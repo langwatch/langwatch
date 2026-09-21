@@ -216,9 +216,9 @@ function TraceSampleShell({
       overline="Traces"
       title={title}
       projectSlug={projectSlug}
-      // The shell's own chip points at the legacy `/messages` index, which is
-      // not where this result lives. The action below goes to the Trace
-      // Explorer WITH the query, which is the only link worth offering here.
+      // The shell's own chip points at the bare `/traces` index, which is not
+      // where this result lives. The action below goes to the Trace Explorer
+      // WITH the query, which is the only link worth offering here.
       deepLink={false}
       actions={
         explorerHref ? <ExplorerAction href={explorerHref} /> : undefined

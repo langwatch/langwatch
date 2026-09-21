@@ -49,14 +49,23 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
 
     // An SSO-born user: user row + OAuth account row, NO credential account.
     const ctx = await auth.$context;
-    const user = await ctx.internalAdapter.createUser({
-      email: "sso-born@example.com",
-      name: "SSO Born",
-      emailVerified: true,
-    });
+    const user = await ctx.internalAdapter.createUser(
+      {
+        email: "sso-born@example.com",
+        name: "SSO Born",
+        emailVerified: true,
+      },
+      // better-auth 1.7 requires the provisioning source, and feeds it to
+      // `user.validateUserInfo`. This user is born from the IdP callback, so
+      // the honest source is the OAuth one naming the provider.
+      { method: "oauth", oauth: { providerId: "auth0" } },
+    );
     await ctx.internalAdapter.createAccount({
       userId: user.id,
       providerId: "auth0",
+      // The issuer `buildGenericOAuthConfigs` pins every generic-OAuth
+      // provider to, which is what better-auth 1.7 keys this row by.
+      issuer: "local:oauth:auth0",
       accountId: "auth0|123",
     });
   });

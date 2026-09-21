@@ -2,7 +2,12 @@
 
 **Date:** 2026-06-23
 
-**Status:** Accepted
+**Status:** Superseded by ADR-094 — the boot sweep described here (and the
+QUEUED sibling sweep in `scenario-orphan-reconciler.ts`) was deleted
+outright. Orphan recovery is now owned by the simulation_run_execution
+process manager's stall watchdog; pre-migration in-flight rows may never
+reach a terminal state, an accepted deployment-window loss. Kept for
+historical context.
 
 ## Context
 

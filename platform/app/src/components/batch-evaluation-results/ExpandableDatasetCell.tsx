@@ -10,6 +10,7 @@ import { useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
+import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
@@ -93,6 +94,8 @@ export function ExpandableDatasetCell({
   const handleClose = useCallback(() => {
     setIsExpanded(false);
   }, []);
+
+  useEscapeKey({ enabled: isExpanded, onEscape: handleClose });
 
   // Copy to clipboard
   const handleCopy = useCallback(() => {

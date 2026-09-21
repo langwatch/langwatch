@@ -660,7 +660,7 @@ describe("governance CLI wrappers — e2e", () => {
 
   describe("budget pre-check", () => {
     describe("when the control-plane returns 402 budget_exceeded", () => {
-      it("exits 2 BEFORE spawning the tool and stamps last_request_increase_url", async () => {
+      it("exits 2 BEFORE spawning the tool and prints the request URL", async () => {
         writeLoggedInConfig();
         writeToolStub("claude", "echo-env");
         cpBudgetResponse = {
@@ -683,14 +683,14 @@ describe("governance CLI wrappers — e2e", () => {
         const combined = (res.stdout ?? "") + (res.stderr ?? "");
         expect(combined).toMatch(/Budget limit reached/);
         expect(combined).toMatch(/\$10\.50.*\$10\.00.*monthly/);
-        expect(combined).toMatch(/langwatch request-increase/);
-        // tool stub did NOT run (no env line in stdout)
-        expect(res.stdout ?? "").not.toMatch(/^ANTHROPIC_BASE_URL=/m);
-        // last_request_increase_url persisted
-        const cfg = readConfig();
-        expect(cfg.last_request_increase_url).toBe(
+        // The box prints the signed request URL itself, so the user reaches
+        // the form in one step.
+        expect(combined).toMatch(/Need urgent access\? Request an increase:/);
+        expect(combined).toContain(
           "http://app.test/orgs/acme/governance/personal-portal?token=abc",
         );
+        // tool stub did NOT run (no env line in stdout)
+        expect(res.stdout ?? "").not.toMatch(/^ANTHROPIC_BASE_URL=/m);
       });
     });
 

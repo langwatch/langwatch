@@ -22,7 +22,7 @@
  */
 import { randomBytes } from "crypto";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 
 export interface Args {
   personalProject: string;
@@ -109,7 +109,7 @@ const SAMPLE_PROMPTS = [
   "Triage this ClickHouse error: code 184 ILLEGAL_AGGREGATION.",
   "Generate an OpenAPI 3 schema from these example payloads.",
   "Plan a 3-step rollout for the persona-aware sidebar gating.",
-  "Explain the difference between event-sourcing folds and reactors.",
+  "Explain the difference between event-sourcing folds and subscribers.",
 ];
 
 const SAMPLE_OUTPUTS = [
@@ -122,7 +122,7 @@ const SAMPLE_OUTPUTS = [
   "argMax(...) inside an outer sum() in the same SELECT level. Wrap in a subquery or rename the inner alias.",
   "Generated. Endpoints inferred from POST/GET pairs; auth scheme assumed Bearer JWT. Review before publishing.",
   "Ship 1: FF-gated for ADMIN. Ship 2: enable for MEMBER read-only. Ship 3: full GA + remove FF.",
-  "Folds materialise state idempotently from the event log; reactors fire side-effects (CH inserts, alerts) once per event.",
+  "Folds materialise state idempotently from the event log; subscribers fire side-effects (CH inserts, alerts) once per event.",
 ];
 
 function parseArgs(argv: string[]): Args {
@@ -239,7 +239,7 @@ export async function runSeedHeavyUsage(
   const traces: SyntheticTrace[] = [];
   for (let i = 0; i < args.rows; i++) traces.push(synthTrace(args));
 
-  const client = await getClickHouseClientForProject(args.personalProject);
+  const client = await getClickHouseClientForTenant(args.personalProject);
   if (!client) throw new Error("ClickHouse client unavailable for tenant");
 
   const traceRows = traces.map((t) => ({

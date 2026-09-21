@@ -3,7 +3,7 @@ title: Troubleshooting and Support
 description: Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
 ---
 
-While using LangWatch, you may encounter issues or have questions that need further assistance. This page outlines the steps you can take to troubleshoot problems and how to reach out for support when you need it.
+If something does not work, start with the troubleshooting steps below. If they do not resolve it, report the issue from your coding agent, open a GitHub issue, email support, or ask on Discord.
 
 ## Troubleshooting Steps
 
@@ -33,7 +33,7 @@ Before reaching out for support, here are a few steps you can take to resolve co
 
 ## Reporting Issues from Coding Agents
 
-Most LangWatch integrations are driven by a coding agent (Claude Code, Codex, Cursor, and others). If you are an agent, or you are watching your agent struggle, the fastest way to get the problem in front of the LangWatch team is:
+If you are a coding agent (Claude Code, Codex, Cursor, and others), or you are watching your agent struggle, the fastest way to get the problem in front of the LangWatch team is:
 
 ```bash
 npx langwatch report
@@ -59,7 +59,7 @@ It works with no login and no API key, and comes in two shapes:
      --summary "langwatch scenario create returned HTTP 500 with ..."
    ```
 
-**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
+**Privacy**: the title, summary and transcript are scrubbed locally by pattern before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IPv4 addresses are replaced with typed markers. Anything no pattern matches is sent as written, including a contact address passed with `--email`. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
 
 **Consent**: agents must ask the user for permission before sending, then pass `--user-approved`.
 
@@ -95,7 +95,3 @@ Our support team aims to respond to inquiries as quickly as possible, typically 
 ## Discord Channel
 
 You can also join our [Discord](https://discord.gg/kT4PhDS2gH) channel and ask questions directly for the community and the core team.
-
-## We're Here to Help
-
-At LangWatch, we're committed to ensuring that your experience is as smooth and beneficial as possible. Whether it's a technical hiccup or a general question, our team is here to support your journey in harnessing the full potential of LLMs with our platform.

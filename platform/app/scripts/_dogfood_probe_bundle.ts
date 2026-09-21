@@ -11,7 +11,7 @@ import { prisma } from "~/server/db";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import {
   eligibleModelProvidersForVk,
-  resolveTraceProject,
+  traceProjectFor,
 } from "~/server/gateway/scopeResolver";
 import { hashVirtualKeySecret } from "~/server/gateway/virtualKey.crypto";
 
@@ -29,7 +29,7 @@ async function probe(secret: string) {
   }
 
   const eligibleMPs = await eligibleModelProvidersForVk(prisma, vk);
-  const traceProject = await resolveTraceProject(prisma, vk);
+  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
 
   const materialiser = new GatewayConfigMaterialiser(prisma, null);
   const bundle = await materialiser.materialise(vk);

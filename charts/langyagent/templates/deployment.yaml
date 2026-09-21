@@ -5,7 +5,7 @@
 {{- fail "langyagent.replicaCount must remain 1 until conversation-sticky routing exists" }}
 {{- end }}
 {{- /* A sandboxed runtime is the posture this workload wants everywhere. The
-       agent runs LLM-driven arbitrary shell (opencode workers spawn
+       agent runs LLM-driven arbitrary shell (workers spawn
        git/gh/npm), so an unset/empty runtimeClassName drops the pod onto the
        node's default runtime (runc, no sandbox) and re-opens the pod->host
        escape surface. `not` catches BOTH the absent key and the empty string.
@@ -27,8 +27,8 @@ metadata:
   name: {{ include "langyagent.fullname" . }}
   labels: {{- include "langyagent.labels" . | nindent 4 }}
 spec:
-  # Single replica on purpose. The manager keeps per-conversation OpenCode
-  # workers in memory keyed by conversationId; a second replica would
+  # Single replica on purpose. The manager keeps per-conversation workers
+  # in memory keyed by conversationId; a second replica would
   # cold-start a fresh worker whenever a follow-up turn lands on the other
   # pod. Scale vertically (resources / LANGY_MAX_WORKERS), not horizontally,
   # until conversation-sticky routing exists. No HPA for the same reason.
@@ -51,11 +51,11 @@ spec:
       # default-ServiceAccount token is pure attack surface: it is projected
       # at /var/run/secrets/kubernetes.io/serviceaccount/token (mode 0644),
       # readable by the worker UID, and never used. Drop it so a compromised
-      # opencode worker cannot read a namespace identity off disk.
+      # worker cannot read a namespace identity off disk.
       automountServiceAccountToken: false
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # Give the manager time to drain workers on SIGTERM (it kills each
-      # OpenCode subprocess in its shutdown handler).
+      # worker subprocess in its shutdown handler).
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
       containers:
         - name: agent

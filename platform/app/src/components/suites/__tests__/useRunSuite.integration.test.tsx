@@ -47,7 +47,7 @@ const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
       },

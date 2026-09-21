@@ -117,6 +117,33 @@ Feature: Policy rules — regex policy on tools, MCP servers, URLs, and models
     Then the response status is 403 model_not_allowed
     And the cause is the policy_rules.models deny (takes precedence over the allowlist membership)
 
+  Rule: A model rule judges the model that runs, not the name the caller typed
+
+    Every other dimension is a property of the body as sent, so it is judged
+    before anything is resolved. A model is not: the caller may name an alias,
+    and the alias decides which model actually runs. Judging the typed name
+    means naming a denied model in an alias walks straight past the rule.
+
+    So the model rules are the one dimension evaluated after resolution, on
+    the resolved id. The deliberate consequence is symmetric: a denied name
+    that resolves to a permitted model is served, because nothing denied ever
+    reaches a provider.
+
+    @unit
+    Scenario: A model deny rule judges the model an alias resolved to
+      Given VK config policy_rules.models.deny = ["^gpt-4.*"]
+      And the key aliases "safe-model" to "gpt-4o"
+      When a request names model "safe-model"
+      Then the request is refused for violating policy
+      And no call is made to any provider
+
+    @unit
+    Scenario: A model rule matches either spelling of the same model
+      Given VK config policy_rules.models.deny = ["^openai/gpt-4.*"]
+      When a request resolves to model "gpt-4o" on provider "openai"
+      Then the request is refused for violating policy
+      And a rule written without the provider prefix refuses the same model
+
   # ─────────────────────────────────────────────────────────────────────────
   # §5. Evaluation semantics — deny-wins, fail-closed on invalid regex
   # ─────────────────────────────────────────────────────────────────────────

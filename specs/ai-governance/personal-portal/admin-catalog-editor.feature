@@ -1,4 +1,4 @@
-Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-catalog
+Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=catalog
   As an org admin curating which AI tools my team can see on /me
   I want a catalog editor with sections per tile type, drag-to-reorder,
   add/edit drawer, and per-team scoping
@@ -6,7 +6,7 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
   database access
 
     The admin editor is the only authoring surface — no API for tile
-    creation outside of /settings/governance/tool-catalog. Reuses Chakra
+    creation outside of /governance/inventory?tab=catalog. Reuses Chakra
     Drawer pattern from existing IngestionSource/AnomalyRule editors.
     Reuses iter109 Chakra multi-select scope picker for team-scope binding.
 
@@ -17,13 +17,13 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
 
   Scenario: page is gated by aiTools:manage permission
     Given user "jane@acme.com" is a MEMBER of "acme" without `aiTools:manage` permission
-    When user "jane@acme.com" navigates to "/settings/governance/tool-catalog"
+    When user "jane@acme.com" navigates to "/governance/inventory?tab=catalog"
     Then the page renders the not-found scene OR the no-permission scene
     And no `api.aiTools.adminList` query is fired
 
   Scenario: admin sees three sections, even when empty
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the page renders three section headings:
       | Coding assistants (0) |
       | Model providers (0)   |
@@ -33,7 +33,7 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
 
   Scenario: starter pack lets the admin choose which tools to publish
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the starter-pack callout lists every starter tool as a checkbox, all checked by default
     When user "carol@acme.com" unchecks "AWS Bedrock" and "Google AI"
     And user "carol@acme.com" imports the starter pack
@@ -42,7 +42,7 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
 
   Scenario: importing the starter pack with no tools selected is not allowed
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     And user "carol@acme.com" unchecks every starter tool
     Then the import action is disabled
 
@@ -55,7 +55,7 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
   @bdd @admin-catalog @starter-pack @integration
   Scenario: a populated catalog still offers the starter pack import behind a toggle
     Given the org-scoped catalog already has entries
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then an "Import starter pack" button is shown instead of the empty-state callout
     And clicking it reveals the starter tool checklist
 
@@ -79,22 +79,37 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
       | coding_assistant | Claude Code    | organization | acme             | true    |
       | coding_assistant | Gemini CLI     | team         | engineering_team | true    |
       | model_provider   | Anthropic      | organization | acme             | false   |
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the Claude Code row shows scope badge "Org-wide"
     And the Gemini CLI row shows scope badge "Team: engineering"
     And the Anthropic row renders dimmed (opacity 0.5) because `enabled=false`
     And the Anthropic row's enable/disable button reads "Enable" (not "Disable")
 
-  Scenario: each row has drag handle, scope badge, edit, and disable buttons
+  Scenario: each card has drag handle, scope badge, and an actions menu
     Given the catalog has at least one entry per section
-    When user "carol@acme.com" hovers over a row
-    Then the row exposes:
+    When user "carol@acme.com" looks at a card
+    Then the card exposes:
       | element           | function                                          |
       | grip-vertical    | drag handle (cursor: grab)                        |
       | display name     | non-interactive label                             |
+      | tile icon        | the same icon the /me portal renders for the tile |
+      | type badge       | "Coding assistant", "Model provider" or "Internal tool" |
       | scope badge      | "Org-wide" or "Team: <name>"                      |
-      | Edit button      | opens edit drawer pre-populated with entry config |
-      | Disable/Enable   | toggles `enabled` field via tRPC mutation         |
+      | actions menu     | Edit / Disable-Enable / Delete                    |
+
+  @bdd @admin-catalog @cards @integration
+  Scenario: the catalog renders cards with only the fields a tile has
+    Given the catalog has a coding assistant "Claude Code" allowing the
+      gateway path but not direct ingestion, a model provider "Anthropic",
+      and an internal tool "Wiki" linking to "https://wiki.example.test"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
+    Then each section lays its tiles out as a grid of cards, one to three
+      across depending on the viewport
+    And the "Claude Code" card carries its type badge, its scope chip and
+      the line "CLI paths: gateway only"
+    And the "Wiki" card carries its link
+    And no card shows a seat count, a licence, or a cost — nothing the tile
+      does not actually store
 
   Scenario: + Add tile opens drawer with section's type pre-selected
     Given the editor is loaded
@@ -168,7 +183,7 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
 
   Scenario: UI-preview banner renders while backend router is unwired
     Given Sergey's `aiToolsCatalogRouter` is not yet shipped
-    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then a yellow/orange banner renders at the top of the page
     And the banner reads "UI preview only" and names the backend dependency
     And mock data renders in the editor

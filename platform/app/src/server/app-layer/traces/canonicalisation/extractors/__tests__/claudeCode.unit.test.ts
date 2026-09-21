@@ -5,6 +5,7 @@ import {
   ClaudeCodeExtractor,
   extractAssistantOutputFromResponseBody,
   extractAssistantTextFromResponseBody,
+  extractSessionTitleFromResponseBody,
   isConversationalQuerySource,
 } from "../claudeCode";
 import {
@@ -344,6 +345,64 @@ describe("extractAssistantOutputFromResponseBody", () => {
   });
 });
 
+describe("extractSessionTitleFromResponseBody", () => {
+  const titleBody = (text: string): string =>
+    JSON.stringify({ content: [{ type: "text", text }] });
+
+  describe("given the title generator's own reply", () => {
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("reads the title out of the JSON text block", () => {
+      expect(
+        extractSessionTitleFromResponseBody(
+          titleBody('{"title": "Fix the flaky session fold test"}'),
+        ),
+      ).toBe("Fix the flaky session fold test");
+    });
+
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("caps a title long enough to be something other than a title", () => {
+      const title = extractSessionTitleFromResponseBody(
+        titleBody(JSON.stringify({ title: "b".repeat(4_000) })),
+      );
+      expect(title).toHaveLength(512);
+    });
+  });
+
+  describe("given a body that is not a title", () => {
+    /** @scenario An unparseable title body sets no title */
+    it("answers null for every deviation instead of guessing", () => {
+      // Unparseable body, and the truncation claude applies past its inline cap.
+      expect(extractSessionTitleFromResponseBody("{not json")).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(
+          '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
+        ),
+      ).toBeNull();
+      // Parseable body whose text is prose, not the title JSON.
+      expect(
+        extractSessionTitleFromResponseBody(titleBody("Done, pushed.")),
+      ).toBeNull();
+      // Right shape, wrong type or empty.
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('{"title": 7}')),
+      ).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('{"title": "   "}')),
+      ).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('["a title"]')),
+      ).toBeNull();
+      // No text block at all.
+      expect(
+        extractSessionTitleFromResponseBody(
+          JSON.stringify({ content: [{ type: "tool_use", name: "Bash" }] }),
+        ),
+      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody("")).toBeNull();
+    });
+  });
+});
+
 describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
   /** @scenario "Claude Code reasoning effort is lifted from the model call log event" */
   it("lifts the effort setting onto the canonical reasoning-effort key for a conversational turn", () => {
@@ -558,5 +617,71 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     expect(
       buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
     ).toBeNull();
+  });
+});
+
+/**
+ * Anthropic bills an hour-long cache entry at twice the input rate against the
+ * 1.25x a five-minute entry costs, and states which is which only in the
+ * response body. That body reaches us on the log stream, never on the span, so
+ * the span side records how much was written and leaves the lifetime to the
+ * log side rather than asserting one it cannot see.
+ */
+describe("ClaudeCodeExtractor.apply cache lifetime", () => {
+  describe("given a claude code model call that wrote to its cache", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("records what was written without qualifying how long it lives", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", cache_creation_tokens: 17854 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(17854);
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
+
+    /** @scenario "An hour-long cache write is recorded only where the provider states it" */
+    it("keeps a lifetime the emitter put on the span itself", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 4000,
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      // Gateway-emitted spans carry the split already. Canonical output merges
+      // over the span rather than replacing it, so writing nothing here is
+      // what leaves the emitter's own 4000 standing.
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+      expect(
+        ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens"),
+      ).toBe(4000);
+    });
+  });
+
+  describe("given a claude code model call that wrote nothing to its cache", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("records no cache lifetime", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", input_tokens: 100 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
   });
 });

@@ -7,13 +7,14 @@ import {
   LuDatabase,
   LuExternalLink,
   LuKeyboard,
+  LuListPlus,
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
+  LuPencil,
   LuPin,
   LuPinOff,
   LuScanSearch,
-  LuShare2,
 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -22,6 +23,8 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { isPreviewTraceId } from "../../../onboarding/data/samplePreviewTraces";
+import { enterTraceEditMode } from "../../../utils/traceEditMode";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -31,18 +34,23 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
-  /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
-  onShare: () => void;
+  /** Sends this trace to a person or an annotation queue. Dialog owned by the header. */
+  onAddToAnnotationQueue: () => void;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
+  /**
+   * Public share view. Correcting a trace is authenticated review work, so the
+   * action is absent rather than shown and refused.
+   */
+  readOnly?: boolean;
 }
 
 /**
  * Single overflow menu that absorbs every secondary drawer action so the
- * top-right action cluster stays at four buttons (Refresh / Maximize /
- * More / Close). High-frequency shortcuts (R, M, Esc) keep their dedicated
- * buttons; the rest hide here behind one click.
+ * top-right action cluster stays small (Share / Refresh / Maximize / More /
+ * Close). High-frequency shortcuts (R, M, Esc) and sharing keep their
+ * dedicated buttons; the rest hide here behind one click.
  */
 export function TraceOverflowMenu({
   traceId,
@@ -52,13 +60,31 @@ export function TraceOverflowMenu({
   dejaViewHref,
   onOpenRawJson,
   onShowShortcuts,
-  onShare,
+  onAddToAnnotationQueue,
   pinned,
   onTogglePinned,
+  readOnly = false,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
   const { project, hasPermission } = useOrganizationTeamProject();
-  const canShare = hasPermission("traces:share");
+  // Queueing a trace for annotation is the same authenticated review work the
+  // correction is, so the share view leaves it out rather than relying on the
+  // reader happening to hold no permission on the project.
+  const canQueueForAnnotation =
+    !readOnly && hasPermission("annotations:create");
+  // Annotating a trace is review work, which is the permission external
+  // reviewers hold, and it is the same one the correction write itself checks.
+  // A sample preview trace is left out: it exists only to show an empty project
+  // what a trace looks like, so a pass over one could never be saved.
+  const canEditTrace =
+    !readOnly &&
+    !isPreviewTraceId(traceId) &&
+    hasPermission("annotations:update");
+
+  const handleEditTrace = useCallback(
+    () => enterTraceEditMode(traceId),
+    [traceId],
+  );
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -168,6 +194,27 @@ export function TraceOverflowMenu({
           </Menu.Item>
         )}
 
+        {canQueueForAnnotation && (
+          <Menu.Item
+            value="add-to-annotation-queue"
+            onClick={onAddToAnnotationQueue}
+          >
+            <HStack gap={2}>
+              <Icon as={LuListPlus} boxSize={3.5} />
+              <Text>Add to annotation queue</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+
+        {canEditTrace && (
+          <Menu.Item value="edit-trace" onClick={handleEditTrace}>
+            <HStack gap={2}>
+              <Icon as={LuPencil} boxSize={3.5} />
+              <Text>Edit trace</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+
         <Menu.Separator />
 
         <Menu.Item value="raw-json" onClick={onOpenRawJson}>
@@ -187,21 +234,12 @@ export function TraceOverflowMenu({
           </Menu.Item>
         )}
 
-        {canShare && (
-          <Menu.Item value="share" onClick={onShare}>
-            <HStack gap={2}>
-              <Icon as={LuShare2} boxSize={3.5} />
-              <Text>Share</Text>
-            </HStack>
-          </Menu.Item>
-        )}
-
         {project && (
           <Menu.Item
             value="pin"
             onClick={handleTogglePin}
             disabled={
-              pinMutation.isLoading || unpinMutation.isLoading || isSharePin
+              pinMutation.isPending || unpinMutation.isPending || isSharePin
             }
           >
             <HStack gap={2}>

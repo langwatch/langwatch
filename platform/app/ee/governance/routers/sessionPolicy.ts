@@ -2,7 +2,7 @@
 
 /**
  * Org-scoped governance policy — admin-tunable knobs flipped from
- * `/settings/governance`:
+ * `/governance`:
  *
  *   - `maxSessionDurationDays` (Phase 8): max lifetime of CLI/device
  *     sessions before re-login is required. 0 = unbounded.
@@ -15,13 +15,13 @@
  */
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { applySessionCeiling } from "~/server/api-key/cli-login-key-reaper";
 
 export const sessionPolicyRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const org = await ctx.prisma.organization.findUnique({
         where: { id: input.organizationId },
@@ -45,12 +45,21 @@ export const sessionPolicyRouter = createTRPCRouter({
         maxSessionDurationDays: z.number().int().min(0).max(365),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.organization.update({
         where: { id: input.organizationId },
         data: { maxSessionDurationDays: input.maxSessionDurationDays },
       });
-      return { ok: true };
+      // The new ceiling applies to the sessions already open, now rather
+      // than at their next refresh: their login keys' expiry is brought
+      // forward and the ones already past it are retired with their ingest
+      // keys.
+      const reaped = await applySessionCeiling({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+        maxSessionDurationDays: input.maxSessionDurationDays,
+      });
+      return { ok: true, reapedSessions: reaped };
     }),
 });

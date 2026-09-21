@@ -19,6 +19,8 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  TraceEventRollup,
+  TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "./types";
@@ -142,6 +144,10 @@ export class SpanStorageService {
    * The partition hint is required rather than optional: the repository read
    * behind this has no unbounded fallback, so a hintless call would widen into
    * a full-table scan instead of staying the cheap point-read it promises.
+   *
+   * Derivation-shaped: the span comes back with empty `events` and `links` —
+   * the read omits those columns because no consumer here reads them and they
+   * are what it fails on. Rendering a span is `getSpanById`'s job, not this.
    */
   async getNormalizedSpanById(
     params: NormalizedSpanByIdParams,
@@ -187,6 +193,19 @@ export class SpanStorageService {
     params: ByTraceId,
   ): Promise<DerivedTraceEvent[]> {
     return this.repository.getTraceEventsByTraceId(params);
+  }
+
+  /**
+   * Event rollups for the trace list's Events column, one query per page.
+   *
+   * Names and counts only, so unlike the per-trace detail read there is no
+   * captured content to gate: redaction blanks event *attributes*, and this
+   * read never asks for them.
+   */
+  async getTraceEventRollupsByTraceIds(
+    params: TraceEventRollupParams,
+  ): Promise<Record<string, TraceEventRollup>> {
+    return this.repository.getTraceEventRollupsByTraceIds(params);
   }
 
   async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {

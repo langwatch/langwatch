@@ -269,6 +269,62 @@ Three consequences worth naming rather than discovering:
   of blocked group is observed in practice, that knob is the follow-up — with
   the retry metrics to size it, per ADR-068's measure-before-you-limit rule.
 
+## Amendment: a bounded derivation is a third staged shape, and the claim-check adopter moves to it (2026-08)
+
+The blocked-group class the previous amendment named as hypothetical was
+observed in production on 2026-08-05: 22 groups parked in `:blocked`, every one
+of them a `codingAgentSpanFactsDispatch` claim-check that had exhausted all 25
+attempts against `Referenced span is not readable yet`, the oldest sitting 7
+hours. The retry budget was not the problem — the jobs used all of it. The
+dependency was.
+
+**The doctrine gains a third option for what staged work may carry.** Until now
+it was a pointer or the whole payload. Add: a **bounded derivation** — the
+subscriber's finished result, carried on the job, when that result is drawn from
+a fixed, closed vocabulary and holds no content.
+
+The boundedness test is what keeps this from being "queue the payload again",
+and it is deliberately structural rather than a byte count:
+
+1. the vocabulary is a **closed list** enumerated in code, not "whatever keys
+   this event happens to carry", so the staged size is bounded by the list's
+   length and not by the payload's;
+2. the values are **scalars only** — lengths, ids, names, counters — so content
+   (prompts, replies, tool output) cannot ride even when a listed key exists;
+3. the canonical row remains the only place content is readable from.
+
+`CODING_AGENT_CONTRIBUTION_KEYS` and `contributionFactsSchema` already satisfy
+all three, and the *log* contribution path has always staged exactly this shape.
+The span path taking a pointer instead was the inconsistency, not the rule.
+
+**What this buys.** The subscriber becomes self-contained again — the property
+the previous amendment recorded losing. No sibling-write race, no store
+dependency, no retry against a projection this subscriber does not own, and the
+class of blocked group above stops being reachable. Payload cost is unchanged in
+kind: a derivation off a closed list is cheap for the same reason a pointer is.
+
+**What it does not buy.** Invariant 1 is still unmet — a carried derivation
+declares no byte size either, so phase 2's byte-bounded stages and phase 3's
+grant pool remain untouched. This narrows one adopter's failure surface; it is
+not progress through the sequencing above.
+
+**Deploy order, and this time enforced.** The previous amendment recorded the
+consumer-first rule and then lost it by merging both halves in one commit. The
+move to a carried derivation is a new staged type and carries the identical
+hazard, so it ships as two releases: **R1 teaches the handler the new shape and
+produces nothing new; R2 flips the producer.** R1 also closes the hole that made
+the hazard silent — the handler's fall-through now distinguishes "an event kind
+I know and decline" (completes quietly, the legitimate case) from "a shape I
+cannot read at all" (throws into the retry). A pre-R1 worker still swallows an
+R2 job silently, which is exactly why R2 must not ship until R1 is everywhere;
+but from R1 onward the failure mode is a retry rather than a loss.
+
+The claim-check mechanism itself stays — `span_referenced` remains the right
+shape for a subscriber whose result is *not* a bounded derivation, and the
+handler keeps resolving it after R2 so the references staged before the flip
+drain. What changes is that a claim-check is no longer the default answer for a
+subscriber that only ever wanted a handful of scalars.
+
 ## References
 
 - **Behavioural contract:** [specs/event-sourcing/payload-cost.feature](../../../specs/event-sourcing/payload-cost.feature) (phase 1 scenarios; phases 2–4 recorded as planned scenarios)

@@ -12,7 +12,7 @@
  *
  * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
  * checks the caller's organization permissions BEFORE the service call and
- * returns FORBIDDEN otherwise. Mirrors `hasOrganizationPermission` from
+ * returns FORBIDDEN otherwise. Mirrors `probeOrganizationPermission` from
  * src/server/api/rbac.ts. Services trust the surface for audit attribution
  * but DO NOT gate access — gating is the entrypoint's job.
  *
@@ -26,8 +26,8 @@
  * Docs: docs/ai-governance/mcp.mdx
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { type ZodRawShape, z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -51,9 +51,15 @@ type McpServerLike = {
   ): unknown;
 };
 
+import { createLogger } from "@langwatch/observability";
+
+import { auditLog } from "../../ee/audit-log/auditLog";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
-import { hasOrganizationPermission, type Permission } from "../server/api/rbac";
+import type { Permission } from "../server/api/rbac";
+import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
+
+const logger = createLogger("langwatch:mcp:governance-tools");
 
 const SURFACE = "mcp" as const;
 
@@ -115,9 +121,8 @@ export function registerGovernanceMcpTools(
     if (!rctx.callerUserId) {
       return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
     }
-    const allowed = await hasOrganizationPermission(
+    const allowed = await probeOrganizationPermission(
       {
-        prisma: ctx.prisma,
         session: { user: { id: rctx.callerUserId } } as any,
       },
       rctx.organizationId,
@@ -137,9 +142,8 @@ export function registerGovernanceMcpTools(
     // since the legacy MCP auth path is project-scoped and the org is
     // implicit. Only enforce permission when a userId is present.
     if (!rctx.callerUserId) return null;
-    const allowed = await hasOrganizationPermission(
+    const allowed = await probeOrganizationPermission(
       {
-        prisma: ctx.prisma,
         session: { user: { id: rctx.callerUserId } } as any,
       },
       rctx.organizationId,
@@ -319,7 +323,7 @@ export function registerGovernanceMcpTools(
       }
       const denied = await requireRead(r, "organization:view");
       if (denied) return text(denied);
-      const rows = await ingestionKeyService.listForPersonalProject({
+      const rows = await ingestionKeyService.list({
         userId: r.callerUserId,
         organizationId: r.organizationId,
       });
@@ -329,7 +333,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_ingestion_keys_mint",
-    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the sk-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
+    "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working. source_type must match a published ingestion template named by template_id; a tool the LangWatch CLI wraps (claude_code, codex, gemini, opencode, copilot_*) is refused here, because its key is minted by the CLI on the machine that runs it and retired with that machine's session. Requires OAuth-authenticated session + organization:view.",
     {
       source_type: z.string(),
       template_id: z.string().optional(),
@@ -338,13 +342,59 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "organization:view");
       if (denied) return text(denied);
-      const result = await ingestionKeyService.ensureForPersonalProject({
+      // Create-only: an agent asking for a key must not revoke the key every
+      // other machine under this login is exporting with. The explicit
+      // rotate lives on the /me tile.
+      const result = await ingestionKeyService.mint({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         sourceType: source_type,
         ingestionTemplateId: template_id ?? null,
       });
+      // The call surface lives in `metadata.surface`, the field every other
+      // governance mutation stamps and incident response queries. The mint is
+      // not held up by the audit write: a write that fails must not swallow a
+      // token this response shows exactly once.
+      void auditLog({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        action: "ingestionKey.mint",
+        args: { apiKeyId: result.apiKeyId, sourceType: source_type },
+        metadata: { surface: SURFACE },
+      }).catch((error: unknown) =>
+        logger.warn(
+          { error },
+          "could not write the ingestionKey.mint audit row",
+        ),
+      );
       return json(result);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_keys_revoke",
+    "Revoke one of the caller's own ingestion keys by api_key_id (from governance_ingestion_keys_list). The token stops authorizing trace writes from that moment; past traces stay. Idempotent: a key already revoked stays revoked. Another person's key answers ingestion_key_not_found. Requires OAuth-authenticated session + organization:view.",
+    { api_key_id: z.string() },
+    async ({ api_key_id }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "organization:view");
+      if (denied) return text(denied);
+      await ingestionKeyService.revoke({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        apiKeyId: api_key_id,
+      });
+      // A revoke reports success only once its audit row is durable: unlike
+      // the mint there is nothing to lose by failing here, and the row is the
+      // record of who retired the key.
+      await auditLog({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        action: "ingestionKey.revoke",
+        args: { apiKeyId: api_key_id },
+        metadata: { surface: SURFACE },
+      });
+      return text(`revoked ${api_key_id}`);
     },
   );
 }

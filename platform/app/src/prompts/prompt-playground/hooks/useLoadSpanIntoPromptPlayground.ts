@@ -236,7 +236,7 @@ async function tryOpenExistingPromptTab({
   promptVersionNumber?: number | null;
   promptTag?: string | null;
   projectId: string;
-  trpc: ReturnType<typeof api.useContext>;
+  trpc: ReturnType<typeof api.useUtils>;
 }): Promise<{
   formValues: PromptConfigFormValues;
   versionNumber: number;
@@ -254,7 +254,6 @@ async function tryOpenExistingPromptTab({
       toaster.create({
         title: "Prompt not found",
         description: `The prompt "${promptHandle}" was not found in this project. Opening from trace data instead.`,
-        meta: { closable: true },
       });
       return null;
     }
@@ -270,7 +269,6 @@ async function tryOpenExistingPromptTab({
       toaster.create({
         title: "Version not found",
         description: `Version ${promptVersionNumber} of "${promptHandle}" was not found. Opened latest version (${prompt.version}) instead.`,
-        meta: { closable: true },
       });
     }
 
@@ -280,13 +278,11 @@ async function tryOpenExistingPromptTab({
       toaster.create({
         title: "Tag not resolved",
         description: `Tag "${promptTag}" could not be resolved for "${promptHandle}". Opening from trace data instead.`,
-        meta: { closable: true },
       });
     } else {
       toaster.create({
         title: "Prompt not found",
         description: `Could not load prompt "${promptHandle}". Opening from trace data instead.`,
-        meta: { closable: true },
       });
     }
     return null;
@@ -346,7 +342,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
     ({ addTab, updateTabData, removeTab }) => ({
       addTab,

@@ -93,7 +93,7 @@ vi.mock("../../components/datasets/CopyDatasetDialog", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
+    useUtils: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
     dataset: {
       getAll: { useQuery: () => datasetsQueryRef.current },
       deleteById: { useMutation: () => ({ mutate: vi.fn() }) },

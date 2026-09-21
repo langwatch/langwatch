@@ -138,9 +138,15 @@ Re-read trace/message content at the execution boundary from its canonical
 store. This makes the persisted schemas a reviewable proof that customer
 content is not copied into Postgres.
 
-## Existing reactors
+## There is no third primitive
 
-`withReactor` still exists for current plain post-projection reactors. Do not
-mechanically migrate unrelated reactors while changing a domain. New code
-should choose deliberately between `withSubscriber` and `withProcessManager`;
-the removed `withOutbox` primitive is not an option.
+`withReactor` is gone (ADR-098). Post-event work has exactly two shapes, and a
+change that adds one picks between them deliberately: `withSubscriber` for
+best-effort side effects, `withProcessManager` for stake-sensitive
+orchestration. The removed `withOutbox` primitive is not an option either.
+
+The word "reactor" survives in three places on purpose, and none of them is a
+primitive you can register: the `es_reactor_*` metrics and their `reactor_name`
+label, the `fold/<projection>/reactor/<name>` queue job path, and the
+`reactor_dispatch` ops stage. Those are contracts that dashboards and in-flight
+jobs read, so they outlive the vocabulary.

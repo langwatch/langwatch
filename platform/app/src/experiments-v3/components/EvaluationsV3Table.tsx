@@ -7,7 +7,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { nanoid } from "nanoid";
 import {
   useCallback,
   useEffect,
@@ -35,11 +34,12 @@ import type {
   Field,
   HttpComponentConfig,
 } from "~/optimization_studio/types/dsl";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
+import { newTargetId } from "../actions/transforms/addTarget";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
 import { useDatasetSync } from "../hooks/useDatasetSync";
@@ -51,6 +51,7 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
+import { useSyncWorkflowTargetFields } from "../hooks/useSyncWorkflowTargetFields";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -67,6 +68,7 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
+import { connectedTargetFields } from "../utils/connectedAgentTarget";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -195,12 +197,24 @@ type EvaluationsV3TableProps = {
   isLoadingDatasets?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /**
+   * "Optimize this prompt": hand the column to Langy. The page owns the
+   * hook (it is the Langy integration point); undefined hides the menu item.
+   */
+  onOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
   disableVirtualization = false,
+  onOptimizeTarget,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
   // Serializable drawer URL params (evaluatorType, evaluatorId, …). Read here so
@@ -209,10 +223,14 @@ export function EvaluationsV3Table({
   const drawerParams = useDrawerParams();
   const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
+
+  // Re-read what each workflow agent target reads and produces from its
+  // workflow, which owns those fields and can change without the workbench.
+  useSyncWorkflowTargetFields();
 
   const {
     datasets,
@@ -234,6 +252,7 @@ export function EvaluationsV3Table({
     setColumnWidths,
     toggleColumnVisibility,
     addTarget,
+    duplicateTarget,
     updateTarget,
     updateTargetComparison,
     removeTarget,
@@ -275,6 +294,7 @@ export function EvaluationsV3Table({
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
       addTarget: state.addTarget,
+      duplicateTarget: state.duplicateTarget,
       updateTarget: state.updateTarget,
       updateTargetComparison: state.updateTargetComparison,
       removeTarget: state.removeTarget,
@@ -416,15 +436,33 @@ export function EvaluationsV3Table({
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
-    (savedAgent: TypedAgent) => {
+    (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
+
+      // A connected agent runs in the customer's own process, so the column
+      // reads the turn to send and the parameters the function declares
+      // rather than the fields of a node.
+      if (savedAgent.type === "connected") {
+        const { inputs, outputs } = connectedTargetFields(savedAgent.config);
+        addOrReplaceTarget({
+          id: newTargetId(),
+          type: "agent",
+          agentType: "connected",
+          dbAgentId: savedAgent.id,
+          inputs,
+          outputs,
+          mappings: {},
+        });
+        closeDrawer();
+        return;
+      }
 
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
       const isHttpAgent =
         savedAgent.type === "http" ||
         (config.url !== undefined && config.bodyTemplate !== undefined);
 
-      // Convert TypedAgent to TargetConfig format (agent type)
+      // Convert the saved agent to TargetConfig format (agent type)
       // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
       // For code/workflow agents, use config.inputs directly
       let targetInputs: Field[];
@@ -449,17 +487,34 @@ export function EvaluationsV3Table({
         ];
       }
 
+      // A workflow agent keeps no inputs or outputs on its own config, its
+      // Studio graph does, and the API derives them from that graph. Once that
+      // derivation resolves it is the whole answer, empty lists included:
+      // falling back to the "one field called output" below is what used to
+      // hide every result but the first from the evaluator's variable picker.
+      // Every other kind keeps its fields on its own config, so an empty list
+      // there means nothing was saved and the fallbacks still apply.
+      const { inputFields, outputFields, fieldsResolved } = savedAgent;
+      const derivationIsFinal =
+        savedAgent.type === "workflow" && fieldsResolved;
+
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`, // Generate unique ID for the workbench
+        id: newTargetId(),
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent
           ? "http"
           : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: targetInputs,
-        outputs: (config.outputs as TargetConfig["outputs"]) ?? [
-          { identifier: "output", type: "str" },
-        ],
+        inputs:
+          derivationIsFinal || inputFields.length > 0
+            ? inputFields
+            : targetInputs,
+        outputs:
+          derivationIsFinal || outputFields.length > 0
+            ? outputFields
+            : ((config.outputs as TargetConfig["outputs"]) ?? [
+                { identifier: "output", type: "str" },
+              ]),
         mappings: {},
         httpConfig, // Only set for HTTP agents
       };
@@ -522,7 +577,7 @@ export function EvaluationsV3Table({
       };
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`,
+        id: newTargetId(),
         type: "evaluator",
         targetEvaluatorId: evaluator.id,
         inputs,
@@ -563,7 +618,7 @@ export function EvaluationsV3Table({
     }) => {
       // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const targetId = `target_${Date.now()}`;
+      const targetId = newTargetId();
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
@@ -784,17 +839,19 @@ export function EvaluationsV3Table({
   // Handler for duplicating a target
   const handleDuplicateTarget = useCallback(
     (target: TargetConfig) => {
-      const newTarget: TargetConfig = {
-        ...target,
-        id: `target-${nanoid(8)}`,
-      };
-      addTarget(newTarget);
+      const duplicatedId = duplicateTarget({ targetId: target.id });
+      if (!duplicatedId) return;
+      // Read the copy back: the store wired it up (its own mappings plus every
+      // evaluator's mappings for it), so this is not the target we passed in.
+      const duplicated = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === duplicatedId);
       // Open the prompt editor for the duplicated target if it's a prompt
-      if (newTarget.type === "prompt") {
-        void openTargetEditor(newTarget);
+      if (duplicated?.type === "prompt") {
+        void openTargetEditor(duplicated);
       }
     },
-    [addTarget, openTargetEditor],
+    [duplicateTarget, openTargetEditor],
   );
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
@@ -895,7 +952,7 @@ export function EvaluationsV3Table({
           useEvaluationsV3Store.getState().activeDatasetId;
 
         // Create target with pending mappings
-        const targetId = `target_${Date.now()}`;
+        const targetId = newTargetId();
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",
@@ -1472,6 +1529,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleOptimizeTarget: onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
@@ -1502,6 +1560,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,

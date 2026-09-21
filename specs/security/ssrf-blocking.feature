@@ -1,15 +1,21 @@
-Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
+Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
   As a self-hosted operator or LangWatch SaaS administrator
   I want a single, explicit env var to control whether outbound HTTP calls
   to private/local networks are blocked across both the TypeScript app and
-  the Python NLP service
+  the Go NLP engine
   So that I can either reach internal services on-prem (toggle off) or
   enforce SSRF protection on multi-tenant SaaS (toggle on) without relying
   on indirect signals like NODE_ENV or IS_SAAS.
 
+  The toggle is only worth having if every egress path reads it. The Go engine
+  refused private addresses unconditionally for a while, ignoring the variable
+  its own config declared, which is how a self-hosted install could permit an
+  internal endpoint everywhere except the one path that actually runs agents.
+
   Implementations:
-    - TS: platform/app/src/utils/ssrfProtection.ts (httpProxyRouter, scenario runner)
-    - Python: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
+    - TS: platform/app/src/utils/ssrfProtection.ts (scenario runner, webhooks)
+    - Go: services/nlpgo/app/engine/blocks/httpblock/ssrf.go (workflow HTTP
+      nodes, which is what an HTTP agent runs as, and remote attachments)
 
   # ============================================================================
   # Default behavior — toggle unset/false
@@ -32,10 +38,10 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
         | TS     | 192.168.1.1 |
         | TS     | 127.0.0.1   |
         | TS     | localhost   |
-        | Python | 10.0.5.3    |
-        | Python | 192.168.1.1 |
-        | Python | 127.0.0.1   |
-        | Python | localhost   |
+        | Go     | 10.0.5.3    |
+        | Go     | 192.168.1.1 |
+        | Go     | 127.0.0.1   |
+        | Go     | localhost   |
 
     @unit
     Scenario Outline: <impl> allows private IP literals when BLOCK_LOCAL_HTTP_CALLS is "false"
@@ -46,7 +52,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
   # ============================================================================
   # Enabled behavior — toggle true
@@ -71,12 +77,12 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
         | TS     | 0.0.0.0     |
         | TS     | localhost   |
         | TS     | ::1         |
-        | Python | 127.0.0.1   |
-        | Python | 10.0.5.3    |
-        | Python | 192.168.1.1 |
-        | Python | 0.0.0.0     |
-        | Python | localhost   |
-        | Python | ::1         |
+        | Go     | 127.0.0.1   |
+        | Go     | 10.0.5.3    |
+        | Go     | 192.168.1.1 |
+        | Go     | 0.0.0.0     |
+        | Go     | localhost   |
+        | Go     | ::1         |
 
     @unit
     Scenario Outline: <impl> blocks DNS rebinding to private IPs when BLOCK_LOCAL_HTTP_CALLS is "true"
@@ -88,7 +94,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
   # ============================================================================
   # Allowlist — same semantics on both sides
@@ -108,7 +114,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
     @unit
     Scenario Outline: <impl> allowlist works in production NODE_ENV
@@ -121,7 +127,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
     @unit
     Scenario Outline: <impl> hostname not in allowlist is still blocked
@@ -133,7 +139,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
   # ============================================================================
   # Cloud metadata — ALWAYS blocked, no escape
@@ -153,8 +159,8 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
         | impl   | metadata_host           |
         | TS     | 169.254.169.254         |
         | TS     | metadata.google.internal |
-        | Python | 169.254.169.254         |
-        | Python | metadata.google.internal |
+        | Go     | 169.254.169.254         |
+        | Go     | metadata.google.internal |
 
     @unit
     Scenario Outline: <impl> blocks cloud metadata even when host is in ALLOWED_PROXY_HOSTS
@@ -166,7 +172,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Examples:
         | impl   |
         | TS     |
-        | Python |
+        | Go     |
 
   # ============================================================================
   # Migration — IS_SAAS no longer drives SSRF blocking

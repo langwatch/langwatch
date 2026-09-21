@@ -79,7 +79,7 @@ export const PushToCopiesDialog = ({
           copyIds: Array.from(selectedCopyIds),
         });
       }}
-      pushLoading={pushToCopies.isLoading}
+      pushLoading={pushToCopies.isPending}
       onSuccess={() => setSelectedCopyIds(new Set())}
     />
   );

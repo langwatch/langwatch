@@ -1,9 +1,15 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
-import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
+import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
+import {
+  deploymentOffersPasskeys,
+  deploymentOffersTwoStepVerification,
+  resolveSignInMethodPolicy,
+} from "~/server/app-layer/identity/signin-method-policy";
+import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 import { env } from "../../../env.mjs";
-import { skipPermissionCheck } from "../rbac";
+import { hasEmailProvider } from "../../mailer/providers";
 import { publicProcedure } from "../trpc";
 
 const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
@@ -17,9 +23,20 @@ const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
 
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
-  .use(skipPermissionCheck)
+  .noPermission({
+    reason: "exposes only the PUBLIC_* env allowlist; no tenant data",
+  })
   .query(async ({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
+
+    // Resolved before the object literal so this endpoint asks the license
+    // gate exactly ONCE: the policy's own read answers `federationLicensed`,
+    // and the provider read below only runs when the gate allowed — at which
+    // point the gate's memo is warm and it costs nothing. The gate evicts its
+    // memo on rejection (self-healing), so a second unconditional read here
+    // would recompute a licensing scan per unauthenticated request exactly
+    // when the licensing store is struggling.
+    const signInPolicy = await resolveSignInMethodPolicy();
 
     const publicEnvVars = {
       BASE_HOST: env.BASE_HOST,
@@ -27,12 +44,42 @@ export const publicEnvRouter = publicProcedure
       // the sign-in page renders the email form and never auto-redirects to
       // a disabled IdP. `resolveAuthProvider()` is the single source of
       // truth — never read `env.NEXTAUTH_PROVIDER` directly here.
-      NEXTAUTH_PROVIDER: await resolveAuthProvider(),
+      NEXTAUTH_PROVIDER: signInPolicy.federationLicensed
+        ? await resolveAuthProvider()
+        : "email",
+      // Whether this deployment mounted the two-factor plugin at boot (D06).
+      // A derived boolean rather than the raw setting: the only thing a
+      // browser may act on is "is there an endpoint behind the button", and
+      // offering a setup where the plugin was never registered is an offer we
+      // cannot honour. Same read the plugin registration makes.
+      MFA_ENROLLMENT_OPEN: deploymentOffersTwoStepVerification(),
+      // Whether this deployment mounted the passkey plugin at boot. Same
+      // contract as MFA_ENROLLMENT_OPEN: a browser only acts on "is there an
+      // endpoint behind the button", and this is the same read the plugin
+      // registration and the method policy make.
+      PASSKEYS_ENABLED: deploymentOffersPasskeys(),
+      // The federated providers this deployment actually offers — mounted AND
+      // licensed — as the sign-in method policy's own answer, so the
+      // linked-accounts offer and the sign-in rail can never disagree. Ids
+      // only: the policy's method objects carry nothing else a browser needs.
+      //
+      // LESS the connection bridge's branded ids: they are sign-in buttons,
+      // not providers — the dial maps them back to `auth0` — and the
+      // linked-accounts screen's Connect flow dials `linkAccount`, which has
+      // no bridge mapping and would ship a provider better-auth never
+      // mounted. A brokered identity links (and shows) through the generic
+      // provider, exactly as before the bridge.
+      SIGNIN_FEDERATED_PROVIDERS: signInPolicy.defaultMethods
+        .filter(
+          (method) =>
+            method.kind === "federated" &&
+            auth0BridgeConnectionOf(method.id) === null,
+        )
+        .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 
-      HAS_EMAIL_PROVIDER_KEY:
-        !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
+      HAS_EMAIL_PROVIDER_KEY: hasEmailProvider(),
       IS_SAAS: env.IS_SAAS,
       // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
       // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see

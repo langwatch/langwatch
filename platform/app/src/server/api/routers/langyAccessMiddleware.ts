@@ -28,14 +28,14 @@ export const refuseDemoProject: PermissionMiddleware<{
 /**
  * tRPC adapter for the authoritative Langy access decision (`hasLangyAccess`).
  *
- * Applied to every customer-facing Langy router (`langy`, `langyGithub`,
- * `langyEgress`) so the internal-only gate lives in exactly one decision. A
- * denied caller gets `NOT_FOUND`, never `FORBIDDEN`: the gate must not double as
- * a probe for whether Langy exists for the account. It reads whichever scope the
- * procedure carries — `projectId` (langy, langyEgress) or `organizationId`
- * (langyGithub) — so project- and org-scoped rollout rules both resolve. Chain
- * it AFTER the router's own permission/membership middleware so an ordinary
- * caller is placed by RBAC first and gated by the rollout second.
+ * Applied to every customer-facing Langy router (`langy`, `langyEgress`) so the
+ * internal-only gate lives in exactly one decision. A denied caller gets
+ * `NOT_FOUND`, never `FORBIDDEN`: the gate must not double as a probe for
+ * whether Langy exists for the account. It reads whichever scope the procedure
+ * carries, `projectId` or `organizationId`, so project- and org-scoped rollout
+ * rules both resolve. Chain it AFTER the router's own permission/membership
+ * middleware so an ordinary caller is placed by RBAC first and gated by the
+ * rollout second.
  */
 export const enforceLangyAccess: PermissionMiddleware<{
   projectId?: string;
@@ -49,7 +49,7 @@ export const enforceLangyAccess: PermissionMiddleware<{
   //
   // Resolved from the project instead (cached, ten minutes), so both rule kinds
   // resolve on every surface. An explicit organizationId on the input still
-  // wins: `langyGithub` is org-scoped and has the real one.
+  // wins, an org-scoped procedure has the real one.
   const organizationId =
     input.organizationId ??
     (input.projectId

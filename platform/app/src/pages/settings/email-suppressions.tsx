@@ -52,104 +52,103 @@ function EmailSuppressionsPage({
   });
 
   return (
-    <VStack
-      align="stretch"
-      gap={6}
-      width="full"
-      maxW="container.lg"
-      padding={6}
-    >
-      <VStack align="start" gap={1}>
-        <Heading size="lg">Email Suppressions</Heading>
-        <Text color="fg.muted">
-          Recipients who unsubscribed from this project&apos;s trigger
-          notifications. Removing an entry resumes delivery to that address.
-        </Text>
-      </VStack>
+    <SettingsLayout>
+      <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
+        <VStack align="start" gap={1} width="full" marginTop={2}>
+          <Heading as="h2" fontSize="xl">
+            Email Suppressions
+          </Heading>
+          <Text color="fg.muted">
+            Recipients who unsubscribed from this project&apos;s trigger
+            notifications. Removing an entry resumes delivery to that address.
+          </Text>
+        </VStack>
 
-      <Card.Root>
-        <Card.Body>
-          {suppressions.isLoading ? (
-            <HStack justify="center" padding={8}>
-              <Spinner />
-            </HStack>
-          ) : suppressions.isError ? (
-            <VStack align="center" gap={3} padding={8}>
-              <Text color="fg.error">
-                Could not load suppressions. Please try again.
-              </Text>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void suppressions.refetch()}
-                loading={suppressions.isRefetching}
-              >
-                Retry
-              </Button>
-            </VStack>
-          ) : !suppressions.data || suppressions.data.length === 0 ? (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <MailX />
-                </EmptyState.Indicator>
-                <EmptyState.Title>No suppressions yet</EmptyState.Title>
-                <EmptyState.Description>
-                  When a recipient unsubscribes from a notification, they appear
-                  here.
-                </EmptyState.Description>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          ) : (
-            <Table.Root size="sm">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                  <Table.ColumnHeader>Date</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {suppressions.data.map((row) => (
-                  <Table.Row key={row.id}>
-                    <Table.Cell>{row.email}</Table.Cell>
-                    <Table.Cell>
-                      {row.triggerId == null ? (
-                        <Badge colorPalette="red">All notifications</Badge>
-                      ) : (
-                        <Badge colorPalette="gray">
-                          {row.triggerName ?? "Notification"}
-                        </Badge>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {new Date(row.createdAt).toLocaleDateString()}
-                    </Table.Cell>
-                    <Table.Cell textAlign="end">
-                      {canManage && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          loading={
-                            remove.isPending && remove.variables?.id === row.id
-                          }
-                          onClick={() =>
-                            remove.mutate({ projectId, id: row.id })
-                          }
-                          aria-label="Remove suppression"
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      )}
-                    </Table.Cell>
+        <Card.Root width="full">
+          <Card.Body>
+            {suppressions.isLoading ? (
+              <HStack justify="center" padding={8}>
+                <Spinner />
+              </HStack>
+            ) : suppressions.isError ? (
+              <VStack align="center" gap={3} padding={8}>
+                <Text color="fg.error">
+                  Could not load suppressions. Please try again.
+                </Text>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void suppressions.refetch()}
+                  loading={suppressions.isRefetching}
+                >
+                  Retry
+                </Button>
+              </VStack>
+            ) : !suppressions.data || suppressions.data.length === 0 ? (
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <MailX />
+                  </EmptyState.Indicator>
+                  <EmptyState.Title>No suppressions yet</EmptyState.Title>
+                  <EmptyState.Description>
+                    When a recipient unsubscribes from a notification, they
+                    appear here.
+                  </EmptyState.Description>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            ) : (
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Email</Table.ColumnHeader>
+                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                    <Table.ColumnHeader>Date</Table.ColumnHeader>
+                    <Table.ColumnHeader />
                   </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          )}
-        </Card.Body>
-      </Card.Root>
-    </VStack>
+                </Table.Header>
+                <Table.Body>
+                  {suppressions.data.map((row) => (
+                    <Table.Row key={row.id}>
+                      <Table.Cell>{row.email}</Table.Cell>
+                      <Table.Cell>
+                        {row.triggerId == null ? (
+                          <Badge colorPalette="red">All notifications</Badge>
+                        ) : (
+                          <Badge colorPalette="gray">
+                            {row.triggerName ?? "Notification"}
+                          </Badge>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {new Date(row.createdAt).toLocaleDateString()}
+                      </Table.Cell>
+                      <Table.Cell textAlign="end">
+                        {canManage && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            loading={
+                              remove.isPending &&
+                              remove.variables?.id === row.id
+                            }
+                            onClick={() =>
+                              remove.mutate({ projectId, id: row.id })
+                            }
+                            aria-label="Remove suppression"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            )}
+          </Card.Body>
+        </Card.Root>
+      </VStack>
+    </SettingsLayout>
   );
 }

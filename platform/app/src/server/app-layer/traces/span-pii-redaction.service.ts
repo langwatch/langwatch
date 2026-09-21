@@ -13,6 +13,7 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
+import { isHeldOutIdentifierAttribute } from "~/server/data-privacy/redaction/identifierHoldout";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
@@ -34,6 +35,7 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
 
 import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpAnyValue,
@@ -371,19 +373,31 @@ export class OtlpSpanPiiRedactionService {
     }
   }
 
-  private redactRecordNative(
-    record: Record<string, string>,
-    policy: ResolvedDataPrivacy,
+  /**
+   * `record` may be keyed by an addressing path rather than by the attribute
+   * name (the log and metric pipelines flatten a decoded OTLP tree into one).
+   * `attributeNames` restores the real name for the sensitive-NAME rules, which
+   * a path can never satisfy; without it those rules silently never fire.
+   */
+  private redactRecordNative({
+    record,
+    policy,
+    compiled,
+    attributeNames,
+  }: {
+    record: Record<string, string>;
+    policy: ResolvedDataPrivacy;
     compiled: {
       secrets: readonly RegExp[] | undefined;
       piiExceptions: readonly RegExp[] | undefined;
-    },
-  ): void {
+    };
+    attributeNames?: Record<string, string>;
+  }): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
       if (value && value.length > 0) {
         const { text } = redactAttributeNative({
-          key,
+          key: attributeNames?.[key] ?? key,
           value,
           policy,
           compiledSecretPatterns: compiled.secrets,
@@ -434,6 +448,7 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     policy: ResolvedDataPrivacy,
   ): void {
@@ -448,8 +463,17 @@ export class OtlpSpanPiiRedactionService {
       });
       if (text !== log.body) log.body = text;
     }
-    this.redactRecordNative(log.attributes, policy, compiled);
-    this.redactRecordNative(log.resourceAttributes, policy, compiled);
+    this.redactRecordNative({
+      record: log.attributes,
+      policy,
+      compiled,
+      attributeNames: log.attributeNames,
+    });
+    this.redactRecordNative({
+      record: log.resourceAttributes,
+      policy,
+      compiled,
+    });
   }
 
   /**
@@ -637,6 +661,13 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      /**
+       * The real OTLP attribute name behind each key of `attributes`, where the
+       * two differ. Declared here because the native pass reads it: without it
+       * the public signature promises less than the method actually honours,
+       * and a caller building the argument inline could not pass it at all.
+       */
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -661,6 +692,7 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -676,10 +708,13 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
+    // The body is free text, not an attribute value, so no hold-out applies:
+    // an identifier written in a sentence sits next to content that may well
+    // hold personal data.
     if (log.body) {
       batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
-    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.attributes, log.attributeNames);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -694,6 +729,7 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -705,12 +741,17 @@ export class OtlpSpanPiiRedactionService {
     }
     if (this.nativePassActive(native.policy)) {
       const compiled = this.compileNativePatterns(native.policy);
-      this.redactRecordNative(metric.attributes, native.policy, compiled);
-      this.redactRecordNative(
-        metric.resourceAttributes,
-        native.policy,
+      this.redactRecordNative({
+        record: metric.attributes,
+        policy: native.policy,
         compiled,
-      );
+        attributeNames: metric.attributeNames,
+      });
+      this.redactRecordNative({
+        record: metric.resourceAttributes,
+        policy: native.policy,
+        compiled,
+      });
     }
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
@@ -725,6 +766,7 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -740,7 +782,7 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
-    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
     this.collectRecordEntries(batch, metric.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -758,7 +800,13 @@ export class OtlpSpanPiiRedactionService {
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_strict_presidio_redaction_disabled",
-      { distinctId: "span-pii-service", defaultValue: false },
+      {
+        distinctId: "span-pii-service",
+        defaultValue: false,
+        // A global kill switch for the whole service, not for one tenant.
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
+      },
     );
     if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;
@@ -815,14 +863,39 @@ export class OtlpSpanPiiRedactionService {
     };
   }
 
+  /**
+   * The log and metric counterpart of {@link collectStringEntries}: the same
+   * identifier hold-out, over a flattened record rather than an OTLP list.
+   *
+   * `attributeNames` restores the real attribute name where the record is keyed
+   * by an addressing path instead, because the reserved-name half of the
+   * hold-out reads the name and a path would never match one.
+   *
+   * It is passed for `attributes` and deliberately not for `resourceAttributes`
+   * at every call site. The map belongs to the attribute record: it is keyed by
+   * that record's keys, so handing it to the resource record would resolve a
+   * resource key against an unrelated attribute path wherever the two collide.
+   * Resource attributes are keyed by their own names already and need no map.
+   * If one is ever needed, it has to be a SEPARATE field — reusing this one is
+   * the bug this note exists to prevent.
+   */
   private collectRecordEntries(
     batch: RedactionBatch,
     record: Record<string, string>,
+    attributeNames?: Record<string, string>,
   ): void {
     for (const key of Object.keys(record)) {
-      if (record[key]) {
-        batch.tryPush(record, key, record[key]!);
+      const value = record[key];
+      if (!value) continue;
+      if (
+        isHeldOutIdentifierAttribute({
+          key: attributeNames?.[key] ?? key,
+          value,
+        })
+      ) {
+        continue;
       }
+      batch.tryPush(record, key, value);
     }
   }
 
@@ -860,6 +933,12 @@ export class OtlpSpanPiiRedactionService {
    * Collects string attribute values into the entries array.
    * Enforces a cumulative character budget — once adding a value would
    * exceed piiRedactionMaxAttributeLength the value is skipped.
+   *
+   * Machine identifiers never leave the process (see
+   * {@link isHeldOutIdentifierAttribute}). Holding one back is NOT a skip: a
+   * skip means "this value may still hold personal data we did not scan for",
+   * which is what marks the span as partially redacted, and an opaque address
+   * holds none. So a held-out attribute sets neither flag.
    */
   private collectStringEntries(
     attributes: OtlpKeyValue[],
@@ -876,6 +955,14 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null &&
         attr.value.stringValue.length > 0
       ) {
+        if (
+          isHeldOutIdentifierAttribute({
+            key: attr.key,
+            value: attr.value.stringValue,
+          })
+        ) {
+          continue;
+        }
         if (
           totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength

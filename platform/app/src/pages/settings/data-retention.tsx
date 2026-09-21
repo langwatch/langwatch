@@ -26,8 +26,8 @@ import {
 } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
 import {
+  BINDING_SCOPE_TIERS,
   SCOPE_ICON,
-  SCOPE_TIER_ORDER,
 } from "~/components/data-retention/constants";
 import { formatDays } from "~/components/data-retention/format";
 import {
@@ -331,7 +331,7 @@ function DataRetentionPage({
   );
   const scopeGroups = groupRulesByScope(filteredRules).sort(
     (a, b) =>
-      SCOPE_TIER_ORDER[a.scopeType] - SCOPE_TIER_ORDER[b.scopeType] ||
+      BINDING_SCOPE_TIERS[a.scopeType] - BINDING_SCOPE_TIERS[b.scopeType] ||
       a.name.localeCompare(b.name),
   );
 
@@ -497,7 +497,7 @@ function DataRetentionPage({
           onCancel={(mutationId) =>
             killMutation.mutate({ projectId, mutationId })
           }
-          isCancelling={killMutation.isLoading}
+          isCancelling={killMutation.isPending}
         />
 
         {available && (
@@ -511,7 +511,7 @@ function DataRetentionPage({
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
-            isSaving={setForScope.isLoading || triggerUpdate.isLoading}
+            isSaving={setForScope.isPending || triggerUpdate.isPending}
             onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
@@ -572,7 +572,6 @@ function DataRetentionPage({
                   toaster.create({
                     title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
                     type: "warning",
-                    meta: { closable: true },
                   });
                 }
                 showErrorToast({
@@ -676,7 +675,7 @@ function DataRetentionPage({
         <RemoveScopeConfirmDialog
           group={removeTarget}
           projectId={projectId}
-          isRemoving={removeForScope.isLoading}
+          isRemoving={removeForScope.isPending}
           onCancel={() => setRemoveTarget(null)}
           onConfirm={async () => {
             if (!removeTarget) return;
@@ -687,7 +686,7 @@ function DataRetentionPage({
 
         <ApplyToExistingConfirmDialog
           pending={pendingConfirm}
-          isApplying={triggerUpdate.isLoading || setForScope.isLoading}
+          isApplying={triggerUpdate.isPending || setForScope.isPending}
           onCancel={() => setPendingConfirm(null)}
           onConfirm={async () => {
             if (!pendingConfirm) return;

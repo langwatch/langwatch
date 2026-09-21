@@ -10,7 +10,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import {
@@ -23,6 +22,11 @@ import {
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
+import type {
+  Dataset,
+  DatasetRecord,
+  Project,
+} from "~/generated/prisma/client";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
@@ -72,7 +76,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
     workflowId,
   }));
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const toggleSaveAsComponentMutation =
     api.optimization.toggleSaveAsComponent.useMutation({
@@ -82,7 +86,6 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           title: "Component status updated",
           type: "success",
           duration: 5000,
-          meta: { closable: true },
         });
       },
     });
@@ -95,7 +98,6 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           title: "Evaluator status updated",
           type: "success",
           duration: 5000,
-          meta: { closable: true },
         });
       },
     });
@@ -207,7 +209,6 @@ const exportWorkflow = async (
       title: "Error exporting workflow",
       description: "An error occurred while exporting the workflow.",
       type: "error",
-      meta: { closable: true },
     });
   }
 };
@@ -233,7 +234,7 @@ function PublishMenu({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
     {
@@ -271,7 +272,6 @@ function PublishMenu({
           title: "Component status updated",
           type: "success",
           duration: 5000,
-          meta: { closable: true },
         });
       },
     });
@@ -284,7 +284,6 @@ function PublishMenu({
           title: "Evaluator status updated",
           type: "success",
           duration: 5000,
-          meta: { closable: true },
         });
       },
     });
@@ -505,9 +504,6 @@ function PublishModalContent({
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
           throw error;
         }
@@ -520,9 +516,6 @@ function PublishModalContent({
           title: "Version ID not found for publishing",
           type: "error",
           duration: 5000,
-          meta: {
-            closable: true,
-          },
         });
         return;
       }
@@ -550,9 +543,6 @@ function PublishModalContent({
               title: "Error publishing workflow",
               type: "error",
               duration: 5000,
-              meta: {
-                closable: true,
-              },
             });
           },
         },
@@ -642,7 +632,7 @@ function PublishModalContent({
                     variant="outline"
                     type="submit"
                     loading={
-                      commitVersion.isLoading || publishWorkflow.isLoading
+                      commitVersion.isPending || publishWorkflow.isPending
                     }
                     disabled={!!isDisabled}
                   >

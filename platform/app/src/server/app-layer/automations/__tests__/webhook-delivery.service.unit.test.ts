@@ -10,7 +10,7 @@ function makeRepo(overrides?: Partial<WebhookDeliveryRepository>) {
   return {
     create: vi.fn(async (_: WebhookDeliveryInput) => undefined),
     findAllRecentByTriggerId: vi.fn(async () => [] as WebhookDeliveryRow[]),
-    deleteOlderThan: vi.fn(async () => 0),
+    pruneExpired: vi.fn(async () => 0),
     ...overrides,
   } satisfies WebhookDeliveryRepository;
 }
@@ -49,15 +49,12 @@ describe("WebhookDeliveryService", () => {
   });
 
   describe("pruneExpired", () => {
-    it("deletes rows older than ~30 days", async () => {
-      const deleteOlderThan = vi.fn(async (_: { before: Date }) => 7);
-      const repo = makeRepo({ deleteOlderThan });
+    it("delegates retention to the repository's shared sweep", async () => {
+      const pruneExpired = vi.fn(async () => 7);
+      const repo = makeRepo({ pruneExpired });
       const deleted = await new WebhookDeliveryService(repo).pruneExpired();
       expect(deleted).toBe(7);
-      const before = deleteOlderThan.mock.calls[0]![0].before.getTime();
-      const daysAgo = (Date.now() - before) / (24 * 60 * 60 * 1000);
-      expect(daysAgo).toBeGreaterThan(29.9);
-      expect(daysAgo).toBeLessThan(30.1);
+      expect(pruneExpired).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import type { PrismaClient } from "~/generated/prisma/client";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
 import { modelProviderRouter } from "../modelProviders";
@@ -44,11 +44,13 @@ const organizationUsers = [
     userId: "user_member_of_project_a",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   {
     userId: "user_other_project_admin",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   { userId: "user_other_org_admin", organizationId: "org_b", role: "ADMIN" },
 ];
@@ -141,11 +143,17 @@ function fixturePrisma(): PrismaClient {
 
 function callerForUser(userId: string) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: userId }, expires: "1" },
     req: undefined,
     res: undefined,
   });
   ctx.prisma = fixturePrisma();
+  ctx.app = { permissions: permissionsServiceFor(fixturePrisma()) } as never;
   return modelProviderRouter.createCaller(ctx);
 }
 

@@ -85,6 +85,7 @@ vi.mock("@ai-sdk/react", async () => {
         stop: () => undefined,
         clearError: () => undefined,
         regenerate: () => undefined,
+        resumeStream: () => Promise.resolve(),
       };
     },
   };
@@ -124,9 +125,8 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
+    await import("./support/langyApiMock");
 
   const useHeldHistoryQuery = (enabled: boolean) => {
     React.useSyncExternalStore(
@@ -158,9 +158,8 @@ vi.mock("~/utils/api", async () => {
           }
         : undefined,
       isLoading: enabled && !settled,
-      isInitialLoading: enabled && !settled,
       isFetching: enabled && !settled,
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: settled,
       isSuccess: settled,
       isError: false,
@@ -225,22 +224,12 @@ vi.mock("~/utils/api", async () => {
     }),
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {

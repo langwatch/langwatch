@@ -78,6 +78,51 @@ Feature: Handled errors — what the customer actually reads
   # What a customer may see
   # ==========================================================================
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: A missing-model rejection is explained per the surface that raised it
+    Given a handled error carries the code "missing_model"
+    And its meta names the request surface (chat, messages, responses,
+      embeddings, speech, transcription, or the Gemini passthrough)
+    When the client surfaces it
+    Then the description says where THAT surface expects its model
+      # each surface disagrees about where a model comes from — a JSON field,
+      # a form part, or the request URL — so one generic sentence would send
+      # some callers looking for something that does not exist on their surface
+    But when the surface named in meta is not one the client recognises
+    Then the description falls back to a surface-neutral sentence
+
+  # The relay reduces a provider failure to a bounded reason code under
+  # "llm_upstream_error". The copy for each reason class is ours to write —
+  # and the classes genuinely disagree about what the customer should do next.
+  @unit @bdd @handled-errors @presentation
+  Scenario: A provider-refused credential gets its own remediation copy
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason says the provider refused the credential or its permissions
+    When the client surfaces it
+    Then the description points at the key and its permissions
+    And it does not suggest retrying, because a retry cannot succeed
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A provider rate limit gets its own remediation copy
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason says the provider rate-limited the call
+    When the client surfaces it
+    Then the description says to wait before retrying
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A provider outage gets its own remediation copy
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason says the provider timed out or was unavailable
+    When the client surfaces it
+    Then the description names a temporary provider problem, not a caller mistake
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: An unrecognised upstream reason falls back to the generic retry line
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason is one the client does not classify
+    When the client surfaces it
+    Then the description falls back to the generic retry-or-switch-model line
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: Remediation reaches the customer when we have nothing better
     Given a handled error carries tips and a docs URL

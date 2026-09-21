@@ -18,14 +18,19 @@
  * behaviour on click — same pattern BatchTargetCell already uses for
  * long prompt / agent outputs so the table reads as one cohesive design.
  *
- * Rows without a verdict (skipped / error / not-yet-run) render a subtle
- * dash so the column width is preserved and the table doesn't reflow
- * between reruns.
+ * A row with no comparison result at all renders a subtle dash so the column
+ * width is preserved and the table doesn't reflow between reruns. A row that
+ * has a result but no winner is not that: it reads "No verdict" and shows the
+ * account of why, text the page used to throw away. Most of those rows were
+ * judged twice, which makes that account the most expensive text on the page;
+ * a row with too few candidate outputs to compare reaches the same state with
+ * no judge call behind it.
  */
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 
+import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
 import type { BatchComparisonColumn, BatchComparisonVerdict } from "./types";
@@ -35,14 +40,39 @@ const CELL_MAX_HEIGHT = 140;
 
 type WinnerVisual = {
   label: string;
-  /** Green for any winner: a win is a win, and the name says which. */
-  colorPalette: "green" | "gray";
+  /**
+   * What the reader is meant to take from the badge at a glance:
+   *
+   * - `green`  a winner, named.
+   * - `gray`   a tie, and the fallback for a winner this snapshot cannot
+   *   place. Both are muted for the same reason: neither points at a
+   *   candidate the reader can go and look at.
+   * - `orange` no verdict. Deliberately not the tie's gray: those two share a
+   *   null winner id, and painting them alike puts the distinction back out
+   *   of reach of anyone reading the page rather than querying it. Orange and
+   *   not red, because the row is unresolved rather than broken.
+   */
+  colorPalette: "green" | "gray" | "orange";
 };
 
-const resolveWinner = (
-  column: BatchComparisonColumn,
-  verdict: BatchComparisonVerdict,
-): WinnerVisual => {
+/**
+ * Exported for its own test: Chakra compiles `colorPalette` into an emotion
+ * class with no attribute to read back, so the colour a verdict resolves to is
+ * only assertable here, before it reaches the Badge.
+ */
+export const resolveWinner = ({
+  column,
+  verdict,
+}: {
+  column: BatchComparisonColumn;
+  verdict: BatchComparisonVerdict;
+}): WinnerVisual => {
+  // Checked before the tie: an unsettled row also has no winner id, and
+  // calling it a tie would report a result the judge explicitly refused to
+  // reach.
+  if (verdict.isUnsettled) {
+    return { label: "No verdict", colorPalette: "orange" };
+  }
   if (verdict.winnerId === null) {
     return { label: "Tie", colorPalette: "gray" };
   }
@@ -95,6 +125,8 @@ export function ComparisonWinnerCell({
 
   const handleCollapse = useCallback(() => setIsExpanded(false), []);
 
+  useEscapeKey({ enabled: isExpanded, onEscape: handleCollapse });
+
   if (!verdict) {
     return (
       <Text
@@ -107,8 +139,9 @@ export function ComparisonWinnerCell({
     );
   }
 
-  const isTie = verdict.winnerId === null;
-  const winner = resolveWinner(column, verdict);
+  const isUnsettled = verdict.isUnsettled === true;
+  const isTie = !isUnsettled && verdict.winnerId === null;
+  const winner = resolveWinner({ column, verdict });
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
   const winnerColor = verdict.winnerId
@@ -120,7 +153,9 @@ export function ComparisonWinnerCell({
       colorPalette={winner.colorPalette}
       size="sm"
       variant="subtle"
-      data-testid={`comparison-winner-badge-${verdict.winnerId ?? "tie"}`}
+      data-testid={`comparison-winner-badge-${
+        verdict.winnerId ?? (isUnsettled ? "no-verdict" : "tie")
+      }`}
     >
       {/* Same colour square the target column header uses, so the reader can
           trace the winner back to its column and its win-rate bar. */}
@@ -133,7 +168,7 @@ export function ComparisonWinnerCell({
           flexShrink={0}
         />
       )}
-      {isTie ? "Tie" : `Winner: ${winner.label}`}
+      {isTie || isUnsettled ? winner.label : `Winner: ${winner.label}`}
     </Badge>
   );
 
@@ -182,7 +217,7 @@ export function ComparisonWinnerCell({
       )}
       {expanded && (
         <Text fontSize="11px" color="fg.subtle" alignSelf="end">
-          click outside to close
+          click outside or press Escape to close
         </Text>
       )}
     </VStack>

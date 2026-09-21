@@ -3,7 +3,7 @@
  * Single Responsibility: Database operations for projects.
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaClient) {}

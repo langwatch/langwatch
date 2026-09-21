@@ -63,7 +63,23 @@ try {
   const files = readdirSync(assetsDir).filter((f) => f.endsWith(".js"));
   // Scan from a terminal public page (/auth/signin) so nothing redirects
   // mid-scan and tears down the JS context we're importing into.
-  await page.goto(new URL("/auth/signin", baseUrl).toString(), {
+  //
+  // The signin page rewrites its own URL to carry a callbackUrl, and that
+  // client-side navigation can start before the goto resolves, which
+  // Playwright reports as an interrupted navigation. Landing on the signin
+  // route is what the scan needs, so wait for the URL to settle instead of
+  // losing that race.
+  const signinUrl = new URL("/auth/signin", baseUrl).toString();
+  try {
+    await page.goto(signinUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!message.includes("interrupted by another navigation")) throw err;
+  }
+  await page.waitForURL(/\/auth\/signin/, {
     waitUntil: "domcontentloaded",
     timeout: 60000,
   });

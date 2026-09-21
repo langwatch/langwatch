@@ -114,9 +114,6 @@ export function AddRowsFromCSVModal({
         title: "Error processing CSV",
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
 
       return;
@@ -144,9 +141,6 @@ export function AddRowsFromCSVModal({
             title: "CSV uploaded successfully",
             type: "success",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -156,9 +150,6 @@ export function AddRowsFromCSVModal({
               "Please make sure you have the right formatting and that the columns are correct",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -246,7 +237,7 @@ export function AddRowsFromCSVModal({
               recordEntries.length === 0 || !canUpload || hasErrors.length > 0
             }
             onClick={uploadCSVData}
-            loading={uploadRecords.isLoading}
+            loading={uploadRecords.isPending}
           >
             Upload
           </Button>

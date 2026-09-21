@@ -210,6 +210,96 @@ describe("normalizeEvaluators", () => {
       expect(normalized?.comparison).toBeUndefined();
     });
   });
+
+  /**
+   * The shape a saved evaluation really held: an exact-match evaluator that was
+   * given a comparison config, so it rendered and ran as a standalone
+   * comparison column instead of as a score on every target column.
+   */
+  describe("given a plain evaluator saved with a comparison config", () => {
+    const stored = () =>
+      [
+        {
+          id: "evaluator_q5RPFdOD",
+          evaluatorType: "langevals/exact_match",
+          inputs: [],
+          comparison: {
+            variants: ["target-1", "target-2"],
+            goldenField: "l3",
+            hasGoldenAnswer: true,
+            variantOutputPaths: { "target-1": ["output"] },
+          },
+          mappings: {
+            "ds-1": {
+              "target-1": {
+                output: {
+                  type: "source",
+                  source: "target",
+                  sourceId: "target-1",
+                  sourceField: "output",
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "ds-1",
+                  sourceField: "l3",
+                },
+              },
+            },
+          },
+          localEvaluatorConfig: { name: "L3 category exact match" },
+        },
+      ] as unknown as EvaluatorConfig[];
+
+    /** @scenario "A stored comparison config on a plain evaluator is repaired" */
+    it("reads back as an evaluator attached to every target column", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.comparison).toBeUndefined();
+    });
+
+    /** @scenario "A stored comparison config on a plain evaluator is repaired" */
+    it("keeps the per-target mappings, which an attached evaluator already needs", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.mappings).toEqual(stored()[0]!.mappings);
+    });
+
+    it("keeps the rest of the evaluator", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.id).toBe("evaluator_q5RPFdOD");
+      expect(normalized?.evaluatorType).toBe("langevals/exact_match");
+      expect(normalized?.localEvaluatorConfig?.name).toBe(
+        "L3 category exact match",
+      );
+    });
+  });
+
+  describe("given the comparison judge with a comparison config", () => {
+    it("leaves the standalone comparison column untouched", () => {
+      const comparison = {
+        variants: ["target-1", "target-2"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [] as ("cost" | "duration")[],
+        randomizeOrder: true,
+      };
+      const evaluators = [
+        {
+          id: "evaluator_compare",
+          evaluatorType: COMPARISON_EVALUATOR_TYPE,
+          inputs: [],
+          mappings: {},
+          comparison,
+        },
+      ] as unknown as EvaluatorConfig[];
+
+      const [normalized] = normalizeEvaluators(evaluators);
+
+      expect(normalized?.comparison).toEqual(comparison);
+    });
+  });
 });
 
 describe("normalizeTargets", () => {
@@ -231,6 +321,59 @@ describe("normalizeTargets", () => {
         "target-b",
       ]);
       expect(normalized?.pairwise).toBeUndefined();
+    });
+  });
+
+  describe("given a prompt target saved with a comparison config", () => {
+    it("drops the config the target cannot own", () => {
+      const targets = [
+        {
+          id: "prompt-target",
+          type: "prompt",
+          promptId: "prompt_1",
+          mappings: {},
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: false,
+            includeMetrics: [] as ("cost" | "duration")[],
+            randomizeOrder: true,
+          },
+        },
+      ] as unknown as TargetConfig[];
+
+      const [normalized] = normalizeTargets(targets);
+
+      // Every comparison edit skips a non-evaluator target, so leaving the
+      // field on would give the column an editor that saves nothing.
+      expect(normalized?.comparison).toBeUndefined();
+      expect(normalized?.type).toBe("prompt");
+      expect(normalized?.promptId).toBe("prompt_1");
+    });
+  });
+
+  describe("given an evaluator target with a comparison config", () => {
+    it("keeps it, because that is the target kind a comparison column has", () => {
+      const targets = [
+        {
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db_evaluator_1",
+          mappings: {},
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: false,
+            includeMetrics: [] as ("cost" | "duration")[],
+            randomizeOrder: true,
+          },
+        },
+      ] as unknown as TargetConfig[];
+
+      const [normalized] = normalizeTargets(targets);
+
+      expect(normalized?.comparison?.variants).toEqual([
+        "target-a",
+        "target-b",
+      ]);
     });
   });
 });

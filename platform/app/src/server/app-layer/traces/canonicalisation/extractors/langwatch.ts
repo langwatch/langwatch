@@ -25,7 +25,7 @@
  * - gen_ai.system_instructions (extracted from first system message)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS, METADATA_SUBKEY_PREFIXES } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";
 import {
@@ -252,10 +252,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // subkeys and normalize to metadata.{bareKey}.
     // Uses setAttr (not setAttrIfAbsent) so subkeys override blob fields.
     // ─────────────────────────────────────────────────────────────────────────
-    const METADATA_SUBKEY_PREFIXES = [
-      "langwatch.metadata.",
-      "langwatch.trace.",
-    ] as const;
     for (const prefix of METADATA_SUBKEY_PREFIXES) {
       for (const { key, value } of attrs.takeByPrefix(prefix)) {
         const bareKey = key.slice(prefix.length);
@@ -498,7 +494,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Evaluation Events (langwatch.evaluation.custom) → GenAI semconv
     // SDK sends span events with name "langwatch.evaluation.custom".
-    // The reactor reads these directly from the OTLP span events to sync
+    // The subscriber reads these directly from the OTLP span events to sync
     // to evaluation_runs. Here we only map to GenAI semconv span attributes.
     // ─────────────────────────────────────────────────────────────────────────
     for (const event of ctx.bag.events.all()) {

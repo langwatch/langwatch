@@ -2,9 +2,11 @@
  * @vitest-environment node
  *
  * Parity between the two resolvers that answer "which providers can this key
- * reach": the gateway's `eligibleModelProvidersForVk` (what actually gets
- * dispatched to) and the client-side `resolveEligible` the virtual-key
- * drawers render (what the user is promised before issuing the key).
+ * reach through its scope": the server's `scopeReachableModelProvidersForVk`
+ * (what a key's provider allowlist may name) and the client-side
+ * `resolveEligible` the virtual-key drawers render (what the user may pick
+ * before issuing the key). Both are scope-only: a routing policy narrows the
+ * DISPATCH set (`eligibleModelProvidersForVk`), never the allowlist.
  *
  * The drawer resolver is a second implementation of the same rule, fed by
  * `listOrgModelProvidersForFrontend`. Any filter present on one side and
@@ -31,7 +33,10 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
-import { eligibleModelProvidersForVk } from "../scopeResolver";
+import {
+  eligibleModelProvidersForVk,
+  scopeReachableModelProvidersForVk,
+} from "../scopeResolver";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 
 const suffix = nanoid(8);
@@ -48,6 +53,14 @@ const MP_ORG_WITHDRAWN_ID = `mp-elig-org-withdrawn-${suffix}`;
 const MP_PROJECT_ID = `mp-elig-project-${suffix}`;
 const MP_SIBLING_ID = `mp-elig-sibling-${suffix}`;
 const MP_MULTISCOPE_ID = `mp-elig-multiscope-${suffix}`;
+
+const RP_ID = `rp-elig-${suffix}`;
+const VK_POLICY_ID = `vk-elig-policy-${suffix}`;
+// The routing policy lists a strict subset of the set a project key reaches
+// ({ORG, MULTISCOPE, PROJECT}): it leaves MULTISCOPE out. The gateway
+// intersects the DISPATCH set with this list, so MULTISCOPE never dispatches.
+// It stays scope-reachable, so it is still savable in the key's allowlist.
+const RP_PROVIDER_IDS = [MP_ORG_ID, MP_PROJECT_ID];
 
 /**
  * Mirrors what `VirtualKeyCreateDrawer` hands the preview: the org-wide
@@ -75,11 +88,11 @@ async function resolveAsTheDrawerWould() {
     ],
     ORG_ID,
   );
-  return resolveEligible(
-    [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+  return resolveEligible({
+    scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
     providers,
     hierarchy,
-  );
+  });
 }
 
 describe("eligible model providers - drawer / gateway parity on real PG", () => {
@@ -181,10 +194,40 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
         },
       },
     });
+
+    await prisma.routingPolicy.create({
+      data: {
+        id: RP_ID,
+        organizationId: ORG_ID,
+        name: `Elig Policy ${suffix}`,
+        modelProviderIds: RP_PROVIDER_IDS,
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      },
+    });
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_POLICY_ID,
+        organizationId: ORG_ID,
+        name: `elig-policy-${suffix}`,
+        hashedSecret: "hash-policy",
+        displayPrefix: "vk-lw-elig-p",
+        createdById: USER_ID,
+        routingMode: "POLICY",
+        routingPolicyId: RP_ID,
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      },
+    });
   }, 120_000);
 
   afterAll(async () => {
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.routingPolicy.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.modelProvider.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -222,14 +265,16 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
     it("resolves the same provider set on both sides", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const gatewayIds = (await eligibleModelProvidersForVk(prisma, vk!))
+      const reachableIds = (
+        await scopeReachableModelProvidersForVk(prisma, vk!)
+      )
         .map((p) => p.id)
         .sort();
       const drawerIds = (await resolveAsTheDrawerWould())
         .map((p) => p.id)
         .sort();
 
-      expect(drawerIds).toEqual(gatewayIds);
+      expect(drawerIds).toEqual(reachableIds);
       expect(drawerIds).toEqual(
         [MP_ORG_ID, MP_MULTISCOPE_ID, MP_PROJECT_ID].sort(),
       );
@@ -286,6 +331,55 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
         scopeType: "PROJECT",
         scopeId: PROJECT_ID,
       });
+    });
+  });
+
+  describe("given a key on a routing policy that omits a reachable provider", () => {
+    /** @scenario A scope-reachable provider can be allowed on a key even when the routing policy omits it */
+    it("keeps the omitted provider savable (scope-reachable + drawer) but out of dispatch", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_POLICY_ID, ORG_ID);
+
+      // The scope-reachable set (allowlist validation + drawer) ignores the
+      // policy, so the multi-scope provider the policy omits stays in it.
+      const reachableIds = (
+        await scopeReachableModelProvidersForVk(prisma, vk!)
+      )
+        .map((p) => p.id)
+        .sort();
+      // The dispatch set (materialiser) applies the policy, so the omitted
+      // provider is excluded from what the gateway routes to.
+      const dispatchIds = (await eligibleModelProvidersForVk(prisma, vk!))
+        .map((p) => p.id)
+        .sort();
+
+      const service = ModelProviderService.create(prisma);
+      const providers: OrgModelProvider[] =
+        await service.listOrgModelProvidersForFrontend(ORG_ID);
+      const hierarchy = buildScopeHierarchy(
+        [
+          { id: PROJECT_ID, teamId: TEAM_ID },
+          { id: SIBLING_PROJECT_ID, teamId: TEAM_ID },
+        ],
+        ORG_ID,
+      );
+      const drawerIds = resolveEligible({
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        providers,
+        hierarchy,
+      })
+        .map((p) => p.id)
+        .sort();
+
+      // The drawer offers exactly the scope-reachable set: the policy never
+      // narrows what a key's provider allowlist may hold.
+      expect(drawerIds).toEqual(reachableIds);
+      // The policy-omitted provider stays offered, so it is savable ...
+      expect(reachableIds).toContain(MP_MULTISCOPE_ID);
+      expect(drawerIds).toContain(MP_MULTISCOPE_ID);
+      // ... but the gateway's dispatch set excludes it: blocked at dispatch,
+      // not at save.
+      expect(dispatchIds).not.toContain(MP_MULTISCOPE_ID);
     });
   });
 });

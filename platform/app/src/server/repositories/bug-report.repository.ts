@@ -1,5 +1,9 @@
 import { generate } from "@langwatch/ksuid";
-import type { BugReport, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  BugReport,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**

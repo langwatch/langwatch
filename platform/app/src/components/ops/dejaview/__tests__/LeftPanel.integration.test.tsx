@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * DejaView's left rail lists what processes an aggregate's events. It now shows
- * event subscribers rather than reactors — the raw-event consumers, keyed by
+ * event subscribers rather than subscribers — the raw-event consumers, keyed by
  * the event types they react to.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -49,7 +49,7 @@ afterEach(cleanup);
 describe("LeftPanel", () => {
   describe("given an aggregate with subscribers", () => {
     describe("when the rail renders", () => {
-      it("lists event subscribers, not reactors", () => {
+      it("lists event subscribers, never the retired reactor rail", () => {
         renderPanel();
         expect(screen.getByText("Event Subscribers")).toBeDefined();
         expect(screen.queryByText("Reactors")).toBeNull();

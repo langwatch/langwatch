@@ -1,4 +1,4 @@
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 
 export type ShareResourceType = "TRACE" | "THREAD";
 

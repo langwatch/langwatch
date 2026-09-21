@@ -24,8 +24,8 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     7. Honest empty / zero / no-baseline states.
 
   This is a v2 over the same `/governance` page (canonical Overview;
-  `/settings/governance` is registered as a back-compat alias per
-  `platform/app/src/routes.tsx` comment) — the v1
+  the legacy `/settings/governance` address redirects there per
+  specs/navigation/gateway-url-move.feature); the v1
   shape continues to ship as a regression invariant for orgs that
   haven't seeded multi-team data yet.
 
@@ -35,7 +35,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     - specs/ai-gateway/governance/persona-home-content.feature (page wrap)
 
   Implementation lives under:
-    - platform/app/src/pages/settings/governance.tsx                   (page)
+    - platform/app/src/pages/governance/index.tsx                      (page)
     - platform/app/src/server/governance/activity-monitor/             (service)
     - platform/app/src/components/governance/charts/                   (Recharts wrappers — Phase B)
     - platform/app/src/utils/colorFromName.ts                          (Phase C util)
@@ -157,7 +157,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     And below the table there is a "View all teams →" link
     And the link points to a route that lists every team with full
       sort + filter + pagination affordances (route lives at
-      "/settings/governance/teams" or similar — see Axis 4)
+      "/governance/teams" or similar, see Axis 4)
 
   @bdd @ui @birds-eye-v2 @top-n
   Scenario: SpendByUser section is explicitly framed as "Top 10 by spend"
@@ -254,7 +254,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     When the user clicks the row for team "engineering"
     Then the user is routed to a page scoped to that team — either:
       | option                         | route                                           |
-      | A — dedicated team detail page | /settings/governance/teams/<teamId>            |
+      | A — dedicated team detail page | /governance/teams/<teamId>            |
       | B — filtered traces view       | /traces?filter[teamId]=<teamId>                |
       | C — filtered activity-monitor  | /settings/activity-monitor?filter[teamId]=...  |
     And whichever option ships, the destination page renders that team's

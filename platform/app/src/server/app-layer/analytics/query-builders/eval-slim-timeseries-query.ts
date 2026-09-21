@@ -68,14 +68,20 @@ function isEvalSlimMetricKey(metric: string): metric is EvalSlimMetricKey {
  * Pass-rate is special: `Passed` is `Nullable(Bool)`, and the registry's
  * `avg` over a boolean treats it as 0/1. We coerce with `toUInt8` so the
  * avg comes out as the pass rate.
+ *
+ * Verdict metrics (score, pass-rate) null themselves out on rows whose
+ * evaluation did not run to completion — an errored run's stray verdict must
+ * not shift the chart (#6833). Matches the legacy per-evaluator path's
+ * `Status = 'processed'` condition, and covers slim rows written before the
+ * fold gated Passed/Score at write time.
  */
 function evalSlimColumnFor(metric: EvalSlimMetricKey): string {
   switch (metric) {
     case "evaluations.evaluation_score":
-      return `${ea}.Score`;
+      return `if(${ea}.Status = 'processed', ${ea}.Score, NULL)`;
     case "evaluations.evaluation_pass_rate":
       // Treat true as 1, false as 0; null stays null (excluded from avg).
-      return `toUInt8(${ea}.Passed)`;
+      return `toUInt8(if(${ea}.Status = 'processed', ${ea}.Passed, NULL))`;
     case "evaluations.evaluation_runs":
       return `${ea}.EvaluationId`;
     default: {
@@ -108,10 +114,14 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
     case "evaluations.evaluator_type":
       return `if(${ea}.EvaluatorType = '', 'unknown', ${ea}.EvaluatorType)`;
     case "evaluations.evaluation_passed":
-      // Nullable(Bool) → display string for group_key.
-      return `if(${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
+      // Nullable(Bool) → display string for group_key. Status-gated like the
+      // metric columns: a historical errored row carrying a stray verdict
+      // must bucket as 'unknown', not 'failed' — the legacy per-evaluator
+      // path gates the same way (aggregation-builder.ts, #6833).
+      return `if(${ea}.Status != 'processed' OR ${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
     case "evaluations.evaluation_label":
-      return `coalesce(${ea}.Label, 'unknown')`;
+      // Same status gate — an errored run's label is not a verdict (#6833).
+      return `if(${ea}.Status != 'processed', 'unknown', coalesce(${ea}.Label, 'unknown'))`;
     case "evaluations.evaluation_status":
       return `${ea}.Status`;
     default: {

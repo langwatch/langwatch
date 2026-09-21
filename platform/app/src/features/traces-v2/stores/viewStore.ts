@@ -191,7 +191,8 @@ function persistActiveLensId(id: string): void {
   }
 }
 
-const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
+/** Newest first: the order the flat trace list falls back to. */
+export const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
 function isGroupingMode(value: unknown): value is GroupingMode {
   return (
@@ -335,15 +336,20 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
+    // Rows come from the server-side session rollup with true totals per
+    // conversation, plus context size and last activity
+    // (specs/traces-v2/sessions-lens.feature).
     id: "conversations",
     name: "Conversations",
     isBuiltIn: true,
     columns: [
       "conversation",
       "turns",
+      "lastTurn",
       "duration",
       "cost",
       "tokens",
+      "contextSize",
       "model",
       "service",
       "status",
@@ -413,7 +419,8 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Heaviest token conversations — tokens roll up per thread.
+    // Heaviest token conversations: tokens roll up per conversation,
+    // server-side.
     id: "token-heavy-conversations",
     name: "Token-Heavy Conversations",
     isBuiltIn: true,
@@ -432,9 +439,8 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Conversations with the most turns. Sorts by turn count, which is a
-    // per-conversation aggregate (group-sorted client-side; see
-    // sortConversationGroups in conversationGroups.ts).
+    // Conversations with the most traces. Sorts by the per-conversation trace
+    // count, a rollup dimension the sessions read orders by server-side.
     id: "longest-conversations",
     name: "Longest Conversations",
     isBuiltIn: true,
@@ -472,7 +478,7 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Costliest conversations — cost rolls up per thread.
+    // Costliest conversations: cost rolls up per conversation, server-side.
     id: "expensive-conversations",
     name: "Expensive Conversations",
     isBuiltIn: true,

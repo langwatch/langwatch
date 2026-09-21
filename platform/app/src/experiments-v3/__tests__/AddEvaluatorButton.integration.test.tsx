@@ -67,7 +67,7 @@ vi.mock("../hooks/useEvaluatorName", () => ({
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getById: {
           fetch: vi.fn(),

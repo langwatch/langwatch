@@ -27,6 +27,57 @@ const logger = createLogger("langwatch:clickhouse:migrations");
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+/**
+ * The MergeTree setting that relaxes ClickHouse 26.0's refusal to create an
+ * AggregatingMergeTree table with a column that is neither in the sorting key
+ * nor an aggregate state. It does not exist before 26.0, where naming it in a
+ * CREATE TABLE fails with UNKNOWN_SETTING, so it can only be applied to a
+ * server that has it.
+ */
+const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
+
+/**
+ * The last migration that runs with the setting above relaxed. 00088 is where
+ * those four rollup columns gain their merge rule.
+ *
+ * Migrations up to here are merged history: they still create the tables the
+ * old way on a new install, and on ClickHouse 26 they only run with the
+ * setting above. Everything from 00087 on runs without it, so a new migration
+ * that declares such a column fails on 26 rather than being quietly accepted.
+ * `aggregatingDimensionGuard.unit.test.ts` fails it on every version.
+ */
+const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
+
+/**
+ * How much of goose's own output a run may hold.
+ *
+ * Every migration runs verbose, so goose prints a line per statement and the
+ * output grows with the migration count. `spawnSync` defaults to one megabyte
+ * and then kills the child with ENOBUFS, which reads as a migration failure
+ * on a run where every migration in fact applied. The output is text we only
+ * scan for a few messages, so a generous ceiling costs a few megabytes of RSS
+ * for the length of one call.
+ */
+const GOOSE_OUTPUT_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * What to tell an operator when the child process itself did not run.
+ *
+ * ENOENT means the binary is missing, and ENOBUFS means goose printed past
+ * {@link GOOSE_OUTPUT_MAX_BYTES}, which says nothing about whether the
+ * migrations applied: the message has to point at the buffer rather than at
+ * the schema, or the next reader spends the afternoon in the wrong place.
+ */
+export function messageForSpawnError(message: string): string {
+  if (message.includes("ENOENT")) {
+    return "Goose binary not found. Install from https://github.com/pressly/goose";
+  }
+  if (message.includes("ENOBUFS")) {
+    return `Goose printed more than ${GOOSE_OUTPUT_MAX_BYTES} bytes and was cut off, so this run cannot say whether the migrations applied. Re-run it, and raise GOOSE_OUTPUT_MAX_BYTES if it happens again: ${message}`;
+  }
+  return message;
+}
+
 export interface GooseOptions {
   connectionUrl?: string;
   database?: string; // Optional database override (takes precedence over URL path)
@@ -41,6 +92,7 @@ interface ClickHouseConfig {
   gooseConnectionString: string; // HTTP connection string for goose
   clusterName: string | undefined; // If set, enables replication with this cluster name
   hasLocalPrimaryPolicy?: boolean; // Set during bootstrap — true if 'local_primary' storage policy exists
+  requiresDimensionCompat?: boolean; // Set during bootstrap — true if the server refuses an AggregatingMergeTree column outside the sorting key
 }
 
 /**
@@ -334,10 +386,37 @@ async function bootstrapDatabase(
     }
   });
 
+  // ClickHouse 26.0 refuses to create an AggregatingMergeTree table with a
+  // column that is neither in the sorting key nor an aggregate state. Four
+  // rollups were created that way before 00088 converted them, and those
+  // CREATE TABLE statements are merged history that a new install still
+  // replays. The presence of the setting that relaxes the check is what says
+  // the server enforces it — read rather than inferred from a version number,
+  // so a backport or a fork answers correctly too.
+  await withClient(config.databaseUrl, async (client) => {
+    const result = await client.query({
+      query: `SELECT name FROM system.merge_tree_settings WHERE name = {setting:String}`,
+      query_params: { setting: AGGREGATING_DIMENSION_SETTING },
+      format: "JSONEachRow",
+    });
+    config.requiresDimensionCompat = (await result.json()).length > 0;
+  });
+
   logger.info("Bootstrap completed");
 }
 
-function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
+function buildMigrationEnvVars({
+  config,
+  allowDimensionsOutsideSortingKey = false,
+}: {
+  config: ClickHouseConfig;
+  /**
+   * Append the compatibility setting to every CREATE TABLE. Only the phase
+   * that replays migrations up to LAST_MIGRATION_NEEDING_DIMENSION_COMPAT
+   * asks for this, and only when the server enforces the check.
+   */
+  allowDimensionsOutsideSortingKey?: boolean;
+}): NodeJS.ProcessEnv {
   // In Replicated databases, use empty args - the DB handles replication automatically
   const vars: Record<string, string | undefined> = {
     // System vars
@@ -369,11 +448,22 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
     // from a plain-engine table, whose content is per-replica when clustered).
     CLICKHOUSE_IS_REPLICATED: config.clusterName ? "1" : "0",
 
-    // Storage policy: use 'local_primary' if available (production with S3 tiering),
-    // otherwise omit the setting (uses ClickHouse default policy)
-    CLICKHOUSE_STORAGE_POLICY_SETTING: config.hasLocalPrimaryPolicy
-      ? ", storage_policy = 'local_primary'"
-      : "",
+    // The settings appended to every CREATE TABLE, after index_granularity.
+    //
+    // Storage policy: use 'local_primary' if available (production with S3
+    // tiering), otherwise omit the setting (uses ClickHouse default policy).
+    //
+    // The compatibility setting rides along here because this substitution is
+    // the only one present in the SETTINGS clause of every historical CREATE
+    // TABLE, and those statements are merged history that cannot be edited.
+    // It is accepted by MergeTree, ReplacingMergeTree and AggregatingMergeTree
+    // alike, and ClickHouse only applies it to a table that aggregates.
+    CLICKHOUSE_STORAGE_POLICY_SETTING: [
+      config.hasLocalPrimaryPolicy ? ", storage_policy = 'local_primary'" : "",
+      allowDimensionsOutsideSortingKey
+        ? `, ${AGGREGATING_DIMENSION_SETTING} = 1`
+        : "",
+    ].join(""),
   };
 
   // Filter out undefined values
@@ -392,13 +482,23 @@ function logConfig(config: ClickHouseConfig): void {
   );
 }
 
-function executeGoose(
-  command: string,
-  config: ClickHouseConfig,
-  options: GooseOptions = {},
-): string {
+function executeGoose({
+  command,
+  config,
+  options = {},
+  allowDimensionsOutsideSortingKey = false,
+}: {
+  /** The goose command and its arguments, e.g. ["up"] or ["up-to", "86"]. */
+  command: string[];
+  config: ClickHouseConfig;
+  options?: GooseOptions;
+  allowDimensionsOutsideSortingKey?: boolean;
+}): string {
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
-  const envVars = buildMigrationEnvVars(config);
+  const envVars = buildMigrationEnvVars({
+    config,
+    allowDimensionsOutsideSortingKey,
+  });
 
   if (options.verbose) {
     logConfig(config);
@@ -418,7 +518,7 @@ function executeGoose(
     `${config.database}.goose_db_version`,
     "clickhouse",
     config.gooseConnectionString,
-    command,
+    ...command,
   ];
 
   if (options.verbose) {
@@ -430,12 +530,11 @@ function executeGoose(
     encoding: "utf-8",
     stdio: "pipe",
     env: envVars,
+    maxBuffer: GOOSE_OUTPUT_MAX_BYTES,
   });
 
   if (result.error) {
-    const message = result.error.message.includes("ENOENT")
-      ? "Goose binary not found. Install from https://github.com/pressly/goose"
-      : result.error.message;
+    const message = messageForSpawnError(result.error.message);
     throw new MigrationError(`Goose migration failed: ${message}`, "migrate");
   }
 
@@ -479,8 +578,24 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   // Bootstrap creates the database and goose_db_version table with correct engines
   await bootstrapDatabase(config, options.verbose);
 
-  // Run goose migrations
-  const result = executeGoose("up", config, options);
+  // Run goose migrations. On a server that enforces the AggregatingMergeTree
+  // dimension check, the merged history runs first with the compatibility
+  // setting, then everything from 00087 on runs without it. On every other
+  // server this is a single pass, exactly as before.
+  if (config.requiresDimensionCompat) {
+    logger.info(
+      { throughVersion: LAST_MIGRATION_NEEDING_DIMENSION_COMPAT },
+      `This ClickHouse enforces ${AGGREGATING_DIMENSION_SETTING}; replaying the migrations that predate 00087 with it relaxed`,
+    );
+    executeGoose({
+      command: ["up-to", String(LAST_MIGRATION_NEEDING_DIMENSION_COMPAT)],
+      config,
+      options,
+      allowDimensionsOutsideSortingKey: true,
+    });
+  }
+
+  const result = executeGoose({ command: ["up"], config, options });
   logger.info("ClickHouse migrations completed.");
   return result;
 }
@@ -493,7 +608,7 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
   // Pre-flight checks (skip bootstrap for down migration)
   await preflight(config);
 
-  const result = executeGoose("down", config, options);
+  const result = executeGoose({ command: ["down"], config, options });
   logger.info("ClickHouse migration rollback completed.");
   return result;
 }
@@ -508,7 +623,7 @@ export async function migrateReset(
   // Pre-flight checks (skip bootstrap for reset)
   await preflight(config);
 
-  const result = executeGoose("reset", config, options);
+  const result = executeGoose({ command: ["reset"], config, options });
   logger.info("ClickHouse migrations reset completed.");
   return result;
 }
@@ -517,14 +632,14 @@ export async function getMigrateVersion(
   options: GooseOptions = {},
 ): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
-  return executeGoose("version", config, options);
+  return executeGoose({ command: ["version"], config, options });
 }
 
 export async function getMigrateStatus(
   options: GooseOptions = {},
 ): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
-  return executeGoose("status", config, options);
+  return executeGoose({ command: ["status"], config, options });
 }
 
 export async function runMigrations(options: GooseOptions = {}): Promise<void> {

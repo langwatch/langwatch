@@ -160,4 +160,4 @@ Feature: Langy projects canonical ClickHouse events into Postgres operational st
     And only the process outbox can request automatic title generation
     And broadcast and liveness are direct event subscribers
     And only the liveness subscriber may re-dispatch a stalled turn
-    And no legacy spawn, title, or projection-reactor bridge is registered
+    And no legacy spawn, title, or projection-subscriber bridge is registered

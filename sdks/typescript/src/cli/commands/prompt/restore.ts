@@ -8,6 +8,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the restored version rather than printing it: the output port renders
@@ -28,7 +29,7 @@ export const promptRestoreCommand = async (
   ).start();
 
   try {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
       {
         method: "POST",

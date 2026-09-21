@@ -1,0 +1,97 @@
+---
+title: LangWatch AI Gateway architecture
+description: The components of the LangWatch AI Gateway and how they connect, from the request pipeline in the gateway service to the control plane routes, the change feed, the spend spool and the auth cache.
+sidebarTitle: Architecture
+---
+
+## Components
+
+The LangWatch AI Gateway is two processes. The gateway service is a Go binary on the request path. The control plane is the LangWatch application, which owns the virtual keys, the routing policies, the budgets and the spend ledger.
+
+| Component | Where it runs | What it does |
+|---|---|---|
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
+| Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
+| Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
+| Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
+| Spend spool | On the gateway pod's local disk | Records every request as spend commands and ships them to the control plane in batches. See [Spend spool](#spend-spool). |
+| Control plane routes | The LangWatch application, under `/api/internal/gateway/*` | Resolves keys, serves the per-key config, serves the change feed, answers guardrail and budget bucket calls, and ingests spend commands. See [Control plane routes](#control-plane-routes). |
+| Change feed | A Postgres table in the control plane | A monotonic revision log of every mutation to a virtual key, budget, model provider, routing policy or cache rule. The gateway long-polls it. See [Change feed](#change-feed). |
+| Spend ledger | ClickHouse, table `gateway_budget_ledger_events` | The debits the budget precheck enforces against. Written by the control plane from the spend commands, never by the gateway. |
+
+## Request flow
+
+1. The client sends `Authorization: Bearer vk-lw-...` to the gateway.
+2. The auth cache returns the key's bundle, or the gateway calls `POST /api/internal/gateway/resolve-key` on the control plane and caches the answer.
+3. The pipeline runs the interceptors in order. A rejected request (rate limit, policy rule, budget, guardrail) returns before any provider is called, and still writes a spend admission record.
+4. The provider dispatch sends the request upstream and streams the response back.
+5. The spend interceptor writes a confirm or fail record to the spool. The drainer ships it to the control plane, which debits the ledger.
+
+## Control plane routes
+
+The gateway signs every call to the control plane with HMAC-SHA256 over the shared secret `LW_GATEWAY_INTERNAL_SECRET`. An unsigned or incorrectly signed call is refused.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/internal/gateway/resolve-key` | `POST` | Exchanges a presented `vk-lw-...` key for a JWT signed with `LW_GATEWAY_JWT_SECRET`. The JWT carries the organization, project, team, virtual key and principal ids and expires after 15 minutes, or at the key's own expiration date if that comes first. |
+| `/api/internal/gateway/config/:vk_id` | `GET` | Returns the key's materialised config: the credential chain, the routing policy with its model aliases and policy rules, the applicable budgets with their current-period spend, cache rules and guardrails. Carries an `ETag`; a conditional fetch with a matching `If-None-Match` returns `304`. |
+| `/api/internal/gateway/changes` | `GET` | The change feed long-poll. See [Change feed](#change-feed). |
+| `/api/internal/gateway/budget-bucket-spend` | `GET` | Current-period spend for one per-end-user budget bucket. The gateway caches the answer. |
+| `/api/internal/gateway/guardrail/check` | `POST` | Evaluates a guardrail against a request or response body. |
+| `/api/internal/gateway/spend-commands` | `POST` | Ingests a batch of spend commands from the spool. |
+| `/api/internal/gateway/realtime-sessions` | `POST` | Creates a realtime session and records its usage. |
+| `/api/internal/gateway/health` | `GET` | Signed connectivity probe behind the gateway's public `/health` status. A success proves DNS, TLS, the control plane being up and the shared secret matching. |
+
+The gateway reads the control plane location from `LW_GATEWAY_BASE_URL`. Every spend, budget and auth call depends on it, and a wrong value fails without an error on the request path, so set it explicitly on every deployment.
+
+## Change feed
+
+Every mutation that the gateway must see appends a row to the change feed with a monotonic revision. The kinds are `VK_CREATED`, `VK_CONFIG_UPDATED`, `VK_ROTATED`, `VK_REVOKED`, `VK_DISABLED`, `VK_ENABLED`, `BUDGET_CREATED`, `BUDGET_UPDATED`, `BUDGET_DELETED`, `MODEL_PROVIDER_UPDATED`, `ROUTING_POLICY_UPDATED`, `ROUTING_POLICY_DELETED`, `CACHE_RULE_CREATED`, `CACHE_RULE_UPDATED` and `CACHE_RULE_DELETED`.
+
+The gateway long-polls `GET /api/internal/gateway/changes?organization_id=...&since=<revision>&timeout_s=10` per organization it has served. The control plane holds the request open for up to `timeout_s` seconds (default 10, maximum 25), checks for new rows every 2 seconds, and returns up to 500 events with `current_revision`. With no events it returns `204` with the current revision in the `X-LangWatch-Revision` header, and the gateway polls again from there.
+
+On each event the gateway evicts or refreshes the affected cache entries. A revoked or disabled key stops serving on the next request after the event arrives.
+
+## Spend spool
+
+The gateway never writes spend on the request path. The spend interceptor appends an admit record when a request enters the pipeline, and a confirm or fail record when it finishes, to an on-disk spool. The spool is at `<os temp dir>/langwatch-gateway-spend-spool` and is bounded to 64 MiB; when it is full, the oldest records are dropped and the `gateway_spend_spool_dropped_total` metric counts them.
+
+Records seal into segments every second. A drainer ships sealed segments oldest first to `POST /api/internal/gateway/spend-commands`, at least once: a segment is deleted only after the control plane acknowledges it. On a failed ship the drainer retries with a backoff from 1 second doubling to 60 seconds.
+
+On the control plane, the spend processing pipeline turns the commands into ledger rows in `gateway_budget_ledger_events` and appends a `BUDGET_UPDATED` change event for each budget it debited. The gateway then re-fetches the key config and sees the new spend on its next precheck.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_SPEND_ENABLED` | `true` | Set to `false` to stop spend emission. Budgets then stop moving. |
+| `LW_GATEWAY_SPEND_SPOOL_DIR` | `<os temp dir>/langwatch-gateway-spend-spool` | Spool directory. |
+| `LW_GATEWAY_SPEND_SPOOL_MAX_BYTES` | `67108864` (64 MiB) | Spool size bound. |
+| `LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS` | `1` | How long a record can wait before its segment seals. |
+| `LW_GATEWAY_SPEND_INGEST_BASE_URL` | `LW_GATEWAY_BASE_URL` | Where batches ship. |
+
+## Auth cache
+
+The auth cache keeps each resolved key's JWT and config in memory, keyed by a hash of the presented key. A hit costs no control plane call.
+
+The cache serves a stale entry when the control plane cannot be reached. After the JWT expires, a refresh that fails for a transport reason (network error, timeout, 5xx) extends the entry by the soft bump and keeps serving, up to the hard grace past the JWT expiry.
+
+A `401`, `403` or `404` from the control plane evicts the entry at once. A key with its own expiration date is refused past that date with `virtual_key_expired` without a control plane call.
+
+The config part of the entry (credentials, routing chain, budgets) has its own TTL. Past it, the gateway re-fetches the config in the background with the stored `ETag`, so a config that has not changed costs a `304`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension per failed refresh. |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` (6 hours) | Cap on stale serving past the JWT expiry. A negative value disables stale serving. |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Config re-fetch interval. A negative value disables it. |
+
+## Budget enforcement
+
+The budget precheck runs on the gateway against the spend figures in the cached config, so the check costs no control plane call. A request over a limit is refused before dispatch. A per-end-user budget reads the bucket's spend from `/api/internal/gateway/budget-bucket-spend` through a cache, and a request with such a budget and no end-user id is refused.
+
+The check is permissive on error: when the spend figure cannot be read, the request is allowed and the debit reconciles later. A budget filtered to one provider does not block the request; it removes that provider from the routing chain, and only an emptied chain returns a budget error.
+
+## Deployment
+
+The gateway sub-chart of the `langwatch` Helm chart deploys the gateway as a Deployment with a Service, an optional Ingress, an HPA, a PodDisruptionBudget and a NetworkPolicy. The spool lives on the pod's writable emptyDir, so a pod that is killed loses at most the records still in the spool, about a second of drain lag.
+
+**Also check:** [Helm deployment](/ai-gateway/self-hosting/helm) for the chart values, and [Budgets](/ai-gateway/budgets) for the budget scopes and periods.

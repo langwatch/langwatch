@@ -1,7 +1,8 @@
 import {
   type Logger,
+  type LoggerOptions,
   type LoggerProvider,
-  NoopLoggerProvider,
+  createNoopLogger,
 } from "@opentelemetry/api-logs";
 import {
   type LangWatchLogger,
@@ -9,12 +10,22 @@ import {
 import { LangWatchLoggerInternal } from "./implementation";
 
 /**
+ * `NoopLoggerProvider` was dropped from @opentelemetry/api-logs' public exports
+ * (0.221) in favour of the still-exported `createNoopLogger`, so this is its
+ * replacement: a provider whose loggers are always the shared no-op logger.
+ */
+const NOOP_LOGGER_PROVIDER: LoggerProvider = {
+  getLogger: (_name: string, _version?: string, _options?: LoggerOptions) =>
+    createNoopLogger(),
+};
+
+/**
  * The LangWatch-specific global logger provider. It may not be the same as the current
  * OpenTelemetry global logger provider, but it's the last one the `setupObservability`
  * knows about.
  * @internal
  */
-let currentLoggerProvider: LoggerProvider = new NoopLoggerProvider();
+let currentLoggerProvider: LoggerProvider = NOOP_LOGGER_PROVIDER;
 
 /**
  * @module observability/logger

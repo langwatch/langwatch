@@ -227,7 +227,8 @@ reserving the worker-metrics port in that mode.
   in both `start.sh` and `start.ts`, and prod never sets it.
 - Vite and the Go services (aigateway, nlpgo) remain separate processes — this
   only folds in the *worker* Node process, not those.
-- Known limitation: the web entrypoint does not load `instrumentation.node`, so
-  in-process workers produce no-op OTel spans. Run the standalone worker
-  (`pnpm dev`, default) to get worker traces. Follow-up if in-process worker
-  tracing is wanted.
+- In-process workers are instrumented. `server.mts` loads `instrumentation.node`
+  before the app graph evaluates — precisely because the standalone workers lane,
+  which does the same import, no longer runs under the single-process default.
+  Worker spans are real, not no-ops. (This was a known limitation when the mode
+  was opt-in; making it the default is what closed it.)

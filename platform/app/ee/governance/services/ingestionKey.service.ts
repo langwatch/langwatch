@@ -1,13 +1,91 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@prisma/client";
-import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { createLogger } from "@langwatch/observability";
 
+import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  ApiKeyRepository,
+  type ApiKeyWithBindings,
+} from "~/server/api-key/api-key.repository";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { ApiKeyAlreadyRevokedError } from "~/server/api-key/errors";
+import {
+  type ApiKeyRevocationCause,
+  isApiKeyRevocationCause,
+} from "~/server/api-key/revocation-cause";
+
+import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
+import {
+  IngestionKeyNotFoundError,
+  IngestionKeyRevokeIncompleteError,
+  IngestionKeySessionRevokedError,
+  IngestionKeySourceNotAllowedError,
+  IngestionKeyWorkspaceMissingError,
+} from "./ingestionKey.errors";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
+/** What every project-scoped mint needs to know. */
+interface IngestionKeyMintParams {
+  callerUserId: string;
+  ownerUserId: string | null;
+  organizationId: string;
+  projectId: string;
+  sourceType: string;
+  ingestionTemplateId?: string | null;
+  /**
+   * Human label of the CLI device session that minted the key (display
+   * provenance on the API-keys settings page). Null for non-CLI callers.
+   */
+  createdByDeviceLabel?: string | null;
+  /** The session's CLI login key, for keys minted by a CLI session. */
+  parentApiKeyId?: string | null;
+}
+
 /**
- * Issues and rotates "ingestion keys": project-scoped, ingest-only ApiKeys.
+ * The source types the CLI wraps or captures, each stamped as
+ * `langwatch.source`. A personal key for one of these comes from the CLI on
+ * the machine that runs the tool, under that machine's session, and from
+ * nowhere else: the tile and the MCP mint have no session to parent a key
+ * to. A new tool joins here when the CLI learns to wrap it.
+ */
+export const PERSONAL_INGEST_SOURCE_TYPES = [
+  "claude_code",
+  "codex",
+  "gemini",
+  "opencode",
+  "copilot_cli",
+  "copilot_vscode",
+  "copilot_app",
+] as const;
+
+/** The plaintext token, returned exactly once, plus its identifiers. */
+export interface IssuedIngestionKey {
+  token: string;
+  apiKeyId: string;
+  prefix: string;
+  sourceType: string;
+}
+
+/** One of the caller's live personal ingestion keys, without its secret. */
+export interface PersonalIngestionKey {
+  apiKeyId: string;
+  name: string;
+  sourceType: string;
+  lookupId: string;
+  ingestionTemplateId: string | null;
+  /** The device that minted it, null for keys minted outside a CLI session. */
+  deviceLabel: string | null;
+  /** The CLI login key it lives and dies with, null outside a CLI session. */
+  parentApiKeyId: string | null;
+  createdAtMs: number;
+  lastUsedAtMs: number | null;
+}
+
+const logger = createLogger("langwatch:governance:ingestion-key");
+
+/**
+ * Issues, lists and revokes "ingestion keys": project-scoped, ingest-only
+ * ApiKeys.
  *
  * An ingestion key is one row of the single ApiKey primitive (`ik-lw-` prefix,
  * HMAC+pepper) with:
@@ -20,19 +98,33 @@ import { PersonalWorkspaceService } from "./personalWorkspace.service";
  *     to mint is enforced by the caller (router); ownership only governs list
  *     visibility.
  *
- * Rotation is hard-cut: minting revokes any prior live ingest key for the same
- * (project, sourceType) before creating the new one, so a tool never
- * accumulates keys.
+ * A personal key belongs to the CLI session that minted it. A person runs one
+ * tool from a laptop, a desktop and a few cloud machines under one login;
+ * each machine signs in and mints its own key under its own login key
+ * (`parentApiKeyId`), and the key is retired when that login key is: logout,
+ * the devices tab, a re-login from the same device, session expiry. The mint
+ * itself never revokes anything, so no machine's setup can break another's.
+ *
+ * Keys minted outside a CLI session (the /me tile, the MCP mint) have no
+ * parent and are accepted only for sources a published template names and no
+ * CLI wrapper covers. They stay until a person revokes them, one at a time or
+ * every key of a source at once through the tile's rotate.
+ *
+ * `issueForProject` is the pinned `--project` path: an org service key for a
+ * named project, outside this lifecycle. It has no session and is retired
+ * only by a person's revoke.
  */
 export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
   private readonly apiKeyRepo: ApiKeyRepository;
   private readonly personalWorkspace: PersonalWorkspaceService;
+  private readonly templates: IngestionTemplateRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.apiKeys = ApiKeyService.create(prisma);
     this.apiKeyRepo = ApiKeyRepository.create(prisma);
     this.personalWorkspace = new PersonalWorkspaceService(prisma);
+    this.templates = new IngestionTemplateRepository();
   }
 
   static create(prisma: PrismaClient): IngestionKeyService {
@@ -40,14 +132,19 @@ export class IngestionKeyService {
   }
 
   /**
-   * Issues (rotating in place) an ingestion key for a specific project.
-   * Returns the plaintext token exactly once.
+   * Issues an ingestion key for a specific project WITHOUT touching the keys
+   * that already exist for that (project, sourceType). Returns the plaintext
+   * token exactly once.
    *
-   * `ownerUserId` decides API-key list visibility: pass the owning user for a
-   * personal-project key (so only that user and org admins see it), or `null`
-   * for a company-wide governance-project key (a genuine org service key).
+   * The pinned `--project` path. Two laptops working on the same repository
+   * each hold their own token, so one developer re-running the setup does
+   * not silently kill the other's telemetry. The key name carries the source
+   * type and the minting device, so the API-keys settings page shows where
+   * each row came from. `ownerUserId` decides API-key list visibility: the
+   * owning user for a personal-project key, `null` for a shared project's
+   * org service key.
    */
-  async ensureForProject({
+  async issueForProject({
     callerUserId,
     ownerUserId,
     organizationId,
@@ -55,41 +152,418 @@ export class IngestionKeyService {
     sourceType,
     ingestionTemplateId = null,
     createdByDeviceLabel = null,
-  }: {
-    callerUserId: string;
-    ownerUserId: string | null;
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    /** Human label of the CLI device session that minted the key (display
-     * provenance on the API-keys settings page). Null for non-CLI callers. */
-    createdByDeviceLabel?: string | null;
-  }): Promise<{
-    token: string;
-    apiKeyId: string;
-    prefix: string;
-    sourceType: string;
-  }> {
-    // Hard-cut rotation: revoke any prior live ingest key for this
-    // (project, sourceType) so the previous token dies immediately and we
-    // never accumulate keys.
-    const prior = await this.apiKeyRepo.findIngestKey({
+    parentApiKeyId = null,
+  }: IngestionKeyMintParams): Promise<IssuedIngestionKey> {
+    const origin = createdByDeviceLabel
+      ? `${sourceType}, ${createdByDeviceLabel}`
+      : sourceType;
+    return await this.createKey({
+      name: `Ingestion key (${origin})`,
+      callerUserId,
+      ownerUserId,
       organizationId,
       projectId,
       sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+      parentApiKeyId,
     });
-    if (prior) {
-      await this.apiKeys.revoke({
-        id: prior.id,
-        callerUserId,
-        callerIsAdmin: true,
+  }
+
+  /**
+   * Mints a key into the caller's personal workspace.
+   *
+   * With `fromCliSession`, this is the CLI session mint (`langwatch
+   * instrument <tool>`, `langwatch <tool>`): the source type must be a tool
+   * the CLI wraps, and the login key named by `parentApiKeyId` must still be
+   * live, or the device is signed out and answers so. Otherwise this is the
+   * tile or the MCP mint: the source type must be one a published template
+   * names, and a tool the CLI wraps is refused, because a key for it belongs
+   * to the machine that runs it.
+   *
+   * A CLI session may name no parent at all. Those are the sessions opened
+   * before the login key existed; they mint the unparented key they always
+   * did rather than being told to sign in again. See
+   * `mintPersonalIngestionKey` in `auth-cli.ts` for the window that produces
+   * them.
+   *
+   * Create-only in every shape: the keys other machines hold stay live.
+   */
+  async mint({
+    userId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+    parentApiKeyId = null,
+    createdByDeviceLabel = null,
+    fromCliSession = parentApiKeyId !== null,
+  }: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+    parentApiKeyId?: string | null;
+    createdByDeviceLabel?: string | null;
+    /**
+     * Whether a CLI device session is asking. Defaults to "yes if it named a
+     * login key", which is every caller but the one legacy window.
+     */
+    fromCliSession?: boolean;
+  }): Promise<IssuedIngestionKey> {
+    if (fromCliSession) {
+      if (!isWrappedTool(sourceType)) {
+        throw new IngestionKeySourceNotAllowedError(sourceType);
+      }
+      if (parentApiKeyId) {
+        await this.assertSessionLive({
+          parentApiKeyId,
+          userId,
+          organizationId,
+        });
+      }
+    } else {
+      await this.assertMintableWithoutSession({
         organizationId,
+        ingestionTemplateId,
+        sourceType,
       });
     }
 
+    const workspace = await this.personalWorkspace.findExisting({
+      userId,
+      organizationId,
+    });
+    if (!workspace) {
+      throw new IngestionKeyWorkspaceMissingError();
+    }
+
+    const issued = await this.issueForProject({
+      callerUserId: userId,
+      ownerUserId: userId,
+      organizationId,
+      projectId: workspace.project.id,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+      parentApiKeyId,
+    });
+
+    if (parentApiKeyId) {
+      await this.retireIfSessionEndedDuringMint({
+        issuedApiKeyId: issued.apiKeyId,
+        parentApiKeyId,
+        userId,
+        organizationId,
+      });
+    }
+    return issued;
+  }
+
+  /**
+   * Close the window between the session check and the row this mint writes.
+   *
+   * The cascade revokes a login key first and lists its children second, so
+   * reading the parent once more after the child exists leaves nowhere for
+   * the child to hide: either this read sees the revoke, and the key it just
+   * wrote is retired here, or the revoke lands afterwards and the listing
+   * behind it finds the row. Without it a mint that began a moment before a
+   * logout could leave a live key under a dead session, which no later sweep
+   * would look for.
+   */
+  private async retireIfSessionEndedDuringMint({
+    issuedApiKeyId,
+    parentApiKeyId,
+    userId,
+    organizationId,
+  }: {
+    issuedApiKeyId: string;
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const stillLive = await this.isSessionLive({
+      parentApiKeyId,
+      userId,
+      organizationId,
+    });
+    if (stillLive) return;
+
+    try {
+      await this.apiKeys.revoke({
+        id: issuedApiKeyId,
+        callerUserId: userId,
+        callerIsAdmin: false,
+        organizationId,
+        awaitProjection: false,
+        cause: "session",
+      });
+    } catch (error) {
+      if (!ApiKeyAlreadyRevokedError.is(error)) {
+        logger.warn(
+          { error, apiKeyId: issuedApiKeyId, parentApiKeyId },
+          "could not retire a key whose session ended while it was minted",
+        );
+      }
+    }
+    throw new IngestionKeySessionRevokedError();
+  }
+
+  /**
+   * Revokes one of the caller's own personal ingestion keys, as a person's
+   * decision (cause `user`). Another person's key, a key outside this
+   * organization and a key that is not an ingestion key all read as not
+   * found, so the answer never confirms one exists. A key already revoked is
+   * left as it is: the person asked for a dead key and has one.
+   */
+  async revoke({
+    userId,
+    organizationId,
+    apiKeyId,
+  }: {
+    userId: string;
+    organizationId: string;
+    apiKeyId: string;
+  }): Promise<void> {
+    const key = await this.apiKeyRepo.findByIdInOrg({
+      id: apiKeyId,
+      organizationId,
+    });
+    if (!key || key.userId !== userId || !key.ingestSourceType) {
+      throw new IngestionKeyNotFoundError(apiKeyId);
+    }
+    if (key.revokedAt) return;
+    try {
+      await this.apiKeys.revoke({
+        id: key.id,
+        callerUserId: userId,
+        callerIsAdmin: false,
+        organizationId,
+        cause: "user",
+      });
+    } catch (error) {
+      if (ApiKeyAlreadyRevokedError.is(error)) return;
+      throw error;
+    }
+  }
+
+  /**
+   * Retires every live ingestion key minted under one CLI login key: the
+   * cascade a login-key revoke runs. `session` when the login key was
+   * revoked, `expired` when its session ran out. Each key gets its attempt
+   * even if another fails, and the count is what was revoked here; a key
+   * someone revoked a moment earlier is the outcome this wanted.
+   */
+  async revokeForSession({
+    parentApiKeyId,
+    userId,
+    organizationId,
+    cause,
+  }: {
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+    /**
+     * What the children record. The CLI reads this off a dead key to decide
+     * whether it may re-mint, so `rotation` (a re-login, whose new session is
+     * live) has to reach them as `rotation` rather than as `session`.
+     */
+    cause: "session" | "rotation" | "expired" | "offboarded";
+  }): Promise<{ revokedCount: number }> {
+    const children = (
+      await this.apiKeyRepo.findIngestKeysForUser({ organizationId, userId })
+    ).filter((key) => key.parentApiKeyId === parentApiKeyId);
+
+    let revokedCount = 0;
+    let failed = 0;
+    for (const key of children) {
+      try {
+        await this.apiKeys.revoke({
+          id: key.id,
+          callerUserId: userId,
+          callerIsAdmin: false,
+          organizationId,
+          awaitProjection: false,
+          cause,
+        });
+        revokedCount += 1;
+      } catch (error) {
+        if (ApiKeyAlreadyRevokedError.is(error)) continue;
+        failed += 1;
+        logger.warn(
+          { error, apiKeyId: key.id, parentApiKeyId, cause },
+          "could not revoke an ingest key with its session",
+        );
+      }
+    }
+    if (failed > 0) {
+      throw new Error(
+        `${failed} ingest key(s) under login key ${parentApiKeyId} could not be revoked`,
+      );
+    }
+    return { revokedCount };
+  }
+
+  /**
+   * Retires every live key of one (source type, template) in the caller's
+   * personal workspace, across every machine: the first half of the tile's
+   * rotate. Refuses a tool the CLI wraps before touching anything, since a
+   * rotate that could not mint the replacement would only leave the source
+   * dead.
+   *
+   * Every key gets its attempt, so a retry has less left to do, but a key
+   * that survives fails the call: the caller was about to mint a replacement
+   * and tell the person the old tokens are dead, and one of them is not.
+   * Returns the devices whose keys were retired, for the person to read.
+   */
+  async revokeForSource({
+    userId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+  }: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+  }): Promise<{ revokedCount: number; deviceLabels: string[] }> {
+    await this.assertMintableWithoutSession({
+      organizationId,
+      ingestionTemplateId,
+      sourceType,
+    });
+
+    const prior = (
+      await this.apiKeyRepo.findIngestKeysForUser({ organizationId, userId })
+    ).filter(
+      (key) =>
+        key.ingestSourceType === sourceType &&
+        (key.ingestionTemplateId ?? null) === ingestionTemplateId,
+    );
+
+    const deviceLabels: string[] = [];
+    const survivors: string[] = [];
+    let revokedCount = 0;
+    for (const key of prior) {
+      try {
+        await this.apiKeys.revoke({
+          id: key.id,
+          callerUserId: userId,
+          callerIsAdmin: false,
+          organizationId,
+          // The prior key is dead the moment its row is revoked, and its
+          // private role is named after that key id, so the mint that
+          // follows never waits for the name.
+          awaitProjection: false,
+          cause: "rotation",
+        });
+        revokedCount += 1;
+        deviceLabels.push(labelOf(key));
+      } catch (error) {
+        if (ApiKeyAlreadyRevokedError.is(error)) continue;
+        logger.warn(
+          { error, apiKeyId: key.id, sourceType },
+          "could not revoke a prior ingest key during rotation",
+        );
+        survivors.push(labelOf(key));
+      }
+    }
+    if (survivors.length > 0) {
+      throw new IngestionKeyRevokeIncompleteError(survivors);
+    }
+    return { revokedCount, deviceLabels };
+  }
+
+  /**
+   * The caller's live personal ingestion keys in this organization, newest
+   * first, with the session each belongs to. The plaintext token is never
+   * returned here; only a mint reveals it, once.
+   */
+  async list({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<PersonalIngestionKey[]> {
+    const keys = await this.apiKeyRepo.findIngestKeysForUser({
+      organizationId,
+      userId,
+    });
+    return keys
+      .filter((key): key is typeof key & { ingestSourceType: string } =>
+        Boolean(key.ingestSourceType),
+      )
+      .map((key) => ({
+        apiKeyId: key.id,
+        name: key.name,
+        sourceType: key.ingestSourceType,
+        lookupId: key.lookupId,
+        ingestionTemplateId: key.ingestionTemplateId,
+        deviceLabel: key.createdByDeviceLabel,
+        parentApiKeyId: key.parentApiKeyId,
+        createdAtMs: key.createdAt.getTime(),
+        lastUsedAtMs: key.lastUsedAt?.getTime() ?? null,
+      }));
+  }
+
+  /**
+   * What became of one of the caller's own personal ingest keys, looked up by
+   * the lookup id embedded in its token. The CLI asks this before it re-mints
+   * a key the collector rejected: a key retired with its session or replaced
+   * by a rotation may be re-minted, a key a person revoked may not.
+   *
+   * Null when no such key belongs to this user in this organization, which is
+   * also what a key of another user reads as: the answer never confirms that
+   * someone else's key exists.
+   */
+  async describe({
+    userId,
+    organizationId,
+    lookupId,
+  }: {
+    userId: string;
+    organizationId: string;
+    lookupId: string;
+  }): Promise<{
+    sourceType: string;
+    live: boolean;
+    revocationCause: ApiKeyRevocationCause | null;
+  } | null> {
+    const key = await this.apiKeyRepo.findByLookupId({ lookupId });
+    if (
+      !key ||
+      key.organizationId !== organizationId ||
+      key.userId !== userId ||
+      !key.ingestSourceType
+    ) {
+      return null;
+    }
+    return {
+      sourceType: key.ingestSourceType,
+      live: key.revokedAt === null,
+      revocationCause: isApiKeyRevocationCause(key.revocationCause)
+        ? key.revocationCause
+        : null,
+    };
+  }
+
+  /**
+   * The shared create step: one restricted ApiKey carrying `traces:create`
+   * through a single PROJECT-scoped CUSTOM binding.
+   */
+  private async createKey({
+    name,
+    callerUserId,
+    ownerUserId,
+    organizationId,
+    projectId,
+    sourceType,
+    ingestionTemplateId,
+    createdByDeviceLabel,
+    parentApiKeyId,
+  }: IngestionKeyMintParams & { name: string }): Promise<IssuedIngestionKey> {
     const { token, apiKey } = await this.apiKeys.create({
-      name: `Ingestion key (${sourceType})`,
+      name,
       userId: ownerUserId,
       createdByUserId: callerUserId,
       organizationId,
@@ -99,6 +573,7 @@ export class IngestionKeyService {
       ingestSourceType: sourceType,
       ingestionTemplateId,
       createdByDeviceLabel,
+      parentApiKeyId,
     });
 
     return {
@@ -110,91 +585,80 @@ export class IngestionKeyService {
   }
 
   /**
-   * Issues an ingestion key for the caller's personal project in the given org.
-   * Used by the unified CLI Path B (no template) and by personal template
-   * installs (with a templateId).
+   * A session mint needs a live login key. A login key already revoked means
+   * the session was logged out, revoked, replaced or expired, and a key
+   * minted under it now would be orphaned from every cascade that follows.
    */
-  async ensureForPersonalProject({
+  private async assertSessionLive({
+    parentApiKeyId,
     userId,
     organizationId,
-    sourceType,
-    ingestionTemplateId = null,
-    createdByDeviceLabel = null,
   }: {
+    parentApiKeyId: string;
     userId: string;
     organizationId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    createdByDeviceLabel?: string | null;
-  }): Promise<{
-    token: string;
-    apiKeyId: string;
-    prefix: string;
-    sourceType: string;
-  }> {
-    const workspace = await this.personalWorkspace.findExisting({
+  }): Promise<void> {
+    const live = await this.isSessionLive({
+      parentApiKeyId,
       userId,
       organizationId,
     });
-    if (!workspace) {
-      throw new Error(
-        "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
-      );
-    }
+    if (!live) throw new IngestionKeySessionRevokedError();
+  }
 
-    return this.ensureForProject({
-      callerUserId: userId,
-      // Personal-project key: owned by the user so the API-key list scopes it
-      // to its owner (and org admins), never to other org members.
-      ownerUserId: userId,
+  /** Whether that login key is still this caller's and still unrevoked. */
+  private async isSessionLive({
+    parentApiKeyId,
+    userId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const parent = await this.apiKeyRepo.findByIdInOrg({
+      id: parentApiKeyId,
       organizationId,
-      projectId: workspace.project.id,
-      sourceType,
-      ingestionTemplateId,
-      createdByDeviceLabel,
     });
+    return !!parent && parent.userId === userId && parent.revokedAt === null;
   }
 
   /**
-   * Lists the live ingestion keys in the caller's personal project for the
-   * given org. Returns one row per connected source (sourceType +
-   * ingestionTemplateId), so the /me Trace Ingest grid can render
-   * green-checked tiles that survive a reload. The plaintext token is never
-   * returned here — only mint/rotate reveal it once.
+   * The source types a mint with no session may name: those a published
+   * template names, and none the CLI wraps. The template is an admin-created
+   * row, so the set of source types it can name is the set the product
+   * knows. A platform template (`organizationId: null`) counts for every
+   * organization, which is what makes the shipped tiles installable.
    */
-  async listForPersonalProject({
-    userId,
+  private async assertMintableWithoutSession({
     organizationId,
+    ingestionTemplateId,
+    sourceType,
   }: {
-    userId: string;
     organizationId: string;
-  }): Promise<
-    {
-      apiKeyId: string;
-      sourceType: string;
-      lookupId: string;
-      ingestionTemplateId: string | null;
-    }[]
-  > {
-    const workspace = await this.personalWorkspace.findExisting({
-      userId,
+    ingestionTemplateId: string | null;
+    sourceType: string;
+  }): Promise<void> {
+    if (isWrappedTool(sourceType) || !ingestionTemplateId) {
+      throw new IngestionKeySourceNotAllowedError(sourceType);
+    }
+    const template = await this.templates.findByIdForOrg(this.prisma, {
+      id: ingestionTemplateId,
       organizationId,
     });
-    if (!workspace) return [];
-
-    const keys = await this.apiKeyRepo.findIngestKeysForProject({
-      organizationId,
-      projectId: workspace.project.id,
-    });
-    return keys
-      .filter((k): k is typeof k & { ingestSourceType: string } =>
-        Boolean(k.ingestSourceType),
-      )
-      .map((k) => ({
-        apiKeyId: k.id,
-        sourceType: k.ingestSourceType,
-        lookupId: k.lookupId,
-        ingestionTemplateId: k.ingestionTemplateId,
-      }));
+    if (template?.sourceType !== sourceType) {
+      throw new IngestionKeySourceNotAllowedError(sourceType);
+    }
   }
+}
+
+function isWrappedTool(sourceType: string): boolean {
+  return (PERSONAL_INGEST_SOURCE_TYPES as readonly string[]).includes(
+    sourceType,
+  );
+}
+
+/** How a key is named to a person: its device, else the key's own name. */
+function labelOf(key: ApiKeyWithBindings): string {
+  return key.createdByDeviceLabel ?? key.name;
 }

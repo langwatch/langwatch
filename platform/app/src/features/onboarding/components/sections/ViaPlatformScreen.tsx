@@ -12,6 +12,7 @@ import {
 import type React from "react";
 import { Link } from "~/components/ui/link";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import { accentChipBg } from "./shared/accent-surface";
 
 interface CapabilityProps {
   icon: LucideIcon;
@@ -96,7 +97,7 @@ function CapabilityCard({
           flexShrink={0}
           p={2.5}
           borderRadius="xl"
-          bg="orange.50"
+          bg={accentChipBg}
           color="orange.500"
           display="flex"
           alignItems="center"

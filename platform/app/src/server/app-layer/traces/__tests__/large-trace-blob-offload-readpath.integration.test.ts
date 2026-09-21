@@ -55,7 +55,10 @@ import {
   LARGE_VALUE,
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import {
+  BlobStore,
+  type S3ClientResolver,
+} from "~/server/app-layer/traces/blob-store.service";
 import {
   EVENTREF_ATTR_PREFIX,
   leanForProjection,
@@ -254,10 +257,10 @@ function makeRealBlobStore(client: ClickHouseClient): BlobStore {
       "S3 resolver must not be called on the event_log read path in this test",
     );
   };
-  return new BlobStore(
-    s3Resolver as unknown as ConstructorParameters<typeof BlobStore>[0],
-    async (_tenantId: string) => client,
-  );
+  return new BlobStore({
+    resolveS3Client: s3Resolver as unknown as S3ClientResolver,
+    resolveClickHouseClient: async (_tenantId: string) => client,
+  });
 }
 
 describe.skipIf(!hasTestcontainers)(

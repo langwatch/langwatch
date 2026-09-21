@@ -16,7 +16,7 @@ For Claude Code (manual) or other MCP clients (Cursor, Copilot, etc.), add an en
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
-The API key is required for observability and prompt tools. Documentation tools work without it.
+In stdio mode the API key is required for observability and prompt tools, and documentation tools work without it. In HTTP mode every MCP request needs a valid key, including documentation-tool requests, because the server authenticates the request before it reaches any tool.
 
 > The config is described in prose rather than as a JSON snippet because some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104). The bash form above is safe — the package name is followed by a whitespace terminator.
 
@@ -26,6 +26,60 @@ The API key is required for observability and prompt tools. Documentation tools 
 |---------|---------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
+| | `--http` | Serve over HTTP and SSE instead of stdio |
+| | `--port` | HTTP port (default: `3000`) |
+| `LANGWATCH_MCP_HTTP_HOST` | `--host` | HTTP listen address (default: `127.0.0.1`) |
+| `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server |
+| `LANGWATCH_MCP_TRUST_PROXY` | | Use `X-Forwarded-For` as the rate limit key (default: off) |
+
+### HTTP mode
+
+In HTTP mode each client brings its own API key in an `Authorization: Bearer <key>`
+header, on every MCP request rather than only at session start. That covers
+`/mcp`, `/sse`, and `/messages`. The key is checked against the LangWatch API
+before a session is created and re-checked on each request, so a session id by
+itself grants no access and revoking a key stops its sessions being served
+within a minute. The API key is never read from a query parameter.
+
+Because authentication happens before routing, this applies to the documentation
+tools too: unlike stdio mode, they are not reachable without a valid key.
+
+Three routes do not take the bearer. `/health` reports liveness only.
+`/.well-known/oauth-authorization-server` is the discovery document clients read
+before they hold a token. `/oauth/token` exchanges an API key, sent as
+`client_secret` in the form body, for a short-lived access token; it verifies
+that key against the LangWatch API before issuing anything, and the token it
+returns is what later MCP requests carry.
+
+The server listens on `127.0.0.1` by default, per the MCP transport guidance for
+local servers. Pass `--host 0.0.0.0` to accept connections from other machines,
+and only behind a network boundary you trust.
+
+Requests carrying a browser `Origin` header are checked against an allowlist.
+Loopback origins are always allowed; anything else has to be listed:
+
+```bash
+npx @langwatch/mcp-server --http --port 3000 \
+  --allowedOrigin https://your-app.example.com
+```
+
+#### Running behind a proxy
+
+Forwarded proxy headers resolve the external scheme that the OAuth metadata
+document advertises, so they are read by default.
+
+They do not decide the rate limit. Failed authentication is limited per client
+address, and that address comes from the socket rather than from
+`X-Forwarded-For`, so a client reaching the port directly cannot rotate a header
+to reset its own counter. Behind a real proxy every request shares the proxy's
+socket address, which means the whole proxy is limited as one client. Set
+`LANGWATCH_MCP_TRUST_PROXY=true` there to limit per real client instead, and
+only when the proxy overwrites `X-Forwarded-For` on the way in.
+
+This is defense in depth, not the security boundary. API keys are verified
+against the LangWatch API before a session is created and re-checked on every
+request; the rate limit exists to make guessing expensive, not to decide who
+gets in. A spoofable rate limit does not let anyone authenticate.
 
 ## Tools
 
@@ -71,11 +125,39 @@ The API key is required for observability and prompt tools. Documentation tools 
 
 | Tool | Description |
 |------|-------------|
-| `platform_list_scenarios` | List all scenarios |
+| `platform_list_scenarios` | List all scenarios, or only the ones filed in a test suite |
 | `platform_get_scenario` | Get scenario details |
-| `platform_create_scenario` | Create a new scenario |
-| `platform_update_scenario` | Update a scenario |
+| `platform_create_scenario` | Create a new scenario, optionally filed in a test suite |
+| `platform_update_scenario` | Update a scenario, or file it in another test suite |
 | `platform_archive_scenario` | Archive a scenario |
+
+### Test suites and run plans (requires API key)
+
+A test suite is a folder of scenarios. A run plan is what you run, and its
+name identifies it: running a name that exists replaces that plan's
+configuration, running a new name creates the plan. Running a test suite is
+sugar over a run plan, and creates or joins the plan `<suite name> <target name>`.
+
+| Tool | Description |
+|------|-------------|
+| `platform_run_plan` | Run scenarios against targets, by plan name |
+| `platform_list_run_plans` | List the run plans of the project |
+| `platform_get_run_plan` | Get the full configuration of a run plan |
+| `platform_rerun_run_plan` | Run a plan again with the configuration it holds |
+| `platform_archive_run_plan` | Archive a run plan |
+| `platform_list_test_suites` | List the test suites of the project |
+| `platform_create_test_suite` | Create a test suite |
+| `platform_get_test_suite` | Get a test suite and the scenarios filed in it |
+| `platform_rename_test_suite` | Rename a test suite |
+| `platform_archive_test_suite` | Archive a test suite and the scenarios filed in it |
+| `platform_run_test_suite` | Run every scenario of a test suite against targets |
+
+### Simulation runs (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_simulation_runs` | List simulation run results |
+| `platform_get_simulation_run` | Get one run with its conversation and verdict |
 
 ### Evaluators (requires API key)
 

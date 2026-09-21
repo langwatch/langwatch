@@ -142,11 +142,14 @@ describe.skipIf(!hasTestcontainers)(
         ).repository,
       );
 
-      const noopReactor = {
-        name: "noop",
-        options: {},
-        handle: async () => {},
-      };
+      const noopFoldSubscriber = () => ({
+        fold: "traceSummary",
+        handler: async () => {},
+      });
+      const noopMapSubscriber = () => ({
+        map: "spanStorage",
+        handler: async () => {},
+      });
 
       const pipelineName = `trace_role_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const pipelineDef = definePipeline<TraceProcessingEvent>()
@@ -160,16 +163,12 @@ describe.skipIf(!hasTestcontainers)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor(
-          "traceSummary",
-          "simulationMetricsSync",
-          noopReactor as any,
-        )
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
+        .withSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
+        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
+        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
+        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
+        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
+        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();

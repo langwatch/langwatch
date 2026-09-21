@@ -21,7 +21,7 @@ Feature: Trace origin classification
   #   - Empty/absent origin means "pending" (not yet determined), NOT "application"
   #   - This was changed from an absence-based design because of a race condition:
   #     when child spans arrive before the root span (which carries the origin),
-  #     the trace has no origin for up to a minute. The evaluation trigger reactor
+  #     the trace has no origin for up to a minute. The evaluation trigger subscriber
   #     fires after 30s and the precondition matcher was defaulting empty to
   #     "application", causing evaluations to incorrectly fire on evaluation and
   #     simulation traces.
@@ -48,14 +48,14 @@ Feature: Trace origin classification
   # 1. metadata.platform = "optimization_studio"
   #    - Set by: langwatch_nlp execute_flow.py (line 69) and
   #      execute_component.py (line 34) via langwatch.trace(metadata={...})
-  #    - Used by: evaluationTrigger.reactor.ts (line 46) to skip dev traces
+  #    - Used by: evaluationTrigger.subscriber.ts (line 46) to skip dev traces
   #    - Hoisted as: attrs["langwatch.platform"] in trace summary
   #    - Inference: langwatch.origin = "workflow" (or "playground" if from
   #      PromptStudioAdapter, or "evaluation" if from evaluations-v3)
   #
   # 2. metadata.environment = "development" | "production"
   #    - Set by: execute_flow.py (line 70) and execute_component.py (line 35)
-  #    - Used by: evaluationTrigger.reactor.ts (line 47) combined with #1
+  #    - Used by: evaluationTrigger.subscriber.ts (line 47) combined with #1
   #    - Hoisted as: attrs["langwatch.environment"] in trace summary
   #    - Inference: combined with #1 to distinguish dev vs prod workflows
   #
@@ -439,20 +439,20 @@ Feature: Trace origin classification
     # Resets via useSavedViews.resetAllFilters; see savedViewsLogic.ts:47.
 
   # ===========================================================================
-  # Step 6: Online evaluation origin handling (reactor + preconditions)
+  # Step 6: Online evaluation origin handling (subscriber + preconditions)
   # ===========================================================================
 
-  # As of 2026-05-01, the evaluationTrigger reactor no longer rejects traces
+  # As of 2026-05-01, the evaluationTrigger subscriber no longer rejects traces
   # based on origin — it dispatches for any known origin and lets the
   # precondition matcher (precondition-matchers.ts) filter per monitor config.
   # The exception is empty origin with no SDK info: that path schedules a
-  # deferred check via originGate.reactor.ts.
+  # deferred check via originGate.subscriber.ts.
 
   @unit @unimplemented
   Scenario: Online evaluations dispatch for evaluation-origin traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" = "evaluation"
-    When the evaluation trigger reactor processes the trace
+    When the evaluation trigger subscriber processes the trace
     Then evaluation commands are dispatched
     And precondition matchers filter based on the monitor's configured origin
 
@@ -460,22 +460,22 @@ Feature: Trace origin classification
   Scenario: Online evaluations run on application traces
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" = "application"
-    When the evaluation trigger reactor processes the trace
+    When the evaluation trigger subscriber processes the trace
     Then evaluations are triggered normally
 
   @unit @unimplemented
   Scenario: Online evaluations skip traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
     And a trace arrives without "langwatch.origin" and without sdk.name
-    When the evaluation trigger reactor processes the trace
+    When the evaluation trigger subscriber processes the trace
     Then no evaluation is triggered immediately
-    And a deferred origin-resolution check is scheduled (originGate.reactor)
+    And a deferred origin-resolution check is scheduled (originGate.subscriber)
 
   @unit @unimplemented
   Scenario: Online evaluations dispatch for simulation/workflow/playground traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" in {simulation, workflow, playground}
-    When the evaluation trigger reactor processes the trace
+    When the evaluation trigger subscriber processes the trace
     Then evaluation commands are dispatched
     And precondition matchers reject the trace if the monitor's configured
     origin does not match (server/evaluations/preconditions.ts)

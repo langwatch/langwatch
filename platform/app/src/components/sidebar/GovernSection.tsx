@@ -3,6 +3,7 @@ import React from "react";
 
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { featureIcons } from "~/utils/featureIcons";
 import { SidebarSection } from "./SidebarSection";
@@ -20,13 +21,14 @@ export const GovernSection = React.memo(function GovernSection({
   showExpanded: boolean;
 }) {
   const router = useRouter();
-  const { organization, hasPermission } = useOrganizationTeamProject({
+  const { project, organization, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -34,6 +36,7 @@ export const GovernSection = React.memo(function GovernSection({
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -47,13 +50,11 @@ export const GovernSection = React.memo(function GovernSection({
   if (!showGatewayEntry && !showGovernanceEntry) return null;
 
   const isGatewayActive =
-    router.pathname.startsWith("/settings/gateway") ||
-    router.pathname === "/settings/routing-policies" ||
+    router.pathname.startsWith("/gateway") ||
     router.pathname === "/settings/model-providers";
   const isGovernanceActive =
     router.pathname === "/governance" ||
-    router.pathname === "/settings/governance" ||
-    router.pathname.startsWith("/settings/governance/");
+    router.pathname.startsWith("/governance/");
 
   return (
     <SidebarSection
@@ -66,7 +67,7 @@ export const GovernSection = React.memo(function GovernSection({
         <SideMenuLink
           icon={featureIcons.gateway.icon}
           label="AI Gateway"
-          href="/settings/gateway/virtual-keys"
+          href="/gateway/virtual-keys"
           isActive={isGatewayActive}
           showLabel={showExpanded}
         />

@@ -12,10 +12,12 @@ export {
   compileSecretPatterns,
   detectSecretsInText,
   isSensitiveAttributeKey,
+  overBroadSecretPatternProbe,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
   type SecretMatch,
   type SecretsRedactionResult,
+  SHAPE_ONLY_SECRET_RULE_IDS,
 } from "./secrets.js";
 export {
   collectSensitiveEnvValues,

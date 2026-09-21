@@ -6,19 +6,18 @@
  *   2. Reconstitute the full span and process it normally.
  *   3. After event_log INSERT succeeds, best-effort delete the spool.
  *
- * These tests FAIL at unit runtime because RecordSpanCommand does not yet
- * fetch from spool or call deleteSpool (Step 5). They pass typecheck,
- * serving as the TDD contract.
- *
- * BDD structure: describe("given X") → describe("when Y") → it("…").
- * No "should" in it() names (project convention).
+ * And the other side of that branch: when no `spoolRef` is present, because
+ * the payload fit inline or because the edge spool failed open, the worker
+ * caps oversized attribute values before the span becomes an event.
  */
 
 import { describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
 import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../utils/capOversizedAttributes";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
@@ -170,10 +169,18 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
         (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
           .getSpool,
       ).toHaveBeenCalledOnce();
+      // The location is derived from the command's own authenticated tenant and
+      // span ids — the ref is passed through only so the legacy format can be
+      // recognised (langwatch/langwatch-saas#800).
       expect(
         (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
           .getSpool,
-      ).toHaveBeenCalledWith(SPOOL_REF);
+      ).toHaveBeenCalledWith({
+        spoolRef: SPOOL_REF,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID,
+        spanId: SPAN_ID,
+      });
 
       // Reconstituted span flows through — event data carries the full attributes
       expect(events).toHaveLength(1);
@@ -233,7 +240,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
       // deleteSpool is called once with the spool ref
       expect(deleteSpoolMock).toHaveBeenCalledOnce();
-      expect(deleteSpoolMock).toHaveBeenCalledWith(SPOOL_REF);
+      expect(deleteSpoolMock).toHaveBeenCalledWith({
+        spoolRef: SPOOL_REF,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID,
+        spanId: SPAN_ID,
+      });
     });
 
     it("does NOT call BlobStore.deleteSpool when storeEvents throws (handle() succeeded but INSERT failed)", async () => {
@@ -322,6 +334,97 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 });
 
 // ---------------------------------------------------------------------------
+// Fail-open consequence: what the worker does with the command the edge hands
+// back when the spool is unavailable
+// ---------------------------------------------------------------------------
+
+/**
+ * Starts from the real edge decision rather than a hand-built command: a
+ * failing spool PUT is what produces the inline command, and the worker is
+ * what applies the cap. Asserting the cap helper directly would stay green if
+ * the worker stopped calling it, applied it before spool rehydration, or
+ * skipped it on the inline path.
+ */
+describe("given the edge spool PUT failed and the command fell back to inline", () => {
+  const OVERSIZED_BYTES = 300 * 1024;
+
+  function makeFailingBlobStore(): BlobStore {
+    return {
+      putSpool: vi.fn().mockRejectedValue(new Error("S3 PUT failed")),
+      getSpool: vi.fn(),
+      deleteSpool: vi.fn(),
+    } as unknown as BlobStore;
+  }
+
+  async function inlineCommandAfterFailedSpool(): Promise<
+    Command<RecordSpanCommandData>
+  > {
+    const blobStore = makeFailingBlobStore();
+    const data = await maybeSpool({
+      data: {
+        tenantId: TENANT_ID,
+        occurredAt: 1700000000000,
+        span: {
+          traceId: TRACE_ID,
+          spanId: SPAN_ID,
+          name: "test-span",
+          kind: 1,
+          startTimeUnixNano: { low: 0, high: 0 },
+          endTimeUnixNano: { low: 1000000, high: 0 },
+          attributes: [
+            {
+              key: "langwatch.output",
+              value: { stringValue: "z".repeat(OVERSIZED_BYTES) },
+            },
+          ],
+          events: [],
+          links: [],
+          status: {},
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource: null,
+        instrumentationScope: null,
+      },
+      blobStore,
+      logger: { warn: vi.fn() },
+    });
+
+    return {
+      type: RECORD_SPAN_COMMAND_TYPE,
+      aggregateId: TRACE_ID,
+      tenantId: createTenantId(TENANT_ID),
+      data,
+    };
+  }
+
+  describe("when the command worker handles that command", () => {
+    /** @scenario When edge S3 spool PUT fails, ingestion falls back to inline (fail-open) */
+    it("emits a span whose oversized value carries the truncation marker and fits the cap", async () => {
+      const handler = new RecordSpanCommand({
+        ...makeDeps(),
+        blobStore: makeFailingBlobStore(),
+      });
+      const command = await inlineCommandAfterFailedSpool();
+
+      // Fail-open contract: the edge forwarded the full payload inline.
+      expect(command.data.spoolRef).toBeUndefined();
+
+      const events = await handler.handle(command);
+
+      const outputValue = events[0]?.data.span?.attributes?.find(
+        (a: { key: string }) => a.key === "langwatch.output",
+      )?.value?.stringValue;
+      expect(outputValue).toContain("[truncated:");
+      expect(Buffer.byteLength(outputValue ?? "", "utf-8")).toBeLessThanOrEqual(
+        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Race-condition regression test (ADR-022 fix)
 // ---------------------------------------------------------------------------
 
@@ -404,12 +507,14 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
     it("deletes each job's own spoolRef — not the other job's ref — pinning the race fix", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
-        getSpool: vi.fn().mockImplementation(async (ref: string) => {
-          if (ref === SPOOL_REF_A) {
-            return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
-          }
-          return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
-        }),
+        getSpool: vi
+          .fn()
+          .mockImplementation(async ({ traceId }: { traceId: string }) => {
+            if (traceId === TRACE_ID_A) {
+              return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
+            }
+            return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
+          }),
         deleteSpool: deleteSpoolMock,
       } as unknown as BlobStore;
 
@@ -437,11 +542,22 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
       // Exactly two deletions — one per job, in order of cleanupAfterStore calls
       expect(deleteSpoolMock).toHaveBeenCalledTimes(2);
 
-      // First cleanup must target cmdA's spool — NOT cmdB's
-      expect(deleteSpoolMock).toHaveBeenNthCalledWith(1, SPOOL_REF_A);
+      // Each cleanup must target its OWN job's span coordinates — those, not the
+      // reference, are what now locate the object (langwatch/langwatch-saas#800),
+      // so they are what pins the race fix.
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(1, {
+        spoolRef: SPOOL_REF_A,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID_A,
+        spanId: SPAN_ID_A,
+      });
 
-      // Second cleanup must target cmdB's spool — NOT cmdA's
-      expect(deleteSpoolMock).toHaveBeenNthCalledWith(2, SPOOL_REF_B);
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(2, {
+        spoolRef: SPOOL_REF_B,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID_B,
+        spanId: SPAN_ID_B,
+      });
     });
   });
 });

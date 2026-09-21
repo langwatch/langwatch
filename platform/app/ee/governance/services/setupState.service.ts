@@ -17,10 +17,9 @@
  * Spec: specs/ai-gateway/governance/feature-flag-gating.feature
  *       (persona detection sub-scenario, added next iter as we wire)
  */
-import type { PrismaClient } from "@prisma/client";
-
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PROJECT_KIND } from "./governanceProject.service";
+import type { GovernanceTraceActivityClickHouseRepository } from "./governanceTraceActivity.clickhouse.repository";
 
 export interface GovernanceSetupState {
   hasPersonalVKs: boolean;
@@ -42,10 +41,33 @@ export interface GovernanceSetupState {
 }
 
 export class GovernanceSetupStateService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The governance trace-activity reader, from the App. `undefined` on a
+   * deployment without ClickHouse, in which case {@link probeRecentActivity}
+   * short-circuits to `false` — same as the pre-repository "no client"
+   * fallback.
+   */
+  private readonly traceActivity:
+    | GovernanceTraceActivityClickHouseRepository
+    | undefined;
 
-  static create(prisma: PrismaClient): GovernanceSetupStateService {
-    return new GovernanceSetupStateService(prisma);
+  constructor({
+    prisma,
+    traceActivity,
+  }: {
+    prisma: PrismaClient;
+    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.traceActivity = traceActivity;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
+  }): GovernanceSetupStateService {
+    return new GovernanceSetupStateService(deps);
   }
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {
@@ -70,7 +92,7 @@ export class GovernanceSetupStateService {
       }),
       // Persona-3 detection: any application-kind project that has ever
       // received its first message (firstMessage flag is set by the
-      // collectorWorker + projectMetadata reactor on the first ingested
+      // collectorWorker + projectMetadata subscriber on the first ingested
       // span). Excludes internal_governance projects so a freshly-minted
       // Gov Project alone does not flip persona-3 to true.
       this.prisma.project.count({
@@ -138,24 +160,12 @@ export class GovernanceSetupStateService {
       select: { id: true },
     });
     if (!govProject) return false;
-
-    const ch = await getClickHouseClientForOrganization(organizationId);
-    if (!ch) return false;
+    if (!this.traceActivity) return false;
 
     const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const result = await ch.query({
-      query: `
-        SELECT 1 AS hit
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-          AND ts.Attributes['langwatch.origin.kind'] = 'ingestion_source'
-        LIMIT 1
-      `,
-      query_params: { tenantId: govProject.id, since },
-      format: "JSONEachRow",
+    return await this.traceActivity.hasRecentActivity({
+      tenantId: govProject.id,
+      sinceMs: since,
     });
-    const rows = (await result.json()) as Array<{ hit: number }>;
-    return rows.length > 0;
   }
 }

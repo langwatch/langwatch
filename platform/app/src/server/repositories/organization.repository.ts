@@ -1,4 +1,4 @@
-import type { PricingModel, PrismaClient } from "@prisma/client";
+import type { PricingModel, PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Repository for organization-related data access

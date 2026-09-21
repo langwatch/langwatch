@@ -83,7 +83,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutateAsync: mockDuplicate }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       prompts: {
         getAllPromptsForProject: { invalidate: mockInvalidatePromptList },
       },

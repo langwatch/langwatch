@@ -19,7 +19,7 @@ export function useUrlParamToOpenNewTab() {
   const { project } = useOrganizationTeamProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { selectedPromptId } = usePromptIdQueryParam();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   // Cascade-resolved model for new prompts. The query subscribes lazily
   // so the effect can read the cached value without firing a second

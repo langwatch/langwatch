@@ -14,8 +14,8 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { tracesRouter } from "../traces";
 
@@ -46,6 +46,14 @@ const {
   };
 });
 
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: { create: mockCreate },
 }));
@@ -70,18 +78,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkPermissionOrPubliclyShared:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
@@ -195,11 +194,13 @@ describe("traces router — #4991 AC2 thread reads", () => {
         threadIds: ["thread-1"],
       });
       expectConstructedWithBlobDeps();
+      // Trace corrections are opt-in per caller, so a thread read that does
+      // not ask for them gets what was captured.
       expect(mockGetTracesWithSpansByThreadIds).toHaveBeenCalledWith(
         "project_123",
         ["thread-1"],
         expect.any(Object),
-        { full: true },
+        { full: true, withEditOverlay: false },
       );
     });
   });
@@ -327,6 +328,27 @@ describe("traces router — #4991 AC5 list grid stays preview", () => {
         "project_123",
         ["t1"],
         expect.any(Object),
+        undefined,
+        { withEditOverlay: false },
+      );
+    });
+
+    it("stays on previews when it is asked for the corrected trace", async () => {
+      await caller.getFormattedSpansDigest({
+        projectId: "project_123",
+        traceIds: ["t1"],
+        withEditOverlay: true,
+      });
+      // Applying a correction needs neither the blob-resolution deps nor full
+      // resolution, so asking for one must not drag a whole page of offloaded
+      // values in behind it.
+      expect(mockBuildDeps).not.toHaveBeenCalled();
+      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+        "project_123",
+        ["t1"],
+        expect.any(Object),
+        undefined,
+        { withEditOverlay: true },
       );
     });
   });

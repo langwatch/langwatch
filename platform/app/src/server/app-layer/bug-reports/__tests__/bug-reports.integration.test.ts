@@ -1,6 +1,6 @@
-import type { BugReport } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { BugReport } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { app } from "~/server/routes/bug-reports";
 import {

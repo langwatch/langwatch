@@ -33,7 +33,7 @@ export function useBlobStoreActions({
   onCleanupSuccess: (variables: CleanupVariables) => void;
   onDeleteSuccess: (variables: DeleteVariables) => void;
 }) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const cleanup = api.ops.runBlobCleanup.useMutation({
     onSuccess: (report, variables) => {

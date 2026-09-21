@@ -14,10 +14,12 @@ if TYPE_CHECKING:
     from ..models.get_api_prompts_response_200_item_inputs_item import GetApiPromptsResponse200ItemInputsItem
     from ..models.get_api_prompts_response_200_item_messages_item import GetApiPromptsResponse200ItemMessagesItem
     from ..models.get_api_prompts_response_200_item_outputs_item import GetApiPromptsResponse200ItemOutputsItem
+    from ..models.get_api_prompts_response_200_item_parameters import GetApiPromptsResponse200ItemParameters
     from ..models.get_api_prompts_response_200_item_prompting_technique import (
         GetApiPromptsResponse200ItemPromptingTechnique,
     )
     from ..models.get_api_prompts_response_200_item_response_format import GetApiPromptsResponse200ItemResponseFormat
+    from ..models.get_api_prompts_response_200_item_tags_item import GetApiPromptsResponse200ItemTagsItem
 
 
 T = TypeVar("T", bound="GetApiPromptsResponse200Item")
@@ -42,6 +44,8 @@ class GetApiPromptsResponse200Item:
         inputs (list[GetApiPromptsResponse200ItemInputsItem]):
         outputs (list[GetApiPromptsResponse200ItemOutputsItem]):
         model (str):
+        tags (list[GetApiPromptsResponse200ItemTagsItem]):
+        parameters (GetApiPromptsResponse200ItemParameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
         temperature (float | Unset):
@@ -66,6 +70,8 @@ class GetApiPromptsResponse200Item:
     inputs: list[GetApiPromptsResponse200ItemInputsItem]
     outputs: list[GetApiPromptsResponse200ItemOutputsItem]
     model: str
+    tags: list[GetApiPromptsResponse200ItemTagsItem]
+    parameters: GetApiPromptsResponse200ItemParameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
     temperature: float | Unset = UNSET
@@ -116,6 +122,13 @@ class GetApiPromptsResponse200Item:
 
         model = self.model
 
+        tags = []
+        for tags_item_data in self.tags:
+            tags_item = tags_item_data.to_dict()
+            tags.append(tags_item)
+
+        parameters = self.parameters.to_dict()
+
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
             author_id = UNSET
@@ -163,6 +176,8 @@ class GetApiPromptsResponse200Item:
                 "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
+                "tags": tags,
+                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
@@ -188,12 +203,14 @@ class GetApiPromptsResponse200Item:
         from ..models.get_api_prompts_response_200_item_inputs_item import GetApiPromptsResponse200ItemInputsItem
         from ..models.get_api_prompts_response_200_item_messages_item import GetApiPromptsResponse200ItemMessagesItem
         from ..models.get_api_prompts_response_200_item_outputs_item import GetApiPromptsResponse200ItemOutputsItem
+        from ..models.get_api_prompts_response_200_item_parameters import GetApiPromptsResponse200ItemParameters
         from ..models.get_api_prompts_response_200_item_prompting_technique import (
             GetApiPromptsResponse200ItemPromptingTechnique,
         )
         from ..models.get_api_prompts_response_200_item_response_format import (
             GetApiPromptsResponse200ItemResponseFormat,
         )
+        from ..models.get_api_prompts_response_200_item_tags_item import GetApiPromptsResponse200ItemTagsItem
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -245,6 +262,15 @@ class GetApiPromptsResponse200Item:
             outputs.append(outputs_item)
 
         model = d.pop("model")
+
+        tags = []
+        _tags = d.pop("tags")
+        for tags_item_data in _tags:
+            tags_item = GetApiPromptsResponse200ItemTagsItem.from_dict(tags_item_data)
+
+            tags.append(tags_item)
+
+        parameters = GetApiPromptsResponse200ItemParameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -305,6 +331,8 @@ class GetApiPromptsResponse200Item:
             inputs=inputs,
             outputs=outputs,
             model=model,
+            tags=tags,
+            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
             temperature=temperature,

@@ -5,12 +5,13 @@ Feature: Authorize page project picker - honest selection and a path for empty o
 
   # Background
   #
-  # The /cli/auth page (project_api_key mode) offers the projects a key can be
-  # minted for. Historically it hid personal workspace projects entirely, so a
-  # user with no shared projects saw an empty picker and a dead-end card, and
-  # the generic scope picker presented "Multiple" as the active state when
-  # nothing was selected. Personal is now an explicit, clearly-labelled entry:
-  # picking it is a deliberate act, never implied by an org or team selection.
+  # The /cli/auth page (project_api_key mode) offers the projects whose API key
+  # the CLI can receive. Historically it hid personal workspace projects
+  # entirely, so a user with no shared projects saw an empty picker and a
+  # dead-end card, and the generic scope picker presented "Multiple" as the
+  # active state when nothing was selected. Personal is now an explicit,
+  # clearly-labelled entry: picking it is a deliberate act, never implied by an
+  # org or team selection.
 
   Background:
     Given a signed-in user on /cli/auth with a pending project_api_key device code

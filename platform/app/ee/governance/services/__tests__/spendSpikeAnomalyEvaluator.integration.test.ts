@@ -9,8 +9,8 @@
  *   → dedup invariant on re-tick → scope filter on a mismatched source.
  *
  * Test isolation strategy: seeds CH governance_kpis rows directly
- * (no fold reactor, no async pipeline delays) so the test stays
- * deterministic + sub-second. The reactor that populates
+ * (no fold subscriber, no async pipeline delays) so the test stays
+ * deterministic + sub-second. The subscriber that populates
  * governance_kpis is covered separately in 3b-iii integration tests.
  *
  * Spec contracts:
@@ -22,15 +22,16 @@
  *   - 3e-ii anomalyDetectionWorker (BullMQ orchestrator, separate test)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Organization, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Organization, Project } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { GovernanceKpisClickHouseRepository } from "../governanceKpis.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { SpendSpikeAnomalyEvaluator } from "../spendSpikeAnomalyEvaluator.service";
 
@@ -42,13 +43,24 @@ interface SeedKpiRow {
   promptTokens: number;
   completionTokens: number;
   traceId?: string;
+  /**
+   * The ReplacingMergeTree's version. Defaults to the hour bucket, which is
+   * what the fold writes for a first contribution; a test seeding a SECOND
+   * version of the same (source, hour, trace) has to move this forward, or
+   * the two rows are indistinguishable and which one survives is arbitrary.
+   */
+  lastEventOccurredAt?: Date;
 }
 
-async function insertGovernanceKpiRow(
-  ch: ClickHouseClient,
-  tenantId: string,
-  row: SeedKpiRow,
-): Promise<void> {
+async function insertGovernanceKpiRow({
+  ch,
+  tenantId,
+  row,
+}: {
+  ch: ClickHouseClient;
+  tenantId: string;
+  row: SeedKpiRow;
+}): Promise<void> {
   await ch.insert({
     table: "governance_kpis",
     values: [
@@ -61,7 +73,7 @@ async function insertGovernanceKpiRow(
         SpendUsd: row.spendUsd,
         PromptTokens: row.promptTokens,
         CompletionTokens: row.completionTokens,
-        LastEventOccurredAt: row.hourBucket,
+        LastEventOccurredAt: row.lastEventOccurredAt ?? row.hourBucket,
       },
     ],
     format: "JSONEachRow",
@@ -72,6 +84,7 @@ async function insertGovernanceKpiRow(
 describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis + AnomalyAlert", () => {
   const namespace = `spend-spike-${nanoid(8)}`;
   let ch: ClickHouseClient;
+  let kpisRepository: GovernanceKpisClickHouseRepository;
   let org: Organization;
   let govProject: Project;
   let primarySourceId: string;
@@ -85,6 +98,7 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
+    kpisRepository = new GovernanceKpisClickHouseRepository(async () => ch);
 
     org = await prisma.organization.create({
       data: {
@@ -107,13 +121,17 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     // Current window: NOW - 1h .. NOW. One trace, $10 spend, well above
     // any 2x baseline threshold given the seeded baseline.
     const inCurrentWindow = new Date(NOW.getTime() - 30 * 60 * 1000); // T-30min
-    await insertGovernanceKpiRow(ch, govProject.id, {
-      sourceId: primarySourceId,
-      sourceType: "otel_generic",
-      hourBucket: inCurrentWindow,
-      spendUsd: 10.0,
-      promptTokens: 1000,
-      completionTokens: 500,
+    await insertGovernanceKpiRow({
+      ch,
+      tenantId: govProject.id,
+      row: {
+        sourceId: primarySourceId,
+        sourceType: "otel_generic",
+        hourBucket: inCurrentWindow,
+        spendUsd: 10.0,
+        promptTokens: 1000,
+        completionTokens: 500,
+      },
     });
 
     // Baseline windows: 6 hours of $1.00 spend each. Total $6, average
@@ -121,13 +139,17 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     // = $2. Current ($10) ≥ $2 → fire.
     for (let i = 1; i <= 6; i++) {
       const baselineHour = new Date(NOW.getTime() - (60 + i * 60) * 60 * 1000); // T-2h, T-3h, … T-7h
-      await insertGovernanceKpiRow(ch, govProject.id, {
-        sourceId: primarySourceId,
-        sourceType: "otel_generic",
-        hourBucket: baselineHour,
-        spendUsd: 1.0,
-        promptTokens: 100,
-        completionTokens: 50,
+      await insertGovernanceKpiRow({
+        ch,
+        tenantId: govProject.id,
+        row: {
+          sourceId: primarySourceId,
+          sourceType: "otel_generic",
+          hourBucket: baselineHour,
+          spendUsd: 1.0,
+          promptTokens: 100,
+          completionTokens: 50,
+        },
       });
     }
   });
@@ -177,7 +199,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
+        prisma,
+        kpisRepository,
+      });
       // evaluator.evaluateAll() iterates ALL active spend_spike rules in PG,
       // so its bulk counters reflect global state (other orgs' rules from
       // dogfood fixtures may be present). Assertions stay scoped to MY rule's
@@ -208,7 +233,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
 
     describe("dedup invariant — re-running on the same window", () => {
       it("does not create a second AnomalyAlert for the same rule + window", async () => {
-        const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+        const evaluator = SpendSpikeAnomalyEvaluator.create({
+          prisma,
+          kpisRepository,
+        });
         await evaluator.evaluateAll({ now: NOW });
 
         const alerts = await prisma.anomalyAlert.findMany({
@@ -241,7 +269,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
+        prisma,
+        kpisRepository,
+      });
       await evaluator.evaluateAll({ now: NOW });
 
       // The source-scoped rule has zero matching governance_kpis rows
@@ -273,7 +304,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
+        prisma,
+        kpisRepository,
+      });
       await evaluator.evaluateAll({ now: NOW });
 
       // Archived rule is filtered out by the findMany WHERE clause in
@@ -283,6 +317,75 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         where: { ruleId: archivedRule.id },
       });
       expect(archivedAlerts).toHaveLength(0);
+    });
+  });
+
+  describe("given two unmerged versions of the same trace's hour", () => {
+    /**
+     * `governance_kpis` is a ReplacingMergeTree(LastEventOccurredAt) keyed by
+     * (TenantId, SourceId, HourBucket, TraceId), and its writer is
+     * LEVEL-TRIGGERED: governanceKpisSync.subscriber.ts writes the fold's
+     * RUNNING TOTAL for a trace every throttle window. So a trace that spans
+     * three windows leaves three rows carrying, say, $2 then $5 then $9, and
+     * multiple live versions per key is normal operation rather than a rare
+     * replay. Until a background merge collapses them, a plain sum returns
+     * $16 for $9 of spend.
+     *
+     * That inflation is not symmetric across the ratio this evaluator
+     * computes — long traces concentrate in the current window while the
+     * baseline averages six — so it reads as a spend spike that never
+     * happened.
+     *
+     * Seeded on its own day so the fixtures the evaluator tests above rely on
+     * cannot contribute to these totals.
+     */
+    const HOUR = new Date("2026-03-15T10:00:00Z");
+
+    describe("when reading the spend totals", () => {
+      it("counts only the surviving version, not the sum of both", async () => {
+        const traceId = `tr-restated-${nanoid()}`;
+        const sourceId = `is-restated-${nanoid()}`;
+        const seed = {
+          sourceId,
+          sourceType: "otel_generic",
+          hourBucket: HOUR,
+          traceId,
+          promptTokens: 10,
+          completionTokens: 5,
+        };
+        // The same trace, twice, as the throttled writer would leave it.
+        await insertGovernanceKpiRow({
+          ch,
+          tenantId: govProject.id,
+          row: {
+            ...seed,
+            spendUsd: 2,
+            lastEventOccurredAt: new Date(HOUR.getTime() + 1_000),
+          },
+        });
+        await insertGovernanceKpiRow({
+          ch,
+          tenantId: govProject.id,
+          row: {
+            ...seed,
+            spendUsd: 9,
+            lastEventOccurredAt: new Date(HOUR.getTime() + 2_000),
+          },
+        });
+
+        const totals = await kpisRepository.findSpendTotals({
+          tenantId: govProject.id,
+          windowStart: new Date("2026-03-15T09:00:00Z"),
+          windowEnd: new Date("2026-03-15T11:00:00Z"),
+          baselineStart: new Date("2026-03-15T08:00:00Z"),
+          sourceFilter: { sql: "", params: {} },
+        });
+
+        // 9, the running total the trace actually reached — not 11, which is
+        // that total added to the intermediate reading it superseded.
+        expect(totals.currentSpend).toBe(9);
+        expect(totals.baselineSpend).toBe(0);
+      });
     });
   });
 });

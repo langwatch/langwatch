@@ -6,7 +6,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
@@ -17,7 +17,7 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 /**
  * ClickHouse repository for stored_objects rows.
  *
- * Clients are resolved at call time via `getClickHouseClientForProject` so
+ * Clients are resolved at call time through the App's resolver so
  * per-tenant private ClickHouse routing is always respected.
  */
 export class StoredObjectsRepository {
@@ -46,12 +46,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot insert stored object",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         await client.insert({
           table: TABLE_NAME,
@@ -110,12 +105,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot find stored object by id",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         // Scalar-subquery dedup: inner reads only (project_id, id, inserted_at)
         // to find max(inserted_at), outer reads the full row for that version.
@@ -199,12 +189,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot enumerate stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         // Project-scoped enumeration. Two notes on cost:
         //
@@ -248,6 +233,65 @@ export class StoredObjectsRepository {
   }
 
   /**
+   * Returns every latest stored-object row for one project.
+   *
+   * This is intentionally a migration/admin surface rather than a hot-path
+   * query. Provider migration must preserve every column when it appends a
+   * newer ReplacingMergeTree version with a different storage URI.
+   */
+  async findLiveRowsByProjectPage({
+    projectId,
+    afterId,
+    limit,
+  }: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<StoredObject[]> {
+    const client = await getApp().clickhouse.resolveClient(projectId);
+
+    const result = await client.query({
+      query: `
+        SELECT
+          t.id,
+          t.project_id,
+          t.purpose,
+          t.owner_kind,
+          t.owner_id,
+          t.media_type,
+          t.size_bytes,
+          t.sha256,
+          t.storage_uri,
+          t.created_at,
+          t.inserted_at
+        FROM ${TABLE_NAME} AS t
+        WHERE t.project_id = {projectId:String}
+          AND t.id > {afterId:String}
+          AND (t.project_id, t.id, t.inserted_at) IN (
+            SELECT project_id, id, max(inserted_at)
+            FROM ${TABLE_NAME}
+            WHERE project_id = {projectId:String}
+              AND id > {afterId:String}
+            GROUP BY project_id, id
+          )
+        ORDER BY t.id
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { projectId, afterId: afterId ?? "", limit },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<Record<string, unknown>>();
+    return rows.map((raw) =>
+      storedObjectSchema.parse({
+        ...raw,
+        size_bytes: Number(raw.size_bytes),
+        created_at: new Date(raw.created_at as string),
+        inserted_at: new Date(raw.inserted_at as string),
+      }),
+    );
+  }
+
+  /**
    * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
    * one `purpose`, as the storage-accounting byte ledger (ADR-040).
    *
@@ -276,12 +320,7 @@ export class StoredObjectsRepository {
         },
       },
       async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured - cannot sum stored object sizes",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         const purposePredicate = purpose
           ? "AND t.purpose = {purpose:String}"
@@ -353,12 +392,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
 
         await client.exec({
           query: `
@@ -413,12 +447,7 @@ export class StoredObjectsRepository {
         },
       },
       async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
+        const client = await getApp().clickhouse.resolveClient(projectId);
         await client.exec({
           query: `
             ALTER TABLE ${TABLE_NAME}

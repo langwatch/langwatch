@@ -1,9 +1,11 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import type { TeamRoleValue } from "../memberRoleConstraints";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
+  getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
+  isBindingRoleAllowedForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
 } from "../memberRoleConstraints";
 
@@ -32,6 +34,67 @@ describe("memberRoleConstraints", () => {
           "Lite Member",
         );
       });
+    });
+  });
+
+  describe("isBindingRoleAllowedForOrganizationRole()", () => {
+    describe("when organization role is Lite Member", () => {
+      it("allows only Viewer", () => {
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.EXTERNAL,
+            role: TeamUserRole.VIEWER,
+          }),
+        ).toBe(true);
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.EXTERNAL,
+            role: TeamUserRole.MEMBER,
+          }),
+        ).toBe(false);
+      });
+
+      it("rejects custom roles, which require a full seat", () => {
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.EXTERNAL,
+            role: TeamUserRole.CUSTOM,
+          }),
+        ).toBe(false);
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.EXTERNAL,
+            role: "custom:role_1" as TeamRoleValue,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when organization role is Member", () => {
+      it("allows Viewer, unlike the team-membership rule", () => {
+        // An access row scoping a full member down to Viewer on one project is
+        // legitimate; only the Lite Member seat constrains stored rows.
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.MEMBER,
+            role: TeamUserRole.VIEWER,
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("getDefaultTeamRoleForOrganizationRole()", () => {
+    it("starts a Lite Member at Viewer and everyone else at Member", () => {
+      expect(
+        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.EXTERNAL),
+      ).toBe(TeamUserRole.VIEWER);
+      expect(
+        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.MEMBER),
+      ).toBe(TeamUserRole.MEMBER);
+      expect(
+        getDefaultTeamRoleForOrganizationRole(OrganizationUserRole.ADMIN),
+      ).toBe(TeamUserRole.MEMBER);
     });
   });
 
@@ -143,7 +206,7 @@ describe("memberRoleConstraints", () => {
     describe("when organization role is Lite Member", () => {
       /** @scenario Switching from Member to Lite Member auto-corrects team role to Viewer */
       /** @scenario Switching from Admin to Lite Member auto-corrects team role to Viewer */
-      /** @scenario Saving a Lite Member update enforces Viewer team role in every team */
+      /** @scenario Saving a Lite Member update enforces Viewer team role in every shared team */
       it("forces Admin to Viewer", () => {
         expect(
           getAutoCorrectedTeamRoleForOrganizationRole({

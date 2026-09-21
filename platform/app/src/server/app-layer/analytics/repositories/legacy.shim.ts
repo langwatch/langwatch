@@ -33,20 +33,28 @@ import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { adjustTimeScaleForBucketCap } from "../query-builders/_shared";
+import type { TimeseriesReadOptions } from "../types";
 import { parseTimeseriesRows } from "./_timeseries-row-parser";
+import { maxResultRowsSettings } from "./analyticsTimeseriesRead.repository";
 
 const logger = createLogger(
   "langwatch:app-layer:analytics:legacy-analytics-shim",
 );
 
 export interface LegacyAnalyticsShim {
-  run(input: TimeseriesInputType): Promise<TimeseriesResult>;
+  run(
+    input: TimeseriesInputType,
+    options?: TimeseriesReadOptions,
+  ): Promise<TimeseriesResult>;
 }
 
 export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async run(input: TimeseriesInputType): Promise<TimeseriesResult> {
+  async run(
+    input: TimeseriesInputType,
+    options?: TimeseriesReadOptions,
+  ): Promise<TimeseriesResult> {
     if (!input.projectId) {
       throw new Error(
         "ClickHouseLegacyAnalyticsShim.run: projectId is required",
@@ -81,6 +89,7 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
       timeZone: input.timeZone,
       traceIds: input.traceIds,
       negateFilters: input.negateFilters,
+      excludeOrigins: input.excludeOrigins,
     });
 
     try {
@@ -88,7 +97,11 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
         query: sql,
         query_params: params,
         format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+        clickhouse_settings: {
+          ...ANALYTICS_CLICKHOUSE_SETTINGS,
+          log_comment: "analytics:timeseries:legacy-shim",
+          ...maxResultRowsSettings(options?.maxResultRows),
+        },
       });
       const rows = (await result.json()) as Array<Record<string, unknown>>;
       return parseTimeseriesRows({
@@ -98,7 +111,7 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
         timeScale: input.timeScale,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: input.projectId,
           error: error instanceof Error ? error.message : String(error),

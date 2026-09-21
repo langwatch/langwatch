@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -111,37 +113,70 @@ func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
 	o.dropWorktreeDatabases(ctx, dbSlug)
 }
 
-// resolveDestroySlug picks the slug whose databases DestroyWorktree may drop.
-// The registry is authoritative: a stack registered for dir carries the slug
-// haven itself assigned, so it wins over the worktree-local slug cache
-// (.langwatch-slug), which a hostile branch checked out via `haven pr` can forge
-// to name another worktree's slug. The cache is consulted only as a fallback
-// when no stack is registered for dir, and even then a cached slug that collides
-// with a *different* registered worktree's slug is refused. Returns "" when no
-// safe slug can be established (nothing is dropped).
+// resolveDestroySlug picks the slug whose databases DestroyWorktree may drop,
+// logging any slug-cache disagreement — the destroy path is where that
+// tampering signal matters.
 func (o *Orchestrator) resolveDestroySlug(dir string) string {
+	slug, warns := o.slugForDir(dir)
+	for _, w := range warns {
+		o.log.Warn("destroy: "+w.message, w.fields...)
+	}
+	return slug
+}
+
+type slugWarning struct {
+	message string
+	fields  []zap.Field
+}
+
+// slugForDir picks the slug that owns dir's databases, silently. The registry
+// is authoritative: a stack registered for dir carries the slug haven itself
+// assigned, so it wins over the worktree-local slug cache (.langwatch-slug),
+// which a hostile branch checked out via `haven pr` can forge to name another
+// worktree's slug. The cache is consulted only as a fallback when no stack is
+// registered for dir, and even then a cached slug that collides with a
+// *different* registered worktree's slug is refused. Returns "" when no safe
+// slug can be established (nothing is dropped). Read-only surfaces (the hub's
+// worktree list, the prune plan) call this on every refresh, so it returns its
+// warnings instead of logging them — only the destroy path speaks.
+func (o *Orchestrator) slugForDir(dir string) (string, []slugWarning) {
+	if slug, warns, ok := o.registrySlugForDir(dir); ok {
+		return slug, warns
+	}
+	return o.cachedSlugForDir(dir)
+}
+
+// registrySlugForDir answers from the registry (ok=false when no stack is
+// registered for dir), warning when the worktree-local cache disagrees.
+func (o *Orchestrator) registrySlugForDir(dir string) (string, []slugWarning, bool) {
 	for _, st := range o.store.Stacks() {
 		if canonicalPath(st.WorktreeDir) != dir {
 			continue
 		}
+		var warns []slugWarning
 		if cached, ok := o.store.ReadSlugCache(dir); ok && cached != "" && cached != st.Slug {
-			o.log.Warn("destroy: ignoring worktree slug cache that disagrees with the registry",
-				zap.String("dir", dir), zap.String("cached", cached), zap.String("registry", st.Slug))
+			warns = append(warns, slugWarning{"ignoring worktree slug cache that disagrees with the registry",
+				[]zap.Field{zap.String("dir", dir), zap.String("cached", cached), zap.String("registry", st.Slug)}})
 		}
-		return st.Slug
+		return st.Slug, warns, true
 	}
+	return "", nil, false
+}
+
+// cachedSlugForDir is the fallback: the worktree-local cache, refused when the
+// cached slug collides with a different registered worktree's slug.
+func (o *Orchestrator) cachedSlugForDir(dir string) (string, []slugWarning) {
 	cached, ok := o.store.ReadSlugCache(dir)
 	if !ok || cached == "" {
-		return ""
+		return "", nil
 	}
 	for _, st := range o.store.Stacks() {
 		if st.Slug == cached && canonicalPath(st.WorktreeDir) != dir {
-			o.log.Warn("destroy: refusing to drop databases — cached slug belongs to another registered worktree",
-				zap.String("dir", dir), zap.String("cached", cached), zap.String("owner", st.WorktreeDir))
-			return ""
+			return "", []slugWarning{{"refusing to drop databases — cached slug belongs to another registered worktree",
+				[]zap.Field{zap.String("dir", dir), zap.String("cached", cached), zap.String("owner", st.WorktreeDir)}}}
 		}
 	}
-	return cached
+	return cached, nil
 }
 
 // dropWorktreeDatabases drops the ClickHouse + Postgres databases for slug — a
@@ -232,24 +267,185 @@ type HubStack struct {
 	ServiceUp map[string]bool
 }
 
-// HubStacks assembles the hub rows from the registry + live probes.
-func (o *Orchestrator) HubStacks() []HubStack {
-	var rows []HubStack
-	for _, st := range o.store.Stacks() {
-		row := HubStack{Stack: st, IsLive: o.sys.ProcessAlive(st.LauncherPID), ServiceUp: map[string]bool{}}
-		if row.IsLive {
-			row.RSS = o.sys.GroupRSS(st.LauncherPID)
-		}
-		for _, svc := range st.Services {
-			up := svc.Port != 0 && o.sys.PortInUse(svc.Port)
-			row.ServiceUp[svc.Name] = up
-			if up {
-				row.PortsUp++
-			}
-		}
-		rows = append(rows, row)
+// HubWorktree is a worktree with no registered stack — visible in the hub so
+// "what is on this machine" includes the trees nothing is running from.
+type HubWorktree struct {
+	Dir, Branch, Slug    string
+	IsPrimary, IsCurrent bool
+}
+
+// HubFootprint is the machine's memory picture as the hub header shows it:
+// every dev-work process attributed once (domain.PartitionFootprint), plus the
+// machine total and the daemon's pressure reading for context.
+type HubFootprint struct {
+	TotalRAM   uint64
+	StacksRSS  uint64
+	ServerRSS  map[string]uint64 // clickhouse | postgres | redis | containers
+	AgentRSS   uint64
+	AgentCount int
+	ToolingRSS uint64
+	// OtherRSS is everything alive that is not dev work — shown in its own
+	// color so the chart reflects the whole machine.
+	OtherRSS uint64
+	Pressure domain.Pressure
+}
+
+// DevRSS is everything the partitioner attributed to dev work, summed.
+func (f HubFootprint) DevRSS() uint64 {
+	total := f.StacksRSS + f.AgentRSS + f.ToolingRSS
+	for _, rss := range f.ServerRSS {
+		total += rss
 	}
-	return rows
+	return total
+}
+
+// HubView is everything one hub refresh shows: the stacks, the stackless
+// worktrees, the machine footprint, and the daemon's recent reap events
+// (newest first).
+type HubView struct {
+	Stacks    []HubStack
+	Worktrees []HubWorktree
+	Footprint HubFootprint
+	Events    []domain.ReapEvent
+}
+
+// HubView assembles one refresh of the hub from a single process listing plus
+// the registry, the worktree list, and the daemon's records. gitDir is the
+// repository the worktree list comes from and selfDir the worktree haven runs
+// from (its row is marked protected); either may be "" to skip the listing.
+func (o *Orchestrator) HubView(gitDir, selfDir string) HubView {
+	stacks := o.store.Stacks()
+	part := o.partitionMachine(stacks)
+	view := HubView{Footprint: o.hubFootprint(part)}
+	for i := range stacks {
+		view.Stacks = append(view.Stacks, o.hubStackRow(&stacks[i], part))
+	}
+	view.Worktrees = o.hubWorktrees(gitDir, selfDir, stacks)
+	view.Events = newestFirst(o.store.ReapEvents())
+	return view
+}
+
+// partitionMachine attributes one process listing across the live stacks'
+// launcher groups and everything else the footprint names.
+func (o *Orchestrator) partitionMachine(stacks []domain.Stack) domain.Footprint {
+	var launchers []int
+	for i := range stacks {
+		if o.sys.ProcessAlive(stacks[i].LauncherPID) {
+			launchers = append(launchers, stacks[i].LauncherPID)
+		}
+	}
+	samples := o.sys.ProcessSamples()
+	fpSamples := make([]domain.FootprintSample, 0, len(samples))
+	for _, s := range samples {
+		fpSamples = append(fpSamples, domain.FootprintSample{PID: s.PID, PPID: s.PPID, PGID: s.PGID, RSS: s.RSSBytes, Command: s.Command})
+	}
+	return domain.PartitionFootprint(fpSamples, launchers)
+}
+
+// StackRSSByLauncher is each live stack's whole-tree resident set, keyed by
+// launcher pid — the one number every reporting surface (hub, status, session,
+// the daemon's pressure hint) should agree on. Group RSS is wrong for this:
+// supervised children lead their own process groups, so a group sum sees only
+// the launcher itself.
+func (o *Orchestrator) StackRSSByLauncher() map[int]uint64 {
+	part := o.partitionMachine(o.store.Stacks())
+	out := make(map[int]uint64, len(part.StackRSS))
+	for pid, rss := range part.StackRSS {
+		out[pid] = uint64(max(rss, 0))
+	}
+	return out
+}
+
+func (o *Orchestrator) hubStackRow(st *domain.Stack, part domain.Footprint) HubStack {
+	row := HubStack{Stack: *st, IsLive: o.sys.ProcessAlive(st.LauncherPID), ServiceUp: map[string]bool{}}
+	if row.IsLive {
+		row.RSS = uint64(max(part.StackRSS[st.LauncherPID], 0))
+	}
+	for _, svc := range st.Services {
+		up := svc.Port != 0 && o.sys.PortInUse(svc.Port)
+		row.ServiceUp[svc.Name] = up
+		if up {
+			row.PortsUp++
+		}
+	}
+	return row
+}
+
+func (o *Orchestrator) hubFootprint(part domain.Footprint) HubFootprint {
+	f := HubFootprint{
+		TotalRAM:   o.sys.TotalMemory(),
+		StacksRSS:  uint64(max(part.StacksRSS(), 0)),
+		ServerRSS:  map[string]uint64{},
+		AgentRSS:   uint64(max(part.AgentRSS, 0)),
+		AgentCount: part.AgentCount,
+		ToolingRSS: uint64(max(part.ToolingRSS, 0)),
+		OtherRSS:   uint64(max(part.OtherRSS, 0)),
+	}
+	for name, rss := range part.ServerRSS {
+		f.ServerRSS[name] = uint64(max(rss, 0))
+	}
+	rec, ok := o.store.ReadPressure()
+	f.Pressure = domain.ReadPressure(rec, ok, o.sys.Now())
+	return f
+}
+
+// hubWorktrees lists the repository's worktrees that have no registered stack,
+// via the same scan (and the same primary/current protection flags) the prune
+// picker uses. A repo that cannot be listed degrades to no rows, never an error
+// — the hub must open even when git is momentarily unhappy.
+func (o *Orchestrator) hubWorktrees(gitDir, selfDir string, stacks []domain.Stack) []HubWorktree {
+	if gitDir == "" || o.hyg == nil {
+		return nil
+	}
+	rows, err := o.PlanPrune(gitDir, selfDir)
+	if err != nil {
+		return nil
+	}
+	hasStack := map[string]bool{}
+	for i := range stacks {
+		hasStack[canonicalPath(stacks[i].WorktreeDir)] = true
+	}
+	var worktrees []HubWorktree
+	for _, r := range rows {
+		if hasStack[canonicalPath(r.Dir)] {
+			continue
+		}
+		worktrees = append(worktrees, HubWorktree{
+			Dir: r.Dir, Branch: r.Branch, Slug: r.Slug,
+			IsPrimary: r.IsPrimary, IsCurrent: r.IsCurrent,
+		})
+	}
+	return worktrees
+}
+
+// DashboardURL is the machine's cross-worktree web dashboard — what the hub's
+// "w" opens.
+func (o *Orchestrator) DashboardURL() string {
+	scheme, port := o.proxy.Endpoint()
+	return o.cfg.Naming.URL(domain.HubService, "", scheme, port)
+}
+
+// RedirectLogsToFile sends this orchestrator's logs to a file under the haven
+// home instead of stderr — for commands that own the terminal with a
+// full-screen TUI, where a stray log line scribbles over the interface. If the
+// file cannot be opened the logs are dropped: a corrupted TUI is worse than a
+// lost warning.
+func (o *Orchestrator) RedirectLogsToFile(name string) {
+	f, err := os.OpenFile(filepath.Join(o.cfg.Home, name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		o.log = zap.NewNop()
+		return
+	}
+	enc := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	o.log = zap.New(zapcore.NewCore(enc, zapcore.AddSync(f), zap.InfoLevel))
+}
+
+func newestFirst(events []domain.ReapEvent) []domain.ReapEvent {
+	out := make([]domain.ReapEvent, 0, len(events))
+	for _, ev := range slices.Backward(events) {
+		out = append(out, ev)
+	}
+	return out
 }
 
 func (o *Orchestrator) stackBySlug(slug string) (domain.Stack, bool) {

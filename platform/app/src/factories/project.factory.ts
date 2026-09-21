@@ -1,6 +1,6 @@
-import type { Project } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
+import type { Project } from "~/generated/prisma/client";
 
 // Omit the Json fields - Prisma's output type (JsonValue | null) is structurally
 // incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).
@@ -14,6 +14,7 @@ export const projectFactory = Factory.define<
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
   apiKey: `test-api-key-${nanoid()}`,
+  lwqlKey: `test-lwql-key-${nanoid()}`,
   teamId: nanoid(),
   language: "en",
   framework: "langchain",
@@ -33,4 +34,6 @@ export const projectFactory = Factory.define<
   ownerUserId: null,
   presenceEnabled: false,
   departmentId: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
 }));

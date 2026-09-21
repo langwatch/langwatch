@@ -14,18 +14,18 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";
-import Parse from "papaparse";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import { downloadCsv } from "~/utils/downloadCsv";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { InputGroup } from "../../components/ui/input-group";
@@ -51,6 +51,26 @@ function truncateJsonForCsv(value: unknown): string {
   if (s.length <= CSV_JSON_CAP) return s;
   return `${s.slice(0, CSV_JSON_CAP)}…[truncated ${s.length - CSV_JSON_CAP} chars]`;
 }
+
+/**
+ * Which system made the change, in the reader's words.
+ *
+ * "Directory" is the one that earns its place (ADR-122): a membership change
+ * the customer's identity provider made has no user to name, so without it
+ * the row reads as a change with no author — and that is the reading that
+ * sends an administrator hunting for a person who does not exist.
+ */
+const SOURCE_LABEL: Record<string, string> = {
+  gateway: "Gateway",
+  directory: "Directory",
+  platform: "Platform",
+};
+
+const SOURCE_TONE: Record<string, string> = {
+  gateway: "purple",
+  directory: "blue",
+  platform: "gray",
+};
 
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
@@ -107,7 +127,7 @@ function AuditLogPage() {
   const organizationId = organization?.id ?? "";
 
   // Initialize query client (must be before early return)
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   // Get users for search - we'll search by user ID or name/email
   const { data: organizationMembers } =
@@ -341,24 +361,12 @@ function AuditLogPage() {
         truncateJsonForCsv(log.after),
       ]);
 
-      // Generate CSV
-      const csvBlob = Parse.unparse({
+      const formattedDate = new Date().toISOString().split("T")[0];
+      downloadCsv({
         fields,
-        data: csvData,
+        rows: csvData,
+        fileName: `audit_logs_${formattedDate}.csv`,
       });
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([csvBlob]));
-      const link = document.createElement("a");
-      link.href = url;
-      const today = new Date();
-      const formattedDate = today.toISOString().split("T")[0];
-      const fileName = `audit_logs_${formattedDate}.csv`;
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export audit logs:", error);
     } finally {
@@ -595,11 +603,9 @@ function AuditLogPage() {
                         <Badge
                           size="sm"
                           variant="subtle"
-                          colorPalette={
-                            log.source === "gateway" ? "purple" : "gray"
-                          }
+                          colorPalette={SOURCE_TONE[log.source] ?? "gray"}
                         >
-                          {log.source === "gateway" ? "Gateway" : "Platform"}
+                          {SOURCE_LABEL[log.source] ?? "Platform"}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>

@@ -9,15 +9,17 @@ export function buildPairwiseComparisons(
   column: BatchComparisonColumn,
 ): PairwiseComparison[] {
   return Object.values(column.verdictsByRow).map((verdict) => {
-    // An unresolved label is no evidence at all (excluded via winner: null);
-    // a genuine tie is real 0.5/0.5 evidence. Both leave winnerId === null on
-    // the verdict itself, so the distinction has to be read off
-    // `isUnresolved`, not re-derived from winnerId.
-    const winner: string | "tie" | null = verdict.isUnresolved
-      ? null
-      : verdict.winnerId === null
-        ? "tie"
-        : verdict.winnerId;
+    // Three different things leave winnerId === null, and only one of them is
+    // evidence. A genuine tie is real 0.5/0.5 evidence; an unresolved label
+    // and a row the judge never settled are no evidence at all and are
+    // excluded via winner: null. The distinction cannot be re-derived from
+    // winnerId, so it is read off the two flags.
+    const winner: string | "tie" | null =
+      verdict.isUnresolved || verdict.isUnsettled
+        ? null
+        : verdict.winnerId === null
+          ? "tie"
+          : verdict.winnerId;
 
     return {
       // Rows predating candidate-id capture (very old runs) have none

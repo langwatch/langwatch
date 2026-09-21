@@ -18,25 +18,32 @@
             "code": {
               "sdk": {
                 "python": "langwatch.trace",
-                "typescript": "langwatch"
+                "typescript": "langwatch",
+                "go": "langwatch.Tracer"
               },
               "cli": [
                 "trace search",
                 "trace get",
                 "trace export",
-                "trace transcript"
+                "trace transcript",
+                "session events",
+                "trace facets",
+                "trace fields"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
                 "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
-                "trace transcript": "langwatch trace transcript <traceId> -o json"
+                "trace transcript": "langwatch trace transcript <traceId> -o json",
+                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json",
+                "trace facets": "langwatch trace facets model --prefix gpt -o json",
+                "trace fields": "langwatch trace fields -o json"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
             "platform": {
-              "ui": "/messages",
+              "ui": "/traces",
               "mcp": [
                 "search_traces",
                 "get_trace"
@@ -95,6 +102,48 @@
           ]
         },
         {
+          "id": "observability.custom-query",
+          "name": "Custom Query",
+          "description": "Query traces two ways: LangWatchQL analytics SQL for counts, rates and joins, and the trace filter language for finding traces",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "typescript": "langwatch.query"
+              },
+              "cli": [
+                "query run",
+                "query schema",
+                "query reference",
+                "query examples"
+              ],
+              "hints": {
+                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
+                "query schema": "langwatch query schema -f json",
+                "query reference": "langwatch query reference -f json",
+                "query examples": "langwatch query examples --tag cost"
+              },
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/experiments/workbench",
+              "mcp": [
+                "run_query",
+                "discover_schema"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/query",
+            "docs": null
+          },
+          "sync": "code-to-platform",
+          "produces": [],
+          "consumes": [
+            "traces"
+          ]
+        },
+        {
           "id": "observability.user-events",
           "name": "User Events",
           "description": "Track user interactions \u2014 thumbs up/down, selected text, custom events",
@@ -102,7 +151,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.track_event",
-                "typescript": null
+                "typescript": null,
+                "go": "client.Events"
               },
               "cli": null,
               "skill": null,
@@ -127,7 +177,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.annotations",
-                "typescript": "langwatch.annotations"
+                "typescript": "langwatch.annotations",
+                "go": "client.Annotations"
               },
               "cli": [
                 "annotation list",
@@ -184,14 +235,24 @@
                 "experiment run",
                 "experiment status",
                 "experiment list-runs",
-                "experiment results"
+                "experiment results",
+                "experiment create",
+                "experiment get-state",
+                "experiment set-state",
+                "experiment versions",
+                "experiment restore"
               ],
               "hints": {
                 "experiment list": "langwatch experiment list --limit 20 -o json",
                 "experiment run": "langwatch experiment run <slug> --wait",
                 "experiment status": "langwatch experiment status <slug> -o json",
                 "experiment list-runs": "langwatch experiment list-runs <slug> -o json",
-                "experiment results": "langwatch experiment results <slug> --filter failed -o json"
+                "experiment results": "langwatch experiment results <slug> --filter failed -o json",
+                "experiment create": "langwatch experiment create --name \"Checkout quality\" -o json",
+                "experiment get-state": "langwatch experiment get-state <slug> -o json",
+                "experiment set-state": "langwatch experiment set-state <slug> --file state.json --expected-version 4 --message \"Added a target\"",
+                "experiment versions": "langwatch experiment versions <slug> -o json",
+                "experiment restore": "langwatch experiment restore <slug> 3"
               },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
@@ -199,8 +260,11 @@
             "platform": {
               "ui": "/evaluations",
               "mcp": [
-                "platform_run_evaluation",
-                "platform_evaluation_status"
+                "platform_experiment_list",
+                "platform_run_experiment",
+                "platform_experiment_status",
+                "platform_experiment_list_runs",
+                "platform_experiment_results"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
@@ -226,7 +290,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.monitors",
-                "typescript": "langwatch.monitors"
+                "typescript": "langwatch.monitors",
+                "go": "client.Monitors"
               },
               "cli": [
                 "monitor list",
@@ -268,6 +333,56 @@
             "evaluators"
           ],
           "notes": "Platform side uses Monitors. Code side includes guardrails (as_guardrail=True for sync blocking)."
+        },
+        {
+          "id": "evaluations.instant-evals",
+          "name": "Instant Evals",
+          "description": "Search your entire production history with on-demand evals: ask one question of every trace, conversation or model call and get the matches back",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": "client.instantEvals",
+                "go": null
+              },
+              "cli": [
+                "instant-eval run",
+                "instant-eval estimate",
+                "instant-eval status",
+                "instant-eval list",
+                "instant-eval results",
+                "instant-eval sample",
+                "instant-eval cancel"
+              ],
+              "hints": {
+                "instant-eval run": "langwatch instant-eval run \"the customer sounds annoyed\" --target threads --last 7d --limit 100 --wait",
+                "instant-eval estimate": "langwatch instant-eval estimate \"the customer sounds annoyed\" --target threads --last 30d --limit 10000",
+                "instant-eval status": "langwatch instant-eval status <id> --wait -o json",
+                "instant-eval list": "langwatch instant-eval list -o json",
+                "instant-eval results": "langwatch instant-eval results <id> --matched -o json",
+                "instant-eval sample": "langwatch instant-eval sample <id> -n 5",
+                "instant-eval cancel": "langwatch instant-eval cancel <id>"
+              },
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/features/instant-evals/cli.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": [],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/features/instant-evals/overview.md"
+            },
+            "api": "/api/v1/instant-evals",
+            "docs": "https://langwatch.ai/docs/features/instant-evals/overview.md"
+          },
+          "sync": null,
+          "produces": [
+            "judgments"
+          ],
+          "consumes": [
+            "traces"
+          ],
+          "notes": "Behind the release_instant_evals flag. The input is one LangWatchQL statement; a target and questions have the statement written for them and it is handed back on the run."
         }
       ]
     },
@@ -276,7 +391,7 @@
       "name": "Agent Simulations",
       "description": "Test agents with simulation-based testing using user simulators and judge evaluation",
       "surfaces": {
-        "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+        "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
       },
       "children": [
         {
@@ -287,7 +402,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.scenarios",
-                "typescript": "langwatch.scenarios"
+                "typescript": "langwatch.scenarios",
+                "go": "client.Scenarios"
               },
               "cli": [
                 "scenario list",
@@ -295,14 +411,19 @@
                 "scenario create",
                 "scenario update",
                 "scenario run",
-                "scenario delete"
+                "scenario delete",
+                "scenario version list",
+                "scenario version get"
               ],
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\"",
-                "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --wait",
-                "scenario delete": "langwatch scenario delete <id>"
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
+                "scenario update": "langwatch scenario update <id> --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
+                "scenario run": "langwatch scenario run <id> --target http:<agent-id> --note \"after the timeout fix\"",
+                "scenario delete": "langwatch scenario delete <id>",
+                "scenario version list": "langwatch scenario version list <id> -o json",
+                "scenario version get": "langwatch scenario version get <id> 2 -o json"
               },
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
@@ -320,7 +441,7 @@
               "docs": "https://langwatch.ai/scenario/basics/no-code-scenario.md"
             },
             "api": "/api/scenarios",
-            "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
           },
           "sync": null,
           "plannedSync": "bidirectional",
@@ -340,7 +461,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": "langwatch.simulationRuns"
+                "typescript": "langwatch.simulationRuns",
+                "go": "client.Scenarios.ListRuns"
               },
               "cli": [
                 "simulation-run list",
@@ -360,10 +482,10 @@
                 "platform_get_simulation_run"
               ],
               "skill": null,
-              "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+              "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
             },
             "api": "/api/simulation-runs",
-            "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
           },
           "sync": null,
           "produces": [
@@ -374,56 +496,110 @@
           ]
         },
         {
-          "id": "agent-simulations.suites",
-          "name": "Suites (Run Plans)",
-          "description": "Bundle scenarios with targets for batch execution and repeated testing",
+          "id": "agent-simulations.test-suites",
+          "name": "Test Suites",
+          "description": "Groups of scenarios: a name and the scenarios filed in it",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.suites",
-                "typescript": "langwatch.suites"
+                "python": "langwatch.test_suites",
+                "typescript": "client.testSuites"
               },
               "cli": [
-                "suite list",
-                "suite get",
-                "suite create",
-                "suite update",
-                "suite duplicate",
-                "suite run",
-                "suite delete"
+                "test-suite list",
+                "test-suite create",
+                "test-suite get",
+                "test-suite update",
+                "test-suite rename",
+                "test-suite archive",
+                "test-suite run"
               ],
               "hints": {
-                "suite list": "langwatch suite list -o json",
-                "suite get": "langwatch suite get <id> -o json",
-                "suite create": "langwatch suite create \"regression\" --scenarios id1,id2 --targets http:agent_abc123",
-                "suite run": "langwatch suite run <id> --wait"
+                "test-suite list": "langwatch test-suite list -o json",
+                "test-suite create": "langwatch test-suite create \"Case lookups\" --field golden_sql:text --field table_schema:text --evaluator sql-query-equivalence --required",
+                "test-suite get": "langwatch test-suite get <id-or-name> -o json",
+                "test-suite update": "langwatch test-suite update <id-or-name> --field golden_sql:text --evaluator sql-query-equivalence --evaluator answer-quality-judge --not-required",
+                "test-suite rename": "langwatch test-suite rename <id-or-name> \"Refunds and credits\"",
+                "test-suite archive": "langwatch test-suite archive <id-or-name>",
+                "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
               },
               "skill": null,
               "docs": null
             },
             "platform": {
-              "ui": "/simulations/run-plans",
+              "ui": "/agent-testing",
               "mcp": [
-                "platform_list_suites",
-                "platform_get_suite",
-                "platform_create_suite",
-                "platform_update_suite",
-                "platform_run_suite",
-                "platform_archive_suite"
+                "platform_list_test_suites",
+                "platform_create_test_suite",
+                "platform_get_test_suite",
+                "platform_update_test_suite",
+                "platform_rename_test_suite",
+                "platform_archive_test_suite",
+                "platform_run_test_suite"
               ],
               "skill": null,
               "docs": null
             },
-            "api": "/api/suites",
+            "api": "/api/v1/test-suites",
             "docs": null
           },
           "sync": null,
           "produces": [
-            "suites",
+            "test-suites"
+          ],
+          "consumes": [
+            "scenarios",
+            "agents"
+          ]
+        },
+        {
+          "id": "agent-simulations.run-plans",
+          "name": "Run Plans",
+          "description": "Named configurations that run scenarios against targets and keep their run history",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": "langwatch.run_plans",
+                "typescript": "client.runPlans"
+              },
+              "cli": [
+                "run-plan run",
+                "run-plan list",
+                "run-plan get",
+                "run-plan archive"
+              ],
+              "hints": {
+                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --evaluator pii-leak-scanner --name \"nightly regression\" --wait",
+                "run-plan list": "langwatch run-plan list -o json",
+                "run-plan get": "langwatch run-plan get <id> -o json",
+                "run-plan archive": "langwatch run-plan archive <id>"
+              },
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/agent-testing/results",
+              "mcp": [
+                "platform_run_plan",
+                "platform_list_run_plans",
+                "platform_get_run_plan",
+                "platform_rerun_run_plan",
+                "platform_archive_run_plan"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/run-plans",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "run-plans",
             "simulation-runs"
           ],
           "consumes": [
             "scenarios",
+            "test-suites",
             "agents"
           ]
         }
@@ -445,7 +621,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.prompts",
-                "typescript": "langwatch.prompts"
+                "typescript": "langwatch.prompts",
+                "go": "client.Prompts"
               },
               "cli": [
                 "prompt init",
@@ -461,6 +638,7 @@
                 "prompt tag rename",
                 "prompt tag assign",
                 "prompt tag delete",
+                "prompt get",
                 "prompt versions",
                 "prompt restore"
               ],
@@ -532,23 +710,25 @@
         {
           "id": "library.agents",
           "name": "Agents",
-          "description": "Agent definitions used in simulations and experiments",
+          "description": "Agent definitions used in simulations and experiments. A connected agent registers itself from code: connect_agent in Python, connectAgent from langwatch/agent in TypeScript",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.agents",
-                "typescript": "langwatch.agents"
+                "python": "langwatch.agents, langwatch.connect_agent",
+                "typescript": "langwatch.agents, connectAgent (langwatch/agent)"
               },
               "cli": [
                 "agent list",
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent test",
+                "agent tunnel",
                 "agent update",
                 "agent delete"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
             "platform": {
               "ui": "/agents",
@@ -558,13 +738,14 @@
                 "platform_create_agent",
                 "platform_update_agent",
                 "platform_run_agent",
+                "platform_test_agent",
                 "platform_delete_agent"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
-            "api": "/api/agents",
-            "docs": null
+            "api": "/api/v1/agents",
+            "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
           },
           "sync": null,
           "produces": [
@@ -677,7 +858,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.dataset",
-                "typescript": "langwatch.datasets"
+                "typescript": "langwatch.datasets",
+                "go": "client.Datasets"
               },
               "cli": [
                 "dataset list",
@@ -756,9 +938,23 @@
             "graph get",
             "graph create",
             "graph update",
-            "graph delete"
+            "graph delete",
+            "chart schema",
+            "chart list",
+            "chart get",
+            "chart create",
+            "chart update",
+            "chart delete",
+            "chart run",
+            "chart place",
+            "chart unplace"
           ],
-          "skill": null,
+          "hints": {
+            "chart create": "langwatch chart create --name \"Traces per day\" --sql-file query.sql --param since=2026-01-01 --spec-file spec.json",
+            "chart run": "langwatch chart run <chart-id> --start 2026-08-01T00:00:00Z --end 2026-08-08T00:00:00Z --granularity 3600",
+            "chart place": "langwatch chart place <chart-id> --dashboard-id <dashboard-id>"
+          },
+          "skill": "lwql-charts",
           "docs": null
         },
         "platform": {
@@ -786,6 +982,50 @@
       ]
     },
     {
+      "id": "dashboard-widgets",
+      "name": "Dashboard Widgets",
+      "description": "Custom React widgets backed by LangWatchQL queries, authored and edited in place on dashboards",
+      "surfaces": {
+        "code": {
+          "cli": [
+            "dashboard-widget schema",
+            "dashboard-widget list",
+            "dashboard-widget get",
+            "dashboard-widget create",
+            "dashboard-widget update",
+            "dashboard-widget delete",
+            "dashboard-widget pin"
+          ],
+          "hints": {
+            "dashboard-widget schema": "langwatch dashboard-widget schema",
+            "dashboard-widget list": "langwatch dashboard-widget list -o json",
+            "dashboard-widget get": "langwatch dashboard-widget get <id> -o json",
+            "dashboard-widget create": "langwatch dashboard-widget create --name \"Errors by model\" --code-file widget.tsx --queries-file queries.json",
+            "dashboard-widget update": "langwatch dashboard-widget update <id> --code-file widget.tsx",
+            "dashboard-widget delete": "langwatch dashboard-widget delete <id>",
+            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>"
+          },
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/analytics/reports",
+          "mcp": null,
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
+        "docs": null
+      },
+      "sync": null,
+      "produces": [
+        "dashboard-widgets"
+      ],
+      "consumes": [
+        "dashboards"
+      ]
+    },
+    {
       "id": "triggers",
       "name": "Triggers (Automations)",
       "description": "Automated actions triggered by conditions \u2014 email alerts, Slack notifications, dataset additions",
@@ -793,7 +1033,8 @@
         "code": {
           "sdk": {
             "python": "langwatch.triggers",
-            "typescript": "langwatch.triggers"
+            "typescript": "langwatch.triggers",
+            "go": "client.Triggers"
           },
           "cli": [
             "trigger list",
@@ -860,7 +1101,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
             },
             "platform": {
-              "ui": "/settings/gateway/virtual-keys",
+              "ui": "/gateway/virtual-keys",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -895,7 +1136,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
             },
             "platform": {
-              "ui": "/settings/gateway/budgets",
+              "ui": "/gateway/budgets",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -914,7 +1155,7 @@
         {
           "id": "ai-gateway.webhooks",
           "name": "Webhook endpoints",
-          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries, retry ladder, delivery log, replay (enterprise)",
+          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries to an HTTPS endpoint or an Amazon SQS queue, retry ladder, delivery log, replay (enterprise)",
           "surfaces": {
             "code": {
               "sdk": {
@@ -928,7 +1169,7 @@
                 "webhooks update",
                 "webhooks enable",
                 "webhooks disable",
-                "webhooks delete",
+                "webhooks archive",
                 "webhooks roll-secret",
                 "webhooks test",
                 "webhooks deliveries",
@@ -940,7 +1181,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/gateway/webhooks",
+              "ui": "/gateway/webhooks",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1013,7 +1254,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance",
+              "ui": "/governance",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1029,8 +1270,8 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Ingestion Sources",
-          "description": "Read-only inspection of OCSF-normalised event ingestion (sources, event tail, health)",
+          "name": "Inventory (ingestion)",
+          "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1040,13 +1281,15 @@
               "cli": [
                 "ingest list",
                 "ingest tail",
-                "ingest health"
+                "ingest health",
+                "ingest codex",
+                "ingest context"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance/ingestion-sources",
+              "ui": "/governance/inventory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1075,7 +1318,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": null
+                "typescript": null,
+                "go": "client.Projects"
               },
               "cli": [
                 "projects list",
@@ -1121,6 +1365,8 @@
               "cli": [
                 "api-keys list",
                 "api-keys create",
+                "api-keys get",
+                "api-keys update",
                 "api-keys revoke"
               ],
               "skill": null,
@@ -1142,6 +1388,264 @@
           "sync": null,
           "produces": [
             "api-keys"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.organization",
+          "name": "Organization",
+          "description": "Read and update the organization profile, and provision organizations on a self-hosted instance",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "organization get",
+                "organization update",
+                "organizations create",
+                "organizations list",
+                "organizations get"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "organizations"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.members",
+          "name": "Members and Invites",
+          "description": "Manage who belongs to the organization: member roles, access, removal, and pending invites",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "members list",
+                "members get",
+                "members update",
+                "members disable",
+                "members enable",
+                "members remove",
+                "members access",
+                "invites list",
+                "invites create",
+                "invites revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/members",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization/members",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "members",
+            "invites"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.teams",
+          "name": "Teams",
+          "description": "Create and manage the teams that group projects and people",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "teams list",
+                "teams get",
+                "teams create",
+                "teams update",
+                "teams archive",
+                "teams members list",
+                "teams members add",
+                "teams members remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/teams",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/teams",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "teams"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.groups",
+          "name": "Access Groups",
+          "description": "Group members so a single role binding grants everyone in the group",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "groups list",
+                "groups get",
+                "groups create",
+                "groups rename",
+                "groups delete",
+                "groups members list",
+                "groups members add",
+                "groups members remove",
+                "groups bindings list",
+                "groups bindings add",
+                "groups bindings remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/groups",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/groups",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "groups"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.roles",
+          "name": "Custom Roles",
+          "description": "Define custom roles from resource and action permissions, and read the permission catalog",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "roles list",
+                "roles get",
+                "roles create",
+                "roles update",
+                "roles delete",
+                "roles permissions"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/roles",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/roles",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "custom-roles"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.role-bindings",
+          "name": "Role Bindings",
+          "description": "Grant a role to a user, a group or an API key at an organization, team or project scope",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "role-bindings list",
+                "role-bindings create",
+                "role-bindings update",
+                "role-bindings delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/role-bindings",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/role-bindings",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "role-bindings"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.scim",
+          "name": "SCIM Provisioning",
+          "description": "Mint and revoke the bearer tokens an identity provider uses to sync users and groups",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "scim-tokens list",
+                "scim-tokens create",
+                "scim-tokens revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/scim",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/scim-tokens",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "scim-tokens"
           ],
           "consumes": []
         },
@@ -1217,6 +1721,35 @@
           "sync": null,
           "produces": [
             "secrets"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.agent-cache",
+          "name": "Agent Cache",
+          "description": "A per-project store an agent keeps its own run state in, encrypted at rest, where each entry expires by itself",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": "langwatch.cache",
+                "typescript": null
+              },
+              "cli": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/api-reference/agent-cache/overview.md"
+            },
+            "api": "/api/agent-cache",
+            "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
+          },
+          "sync": null,
+          "produces": [
+            "agent-cache"
           ],
           "consumes": []
         },
@@ -1335,6 +1868,35 @@
           "sync": null,
           "produces": [],
           "consumes": []
+        },
+        {
+          "id": "support.langy-local-control",
+          "name": "Langy local control",
+          "description": "Langy works directly in the developer's local folder through the CLI, reading and changing files on the machine the conversation asked about",
+          "surfaces": {
+            "code": {
+              "sdk": null,
+              "cli": [
+                "langy"
+              ],
+              "hints": {
+                "langy": "langwatch langy --share-control"
+              },
+              "skill": "code-changes",
+              "docs": "https://langwatch.ai/docs/langy/local-development.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": "https://langwatch.ai/docs/langy/local-development.md"
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": []
         }
       ]
     }
@@ -1346,7 +1908,7 @@
     ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
-      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
+      "agent-performance": "Cross-cutting skill for querying performance (works for both code and platform users)",
       "datasets": "Generate realistic synthetic evaluation datasets from codebase, prompts, and traces"
     },
     "recipes": {
@@ -1355,7 +1917,7 @@
       "debug-with-langwatch": "Root-cause production errors: errored traces, span inspection, monitor/evaluator scores",
       "eval-triage": "Investigate failing experiments and evaluation regressions",
       "setup-lw": "Set up and troubleshoot the LangWatch CLI (login, endpoint, project)",
-      "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
+      "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
       "test-compliance": "Test that your agent stays observational in regulated domains"

@@ -24,10 +24,11 @@ type LangWatchExporter struct {
 
 // exporterConfig holds configuration for the exporter.
 type exporterConfig struct {
-	apiKey    string
-	projectID string
-	endpoint  string
-	filters   []Filter
+	apiKey      string
+	projectID   string
+	endpoint    string
+	filters     []Filter
+	dataCapture dataCaptureConfig
 }
 
 // ExporterOption configures the LangWatchExporter.
@@ -61,6 +62,25 @@ func WithEndpoint(url string) ExporterOption {
 	}
 }
 
+// WithDataCapture sets a fixed data-capture mode controlling whether span
+// input/output content is exported (DataCaptureAll/Input/Output/None). Span
+// structure, metrics, metadata and models are always kept. Applies to every
+// span this exporter handles, across all instrumentations.
+func WithDataCapture(mode DataCaptureMode) ExporterOption {
+	return func(c *exporterConfig) {
+		c.dataCapture = dataCaptureConfig{enabled: true, mode: mode}
+	}
+}
+
+// WithDataCaptureFunc sets a per-span data-capture predicate. The predicate
+// receives the span's name, kind, LangWatch span type and attributes and returns
+// the mode to apply — enabling policies like "capture nothing for tool spans".
+func WithDataCaptureFunc(predicate DataCapturePredicate) ExporterOption {
+	return func(c *exporterConfig) {
+		c.dataCapture = dataCaptureConfig{enabled: true, predicate: predicate}
+	}
+}
+
 // WithFilters sets the filters to apply to spans before exporting.
 // Multiple filters are applied in sequence (AND semantics).
 func WithFilters(filters ...Filter) ExporterOption {
@@ -86,8 +106,8 @@ func resolveConfig(opts ...ExporterOption) *exporterConfig {
 }
 
 // buildHeaders constructs the LangWatch-specific headers, delegating
-// auth-header assembly to buildAuthHeaders so PATs route through Basic
-// Auth when a project ID is available.
+// auth-header assembly to buildAuthHeaders (Authorization: Bearer plus an
+// X-Project-Id header when a project ID is available).
 func buildHeaders(apiKey, projectID string) map[string]string {
 	headers := buildAuthHeaders(apiKey, projectID)
 	headers["x-langwatch-sdk-name"] = "langwatch-sdk-go"
@@ -116,7 +136,7 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 	}
 
 	return &LangWatchExporter{
-		FilteringExporter: NewFilteringExporter(otlpExporter, cfg.filters...),
+		FilteringExporter: newFilteringExporter(otlpExporter, cfg.dataCapture, cfg.filters...),
 	}, nil
 }
 
@@ -132,16 +152,32 @@ func NewDefaultExporter(ctx context.Context, opts ...ExporterOption) (*LangWatch
 // FilteringExporter wraps any SpanExporter with filtering capabilities.
 // This is useful for testing or when using custom exporters.
 type FilteringExporter struct {
-	wrapped sdktrace.SpanExporter
-	filters []Filter
+	wrapped     sdktrace.SpanExporter
+	filters     []Filter
+	dataCapture dataCaptureConfig
 }
 
 // NewFilteringExporter creates a filtering wrapper around any SpanExporter.
 // This is useful for testing or when you want to add filtering to a custom exporter.
+//
+// It applies no data-capture policy: content reaches the wrapped exporter as
+// recorded. Use NewExporter with WithDataCapture / WithDataCaptureFunc for a
+// capture-gated exporter.
 func NewFilteringExporter(wrapped sdktrace.SpanExporter, filters ...Filter) *FilteringExporter {
+	return newFilteringExporter(wrapped, dataCaptureConfig{}, filters...)
+}
+
+// newFilteringExporter builds the wrapper with a resolved capture policy, so no
+// construction path depends on assigning dataCapture after the fact.
+func newFilteringExporter(
+	wrapped sdktrace.SpanExporter,
+	capture dataCaptureConfig,
+	filters ...Filter,
+) *FilteringExporter {
 	return &FilteringExporter{
-		wrapped: wrapped,
-		filters: filters,
+		wrapped:     wrapped,
+		filters:     filters,
+		dataCapture: capture,
 	}
 }
 
@@ -155,6 +191,15 @@ func (e *FilteringExporter) ExportSpans(ctx context.Context, spans []sdktrace.Re
 	filtered := applyFilters(spans, e.filters)
 	if len(filtered) == 0 {
 		return nil
+	}
+
+	// Apply data capture: strip input/output content per the resolved mode.
+	if e.dataCapture.enabled {
+		out := make([]sdktrace.ReadOnlySpan, len(filtered))
+		for i, span := range filtered {
+			out[i] = applyDataCapture(span, e.dataCapture.resolve(span))
+		}
+		filtered = out
 	}
 
 	return e.wrapped.ExportSpans(ctx, filtered)

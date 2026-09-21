@@ -40,7 +40,7 @@ import (
 // belongs here.
 var protectedAttributeKeys = []string{
 	// Origin discriminator + IngestionSource identity (governance
-	// reactors filter on these to decide whether to fold + into
+	// subscribers filter on these to decide whether to fold + into
 	// which projection bucket).
 	"langwatch.origin.kind",
 	"langwatch.ingestion_source.id",

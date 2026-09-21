@@ -1,9 +1,22 @@
-import { Box, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+} from "@chakra-ui/react";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { useConversationExpand } from "../../../../TraceDrawer/conversationView/expandContext";
+import {
+  MessageAnnotateCluster,
+  type MessageAnnotateTarget,
+  type MessageTranslation,
+} from "../../../../TraceDrawer/conversationView/MessageAnnotateCluster";
 import { MessageExpandToggle } from "../../../../TraceDrawer/conversationView/MessageExpandToggle";
 import { ReasoningBlock } from "../../../../TraceDrawer/transcript";
 
@@ -74,6 +87,17 @@ interface BubbleProps {
    * elsewhere for "suggested output".
    */
   annotation?: { count: number; hasCorrection: boolean };
+  /**
+   * When set, the bubble offers to have a comment left on the message it is
+   * showing. Left unset by the surfaces that render a bubble as a preview of
+   * somebody else's conversation, where there is nothing to annotate.
+   */
+  annotate?: MessageAnnotateTarget;
+  /**
+   * When set, the bubble offers to flip the message it is showing to English.
+   * Owned by the host, which holds the text and swaps it.
+   */
+  translate?: MessageTranslation;
 }
 
 const DEFAULT_MAX_CHARS = 320;
@@ -112,6 +136,8 @@ export const Bubble: React.FC<BubbleProps> = ({
   size = "regular",
   maxChars = DEFAULT_MAX_CHARS,
   annotation,
+  annotate,
+  translate,
 }) => {
   const palette = BUBBLE_TONES[tone];
   const compact = size === "compact";
@@ -141,6 +167,12 @@ export const Bubble: React.FC<BubbleProps> = ({
       gap={2}
       flexDirection={side === "right" ? "row-reverse" : "row"}
       width="full"
+      // `className="group"` is what the comment cluster's `_groupHover`
+      // resolves against; the role is what tells a reader the message and its
+      // actions are one thing. The turn separator's own group sits on a
+      // sibling, so the two scopes never nest.
+      className="group"
+      role="group"
     >
       <Circle
         size={compact ? "22px" : "26px"}
@@ -208,6 +240,15 @@ export const Bubble: React.FC<BubbleProps> = ({
                 <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />
               )}
             </HStack>
+          )}
+          {annotate && (
+            <>
+              <Spacer />
+              <MessageAnnotateCluster
+                target={annotate}
+                translation={translate}
+              />
+            </>
           )}
         </HStack>
         {reasoning && (

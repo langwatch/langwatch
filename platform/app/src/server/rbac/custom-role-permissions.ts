@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
-import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { Actions, Resources } from "../api/rbac";
+import type { Prisma } from "~/generated/prisma/client";
+import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 const VALID_PERMISSIONS: Set<string> = new Set(
   Object.values(Resources).flatMap((r) =>

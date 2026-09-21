@@ -182,6 +182,58 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
   });
 });
 
+describe("TraceIOAccumulationService: media refs", () => {
+  const audioPart = (id: string) => ({
+    type: "input_audio",
+    input_audio: { url: `/api/files/p1/${id}`, mimeType: "audio/wav" },
+  });
+
+  describe("given a voice turn whose transcript holds both sides", () => {
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("records which side of the conversation each recording came from", () => {
+      // A voice agent's span input is the whole transcript, so the caller's
+      // recording and the agent's reply both ride the input attribute.
+      const accumulator = new TraceIOAccumulationService(
+        stubExtractor({
+          input: {
+            raw: { input: "shipment 4417?" },
+            text: "shipment 4417?",
+            source: "langwatch",
+          },
+          output: {
+            raw: { output: "it arrives tomorrow" },
+            text: "it arrives tomorrow",
+            source: "langwatch",
+          },
+        }),
+      );
+
+      const result = accumulator.accumulateIO({
+        state: emptyState(),
+        span: rootSpan({
+          spanAttributes: {
+            "langwatch.input": JSON.stringify([
+              { role: "user", content: [audioPart("spoken")] },
+              { role: "assistant", content: [audioPart("reply")] },
+            ]),
+            "langwatch.output": JSON.stringify([
+              { role: "assistant", content: [audioPart("reply")] },
+            ]),
+          },
+        } as never),
+      });
+
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
+        { kind: "audio", url: "/api/files/p1/spoken", role: "user" },
+        { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+      ]);
+      expect(JSON.parse(result.outputMediaRefs!)).toEqual([
+        { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+      ]);
+    });
+  });
+});
+
 describe("TraceIOAccumulationService — claude utility spans", () => {
   const utilityOutput = stubExtractor({
     output: {
@@ -297,6 +349,173 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
       );
 
       expect(result).toEqual({ input: null, output: null });
+    });
+  });
+});
+
+/**
+ * Media refs are a separate question from the computed text: which span names
+ * the trace, and where the trace's media is. A wrapper span sets the headline
+ * text while the model call underneath it holds the picture, so the refs
+ * accumulate across spans rather than following the text's winner.
+ */
+describe("TraceIOAccumulationService: media refs", () => {
+  const IMAGE_URL = "/api/files/p1/i1";
+  const AUDIO_URL = "/api/files/p1/a1";
+
+  const textOnlyIO = (text: string) => ({
+    raw: { input: text },
+    text,
+    source: "langwatch" as const,
+  });
+
+  /**
+   * A span the way the wire records it: the picture is on the span attribute,
+   * and what the extraction service reports about the span is a separate
+   * question. Instrumentation for several SDKs reports the text alone.
+   */
+  const spanCarrying = ({
+    spanId,
+    parentSpanId,
+    url,
+  }: {
+    spanId: string;
+    parentSpanId: string | null;
+    url: string;
+  }) =>
+    rootSpan({
+      spanId,
+      parentSpanId,
+      name: parentSpanId === null ? "root" : "llm",
+      spanAttributes: {
+        "langwatch.input": JSON.stringify([
+          {
+            role: "user",
+            content: [{ type: "image_url", image_url: { url } }],
+          },
+        ]),
+      },
+    } as never);
+
+  /** Fold a list of spans through the accumulator the way the projection does. */
+  function foldSpans(
+    spans: Array<{
+      span: NormalizedSpan;
+      input?: { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
+    }>,
+  ) {
+    let state = emptyState();
+    let last!: ReturnType<TraceIOAccumulationService["accumulateIO"]>;
+    for (const { span, input } of spans) {
+      const accumulator = new TraceIOAccumulationService(
+        stubExtractor({ input }),
+      );
+      last = accumulator.accumulateIO({ state, span });
+      state = {
+        ...state,
+        computedInput: last.computedInput,
+        computedOutput: last.computedOutput,
+        outputFromRootSpan: last.outputFromRootSpan,
+        outputSpanEndTimeMs: last.outputSpanEndTimeMs,
+        attributes: {
+          ...state.attributes,
+          "langwatch.reserved.output_source": last.outputSource,
+          ...(last.inputMediaRefs
+            ? { "langwatch.reserved.media_refs.input": last.inputMediaRefs }
+            : {}),
+        },
+      } as TraceSummaryData;
+    }
+    return last;
+  }
+
+  const childCarrying = (spanId: string, url: string) =>
+    spanCarrying({ spanId, parentSpanId: "s1", url });
+
+  describe("given a text-only root span and a child model call carrying the image", () => {
+    /** @scenario Media on a child span reaches the trace's refs */
+    it("keeps the child's image on the trace, whichever span folds first", () => {
+      const child = { span: childCarrying("s2", IMAGE_URL) };
+      const root = { span: rootSpan(), input: textOnlyIO("what is this?") };
+
+      const rootFirst = foldSpans([root, child]);
+      expect(rootFirst.computedInput).toBe("what is this?");
+      expect(JSON.parse(rootFirst.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+      ]);
+
+      // Spans arrive in whatever order the queue hands them over, and the root
+      // winning the headline text must not wipe what the child contributed.
+      const childFirst = foldSpans([child, root]);
+      expect(childFirst.computedInput).toBe("what is this?");
+      expect(JSON.parse(childFirst.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+      ]);
+    });
+  });
+
+  describe("given instrumentation that reports the text and drops the picture", () => {
+    /** @scenario Media on a child span reaches the trace's refs */
+    it("still finds the picture on the span the customer sent", () => {
+      // What several SDK instrumentations do: the reported messages carry the
+      // question only, while the recorded request carries the attachment too.
+      const result = foldSpans([
+        {
+          span: childCarrying("s2", IMAGE_URL),
+          input: textOnlyIO("what is this?"),
+        },
+      ]);
+
+      expect(result.computedInput).toBe("what is this?");
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+      ]);
+    });
+  });
+
+  describe("given both the winning span and a child carrying media", () => {
+    /** @scenario The headline span's media is preferred over a child's */
+    it("puts the winning span's media first", () => {
+      const result = foldSpans([
+        { span: childCarrying("s2", AUDIO_URL) },
+        {
+          span: spanCarrying({
+            spanId: "s1",
+            parentSpanId: null,
+            url: IMAGE_URL,
+          }),
+          input: textOnlyIO("what is this?"),
+        },
+      ]);
+
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+        { kind: "image", url: AUDIO_URL, role: "user" },
+      ]);
+    });
+  });
+
+  describe("given the same stored object quoted by two spans", () => {
+    /** @scenario One recording reachable through two paths collapses to one ref */
+    it("records it once", () => {
+      const result = foldSpans([
+        { span: childCarrying("s2", IMAGE_URL) },
+        { span: childCarrying("s3", IMAGE_URL) },
+      ]);
+
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
+        { kind: "image", url: IMAGE_URL, role: "user" },
+      ]);
+    });
+  });
+
+  describe("given a span with no media at all", () => {
+    it("leaves the trace's refs empty rather than inventing an attribute", () => {
+      const result = foldSpans([
+        { span: rootSpan(), input: textOnlyIO("just words") },
+      ]);
+
+      expect(result.inputMediaRefs).toBeNull();
     });
   });
 });

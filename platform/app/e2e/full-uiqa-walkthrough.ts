@@ -7,7 +7,7 @@
  * Sections:
  *  A. /me portal — admin POV
  *  B. Govern → AI Gateway sub-tree (virtual-keys list, budgets, usage)
- *  C. Govern → Governance bird-eye + Tool Catalog + Anomaly Rules + Ingestion + Routing
+ *  C. Govern → Governance bird-eye + Tool Tiles + Anomaly Rules + Catalog + Routing
  *  D. Settings → Members + Teams + Roles + Audit Log
  *  E. Tile install drawer (Claude Code)
  *  F. AI Tools Portal cold visit (workspace switcher, /me/devices, /me/settings)
@@ -121,12 +121,12 @@ void (async () => {
   await tryGoto(
     page,
     "C1-birdeye",
-    "/settings/governance",
+    "/governance",
     /teams shown|Engineering|Marketing|OPEN ANOMALIES/,
   );
   await shoot(page, "C1-governance-birdeye", true);
 
-  await tryGoto(page, "C2-toolcatalog", "/settings/governance/tool-catalog");
+  await tryGoto(page, "C2-toolcatalog", "/governance/inventory?tab=catalog");
   await shoot(page, "C2-tool-catalog-list", true);
 
   // Click "+ New" or first tile to open drawer
@@ -143,7 +143,7 @@ void (async () => {
     await page.waitForTimeout(500);
   }
 
-  await tryGoto(page, "C3-anomalies", "/settings/governance/anomaly-rules");
+  await tryGoto(page, "C3-anomalies", "/governance/anomaly-rules");
   await shoot(page, "C3-anomaly-rules-list", true);
 
   const newAnomalyBtn = page
@@ -159,10 +159,10 @@ void (async () => {
     await page.waitForTimeout(500);
   }
 
-  await tryGoto(page, "C4-ingestion", "/settings/governance/ingestion-sources");
+  await tryGoto(page, "C4-ingestion", "/governance/inventory?tab=sources");
   await shoot(page, "C4-ingestion-sources-list", true);
 
-  await tryGoto(page, "C5-routing", "/settings/governance/routing-policies");
+  await tryGoto(page, "C5-routing", "/gateway/routing-policies");
   await shoot(page, "C5-routing-policies-list", true);
 
   // ============================================================

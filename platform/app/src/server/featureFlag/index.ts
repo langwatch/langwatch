@@ -1,6 +1,5 @@
 export { FeatureFlagService, featureFlagService } from "./featureFlag.service";
 export { FeatureFlagServiceMemory } from "./featureFlagService.memory";
-export { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
 export {
   FeatureFlagStorePostgres,
   getFeatureFlagStore,
@@ -31,12 +30,17 @@ export type {
   RuleEvaluationContext,
 } from "./rules";
 export {
+  emailDomainsOf,
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   parseRules,
+  readNeedsOrganizationAge,
   resolveEffectiveForListing,
 } from "./rules";
+export type { FeatureFlagTargetId, NotTargeted } from "./targeting";
+export { NOT_TARGETED, toRuleContextId } from "./targeting";
 export type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,

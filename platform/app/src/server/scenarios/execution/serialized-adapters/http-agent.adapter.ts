@@ -8,17 +8,27 @@
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
+import type { RunParameterValues } from "../../parameters";
 import { createChildProcessLogger } from "../child-logger";
 import {
   buildTemplateContext,
+  mergePropagationHeaders,
   renderBodyTemplate,
+  renderHeaderTemplate,
   renderUrlTemplate,
 } from "../http-template-engine";
+import {
+  fenceSecretRefs,
+  preserveSecretRefs,
+  redactSecrets,
+  resolveAuthSecrets,
+} from "../secret-references";
 import type { HttpAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in
@@ -32,6 +42,67 @@ function previewResponseBody(body: string): string {
     return body;
   }
   return `${body.slice(0, RESPONSE_BODY_PREVIEW_CHARS)}…`;
+}
+
+/**
+ * A call that never reached the target: DNS did not resolve, the connection
+ * was refused or reset, or the request timed out at the socket. This is not
+ * the target rejecting the request — a non-2xx answer keeps its own error —
+ * and what fetch throws for it reads as a Node crash ("TypeError: fetch
+ * failed") rather than a reason a customer can act on.
+ *
+ * The message names the host and the failure kind, and ends with the
+ * underlying text so the infra-error classifier still recognises the
+ * ECONNREFUSED / getaddrinfo markers it keys on. The raw error rides on
+ * `cause`, so the log and any debugger keep everything.
+ */
+export class HttpAgentTransportError extends Error {
+  constructor({
+    host,
+    reason,
+    cause,
+  }: {
+    host: string;
+    reason: string;
+    cause: unknown;
+  }) {
+    super(`HTTP agent target ${host} could not be reached: ${reason}`);
+    this.name = "HttpAgentTransportError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * The host of a request url. A url that does not parse gets a fixed label:
+ * it can carry a credential in its query, and this text reaches a customer.
+ */
+function hostForMessage(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "configured target";
+  }
+}
+
+/**
+ * Flattens an error and its causes into one line of messages.
+ *
+ * undici reports a transport failure as a bare `TypeError: fetch failed`
+ * whose real reason lives on `cause`, so the top message alone classifies as
+ * nothing. Messages only — a stack never enters the text a customer reads.
+ */
+function flattenErrorMessages(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    const message = current.message.trim();
+    if (message.length > 0 && !parts.includes(message)) parts.push(message);
+    current = (current as { cause?: unknown }).cause;
+  }
+  if (parts.length === 0) return String(error);
+  return parts.join(": ");
 }
 
 /**
@@ -92,39 +163,128 @@ function pickUpstreamRequestId(headers: {
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedHttpAgentAdapter extends AgentAdapter {
+export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: HttpAgentData;
   private readonly logger: Logger;
-  private capturedTraceId: string | undefined;
+  private readonly parameters: RunParameterValues;
 
-  constructor(config: HttpAgentData, logger?: Logger) {
+  constructor({
+    config,
+    logger,
+    parameters,
+  }: {
+    config: HttpAgentData;
+    logger?: Logger;
+    /** The run's resolved values, read from url and body as `params.NAME`. */
+    parameters?: RunParameterValues;
+  }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
+    this.parameters = parameters ?? {};
     this.logger =
       logger ?? createChildProcessLogger("langwatch:scenarios:http-adapter");
   }
 
-  /** Returns the trace ID captured during the most recent HTTP request. */
-  getTraceId(): string | undefined {
-    return this.capturedTraceId;
+  /** The project secrets this target may reference, never empty-undefined. */
+  private get secrets(): Record<string, string> {
+    return this.config.secrets ?? {};
   }
 
   async call(input: AgentInput): Promise<string> {
-    const templateContext = buildTemplateContext({
-      input,
-      scenarioMappings: this.config.scenarioMappings,
-    });
-    const url = this.buildUrl(templateContext);
-    const headers = this.buildRequestHeaders();
-    const body = this.buildRequestBody(input, templateContext);
-    const responseData = await this.executeHttpRequest(url, headers, body);
-    return this.extractResponseContent(responseData);
+    try {
+      // One capture per turn: the traceparent header and the `{{ traceId }}`
+      // / `{{ traceparent }}` template variables all name the same trace.
+      const { headers: propagationHeaders, traceId } =
+        injectTraceContextHeaders({ headers: {} });
+      const traceparent = propagationHeaders.traceparent;
+      const templateContext = buildTemplateContext({
+        input,
+        scenarioMappings: this.config.scenarioMappings,
+        parameters: this.parameters,
+        traceContext: { traceId, traceparent },
+        session: this.sessionOf(input.threadId),
+      });
+      const url = this.buildUrl(templateContext);
+      const headers = this.buildRequestHeaders(
+        templateContext,
+        propagationHeaders,
+      );
+      const body = this.buildRequestBody(input, templateContext);
+      const responseData = await this.executeHttpRequest(url, headers, body);
+      this.storeSession({
+        threadId: input.threadId,
+        session: this.extractSession(responseData),
+      });
+      return this.extractResponseContent(responseData);
+    } catch (error) {
+      throw this.scrubErrorChain(error);
+    }
   }
 
-  private buildRequestHeaders(): Record<string, string> {
+  /** A message with every resolved secret value replaced by the placeholder. */
+  private scrub(message: string): string {
+    return redactSecrets({ message, secrets: this.secrets });
+  }
+
+  /**
+   * Header values for a log line: masked by name, then scrubbed by value.
+   *
+   * The name list only covers the headers that carry a credential by
+   * convention. A target may write `{{ secrets.NAME }}` into any header it
+   * likes, so `X-Custom-Token` holds a real credential and no name list can
+   * know that. The value scrub is what covers the rest.
+   */
+  private headersForLogs(
+    headers: Record<string, string>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(redactHeaders(headers)).map(([key, value]) => [
+        key,
+        this.scrub(value),
+      ]),
+    );
+  }
+
+  /**
+   * Scrubs an error and everything it was caused by, in place.
+   *
+   * The whole chain matters, not just the top: undici reports a transport
+   * failure as a bare `TypeError: fetch failed` whose real reason, request
+   * url and all, lives on `cause`, and the child process flattens the chain
+   * into the message the run records. Rewriting messages rather than wrapping
+   * keeps the error's class, its `code`, and the chain the failure classifier
+   * reads. With no secrets configured this does nothing at all.
+   */
+  private scrubErrorChain(error: unknown): unknown {
+    if (Object.keys(this.secrets).length === 0) return error;
+    const seen = new Set<unknown>();
+    let current: unknown = error;
+    while (current instanceof Error && !seen.has(current)) {
+      seen.add(current);
+      const scrubbed = this.scrub(current.message);
+      if (scrubbed !== current.message) current.message = scrubbed;
+      current = (current as { cause?: unknown }).cause;
+    }
+    return error;
+  }
+
+  /**
+   * Each configured header value renders through the header engine with the
+   * same fence/restore discipline as `buildUrl` (see its comment for why the
+   * order matters). The fence is also what resolves the references, so
+   * rendered output is never re-scanned for them: a conversation turn or a
+   * run parameter that spells `{{ secrets.NAME }}` stays literal text instead
+   * of pulling the credential into the request. Auth goes on top as before,
+   * and the propagation headers merge last without clobbering one the target
+   * configured itself.
+   */
+  private buildRequestHeaders(
+    context: Record<string, unknown>,
+    propagationHeaders: Record<string, string>,
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -132,20 +292,85 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     for (const header of this.config.headers) {
       const key = header.key.trim();
       if (key) {
-        headers[key] = header.value;
+        const { template, restore } = fenceSecretRefs({
+          template: header.value,
+          secrets: this.secrets,
+        });
+        headers[key] = restore(
+          renderHeaderTemplate({ template, context, headerKey: key }),
+        );
       }
     }
 
-    Object.assign(headers, applyAuthentication(this.config.auth));
+    const resolved = {
+      ...headers,
+      ...applyAuthentication(
+        resolveAuthSecrets({ auth: this.config.auth, secrets: this.secrets }),
+      ),
+    };
 
-    const { traceId } = injectTraceContextHeaders({ headers });
-    this.capturedTraceId = traceId;
-
-    return headers;
+    return mergePropagationHeaders({ headers: resolved, propagationHeaders });
   }
 
+  /**
+   * Render the url, with secret references resolved first.
+   *
+   * Order matters: `secrets` is not a name the url engine binds, so rendering
+   * first would turn `{{ secrets.AGENT_TOKEN }}` into an empty string and send
+   * an unauthenticated request. Resolution therefore runs first, and what it
+   * resolved is held out of the render entirely and put back afterwards, so a
+   * resolved value reaches the wire byte for byte without ever being read as
+   * template source, and a reference to a name the project does not have stays
+   * exactly as written.
+   */
   private buildUrl(context: Record<string, unknown>): string {
-    return renderUrlTemplate({ template: this.config.url, context });
+    const { template, restore } = fenceSecretRefs({
+      template: this.config.url,
+      secrets: this.secrets,
+    });
+    return restore(renderUrlTemplate({ template, context }));
+  }
+
+  /**
+   * Logs an upstream error response and throws the error the caller reports.
+   * It never returns.
+   */
+  private async failOnErrorResponse({
+    response,
+    loggedUrl,
+    method,
+    durationMs,
+    redactedHeaders,
+  }: {
+    response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+    loggedUrl: string;
+    method: string;
+    durationMs: number;
+    redactedHeaders: Record<string, string>;
+  }): Promise<never> {
+    const responseBody = this.scrub(
+      typeof response.text === "function"
+        ? await response.text().catch(() => "")
+        : "",
+    );
+    const upstreamRequestId = pickUpstreamRequestId(response.headers);
+    this.logger.warn(
+      {
+        url: loggedUrl,
+        method,
+        statusCode: response.status,
+        durationMs,
+        responseBodyPreview: previewResponseBody(responseBody),
+        requestId: upstreamRequestId,
+        headers: redactedHeaders,
+      },
+      "http call failed",
+    );
+    throw new Error(
+      `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
+        upstreamRequestId ?? "none"
+      }): ${previewErrorBody(responseBody)}`,
+    );
   }
 
   private async executeHttpRequest(
@@ -155,8 +380,8 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
-    const loggedUrl = redactUrlForLogs(url);
-    const redactedHeaders = redactHeaders(headers);
+    const loggedUrl = this.scrub(redactUrlForLogs(url));
+    const redactedHeaders = this.headersForLogs(headers);
     let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {
@@ -167,7 +392,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     } catch (error) {
       const errorClass =
         error instanceof Error ? error.constructor.name : typeof error;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.scrub(
+        error instanceof Error ? error.message : String(error),
+      );
       this.logger.error(
         {
           url: loggedUrl,
@@ -179,34 +406,23 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         },
         "http call failed",
       );
-      throw error;
+      throw new HttpAgentTransportError({
+        host: hostForMessage(url),
+        reason: this.scrub(flattenErrorMessages(error)),
+        cause: error,
+      });
     }
 
     const durationMs = Date.now() - startedAt;
 
     if (!response.ok) {
-      const responseBody =
-        typeof response.text === "function"
-          ? await response.text().catch(() => "")
-          : "";
-      const upstreamRequestId = pickUpstreamRequestId(response.headers);
-      this.logger.warn(
-        {
-          url: loggedUrl,
-          method,
-          statusCode: response.status,
-          durationMs,
-          responseBodyPreview: previewResponseBody(responseBody),
-          requestId: upstreamRequestId,
-          headers: redactedHeaders,
-        },
-        "http call failed",
-      );
-      throw new Error(
-        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
-          upstreamRequestId ?? "none"
-        }): ${previewErrorBody(responseBody)}`,
-      );
+      await this.failOnErrorResponse({
+        response,
+        loggedUrl,
+        method,
+        durationMs,
+        redactedHeaders,
+      });
     }
 
     this.logger.info(
@@ -244,6 +460,31 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     }
   }
 
+  /**
+   * The session the response carries at `sessionPath`, or nothing: no path
+   * configured, a body that is not JSON, a path that matches nothing and a
+   * path that does not parse all leave the held value as it is. A match is
+   * kept as the JSON value found there, so the next turn renders exactly it.
+   */
+  private extractSession(data: unknown): unknown {
+    const path = this.config.sessionPath?.trim();
+    if (!path || data === null || typeof data !== "object") return undefined;
+
+    try {
+      const extracted = JSONPath({ path, json: data }) as unknown[];
+      return extracted.length > 0 ? extracted[0] : undefined;
+    } catch (error) {
+      this.logger.warn(
+        {
+          sessionPath: path,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        "session path did not parse, keeping the held session",
+      );
+      return undefined;
+    }
+  }
+
   private stringify(value: unknown): string {
     return typeof value === "string" ? value : JSON.stringify(value);
   }
@@ -256,9 +497,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return JSON.stringify({ messages: input.messages });
     }
 
-    return renderBodyTemplate({
-      template: this.config.bodyTemplate,
-      context,
-    });
+    const { template, restore } = preserveSecretRefs(this.config.bodyTemplate);
+    return restore(renderBodyTemplate({ template, context }));
   }
 }

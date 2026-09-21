@@ -7,23 +7,18 @@
  */
 
 import { z } from "zod";
-import type { Span } from "../../tracer/types";
+import { FieldMappingSchema } from "../field-mapping";
+import { runParameterValuesSchema } from "../parameters";
+import { callerVoiceConfigSchema } from "../voice/caller-voice.config";
 
 // ============================================================================
 // Field Mapping Types
 // (defined first so adapter schemas can reference them)
 // ============================================================================
 
-/** Field mapping for agent inputs — maps to a scenario source or a static value */
-export const FieldMappingSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("source"),
-    sourceId: z.string(),
-    path: z.array(z.string()),
-  }),
-  z.object({ type: z.literal("value"), value: z.string() }),
-]);
-export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+// FieldMappingSchema lives in ../field-mapping: it is the one thing here that
+// the suite schema and the studio DSL also need, and keeping it out means this
+// module has no importers outside the child's own code.
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
@@ -43,6 +38,25 @@ export const PromptConfigDataSchema = z.object({
       content: z.string(),
     }),
   ),
+  /**
+   * The prompt's declared input variables. Without these the adapter cannot
+   * know a template's `{{question}}` was meant to be bound to anything, and it
+   * rendered as an empty string instead (#6590). Defaulted so a job queued by
+   * an older worker still parses.
+   */
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .default([]),
+  /**
+   * Explicit bindings from the suite target for this prompt. Declared inputs
+   * these leave out are matched to a scenario source by name.
+   */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Model configured on prompt (if any). Used for model selection logic. */
   model: z.string().optional(),
   temperature: z.number().optional(),
@@ -100,8 +114,21 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /**
+   * JSONPath of the value the endpoint returns for the conversation. What it
+   * matches is held per thread and rendered as `{{ session }}` on the next
+   * turn of the same thread.
+   */
+  sessionPath: z.string().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * The project's decrypted secrets, so `{{ secrets.NAME }}` resolves in the
+   * url, the header values and the auth fields, the places a credential
+   * belongs. Defaulted so a job queued before secrets reached http targets
+   * still parses.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -138,6 +165,25 @@ export const CodeAgentDataSchema = z.object({
    * the studio's addEnvs behavior for in-app workflow execution.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /**
+   * The run's own LangWatch credential, minted once for the run. It reaches
+   * the project's agent cache and nothing else, and expires by itself, so the
+   * code under test can keep state between turns without the project key ever
+   * entering the sandbox. Absent when the platform could not mint one, which
+   * leaves every turn doing its own work.
+   */
+  sandboxApiKey: z.string().optional(),
+  /**
+   * Wall-clock budget for the agent's Python, in milliseconds, sent to the
+   * engine as the code node's `timeout_ms` parameter.
+   *
+   * It can only SHORTEN the run: the code executor clamps every per-node
+   * request to the operator's ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset), so a value
+   * above that ceiling is silently ignored. Absent leaves the engine on the
+   * operator default.
+   */
+  timeoutMs: z.number().int().positive().optional(),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
@@ -182,12 +228,109 @@ export const WorkflowAgentDataSchema = z.object({
 });
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
+/**
+ * Pre-fetched connected agent configuration for serialized execution.
+ *
+ * The child reaches the agent through the relay route with the project key,
+ * so all it needs is the agent id, where the platform is, and the per-call
+ * budget the agent declared. The parameters the agent declares travel with
+ * the job so a typed value is sent as its declared type.
+ */
+export const ConnectedAgentDataSchema = z.object({
+  type: z.literal("connected"),
+  agentId: z.string(),
+  /** The platform's own address, the origin the relay route is posted to. */
+  endpoint: z.string(),
+  /** Per-call budget in milliseconds, already capped by the platform. */
+  timeoutMs: z.number().int().positive(),
+});
+export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
+
+/**
+ * What a voice run carries to the child: the transport, the agent id on that
+ * transport (the ElevenLabs agent id, or the phone number for a phone target),
+ * and the project's provider credential resolved from the model-provider row
+ * (never stored on the agent). A discriminated union on `transport` so each
+ * transport carries only the credential shape it can use: ElevenLabs an API key
+ * and host, phone the Twilio account SID, auth token and from-number. The
+ * credential is `null` when the project has no key for the transport, so the
+ * child fails the run with a named reason rather than reaching the vendor with
+ * an empty credential — the same way the http data carries its secrets to the
+ * child.
+ */
+export const ElevenLabsVoiceTargetSchema = z.object({
+  transport: z.literal("elevenlabs_convai"),
+  agentId: z.string(),
+  credential: z
+    .object({
+      kind: z.literal("elevenlabs"),
+      apiKey: z.string(),
+      baseUrl: z.string(),
+    })
+    .nullable(),
+});
+export const PhoneVoiceTargetSchema = z.object({
+  transport: z.literal("phone"),
+  agentId: z.string(),
+  credential: z
+    .object({
+      kind: z.literal("twilio"),
+      accountSid: z.string(),
+      authToken: z.string(),
+      fromNumber: z.string(),
+    })
+    .nullable(),
+  /**
+   * Which way the call goes. On "inbound" the agent under test answers and
+   * greets on connect, so the run opens with the agent's turn (the greeting is
+   * captured) before handing over to the simulator/judge loop; "outbound" (the
+   * default) opens with the caller. Defaulted so a job queued before this field
+   * existed still parses.
+   */
+  callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
+});
+export const VoiceTargetSchema = z.discriminatedUnion("transport", [
+  ElevenLabsVoiceTargetSchema,
+  PhoneVoiceTargetSchema,
+]);
+export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
+
+/** Pre-fetched voice agent configuration for serialized execution. */
+export const VoiceAgentDataSchema = z.object({
+  type: z.literal("voice"),
+  agentId: z.string(),
+  voiceTarget: VoiceTargetSchema,
+  /**
+   * Environment the SDK builds its own OpenAI client from for the simulated
+   * caller's text-to-speech and for the transcription the judge uses. Only
+   * `OPENAI_API_KEY` — transcription runs on OpenAI for every voice run, and
+   * `CALLER_VOICES` offers no ElevenLabs voice today, so no ElevenLabs key
+   * travels here. Resolved from the project's model provider rows and merged
+   * into the child env for a voice target only, mirroring the transport
+   * credential's ride-in-job-data-only handling: never logged, never in an
+   * event. Empty when the project has no OpenAI key, which the child surfaces
+   * as a named failure. Defaulted so a job queued before it existed still
+   * parses.
+   */
+  callerEnv: z.record(z.string(), z.string()).default({}),
+  /**
+   * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS). The transport
+   * clamps a single turn's wait to it, and the child arms a timer that ends the
+   * call at it so the judge still runs on what was said. Defaulted so a job
+   * queued before the limit existed still parses.
+   */
+  maxCallSeconds: z.number().int().positive().default(300),
+});
+export type VoiceAgentData = z.infer<typeof VoiceAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
+  ConnectedAgentDataSchema,
+  VoiceAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -215,6 +358,8 @@ export const ScenarioConfigSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  maxTurns: z.number().int().optional(),
+  minTurns: z.number().int().optional(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 
@@ -247,24 +392,27 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 // ============================================================================
-// Span Query Types
-// ============================================================================
-
-/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
-export type SpanQueryFn = (params: {
-  projectId: string;
-  traceId: string;
-}) => Promise<Span[]>;
-
-// ============================================================================
 // Result Types
 // ============================================================================
+
+/**
+ * The connected agent instance that answered a run.
+ *
+ * The runner writes it on its stdout result line, so the parent parses it
+ * against this schema before it narrows the value: a line carrying no label,
+ * or a label that is not text, is not an instance.
+ */
+export const ScenarioAgentInstanceSchema = z.object({
+  hostname: z.string(),
+  label: z.string().nullable(),
+});
+export type ScenarioAgentInstance = z.infer<typeof ScenarioAgentInstanceSchema>;
 
 /** Result of scenario execution */
 export const ScenarioExecutionResultSchema = z.object({
@@ -274,6 +422,10 @@ export const ScenarioExecutionResultSchema = z.object({
   error: z.string().optional(),
   /** When true, the job was cancelled by user (not a crash/error). */
   cancelled: z.boolean().optional(),
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance: ScenarioAgentInstanceSchema.optional(),
+  /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
+  isCutAtLimit: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -284,28 +436,107 @@ export type ScenarioExecutionResult = z.infer<
 // ============================================================================
 
 /**
+ * A run whose conversation is written down in advance. The user sends one
+ * message, the agent answers, and the run succeeds when the answer arrives.
+ */
+export const ScriptedRunSchema = z.object({
+  kind: z.literal("agent_test"),
+  userMessage: z.string().min(1),
+});
+export type ScriptedRun = z.infer<typeof ScriptedRunSchema>;
+
+/**
  * Complete data package for child process execution.
  * Contains everything needed to run a scenario without DB access.
+ *
+ * All three model-params fields are individually optional because the
+ * producer and the consumer of a job payload can be on different builds: a
+ * job queued just before the simulator/judge model split carries only
+ * `modelParams`, and it must still parse and run after the deploy that
+ * introduced the split. What is NOT optional is that every role ends up with
+ * a model — the refinement below rejects a payload from which the simulator
+ * or the judge could not be built, so that failure is a named schema error at
+ * the process boundary rather than an opaque "undefined has no properties"
+ * crash three layers into model construction (issue #6634).
+ *
+ * `selectRoleModelParams` (job-model-params.ts) applies the fallback the
+ * refinement guarantees is available.
  */
-export const ChildProcessJobDataSchema = z.object({
-  context: ExecutionContextSchema,
-  scenario: ScenarioConfigSchema,
-  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
-  scenarioRunId: z.string().optional(),
-  adapterData: TargetAdapterDataSchema,
-  /** Model params for the target adapter (prompt / workflow under test). */
-  modelParams: LiteLLMParamsSchema,
-  /**
-   * Model params for the user-simulator agent. Resolved from the run-plan /
-   * scenario override or the scenarios.user_simulator default. Optional so a
-   * job queued by an older worker (which only carried modelParams) still
-   * parses; the child falls back to modelParams when absent.
-   */
-  simulatorModelParams: LiteLLMParamsSchema.optional(),
-  /** Model params for the judge agent — same resolution + fallback as the
-   *  simulator, from the scenarios.judge default. */
-  judgeModelParams: LiteLLMParamsSchema.optional(),
-  nlpServiceUrl: z.string(),
-  target: TargetConfigSchema,
-});
+export const ChildProcessJobDataSchema = z
+  .object({
+    context: ExecutionContextSchema,
+    scenario: ScenarioConfigSchema,
+    /**
+     * The values the run resolved for this scenario. The scenario's own text
+     * arrives already rendered against them; the target under test reads them
+     * as `params.NAME`. Defaulted so a job queued before parameters existed
+     * still parses.
+     */
+    parameters: runParameterValuesSchema.default({}),
+    /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+    scenarioRunId: z.string().optional(),
+    adapterData: TargetAdapterDataSchema,
+    /**
+     * Model params for the target adapter (the prompt under test). Only a
+     * prompt target ever resolves one — workflow / code / http targets send
+     * the project's platform API key instead (see
+     * serialized-adapter.registry.ts) and never consume an LLM key for the
+     * agent under test, so this is absent for them.
+     *
+     * Doubles as the legacy fallback for the two fields below: before the
+     * model split this single value drove all three agents.
+     */
+    modelParams: LiteLLMParamsSchema.optional(),
+    /**
+     * Model params for the user-simulator agent. Resolved from the run-plan /
+     * scenario override or the scenarios.user_simulator default. Absent only
+     * on a pre-split payload, which falls back to `modelParams`.
+     */
+    simulatorModelParams: LiteLLMParamsSchema.optional(),
+    /** Model params for the judge agent — same resolution and same pre-split
+     *  fallback as the simulator, from the scenarios.judge default. */
+    judgeModelParams: LiteLLMParamsSchema.optional(),
+    nlpServiceUrl: z.string(),
+    target: TargetConfigSchema,
+    /**
+     * Total time in milliseconds the judge waits at verdict time for an http
+     * target's remote traces to arrive and stabilize. Computed by the
+     * prefetcher from the project's own ingest lag; absent for non-http
+     * targets and on jobs queued before the budget existed, in which case
+     * the scenario SDK's default applies.
+     */
+    traceWaitTimeoutMs: z.number().optional(),
+    /**
+     * A fixed conversation for the run. Present on an agent test run only:
+     * the user's messages are written down, no simulator plays the person and
+     * no judge decides, so the run needs no model at all.
+     */
+    script: ScriptedRunSchema.optional(),
+    /**
+     * The simulated caller's voice, interrupt probability and effects — carried
+     * from the scenario for a voice target only. The child builds the voice
+     * user simulator from it and records the effective values on the run.
+     * Absent for every non-voice run and for a job queued before it existed.
+     */
+    callerVoice: callerVoiceConfigSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.script) return;
+    if (!data.simulatorModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["simulatorModelParams"],
+        message:
+          "No model params for the user simulator, and no modelParams to fall back to",
+      });
+    }
+    if (!data.judgeModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["judgeModelParams"],
+        message:
+          "No model params for the judge, and no modelParams to fall back to",
+      });
+    }
+  });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

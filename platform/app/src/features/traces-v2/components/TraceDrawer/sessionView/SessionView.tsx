@@ -110,6 +110,19 @@ export function SessionView({ session, entries }: SessionViewProps) {
   );
 }
 
+/**
+ * The fold keeps its dedup sets bounded at 50 entries (MAX_SET in
+ * coding-agent-session.derivation.ts), so a set-derived figure that reads
+ * exactly 50 is a floor, not a count — a long session shows "50+" rather
+ * than presenting the cap as the total. Counter-derived figures (model
+ * calls, tools run) are exact and never pass through this.
+ */
+const FOLD_SET_CAP = 50;
+
+function boundedCount(n: number): string {
+  return n >= FOLD_SET_CAP ? `${FOLD_SET_CAP}+` : String(n);
+}
+
 function Headline({ session }: { session: CodingAgentSessionRow }) {
   // No agent / version / model chips here: the drawer header directly above
   // already carries Service and Models, and the agent version opens the
@@ -123,7 +136,7 @@ function Headline({ session }: { session: CodingAgentSessionRow }) {
     <VStack align="stretch" gap={3}>
       {session.traceIds.length > 1 && (
         <HStack gap={2} flexWrap="wrap">
-          <MetaChip>{`spans ${session.traceIds.length} traces`}</MetaChip>
+          <MetaChip>{`spans ${boundedCount(session.traceIds.length)} traces`}</MetaChip>
         </HStack>
       )}
 
@@ -136,11 +149,11 @@ function Headline({ session }: { session: CodingAgentSessionRow }) {
         <Stat label="Model calls" value={String(session.modelCalls)} />
         <Stat label="Tools run" value={String(session.toolCalls)} />
         {session.subAgents > 0 && (
-          <Stat label="Sub-agents" value={String(session.subAgents)} />
+          <Stat label="Sub-agents" value={boundedCount(session.subAgents)} />
         )}
         <Stat
           label="Files touched"
-          value={String(session.filesTouched.length)}
+          value={boundedCount(session.filesTouched.length)}
         />
       </Grid>
     </VStack>

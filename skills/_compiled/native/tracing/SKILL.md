@@ -13,7 +13,7 @@ compatibility: Works with Claude Code and similar coding agents. The `langwatch`
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 
 - Read the full codebase to understand the agent's architecture
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
+- Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -22,58 +22,35 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 - Add tracing only where requested
 - Verify the instrumentation works in context
 
-This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
+This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
+
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Step 1: Read the Integration Docs
-
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
-
-**Projects and API keys: target a real project, not a personal one.**
-
-LangWatch has two kinds of project:
-
-- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
-
-And two ways to authenticate:
-
-- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
-- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
-
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
 ## Step 2: Install the LangWatch SDK
 
-For Python: `pip install langwatch` (or `uv add langwatch`).
-For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
+For Python, a ladder, stopping at the first that works, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line (a venv uv made has no pip in it); otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists, and only then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`. A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
+For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
+`uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `python -m pip show langwatch` gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
+Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require('langwatch')"` for TypeScript. A Python release below 1.3.0 has neither, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, and pip walks back to the last release with none. `pip install langwatch --upgrade` cannot help there. A failed check is a question about the interpreter, asked before giving up: "Install Python 3.13 with uv for me" or "I'll pick the interpreter myself".
 
-If install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip.
+If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
 ## Step 3: Add Instrumentation
 
@@ -97,7 +74,34 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 ```
 
-The exact pattern depends on the framework — follow the docs, not these examples.
+The exact pattern depends on the framework, so follow the docs, not these examples.
+
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
 
 ## Step 4: Verify
 
@@ -105,11 +109,14 @@ Do NOT consider the work complete without verifying. In order:
 
 1. Confirm dependencies installed cleanly.
 2. Run the agent with a test input that produces at least one trace (study how the framework starts; only give up if it requires infrastructure you cannot spin up).
-3. Check traces arrived: `langwatch trace search --limit 5 --format json`.
-4. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
+3. Check traces arrived: `langwatch trace search --limit 5 --format json`. A trace is not searchable the moment the run ends: the export leaves the process first and ingestion adds a few seconds more, so an empty first answer means "not yet", not "not working". Wait and ask again, up to three times, about twenty seconds apart, and stop there. Do not change the command between tries: the search already covers the last twenty four hours, so a trace that is in is in.
+4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
+5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
 ## Common Mistakes
 
-- Do NOT invent instrumentation patterns — read the framework-specific doc
+- Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
-- Do NOT skip Step 1 — instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
+- Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly

@@ -5,9 +5,9 @@ Given 2+ candidate outputs (from different EvaluationsV3 target columns) and
 an optional golden reference, asks an LLM judge to pick the single best
 candidate, with deterministic candidate-order shuffling (seeded by
 `row_index`) for position-bias mitigation. By default (`swap_and_reconcile`),
-each row is judged twice — once in that shuffled order, once with the order
-fully reversed — and a disagreement between the two verdicts is treated as a
-tie rather than trusting either individual call.
+each row is judged twice, once in that shuffled order and once with the order
+fully reversed. A disagreement between the two verdicts leaves the row with no
+winner, which is neither a tie nor either individual call taken on trust.
 
 Two candidates is not a special case. This evaluator is the only comparison
 judge offered, superseding the two-slot `langevals/pairwise_compare` (#5100),
@@ -20,10 +20,11 @@ BDD spec:     specs/experiments/comparison.feature
 """
 
 import json
-import os
 import random
+import re
 from typing import Literal, Optional, cast
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -257,11 +258,6 @@ class SelectBestCompareEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: SelectBestCompareEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         candidates = [c for c in entry.candidates if c.output]
         if len(candidates) < 2:
             return EvaluationResultSkipped(
@@ -286,13 +282,32 @@ class SelectBestCompareEvaluator(
 
         winner_id = verdict["winner"]
 
-        # No winner at all — reconciliation found the verdict was order-
-        # dependent and ties are disabled, so there is nothing to report. This
-        # is skipped rather than scored: `score=1.0` would read as a win for
-        # `label=None`, and `score=0.5` would be the tie the settings ruled
-        # out. An absent verdict must contribute no evidence either way.
+        # `is not None` (not a truthiness check) so a genuine $0.0 cost, a
+        # real free judge call, is preserved as Money(0.0) rather than being
+        # coerced to None. cost stays None only when completion_cost actually
+        # failed to compute (verdict["cost"] is None).
+        cost = (
+            Money(amount=verdict["cost"], currency="USD")
+            if verdict.get("cost") is not None
+            else None
+        )
+
+        # No winner at all: reconciliation found the verdict was order-
+        # dependent, whatever `allow_tie` says, so there is nothing to report.
+        # This is skipped rather than scored: `score=1.0` would read as a win
+        # for `label=None`, and `score=0.5` would claim a tie the run never
+        # established. An absent verdict must contribute no evidence either
+        # way.
+        #
+        # The judge calls were still made and still billed, so the cost rides
+        # along: an inconclusive row is the most expensive kind there is (two
+        # calls instead of one), and dropping its spend understates exactly the
+        # rows a user would want to know cost them the most.
         if winner_id is None:
-            return EvaluationResultSkipped(details=verdict["reasoning"])
+            return EvaluationResultSkipped(
+                details=verdict["reasoning"],
+                cost=cost,
+            )
 
         score = 0.5 if winner_id == "tie" else 1.0
 
@@ -300,16 +315,7 @@ class SelectBestCompareEvaluator(
             score=score,
             label=winner_id,
             details=verdict["reasoning"],
-            cost=(
-                # `is not None` (not a truthiness check) so a genuine $0.0
-                # cost — a real, free judge call — is preserved as Money(0.0)
-                # rather than being coerced to None. cost stays None only when
-                # completion_cost actually failed to compute (verdict["cost"]
-                # is None).
-                Money(amount=verdict["cost"], currency="USD")
-                if verdict.get("cost") is not None
-                else None
-            ),
+            cost=cost,
         )
 
     def _effective_temperature(self) -> float:
@@ -332,13 +338,19 @@ class SelectBestCompareEvaluator(
         ordered: list[CandidateInput],
     ) -> dict:
         """
-        Swap-and-reconcile: call `_judge` twice — once across `ordered` as
-        given, once with that same list fully reversed — and treat a
-        disagreement between the two verdicts as a tie rather than trusting
+        Swap-and-reconcile: call `_judge` twice, once across `ordered` as
+        given and once with that same list fully reversed, and leave the row
+        with no winner when the two verdicts disagree rather than trusting
         either individual call. `_judge` builds its own slot-to-candidate
         mapping from whatever list it's handed and translates the judge's
         slot pick back to the candidate's real id, so the reversed call
         "just works" through that existing translation logic.
+
+        Slot A of the reversed call is a different candidate from slot A of
+        the first, so both verdicts arrive with their reasoning already
+        translated against the mapping of the call that produced it. The
+        merging below only ever concatenates text that already names real
+        candidates.
 
         Returns the same `{"winner", "reasoning", "cost"}` shape `_judge`
         returns, so callers don't need to know which path ran.
@@ -359,6 +371,20 @@ class SelectBestCompareEvaluator(
             None if cost1 is None and cost2 is None else (cost1 or 0.0) + (cost2 or 0.0)
         )
 
+        # One unusable answer is not a disagreement. Reading it as one would
+        # tell the reader the candidates could not be separated, when what
+        # actually happened is that the judge never answered; and two unusable
+        # answers would agree with each other and report a winner of None as
+        # though it had been confirmed twice.
+        if verdict1.get("unanswered") or verdict2.get("unanswered"):
+            unusable = verdict1 if verdict1.get("unanswered") else verdict2
+            return {
+                "winner": None,
+                "unanswered": True,
+                "reasoning": unusable["reasoning"],
+                "cost": total_cost,
+            }
+
         if winner1 == winner2:
             # Same winner both times (including both "tie") — agreement.
             #
@@ -375,7 +401,7 @@ class SelectBestCompareEvaluator(
             )
             return {
                 "winner": winner1,
-                "reasoning": f"{confirmation} {verdict1['reasoning']}",
+                "reasoning": f"{confirmation}\n\n{verdict1['reasoning']}",
                 "cost": total_cost,
             }
 
@@ -393,21 +419,27 @@ class SelectBestCompareEvaluator(
         # establish a winner. Only the explanation has to be earned.
         pinned = self._effective_temperature() == 0.0
         cause = (
-            "The verdict changed with candidate order, so this row does not "
-            "establish a winner."
+            "The verdict changed with candidate order."
             if pinned
             else (
                 "The verdict did not survive being asked again with the "
-                "candidate order reversed, so this row does not establish a "
-                "winner. This judge does not run at a fixed temperature, so "
-                "the disagreement is not necessarily caused by the order."
+                "candidate order reversed. This judge does not run at a fixed "
+                "temperature, so the disagreement is not necessarily caused "
+                "by the order."
             )
         )
         label = "Order-sensitive verdict" if pinned else "Unreproducible verdict"
+        # Laid out as blocks rather than one paragraph. Each pass writes prose
+        # carrying its own commas, semicolons and parentheses, so joining two
+        # of them with more of the same buried the one thing the reader needs
+        # first — where one pass's account ends and the other's begins — under
+        # a wall of nested punctuation. The headline states the finding, each
+        # pass gets its own block, and the caveat lands last.
         details = (
-            f"{label}: original order picked {winner1} "
-            f"({verdict1['reasoning']}); reversed order picked {winner2} "
-            f"({verdict2['reasoning']}). {cause}"
+            f"{label}: this row does not establish a winner.\n\n"
+            f"Original order picked {winner1}:\n{verdict1['reasoning']}\n\n"
+            f"Reversed order picked {winner2}:\n{verdict2['reasoning']}\n\n"
+            f"{cause}"
         )
 
         # No winner, regardless of `allow_tie`.
@@ -441,8 +473,9 @@ class SelectBestCompareEvaluator(
     ) -> dict:
         """
         Run one judge call across N candidates. Returns the winner's
-        ORIGINAL id (not the slot label). Slot labels are alphabetic
-        (A, B, C, ...) so the judge can pick by slot and we translate.
+        ORIGINAL id (not the slot label) and reasoning that names the same
+        ids. Slot labels are alphabetic (A, B, C, ...) so the judge can pick
+        by slot and we translate both the pick and the explanation of it.
         """
         slot_to_candidate = {
             _slot_label(i): cand for i, cand in enumerate(ordered)
@@ -511,8 +544,37 @@ class SelectBestCompareEvaluator(
 
         effective_temperature = self._effective_temperature()
 
+        # The system message carries the rules that exist because of how the
+        # candidates are PRESENTED, anonymized and in an order we chose,
+        # rather than anything about the task. It lives here and not in the
+        # prompt templates for two reasons: `settings.prompt` is a user escape
+        # hatch, and a hand-tuned prompt still gets anonymized slots, so the
+        # rules that make them readable cannot be something the user can
+        # delete; and the templates are mirrored in the config form and in two
+        # generated catalogs, so every word added to them is a fourfold drift
+        # surface.
+        #
+        # "Write every slot as Candidate A" is the upstream half of
+        # `_translate_slot_references` below. A bare "A" is also the English
+        # article, so the translation can only rewrite it where the
+        # surrounding words rule the article out, and no follower list can
+        # cover an open verb vocabulary ("A strikes the best balance..." is
+        # left standing). A judge that always writes the noun in front never
+        # produces the ambiguous form in the first place, and "Candidate A"
+        # translates unconditionally. The guard stays as the fallback for the
+        # bare letters that still get through: over 24 rows of real gpt-5-mini
+        # output the rule took responses carrying a bare letter from 24 to 9,
+        # and bare letter tokens from 53 to 11, which is a much smaller surface
+        # for the guard to gamble on rather than none at all.
+        #
+        # Given once, here, and deliberately not repeated on the `reasoning`
+        # field below. Restating it there raised compliance slightly and
+        # lengthened the reasoning by a third, because a judge told twice to
+        # name slots starts enumerating every candidate. The reasoning is
+        # customer-facing prose and the schema already asks for brevity.
         response = completion(
             model=self.settings.model,
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             temperature=effective_temperature,
             drop_params=True,
             messages=[
@@ -522,8 +584,12 @@ class SelectBestCompareEvaluator(
                         "You are an impartial judge picking the best of "
                         "several candidate outputs. Reason briefly, then "
                         "pick the winning slot label using the provided "
-                        "function call. Judge the candidates' content only "
-                        "— ignore the order in which they are presented."
+                        "function call. Judge the candidates' content only, "
+                        "ignore the order in which they are presented. "
+                        "In your reasoning write every slot as "
+                        '"Candidate A", "Candidate B" and so on, never as a '
+                        "bare letter; the winner field still takes the bare "
+                        "label."
                     ),
                 },
                 {"role": "user", "content": rendered_prompt},
@@ -570,11 +636,43 @@ class SelectBestCompareEvaluator(
 
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
-        )
 
-        displayed = arguments["winner"]
+        # Read the cost before reading the answer. The call was made and billed
+        # whatever came back inside it, so an answer we cannot use still has to
+        # carry its price to the row.
+        try:
+            call_cost = completion_cost(completion_response=response)
+        except Exception:
+            call_cost = None
+
+        # A forced `tool_choice` is a request, not a guarantee. Providers
+        # occasionally answer with no tool call, or with one whose arguments
+        # are unreadable or carry no `winner`; two of roughly 200 live calls
+        # did while dogfooding. Each of those is the judge failing to answer,
+        # which is a verdict-shaped outcome the reader can act on, so it is
+        # reported as no verdict rather than raised as an evaluator error.
+        tool_calls = getattr(cast(Message, choice.message), "tool_calls", None)
+        if not tool_calls:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            raw_arguments = tool_calls[0].function.arguments
+        except AttributeError:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            arguments = json.loads(raw_arguments)
+        except (TypeError, ValueError):
+            return _unanswered("returned an answer that could not be read", call_cost)
+
+        # A present-but-empty `winner` is the same non-answer as an absent one:
+        # `{"winner": null}` names nobody. It is checked here rather than left
+        # to the slot lookup below, whose fallback deliberately degrades an
+        # unrecognised slot LETTER to a real candidate — a fallback that would
+        # otherwise turn "the judge named no one" into "candidate A won".
+        displayed = arguments.get("winner") if isinstance(arguments, dict) else None
+        if not isinstance(displayed, str) or not displayed.strip():
+            return _unanswered("answered without naming a winner", call_cost)
         if displayed == "tie":
             winner_id = "tie"
         elif displayed in slot_to_candidate:
@@ -591,14 +689,24 @@ class SelectBestCompareEvaluator(
             # still yields a processed result naming a real candidate.
             winner_id = slot_to_candidate[_slot_label(0)].id
 
-        try:
-            call_cost = completion_cost(completion_response=response)
-        except Exception:
-            call_cost = None
+        # `reasoning` is free text in the tool schema, and a provider that does
+        # not strictly enforce the schema can put an object, a list or a number
+        # there. Anything that is not text is the same as no explanation: it
+        # cannot be read by the customer, and it cannot be slot-translated
+        # below, where a non-string would raise instead of returning a verdict.
+        explanation = arguments.get("reasoning")
+        if not isinstance(explanation, str) or not explanation.strip():
+            explanation = "The judge gave no explanation."
 
+        # The judge argues in terms of the slot labels it was shown, so the
+        # reasoning is translated before it leaves `_judge`, with the same
+        # mapping the winner above is translated with. Slot order differs per
+        # call (`_reconcile` reverses it for the second one), so a reasoning
+        # that travelled any further before being translated would be read
+        # against the wrong candidates.
         return {
             "winner": winner_id,
-            "reasoning": arguments["reasoning"],
+            "reasoning": _translate_slot_references(explanation, slot_to_candidate),
             "cost": call_cost,
         }
 
@@ -624,6 +732,29 @@ class SelectBestCompareEvaluator(
         return "\n".join(lines)
 
 
+def _unanswered(what_happened: str, cost: float | None) -> dict:
+    """
+    A judge call that came back without a usable verdict, in the same
+    `{"winner", "reasoning", "cost"}` shape a real verdict has, plus the
+    `unanswered` marker `_reconcile` reads.
+
+    The marker matters because a `None` winner already means "the two passes
+    disagreed", and the two are not the same finding: a disagreement is
+    something the row established about the candidates, an unanswered call is
+    something that went wrong with the provider. Merging them would report a
+    provider slip as evidence the candidates are too close to separate.
+    """
+    return {
+        "winner": None,
+        "unanswered": True,
+        "reasoning": (
+            f"The judge {what_happened}, so this row has no verdict. "
+            "The call was still made and billed."
+        ),
+        "cost": cost,
+    }
+
+
 def _slot_label(index: int) -> str:
     """
     Map a candidate index to an alphabetic slot label: 0->A, 1->B, ...,
@@ -641,3 +772,319 @@ def _slot_label(index: int) -> str:
         if n < 0:
             break
     return letters
+
+
+# A slot label, optionally introduced by the noun the judge puts in front of
+# it. The lookaround pair keeps the label a word of its own, so a letter
+# inside a longer token ("v0", "A_1") is never a match.
+_SLOT_REFERENCE_RE = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"(?:(?P<prefix>candidates?|slots?|options?)(?P<gap>[ \t]+))?"
+    r"(?P<slot>[A-Za-z]{1,2})"
+    r"(?![A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+
+# Slot labels that are also ordinary English: the article "A", the pronoun
+# "I", and the two-letter labels a run of 27+ candidates reaches. Left alone
+# unless the surrounding words rule the English reading out.
+_WORD_LIKE_SLOT_LABELS = frozenset(
+    {
+        "A",
+        "AI",
+        "AM",
+        "AN",
+        "AS",
+        "AT",
+        "BE",
+        "BY",
+        "DO",
+        "GO",
+        "HE",
+        "I",
+        "ID",
+        "IF",
+        "IN",
+        "IS",
+        "IT",
+        "ME",
+        "MY",
+        "NO",
+        "OF",
+        "OK",
+        "ON",
+        "OR",
+        "SO",
+        "TO",
+        "UP",
+        "US",
+        "WE",
+    }
+)
+
+# Words that can follow a slot label but never the article "a" or the pronoun
+# "I". Auxiliaries, coordinators and third-person verbs only: a past
+# participle ("a covered case") and an adverb ("a slightly narrower reply")
+# both read fine after an article, so neither proves anything. Modals that
+# double as nouns ("a must", "a can") are left out for the same reason.
+_NON_ARTICLE_FOLLOWERS = frozenset(
+    {
+        # Auxiliaries and copulas.
+        "is",
+        "isn't",
+        "was",
+        "wasn't",
+        "are",
+        "aren't",
+        "were",
+        "weren't",
+        "has",
+        "hasn't",
+        "have",
+        "haven't",
+        "had",
+        "hadn't",
+        "does",
+        "doesn't",
+        "do",
+        "don't",
+        "did",
+        "didn't",
+        "cannot",
+        "can't",
+        "won't",
+        "would",
+        "wouldn't",
+        "could",
+        "couldn't",
+        "should",
+        "shouldn't",
+        # Coordinators and discourse markers.
+        "and",
+        "or",
+        "but",
+        "nor",
+        "however",
+        "therefore",
+        "then",
+        "though",
+        "although",
+        # Adverbs that cannot introduce a noun phrase. "Merely", "clearly" and
+        # friends can ("a clearly better reply"), so they are not here.
+        "again",
+        "also",
+        "instead",
+        "only",
+        # Third-person verbs a judge reaches for when comparing replies.
+        "adds",
+        "addresses",
+        "aligns",
+        "answers",
+        "appears",
+        "beats",
+        "captures",
+        "cites",
+        "comes",
+        "contains",
+        "covers",
+        "delivers",
+        "describes",
+        "discusses",
+        "drops",
+        "elaborates",
+        "explains",
+        "fails",
+        "follows",
+        "gets",
+        "gives",
+        "handles",
+        "hedges",
+        "ignores",
+        "includes",
+        "lacks",
+        "lists",
+        "loses",
+        "matches",
+        "mentions",
+        "misses",
+        "names",
+        "notes",
+        "offers",
+        "omits",
+        "presents",
+        "provides",
+        "quotes",
+        "ranks",
+        "reads",
+        "remains",
+        "repeats",
+        "restates",
+        "says",
+        "scores",
+        "seems",
+        "skips",
+        "stays",
+        "sticks",
+        "summarizes",
+        "ties",
+        "tracks",
+        "uses",
+        "wanders",
+        "wins",
+    }
+)
+
+# Comparisons the judge draws against another candidate. What follows one of
+# these is a candidate, not the start of a noun phrase.
+#
+# The prepositions carry as much of this as the verbs do: "compared with A",
+# "compared to A", "measured against A" and "set alongside A" are the judge's
+# ordinary way of naming the candidate it weighed the winner against. They are
+# safe for the same reason "than" is: a capitalized article after one of them
+# only happens in title case, which the next-word check below rules out.
+_COMPARATIVE_PRECEDERS = frozenset(
+    {
+        "against",
+        "alongside",
+        "beats",
+        "chose",
+        "outperforms",
+        "over",
+        "picked",
+        "prefers",
+        "than",
+        "to",
+        "unlike",
+        "versus",
+        "vs",
+        "with",
+    }
+)
+
+# Characters that close a reference when they come immediately after the
+# label. Immediacy is the whole guard: "A," ends a reference, while
+# "A 'concise' reply" is an article in front of a quoted adjective.
+_CLOSING_AFTER_SLOT = ",.;:!?)]}\n\r"
+
+# A lone letter in quotes is quoted material, most often a multiple-choice
+# answer of "B", rather than a reference to slot B. Backticks count: a judge
+# comparing code writes `C` about the language.
+_OPENING_QUOTES = "\"'“‘`"
+_CLOSING_QUOTES = "\"'”’`"
+
+# Punctuation that can follow a bare label without binding to it. Anything
+# else glued to the letter makes it part of a name rather than a reference:
+# "C++", "C#" and "B-side" are one token to a reader, and rewriting the letter
+# inside one produces "plain++", which is worse than the letter left standing.
+_UNBOUND_AFTER_SLOT = _CLOSING_AFTER_SLOT + " \t'’" + _CLOSING_QUOTES
+
+_NEXT_WORD_RE = re.compile(r"[A-Za-z'’]+")
+_PREVIOUS_WORD_RE = re.compile(r"([A-Za-z'’]+)[^A-Za-z]*$")
+
+
+def _translate_slot_references(
+    reasoning: str, slot_to_candidate: dict[str, CandidateInput]
+) -> str:
+    """
+    Rewrite the slot labels in a judge's reasoning into the candidate ids
+    they stand for, using the mapping of the call that produced it.
+
+    The judge sees anonymized slots so a candidate's name cannot sway it,
+    which leaves it explaining a verdict in terms of "A", "B" and "C" that
+    the reader has no key to. This is the key.
+
+    The prose is customer-visible and comes first: a substitution that
+    corrupts a sentence is worse than a slot letter left standing, so a label
+    is only translated where it cannot be read as ordinary English. "A
+    concise answer is better" keeps its article. Substitution happens in one
+    pass per match, so a candidate id that happens to look like a slot label
+    is never translated a second time.
+    """
+    if not reasoning:
+        return reasoning
+
+    def substitute(match: re.Match[str]) -> str:
+        candidate = slot_to_candidate.get(match.group("slot").upper())
+        if candidate is None or not _reads_as_slot_reference(reasoning, match):
+            return match.group(0)
+        prefix = match.group("prefix") or ""
+        gap = match.group("gap") or ""
+        return f"{prefix}{gap}{candidate.id}"
+
+    return _SLOT_REFERENCE_RE.sub(substitute, reasoning)
+
+
+def _reads_as_slot_reference(text: str, match: re.Match[str]) -> bool:
+    """Whether a slot-shaped token refers to a candidate rather than being an
+    ordinary word that happens to be one letter long."""
+    token = match.group("slot")
+    start, end = match.span("slot")
+    word_like = token.upper() in _WORD_LIKE_SLOT_LABELS
+
+    if match.group("prefix"):
+        # "Candidate C" / "candidate c": the noun in front settles it, unless
+        # the label is lowercase and a word in its own right. "The candidate a
+        # reader would pick" is about a reader, not about slot A.
+        if not (word_like and not token.isupper()):
+            return True
+    elif not token.isupper():
+        # A bare lowercase letter is prose far more often than a slot label.
+        return False
+    elif _is_quoted(text, start, end):
+        return False
+    elif _binds_to_what_follows(text, end):
+        return False
+    elif not word_like:
+        return True
+
+    return _english_reading_is_ruled_out(text, start, end)
+
+
+def _binds_to_what_follows(text: str, end: int) -> bool:
+    """Whether the character right after a label glues it into a longer name,
+    as the plus signs do in "C++"."""
+    return end < len(text) and text[end] not in _UNBOUND_AFTER_SLOT
+
+
+def _english_reading_is_ruled_out(text: str, start: int, end: int) -> bool:
+    """Whether the words around a slot label make the English word reading of
+    it impossible."""
+    after = text[end:]
+    if after == "" or after[0] in _CLOSING_AFTER_SLOT:
+        return True
+    if after[:2].lower() in ("'s", "’s"):
+        return True
+
+    next_word = _next_word(after)
+    if _normalize_apostrophe(next_word) in _NON_ARTICLE_FOLLOWERS:
+        return True
+
+    if _normalize_apostrophe(_previous_word(text[:start])) in _COMPARATIVE_PRECEDERS:
+        # "more complete than A (one-liner)". A capitalized word after the
+        # label means title case, where an article is capitalized too and the
+        # reading is open again.
+        return not next_word[:1].isupper()
+
+    return False
+
+
+def _is_quoted(text: str, start: int, end: int) -> bool:
+    before = text[start - 1] if start > 0 else ""
+    after = text[end] if end < len(text) else ""
+    if not before or not after:
+        return False
+    return before in _OPENING_QUOTES and after in _CLOSING_QUOTES
+
+
+def _next_word(after: str) -> str:
+    match = _NEXT_WORD_RE.match(after.lstrip(" \t"))
+    return match.group(0) if match else ""
+
+
+def _previous_word(before: str) -> str:
+    match = _PREVIOUS_WORD_RE.search(before)
+    return match.group(1) if match else ""
+
+
+def _normalize_apostrophe(word: str) -> str:
+    return word.replace("’", "'").lower()

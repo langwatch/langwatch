@@ -6,9 +6,15 @@
  * department), the chain query, the per-scope upsert/delete roundtrip, and
  * the cache-invalidation reach of every scope tier.
  */
-import type { Department, Project, Team, User } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type {
+  Department,
+  Project,
+  Team,
+  User,
+} from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";

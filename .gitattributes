@@ -1,7 +1,19 @@
 **/package-lock.json                    linguist-generated=true merge=ours
+**/pnpm-lock.yaml                       linguist-generated=true merge=ours
 **/uv.lock                              linguist-generated=true merge=ours
 **/go.sum                               linguist-generated=true merge=ours
+**/Chart.lock                           linguist-generated=true merge=ours
 sdks/python/src/langwatch/generated/**/* linguist-generated=true
 platform/app/src/app/api/openapiLangWatch.json linguist-generated=true
 sdks/typescript/src/internal/generated/openapi/api-client.ts linguist-generated=true merge=ours
+sdks/go/client/internal/openapi/zz_generated.gen.go linguist-generated=true merge=ours
 packages/handled-error/src/codes.generated.ts linguist-generated=true merge=ours
+platform/app/src/server/evaluations/evaluators.generated.ts linguist-generated=true
+services/langevals/ts-integration/evaluators.generated.ts linguist-generated=true
+platform/app/src/shared/langy/langySkills.generated.json linguist-generated=true
+sdks/typescript/src/internal/generated/redaction/*.ts linguist-generated=true
+docs/llms.txt                           linguist-generated=true
+docs/llms-full.txt                      linguist-generated=true
+docs/api-reference/openapi-evals.json   linguist-generated=true
+platform/app/src/generated/**           linguist-generated=true
+platform/app/vitest.durations.json      linguist-generated=true merge=ours

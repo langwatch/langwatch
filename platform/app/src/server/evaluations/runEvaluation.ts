@@ -1,4 +1,7 @@
-import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
+import {
+  EvaluatorConfigError,
+  EvaluatorNotFoundError,
+} from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
@@ -246,6 +249,10 @@ const buildDataForEvaluation = async (
   }
 
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+  if (!evaluator) {
+    throw new EvaluatorNotFoundError(evaluatorType);
+  }
+
   const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
   const data_ = Object.fromEntries(
     fields.map((field) => [field, data[field] ?? ""]),
@@ -397,7 +404,7 @@ export const runEvaluation = async ({
   ).find((k) => k === evaluatorType);
 
   if (!builtInEvaluatorType) {
-    throw new Error(`Evaluator ${evaluatorType} not found`);
+    throw new EvaluatorNotFoundError(evaluatorType);
   }
 
   const droppedCategories = trace?.privacy?.droppedCategories ?? [];

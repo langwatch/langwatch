@@ -1,6 +1,6 @@
-import type { Dataset, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { Dataset, PrismaClient } from "~/generated/prisma/client";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { DatasetService } from "../../datasets/dataset.service";
 import {
@@ -17,7 +17,6 @@ import {
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { StorageService } from "../../storage";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   createManyDatasetRecords,
@@ -87,7 +86,7 @@ export const datasetRecordRouter = createTRPCRouter({
         newDatasetEntriesSchema,
       ),
     )
-    .use(checkProjectPermission("datasets:create"))
+    .permission("datasets:create")
     .mutation(async ({ ctx, input }) => {
       const dataset = await ctx.prisma.dataset.findFirst({
         where: {
@@ -124,7 +123,7 @@ export const datasetRecordRouter = createTRPCRouter({
         updatedRecord: z.record(z.string(), z.any()),
       }),
     )
-    .use(checkProjectPermission("datasets:update"))
+    .permission("datasets:update")
     .mutation(async ({ ctx, input }) => {
       const { recordId, updatedRecord } = input;
 
@@ -156,7 +155,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkProjectPermission("datasets:view"))
+    .permission("datasets:view")
     .query(async ({ input }) => {
       try {
         return await getFullDataset({
@@ -188,9 +187,13 @@ export const datasetRecordRouter = createTRPCRouter({
         datasetId: z.string(),
         page: z.number().int().positive().default(1),
         limit: z.number().int().positive().max(200).default(50),
+        // When set, the page is a page of the rows whose cell values contain
+        // this text, and `count` is the number of matches — so the editor's
+        // pager pages the matches rather than the whole dataset.
+        search: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("datasets:view"))
+    .permission("datasets:view")
     .query(async ({ ctx, input }) => {
       try {
         return await DatasetService.create(ctx.prisma).getDatasetPage({
@@ -198,6 +201,7 @@ export const datasetRecordRouter = createTRPCRouter({
           projectId: input.projectId,
           page: input.page,
           limit: input.limit,
+          search: input.search,
         });
       } catch (error) {
         // Parity with getAll/getFullDataset: an archived/missing dataset reads
@@ -209,7 +213,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   download: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkProjectPermission("datasets:view"))
+    .permission("datasets:view")
     .mutation(async ({ input }) => {
       try {
         return await getFullDataset({
@@ -225,7 +229,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   getHead: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkProjectPermission("datasets:view"))
+    .permission("datasets:view")
     .query(async ({ input, ctx }) => {
       try {
         return await getDatasetHead({ input, ctx });
@@ -243,7 +247,7 @@ export const datasetRecordRouter = createTRPCRouter({
         recordIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("datasets:delete"))
+    .permission("datasets:delete")
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 

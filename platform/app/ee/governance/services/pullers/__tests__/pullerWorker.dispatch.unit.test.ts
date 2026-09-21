@@ -5,9 +5,9 @@
  *   adapter resolution (real registry) →
  *   adapter.runOnce (real adapter, stubbed fetch) →
  *   OCSF row composition (real mapToOcsfRow) →
- *   governance_ocsf_events insert (mock CH client)
+ *   governance_ocsf_events insert (mock App-provided repository)
  *
- * Mocks Prisma + the CH client at the module boundary so the test
+ * Mocks Prisma + the App's OCSF repository at the module boundary so the test
  * runs without Docker. The dispatch logic, adapter dispatch, OCSF
  * mapping, and cursor-persistence semantics are all covered with
  * real code; only the storage edges are stubbed.
@@ -41,15 +41,22 @@ beforeEach(() => {
       },
     },
   }));
-  vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForProject: async () => ({}),
+  // The worker takes the OCSF sink from the App, so standing in for the
+  // store means standing in for `getApp()`.
+  vi.doMock("~/server/app-layer/app", () => ({
+    getApp: () => ({
+      governance: {
+        ocsfEvents: {
+          // The worker writes a page as one insert; the spy sees each row so
+          // the per-row assertions below stay about rows, not batching.
+          insertEvents: async (rows: unknown[]) => {
+            for (const row of rows) ocsfInsert(row);
+          },
+        },
+      },
+    }),
   }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
-    GovernanceOcsfEventsClickHouseRepository: class {
-      async insertEvent(row: unknown) {
-        return ocsfInsert(row);
-      }
-    },
     OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
     OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
   }));
@@ -58,6 +65,12 @@ beforeEach(() => {
   }));
   vi.doMock("~/utils/ssrfProtection", () => ({
     ssrfSafeFetch: fetchStub,
+  }));
+  // This test is about audit rows, not cost. The real service would reach for
+  // Redis through the App and throw, and a flag lookup that cannot answer now
+  // fails the run rather than filing the window at no cost.
+  vi.doMock("~/server/featureFlag", () => ({
+    featureFlagService: { isEnabled: async () => false },
   }));
 });
 
@@ -138,7 +151,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       const firstRow = ocsfInsert.mock.calls[0]![0];
       expect(firstRow).toMatchObject({
         // TenantId is the org's hidden internal_governance Project ID,
-        // resolved by the worker — same key as the trace-fold reactor +
+        // resolved by the worker — same key as the trace-fold subscriber +
         // OCSF export service. Org id is NOT used.
         tenantId: "gov-proj-1",
         eventId: `http_polling:${sourceId}:evt-1`,
@@ -150,7 +163,17 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
-      expect(outcome).toEqual({ nextCursor: null, eventCount: 2 });
+      // Exact equality on purpose, and it stays exact. On a run outcome this
+      // is a guard against fields nobody meant to add: it is what fails the
+      // day something personal starts riding along to a sink. A new field is
+      // written down here deliberately or it does not travel.
+      expect(outcome).toEqual({
+        nextCursor: null,
+        eventCount: 2,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: expect.any(Date),
+      });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
@@ -196,6 +219,27 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       await expect(
         runIngestionPull({ sourceId: "src-unknown", cursor: null }),
       ).rejects.toThrow("Unknown ingestion pull adapter");
+      expect(sourceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the adapter refuses the config", () => {
+    it("fails before dispatching, so no request is made against a half-read config", async () => {
+      const { url: _dropped, ...withoutUrl } = HTTP_POLLING_CONFIG;
+      sourceFindUnique.mockResolvedValueOnce({
+        id: "src-bad-config",
+        organizationId: "org-1",
+        sourceType: "http_polling",
+        status: "active",
+        parserConfig: withoutUrl,
+        pollerCursor: null,
+      });
+      const { runIngestionPull } = await import("../pullerWorker");
+      await expect(
+        runIngestionPull({ sourceId: "src-bad-config", cursor: null }),
+      ).rejects.toThrow(/url/i);
+      expect(fetchStub).not.toHaveBeenCalled();
+      expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });

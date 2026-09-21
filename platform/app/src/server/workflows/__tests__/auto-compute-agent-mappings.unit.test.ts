@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { autoComputeAgentMappings } from "../auto-compute-agent-mappings";
 
 // ---------------------------------------------------------------------------

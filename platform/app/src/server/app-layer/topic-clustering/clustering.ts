@@ -1,7 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import {
+  CostReferenceType,
+  CostType,
+  type Project,
+} from "~/generated/prisma/client";
 import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
@@ -9,7 +13,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
@@ -102,11 +106,25 @@ export interface ClusteringRunContext {
   page: number;
 }
 
-export const clusterTopicsForProject = async (
-  projectId: string,
-  searchAfter?: [number, string],
-  runContext?: ClusteringRunContext,
-): Promise<ClusteringPageOutcome> => {
+/**
+ * Runs one clustering page for a project.
+ *
+ * The ClickHouse resolver is threaded in rather than imported: it is built once
+ * in the composition root, and this parameter is what carries it here. The
+ * worker path gets it from the clustering run port in `presets.ts`; the manual
+ * task gets it from the App.
+ */
+export const clusterTopicsForProject = async ({
+  projectId,
+  searchAfter,
+  runContext,
+  resolveClickHouseClient,
+}: {
+  projectId: string;
+  searchAfter?: [number, string];
+  runContext?: ClusteringRunContext;
+  resolveClickHouseClient: ClickHouseClientResolver;
+}): Promise<ClusteringPageOutcome> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -114,9 +132,10 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  const clickhouse = await getClickHouseClientForProject(projectId);
-
-  if (!clickhouse) {
+  let clickhouse: ClickHouseClient;
+  try {
+    clickhouse = await resolveClickHouseClient(projectId);
+  } catch {
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
 

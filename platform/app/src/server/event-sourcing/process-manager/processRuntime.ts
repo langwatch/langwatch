@@ -7,6 +7,7 @@ import {
 } from "../pipeline/processManagerDefinition";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import {
+  DEFAULT_LEASE_DURATION_MS,
   type IntentHandler,
   OutboxDispatcherService,
 } from "./outbox/outboxDispatcherService";
@@ -24,8 +25,36 @@ import {
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 
+const STUCK_DRAIN_LEASE_MULTIPLE = 5;
+const STUCK_DRAIN_FLOOR_MS = 300_000;
+
+/**
+ * Resolves the process instance an event belongs to: the declared `keyBy`, or
+ * the event's aggregate — see `ProcessManagerConfig.keyBy`.
+ */
+function processKeyResolver<E extends Event>(
+  keyBy: ((event: E) => string) | undefined,
+): (params: { event: E; aggregateId: string }) => string {
+  if (!keyBy) return ({ aggregateId }) => aggregateId;
+  return ({ event }) => keyBy(event);
+}
+
+/**
+ * Far above any legitimate drain (a full batch of slow deliveries fits in one
+ * lease), so only a never-settling delivery trips it.
+ */
+function stuckDrainTimeoutMs(leaseDurationMs: number | undefined): number {
+  return Math.max(
+    STUCK_DRAIN_LEASE_MULTIPLE * (leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS),
+    STUCK_DRAIN_FLOOR_MS,
+  );
+}
+
 export const SCHEDULED_SINGLETON_PROJECT_ID = "__global__" as const;
-const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
+/** The synthetic event that arms a scheduled process's first wake. Exported
+ *  so a test drives the same value the runtime does, rather than copying the
+ *  literal and drifting from it. */
+export const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
 
 interface RegisteredProcessManager {
   definition: ProcessManagerDefinition;
@@ -55,6 +84,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }
@@ -73,6 +103,7 @@ export function buildProcessDefinition(
   return {
     name: config.name,
     initialState: config.state,
+    ...(config.transient ? { transient: true } : {}),
     evolve: ({ previousState, input, ref }) => {
       const factories = buildIntentFactories(config.intents, {
         processKey: ref.processKey,
@@ -164,9 +195,17 @@ export class ProcessRuntime {
     for (const definition of params.processManagers.values()) {
       const registered = this.registerProcessManager(definition);
       if (definition.config.eventTypes.length === 0) continue;
+      const keyBy = definition.config.keyBy as
+        | ((event: E) => string)
+        | undefined;
+      const processKeyOf = processKeyResolver(keyBy);
       subscribers.push({
         name: `pm:${definition.config.name}`,
         eventTypes: definition.config.eventTypes,
+        // A keyed process gathers several aggregates into one instance, so
+        // its deliveries must serialize into one lane per key — concurrent
+        // ones would fight over the instance revision.
+        options: keyBy ? { groupKeyFn: keyBy } : undefined,
         handle: async (event, context) => {
           const envelope: ProcessEventEnvelope = {
             // The event log can briefly expose two physical rows before its
@@ -178,7 +217,10 @@ export class ProcessRuntime {
             occurredAt: event.occurredAt,
             tenantId: context.tenantId,
             projectId: context.tenantId,
-            processKey: context.aggregateId,
+            processKey: processKeyOf({
+              event,
+              aggregateId: context.aggregateId,
+            }),
             // `toPayload` is the content boundary. Without one the raw event
             // data is persisted into process state and outbox rows verbatim.
             payload: definition.config.toPayload
@@ -239,7 +281,9 @@ export class ProcessRuntime {
     const outboxWorker = new ProcessOutboxWorker({
       dispatcher,
       logger: this.logger,
+      name: config.name,
       batchSize: config.outbox?.batchSize,
+      stuckDrainTimeoutMs: stuckDrainTimeoutMs(config.outbox?.leaseDurationMs),
     });
     const registered = { definition, manager, outboxWorker };
     this.managers.set(config.name, registered);

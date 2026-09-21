@@ -13,9 +13,7 @@ import { Plus, Users } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Select } from "../../components/ui/select";
-import { getColorForString } from "../../utils/rotatingColors";
 import { RandomColorAvatar } from "../RandomColorAvatar";
-import { UserAvatar } from "../UserAvatar";
 
 export const AddParticipants = ({
   annotators,
@@ -74,7 +72,9 @@ export const AddParticipants = ({
     image: null,
   }));
 
-  const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
+  // Queues first: a queue reaches whoever is on it, so it is the answer most
+  // of the time and a person is the exception.
+  const options = [...(queueOptions ?? []), ...(userOptions ?? [])];
 
   const participantsCollection = createListCollection({
     items: options.map((option) => ({
@@ -122,12 +122,8 @@ export const AddParticipants = ({
                         background="bg.muted"
                       >
                         {item.value.startsWith("user-") ? (
-                          <UserAvatar
+                          <RandomColorAvatar
                             size="2xs"
-                            color="white"
-                            background={
-                              getColorForString("colors", item.label).color
-                            }
                             name={item.label}
                             image={item.image}
                           />

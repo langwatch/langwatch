@@ -96,6 +96,70 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     And the steps card shows the opened step when the PR URL arrives
     And no raw "[langy:progress:" markers appear in my chat history
 
+  @unit
+  Scenario: One command that commits, pushes and opens the PR ticks all three steps
+    Given Langy ran "git add . && git commit -m x && git push -u origin HEAD && gh pr create --base main"
+    When the steps card reads that turn's tool parts
+    Then the committed, pushed and opened steps are all reached
+
+  @unit
+  Scenario: A step whose command errored is not reached
+    Given Langy ran a command that commits and then pushes, and the command failed
+    When the steps card reads that turn's tool parts
+    Then no step of that command is reached
+
+  @unit
+  Scenario: The pull request URL printed by the command reaches the opened step
+    Given Langy ran "git add -A && git commit -m x && git push -u origin HEAD && gh pr create --title t --body b"
+    And the command printed a warning line and then the pull request URL
+    When the steps card reads that turn's tool parts
+    Then the opened step carries the pull request URL
+
+  @unit
+  Scenario: A command that opened no pull request leaves the opened step without a URL
+    Given Langy ran "gh pr create --title t --body b"
+    And the command printed no pull request URL
+    When the steps card reads that turn's tool parts
+    Then the opened step carries no URL
+
+  @integration
+  Scenario: The opened step links to the pull request
+    Given a settled steps card whose opened step carries a pull request URL
+    When I read that turn back
+    Then the PR step is a link to the pull request
+    And the link opens in a new tab
+
+  @integration
+  Scenario: The opened step stays readable without a URL
+    Given a settled steps card whose opened step carries no URL
+    When I read that turn back
+    Then the PR step is plain text rather than a link
+
+  @integration
+  Scenario: The steps card stops calling the turn work in progress once it ends
+    Given a finished turn whose steps card reached the opened step
+    When I read that turn back
+    Then the steps card says the pull request was opened
+    And the card does not say Langy is working on it
+
+  @unit
+  Scenario: A pull request number in the reply links to the pull request
+    Given a turn whose tool call printed the URL of pull request 1
+    When Langy's reply names pull request 1 by its number
+    Then the number is a link to that pull request
+
+  @unit
+  Scenario: A number with no pull request behind it stays plain text
+    Given a turn that opened no pull request
+    When Langy's reply names a number
+    Then the number is left as it was
+
+  @integration
+  Scenario: A finished turn that never opened a pull request says so plainly
+    Given a finished turn whose steps card reached the pushed step only
+    When I read that turn back
+    Then the card does not say Langy is working on it
+
   @integration
   Scenario: Per-user daily PR cap stops runaway loops
     Given I have already opened 20 PRs via Langy today

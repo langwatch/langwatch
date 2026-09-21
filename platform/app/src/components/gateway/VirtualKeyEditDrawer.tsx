@@ -24,6 +24,7 @@ import {
   type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
 import { humanizeGatewayError } from "./gatewayErrorCopy";
+import { resolveTracesHrefForKey } from "./tracesHrefForKey";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -31,6 +32,11 @@ import {
   type VirtualKeyBudgetValue,
   type VirtualKeyBudgetWindow,
 } from "./VirtualKeyBudgetSection";
+import {
+  NEVER_EXPIRES,
+  VirtualKeyExpirationSection,
+  type VirtualKeyExpirationValue,
+} from "./VirtualKeyExpirationSection";
 import { VirtualKeyOwnershipReadOnly } from "./VirtualKeyOwnershipSection";
 import {
   ALL_PROVIDERS,
@@ -45,24 +51,34 @@ import {
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
 import {
+  expirationStateFromStored,
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "./virtualKeyExpiration";
+import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
   tagsBeyondLimitsNotice,
   VK_TAGS_FIELD_DESCRIPTION,
 } from "./virtualKeyTagsField";
 
-type VirtualKeyDetail = {
+export type VirtualKeyDetail = {
   id: string;
   organizationId: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
   traceProjectId?: string | null;
+  /** True when the project the key traces into has been deleted. */
+  traceProjectArchived?: boolean;
   principalUserId?: string | null;
   principalUser?: { name: string | null; email: string | null } | null;
+  /** When the key stops serving; null or absent means it never expires. */
+  expiresAt?: string | null;
   config: {
     // null / undefined = no allowlist = every eligible model is allowed.
     modelsAllowed?: string[] | null;
@@ -73,6 +89,9 @@ type VirtualKeyDetail = {
       rpm: number | null;
       tpm: number | null;
       rpd: number | null;
+    };
+    realtime?: {
+      maxOpenSessions: number | null;
     };
     metadata?: {
       label?: string;
@@ -89,6 +108,23 @@ type VirtualKeyEditDrawerProps = {
 };
 
 const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
+
+/**
+ * Whether the typed open-session cap is something other than blank or a whole
+ * number of 1 or more.
+ *
+ * The whole string is read, not a prefix of it. `Number.parseInt` accepts
+ * "1.9" as 1 and "12voice" as 12, so a typo would silently save a cap the
+ * operator did not choose, and a cap is the thing that refuses a customer's
+ * calls. Zero is refused too: an operator who means "no voice" removes the
+ * provider, and a saved 0 would look like a mistake either way.
+ */
+function maxOpenSessionsInvalid(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") return false;
+  const parsed = Number(trimmed);
+  return !Number.isInteger(parsed) || parsed < 1;
+}
 
 export function VirtualKeyEditDrawer({
   organizationId,
@@ -116,6 +152,10 @@ export function VirtualKeyEditDrawer({
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
+  const [maxOpenSessions, setMaxOpenSessions] = useState<string>("");
+  const [expiration, setExpiration] =
+    useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!vk) return;
@@ -127,6 +167,7 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
+    setMaxOpenSessions(vk.config.realtime?.maxOpenSessions?.toString() ?? "");
     const providersAllowed = vk.config.providersAllowed ?? null;
     setProviderAccess({
       allProviders: !providersAllowed || providersAllowed.length === 0,
@@ -143,6 +184,8 @@ export function VirtualKeyEditDrawer({
     setBudgetLoaded(false);
     setIsBudgetDirty(false);
     setHadManagedBudget(false);
+    setExpiration(expirationStateFromStored(vk.expiresAt ?? null));
+    setExpiryFieldError(null);
   }, [vk]);
 
   const availableTeams = useMemo(
@@ -160,8 +203,20 @@ export function VirtualKeyEditDrawer({
       ) ?? [],
     [organization?.teams],
   );
+  const viewTracesHref = useMemo(
+    () =>
+      vk
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId: vk.id,
+            traceProjectId: vk.traceProjectId,
+            traceProjectArchived: vk.traceProjectArchived,
+          })
+        : undefined,
+    [vk, organization?.teams],
+  );
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: !!vk && !!organizationId },
@@ -218,15 +273,29 @@ export function VirtualKeyEditDrawer({
   }>;
   const eligible = useMemo(
     () =>
-      resolveEligible(
-        vk?.scopes ?? [],
+      resolveEligible({
+        scopes: vk?.scopes ?? [],
         providers,
-        buildScopeHierarchy(availableProjects, organizationId),
-      ),
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
     [vk?.scopes, providers, availableProjects, organizationId],
   );
 
   const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
+  const seededExpiration = expirationStateFromStored(vk?.expiresAt ?? null);
+  const expirationUntouched =
+    expiration.preset === seededExpiration.preset &&
+    expiration.customDate === seededExpiration.customDate;
+  const expiresAt = resolveExpiresAt({
+    preset: expiration.preset,
+    customDate: expiration.customDate,
+  });
+  // Omitted leaves the stored date alone, which is what an untouched block
+  // means. Sending it back would round a stored instant to the end of the
+  // day it was seeded as, and would fail the future-date check on every
+  // unrelated edit to a key that has already expired: renaming an expired
+  // key or extending it is exactly what this drawer is for.
+  const expiresAtPatch = expirationUntouched ? undefined : expiresAt;
 
   const close = () => {
     if (updateMutation.isPending) return;
@@ -237,6 +306,9 @@ export function VirtualKeyEditDrawer({
     if (!name) return "Name is required.";
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
+    if (maxOpenSessionsInvalid(maxOpenSessions)) {
+      return "Max open sessions must be a whole number of 1 or more, or blank for unlimited.";
+    }
     // Until providers resolve, an explicit selection cannot be told
     // apart from an empty one, and submitting would filter the picked
     // ids against an empty eligible set and persist an empty allowlist.
@@ -249,7 +321,7 @@ export function VirtualKeyEditDrawer({
       eligible,
     );
     if (providerReason) return providerReason;
-    return null;
+    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
   const submit = async () => {
@@ -258,6 +330,7 @@ export function VirtualKeyEditDrawer({
       toaster.create({ title: cannotSaveReason, type: "error" });
       return;
     }
+    setExpiryFieldError(null);
     try {
       const access = providerAccessToConfig(providerAccess, eligible);
       const trimmedLimit = budget.limitUsd.trim();
@@ -268,6 +341,9 @@ export function VirtualKeyEditDrawer({
         description: description || null,
         routingMode: routing.mode,
         routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
+        // Absent leaves the stored date alone; null clears it, which is
+        // what "Never" means here; a date moves it.
+        ...(expiresAtPatch !== undefined ? { expiresAt: expiresAtPatch } : {}),
         // Undefined leaves an absent budget alone; null archives one the
         // key had; a value creates or updates it.
         budget: trimmedLimit
@@ -287,6 +363,11 @@ export function VirtualKeyEditDrawer({
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
+          realtime: {
+            maxOpenSessions: maxOpenSessions.trim()
+              ? Number(maxOpenSessions.trim())
+              : null,
+          },
           metadata: {
             tags: parseTagsCsv(tagsCsv),
           },
@@ -295,6 +376,13 @@ export function VirtualKeyEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
+      // A rejected date belongs on the field the reader is still looking
+      // at; everything else has nowhere better to go than the toast.
+      const expiryError = expiryFieldErrorFrom(error);
+      if (expiryError) {
+        setExpiryFieldError(expiryError);
+        return;
+      }
       toaster.create({
         title: humanizeGatewayError(error, "Failed to update virtual key"),
         type: "error",
@@ -369,6 +457,9 @@ export function VirtualKeyEditDrawer({
                       ? vk.principalUser
                       : undefined
                   }
+                  traceProjectId={vk.traceProjectId ?? null}
+                  traceProjectArchived={vk.traceProjectArchived ?? false}
+                  viewTracesHref={viewTracesHref}
                   ctx={{
                     organizationName: organization?.name,
                     availableTeams,
@@ -510,6 +601,41 @@ export function VirtualKeyEditDrawer({
                 <Field.HelperText>Requests / day</Field.HelperText>
               </Field.Root>
             </HStack>
+
+            <Separator />
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Realtime voice
+              </Text>
+              <FieldInfoTooltip
+                description="How many brokered voice sessions this key may hold open at once, blank = unlimited. The request limits above do not bound voice: one mint opens a call that bills for as long as it runs. A mint over the cap gets HTTP 429; a slot frees when the call ends."
+                docHref="/ai-gateway/api/realtime"
+              />
+            </HStack>
+            <HStack gap={4} align="flex-start">
+              <Field.Root flex={1}>
+                <Field.Label>max open sessions</Field.Label>
+                <Input
+                  value={maxOpenSessions}
+                  onChange={(e) => setMaxOpenSessions(e.target.value)}
+                  placeholder="unlimited"
+                  inputMode="numeric"
+                />
+                <Field.HelperText>
+                  Concurrent realtime voice sessions
+                </Field.HelperText>
+              </Field.Root>
+            </HStack>
+            {vk && (
+              <>
+                <Separator />
+                <VirtualKeyExpirationSection
+                  value={expiration}
+                  onChange={setExpiration}
+                  fieldError={expiryFieldError}
+                />
+              </>
+            )}
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>

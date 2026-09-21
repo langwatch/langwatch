@@ -90,7 +90,7 @@ describe("extractCanonicalCostEvents", () => {
       );
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
-        costUsd: 0.12545,
+        costUsd: "0.12545",
         requestId: "req_abc",
         model: "claude-opus-4-7",
         inputTokens: 1234,

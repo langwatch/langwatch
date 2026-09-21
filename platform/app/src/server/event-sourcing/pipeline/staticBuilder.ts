@@ -23,9 +23,12 @@ import type {
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type {
+  SubscriberDispatchDefinition,
+  SubscriberDispatchOptions,
+} from "../subscribers/subscriber.types";
 import {
   buildProcessManager,
   type ProcessManagerApplier,
@@ -137,13 +140,19 @@ export class StaticPipelineBuilderWithNameAndType<
     handlerInstance?: any;
     options?: CommandHandlerOptions;
   }> = [];
-  private foldReactors = new Map<
+  private foldSubscribers = new Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >();
-  private mapReactors = new Map<
+  private mapSubscribers = new Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >();
   private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<
@@ -227,7 +236,8 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register the default operational state projection.
    *
    * It runs as one direct repository load/apply/store cycle under the queue's
-   * per-key lock. It is intentionally not a valid parent for `.withReactor()`.
+   * per-key lock. It is intentionally not a valid parent for
+   * `.withSubscriber()`.
    */
   withProjection(
     name: string,
@@ -303,6 +313,10 @@ export class StaticPipelineBuilderWithNameAndType<
     subscriberName: string,
     spec: SubscriberSpec<EventType> & {
       fold: Fold;
+      when?: (
+        event: EventType,
+        context: TriggerContext<RegisteredFoldStates[Fold]>,
+      ) => boolean;
       handler: (
         event: EventType,
         context: TriggerContext<RegisteredFoldStates[Fold]>,
@@ -316,8 +330,8 @@ export class StaticPipelineBuilderWithNameAndType<
   ): this {
     const nameTaken =
       this.eventSubscribers.has(subscriberName) ||
-      this.foldReactors.has(subscriberName) ||
-      this.mapReactors.has(subscriberName);
+      this.foldSubscribers.has(subscriberName) ||
+      this.mapSubscribers.has(subscriberName);
     if (nameTaken) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
@@ -327,79 +341,7 @@ export class StaticPipelineBuilderWithNameAndType<
     }
 
     if (spec.fold !== undefined || spec.map !== undefined) {
-      const projectionName = (spec.fold ?? spec.map)!;
-      const isFold = spec.fold !== undefined;
-      if (isFold && !this.foldProjections.has(projectionName)) {
-        throw new ConfigurationError(
-          "StaticPipelineBuilder",
-          `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
-          { subscriberName, projectionName },
-        );
-      }
-      if (!isFold && !this.mapProjections.has(projectionName)) {
-        throw new ConfigurationError(
-          "StaticPipelineBuilder",
-          `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
-          { subscriberName, projectionName },
-        );
-      }
-      const eventFilter =
-        spec.events !== undefined ? new Set<string>(spec.events) : null;
-      const passes = (event: EventType): boolean => {
-        if (eventFilter && !eventFilter.has(event.type)) return false;
-        return spec.when?.(event) ?? true;
-      };
-      const definition: ReactorDefinition<EventType> = {
-        name: subscriberName,
-        options: {
-          deduplication: (() => {
-            const defaultId = (event: Event) =>
-              `${event.tenantId}:${String(event.aggregateId)}`;
-            const customDedup =
-              spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
-            if (customDedup) {
-              return {
-                ...customDedup,
-                makeId: (payload: { event: Event; foldState: unknown }) =>
-                  `subscriber:${subscriberName}:${customDedup.makeId(payload.event as EventType)}`,
-                ttlMs: spec.ttl ?? customDedup.ttlMs,
-              };
-            }
-            return {
-              makeId: (payload: { event: Event; foldState: unknown }) =>
-                `subscriber:${subscriberName}:${
-                  spec.dedupId
-                    ? spec.dedupId(payload.event as EventType)
-                    : defaultId(payload.event)
-                }`,
-              ttlMs: spec.ttl ?? 30_000,
-            };
-          })(),
-          delay: spec.delay ?? 0,
-          // Reactor payloads wrap the event; adapt the spec's event-shaped
-          // key so fold/map subscribers get the same lane semantics as raw
-          // ones instead of a silently dropped option.
-          groupKeyFn: spec.groupKeyFn
-            ? (payload: { event: Event; foldState: unknown }) =>
-                spec.groupKeyFn!(payload.event as EventType)
-            : undefined,
-        },
-        // Pre-enqueue rejection: a filtered event never pays serialization.
-        shouldReact: passes,
-        handle: async (event, context) => {
-          if (!passes(event)) return;
-          await spec.handler(event, {
-            tenantId: context.tenantId,
-            aggregateId: context.aggregateId,
-            state: context.foldState,
-          });
-        },
-      };
-      if (isFold) {
-        this.foldReactors.set(subscriberName, { projectionName, definition });
-      } else {
-        this.mapReactors.set(subscriberName, { projectionName, definition });
-      }
+      this.registerProjectionSubscriber(subscriberName, spec);
       return this;
     }
 
@@ -420,15 +362,50 @@ export class StaticPipelineBuilderWithNameAndType<
             : undefined),
       },
       handle: async (event, context) => {
-        if (spec.when && !spec.when(event)) return;
-        await spec.handler(event, {
+        const triggerContext = {
           tenantId: context.tenantId,
           aggregateId: context.aggregateId,
           state: undefined,
-        });
+        };
+        if (spec.when && !spec.when(event, triggerContext)) return;
+        await spec.handler(event, triggerContext);
       },
     });
     return this;
+  }
+
+  /** The fold/map half of `withSubscriber`: compiles the spec into the shared
+   *  post-projection registration and validates its parent projection. */
+  private registerProjectionSubscriber(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType>,
+  ): void {
+    const projectionName = (spec.fold ?? spec.map)!;
+    const isFold = spec.fold !== undefined;
+    if (isFold && !this.foldProjections.has(projectionName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
+        { subscriberName, projectionName },
+      );
+    }
+    if (!isFold && !this.mapProjections.has(projectionName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
+        { subscriberName, projectionName },
+      );
+    }
+
+    const definition = buildProjectionSubscriberDefinition(
+      subscriberName,
+      spec,
+    );
+    if (isFold) {
+      this.foldSubscribers.set(subscriberName, { projectionName, definition });
+    } else {
+      this.mapSubscribers.set(subscriberName, { projectionName, definition });
+    }
   }
 
   /**
@@ -463,46 +440,6 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
     this.processManagers.set(name, definition);
-    return this;
-  }
-
-  /**
-   * Register a reactor on a fold or map projection.
-   * A reactor is a post-projection side-effect handler that fires after the
-   * projection's processing succeeds.
-   *
-   * @param projectionName - Name of the fold or map projection this reactor is attached to
-   * @param reactorName - Unique name for this reactor within the pipeline
-   * @param definition - Reactor definition with handle function
-   * @returns Builder instance for method chaining
-   */
-  withReactor(
-    projectionName: FoldNames | MapNames,
-    reactorName: string,
-    definition: ReactorDefinition<EventType>,
-  ): this {
-    const nameTaken =
-      this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName);
-    if (nameTaken) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Reactor with name "${reactorName}" already exists`,
-        { reactorName },
-      );
-    }
-
-    if (this.foldProjections.has(projectionName)) {
-      this.foldReactors.set(reactorName, { projectionName, definition });
-    } else if (this.mapProjections.has(projectionName)) {
-      this.mapReactors.set(reactorName, { projectionName, definition });
-    } else {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Cannot register reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
-        { projectionName, reactorName },
-      );
-    }
-
     return this;
   }
 
@@ -664,8 +601,8 @@ export class StaticPipelineBuilderWithNameAndType<
       stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,
       commands: this.commands,
-      foldReactors: this.foldReactors,
-      mapReactors: this.mapReactors,
+      foldSubscribers: this.foldSubscribers,
+      mapSubscribers: this.mapSubscribers,
       eventSubscribers: this.eventSubscribers,
       processManagers: this.processManagers,
       featureFlagService: this.featureFlagService,
@@ -701,4 +638,103 @@ export function definePipeline<
   EventType extends Event,
 >(): StaticPipelineBuilder<EventType> {
   return new StaticPipelineBuilder<EventType>();
+}
+
+type SubscriberJobPayload = { event: Event; foldState: unknown };
+
+function toTriggerContext(subscriberDispatchContext: {
+  tenantId: string;
+  aggregateId: string;
+  foldState: unknown;
+}): TriggerContext<unknown> {
+  return {
+    tenantId: subscriberDispatchContext.tenantId,
+    aggregateId: subscriberDispatchContext.aggregateId,
+    state: subscriberDispatchContext.foldState,
+  };
+}
+
+/**
+ * Dedup only when the spec asks for it (dedup / dedupId / ttl). A spec
+ * without any of those means EVERY event must dispatch its own job —
+ * e.g. a lifecycle sync where a coalesced batch carrying both `started`
+ * and `finished` must deliver both, not collapse to the newest.
+ */
+function buildProjectionSubscriberDedup<E extends Event>(
+  subscriberName: string,
+  spec: SubscriberSpec<E>,
+): (SubscriberDispatchOptions["deduplication"] & object) | undefined {
+  const wantsDedup =
+    spec.dedup !== undefined ||
+    spec.dedupId !== undefined ||
+    spec.ttl !== undefined;
+  if (!wantsDedup) return undefined;
+
+  const customDedup =
+    spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
+  if (customDedup) {
+    return {
+      ...customDedup,
+      makeId: (payload: SubscriberJobPayload) =>
+        `subscriber:${subscriberName}:${customDedup.makeId(payload.event as E, payload.foldState)}`,
+      ttlMs: spec.ttl ?? customDedup.ttlMs,
+    };
+  }
+
+  const defaultId = (event: Event) =>
+    `${event.tenantId}:${String(event.aggregateId)}`;
+  return {
+    makeId: (payload: SubscriberJobPayload) =>
+      `subscriber:${subscriberName}:${
+        spec.dedupId
+          ? spec.dedupId(payload.event as E)
+          : defaultId(payload.event)
+      }`,
+    ttlMs: spec.ttl ?? 30_000,
+  };
+}
+
+function buildProjectionSubscriberDefinition<E extends Event>(
+  subscriberName: string,
+  spec: SubscriberSpec<E>,
+): SubscriberDispatchDefinition<E> {
+  const eventFilter =
+    spec.events !== undefined ? new Set<string>(spec.events) : null;
+  const passes = (event: E, context: TriggerContext<unknown>): boolean => {
+    if (eventFilter && !eventFilter.has(event.type)) return false;
+    return spec.when?.(event, context) ?? true;
+  };
+
+  const deduplication = buildProjectionSubscriberDedup(subscriberName, spec);
+
+  return {
+    name: subscriberName,
+    options: {
+      deduplication,
+      // The router's pre-staging batch collapse reads `makeJobId`, the
+      // queue reads `deduplication.makeId`; one function serves both so
+      // they cannot drift (same doctrine as `throttledPerWindow`).
+      makeJobId: deduplication?.makeId,
+      runIn: spec.runIn,
+      disabled: spec.disabled,
+      delay: spec.delay ?? 0,
+      // Subscriber payloads wrap the event; adapt the spec's event-shaped
+      // key so fold/map subscribers get the same lane semantics as raw
+      // ones instead of a silently dropped option.
+      groupKeyFn: spec.groupKeyFn
+        ? (payload: SubscriberJobPayload) =>
+            spec.groupKeyFn!(payload.event as E, payload.foldState)
+        : undefined,
+    },
+    // Pre-enqueue rejection: a filtered event never pays serialization.
+    // The committed projection state is in hand at guard time, so
+    // state-dependent `when` guards reject before enqueue too.
+    shouldDispatch: (event, context) =>
+      passes(event, toTriggerContext(context)),
+    handle: async (event, context) => {
+      const triggerContext = toTriggerContext(context);
+      if (!passes(event, triggerContext)) return;
+      await spec.handler(event, triggerContext);
+    },
+  };
 }

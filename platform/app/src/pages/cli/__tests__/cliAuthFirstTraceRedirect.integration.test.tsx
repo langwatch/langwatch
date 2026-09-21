@@ -101,6 +101,32 @@ const organizationsFixture = [
       },
     ],
   },
+  // A second organization, so the page renders its organization picker at all
+  // (it is hidden for a single-organization user). Its personal project is
+  // what a watcher reading the live selection instead of the approved
+  // organization would land on.
+  {
+    id: "org-2",
+    name: "Second Org",
+    teams: [
+      {
+        id: "team-personal-2",
+        slug: "personal-team-2",
+        name: "Personal",
+        isPersonal: true,
+        ownerUserId: "user-1",
+        projects: [
+          {
+            id: "proj-personal-2",
+            slug: "personal-proj-2",
+            name: "Personal project",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 vi.mock("~/utils/api", async () => {
@@ -125,6 +151,20 @@ vi.mock("~/utils/api", async () => {
       modelProvider: {
         getAllForProject: {
           useQuery: () => ({ data: undefined, isLoading: false }),
+        },
+      },
+      // Org admin ceiling so the device-session flow defaults to a full
+      // organization scope selection and the Approve button stays enabled;
+      // the key-selection UI itself is covered by
+      // cliAuthKeySelection.integration.test.tsx.
+      apiKey: {
+        myBindings: {
+          useQuery: () => ({
+            data: [
+              { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+            ],
+            isLoading: false,
+          }),
         },
       },
       project: {
@@ -172,10 +212,10 @@ const serveCliAuthEndpoints = () => {
       );
     }
     if (url.includes("/api/auth/cli/approve")) {
-      return new Response(
-        JSON.stringify({ ok: true, personal_vk_label: "default" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(JSON.stringify({}), {
       status: 200,
@@ -207,8 +247,18 @@ describe("/cli/auth first-trace watch", () => {
     mockRouter.query = {};
   });
 
+  // Step one of the screen: the code check gates everything below it.
+  const confirmCode = async () => {
+    const user = userEvent.setup();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeDefined(),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+  };
+
   const approveDeviceSession = async () => {
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
     );
@@ -263,25 +313,92 @@ describe("/cli/auth first-trace watch", () => {
     expect(screen.getByText(/You're signed in!/i)).toBeDefined();
   });
 
-  /** @scenario "Generating a project API key does not start the first-trace watcher" */
+  /** @scenario "Sending a project API key keeps the success card still, with no waiting line and no redirect" */
   it("does not watch for traces on the project API key flow", async () => {
     credentialTypeRef.current = "project_api_key";
     renderPage();
 
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Generate API key" }),
+        screen.getByRole("button", { name: "Send API key" }),
       ).toBeDefined(),
     );
-    await user.click(screen.getByRole("button", { name: "Generate API key" }));
+    await user.click(screen.getByRole("button", { name: "Send API key" }));
     await waitFor(() =>
-      expect(screen.getByText(/API key generated!/i)).toBeDefined(),
+      expect(screen.getByText(/API key approved/i)).toBeDefined(),
     );
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     expect(screen.queryByText(/Waiting for your first trace/i)).toBeNull();
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  // The picker stays interactive while the approval request is in flight, so
+  // the organization the page shows can move after the request has gone out.
+  // The approval was granted against one organization: the card names it and
+  // the watcher must poll that organization's personal project, not whichever
+  // one the picker happens to be sitting on when the response lands.
+  describe("given an approval request that has not yet completed", () => {
+    /** Holds the approve response open until the returned release is called. */
+    const holdApprovalOpen = () => {
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const baseFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/api/auth/cli/approve")) {
+          await held;
+        }
+        return baseFetch(input);
+      });
+      return () => release();
+    };
+
+    describe("when the organization is changed before the response lands", () => {
+      it("watches the approved organization, not the one now selected", async () => {
+        const releaseApproval = holdApprovalOpen();
+
+        const user = userEvent.setup();
+        renderPage();
+        await confirmCode();
+        await waitFor(() =>
+          expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
+        );
+
+        void user.click(screen.getByRole("button", { name: "Approve" }));
+        await waitFor(() =>
+          expect(
+            fetchMock.mock.calls.some(([input]) =>
+              String(input).includes("/api/auth/cli/approve"),
+            ),
+          ).toBe(true),
+        );
+
+        await user.click(screen.getByRole("button", { name: "Second Org" }));
+        releaseApproval();
+
+        await waitFor(() =>
+          expect(screen.getByText(/You're signed in!/i)).toBeDefined(),
+        );
+        expect(screen.getByText("Acme Org")).toBeDefined();
+
+        act(() => firstMessageState.set(true));
+
+        await waitFor(
+          () =>
+            expect(mockRouter.push).toHaveBeenCalledWith(
+              "/personal-proj/traces",
+            ),
+          { timeout: 4_000 },
+        );
+        expect(mockRouter.push).not.toHaveBeenCalledWith(
+          "/personal-proj-2/traces",
+        );
+      });
+    });
   });
 });

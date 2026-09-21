@@ -23,7 +23,7 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   # (it lives in job data) — we deliberately do not pretend otherwise.
   # Use the groupId-fragment patterns operators actually see:
   #   "/fold/traceSummary/" — only this fold's groups
-  #   "/reactor/customEvaluationSync/" — only this reactor's groups
+  #   "/reactor/customEvaluationSync/" — only this subscriber's groups
   #   "/map/spanStorage/" — only the span-storage map groups
   # No filter = drop everything for that tenant.
 

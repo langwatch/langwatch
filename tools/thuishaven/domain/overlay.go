@@ -53,6 +53,16 @@ func (s Stack) OverlayEnv() []string {
 	// client, langy) dial that loopback port directly — robust, no TLS/CA, no
 	// second public hostname to confuse anyone.
 	apiInternal := fmt.Sprintf("http://127.0.0.1:%d", s.APIPort)
+	// better-auth trusts only the origin it is told about via BASE_HOST/
+	// NEXTAUTH_URL. A stack exposed through a tunnel (tailscale serve,
+	// cloudflared) is reached by browsers at PublicURL, not app.URL — carry
+	// that origin on those two lines only, so sign-in from the tunnel passes
+	// the trusted-origin check while every other URL (LANGWATCH_ENDPOINT
+	// included) stays local.
+	authURL := app.URL
+	if s.PublicURL != "" {
+		authURL = s.PublicURL
+	}
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
@@ -61,8 +71,8 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
 		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
 		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
-		"BASE_HOST=" + app.URL,
-		"NEXTAUTH_URL=" + app.URL,
+		"BASE_HOST=" + authURL,
+		"NEXTAUTH_URL=" + authURL,
 		"LANGWATCH_ENDPOINT=" + app.URL,
 		"LANGWATCH_API_URL=" + apiInternal,
 		"LANGWATCH_NLP_SERVICE=" + nlp.URL,
@@ -88,6 +98,29 @@ func (s Stack) OverlayEnv() []string {
 		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The IdP simulator is an opt-in lane; only a worktree actually running (or
+	// falling back to) one gets the pointer, so nothing reads a dead URL.
+	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {
+		// Where the simulator is, and — the part the platform cannot work out
+		// on its own — that it may be TRUSTED. The engine refuses to fetch an
+		// issuer's discovery document from an origin nobody vouched for,
+		// which is what stops a server being pointed at an arbitrary address;
+		// a simulator on a sibling hostname is exactly the arbitrary address
+		// it refuses, so a local single sign-on journey cannot start without
+		// this line.
+		env = append(env,
+			"LANGWATCH_IDPSIM_URL="+idp.URL,
+			"SSO_TRUSTED_IDP_ORIGINS="+idp.URL,
+		)
+		// And its NAMESERVER, because the domains a local walk claims are
+		// reserved names like `acme.test` that no public resolver will ever
+		// answer for. The simulator is authoritative for them and the
+		// machine's resolver has never heard of it, so a domain proof that
+		// does not ask it can only ever fail.
+		if idp.DNSPort != 0 {
+			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
+		}
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
@@ -96,6 +129,13 @@ func (s Stack) OverlayEnv() []string {
 	// is ever set; domain_test.go pins that this overlay never emits it.
 	if s.LocalAPIKey != "" {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
+	}
+	// Google DLP off by default locally: no local workflow wants trace text leaving
+	// for Google, and the app skips loading @google-cloud/dlp (grpc + generated
+	// protos) entirely when this is set. False emits nothing, leaving .env to decide
+	// — which is how you opt back in to running the DLP check locally.
+	if s.DisableGoogleDLP {
+		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
@@ -110,7 +150,7 @@ func (s Stack) OverlayEnv() []string {
 		// as admin@haven.localhost gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
-	// langyagent (the OpenCode manager): the control plane dials it at its loopback
+	// langyagent (the worker manager): the control plane dials it at its loopback
 	// port with the shared internal secret both sides require. Emitted whenever the
 	// service has a port (local or a baseline fallback). The isolation posture
 	// (LANGY_UNSAFE_DEV_DISABLE_ISOLATION) is NOT set here — it is a langyagent-only
@@ -118,7 +158,7 @@ func (s Stack) OverlayEnv() []string {
 	// control plane never reads it.
 	if langy.Port != 0 {
 		env = append(env,
-			fmt.Sprintf("OPENCODE_AGENT_URL=http://127.0.0.1:%d", langy.Port),
+			fmt.Sprintf("LANGY_AGENT_URL=http://127.0.0.1:%d", langy.Port),
 			"LANGY_INTERNAL_SECRET="+DefaultLangyInternalSecret,
 		)
 		// When the worker runs inside colima (the sandboxed / container-unsafe
@@ -143,6 +183,17 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
 			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+		// Backup-status gauges query system.backup_log, which only exists once
+		// backups are configured, a production concern. The app collects them by
+		// default (unset must not disarm the production alerts that read them), so
+		// haven's container, which has no backups, opts out explicitly. Otherwise
+		// every 15s stats tick would fail on a missing table for nothing.
+		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
+		// The app sizes its connection pool from the server's query cap and
+		// assumes a 300-query server when nobody states it. haven rendered this
+		// one, so haven says so; otherwise a 64-connection pool meets a 32-query
+		// server and the first burst is rejected mid-page (#8064).
+		env = append(env, fmt.Sprintf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES=%d", ClickHouseMaxConcurrentQueries))
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.
@@ -192,9 +243,25 @@ func (s Stack) observabilityEnv() []string {
 		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
-	// Loopback: the link is followed by the developer's own browser on this machine.
-	if s.ObservabilityGrafanaPort != 0 {
+	// The proxied hostname when the portless proxy carries the route (stable,
+	// matches every other haven surface); loopback otherwise — either way the
+	// link is followed by the developer's own browser on this machine.
+	if s.ObservabilityGrafanaURL != "" {
+		env = append(env, "GRAFANA_BASE_URL="+s.ObservabilityGrafanaURL)
+	} else if s.ObservabilityGrafanaPort != 0 {
 		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
+	}
+	// Continuous profiling. Named only while Pyroscope is actually listening,
+	// because the profiler is a push: with nowhere to push to, a process that
+	// started one would sample itself on a timer, fail every upload, and pay the
+	// native profiler's boot cost for nothing. Absence of this variable is the off
+	// switch, exactly as OTEL_EXPORTER_OTLP_ENDPOINT's absence is for traces.
+	//
+	// The service name and the worktree tag come from the OTel variables above, so
+	// a flame graph is attributable to the same service and worktree as the trace
+	// beside it without a second set of identity variables to keep in step.
+	if s.ObservabilityPyroscopePort != 0 {
+		env = append(env, fmt.Sprintf("PYROSCOPE_SERVER_ADDRESS=http://127.0.0.1:%d", s.ObservabilityPyroscopePort))
 	}
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {

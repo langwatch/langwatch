@@ -3,7 +3,7 @@ import {
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -135,6 +135,7 @@ export async function dispatchTriggerAction({
   trigger,
   traceId,
   tenantId,
+  project: preloadedProject,
 }: {
   deps: TriggerActionDispatchDeps;
   trigger: TriggerSummary;
@@ -144,19 +145,19 @@ export async function dispatchTriggerAction({
   // pass it uniformly, but not read here: the persist actions (annotation
   // queue, dataset) work off the full trace, not the fold projection.
   foldState: TraceSummaryData;
+  /**
+   * Optional preloaded project row. A paged caller dispatches many traces
+   * for one project and resolves the row once; without it this function
+   * loads its own.
+   */
+  project?: NonNullable<Awaited<ReturnType<ProjectService["getById"]>>>;
 }): Promise<void> {
-  const project = await deps.projects.getById(tenantId);
+  const project = preloadedProject ?? (await deps.projects.getById(tenantId));
 
   if (!project) {
     logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
     return;
   }
-
-  // Fetch full trace once — used by Slack (events), email (events), and ADD_TO_DATASET (mapping).
-  // Best-effort: if trace not found, actions that only need input/output still work with a stub.
-  const fullTrace =
-    (await deps.traceById(tenantId, traceId)) ??
-    ({ trace_id: traceId } as Trace);
 
   const params = (trigger.actionParams ?? {}) as ActionParams;
 
@@ -195,7 +196,15 @@ export async function dispatchTriggerAction({
       });
       break;
 
-    case TriggerAction.ADD_TO_DATASET:
+    case TriggerAction.ADD_TO_DATASET: {
+      // The full trace is only read by the dataset mapping, so it is fetched
+      // here rather than up front — the annotation-queue action used to pay
+      // a whole-trace ClickHouse read per trace it never looked at.
+      // Best-effort: if the trace is not found, the mapping still works off
+      // a stub for the fields it has.
+      const fullTrace =
+        (await deps.traceById(tenantId, traceId)) ??
+        ({ trace_id: traceId } as Trace);
       dispatched = await addTraceToDataset({
         deps,
         trigger,
@@ -205,6 +214,7 @@ export async function dispatchTriggerAction({
         fullTrace,
       });
       break;
+    }
   }
 
   if (!dispatched) {

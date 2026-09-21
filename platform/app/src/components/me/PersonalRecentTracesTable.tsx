@@ -1,4 +1,5 @@
 import { Box, HStack, Spinner } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
   getCoreRowModel,
@@ -83,7 +84,11 @@ export function PersonalRecentTracesTable({
       page: 1,
       pageSize: RECENT_LIMIT,
     },
-    { enabled: !!projectId, staleTime: 60_000, keepPreviousData: true },
+    {
+      enabled: !!projectId,
+      staleTime: 60_000,
+      placeholderData: keepPreviousData,
+    },
   );
 
   const rows = useMemo(() => mapTraceListPayload(query.data), [query.data]);

@@ -32,7 +32,7 @@ vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
   useAllPromptsForProject: () => mockUseAllPromptsForProject(),
 }));
 
-vi.mock("~/server/modelProviders/iconsMap", () => ({
+vi.mock("~/components/modelProviders/iconsMap", () => ({
   modelProviderIcons: {},
 }));
 

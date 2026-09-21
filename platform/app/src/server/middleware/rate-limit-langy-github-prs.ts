@@ -10,7 +10,7 @@
  *
  * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
  */
-import { connection } from "../redis";
+import { tryGetApp } from "../app-layer/app";
 
 export const LANGY_GITHUB_PRS_PER_DAY = 20;
 
@@ -53,6 +53,7 @@ export async function getLangyGithubPrUsage({
   userId: string;
   limit?: number;
 }): Promise<GithubPrLimitResult> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     return {
       allowed: true,
@@ -102,6 +103,7 @@ export async function recordLangyGithubPr({
   userId: string;
   limit?: number;
 }): Promise<GithubPrLimitResult> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     return {
       allowed: true,
@@ -156,6 +158,7 @@ export async function recordExtraLangyGithubPrs({
   userId: string;
   extra: number;
 }): Promise<void> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) return;
   if (extra <= 0) return;
   const bucket = dayBucket();
@@ -194,6 +197,7 @@ export async function reserveLangyGithubPrPermit({
   userId: string;
   limit?: number;
 }): Promise<GithubPrLimitResult> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     // No Redis configured (dev / smaller self-hosters). `allowed: true`
     // keeps GitHub PRs working in those environments; `reserved: false`
@@ -291,6 +295,7 @@ export async function releaseLangyGithubPrPermit({
 }: {
   userId: string;
 }): Promise<void> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) return;
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;

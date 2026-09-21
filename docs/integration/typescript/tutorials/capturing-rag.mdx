@@ -1,14 +1,14 @@
 ---
 title: Capturing RAG
 sidebarTitle: TypeScript/JS
-description: Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
+description: LangWatch captures Retrieval-Augmented Generation (RAG) data for evaluations and agent testing.
 icon: square-js
 keywords: RAG, Retrieval Augmented Generation, LangChain, LangWatch, LangChain RAG, RAG Span, RAG Chunk, RAG Tool
 ---
 
 Retrieval Augmented Generation (RAG) is a common pattern in LLM applications where you first retrieve relevant context from a knowledge base and then use that context to generate a response. LangWatch provides specific ways to capture RAG data, enabling better observability and evaluation of your RAG pipelines.
 
-By capturing the `contexts` (retrieved documents) used by the LLM, you unlock several benefits in LangWatch:
+Capturing the `contexts` (retrieved documents) used by the LLM enables the following in LangWatch:
 - Specialized RAG evaluators (e.g., Faithfulness, Context Relevancy).
 - Analytics on document usage (e.g., which documents are retrieved most often, which ones lead to better responses).
 - Deeper insights into the retrieval step of your pipeline.
@@ -208,8 +208,8 @@ async function ragWithMetadata(query: string): Promise<string> {
 When working with RAG operations, it's important to handle errors gracefully and capture error information in your spans:
 
 ```typescript
-async function robustRAGRetrieval(query: string): Promise<LangWatchSpanRAGContext[]> {
-  return await tracer.withActiveSpan("Robust RAG Retrieval", async (span) => {
+async function ragRetrievalWithErrorHandling(query: string): Promise<LangWatchSpanRAGContext[]> {
+  return await tracer.withActiveSpan("RAG Retrieval with Error Handling", async (span) => {
     span.setType("rag");
     span.setInput("text", query);
     
@@ -251,7 +251,7 @@ async function robustRAGRetrieval(query: string): Promise<LangWatchSpanRAGContex
 5. **Use Consistent Document IDs**: Use consistent naming conventions for document and chunk IDs.
 6. **Control Data Capture**: Use data capture configuration to manage what gets captured in sensitive operations.
 
-By effectively capturing RAG spans, you gain much richer data in LangWatch, enabling more powerful analysis and evaluation of your RAG systems. Refer to the SDK examples for more detailed implementations.
+Refer to the SDK examples for more detailed implementations.
 
 ## Related Documentation
 

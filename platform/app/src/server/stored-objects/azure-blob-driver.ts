@@ -2,41 +2,36 @@
  * AzureBlobDriver — StorageDriver implementation backed by Azure Blob Storage.
  *
  * Talks the Azure Blob REST API directly via `fetch` so no Azure SDK
- * dependency is needed at runtime. Works against the production Azure
- * cloud and against the Azurite emulator (which speaks the same REST
- * shape on a local endpoint).
+ * dependency is needed at runtime for the shared-key path. Works against
+ * the production Azure cloud and against the Azurite emulator (which
+ * speaks the same REST shape on a local endpoint).
  *
  * URI shape: `azure-blob://{accountName}/{container}/{key}`
  *
- * Authentication: requires `AZURE_BLOB_ACCOUNT_NAME` and
- * `AZURE_BLOB_ACCOUNT_KEY` to be set in the environment. The shared-key
- * scheme is sufficient for self-hosted deployments; production Azure
- * deployments will typically rotate to a managed identity wrapper later
- * — that change lives behind this driver, not in the stored-objects
- * service.
- *
- * Construction takes the account credentials by reference so test code
- * can inject Azurite credentials without mutating process.env.
+ * Authentication: constructed with `AzureCredentials` (issue #6087), a
+ * discriminated union over the supported auth modes. `sharedKey` signs
+ * every request with an HMAC Authorization header computed from
+ * `accountKey`. The three token-based modes (`workloadIdentity`,
+ * `managedIdentity`, `azureCli`) exchange an OAuth bearer token via
+ * `azure-token-provider.ts` instead — see that module for the token cache.
+ * `resolveAzureCredentials()` in `azure-credentials.ts` is the only place
+ * that decides which mode applies; this driver never reads AZURE_BLOB_* env
+ * vars itself.
  */
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
+import type { AzureCredentials } from "./azure-credentials";
+import {
+  getAzureBlobToken,
+  invalidateAzureBlobToken,
+} from "./azure-token-provider";
 import { ObjectNotFoundError } from "./errors";
-import { redactStorageUri } from "./project-storage-destination";
+import {
+  redactStorageErrorText,
+  redactStorageUri,
+} from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
-
-/**
- * Settings for talking to an Azure Blob endpoint.
- *
- * `endpointBaseUrl` defaults to `https://{accountName}.blob.core.windows.net`
- * for the public cloud. Tests against Azurite override this to point at
- * the emulator (typically `http://127.0.0.1:10000/{accountName}`).
- */
-export interface AzureBlobCredentials {
-  accountName: string;
-  accountKey: string;
-  endpointBaseUrl?: string;
-}
 
 interface ParsedAzureBlobUri {
   accountName: string;
@@ -241,12 +236,11 @@ function defaultEndpoint(accountName: string): string {
 
 /**
  * Endpoints are concatenated as `${endpoint}/${container}/${blobPath}`, so a
- * trailing slash on the configured value produces `//container/blob` on the
- * wire while the signature canonicalises `/container/blob`. Azure answers 400.
- * A trailing slash is a normal thing to paste out of the portal, so strip it
- * once here rather than at each of the six call sites — path-style detection
- * reads the same normalised value, otherwise the empty last path segment
- * makes it miss the account name.
+ * trailing slash on the configured value sends `//container/blob` while the
+ * signature canonicalises `/container/blob` — Azure answers 400. A trailing
+ * slash is a normal thing to paste out of the portal, so strip it once here.
+ * Path-style detection reads the same normalised value: an empty final path
+ * segment would otherwise stop it ever matching the account name.
  */
 function normalizeEndpoint(endpointBaseUrl: string): string {
   return endpointBaseUrl.replace(/\/+$/, "");
@@ -257,22 +251,26 @@ function normalizeEndpoint(endpointBaseUrl: string): string {
  * don't pull in the full @azure/storage-blob SDK for one driver.
  */
 export class AzureBlobDriver implements StorageDriver {
-  constructor(private readonly credentials: AzureBlobCredentials) {}
+  constructor(private readonly credentials: AzureCredentials) {}
+
+  private resolvedEndpoint(): string {
+    return this.credentials.endpointBaseUrl
+      ? normalizeEndpoint(this.credentials.endpointBaseUrl)
+      : defaultEndpoint(this.credentials.accountName);
+  }
 
   async get(uri: string): Promise<Readable> {
     const { container, blobPath } = parseAzureBlobUri(uri);
-    const { endpoint, headers } = this.signedRequest({
+    const endpoint = this.resolvedEndpoint();
+
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}/${blobPath}`,
       method: "GET",
       container,
       blobPath,
       contentLength: "",
       contentType: "",
       extraHeaders: {},
-    });
-
-    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
-      method: "GET",
-      headers,
     });
 
     if (response.status === 404) {
@@ -296,8 +294,14 @@ export class AzureBlobDriver implements StorageDriver {
 
   async put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {
     const { container, blobPath } = parseAzureBlobUri(uri);
+    const endpoint = this.resolvedEndpoint();
 
-    const { endpoint, headers } = this.signedRequest({
+    // Content-Length is deliberately NOT set as a request header: undici
+    // computes it from the body and rejects a manually supplied duplicate.
+    // For shared-key mode the signature covers the value undici puts on the
+    // wire (see signedHeaders' Content-Length handling).
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}/${blobPath}`,
       method: "PUT",
       container,
       blobPath,
@@ -310,22 +314,14 @@ export class AzureBlobDriver implements StorageDriver {
       contentLength: bytes.length > 0 ? String(bytes.length) : "",
       contentType: mediaType,
       extraHeaders: { "x-ms-blob-type": "BlockBlob" },
-    });
-
-    // Content-Length is deliberately NOT set as a request header: undici
-    // computes it from the body and rejects a manually supplied duplicate.
-    // The signature above covers the value undici puts on the wire.
-    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
-      method: "PUT",
-      headers: {
-        ...headers,
-        "Content-Type": mediaType,
-      },
+      extraRequestHeaders: { "Content-Type": mediaType },
       body: new Uint8Array(bytes),
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
+      const body = redactStorageErrorText(
+        await response.text().catch(() => ""),
+      );
       throw new Error(
         `Azure Blob PUT failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText} ${body}`,
       );
@@ -334,19 +330,16 @@ export class AzureBlobDriver implements StorageDriver {
 
   async delete(uri: string): Promise<void> {
     const { container, blobPath } = parseAzureBlobUri(uri);
+    const endpoint = this.resolvedEndpoint();
 
-    const { endpoint, headers } = this.signedRequest({
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}/${blobPath}`,
       method: "DELETE",
       container,
       blobPath,
       contentLength: "",
       contentType: "",
       extraHeaders: {},
-    });
-
-    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
-      method: "DELETE",
-      headers,
     });
 
     // Delete is idempotent: 404 means it was already gone, which is the
@@ -360,19 +353,16 @@ export class AzureBlobDriver implements StorageDriver {
 
   async exists(uri: string): Promise<boolean> {
     const { container, blobPath } = parseAzureBlobUri(uri);
+    const endpoint = this.resolvedEndpoint();
 
-    const { endpoint, headers } = this.signedRequest({
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}/${blobPath}`,
       method: "HEAD",
       container,
       blobPath,
       contentLength: "",
       contentType: "",
       extraHeaders: {},
-    });
-
-    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
-      method: "HEAD",
-      headers,
     });
 
     if (response.status === 404) return false;
@@ -394,19 +384,16 @@ export class AzureBlobDriver implements StorageDriver {
    */
   async head(uri: string): Promise<number> {
     const { container, blobPath } = parseAzureBlobUri(uri);
+    const endpoint = this.resolvedEndpoint();
 
-    const { endpoint, headers } = this.signedRequest({
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}/${blobPath}`,
       method: "HEAD",
       container,
       blobPath,
       contentLength: "",
       contentType: "",
       extraHeaders: {},
-    });
-
-    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
-      method: "HEAD",
-      headers,
     });
 
     if (response.status === 404) {
@@ -445,7 +432,10 @@ export class AzureBlobDriver implements StorageDriver {
    * ContainerAlreadyExists is treated as success.
    */
   async ensureContainer(container: string): Promise<void> {
-    const { endpoint, headers } = this.signedRequest({
+    const endpoint = this.resolvedEndpoint();
+
+    const response = await this.signedFetch({
+      url: `${endpoint}/${container}?restype=container`,
       method: "PUT",
       container,
       blobPath: "",
@@ -457,20 +447,25 @@ export class AzureBlobDriver implements StorageDriver {
       queryParams: { restype: "container" },
     });
 
-    const response = await fetch(`${endpoint}/${container}?restype=container`, {
-      method: "PUT",
-      headers,
-    });
-
     if (!response.ok && response.status !== 409) {
-      const body = await response.text().catch(() => "");
+      const body = redactStorageErrorText(
+        await response.text().catch(() => ""),
+      );
       throw new Error(
         `Azure Blob container create failed for ${container}: ${response.status} ${response.statusText} ${body}`,
       );
     }
   }
 
-  private signedRequest({
+  /**
+   * Computes the request headers for one operation. `sharedKey` signs an
+   * HMAC Authorization header exactly as before (byte-identical — no
+   * canonicalised-resource/header computation runs for token modes). Token
+   * modes fetch a cached bearer token from `azure-token-provider.ts` and
+   * carry NO SharedKey signature at all — no canonicalised resource,
+   * headers, or query string are computed for them.
+   */
+  private async signedHeaders({
     method,
     container,
     blobPath,
@@ -487,41 +482,123 @@ export class AzureBlobDriver implements StorageDriver {
     extraHeaders: Record<string, string>;
     /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
     queryParams?: Record<string, string>;
-  }): { endpoint: string; headers: Record<string, string> } {
+  }): Promise<Record<string, string>> {
     const date = new Date().toUTCString();
-    const endpoint = this.credentials.endpointBaseUrl
-      ? normalizeEndpoint(this.credentials.endpointBaseUrl)
-      : defaultEndpoint(this.credentials.accountName);
-    const pathStyle = isPathStyleEndpoint(
-      this.credentials.endpointBaseUrl,
-      this.credentials.accountName,
-    );
+    const xMsVersion = "2021-12-02"; // Supports both SharedKey and Entra (OAuth) authentication.
 
-    const xMsDate = date;
-    const xMsVersion = "2021-12-02";
-
-    const authorization = signRequest({
-      method,
-      contentLength,
-      contentType,
-      date: xMsDate,
-      accountName: this.credentials.accountName,
-      accountKey: this.credentials.accountKey,
-      container,
-      blobPath,
-      extraHeaders,
-      pathStyle,
-      queryParams,
-    });
-
-    return {
-      endpoint,
-      headers: {
-        "x-ms-date": xMsDate,
+    if (this.credentials.mode === "sharedKey") {
+      const pathStyle = isPathStyleEndpoint(
+        this.credentials.endpointBaseUrl,
+        this.credentials.accountName,
+      );
+      const authorization = signRequest({
+        method,
+        contentLength,
+        contentType,
+        date,
+        accountName: this.credentials.accountName,
+        accountKey: this.credentials.accountKey,
+        container,
+        blobPath,
+        extraHeaders,
+        pathStyle,
+        queryParams,
+      });
+      return {
+        "x-ms-date": date,
         "x-ms-version": xMsVersion,
         Authorization: authorization,
         ...extraHeaders,
-      },
+      };
+    }
+
+    const token = await getAzureBlobToken(this.credentials);
+    return {
+      "x-ms-date": date,
+      "x-ms-version": xMsVersion,
+      Authorization: `Bearer ${token}`,
+      ...extraHeaders,
     };
+  }
+
+  /**
+   * Signs and issues one request, with 401/403 handling for token-based
+   * modes: a 401 invalidates the cached token and retries EXACTLY once
+   * with a fresh one (a second 401 propagates to the caller); a 403 is
+   * never retried and raises an error naming the required role assignment
+   * and the account/container scope it must be granted on. SharedKey mode
+   * gets neither special case — its 401/403 handling is unchanged from
+   * before (each caller's existing `!response.ok` check applies).
+   */
+  private async signedFetch({
+    url,
+    method,
+    container,
+    blobPath,
+    contentLength,
+    contentType,
+    extraHeaders,
+    queryParams,
+    extraRequestHeaders,
+    body,
+  }: {
+    url: string;
+    method: string;
+    container: string;
+    blobPath: string;
+    contentLength: string;
+    contentType: string;
+    extraHeaders: Record<string, string>;
+    queryParams?: Record<string, string>;
+    /** Additional headers folded into the actual fetch() call but NOT into the signature (e.g. Content-Type). */
+    extraRequestHeaders?: Record<string, string>;
+    body?: BodyInit;
+  }): Promise<Response> {
+    const buildHeaders = () =>
+      this.signedHeaders({
+        method,
+        container,
+        blobPath,
+        contentLength,
+        contentType,
+        extraHeaders,
+        queryParams,
+      });
+
+    const headers = await buildHeaders();
+    const response = await fetch(url, {
+      method,
+      headers: { ...headers, ...extraRequestHeaders },
+      body,
+    });
+
+    if (this.credentials.mode === "sharedKey") {
+      return response;
+    }
+
+    if (response.status === 401) {
+      invalidateAzureBlobToken(this.credentials);
+      const retryHeaders = await buildHeaders();
+      return fetch(url, {
+        method,
+        headers: { ...retryHeaders, ...extraRequestHeaders },
+        body,
+      });
+    }
+
+    if (response.status === 403) {
+      // The account and container are tenant-identifying — the same two
+      // segments redactStorageUri strips from every other storage error. The
+      // operator does not need them echoed to act on this: the remedy is a
+      // role assignment on the account they already configured.
+      throw new Error(
+        "Azure Blob request denied (403): the identity lacks data permissions " +
+          'on the configured storage account. Grant the "Storage Blob Data ' +
+          'Contributor" role at the account or container scope. Note the ' +
+          'control-plane "Contributor" role does NOT grant data access.',
+      );
+    }
+
+    return response;
   }
 }

@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { defaultGraphTriggerHeartbeatDeps } from "../graph-trigger-heartbeat";
 import type { TriggerService } from "../trigger.service";
 
@@ -42,6 +43,9 @@ function makeDeps(graph: unknown) {
   const deps = defaultGraphTriggerHeartbeatDeps({
     triggers: {} as TriggerService,
     prisma,
+    resolveClickHouseClient: async () => {
+      throw new Error("no ClickHouse in this test");
+    },
   });
 
   return { deps, findFirst };
@@ -82,7 +86,7 @@ describe("defaultGraphTriggerHeartbeatDeps lookupTriggerSource", () => {
 
       expect(findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: GRAPH, projectId: PROJECT },
+          where: { id: GRAPH, projectId: PROJECT, kind: BUILDER_CHART_KIND },
         }),
       );
     });

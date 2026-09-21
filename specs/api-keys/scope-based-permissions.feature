@@ -81,26 +81,44 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I list the available categories
     Then the categories include:
-      | category    | access levels |
-      | Traces      | read, write   |
-      | Cost        | read          |
-      | Scenarios   | read, write   |
-      | Annotations | read, write   |
-      | Analytics   | read, write   |
-      | Evaluations | read, write   |
-      | Datasets    | read, write   |
-      | Triggers    | read, write   |
-      | Workflows   | read, write   |
-      | Prompts     | read, write   |
-      | Secrets     | read, write   |
-      | Audit Log   | read          |
-      | Team        | read, write   |
-      | Project     | read, write   |
+      | category               | access levels |
+      | Traces                 | read, write   |
+      | Cost                   | read          |
+      | Scenarios              | read, write   |
+      | Annotations            | read, write   |
+      | Analytics              | read, write   |
+      | Evaluations            | read, write   |
+      | Langy                  | read, write   |
+      | Datasets               | read, write   |
+      | Triggers               | read, write   |
+      | Workflows              | read, write   |
+      | Experiments            | read, write   |
+      | Prompts                | read, write   |
+      | Playground             | read, write   |
+      | Secrets                | read, write   |
+      | Audit Log              | read          |
+      | Team                   | read, write   |
+      | Project                | read, write   |
+      | Organization           | read, write   |
+      | Gateway                | read, write   |
+      | Governance             | read, write   |
 
-  # Deferred: Gateway permissions (virtualKeys, gatewayBudgets, gatewayProviders,
-  # gatewayGuardrails, gatewayCacheRules, gatewayUsage) inherit from the scope's
-  # built-in role. Fine-grained gateway control will be added when the gateway UI
-  # supports per-key configuration.
+  @unit
+  Scenario: Project write carries creation and deletion, because manage implies them
+    Given a category "Project" with "write" selected
+    When I compute the backend permissions
+    Then the result includes "project:create" and "project:delete"
+    And a check for "project:create" is answered by "project:manage", so a
+      category that offered project settings alone would describe a
+      separation the request path does not make
+
+  @unit
+  Scenario: Every registry permission belongs to a category
+    Given the permission registry
+    When I list the permissions every category names
+    Then every registry permission appears in exactly one category
+    And the only permissions left out are the platform tier ("ops:view",
+      "ops:manage"), which can never ride on an API key
 
   @unit
   Scenario: "read" access maps to view permission
@@ -113,21 +131,20 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I compute "write" permissions for each category
     Then the exact backend permissions are:
-      | category    | permissions                                                    |
-      | Traces      | traces:view, traces:create, traces:update, traces:share        |
-      | Cost        | cost:view                                                      |
-      | Scenarios   | scenarios:view, scenarios:manage                               |
-      | Annotations | annotations:view, annotations:manage                           |
-      | Analytics   | analytics:view, analytics:manage                               |
-      | Evaluations | evaluations:view, evaluations:manage                           |
-      | Datasets    | datasets:view, datasets:manage                                 |
-      | Triggers    | triggers:view, triggers:manage                                 |
-      | Workflows   | workflows:view, workflows:manage                               |
-      | Prompts     | prompts:view, prompts:manage                                   |
-      | Secrets     | secrets:view, secrets:manage                                   |
-      | Audit Log   | auditLog:view                                                  |
-      | Team        | team:view, team:manage                                         |
-      | Project     | project:view, project:create, project:update, project:delete, project:manage |
+      | category               | permissions                                                              |
+      | Traces                 | traces:view, traces:create, traces:update, traces:share                  |
+      | Cost                   | cost:view                                                                |
+      | Scenarios              | scenarios:view, scenarios:create, scenarios:update, scenarios:delete, scenarios:manage |
+      | Audit Log              | auditLog:view                                                            |
+      | Team                   | team:view, team:manage                                                   |
+      | Project                | project:view, project:create, project:update, project:delete, project:manage |
+
+  @unit
+  Scenario: Older stored keys keep reading as write via the manage hierarchy
+    Given a stored key whose permissions are "datasets:view" and
+      "datasets:manage", written before the expanded write lists
+    When the drawer maps those permissions back to category selections
+    Then the Datasets category reads as "write"
 
   @unit
   Scenario: Selecting no categories produces an empty permission set
@@ -256,9 +273,10 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   @unit
   Scenario: permissionsSummary counts granted categories for restricted keys
-    Given a key with 3 permission categories granted
+    Given a key with 3 of the registry's permission categories granted
     When I compute the permissions summary
-    Then the result is "3 of 14 permissions"
+    Then the result reads "3 of N permissions", where N is the number of
+      categories the registry offers
 
   @unit
   Scenario: scopeLabel formats project scope correctly

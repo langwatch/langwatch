@@ -1,11 +1,19 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
+import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import { performance } from "node:perf_hooks";
+// Imported rather than read off the global: the constructor destructures a
+// `process` handler out of the queue definition, and a class field initializer
+// runs inside that same scope — so a bare `process.pid` here resolves to the
+// handler's binding and dies in its temporal dead zone.
+import { pid } from "node:process";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   ROOT_CONTEXT,
+  type Span,
   SpanKind,
   TraceFlags,
   trace,
@@ -15,9 +23,21 @@ import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
+import {
+  LATENCY_HOUR_BUCKET_TTL_SECONDS,
+  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
+  LATENCY_SAMPLE_SIZE,
+  latencyAllTimeKey,
+  latencyBucketField,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+} from "~/shared/ops/latency";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
+  getCurrentContext,
   getJobContextMetadata,
   type JobContextMetadata,
   runWithContext,
@@ -27,7 +47,6 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
-import { connection } from "../../../redis";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
@@ -56,11 +75,13 @@ import {
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobAttempt,
+  readJobPayloadBytes,
   readJobRoutingMeta,
   withJobAttempt,
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
+  gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
@@ -70,24 +91,40 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsStagedTotal,
+  gqReadyScoreImplausibleTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
+  recordDroppedJob,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
+import {
+  fallbackReadyScore,
+  isPlausibleReadyScore,
+  resolveReadyScore,
+} from "./readyScore";
 import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
-  readClaimStrikeThreshold,
+  readBisectionSplitBudget,
+  readConfirmedDeathThreshold,
   readGroupQuarantineThreshold,
+  WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
+
+/** Mutable state shared across one dispatch's bisection descent. */
+interface BisectionDispatchState {
+  /** True once any sub-batch of this dispatch committed successfully. */
+  hasCommitted: boolean;
+  /** Splits performed so far — compared against the budget above. */
+  splits: number;
+}
 
 /**
  * How long the group's retry-chain counter survives without a refresh.
@@ -117,8 +154,14 @@ function nonEmptyString(value: unknown): string | undefined {
 
 /**
  * Configuration for the group queue.
+ *
+ * Exported because `activeTtlSec` and the heartbeat interval derived from it
+ * set the floor on how soon a dead worker's group is redispatched, and the
+ * poison guard's beacon TTL has to stay under that floor to be able to observe
+ * the death at all. The two constants live in different modules, so the
+ * inequality between them is pinned by a test rather than by proximity.
  */
-const GROUP_QUEUE_CONFIG = {
+export const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
   defaultGlobalConcurrency: Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
   /** TTL for the active key (safety net for crashes), in seconds */
@@ -127,12 +170,16 @@ const GROUP_QUEUE_CONFIG = {
   signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
-  /** Maximum time to wait for graceful shutdown in milliseconds */
-  shutdownTimeoutMs:
-    process.env.NODE_ENV === "development" ||
-    process.env.ENVIRONMENT === "local"
-      ? 2000
-      : 20000,
+  /**
+   * Maximum time to wait for graceful shutdown in milliseconds.
+   *
+   * The innermost of the four nested shutdown clocks — see
+   * server/shutdown/budget.ts, which derives App.close's backstop, the
+   * entrypoint watchdog and the required terminationGracePeriodSeconds from
+   * this one number. Do not hardcode a value here: an increase that the outer
+   * clocks do not hear about is an increase the pod never gets to use.
+   */
+  shutdownTimeoutMs: SHUTDOWN_BUDGET.queueDrainMs,
 } as const;
 
 /** Default TTL for deduplication in milliseconds */
@@ -289,6 +336,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly rateTracker!: TenantRateTracker;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
+  private readonly dispatchGroupAllowListKey?: string;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
   /**
@@ -298,21 +346,84 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly quarantineFailStreakThreshold =
     readGroupQuarantineThreshold();
 
+  /**
+   * Splits allowed per dispatch before bisection yields to retry/backoff. Read
+   * once at construction; 0 disables bisection outright, which restores the
+   * pre-bisection behaviour without a deploy. See
+   * {@link readBisectionSplitBudget}.
+   */
+  private readonly bisectionSplitBudget = readBisectionSplitBudget();
+
+  /**
+   * Confirmed worker deaths tolerated before a group is parked. Read once at
+   * construction, like the two thresholds above; 0 disables the poison guard.
+   * See {@link readConfirmedDeathThreshold}.
+   */
+  private readonly deathThreshold = readConfirmedDeathThreshold();
+
   private shutdownRequested = false;
+  /**
+   * Whether `send`/`sendBatch` may still stage work.
+   *
+   * NOT the same thing as `shutdownRequested`, and the difference is the whole
+   * point. Shutdown is requested at the START of close(), while the drain that
+   * follows is still running jobs — and those jobs store events and dispatch
+   * them onward, into this same queue, because the projection, subscriber, map
+   * and fold queues are all facades over it. Gating sends on
+   * `shutdownRequested` meant the queue refused the work its own drain was
+   * producing, and nothing above retried it: every rollout quietly dropped a
+   * burst of projection dispatches (prod, 2026-08-24).
+   *
+   * Accepting them is safe. `send` stages into Redis over `redisConnection`,
+   * which the drain leaves alone — only the blocking connection is closed here,
+   * and the shared connections go afterwards, in App.close. Staged work is
+   * durable and shared, so anything staged during a drain is picked up by
+   * another pod rather than lost with this one.
+   *
+   * So the gate closes when the drain is over, however it ended.
+   */
+  private stagingClosed = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
+
   /**
-   * Groups whose claim strike is currently outstanding (recorded at claim,
-   * cleared in the processing finally). {@link close} sweeps these so a
-   * planned shutdown never leaves a strike behind as a fake worker death.
+   * Identity this process stamps onto every claim it takes, and the subject of
+   * the liveness beacon the poison guard reads. Unique per process INSTANCE —
+   * a restarted pod must never inherit the identity of the one it replaced, or
+   * its predecessor's death would resolve to "that's me, still running".
    */
-  private readonly inFlightStrikeGroups = new Set<string>();
+  private readonly workerId =
+    `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
+
+  /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
+  private livenessTimer: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Whether this worker's beacon is known to have reached Redis.
+   *
+   * The guard reads a missing beacon as a death, so a worker that stamps claim
+   * markers it cannot vouch for hands every peer a false death — the exact
+   * failure this design removes, re-entered through the beacon write instead of
+   * the release. While the beacon is unconfirmed the guard sits out entirely:
+   * a real death then goes uncounted, which is the cheap direction to be wrong
+   * in. Parking a healthy group is the expensive one.
+   */
+  private beaconLive = false;
+
+  /**
+   * Resolves once this worker's beacon exists in Redis. Claims await it, so a
+   * worker can never own a claim marker before the beacon that vouches for it —
+   * the window in between is exactly the one where a peer would misread this
+   * live process as a dead one.
+   */
+  private readonly livenessReady: Promise<void>;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
     redisConnection?: IORedis | Cluster,
     options?: {
       consumerEnabled?: boolean;
+      dispatchGroupAllowListKey?: string;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (
         projectId: string,
@@ -334,7 +445,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       auditAdapter,
     } = definition;
 
-    const effectiveConnection = redisConnection ?? connection;
+    // `tryGetApp`, not `getApp`: this is a constructor, and EventSourcing
+    // builds queues while the composition root is still assembling — so an App
+    // may legitimately not exist yet. The caller that matters always passes a
+    // connection; falling through to the ConfigurationError below states the
+    // real problem, where `getApp()` would raise a boot-order error instead.
+    const effectiveConnection = redisConnection ?? tryGetApp()?.redis ?? null;
     if (!effectiveConnection) {
       throw new ConfigurationError(
         "GroupQueueProcessor",
@@ -351,6 +467,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
+    this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
@@ -415,7 +532,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       featureFlagService,
     );
 
-    // fastq promise-based queue — replaces BullMQ Queue + Worker
+    // fastq promise-based queue: bounds concurrency on this node
     this.processingQueue = fastq.promise(
       this.processWithRetries.bind(this),
       this.globalConcurrency,
@@ -426,6 +543,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Processing queue saturated",
       );
     };
+
+    // Publish the liveness beacon before anything can claim. A consumer that
+    // never claims still needs no beacon, so producers skip it entirely.
+    this.livenessReady = this.consumerEnabled
+      ? this.startLivenessBeacon()
+      : Promise.resolve();
 
     // Start dispatcher and metrics collection in consumer mode
     if (this.consumerEnabled) {
@@ -438,6 +561,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
         signalTimeoutSec: GROUP_QUEUE_CONFIG.signalTimeoutSec,
         logger: this.logger,
+        dispatchGroupAllowListKey: this.dispatchGroupAllowListKey
+          ? `${this.dispatchGroupAllowListKey}:candidates`
+          : undefined,
       });
       this.dispatcher.start();
 
@@ -458,17 +584,73 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Resolves a ready score and reports what it had to refuse.
+   *
+   * Every path that writes a ready score goes through here, so the counter is
+   * raised at the one moment the information exists. Counting it later, by
+   * scanning the ready set for out-of-range scores, cannot work: by then the
+   * bad value has already been replaced by this function and the scan finds
+   * nothing while the broken producer carries on.
+   *
+   * `delay` is deliberately NOT part of this. Deferral is a queue decision
+   * added to the resolved score by the caller; only the producer's own claim
+   * about when the work occurred is judged here.
+   */
+  private resolveScore(rawScore: unknown, nowMs: number = Date.now()): number {
+    const { score, isRejected } = resolveReadyScore({
+      score: rawScore,
+      nowMs,
+    });
+    if (isRejected) {
+      gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
+    }
+    return score;
+  }
+
+  /**
+   * Ready score for a job the queue is putting BACK - an exhausted retry, a
+   * poison park, a drained sibling after a failed batch.
+   *
+   * Only the absolute check applies, not the two-sided one. The score was
+   * already judged against the producer's clock when the job was first staged,
+   * and re-judging it against a later clock would rewrite a legitimately old
+   * job (a long retry chain, a batch exported a day late) for no reason. What
+   * is still worth catching is a value that is not a timestamp at all, i.e. a
+   * row staged before this guard existed.
+   *
+   * All three re-stage paths share this so they cannot disagree. They used to:
+   * the exhausted-retry path re-scored an unusable value while drained siblings
+   * kept theirs verbatim, so one failure could move the failed job to now and
+   * leave its siblings at 0 - and on unblock the siblings dispatched ahead of
+   * the job they were drained behind.
+   *
+   * Deliberately does NOT raise `gq_ready_score_implausible_total`, which
+   * counts producers, not us. `originalScore` is always a value this queue
+   * wrote and then read back out of Redis, and staging already required it to
+   * clear MIN_PLAUSIBLE_EPOCH_MS - an ABSOLUTE floor, so a score that cleared
+   * it once clears it for ever. This check can therefore only ever fire for a
+   * row staged before the guard existed, or one corrupted in Redis. Neither is
+   * a broken score function, and counting them here would dilute the one
+   * signal that is with our own bookkeeping.
+   */
+  private restageScore(originalScore: unknown): number {
+    return isPlausibleReadyScore(originalScore)
+      ? originalScore
+      : fallbackReadyScore();
+  }
+
+  /**
    * Stages a job into the group queue's Redis staging layer.
    */
   async send(
     payload: Payload,
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "send",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
     assertNoReservedKeys(
@@ -481,8 +663,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const dedup = options?.deduplication ?? this.deduplication;
 
     const groupId = this.groupKey(payload);
+    await this.registerPreflightGroup(groupId);
     const stagedJobId = this.generateStagedJobId(payload);
-    const score = this.score?.(payload) ?? Date.now();
+    // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
+    // no usable occurrence time) survives `??` and stages the job at the epoch.
+    const score = this.resolveScore(this.score?.(payload));
     const dispatchAfterMs = score + (delay ?? 0);
 
     // Get dedup config
@@ -500,7 +685,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     // Attach context metadata to the payload
-    const contextMetadata = getJobContextMetadata();
+    const contextMetadata = {
+      ...getJobContextMetadata(),
+      queueDispatchScopeKey:
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
+    };
     const payloadWithContext = {
       ...(payload as Record<string, unknown>),
       __context: contextMetadata,
@@ -531,6 +721,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldReplace,
       shouldSurviveDispatch,
     });
+    await this.activatePreflightGroup(groupId);
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
@@ -578,11 +769,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     payloads: Payload[],
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "sendBatch",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
 
@@ -600,7 +791,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const delay = options?.delay ?? this.delay;
     const dedup = options?.deduplication ?? this.deduplication;
 
-    const contextMetadata = getJobContextMetadata();
+    const contextMetadata = {
+      ...getJobContextMetadata(),
+      queueDispatchScopeKey:
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
+    };
     const now = Date.now();
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
@@ -613,7 +809,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       payloads.map(async (payload, index) => {
         const groupId = this.groupKey(payload);
         const stagedJobId = this.generateStagedJobId(payload);
-        const score = this.score?.(payload) ?? now;
+        // Same guard as send(); `now` is shared so a batch that falls back
+        // keeps its FIFO order, and so every payload is judged against one
+        // clock reading rather than drifting across the batch.
+        const score = this.resolveScore(this.score?.(payload), now);
         // Add index to ensure FIFO order within the batch even if timestamps are identical
         const dispatchAfterMs = score + (delay ?? 0) + index;
 
@@ -646,7 +845,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
+    await Promise.all(
+      jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)),
+    );
+
     const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
+    await Promise.all(
+      jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)),
+    );
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -766,75 +972,72 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   /**
    * fastq worker function: poison guard, then the real job processing.
    *
-   * The guard records a claim strike BEFORE any decode/parse work and clears
-   * it on every code path where the process survives (the finally below -
-   * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
-   * through it). A job that seizes the event loop never reaches the finally:
-   * the liveness probe kills the process, the strike stays behind, and after
-   * enough consecutive deaths the next claim parks the group instead of
-   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
+   * The guard stamps this worker's identity onto the group's claim BEFORE any
+   * decode/parse work, and releases it on every path where the process survives
+   * (the finally below — success, retry, exhausted-park, drop-to-replay and
+   * graceful drain all pass through it). A job that seizes the event loop never
+   * reaches the finally: the liveness probe kills the process, its beacon stops,
+   * and the next worker to claim the group finds a marker whose owner is
+   * provably gone. Enough confirmed deaths and the claim parks the group instead
+   * of re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
    *
-   * A claim made after a graceful shutdown was requested records NO strike:
-   * the process is about to exit on purpose, and dying with that job in
-   * flight must not read as the job killing the worker. Pre-shutdown strikes
-   * are swept in {@link close} while the event loop is provably alive. A group
-   * already at the threshold is therefore parked at most one claim early: a
-   * claim that begins after the shutdown records no strike and parks on the next
-   * boot's claim instead, while a claim already awaiting its strike record when
-   * the shutdown flips can still cross the threshold and park during the drain —
-   * but only on its real prior-death strikes, never on a shutdown-born one.
+   * Nothing here has to special-case shutdown. A claim held by a process that
+   * exits gracefully resolves through that process's retirement tombstone, and
+   * a release that never reaches Redis resolves through its still-live beacon —
+   * so neither needs the strike to be withheld, swept, or re-checked the way the
+   * count-and-subtract guard did.
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
-    const strikeThreshold = readClaimStrikeThreshold();
-    const recordStrikes = strikeThreshold > 0 && !this.shutdownRequested;
-    if (recordStrikes) {
-      let strikes = 0;
+    // The beacon must exist before this worker owns a marker, or a peer would
+    // read our live claim as an abandoned one.
+    await this.livenessReady;
+
+    const { deathThreshold } = this;
+    const guardEnabled = deathThreshold > 0 && this.beaconLive;
+    if (guardEnabled) {
+      let deaths = 0;
+      let lastOwnerState = "";
       try {
-        strikes = await this.scripts.recordClaimStrike(groupId);
+        ({ deaths, lastOwnerState } = await this.scripts.recordClaim({
+          groupId,
+          workerId: this.workerId,
+          stagedJobId,
+        }));
       } catch {
-        // Strike accounting is protective, never load-bearing: an unreadable
-        // counter must not stop the queue.
+        // Poison accounting is protective, never load-bearing: an unreadable
+        // marker must not stop the queue.
       }
-      if (strikes > strikeThreshold) {
+      if (deaths >= deathThreshold) {
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
           jobDataJson,
           originalScore,
           reason: "claim_strikes",
-          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+          lastOwnerState,
+          errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
         });
         return;
-      }
-      this.inFlightStrikeGroups.add(groupId);
-
-      // close() may have flipped shutdownRequested and taken its sweep snapshot
-      // during the recordClaimStrike await above — before this group was in the
-      // set, so the sweep would miss it and an abandoned drain would leave the
-      // strike behind: exactly the false worker-death this guard must not book.
-      // Re-check on the synchronous heels of the add (no await between them, so
-      // close() cannot interleave here) and clear our own strike if the shutdown
-      // began mid-claim. The add and this check are jointly exhaustive: either
-      // close()'s snapshot already saw the group and swept it, or it did not and
-      // we clear it here.
-      if (this.shutdownRequested) {
-        this.inFlightStrikeGroups.delete(groupId);
-        await this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // Protective accounting only; the strike key's TTL bounds a failed clear.
-        });
       }
     }
 
     try {
       await this.processClaimedJob(dispatched);
     } finally {
-      if (recordStrikes) {
-        this.inFlightStrikeGroups.delete(groupId);
-        this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // The TTL on the strike key bounds the damage of a failed clear.
-        });
+      if (guardEnabled) {
+        // Compare-and-delete: this job may have outlived its own active lease
+        // (heartbeat failures are warn-and-continue), in which case the group
+        // was redispatched and the marker now belongs to someone else. Deleting
+        // it blind would erase their ownership AND the group's accrued deaths.
+        this.scripts
+          .releaseClaim({ groupId, workerId: this.workerId })
+          .catch(() => {
+            // Safe to lose: the marker it would have removed still names this
+            // worker, which is alive (and will retire rather than vanish), so
+            // the next claim reads it as ordinary rather than as a death.
+          });
       }
     }
   }
@@ -918,18 +1121,30 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // so the drain is exclusive. Drained siblings are re-staged on failure so
     // they are not lost. When disabled (maxBatch <= 1) this is a no-op and the
     // per-job path below is unchanged.
-    const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
+    // A preflight scope must propagate through every individual causal chain.
+    // Coalescing jobs from two concurrent scopes would retain only the first
+    // delivery's context and let the other preflight miss downstream fan-out.
+    const maxBatch = contextMetadata?.queueDispatchScopeKey
+      ? 1
+      : (this.coalesceMaxBatch?.(payload) ?? 1);
     let batchPayloads: Payload[] | null = null;
+    // Staged-job id per batch member, index-aligned with batchPayloads, so a
+    // bisected failure can name the payload it narrowed to.
+    let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
       // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
       // would push the batch past maxBytes, counting the dispatched job's own
-      // stored size as the starting point. Whichever of the count/byte bound
+      // payload size as the starting point. Whichever of the count/byte bound
       // binds first wins; an oversized dispatched job (initialBytes already at
       // or over the budget) drains no siblings and processes on its own.
+      //
+      // Payload size, not `jobDataJson.length`: an offloaded body leaves a small
+      // reference in the stored value, so measuring the value would let 256
+      // megabyte-sized records through a 4 MiB budget untouched.
       const maxBytes =
         this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
-      const initialBytes = Buffer.byteLength(jobDataJson);
+      const initialBytes = readJobPayloadBytes(jobDataJson);
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
           groupId,
@@ -1020,18 +1235,42 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           if (firstRejection) {
             throw firstRejection.reason;
           }
+          // Every sibling parse has now run to terminal state, so a null means
+          // `parseDrainedPayload` already routed that sibling to the drop path
+          // (and tagged `sibling.dropped`) — it must not be re-staged below.
           const parsedSiblings = settled.map((r) =>
             r.status === "fulfilled" ? r.value : null,
           );
-          const liveSiblings = drainedSiblings.filter(
-            (_, index) => parsedSiblings[index] !== null,
-          );
-          const siblingPayloads = parsedSiblings.filter(
-            (parsed) => parsed !== null,
-          ) as Payload[];
+          const liveSiblings: DrainedJob[] = [];
+          const siblingPayloads: Payload[] = [];
+          const differentlyScoped: DrainedJob[] = [];
+          for (const [index, parsed] of parsedSiblings.entries()) {
+            if (!parsed) continue;
+            const sibling = drainedSiblings[index]!;
+            // A sibling carrying a different dispatch scope is not this
+            // batch's work: re-stage it untouched, same as a foreign `__jobName`
+            // above. Dropped siblings never reach here — `parsed` is null for
+            // them, which is what keeps #5857's resurrection loop closed.
+            if (
+              parsed.queueDispatchScopeKey !==
+              contextMetadata?.queueDispatchScopeKey
+            ) {
+              differentlyScoped.push(sibling);
+              continue;
+            }
+            liveSiblings.push(sibling);
+            siblingPayloads.push(parsed.payload);
+          }
+          if (differentlyScoped.length > 0) {
+            await this.restageDrainedSiblings(groupId, differentlyScoped);
+          }
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
+            batchJobIds = [
+              stagedJobId,
+              ...liveSiblings.map((sibling) => sibling.stagedJobId),
+            ];
           }
         } catch (err) {
           if (err instanceof TransientBlobStoreError) {
@@ -1192,7 +1431,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     "queue.coalesced_batch_size",
                     batchPayloads.length,
                   );
-                  await this.processBatch(batchPayloads, { attempt });
+                  await this.processBatchBisecting({
+                    entries: batchPayloads.map((batchPayload, index) => ({
+                      payload: batchPayload,
+                      stagedJobId: batchJobIds[index] ?? stagedJobId,
+                    })),
+                    attempt,
+                    routingLabels,
+                    span,
+                  });
                 } else {
                   await this.process(payload, { attempt });
                 }
@@ -1585,16 +1832,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
-      // Feed the ops dashboard P50/P99 tiles. Capped circular buffer; the
-      // collector LRANGE's it every 2s. Fire-and-forget so an instrumentation
-      // hiccup never bubbles into the worker pipeline.
+      // Feed the ops dashboard latency figures. Two shapes, one write: the
+      // capped circular buffer behind the live P50/P99 tiles (LRANGE'd every
+      // 2s, sized by the same shared constant the tiles quote), and the
+      // time-bucketed histograms behind the hour/day/week/all-time windows
+      // (merged by the elected snapshot writer on its detail cycle).
+      // Fire-and-forget so an instrumentation hiccup never bubbles into the
+      // worker pipeline.
+      const completedAtMs = Date.now();
+      const bucketField = latencyBucketField(jobDurationMs);
+      const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
+      const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
       this.redisConnection
         .multi()
         .lpush(
           `${this.queueName}:gq:stats:latencies-ms`,
           String(Math.round(jobDurationMs)),
         )
-        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
+        .ltrim(
+          `${this.queueName}:gq:stats:latencies-ms`,
+          0,
+          LATENCY_SAMPLE_SIZE - 1,
+        )
+        .hincrby(minuteKey, bucketField, 1)
+        .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
+        .hincrby(hourKey, bucketField, 1)
+        .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
+        .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
         .exec()
         .catch(() => {
           // best-effort stats write; failures are non-fatal
@@ -1618,8 +1882,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * parse failure — the job was already removed from staging, so it is DISCARDED
    * here, mirroring the dispatched job's own parse-failure handling.
    *
-   * This used to say "recoverable via event replay". It is not, for a reactor
-   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
+   * This used to say "recoverable via event replay". It is not, for a subscriber
+   * job: replay never invokes subscribers (see {@link dropStagedJob}). The loss is
    * counted instead of asserted away.
    */
   private async parseDrainedPayload({
@@ -1628,13 +1892,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }: {
     sibling: DrainedJob;
     groupId: string;
-  }): Promise<Payload | null> {
+  }): Promise<{
+    payload: Payload;
+    queueDispatchScopeKey?: string;
+  } | null> {
     try {
       const jobData = await this.blobLifecycle.decode({
         value: sibling.jobDataJson,
         groupId,
       });
-      return this.stripInternalFields(jobData);
+      const contextMetadata = jobData.__context as
+        | JobContextMetadata
+        | undefined;
+      return {
+        payload: this.stripInternalFields(jobData),
+        queueDispatchScopeKey: contextMetadata?.queueDispatchScopeKey,
+      };
     } catch (err) {
       // A transient blob-store error on a sibling MUST NOT drop it to replay —
       // the dispatched job's decode routes transient errors through
@@ -1733,6 +2006,259 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
   }
 
+  /**
+   * Runs a coalesced batch, halving it on a retryable failure until it either
+   * succeeds or the failure is attributable to a single payload.
+   *
+   * Why this exists: a coalesced batch is all-or-nothing, so without bisection
+   * ONE unprocessable payload fails the whole batch, and the retry re-drains
+   * the same siblings into the same batch — the poison payload takes up to
+   * `coalesceMaxBatch - 1` healthy payloads down with it on every attempt until
+   * the group blocks. Recovery from a *size*-driven failure (a batch too heavy
+   * for a downstream query's memory budget) was equally undirected: it only
+   * succeeded if the retry happened to re-assemble a lighter set.
+   *
+   * One split handles both, because both are "this set of payloads fails but a
+   * smaller set might not": a too-heavy batch halves until it fits, and a
+   * poison payload halves until it is alone, at which point the throw is
+   * attributable to it and the existing retry / quarantine path takes over.
+   *
+   * Ordering is preserved: the halves are CONTIGUOUS and awaited in sequence,
+   * never concurrently, because a fold derives fields from arrival order (the
+   * same invariant that makes splitting a group across lanes unsafe).
+   *
+   * That invariant also sets the limit of what this can do. A throw propagates
+   * immediately, so payloads AFTER the offender are not attempted — stepping
+   * over it would apply them across a gap the fold cannot see, producing wrong
+   * values silently. So bisection recovers everything BEFORE the offender and
+   * names it; it does not rescue what queued behind it. Doing that needs an
+   * explicit decision about the gap, which is the side-lining work in #6482.
+   *
+   * Re-running a payload that already applied is safe — fold redelivery is
+   * idempotent via the store's applied-event-id set (#6016) — but ONLY because
+   * every sub-batch call after the first successful commit carries
+   * `delivery.isContinuation`, which tells the fold commit to EXTEND that set
+   * rather than replace it. Without the flag, each sub-batch commit would erase
+   * the ids the earlier sub-batches recorded, and a retry after a failed later
+   * sub-batch would re-apply the committed prefix (#6578).
+   *
+   * Non-retryable failures are NOT split: they will fail identically at every
+   * size, so bisecting one only multiplies the work before the same verdict.
+   *
+   * Work within one locked attempt is BOUNDED. Splitting happens while this
+   * job holds the group's active key (heartbeat-renewed), so an unbounded
+   * descent — a handler that only accepts singletons turns a full batch into
+   * ~2N sequential calls — would hold the group lock and a worker slot for the
+   * whole walk instead of yielding to retry/backoff. After
+   * the split budget is spent the current failure propagates
+   * un-split: committed prefixes stay committed, the failed remainder re-stages
+   * through the normal failure path, and backoff takes over.
+   */
+  private async processBatchBisecting({
+    entries,
+    attempt,
+    routingLabels,
+    span,
+    isNarrowed = false,
+    dispatch = { hasCommitted: false, splits: 0 },
+  }: {
+    /**
+     * Payloads paired with the staged job each came from, so a failure that
+     * narrows to one payload can name it. Carrying the id is the whole reason
+     * bisection is worth more than a retry: without it the throw is anonymous
+     * and the terminal record anchors to the DISPATCHED job, which for a failing
+     * drained sibling is the wrong job entirely.
+     */
+    entries: { payload: Payload; stagedJobId: string }[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+    /** True in a recursive call — i.e. this batch is the product of a split. */
+    isNarrowed?: boolean;
+    /**
+     * State shared across the whole descent of ONE dispatch, deliberately
+     * mutable: `hasCommitted` flips once the first sub-batch commits (every later
+     * call is a continuation and must carry the flag — see JobDelivery), and
+     * `splits` is the call budget that bounds work under the group lock.
+     */
+    dispatch?: BisectionDispatchState;
+  }): Promise<void> {
+    if (!this.processBatch) {
+      throw new Error("processBatchBisecting called without a batch handler");
+    }
+
+    let failure: { err: unknown } | undefined;
+    try {
+      await this.processBatch(
+        entries.map((entry) => entry.payload),
+        { attempt, ...(dispatch.hasCommitted ? { isContinuation: true } : {}) },
+      );
+    } catch (err) {
+      failure = { err };
+    }
+
+    // Set on BOTH outcomes, and before the split recurses. The flag means "an
+    // earlier call in this descent MAY have written", which is what a later
+    // commit needs to know — a handler that stored and then threw (a subscriber
+    // failing after the fold committed) has written just as surely as one that
+    // returned. Treating that as a fresh delivery lets the next sub-batch's
+    // commit REPLACE the applied set the failed call recorded (#6578). The
+    // flag only ever turns a replace into a merge, so over-setting it is the
+    // safe direction and under-setting it is what double-applies.
+    dispatch.hasCommitted = true;
+
+    if (failure) {
+      await this.splitFailedBatch({
+        entries,
+        attempt,
+        routingLabels,
+        span,
+        isNarrowed,
+        dispatch,
+        err: failure.err,
+      });
+    }
+  }
+
+  /**
+   * The failure half of {@link processBatchBisecting}: decide whether this
+   * batch can usefully be made smaller, and if so run both halves in order.
+   *
+   * Split out so each half of the decision stays readable on its own — the
+   * happy path is one call, and everything about *why* a failure does or does
+   * not warrant a split lives here.
+   */
+  private async splitFailedBatch({
+    entries,
+    attempt,
+    routingLabels,
+    span,
+    isNarrowed,
+    dispatch,
+    err,
+  }: {
+    entries: { payload: Payload; stagedJobId: string }[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+    isNarrowed: boolean;
+    dispatch: BisectionDispatchState;
+    err: unknown;
+  }): Promise<void> {
+    // Fails the same way at every size, so splitting only multiplies the work
+    // before reaching the identical verdict.
+    if (!isRetryableJobError(err)) {
+      throw err;
+    }
+
+    if (entries.length <= 1) {
+      // Smallest attributable unit — report it, then let the existing retry
+      // and quarantine path take over.
+      this.reportBisectedIsolate({
+        entry: isNarrowed ? entries[0] : undefined,
+        attempt,
+        span,
+        err,
+      });
+      throw err;
+    }
+
+    // Call budget: splitting runs under the group's heartbeat-renewed active
+    // key, so a batch degrading toward singletons must not walk the whole tree
+    // (~2N sequential handler calls for N payloads) inside one locked attempt.
+    // Past the budget the failure propagates un-split: committed prefixes stay
+    // committed, the remainder re-stages via the normal failure path, and
+    // exponential backoff takes over. The budget comfortably covers the useful
+    // descents — isolating one poison payload in a 256 batch costs 8 splits,
+    // converging to sub-batches of 8 costs 31 — and cuts off only the
+    // pathological walk where backoff is the right behaviour anyway.
+    if (dispatch.splits >= this.bisectionSplitBudget) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          batchSize: entries.length,
+          splits: dispatch.splits,
+          attempt,
+          error: err instanceof Error ? err : new Error(String(err)),
+        },
+        "Bisection split budget exhausted; failing the remainder to the normal retry path",
+      );
+      span.addEvent("queue.batch_bisection_budget_exhausted", {
+        "queue.batch_size": entries.length,
+        "queue.batch_splits": dispatch.splits,
+      });
+      throw err;
+    }
+    dispatch.splits += 1;
+
+    const mid = Math.ceil(entries.length / 2);
+    gqBatchBisectionsTotal.inc(routingLabels);
+    span.addEvent("queue.batch_bisected", {
+      "queue.batch_size": entries.length,
+      "queue.batch_split_at": mid,
+    });
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        batchSize: entries.length,
+        splitAt: mid,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch failed; splitting in half and retrying each half in order",
+    );
+
+    // Sequential and contiguous — see the ordering note on the caller.
+    await this.processBatchBisecting({
+      entries: entries.slice(0, mid),
+      attempt,
+      routingLabels,
+      span,
+      isNarrowed: true,
+      dispatch,
+    });
+    await this.processBatchBisecting({
+      entries: entries.slice(mid),
+      attempt,
+      routingLabels,
+      span,
+      isNarrowed: true,
+      dispatch,
+    });
+  }
+
+  /**
+   * Names the payload a bisection narrowed to, so the offender is attributable
+   * rather than "something in that batch".
+   *
+   * `entry` is undefined when the failing batch of one was never split — an
+   * un-split single is just a job that failed, and reporting it as an isolate
+   * would send an investigator hunting for a bisection that never happened.
+   */
+  private reportBisectedIsolate({
+    entry,
+    attempt,
+    span,
+    err,
+  }: {
+    entry: { payload: Payload; stagedJobId: string } | undefined;
+    attempt: number;
+    span: Span;
+    err: unknown;
+  }): void {
+    if (!entry) return;
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        offendingStagedJobId: entry.stagedJobId,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch narrowed to a single failing payload; this staged job is the offender",
+    );
+    span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
+  }
+
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],
@@ -1750,7 +2276,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
           groupId,
-          dispatchAfterMs: sibling.originalScore,
+          // Guarded like every other re-stage. Unvalidated, a legacy row at 0
+          // was rewritten at 0 on every batch failure and never healed, and
+          // because the exhausted-retry path DID re-score, one failure could
+          // leave the siblings ordered ahead of the job they were drained
+          // behind.
+          dispatchAfterMs: this.restageScore(sibling.originalScore),
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
@@ -1770,6 +2301,50 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
       }
     }
+  }
+
+  /**
+   * Publishes this worker's liveness beacon and keeps refreshing it.
+   *
+   * The beacon is the poison guard's only evidence of a worker death: a claim
+   * marker whose owner has no beacon is a process that was working and is now
+   * gone. Refresh failures are logged and otherwise tolerated — the TTL is
+   * several refreshes wide precisely so a transient Redis error cannot make a
+   * live worker look dead.
+   */
+  private async startLivenessBeacon(): Promise<void> {
+    const publish = async () => {
+      try {
+        await this.scripts.recordWorkerAlive(this.workerId);
+        this.beaconLive = true;
+      } catch (err) {
+        // Stand the guard down until a refresh lands: claims made without a
+        // beacon behind them would be read as deaths by every peer.
+        this.beaconLive = false;
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+        );
+      }
+    };
+
+    await publish();
+
+    // close() may have run during that first publish, in which case it found no
+    // timer to stop and has already written the tombstone. Arming one now would
+    // put a refresh AFTER the retirement — restoring a short-lived `alive` that
+    // expires into exactly the false death the tombstone exists to prevent.
+    if (this.shutdownRequested) return;
+
+    this.livenessTimer = setInterval(() => {
+      void publish();
+    }, WORKER_LIVENESS_REFRESH_MS);
+    // Never hold the process open for a beacon refresh.
+    this.livenessTimer.unref?.();
   }
 
   /**
@@ -1836,10 +2411,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     contextMetadata: JobContextMetadata | undefined;
     routingLabels: Record<string, string>;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number"
-        ? originalScore
-        : (this.score?.(payload) ?? Date.now());
+    // The re-staged job keeps its original ready score so an operator sees it
+    // where it belongs in the queue - unless that score is not a usable
+    // timestamp, in which case re-staging it would park the group at the epoch
+    // for as long as it stays blocked.
+    const score = this.restageScore(originalScore);
 
     // Re-stage under the id the job was dispatched under (ADR-080), so the
     // staged job an operator inspects is named by the id its producer knows.
@@ -1896,16 +2472,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * does not — and the proof is structural, not another comment: `ReplayExecutor`
    * calls the fold's pure `projection.apply()` and writes straight to the store
    * via `store.store()`, never constructing a `ProjectionRouter` — which is the
-   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
-   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * only thing that calls `dispatchToSubscribers`. Subscribers are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a subscriber at all,
    * except two that exist to *suppress* re-fires.)
    *
    * `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
-   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * subscribers on the `traceSummary` fold — so for them this method IS the terminal
    * event, and the counter below is the only evidence it ever happened. Scoped
    * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
    * drives `config.projections` + `config.mapProjections`). The false part is
-   * reactor-specific.
+   * subscriber-specific.
    *
    * **Why `complete()`** — there are THREE options here, not two, and an earlier
    * draft of this comment argued a false binary:
@@ -2005,7 +2581,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
 
-    gqJobsDroppedTotal.inc({
+    recordDroppedJob({
       queue_name: this.queueName,
       pipeline_name: pipelineName ?? "unknown",
       job_type: jobType ?? "unknown",
@@ -2060,6 +2636,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     reason,
     errorMessage,
+    lastOwnerState,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2067,9 +2644,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
+    /**
+     * What the parking claim found the previous owner to be. A crash-loop and a
+     * Redis outage that expired healthy beacons both park with the same count
+     * and the same message; this is the field that tells them apart. Absent for
+     * the oversized-payload park, which consults no owner.
+     */
+    lastOwnerState?: string;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number" ? originalScore : Date.now();
+    // Same reasoning as handleExhaustedRetries: keep the original score when it
+    // is a real timestamp, otherwise the parked group reads as decades old.
+    const score = this.restageScore(originalScore);
     await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to
@@ -2079,6 +2664,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       score,
       jobDataJson,
       errorMessage,
+    });
+    // Release the marker as the group is parked. Leaving it meant the death
+    // count survived the park, so an operator who unblocked inside the marker's
+    // TTL had the group re-park on its very next claim — and whether it did
+    // depended on how long they took to press the button.
+    // Unconditional, unlike the release on the healthy path: the group is
+    // leaving the dispatch path, and a marker left at the threshold would
+    // re-park it on the operator's very next unblock.
+    await this.scripts.discardClaim(groupId).catch(() => {
+      // The marker's TTL bounds a failed clear; unblock clears it outright.
     });
     gqGroupsPoisonParkedTotal.inc({
       queue_name: this.queueName,
@@ -2091,6 +2686,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
         stagedJobId,
         reason,
+        // "gone" on every death is the crash-loop signature. A park whose
+        // observations were mostly "alive"/"retired" points at beacon weather
+        // (a Redis outage expiring healthy beacons), not at this group.
+        lastOwnerState,
       },
       "Poison guard parked group into the blocked set",
     );
@@ -2145,7 +2744,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         err,
         reason: "transient_exhausted",
-        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
       });
       return;
     }
@@ -2267,6 +2866,98 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     });
   }
 
+  private async registerPreflightGroup(groupId: string): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    await this.registerPreflightGroups(() => [groupId]);
+  }
+
+  async registerPreflightGroups(
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    const groupIds = resolveGroupIds();
+    const unresolved = groupIds.find(
+      (groupId) => groupId === "__unknown__" || groupId === "__legacy_outbox__",
+    );
+    if (unresolved) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        `Migration preflight refused unresolved group ${unresolved}`,
+      );
+    }
+    if (groupIds.some((groupId) => !groupId)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a pipeline with custom group routing",
+      );
+    }
+    if (!key.startsWith(`${this.queueName}:gq:`)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a dispatch scope outside the canonical queue slot",
+      );
+    }
+    await this.scripts.registerPreflightTargets({
+      targetKey: key,
+      groupIds: groupIds as readonly string[],
+    });
+  }
+
+  private async activatePreflightGroup(groupId: string): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    await this.registerPreflightGroups(() => [groupId]);
+  }
+
+  async waitUntilPreflightIdle(): Promise<void> {
+    const key = this.dispatchGroupAllowListKey;
+    if (!key) {
+      throw new QueueError(
+        this.queueName,
+        "waitUntilPreflightIdle",
+        "Queue has no preflight allow-list",
+      );
+    }
+    const deadline = Date.now() + 60_000;
+    while (true) {
+      const state = await this.scripts.inspectPreflightTargets(key);
+      const settled = state.pending === 0 && state.active === 0;
+      if (settled) this.assertPreflightTargetsSucceeded(state);
+      if (settled && this.processingQueue.idle()) return;
+      if (Date.now() >= deadline) {
+        throw new QueueError(
+          this.queueName,
+          "waitUntilPreflightIdle",
+          "Preflight groups did not drain within 60000ms",
+        );
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  private assertPreflightTargetsSucceeded(state: {
+    failed: number;
+    blocked: number;
+  }): void {
+    if (state.failed === 0 && state.blocked === 0) return;
+    throw new QueueError(
+      this.queueName,
+      "waitUntilPreflightIdle",
+      `Preflight queue has ${state.failed} failed and ${state.blocked} blocked target groups`,
+    );
+  }
+
   async close(): Promise<void> {
     this.shutdownRequested = true;
     this.metricsCollector?.stop();
@@ -2278,23 +2969,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // best-effort wake; a failed signal only delays dispatcher exit
       });
 
-    // A planned shutdown is not a worker death (poison-group-park-guard
-    // spec: "graceful shutdown mid-job does not count as a poison strike").
-    // Sweep the in-flight claim strikes NOW, before the drain below, while
-    // the event loop is provably alive — a worker whose loop a poison job
-    // seized can never reach this sweep, so real crash-loops keep their
-    // count. Jobs that complete during the drain re-clear harmlessly; jobs
-    // the drain budget (or the platform's SIGKILL) abandons leave no strike
-    // behind and re-dispatch cleanly on the next boot.
-    const inFlight = [...this.inFlightStrikeGroups];
-    if (inFlight.length > 0) {
-      await Promise.allSettled(
-        inFlight.map((groupId) => this.scripts.clearClaimStrikes(groupId)),
-      );
-      this.logger.info(
-        { queueName: this.queueName, groups: inFlight.length },
-        "Cleared in-flight claim strikes for graceful shutdown",
-      );
+    // A planned shutdown is not a worker death (poison-group-park-guard spec:
+    // "graceful shutdown mid-job does not count as a poison strike"). One
+    // tombstone answers for every claim this worker holds, however the drain
+    // ends: jobs it completes, jobs the shutdown budget abandons, and jobs the
+    // platform's SIGKILL cuts short all leave markers that resolve to "retired".
+    //
+    // Stop the beacon FIRST — a refresh landing after the tombstone would
+    // restore a short-lived `alive` that then expires into a false death. And
+    // do this while the event loop is provably alive: a worker whose loop a
+    // poison job seized never reaches here, so real crash-loops still count.
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = undefined;
+    }
+    if (this.consumerEnabled) {
+      try {
+        await this.scripts.retireWorker(this.workerId);
+      } catch (err) {
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to record worker retirement; groups this worker held may book a spurious death",
+        );
+      }
     }
 
     this.logger.debug(
@@ -2326,7 +3027,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Group queue processor closed successfully",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error,
@@ -2338,6 +3039,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       throw error;
     } finally {
       clearTimeout(shutdownTimer);
+      // Here, not at the top of close(): until this point the drain was still
+      // running jobs whose fan-out has to be allowed to stage. Past it the
+      // shared transports are about to go, so staging more is pointless. The
+      // timeout path lands here too — a drain that overran was abandoned, not
+      // finished, and either way nothing further should be staged.
+      this.stagingClosed = true;
     }
   }
 

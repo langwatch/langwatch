@@ -67,7 +67,7 @@ const regenerateImpl = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },
       organization: { getAll: { invalidate: vi.fn() } },
     }),
@@ -179,6 +179,16 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         expect(
           screen.getByRole("button", { name: ROTATE_LABEL }),
         ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Edit API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Revoke API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -223,8 +233,15 @@ describe("<ApiKeysSection /> project base key rotation", () => {
           await screen.findByRole("button", { name: "Regenerate Key" }),
         );
 
-        // TokenCreatedDialog opens and the new key appears in at least one snippet
+        // TokenCreatedDialog opens masked; revealing the .env snippet shows
+        // the new key. (CodePreview only puts the unmasked form in the DOM
+        // once revealed — the copy button hands out the real value either
+        // way.)
         expect(await screen.findByText("Token Created")).toBeInTheDocument();
+        const revealButtons = await screen.findAllByRole("button", {
+          name: "Show sensitive values",
+        });
+        await user.click(revealButtons[0]!);
         const keyElements = await screen.findAllByText(
           /sk-lw-newrotatedkey1234/,
         );
@@ -240,29 +257,12 @@ describe("<ApiKeysSection /> project base key rotation", () => {
 
     describe("when viewing the legacy project key row", () => {
       /** @scenario Rotation requires permission to manage the project */
-      it("does not offer a control to rotate the project base API key", () => {
+      it("does not render the secret-bearing legacy key row", () => {
         renderSection();
         expect(
           screen.queryByRole("button", { name: ROTATE_LABEL }),
         ).not.toBeInTheDocument();
-      });
-
-      // The legacy row intentionally has no edit or revoke control — rotation
-      // is the only mutating affordance, and only when permitted.
-      /** @scenario "The base key keeps working until it is explicitly rotated" */
-      it("does not offer edit or revoke controls on the legacy row", () => {
-        renderSection();
-        expect(screen.getByText("Project API Key")).toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Edit API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Revoke API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Project API Key")).not.toBeInTheDocument();
       });
     });
   });

@@ -22,23 +22,40 @@
  *
  * Spec: specs/ai-gateway/public-rest-api.feature
  */
+
+import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
+import {
+  readStoredBody,
+  serializeResponseBody,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { mintLangySessionApiKeyForUser } from "~/server/app-layer/langy/langyApiKey";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
+import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
+import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -56,6 +73,7 @@ const ADMIN_USER_ID = `usr-gwrest-admin-${suffix}`;
 const MEMBER_USER_ID = `usr-gwrest-member-${suffix}`;
 const VIEWER_USER_ID = `usr-gwrest-viewer-${suffix}`;
 const OUTSIDE_USER_ID = `usr-gwrest-outside-${suffix}`;
+const LANGY_USER_ID = `usr-gwrest-langy-${suffix}`;
 
 // An org with NO governance project, exclusively for the
 // trace_project_required refusal — its absence must be a property of the
@@ -80,6 +98,7 @@ const ALL_USER_IDS = [
   MEMBER_USER_ID,
   VIEWER_USER_ID,
   OUTSIDE_USER_ID,
+  LANGY_USER_ID,
 ];
 const ALL_PROJECT_IDS = [
   PROJECT_ID,
@@ -92,6 +111,8 @@ const ALL_PROJECT_IDS = [
 let adminToken = "";
 let memberToken = "";
 let viewerToken = "";
+/** A Langy session key, minted the way the Langy turn processor mints one. */
+let langyToken = "";
 let nogovAdminToken = "";
 
 function ch(): ClickHouseClient {
@@ -333,10 +354,21 @@ async function seedUserWithRole(args: {
   return created.token;
 }
 
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
+
 describe("gateway platform REST API (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
 
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     await seedTenant({
       orgId: ORG_ID,
       teamId: TEAM_ID,
@@ -412,6 +444,26 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       bindingScope: { type: RoleBindingScopeType.PROJECT, id: PROJECT_ID },
       bindingRole: TeamUserRole.MEMBER,
     });
+    // A project member, then the key Langy holds on their behalf: the real
+    // mint, so the test sees exactly the permission subset the policy grants
+    // (create yes, manage and rotate withheld).
+    await seedUserWithRole({
+      userId: LANGY_USER_ID,
+      orgId: ORG_ID,
+      teamId: TEAM_ID,
+      orgRole: OrganizationUserRole.MEMBER,
+      teamRole: TeamUserRole.MEMBER,
+      bindingScope: { type: RoleBindingScopeType.PROJECT, id: PROJECT_ID },
+      bindingRole: TeamUserRole.MEMBER,
+    });
+    langyToken = (
+      await mintLangySessionApiKeyForUser({
+        prisma,
+        userId: LANGY_USER_ID,
+        projectId: PROJECT_ID,
+        organizationId: ORG_ID,
+      })
+    ).token;
     viewerToken = await seedUserWithRole({
       userId: VIEWER_USER_ID,
       orgId: ORG_ID,
@@ -460,6 +512,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     // Every filter names module-level constants (or `in` lists built from
     // them), so a failed setup can never widen a delete (see the
     // undefined-collapse footgun: prisma drops undefined keys entirely).
@@ -505,6 +558,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       where: { organizationId: { in: ALL_ORG_IDS } },
     });
     await prisma.user.deleteMany({ where: { id: { in: ALL_USER_IDS } } });
+    // The Langy session key binds a system custom role that holds its
+    // permission subset; the organization cannot go while that row remains.
+    await prisma.customRole.deleteMany({
+      where: { organizationId: { in: ALL_ORG_IDS } },
+    });
     await prisma.organization.deleteMany({
       where: { id: { in: ALL_ORG_IDS } },
     });
@@ -578,6 +636,32 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   // ── Virtual keys: create ──────────────────────────────────────────────
 
   describe("virtual key create", () => {
+    /** @scenario "The REST create with reveal_once answers with the reveal id and the prefix, not the secret" */
+    it("withholds the secret with reveal_once and serves it once by the reveal id", async () => {
+      const { status, body } = await createVk({
+        name: `reveal-once-${suffix}`,
+        reveal_once: true,
+      });
+      expect(status).toBe(201);
+      expect(body).not.toHaveProperty("secret");
+      expect(JSON.stringify(body)).not.toMatch(/vk-lw-[0-9A-Z]{26}/);
+      expect(body.reveal_id).toMatch(/^rvl_/);
+      expect(body.preview).toBe(body.virtual_key.display_prefix);
+      expect(body.preview).toMatch(/^vk-lw-/);
+
+      const reveals = OneTimeRevealService.create();
+      const revealed = await reveals.reveal({
+        organizationId: ORG_ID,
+        revealId: body.reveal_id,
+      });
+      expect(revealed.secret).toMatch(/^vk-lw-[0-9A-Z]{26}$/);
+      expect(revealed.secret.startsWith(body.preview)).toBe(true);
+      expect(revealed.keyId).toBe(body.virtual_key.id);
+      await expect(
+        reveals.reveal({ organizationId: ORG_ID, revealId: body.reveal_id }),
+      ).rejects.toMatchObject({ code: "secret_already_revealed" });
+    });
+
     /** @scenario Create a virtual key with the SDK's current shape */
     it("accepts the SDK shape and defaults scope to the caller's project", async () => {
       const { status, body } = await createVk({ name: `sdk-min-${suffix}` });
@@ -646,6 +730,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         {
           name: `org-scoped-${suffix}`,
           scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
+          // An organization with projects to choose from must say which
+          // one its shared key traces into, rather than leave it to the
+          // governance fallback. RBAC stays the only thing under test.
+          trace_project_id: PROJECT_ID,
         },
         apiKeyAuth(adminToken),
       );
@@ -655,18 +743,74 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       ]);
     });
 
-    /** @scenario A member API key passes the route gate but not per-scope manage */
-    it("refuses creation when the key can create but not manage the scope", async () => {
-      // MEMBER holds virtualKeys:create (route ceiling passes) but not
-      // virtualKeys:manage — the per-scope gate the tRPC create enforces.
-      // If REST ever stops running the shared per-scope assert, this
-      // returns 201 and fails.
+    /** @scenario A key that can create but not manage mints a key for its own project */
+    it("mints a key for the caller's own project when the key can create but not manage", async () => {
+      // MEMBER holds virtualKeys:create but not virtualKeys:manage. The
+      // default scope is the caller's own project, where create is enough.
       const { status, body } = await createVk(
-        { name: `member-denied-${suffix}` },
+        { name: `member-own-${suffix}` },
+        apiKeyAuth(memberToken),
+      );
+      expect(status).toBe(201);
+      expect(body.virtual_key.scopes).toEqual([
+        { scope_type: "project", scope_id: PROJECT_ID },
+      ]);
+    });
+
+    /** @scenario A key that can create but not manage cannot mint above its project */
+    it("refuses a team-scoped key when the key can create but not manage", async () => {
+      // The per-scope manage gate the tRPC create enforces still stands
+      // beyond the caller's own project. If REST ever stops running the
+      // shared per-scope assert, this returns 201 and fails.
+      const { status, body } = await createVk(
+        {
+          name: `member-denied-${suffix}`,
+          scopes: [{ scope_type: "team", scope_id: TEAM_ID }],
+        },
         apiKeyAuth(memberToken),
       );
       expect(status).toBe(403);
       expect(body.error.message).toContain("virtualKeys:manage");
+    });
+
+    /** @scenario Langy's session key mints a key for the project it speaks for */
+    it("lets a Langy session key mint a key for its own project and nothing beyond it", async () => {
+      const minted = await createVk(
+        { name: `langy-own-${suffix}` },
+        apiKeyAuth(langyToken),
+      );
+      expect(minted.status).toBe(201);
+      expect(minted.body.virtual_key.scopes).toEqual([
+        { scope_type: "project", scope_id: PROJECT_ID },
+      ]);
+
+      const teamScoped = await createVk(
+        {
+          name: `langy-team-${suffix}`,
+          scopes: [{ scope_type: "team", scope_id: TEAM_ID }],
+        },
+        apiKeyAuth(langyToken),
+      );
+      expect(teamScoped.status).toBe(403);
+      expect(teamScoped.body.error.message).toContain("virtualKeys:manage");
+
+      const foreignTraces = await createVk(
+        {
+          name: `langy-traces-${suffix}`,
+          trace_project_id: SIBLING_PROJECT_ID,
+        },
+        apiKeyAuth(langyToken),
+      );
+      expect(foreignTraces.status).toBe(403);
+      expect(foreignTraces.body.error.message).toContain("virtualKeys:manage");
+
+      // Rotation is what the policy withholds manage to protect.
+      const rotated = await post(
+        `/api/gateway/v1/virtual-keys/${minted.body.virtual_key.id}/rotate`,
+        {},
+        apiKeyAuth(langyToken),
+      );
+      expect(rotated.status).toBe(403);
     });
 
     /** @scenario Org-scoped key creation without a governance project is refused */
@@ -1063,6 +1207,115 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(body.budget).toEqual(listed);
     });
 
+    /** @scenario "Creating an anchored budget reports its true cycle on the wire" */
+    it("echoes a cycle anchor and reports the anchored period, not the calendar one", async () => {
+      // A few days back, at a time of day no calendar period starts on.
+      const anchor = new Date(Date.now() - 5 * 86_400_000);
+      anchor.setUTCHours(9, 0, 0, 0);
+
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `anchored-${suffix}`,
+          window: "month",
+          limit_usd: "40",
+          cycle_anchor_at: anchor.toISOString(),
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const budget = (await created.json()).budget;
+      expect(budget.cycle_anchor_at).toBe(anchor.toISOString());
+
+      // The reported period is the anchored one. Since the anchor is days
+      // old and the window is a month, the period start IS the anchor and
+      // the reset is one anchored month on, neither of which is a calendar
+      // month boundary.
+      expect(budget.current_period_started_at).toBe(anchor.toISOString());
+      expect(budget.resets_at).toBe(
+        nextAnchoredResetAt({
+          window: "MONTH",
+          anchorAt: anchor,
+          now: new Date(),
+        }).toISOString(),
+      );
+      expect(budget.resets_at).not.toBe(
+        currentPeriodStart("MONTH", new Date()).toISOString(),
+      );
+
+      // Reading it back agrees, so a caller polling the budget sees the
+      // same cycle the create call promised.
+      const read = await app.request(`/api/gateway/v1/budgets/${budget.id}`, {
+        headers: legacyAuth(),
+      });
+      expect(read.status).toBe(200);
+      expect((await read.json()).budget).toEqual(budget);
+
+      // The anchor is immutable: a patch naming it changes nothing, since
+      // moving it would redraw periods already reported and enforced on.
+      const patched = await patch(
+        `/api/gateway/v1/budgets/${budget.id}`,
+        { name: `anchored-renamed-${suffix}`, cycle_anchor_at: null },
+        legacyAuth(),
+      );
+      expect(patched.status).toBe(200);
+      const after = (await patched.json()).budget;
+      expect(after.name).toBe(`anchored-renamed-${suffix}`);
+      expect(after.cycle_anchor_at).toBe(anchor.toISOString());
+      expect(after.current_period_started_at).toBe(
+        budget.current_period_started_at,
+      );
+    });
+
+    /** @scenario "A cycle anchor is rejected on windows that do not cycle" */
+    it("refuses a cycle anchor on the windows that never roll", async () => {
+      for (const window of ["manual", "total"]) {
+        const res = await post(
+          "/api/gateway/v1/budgets",
+          {
+            scope: { kind: "project", project_id: PROJECT_ID },
+            name: `anchored-${window}-${suffix}`,
+            window,
+            limit_usd: "10",
+            cycle_anchor_at: "2026-01-17T09:00:00.000Z",
+          },
+          legacyAuth(),
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+          error: {
+            code: "gateway_budget_cycle_anchor_invalid",
+            message:
+              "That window does not cycle, so it cannot take a cycle anchor",
+            meta: { window },
+          },
+        });
+        expect(
+          await prisma.gatewayBudget.findMany({
+            where: {
+              organizationId: ORG_ID,
+              name: `anchored-${window}-${suffix}`,
+            },
+          }),
+        ).toHaveLength(0);
+      }
+
+      // The same windows are fine without one.
+      const ok = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `unanchored-manual-${suffix}`,
+          window: "manual",
+          limit_usd: "10",
+        },
+        legacyAuth(),
+      );
+      expect(ok.status).toBe(201);
+      expect((await ok.json()).budget.cycle_anchor_at).toBeNull();
+    });
+
     /** @scenario An absent budget answers a canonical 404 */
     it("answers 404 for a budget that does not exist", async () => {
       const res = await app.request("/api/gateway/v1/budgets/bgt_missing", {
@@ -1174,6 +1427,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           name: `group-budget-${suffix}`,
           window: "month",
           limit_usd: "40",
+          // None of these members hold a key, so the budget is unreachable
+          // and would be refused. What is under test is the per-member
+          // labelling, and reach has its own tests.
+          allow_unreachable: true,
         },
         legacyAuth(),
       );
@@ -1217,9 +1474,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // buckets are the only place this spend exists; the template's own
       // scope id never accrues a row.
       const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
-      for (const [endUserId, amountUsd] of [
-        ["seat-over", "1.500000"],
-        ["seat-under", "0.250000"],
+      for (const { endUserId, amountNanoUsd } of [
+        { endUserId: "seat-over", amountNanoUsd: 1_500_000_000 },
+        { endUserId: "seat-under", amountNanoUsd: 250_000_000 },
       ]) {
         await chRepo.insertDebit([
           {
@@ -1230,7 +1487,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
             window: "MONTH",
             virtualKeyId: anchorId,
             gatewayRequestId: `req-seat-${endUserId}-${suffix}`,
-            amountUsd: amountUsd!,
+            amountNanoUsd,
             tokensInput: 10,
             tokensOutput: 5,
             tokensCacheRead: 0,
@@ -1359,7 +1616,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           window: "MONTH",
           virtualKeyId: vkId,
           gatewayRequestId: `req-gwrest-${suffix}`,
-          amountUsd: "1.2500",
+          amountNanoUsd: 1_250_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,
@@ -1823,6 +2080,416 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const b = await createVk({ name: `ext-null-b-${suffix}` });
       expect(a.status).toBe(201);
       expect(b.status).toBe(201);
+    });
+  });
+
+  // ── Idempotency-Key ───────────────────────────────────────────────────
+
+  describe("when a create carries an Idempotency-Key", () => {
+    /** A distinct budget body per test, so counting by name counts one test. */
+    function budgetBody(label: string) {
+      return {
+        scope: { kind: "project", project_id: PROJECT_ID },
+        name: `idem-${label}-${suffix}`,
+        window: "month",
+        limit_usd: 5,
+      };
+    }
+
+    function keyed(key: string): Record<string, string> {
+      return { ...legacyAuth(), "Idempotency-Key": key };
+    }
+
+    const budgetsNamed = (name: string) =>
+      prisma.gatewayBudget.findMany({
+        where: { organizationId: ORG_ID, name },
+      });
+
+    const receiptFor = (key: string) =>
+      prisma.idempotencyReceipt.findUnique({
+        where: { scopeId_key: { scopeId: PROJECT_ID, key } },
+      });
+
+    /**
+     * Wait for a row a request in flight is about to write.
+     *
+     * The claim goes in before the handler runs, so a request parked inside
+     * its handler has certainly written it; this only covers the moment
+     * between starting that request and its insert landing.
+     */
+    async function pollFor<T>(read: () => Promise<T | null>): Promise<T> {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const found = await read();
+        if (found) return found;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("the awaited row never appeared");
+    }
+
+    /** Re-encrypt under a key this deployment does not hold. */
+    function encryptUnderAnotherKey(text: string): string {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+      const body = cipher.update(text, "utf8", "hex") + cipher.final("hex");
+      return `${iv.toString("hex")}:${body}:${cipher
+        .getAuthTag()
+        .toString("hex")}`;
+    }
+
+    /** @scenario A create sent without an idempotency key is unchanged */
+    it("writes no receipt when the header is absent", async () => {
+      const body = budgetBody("keyless");
+      const res = await post("/api/gateway/v1/budgets", body, legacyAuth());
+
+      expect(res.status).toBe(201);
+      expect(res.headers.get("X-Idempotent-Replay")).toBeNull();
+      // The unkeyed path must not touch the table at all, so the whole scope
+      // is checked rather than one key: a stray write would land under a key
+      // this test does not know to look for.
+      expect(
+        await prisma.idempotencyReceipt.count({
+          where: { scopeId: PROJECT_ID },
+        }),
+      ).toBe(0);
+    });
+
+    /** @scenario Retrying a create with the same key replays the first response */
+    it("replays the stored response and creates nothing the second time", async () => {
+      const key = `idem-replay-key-${suffix}`;
+      const body = budgetBody("replay");
+
+      const first = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(first.status).toBe(201);
+      expect(first.headers.get("X-Idempotent-Replay")).toBeNull();
+      const firstBody = await first.text();
+
+      const receipt = await receiptFor(key);
+      expect(receipt?.responseStatus).toBe(201);
+      // At rest it is ciphertext, not the document. Asserted on the stored
+      // column rather than through the helper, because the point is what an
+      // operator reading this table would see.
+      expect(receipt?.responseBody).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+      expect(receipt?.responseBody).not.toContain(body.name);
+
+      const second = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(second.status).toBe(201);
+      expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
+      // Byte-for-byte, not merely equivalent: the receipt stores the response's
+      // serialised bytes, so a replay writes them through rather than
+      // re-deriving them from a parsed document.
+      expect(await second.text()).toBe(firstBody);
+      expect(second.headers.get("Content-Type")).toBe(
+        first.headers.get("Content-Type"),
+      );
+
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario A receipt that no longer decrypts lets the key be used again */
+    it("treats a receipt written under a rotated secret as a fresh key", async () => {
+      const key = `idem-rotated-key-${suffix}`;
+      const body = budgetBody("rotated");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // What rotating CREDENTIALS_SECRET inside the receipt's 24 hours leaves
+      // behind: an authentic row this process can no longer read.
+      const stored = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: stored!.id },
+        data: { responseBody: encryptUnderAnotherKey(stored!.responseBody!) },
+      });
+
+      const again = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(again.status).toBe(201);
+      expect(again.headers.get("X-Idempotent-Replay")).toBeNull();
+      expect(await budgetsNamed(body.name)).toHaveLength(2);
+
+      // Superseded rather than left to keep failing for the rest of its life.
+      const replacement = await receiptFor(key);
+      expect(replacement?.id).not.toBe(stored!.id);
+    });
+
+    /** @scenario Reusing a key with a different body is refused */
+    it("refuses a second request whose body changed", async () => {
+      const key = `idem-mismatch-key-${suffix}`;
+      const body = budgetBody("mismatch");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      const mutated = await post(
+        "/api/gateway/v1/budgets",
+        { ...body, limit_usd: 6 },
+        keyed(key),
+      );
+      const error = await expectCanonicalError(mutated, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("body_mismatch");
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /**
+     * Wind a receipt back to the state its first request held between
+     * claiming the key and storing its answer.
+     *
+     * Doctoring a real receipt rather than inserting one keeps the
+     * fingerprint identical to the route's, which is taken over the VALIDATED
+     * body and so cannot be recomputed here.
+     */
+    async function windBackToPending({
+      key,
+      claimedAt,
+      lastBeatAt,
+    }: {
+      key: string;
+      claimedAt: Date;
+      lastBeatAt: Date;
+    }) {
+      const claimed = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed!.id },
+        data: {
+          responseStatus: null,
+          responseBody: null,
+          createdAt: claimedAt,
+          heartbeatAt: lastBeatAt,
+        },
+      });
+      return claimed!;
+    }
+
+    /** @scenario A retry sent while the original is still running is refused */
+    it("refuses a retry against a receipt still marked pending", async () => {
+      const key = `idem-pending-key-${suffix}`;
+      const body = budgetBody("pending");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      await windBackToPending({
+        key,
+        claimedAt: new Date(),
+        lastBeatAt: new Date(),
+      });
+
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      const error = await expectCanonicalError(retry, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("in_progress");
+      // Refused, not queued: nothing new was written.
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario "A slow original that is still reporting alive keeps its claim" */
+    it("refuses a retry against a long-running claim that is still beating", async () => {
+      const key = `idem-slow-key-${suffix}`;
+      const body = budgetBody("slow");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // A request five minutes into its handler, waiting on a lock or a
+      // saturated pool, that reported itself alive a moment ago. Any rule
+      // reading the claim's age hands the key to this retry, which then
+      // creates a second budget alongside the one the original is still going
+      // to write. That is the exact failure this refusal exists to stop, and
+      // it lands hardest when the platform is already struggling.
+      await windBackToPending({
+        key,
+        claimedAt: new Date(Date.now() - 5 * 60_000),
+        lastBeatAt: new Date(),
+      });
+
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      const error = await expectCanonicalError(retry, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("in_progress");
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario "A claim that stopped reporting itself alive is taken over" */
+    it("takes over a claim that stopped beating and creates exactly one budget", async () => {
+      const key = `idem-stale-key-${suffix}`;
+      const body = budgetBody("stale");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // A process that died between claiming the key and writing anything:
+      // the budget its create made is removed, so what is left is the pending
+      // row alone, exactly as a crash in that window leaves it.
+      const claimed = await windBackToPending({
+        key,
+        claimedAt: new Date(Date.now() - 5 * 60_000),
+        lastBeatAt: new Date(Date.now() - 61_000),
+      });
+      await prisma.gatewayBudget.deleteMany({
+        where: { organizationId: ORG_ID, name: body.name },
+      });
+
+      // Without the takeover this answers 409 for the next 24 hours, and the
+      // caller can never complete the create it was trying to make.
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(retry.status).toBe(201);
+      expect(retry.headers.get("X-Idempotent-Replay")).toBeNull();
+
+      const superseded = await receiptFor(key);
+      expect(superseded?.responseStatus).toBe(201);
+      // The same row under a new claim rather than a fresh row, which is what
+      // lets the request that was replaced be told apart from the one that
+      // replaced it.
+      expect(superseded?.id).toBe(claimed.id);
+      expect(superseded?.claimId).not.toBe(claimed.claimId);
+
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario "A replaced request cannot overwrite the receipt that replaced it" */
+    it("fences the replaced request out of the receipt", async () => {
+      const key = `idem-fenced-key-${suffix}`;
+      const validatedBody = { name: `idem-fenced-${suffix}` };
+      const operation = "gateway.v1.budgets.create";
+
+      // The original: parked inside its handler, which is what a request slow
+      // enough to be declared dead looks like from outside.
+      let letOriginalFinish: () => void = () => undefined;
+      const parked = new Promise<void>((resolve) => {
+        letOriginalFinish = resolve;
+      });
+      const original = withIdempotency({
+        prisma,
+        operation,
+        scopeId: PROJECT_ID,
+        key,
+        validatedBody,
+        handler: async () => {
+          await parked;
+          return { status: 201, body: { id: "from-the-original" } };
+        },
+      });
+
+      const claimed = await pollFor(() => receiptFor(key));
+      // Silence it without stopping it, so the request is genuinely still
+      // running when its claim is taken away.
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed.id },
+        data: { heartbeatAt: new Date(Date.now() - 61_000) },
+      });
+
+      const replacement = await withIdempotency({
+        prisma,
+        operation,
+        scopeId: PROJECT_ID,
+        key,
+        validatedBody,
+        handler: () =>
+          Promise.resolve({
+            status: 201,
+            body: { id: "from-the-replacement" },
+          }),
+      });
+      expect(replacement.isReplayed).toBe(false);
+
+      const takenOver = await receiptFor(key);
+      expect(takenOver?.claimId).not.toBe(claimed.claimId);
+
+      // The original comes back from the dead and stores its answer.
+      letOriginalFinish();
+      await original;
+
+      const settled = await receiptFor(key);
+      expect(settled?.claimId).toBe(takenOver?.claimId);
+      // The key answers for the request that owns it, not for the one that was
+      // replaced. Without the fence this row now replays a response whose
+      // resource the replacement never made.
+      expect(readStoredBody(settled!)).toBe(
+        serializeResponseBody({ id: "from-the-replacement" }),
+      );
+
+      await prisma.idempotencyReceipt.deleteMany({ where: { id: claimed.id } });
+    });
+
+    /** @scenario An expired receipt lets the key be used again */
+    it("treats a lapsed key as a fresh one", async () => {
+      const key = `idem-expired-key-${suffix}`;
+      const body = budgetBody("expired");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      const stored = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: stored!.id },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+
+      const again = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(again.status).toBe(201);
+      expect(again.headers.get("X-Idempotent-Replay")).toBeNull();
+      expect(await budgetsNamed(body.name)).toHaveLength(2);
+
+      // Collected on the way past, so the table does not keep a row nothing
+      // will ever read again.
+      const replacement = await receiptFor(key);
+      expect(replacement?.id).not.toBe(stored!.id);
+      expect(replacement?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    /** @scenario An unusable idempotency key is refused before anything is created */
+    it("refuses a key that is too short", async () => {
+      const body = budgetBody("shortkey");
+      const res = await post("/api/gateway/v1/budgets", body, keyed("short"));
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      expect(error.meta?.target).toBe("header");
+      expect(await budgetsNamed(body.name)).toHaveLength(0);
+    });
+
+    /** @scenario The other keyed creates take the same header */
+    it("replays a cache rule create too", async () => {
+      const key = `idem-cache-key-${suffix}`;
+      const body = {
+        name: `idem-cache-${suffix}`,
+        matchers: { model: "gpt-5-mini" },
+        action: { mode: "respect", ttl: 60 },
+      };
+
+      const first = await post("/api/gateway/v1/cache-rules", body, keyed(key));
+      expect(first.status).toBe(201);
+      const firstBody = await first.text();
+
+      const second = await post(
+        "/api/gateway/v1/cache-rules",
+        body,
+        keyed(key),
+      );
+      expect(second.status).toBe(201);
+      expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
+      expect(await second.text()).toBe(firstBody);
+
+      expect(
+        await prisma.gatewayCacheRule.findMany({
+          where: { organizationId: ORG_ID, name: body.name },
+        }),
+      ).toHaveLength(1);
     });
   });
 });

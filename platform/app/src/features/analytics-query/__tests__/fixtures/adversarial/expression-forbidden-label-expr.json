@@ -1,0 +1,20 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"encoding": {
+		"x": {
+			"field": "model",
+			"type": "nominal",
+			"axis": {
+				"labelExpr": "warn(data('model_catalog')[0].vendor)"
+			}
+		},
+		"y": {
+			"field": "total",
+			"type": "quantitative"
+		}
+	}
+}

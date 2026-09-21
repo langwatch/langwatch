@@ -1,0 +1,191 @@
+---
+title: Compare Provider Costs
+sidebarTitle: Compare Provider Costs
+description: Your agent prices your real usage mix, with its cache read and write split, against other providers' current price cards.
+keywords:
+  - claude code cost comparison
+  - llm provider cost comparison
+  - cache read pricing
+  - ai token cost
+  - compare model prices
+---
+
+A price-card comparison can mislead on a coding workload. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. This investigation prices your own month of usage under each candidate instead.
+
+## Run the investigation
+
+{/* lw-generated:skill:start */}
+
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
+    <span className="lw-accordion-title">Would another provider be cheaper for my usage?</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/provider-cost-comparison"} data-track="docs_copy_skill_install" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+          <code>npx skills add langwatch/skills/provider-cost-comparison</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/provider-cost-comparison"} data-track="docs_copy_slash_command" data-track-title={"Would another provider be cheaper for my usage?"} data-track-command={"/provider-cost-comparison"}>
+          <code><span className="lw-slash-command">/provider-cost-comparison</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Would another provider be cheaper for my usage?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Price Your Real Usage Mix Against Other Providers
+
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 2: Export the Real Mix
+
+Settle two things before running anything, and hold both for the whole analysis.
+
+**The window.** `analytics query` and `trace export` both default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date, 30 days back to now unless the user names another window, and pass the same pair to every command.
+
+**The scope.** `analytics query` covers the whole project and has no origin filter, while `trace export` takes `--origin`. Mixing them silently compares application traffic in the totals against coding-agent traffic in the breakdown. When the question is about coding-agent usage, scope the export with `--origin coding_agent` and build every priced number from that export. Use the analytics calls only as a project-wide cross-check, and label them that way in the report. When the question is about the whole project, drop `--origin` and the two agree by construction.
+
+```bash
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch analytics query --metric total-cost --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch trace export --format jsonl --origin coding_agent --limit 20000 \
+  --start-date <start> --end-date <end> -o traces.jsonl
+```
+
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the numbers come from a sample of N of M traces. Never present a truncated export as the window's total.
+
+Delete `traces.jsonl` once the analysis is done.
+
+Collect the distinct `metadata.thread_id` values from the export and pull the per-call rows, because the cache split lives there:
+
+```bash
+langwatch session events <sessionId> --format json
+```
+
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the totals over the window you exported. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+
+## Step 3: Fetch Current Prices
+
+Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some price it the same, some offer no caching at all), the cache-storage price and its unit if the candidate bills cache residency by time, the default cache lifetime, and the context window.
+
+Cache pricing has three shapes and they do not reprice the same way: a write premium and no storage charge, a storage charge by token-hour with a cheap or free write, or no cache at all. Record which shape each candidate uses, because Step 4 needs it.
+
+Candidates come from the user; when they name none, take the current obvious ones for the workload's model class and say why those.
+
+## Step 4: Reprice and Compare
+
+For each candidate, reprice the same mix:
+
+1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is the row a sticker-price comparison leaves out.
+3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
+4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
+
+## Step 5: Report
+
+Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first**: "your usage from `<start>` to `<end>` cost $X; under the candidate the same usage prices at $Y" with the exported window and the cache assumption named in the same sentence
+- The mix table: tokens per model per kind (input, output, cache read, cache write)
+- The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
+- The sensitivity chart or table across cache-hit shares
+- A short "what would have to be true" closing: the conditions under which switching saves the claimed amount
+
+State the headline numbers directly in the conversation too.
+
+## Common Mistakes
+
+- Do NOT compare on input and output prices alone; on coding agents the cache columns decide the answer.
+- Do NOT use remembered prices; fetch the price page and cite it with a date.
+- Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
+- Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
+- Do NOT price a cache on token rates alone when the candidate charges for residency by time. A storage charge does not appear in the token mix, so leaving it out makes that candidate look cheaper than it is.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/provider-cost-comparison/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* lw-generated:skill:end */}
+
+## What it computes
+
+The skill exports your real token mix per model: input, output, cache reads and cache writes, from your own LangWatch data. It fetches the candidates' current price pages at analysis time, and reprices the same mix under each one, three ways:
+
+- **Direct**: your tokens at their rates, cache split preserved where the candidate offers caching.
+- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is what a sticker-price comparison leaves out.
+- **Sensitivity**: the same comparison at your observed cache-hit share, at half of it, and at zero, so the conclusion survives a change in how you work.
+
+The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
+
+## What the report looks like
+
+<Frame caption="Example report output with sample numbers. The candidate with the lower sticker price costs 42 percent more once the cache reads rebill as fresh input; the candidate with a cache discount saves 41 percent while the cache-hit share holds.">
+  ![Example provider comparison report](/images/coding-agents/provider-cost-comparison-example.png)
+</Frame>
+
+## What it does not claim
+
+Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you.
+
+**Also check:** [Usage analytics](/coding-agents/usage-analytics) for the data this investigation reads, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) for lowering the bill without switching anything.

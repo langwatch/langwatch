@@ -25,6 +25,10 @@ type SimulationSuite = {
   projectId: string;
   name: string;
   slug: string;
+  kind: string;
+  scope: null;
+  fields: null;
+  evaluators: null;
   description: string | null;
   scenarioIds: string[];
   targets: Array<{ type: string; referenceId: string }>;
@@ -43,11 +47,11 @@ import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 const mockUseQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("@prisma/client", () => ({}));
+vi.mock("~/generated/prisma/client", () => ({}));
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
@@ -129,6 +133,10 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    fields: null,
+    evaluators: null,
+    scope: null,
     description: "Core test scenarios",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [{ type: "http", referenceId: "agent_1" }],

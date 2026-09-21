@@ -64,7 +64,7 @@ function emptyContent({
     return {
       title: "No conversations to show",
       description:
-        "Conversations group traces that share a thread. Tag spans with a thread_id to surface them here.",
+        "A conversation gathers every trace of one exchange, so you can review a whole piece of work end to end instead of a trace at a time. They appear here once your traces carry a conversation identifier.",
     };
   }
   if (hasFilters) {

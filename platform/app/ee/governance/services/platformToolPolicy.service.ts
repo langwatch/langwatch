@@ -30,6 +30,8 @@ export const PLATFORM_TOOL_SLUGS = [
   "gemini",
   "opencode",
   "cursor",
+  "copilot",
+  "code",
 ] as const;
 
 export type PlatformToolSlug = (typeof PLATFORM_TOOL_SLUGS)[number];
@@ -58,8 +60,38 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: Record<
   gemini: { allowVk: true, allowOtelDirect: true },
   opencode: { allowVk: true, allowOtelDirect: true },
   cursor: { allowVk: true, allowOtelDirect: false },
+  // GitHub Copilot CLI (>= 1.0.41): native OTel export + BYOK gateway
+  // env vars, so both paths are real. ADR-039.
+  copilot: { allowVk: true, allowOtelDirect: true },
+  // `code` (VS Code Copilot Chat) is ingestion-only: the chat extension has
+  // native OTel export but no BYOK gateway env, so Path A is structurally
+  // impossible. Inverse of cursor. ADR-039 §Extension #2. allowVk stays
+  // false regardless of tile config (forced, like cursor's allowOtelDirect).
+  code: { allowVk: false, allowOtelDirect: true },
 };
 
 export function isPlatformToolSlug(slug: string): slug is PlatformToolSlug {
   return (PLATFORM_TOOL_SLUGS as readonly string[]).includes(slug);
 }
+
+/**
+ * The ingest `source_type` a wrapped tool stamps, read back to its CLI slug.
+ * Mirrors SOURCE_TYPE_BY_TOOL in
+ * sdks/typescript/src/cli/utils/governance/otel-env-block.ts, which is the
+ * only writer of these values on the direct-OTLP path.
+ *
+ * Deliberately partial, and the mint route treats an unmapped source type as
+ * ungoverned: `cursor` and `copilot_app` have no direct-OTLP wiring to gate,
+ * and an SDK or a template mints under source types that no per-tool policy
+ * describes.
+ */
+export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<
+  Record<string, PlatformToolSlug>
+> = {
+  claude_code: "claude",
+  codex: "codex",
+  gemini: "gemini",
+  opencode: "opencode",
+  copilot_cli: "copilot",
+  copilot_vscode: "code",
+};

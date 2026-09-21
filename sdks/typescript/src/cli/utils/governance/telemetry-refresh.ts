@@ -43,7 +43,9 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
+	codexGatewayBlockBaseUrl,
 	codexHasGatewayBlock,
 	codexHasOtelBlock,
 	codexOtelBlockEndpoint,
@@ -62,23 +64,33 @@ import {
 	installAppEnv,
 	removeAppEnvVars,
 } from "./app-settings";
+import { readClaudePluginState } from "./claude-plugin";
+import {
+	installSessionContextHooks,
+	removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
+	isExpiredSession,
 	listIngestionKeys,
 	mintIngestionKey,
 } from "./cli-api";
-import type { GovernanceConfig } from "./config";
+import { isIsolatedConfig, type GovernanceConfig } from "./config";
 import {
 	buildOtelEnvBlock,
 	SOURCE_TYPE_BY_TOOL,
 	telemetryEnvVarNames,
 } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { runningCodeRestartNotice } from "./running-code";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
+	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
+	rcLangwatchBlockUrls,
 	rcPath,
 	tildify,
 	toolMarkers,
@@ -92,7 +104,7 @@ const LANGWATCH_OTLP_ENDPOINT_RE = /\/api\/otel\/?$/;
 
 /** The OTLP ingestion base endpoint a control plane serves. */
 export function otlpEndpointFor(controlPlaneUrl: string): string {
-	return `${controlPlaneUrl.replace(/\/+$/, "")}/api/otel`;
+	return `${normalizeEndpoint(controlPlaneUrl)}/api/otel`;
 }
 
 /**
@@ -122,6 +134,17 @@ export interface IngestionKeyResolution {
 	endpoint: string;
 	/** True when a fresh key was minted (vs a cached one reused). */
 	minted: boolean;
+	/**
+	 * True when the platform rejected this device's session, so the cached
+	 * key was reused without anything confirming it is still live.
+	 *
+	 * A device that cannot authenticate can neither check its key nor mint a
+	 * replacement, and the key it holds may have been revoked weeks ago. The
+	 * resolution still carries that key, because wiring the tool with a key
+	 * that may work beats wiring it with nothing, but the caller must say so
+	 * instead of reporting a working setup.
+	 */
+	sessionExpired?: boolean;
 }
 
 /**
@@ -168,7 +191,21 @@ export async function resolveLiveIngestionKey({
 	const cached = cfg.default_personal_ingest_keys?.[sourceType];
 	if (cached?.secret) {
 		const cachedLookupId = extractLookupIdFromToken(cached.secret);
+		if (cachedLookupId === undefined) {
+			// Not a personal `ik-lw-` token: the user placed this credential
+			// here by hand (a project `sk-lw-` key, a legacy shape). It cannot
+			// be matched against the personal key listing, so probing it would
+			// always read "revoked" and re-mint over the user's explicit
+			// choice. Pinned: use as-is, never probe, never overwrite.
+			return {
+				token: cached.secret,
+				prefix: cached.prefix,
+				endpoint: otlpEndpointFor(cfg.control_plane_url),
+				minted: false,
+			};
+		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+		let sessionExpired = false;
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
 			// Server resolved - verify the cached lookupId is still present
@@ -180,12 +217,17 @@ export async function resolveLiveIngestionKey({
 				// Key was revoked or rotated on the platform - treat as no cache.
 				cacheIsLive = false;
 			}
-		} catch {
+		} catch (error) {
 			// Network error / older server without the endpoint: reuse cache
-			// as-is (offline-first fallback - hard-cut rotation is a
-			// re-mint-kills-old invariant, so a genuinely revoked key will
-			// self-correct next time the device is online) - unless the
-			// caller disabled that fallback.
+			// as-is (offline-first fallback - a device that is merely offline
+			// keeps exporting with the key it has) - unless the caller
+			// disabled that fallback.
+			//
+			// A session the platform rejected is not that case. Nothing about
+			// the cached key was confirmed and nothing can replace it, so the
+			// fallback still hands the key back but marks the resolution: the
+			// key may have been dead for weeks and only the caller can say so.
+			sessionExpired = isExpiredSession(error);
 			cacheIsLive = allowOfflineFallback;
 		}
 		if (cacheIsLive) {
@@ -194,6 +236,7 @@ export async function resolveLiveIngestionKey({
 				prefix: cached.prefix,
 				endpoint: otlpEndpointFor(cfg.control_plane_url),
 				minted: false,
+				...(sessionExpired ? { sessionExpired: true } : {}),
 			};
 		}
 	}
@@ -206,12 +249,70 @@ export async function resolveLiveIngestionKey({
 	};
 }
 
+export interface IngestionCredentialResolution extends IngestionKeyResolution {
+	/** Where the credential is scoped: the personal workspace or a pinned project. */
+	scope: "personal" | "project";
+	/** Slug (preferred) or id of the pinned project; unset for pasted keys. */
+	projectLabel?: string;
+}
+
+/**
+ * Resolve the ingest credential for a tool: the project pin when one
+ * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
+ * else the personal path via `resolveLiveIngestionKey`.
+ *
+ * A pinned credential is used verbatim with no server round trip: it may
+ * belong to a project the device session cannot list (or the device may
+ * have no session at all), and revocation surfaces on the ingest side.
+ * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ */
+export async function resolveIngestionCredential({
+	cfg,
+	tool,
+	sourceType,
+	allowOfflineFallback = true,
+}: {
+	cfg: GovernanceConfig;
+	tool: string;
+	sourceType: string;
+	allowOfflineFallback?: boolean;
+}): Promise<IngestionCredentialResolution> {
+	const pinned = cfg.tool_project_keys?.[tool];
+	if (pinned?.secret) {
+		return {
+			token: pinned.secret,
+			endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
+			minted: false,
+			scope: "project",
+			projectLabel: pinned.project_slug ?? pinned.project_id,
+		};
+	}
+	const personal = await resolveLiveIngestionKey({
+		cfg,
+		sourceType,
+		allowOfflineFallback,
+	});
+	return { ...personal, scope: "personal" };
+}
+
 /**
  * Re-sync the langwatch-authored env block in `~/.claude/settings.json`
  * with the current run's values. Only fires when a langwatch-shaped
  * block is already present (presence = the user opted into persistence
  * on some earlier run) and its values differ. Returns the refreshed
  * target's label, or null when nothing was touched.
+ *
+ * Every run also re-asserts the session context seam in the same file, not only
+ * the runs that rewrite the env. It is part of the wiring the persisted block
+ * stands for, and the block outlived the CLI version that started writing it, so
+ * a device that persisted earlier has the env and none of the seam. The seam
+ * names no endpoint, so asserting it refreshes nothing to point at this login
+ * and the label stays null when it was the only change.
+ *
+ * A device carrying the LangWatch Claude Code plugin already has those hooks
+ * from the plugin, so the entries here are removed rather than asserted: wiring
+ * both runs the same two hooks twice per session. This path never installs the
+ * plugin, because nobody is being asked anything on a refresh.
  */
 export function refreshClaudeUserTelemetryEnv({
 	vars,
@@ -223,6 +324,15 @@ export function refreshClaudeUserTelemetryEnv({
 	if (!appEnvHasAnyVar(target, Object.keys(vars))) return null;
 	const current = appEnvValues(target);
 	if (!otelWiringLooksLangwatchAuthored(current)) return null;
+	try {
+		if (readClaudePluginState().pluginInstalled) {
+			removeSessionContextHooks({ tool: "claude_code" });
+		} else {
+			installSessionContextHooks({ tool: "claude_code" });
+		}
+	} catch {
+		// The env is the refresh that matters; the seam is best-effort.
+	}
 	if (appEnvHasAllVars(target, vars)) return null;
 	installAppEnv(target, vars);
 	return `claude telemetry env (${target.displayPath})`;
@@ -278,10 +388,15 @@ export function refreshCodexOtelBlockTo({
 }): string | null {
 	if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
 	const result = writeCodexOtelBlock({
-		endpoint: codexTraceEndpoint(endpoint),
+		baseEndpoint: endpoint,
 		ingestionToken: token,
 		environment,
 	});
+	// The exporters carry no conversation; the harvest recovers it, so a
+	// refresh that keeps the exporters healthy heals the harvest wiring too
+	// (idempotent and quiet while the notify block is already in place).
+	assertCodexTurnHarvest();
+	assertCodexAgentGuidance();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -437,6 +552,42 @@ function scopedShellFunctionNeedsRefresh(
 	);
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** True for an endpoint served from this machine. Unparseable reads as not. */
+export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
+	if (!endpoint) return false;
+	try {
+		return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Whether a tool's persisted wiring reports to an instance on this machine.
+ * A scoped shell function carries no parsed endpoint, so every address in
+ * its block is parsed and judged by its host.
+ */
+function toolWiringPointsAtLoopback(tool: string): boolean {
+	if (tool === "claude") {
+		const target = appSettingsTargetFor("claude");
+		if (!target) return false;
+		return isLoopbackEndpoint(
+			appEnvValues(target).OTEL_EXPORTER_OTLP_ENDPOINT,
+		);
+	}
+	if (tool === "codex") {
+		return isLoopbackEndpoint(
+			codexOtelBlockEndpoint(defaultCodexConfigPath()) ?? undefined,
+		);
+	}
+	const markers = toolMarkers(tool);
+	return REFRESH_SHELLS.some((shell) =>
+		rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
+	);
+}
+
 function toolWiringNeedsLoginRefresh(
 	tool: string,
 	expectedEndpoint: string,
@@ -454,6 +605,14 @@ export interface LoginTelemetryRefreshResult {
 	 * cfg.default_personal_ingest_keys) - the caller should saveConfig.
 	 */
 	mintedAny: boolean;
+	/** Restart advice when a live launcher predates successfully changed wiring. */
+	warnings?: string[];
+	/**
+	 * Tools whose wiring points at another instance and was left alone, with
+	 * the reason: this login lives in a config of its own, or it is a login on
+	 * this machine and the wiring reports to a deployment elsewhere.
+	 */
+	kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
 }
 
 /**
@@ -463,6 +622,19 @@ export interface LoginTelemetryRefreshResult {
  * ingest key on the new instance for each. A block already pointing at
  * this instance is left alone here - key-level drift is re-synced
  * value-exactly by the next wrapper run, which resolves a key anyway.
+ *
+ * Two logins never take the wiring over, and both are reported in `kept`:
+ *
+ *   - a login in a config of its own (`isIsolatedConfig`). The wiring under
+ *     the home belongs to the home's default config, so nothing under the
+ *     home is read for rewriting, minted for, or written.
+ *   - a login on this machine (localhost) while the wiring reports to a
+ *     deployment elsewhere. A local stack comes and goes, and taking the
+ *     wiring silently would drop the telemetry of every plain tool run once
+ *     it stops. Running `langwatch <tool>` on that login is the explicit way
+ *     to move a tool over. Wiring that already reports to this machine is
+ *     refreshed as usual, which is what a self-hosted install on localhost
+ *     needs when its port changes.
  *
  * Wholly best-effort: per-tool failures (no personal workspace yet,
  * network) skip that tool; the login itself never fails on refresh.
@@ -474,16 +646,66 @@ export async function refreshTelemetryWiringForLogin(
 ): Promise<LoginTelemetryRefreshResult> {
 	const labels: string[] = [];
 	let mintedAny = false;
+	const warnings: string[] = [];
 	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
+
+	if (isIsolatedConfig()) {
+		const tools = Object.keys(SOURCE_TYPE_BY_TOOL).filter((tool) => {
+			try {
+				return toolWiringNeedsLoginRefresh(tool, expectedEndpoint);
+			} catch {
+				return false;
+			}
+		});
+		return {
+			labels,
+			mintedAny,
+			...(tools.length > 0
+				? { kept: { tools, reason: "isolated_config" as const } }
+				: {}),
+		};
+	}
+
+	const loopbackLogin = isLoopbackEndpoint(expectedEndpoint);
+	const keptForLoopback: string[] = [];
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
-			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
+			// A login on this machine leaves a tool that reports elsewhere
+			// wholly alone, the codex hook and guidance below included: the
+			// hook names this CLI's own path, which is no business of a config
+			// file this login does not take over.
+			if (
+				loopbackLogin &&
+				toolWiringNeedsLoginRefresh(tool, expectedEndpoint) &&
+				!toolWiringPointsAtLoopback(tool)
+			) {
+				keptForLoopback.push(tool);
+				continue;
+			}
+			// codex's notify hook is what recovers the conversation, and the
+			// guidance beside it is what tells a session to declare the checkout
+			// it moved to. Neither names an endpoint or a key, so both stand
+			// ahead of the pin check: a pinned codex needs them exactly as a
+			// personal one does, and only the mint and the rewiring below are a
+			// pin's to refuse. A config already pointing at this login skips the
+			// refresh below, so a device whose [otel] block predates either would
+			// never be given one. Idempotent and quiet when they are in place.
+			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
+				assertCodexTurnHarvest();
+				assertCodexAgentGuidance();
+			}
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
+			}
+			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
 			// This caller only gets here because the persisted endpoint
 			// already differs from the new login, so a network hiccup must
@@ -512,7 +734,12 @@ export async function refreshTelemetryWiringForLogin(
 				});
 				if (label) labels.push(label);
 			} else {
-				labels.push(...refreshScopedShellFunctions({ tool, vars }));
+				const refreshed = refreshScopedShellFunctions({ tool, vars });
+				labels.push(...refreshed);
+				if (tool === "code" && refreshed.length > 0) {
+					const notice = runningCodeRestartNotice();
+					if (notice) warnings.push(notice);
+				}
 			}
 		} catch {
 			// Best-effort per tool: one failed mint must not block the login
@@ -524,7 +751,13 @@ export async function refreshTelemetryWiringForLogin(
 	// the login that wrote it. Re-sync it with this login's gateway URL
 	// when present - no ingest key involved.
 	try {
-		if (codexHasGatewayBlock(defaultCodexConfigPath())) {
+		if (
+			loopbackLogin &&
+			codexHasGatewayBlock(defaultCodexConfigPath()) &&
+			!isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined)
+		) {
+			if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
+		} else if (codexHasGatewayBlock(defaultCodexConfigPath())) {
 			const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
 			if (result.action !== "unchanged") {
 				labels.push(`codex gateway block (${displayCodexConfigPath()})`);
@@ -534,5 +767,29 @@ export async function refreshTelemetryWiringForLogin(
 		// Best-effort, same as above.
 	}
 
-	return { labels, mintedAny };
+	return {
+		labels,
+		mintedAny,
+		...(warnings.length > 0 ? { warnings } : {}),
+		...(keptForLoopback.length > 0
+			? { kept: { tools: keptForLoopback, reason: "loopback_login" as const } }
+			: {}),
+	};
+}
+
+/** The lines the login prints for wiring it left alone. Exported for tests. */
+export function keptWiringLines(
+	kept: NonNullable<LoginTelemetryRefreshResult["kept"]>,
+): string[] {
+	const tools = kept.tools.join(", ");
+	if (kept.reason === "isolated_config") {
+		return [
+			`Left the wiring of ${tools} as it is: this login lives in its own config file (LANGWATCH_CLI_CONFIG), so it is not this machine's login.`,
+		];
+	}
+	const example = kept.tools[0] ?? "claude";
+	return [
+		`Left the wiring of ${tools} as it is: it reports to another LangWatch, and a login on this machine does not take it over.`,
+		`To report to this one instead, run the tool through it once: langwatch ${example}`,
+	];
 }

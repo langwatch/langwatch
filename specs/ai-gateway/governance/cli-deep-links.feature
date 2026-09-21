@@ -1,4 +1,4 @@
-Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links + request-increase
+Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links
   As an enterprise developer using the langwatch CLI day-to-day
   I want to jump from a terminal transcript to the matching trace
   in my web dashboard, and to a signed budget-increase request
@@ -67,53 +67,17 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links + request-increa
     # already has a polished 404 view.
 
   # ---------------------------------------------------------------------------
-  # `langwatch request-increase` — Screen-8 tail
+  # Budget-increase requests: the `langwatch request-increase` command was
+  # retired (nothing used it). The Screen-8 box prints the gateway-signed
+  # `request_increase_url` directly — see budget-exceeded.feature.
   # ---------------------------------------------------------------------------
-
-  @bdd @cli @request-increase @signed-url
-  Scenario: request-increase opens the gateway-issued signed URL when cached
-    Given a recent 402 budget_exceeded response wrote
-      """
-      last_request_increase_url:
-        https://app.langwatch.example.com/me/budget/request?u=jane&l=500&s=500&hmac=abc
-      """
-      to ~/.langwatch/config.json
-    When jane runs "langwatch request-increase"
-    Then the CLI prints "Opening https://app.langwatch.example.com/me/budget/request?u=jane&l=500&s=500&hmac=abc"
-    And the CLI invokes the OS default browser launcher with that URL
-    # The signed URL carries user_id + limit + spent params (HMAC'd) so
-    # the admin sees the request with full context, not a generic page.
-
-  @bdd @cli @request-increase @fallback
-  Scenario: request-increase falls back to the static page when no signed URL is cached
-    Given ~/.langwatch/config.json has no last_request_increase_url
-    When jane runs "langwatch request-increase"
-    Then the CLI prints "Opening http://app.langwatch.example.com/me/budget/request"
-    And the CLI invokes the OS default browser launcher with that URL
-
-  @bdd @cli @request-increase @auth
-  Scenario: request-increase refuses when not logged in
-    Given jane is NOT logged in (config absent)
-    When she runs "langwatch request-increase"
-    Then the CLI exits non-zero
-    And stderr contains "not logged in"
-
-  @bdd @cli @request-increase @persist
-  Scenario: A 402 from the gateway during a wrapped command persists the signed URL
-    Given the gateway is configured to return 402 budget_exceeded for jane's next request
-    When she runs "langwatch claude" (which calls CheckBudget before exec)
-    Then the CLI prints the spec-canonical Screen-8 box
-    And ~/.langwatch/config.json has its `last_request_increase_url` field set to
-        the gateway-issued signed URL
-    And the file's mode remains 0600 (no perm regression on save)
-    And a follow-up "langwatch request-increase" opens that URL
 
   # ---------------------------------------------------------------------------
   # Browser-launcher selection (shared with login flow)
   # ---------------------------------------------------------------------------
 
   @bdd @cli @dashboard @browser
-  Scenario: LANGWATCH_BROWSER override is honored for dashboard + request-increase
+  Scenario: LANGWATCH_BROWSER override is honored for dashboard deep-links
     Given env var LANGWATCH_BROWSER="google-chrome"
     When jane runs "langwatch dashboard --trace tr_x"
     Then on macOS: `open -a 'Google Chrome' <url>` is invoked

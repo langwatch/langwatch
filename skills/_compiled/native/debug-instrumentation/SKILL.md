@@ -13,29 +13,15 @@ This recipe uses the `langwatch` CLI to inspect your production traces and ident
 
 ## Prerequisites
 
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
-
 ## Step 1: Fetch Recent Traces
 
 ```bash
-langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
+langwatch trace search --limit 25 --start-date "$(( ($(date +%s) - 7*24*3600) * 1000 ))" --format json
 ```
 
-(Widen or narrow the window as needed — the CLI accepts ISO strings for `--start-date`.)
+(Widen or narrow the window as needed. `--start-date` accepts an ISO string or
+epoch milliseconds, and defaults to the last 24 hours. The epoch form above is
+used because `date -d '7 days ago'` is GNU-only and fails on macOS.)
 
 For each trace, ask:
 

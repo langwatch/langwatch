@@ -7,9 +7,14 @@
  * about is dropped in silence and the column just goes blank; that is how
  * ATTRIBUTED_USER rows shipped nameless.
  */
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewayBudgetsRouter } from "../gatewayBudgets";
 
@@ -21,23 +26,33 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
   };
 });
 
 const breakdown = vi.hoisted(() => vi.fn());
 
-vi.mock("~/server/gateway/clickhouseRepos", () => ({
-  chRepoOrUndefined: () => ({
-    getSpendForBudgetsAcrossTenants: async () => [],
-    getBucketSpendBreakdownForBudget: breakdown,
-  }),
-}));
+// The router takes the budget ledger from the App, so standing in for the
+// store means standing in for `getApp()`.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      gateway: {
+        budgets: {
+          getSpendForBudgetsAcrossTenants: async () => [],
+          getBucketSpendBreakdownForBudget: breakdown,
+        },
+        virtualKeySpend: undefined,
+      },
+    }),
+  };
+});
 
 vi.mock("~/server/gateway/providerLabels", () => ({
   resolveProviderLabels: async () => new Map(),
@@ -107,17 +122,28 @@ function mockPrisma(budgets: Array<Record<string, unknown>>): PrismaClient {
 function callerFor(budgets: Array<Record<string, unknown>>) {
   return gatewayBudgetsRouter.createCaller({
     ...createInnerTRPCContext({
+      // Not a suite about the second-factor gate. Without this the gate runs
+      // inside the permission middleware, reads the scope's owner from a Prisma
+      // double that has only this router's models, and fails there instead of
+      // here — and only where the deployment switches it on.
+      mfaGate: { offered: () => false },
       session: { user: { id: "usr_1" }, expires: "1" },
     }),
     prisma: mockPrisma(budgets),
   } as any);
 }
 
+/** A bucket's spend, as both wire units, derived from one USD amount. */
+function bucketSpend(usd: string) {
+  const spentNanoUsd = Number(usdToNanoUsd(usd));
+  return { spentNanoUsd, spentUsd: nanoUsdToDecimalString(spentNanoUsd) };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   breakdown.mockResolvedValue([
-    { scopeId: `${ANCHOR_VK_ID}:a`, spentUsd: "1.500000" },
-    { scopeId: `${ANCHOR_VK_ID}:b`, spentUsd: "0.200000" },
+    { scopeId: `${ANCHOR_VK_ID}:a`, ...bucketSpend("1.500000") },
+    { scopeId: `${ANCHOR_VK_ID}:b`, ...bucketSpend("0.200000") },
   ]);
 });
 
@@ -144,7 +170,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
     expect(budgets[0]?.endUsersOver).toBe(0);
   });
 
-  /** @scenario "Budget list Scope column resolves target name with VK link" */
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("names the virtual key a template anchors on", async () => {
     const { budgets } = await callerFor([template()]).list({
       organizationId: ORG_ID,
@@ -158,7 +184,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
     });
   });
 
-  /** @scenario "Budget list Scope column resolves target name with VK link" */
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("names the project a template anchors on", async () => {
     const { budgets } = await callerFor([
       template({ scopeId: ANCHOR_PROJECT_ID }),

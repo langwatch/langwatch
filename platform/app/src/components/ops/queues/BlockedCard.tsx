@@ -21,7 +21,7 @@ const BLOCKED_ROW_HEIGHT = 36;
 
 export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const blockedQuery = api.ops.getBlockedSummary.useQuery();
   const queuesQuery = api.ops.listQueues.useQuery();
@@ -187,7 +187,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
               variant="line"
               css={{ "& tr:last-child td": { borderBottom: "none" } }}
             >
-              <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
+              <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                 <Table.Row>
                   <Table.ColumnHeader width="60px" textAlign="end">
                     Count

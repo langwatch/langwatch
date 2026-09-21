@@ -1,5 +1,7 @@
+import { TRANSIENT_NETWORK_CODES } from "@langwatch/clickhouse-client";
 import { describe, expect, it, vi } from "vitest";
 import {
+  ClickHouseOverloadedError,
   ClickHouseUnavailableError,
   QueryMemoryExceededError,
 } from "~/server/app-layer/traces/errors";
@@ -350,6 +352,49 @@ describe("categorizeError", () => {
 });
 
 describe("classifyClickHouseError", () => {
+  /**
+   * Shedding exists so a busy platform refuses work instead of queueing it
+   * without limit. That only holds if the refusal is retryable: a job turned
+   * away BECAUSE ClickHouse was busy has to come back, not be dropped.
+   *
+   * The shed signal underneath — a full wait queue, or a wait that expired —
+   * carries no ClickHouse code and matches no transient message fragment, so
+   * classifying by the wrapped reasons alone made every shed statement
+   * CRITICAL. The verdict is on the handled shell, and has to be read there.
+   */
+  describe("when the platform shed the statement rather than queue it", () => {
+    /** @scenario a statement that waits too long is refused, not left waiting */
+    it("returns RECOVERABLE so the job is re-staged, not dropped", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          new Error(
+            "ClickHouse concurrency queue is full (64 waiting). Shedding rather than queueing further.",
+          ),
+        ],
+      });
+
+      expect(classifyClickHouseError(shed)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for an expired wait, whose reason names no ClickHouse code", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          new Error("Aborted while waiting for a ClickHouse concurrency slot."),
+        ],
+      });
+
+      expect(classifyClickHouseError(shed)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("still treats an unrelated handled error by its cause", () => {
+      const notShed = new ClickHouseUnavailableError({
+        reasons: [new Error("some permanent schema problem")],
+      });
+
+      expect(classifyClickHouseError(notShed)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+
   describe("when error has a transient ClickHouse error code", () => {
     it("returns RECOVERABLE for code 202 (TOO_MANY_SIMULTANEOUS_QUERIES)", () => {
       const err = Object.assign(new Error("Too many simultaneous queries"), {
@@ -465,6 +510,80 @@ describe("classifyClickHouseError", () => {
           ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    describe("when the connection died before the server answered", () => {
+      // A worker rollout aborts whatever ClickHouse work the pod was holding.
+      // The driver reports that as `socket hang up` carrying an errno, not a
+      // ClickHouse code — and classifying it CRITICAL dead-lettered the job
+      // instead of re-staging it, blocking the group. Prod, 2026-08-10.
+      /** @scenario A socket hang up is recoverable, not a data-integrity failure */
+      it("returns RECOVERABLE for a socket hang up carrying ECONNRESET", () => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }),
+          ),
+        ).toBe(ErrorCategory.RECOVERABLE);
+      });
+
+      /** @scenario Socket-level failures are recoverable whatever the errno */
+      it.each([
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "EPIPE",
+        "ETIMEDOUT",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "EAI_AGAIN",
+      ])("returns RECOVERABLE for socket errno %s", (code) => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(new Error("request failed"), { code }),
+          ),
+        ).toBe(ErrorCategory.RECOVERABLE);
+      });
+
+      // Both message forms, because they come from different layers: "socket
+      // hang up" is Node's http module, "other side closed" is undici's.
+      // Either is all that survives an error that crossed a worker or
+      // serialisation boundary and lost its errno.
+      /** @scenario A socket failure that survived only as a message is still recoverable */
+      it.each([
+        "socket hang up",
+        "other side closed",
+      ])("returns RECOVERABLE for a bare %j message with no code", (message) => {
+        expect(classifyClickHouseError(new Error(message))).toBe(
+          ErrorCategory.RECOVERABLE,
+        );
+      });
+
+      // The shared client owns the retry policy for reads; this classifier
+      // owns it for queued jobs. They read the same failures, so a code the
+      // client retries must not be one this classifier dead-letters.
+      /** @scenario The queue classifier agrees with the ClickHouse client's classifier */
+      it("agrees with every socket code the shared ClickHouse client retries", () => {
+        for (const code of TRANSIENT_NETWORK_CODES) {
+          expect(
+            classifyClickHouseError(
+              Object.assign(new Error("request failed"), { code }),
+            ),
+          ).toBe(ErrorCategory.RECOVERABLE);
+        }
+      });
+
+      /** @scenario A genuine data error is still critical */
+      it("returns CRITICAL for an unknown-table error", () => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(
+              new Error(
+                "Code: 60. DB::Exception: Table default.nope does not exist. (UNKNOWN_TABLE)",
+              ),
+              { code: "60" },
+            ),
+          ),
+        ).toBe(ErrorCategory.CRITICAL);
+      });
     });
   });
 

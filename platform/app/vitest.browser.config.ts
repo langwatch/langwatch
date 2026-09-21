@@ -1,5 +1,5 @@
-import { join } from "path";
 import { playwright } from "@vitest/browser-playwright";
+import { join } from "path";
 import { defineConfig } from "vitest/config";
 
 /**
@@ -32,6 +32,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Browser build of the generated Prisma client — same reason as the
+      // matching alias in vite.config.ts (client.ts pulls the node runtime).
+      "~/generated/prisma/client": join(
+        __dirname,
+        "./src/generated/prisma/browser.ts",
+      ),
       "~/": join(__dirname, "./src/"),
       "@ee/": join(__dirname, "./ee/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),

@@ -157,7 +157,10 @@ describe("ProcessWakeWorker", () => {
       worker.start();
       await vi.advanceTimersByTimeAsync(0);
       expect(handleWake).toHaveBeenCalledTimes(2);
-      expect(logger.error).toHaveBeenCalledTimes(1);
+      // Warning, not error: the wake is retried on the next poll, which the
+      // log line says in as many words.
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.error).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(100);
       expect(handleWake).toHaveBeenCalledTimes(3);

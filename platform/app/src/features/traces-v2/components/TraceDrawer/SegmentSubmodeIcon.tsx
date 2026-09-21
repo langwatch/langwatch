@@ -16,14 +16,14 @@ interface SegmentSubmodeIconProps {
 }
 
 /**
- * Embedded toggle icon rendered *inside* an active `<SegmentedToggle>`
- * pill — same pattern as the × clear button inside a search-bar token.
- * Used to expose a sub-mode (rendered/source markdown, thread/bubbles
- * chat) without growing a second standalone toggle row.
+ * Embedded toggle icon rendered *inside* a `<FormatSelect>` pill — same
+ * pattern as the × clear button inside a search-bar token. Used to expose
+ * a sub-mode (rendered/source markdown, thread/bubbles chat) without
+ * growing a second standalone toggle row.
  *
- * Stays compact so the host segment's pill keeps its baseline height,
- * and stops click propagation so tapping the icon doesn't re-fire the
- * outer segment's onClick.
+ * Stays compact so the host pill keeps its baseline height, and stops
+ * click propagation so tapping the icon doesn't re-fire the pill's own
+ * onClick.
  */
 export function SegmentSubmodeIcon({
   icon,

@@ -3,7 +3,7 @@ import type {
   PlanTypes as PrismaPlanTypes,
   SubscriptionStatus as PrismaSubscriptionStatus,
   Subscription,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type {
   CancelledSubscription,
   SubscriptionRepository,

@@ -67,7 +67,7 @@ describe("toReportTraceRow", () => {
       item: makeItem({ traceId: "trace-abc" }),
       projectUrl: PROJECT_URL,
     });
-    expect(row.url).toBe(`${PROJECT_URL}/messages/trace-abc`);
+    expect(row.url).toBe(`${PROJECT_URL}/traces/trace-abc`);
   });
 });
 

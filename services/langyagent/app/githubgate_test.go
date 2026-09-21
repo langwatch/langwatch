@@ -20,6 +20,37 @@ func toolEndFrame(t *testing.T, command string, isError bool, output string) fra
 	return f
 }
 
+// The same settled command, run by a `local_*` tool: it ran in the developer's
+// own folder, on their own machine, with their own git and gh credentials.
+func localToolEndFrame(t *testing.T, name, command string) frames.Frame {
+	t.Helper()
+	input, err := json.Marshal(map[string]string{"command": command})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := frames.ToolEnd("call-1", name, input, false, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// The shell named `bash`, delegated to the developer's folder while one is
+// connected: the frame carries the worker's local marker instead of a local_
+// name.
+func folderBashEndFrame(t *testing.T, command string) frames.Frame {
+	t.Helper()
+	input, err := json.Marshal(map[string]string{"command": command})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := frames.ToolEndLocal("call-1", "bash", input, false, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
 func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 	t.Helper()
 	input, err := json.Marshal(map[string]string{"command": command})
@@ -33,13 +64,73 @@ func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 	return f
 }
 
+// A command that ran in the folder the developer shared reaches GitHub with
+// THEIR credentials, so the GitHub App has no part in it and the gate must
+// stand down. Without this a plain `git fetch origin` on the local-control path
+// kills the turn with an install card nobody can act on.
+func TestGithubGate_LocalToolNeverTrips(t *testing.T) {
+	t.Run("when the command ran on the developer's own machine", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(localToolEndFrame(t, "local_bash",
+			"git fetch origin && git checkout -b langy/tracing origin/main"))
+		gate.Observe(localToolEndFrame(t, "local_bash",
+			"gh pr create --base main --title tracing --body adds tracing"))
+
+		if _, _, tripped := gate.Tripped(); tripped {
+			t.Fatal("the gate tripped on a command that ran in the developer's own folder")
+		}
+		if canceled {
+			t.Error("the gate canceled a stream it had no business stopping")
+		}
+	})
+}
+
+// The same push through the shell named `bash`: while a folder is connected
+// the worker delegates it to the developer's machine and marks the frame, and
+// the gate reads where the command ran, not what the tool is called. Without
+// the marker the same frame is a sandbox push and trips as it always did.
+func TestGithubGate_FolderBashNeverTrips(t *testing.T) {
+	t.Run("when the bash frame carries the local marker", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(folderBashEndFrame(t,
+			"git push -u origin HEAD && gh pr create --base main --title tracing --body-file .langwatch/pr-body.md"))
+
+		if _, _, tripped := gate.Tripped(); tripped {
+			t.Fatal("the gate tripped on a bash command that ran in the developer's folder")
+		}
+		if canceled {
+			t.Error("the gate canceled a stream it had no business stopping")
+		}
+	})
+
+	t.Run("and still trips on the same bash frame with no marker", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(toolEndFrame(t,
+			"git push -u origin HEAD && gh pr create --base main --title tracing --body-file .langwatch/pr-body.md", false, ""))
+
+		_, code, tripped := gate.Tripped()
+		if !tripped || code != codeGithubNotConnected {
+			t.Fatalf("a sandbox push with no credential must trip not-connected, got tripped=%v code=%q", tripped, code)
+		}
+		if !canceled {
+			t.Error("the gate must cancel the stream when it trips")
+		}
+	})
+}
+
 // A settled GitHub-reaching command on a turn with NO credential trips the gate
 // with the vetted not-connected code and cancels the stream — that is the
 // entire promise the worker skill and the client connect card are built on.
 func TestGithubGate_NoCredential(t *testing.T) {
 	t.Run("when a settled tool command reaches for GitHub", func(t *testing.T) {
-		cancelled := false
-		gate := newGithubGate(false, func() { cancelled = true })
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
 
 		gate.Observe(toolEndFrame(t, "gh repo clone acme/service-x -- --depth 1", true,
 			"gh: To use GitHub CLI in automation, set GH_TOKEN"))
@@ -54,7 +145,7 @@ func TestGithubGate_NoCredential(t *testing.T) {
 		if message == "" {
 			t.Error("tripped gate must carry a message")
 		}
-		if !cancelled {
+		if !canceled {
 			t.Error("trip must cancel the stream")
 		}
 	})
@@ -108,8 +199,8 @@ func TestGithubGate_WithCredential(t *testing.T) {
 	})
 
 	t.Run("when the clone 404s on a repo outside the installation", func(t *testing.T) {
-		cancelled := false
-		gate := newGithubGate(true, func() { cancelled = true })
+		canceled := false
+		gate := newGithubGate(true, func() { canceled = true })
 		gate.Observe(toolEndFrame(t, "gh repo clone acme/other-repo", true,
 			"GraphQL: Could not resolve to a Repository with the name 'acme/other-repo'."))
 
@@ -120,7 +211,7 @@ func TestGithubGate_WithCredential(t *testing.T) {
 		if code != "langy_github_repo_not_accessible" {
 			t.Errorf("code = %q, want langy_github_repo_not_accessible", code)
 		}
-		if !cancelled {
+		if !canceled {
 			t.Error("trip must cancel the stream")
 		}
 	})

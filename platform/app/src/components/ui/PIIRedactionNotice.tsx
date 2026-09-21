@@ -21,6 +21,16 @@ export function PIIRedactionNotice({
   content: string | null | undefined;
 }) {
   if (!hasRedactionMarker(content)) return null;
+  return <PIIRedactionAlert />;
+}
+
+/**
+ * The banner itself, for callers that decide on their own that content was
+ * redacted. The conversation view scans every turn it parsed and shows one
+ * banner for the whole thread rather than one per message, so it needs the
+ * copy and the settings link without the single-string detection.
+ */
+export function PIIRedactionAlert() {
   const settingsHref = "/settings/data-privacy";
 
   return (

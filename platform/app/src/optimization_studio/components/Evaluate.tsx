@@ -222,7 +222,7 @@ export function EvaluateModalContent({
   }, [evaluateOn, total, train.length, test.length]);
 
   const canSave = checkCanCommitNewVersion();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
@@ -290,7 +290,6 @@ export function EvaluateModalContent({
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           throw error;
         }
@@ -303,7 +302,6 @@ export function EvaluateModalContent({
           title: "Version ID not found for evaluation",
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }
@@ -411,7 +409,7 @@ export function EvaluateModalContent({
                   disabled={!!isDisabled}
                   loading={
                     isDatasetLoading ||
-                    commitVersion.isLoading ||
+                    commitVersion.isPending ||
                     evaluationState?.status === "waiting"
                   }
                 >

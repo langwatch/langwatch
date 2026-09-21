@@ -12,15 +12,12 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { AgentService } from "~/server/agents/agent.service";
 import { getApp } from "~/server/app-layer/app";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import {
-  classifyScenarioInfraError,
-  encodeScenarioError,
-} from "~/server/scenarios/scenario-infra-error";
+import { prisma } from "~/server/db";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
+import { isTransportLevelScenarioFailure } from "~/server/scenarios/scenario-infra-error";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
 const logger = createLogger("langwatch:scenarios:failure-handler");
@@ -40,33 +37,30 @@ export interface FailureEventParams {
   description?: string;
   /** When true, writes CANCELLED status instead of ERROR */
   cancelled?: boolean;
+  /**
+   * The run's target, carried from the job data. Lets a transport failure on
+   * an HTTP agent whose config carries `devTunnel` be named a dead dev tunnel
+   * instead of a generic connection error.
+   */
+  target?: { type: string; referenceId: string };
 }
 
-function buildFailureResults(params: { cancelled: boolean; error?: string }) {
-  if (params.cancelled) {
-    return {
-      verdict: Verdict.INCONCLUSIVE,
-      reasoning: "Cancelled by user",
-      metCriteria: [],
-      unmetCriteria: [],
-      error: params.error ?? "Cancelled by user",
-    };
-  }
+/** Reads the target agent's config so the devTunnel marker can be checked. */
+export type AgentConfigLookup = (params: {
+  projectId: string;
+  agentId: string;
+}) => Promise<Record<string, unknown> | null>;
 
-  // Turn the raw runner failure (often a multi-line child-process dump) into a
-  // handled error: a stable code + human message + actionable hint. `reasoning`
-  // keeps the plain human sentence for any consumer that reads it as text; the
-  // `error` field carries the encoded envelope so the drawer can render a clean,
-  // actionable message instead of a stack trace.
-  const handled = classifyScenarioInfraError(params.error);
-  return {
-    verdict: Verdict.FAILURE,
-    reasoning: handled.message,
-    metCriteria: [],
-    unmetCriteria: [],
-    error: encodeScenarioError(handled),
-  };
-}
+const defaultAgentConfigLookup: AgentConfigLookup = async ({
+  projectId,
+  agentId,
+}) => {
+  const agent = await AgentService.create(prisma).getById({
+    id: agentId,
+    projectId,
+  });
+  return (agent?.config as Record<string, unknown> | undefined) ?? null;
+};
 
 /**
  * Handles emission of failure events when scenario jobs fail.
@@ -75,8 +69,49 @@ function buildFailureResults(params: { cancelled: boolean; error?: string }) {
  * gets the terminal status and the UI updates via SSE.
  */
 export class ScenarioFailureHandler {
-  static create(): ScenarioFailureHandler {
-    return new ScenarioFailureHandler();
+  private readonly agentConfigLookup: AgentConfigLookup;
+
+  constructor(agentConfigLookup: AgentConfigLookup = defaultAgentConfigLookup) {
+    this.agentConfigLookup = agentConfigLookup;
+  }
+
+  static create(agentConfigLookup?: AgentConfigLookup): ScenarioFailureHandler {
+    return new ScenarioFailureHandler(agentConfigLookup);
+  }
+
+  /**
+   * Whether the failed target is an HTTP agent whose config carries the
+   * `devTunnel` marker. Only consulted for transport-level failures, so the
+   * common failure paths never pay for the agent lookup; a lookup failure
+   * degrades to the generic classification rather than blocking the event.
+   */
+  private async targetHasDevTunnel(
+    params: FailureEventParams,
+  ): Promise<boolean> {
+    if (params.cancelled) return false;
+    if (params.target?.type !== "http") return false;
+    if (!isTransportLevelScenarioFailure(params.error)) return false;
+    try {
+      const config = await this.agentConfigLookup({
+        projectId: params.projectId,
+        agentId: params.target.referenceId,
+      });
+      return (
+        !!config &&
+        typeof config.devTunnel === "object" &&
+        config.devTunnel !== null
+      );
+    } catch (err) {
+      logger.warn(
+        {
+          err,
+          projectId: params.projectId,
+          agentId: params.target.referenceId,
+        },
+        "Could not read the target agent config for dev tunnel classification",
+      );
+      return false;
+    }
   }
 
   /**
@@ -129,6 +164,8 @@ export class ScenarioFailureHandler {
         const timestamp = Date.now();
         span.setAttribute("scenario.run.id", scenarioRunId);
 
+        const targetHasDevTunnel = await this.targetHasDevTunnel(params);
+
         // Dispatch finishRun with ERROR/CANCELLED status
         try {
           await getApp().simulations.finishRun({
@@ -139,6 +176,7 @@ export class ScenarioFailureHandler {
             results: buildFailureResults({
               cancelled: cancelled ?? false,
               error,
+              targetHasDevTunnel,
             }),
           });
           span.setAttribute("result.emitted_run_finished", true);

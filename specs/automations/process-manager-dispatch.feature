@@ -58,17 +58,90 @@ Feature: Automation dispatch on the process-manager substrate
     When the process wakes at the window boundary
     Then exactly one notify-digest intent is written for both traces
 
-  Scenario: Persist matches dispatch immediately and individually
+  # One outbox message per matched trace melted under match storms: each
+  # message paid the full fixed cost (trigger row, claim check, plan cap,
+  # project row) and the dispatcher drains sequentially, so a burst of
+  # matches turned into hours of backlog (issue #7016). Pages keep the
+  # retry independence at the trace level through the per-trace claims.
+  @unit
+  Scenario: Settled persist matches dispatch in bounded pages
     Given an automation that adds matched traces to a dataset
-    When two traces match and their debounce windows elapse
-    Then one persist intent exists per trace
-    And each intent retries independently of the other
+    When many traces match and their debounce windows elapse
+    Then the settled matches dispatch as pages bounded in size
+    And a retry of a page re-runs only the traces not yet claimed
 
+  @unit
+  Scenario: A later settlement round is never swallowed by a completed page
+    Given a page dispatched for a settle round
+    When the same trace matches again in a later settle window
+    Then the later round produces a distinct page message
+
+  @unit
+  Scenario: Two automations that match the same trace keep separate pages
+    Given two automations on one project that add matched traces to a dataset
+    And both match the same trace in the same settle window
+    When the settled matches dispatch
+    Then each automation dispatches its own page
+
+  @unit
+  Scenario: An old single-trace persist intent still dispatches after the paging change
+    Given a pending persist intent written before the paging change
+    When the intent dispatches
+    Then the single trace is dispatched exactly as a one-trace page
+
+  @unit
+  Scenario: A terminal failure for one trace does not fail its page-mates
+    Given a page where one trace's action fails with a non-retryable error
+    When the page dispatches
+    Then the other traces of the page still dispatch and claim
+    And the failed trace is recorded and not retried
+
+  # A claim is written after the action, so a claim write that fails leaves a
+  # side effect that no claim can suppress. Persist dispatch accepts that
+  # duplicate: the page keeps its retry, because a retryable failure that is
+  # never retried loses a dataset row or an annotation-queue item for good,
+  # and a settled trace has no guaranteed next match.
+  @unit
+  Scenario: A failed claim write does not cancel a page-mate's retry
+    Given a page where one trace dispatches but its claim write fails
+    And another trace fails with a retryable error
+    When the page dispatches
+    Then the page is retried for the failed trace
+    And the dispatched trace can run again instead of being lost
+
+  # A retryable failure is rethrown into the outbox, and the outbox redacts an
+  # error message before it logs the attempt. The page's own retry line was the
+  # only place the cause could still be named, and it carried a count alone, so
+  # a page that retried to its attempt ceiling told an operator "one trace
+  # failed" and nothing about why.
+  @unit
+  Scenario: A retrying page names the failure that caused the retry
+    Given a page where one trace fails with a retryable error
+    When the page decides to retry
+    Then the retry record names the failing error type and message
+
+  @unit
+  Scenario: A daily-ceiling breach is reported once per page
+    Given a page whose traces exceed the automation's daily ceiling
+    When the page dispatches
+    Then every refused trace stays dropped
+    And the breach containment runs at most once for the page
+
+  # The flush record is a log line, so it must cost about as much as a log
+  # line. Keying it on a cumulative counter made every entry unique, which
+  # defeated the outbox's own dedup and wrote one durable row per overflowed
+  # match: a single day of one project's storm produced 119,665 rows whose
+  # entire content was "we flushed early again". Keying it on the trigger and
+  # the minute of event time coalesces a storm into at most one row per trigger
+  # per minute, and the payload still carries the running total so the storm
+  # rate is recoverable from any single row.
+  @unit
   Scenario: Pending matches are bounded without losing matches
     Given a match storm larger than the pending-match bound
     When the storm is consumed
     Then the oldest matches are dispatched immediately instead of being dropped
     And the early flush is logged with a count
+    And at most one overflow entry is written per trigger per minute
 
   Scenario: Pending settlement survives queue loss
     Given a trigger match has committed into settlement process state

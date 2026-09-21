@@ -106,7 +106,7 @@ const REQUEST_SETTLE_WINDOW_MS = 30_000;
 const RUNNING_POLL_MS = 5_000;
 
 function TopicClusteringCard({ project }: { project: { id: string } }) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [lastTriggeredAt, setLastTriggeredAt] = useState<number | null>(null);
 
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
@@ -176,7 +176,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
               onClick={() =>
                 triggerClustering.mutate({ projectId: project.id })
               }
-              loading={triggerClustering.isLoading}
+              loading={triggerClustering.isPending}
             >
               Run topic clustering
             </Button>
@@ -231,8 +231,8 @@ function ClusteringStatusCard({
   const status = api.topics.getClusteringStatus.useQuery(
     { projectId },
     {
-      refetchInterval: (data) => {
-        if (data?.isRunInFlight) return RUNNING_POLL_MS;
+      refetchInterval: (query) => {
+        if (query.state.data?.isRunInFlight) return RUNNING_POLL_MS;
         if (
           lastTriggeredAt !== null &&
           Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
@@ -381,8 +381,8 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
   const history = api.topics.getClusteringRunHistory.useQuery(
     { projectId },
     {
-      refetchInterval: (data) =>
-        data?.some((run) => run.outcome === "running")
+      refetchInterval: (query) =>
+        query.state.data?.some((run) => run.outcome === "running")
           ? RUNNING_POLL_MS
           : false,
     },

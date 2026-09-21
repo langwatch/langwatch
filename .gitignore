@@ -140,6 +140,9 @@ uuid
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
 platform/app/e2e/langy/scenario-logs/
 
+# Per-run red-team crescendo reports (langy-redteam.scenario.test.ts)
+platform/app/e2e/langy/redteam-reports/
+
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
 **/.claude/tmp/

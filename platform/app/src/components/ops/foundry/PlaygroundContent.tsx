@@ -46,11 +46,13 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
           flexDirection="column"
           flex={1}
           overflow="hidden"
-          // lazyMount only (no unmountOnExit): the Editor tab renders
-          // SpanEditorPanel, whose Input/Textarea fields are live editing
-          // surfaces for the selected span. Unmounting on tab switch risks
-          // losing in-progress edits, so inactive tabs are only skipped
-          // until first opened, then kept mounted.
+          // lazyMount only (no unmountOnExit): the Editor tab holds a draft
+          // that lives in React rather than the store. SpanEditorPanel's own
+          // fields are controlled straight through to the traceStore on each
+          // keystroke, so those would survive a remount; the one that would
+          // not is AttributeEditor's `newKey`: an attribute name typed but
+          // not yet committed with Add. Inactive tabs are therefore only
+          // skipped until first opened, then kept mounted.
           lazyMount
         >
           <Tabs.List

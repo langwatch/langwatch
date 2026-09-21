@@ -24,11 +24,23 @@ export type PlanInfo = {
   maxMessagesPerMonth: number;
   canPublish: boolean;
   /**
-   * Webhook endpoints platform (signed outbound event delivery). Enterprise
-   * feature: absent/false on free, PRO, and GROWTH plans; enterprise
-   * licenses and subscriptions carry true.
+   * Webhook endpoints platform (signed outbound event delivery). An
+   * enterprise feature, and the tier is what decides it: absent means the
+   * plan said nothing and its tier answers at resolution
+   * (`planEntitlements.ts`), which is how a contract signed before this
+   * field existed is still entitled. An explicit `false` is a decision and
+   * survives resolution, so a contract may withhold it. Nothing below
+   * enterprise grants it.
    */
   webhookEndpointsEnabled?: boolean;
+  /**
+   * Per-contract override of the daily ceiling on confirmed persist dispatches
+   * an automation may make (dataset rows, annotation-queue items). Absent means
+   * the plan tier's default applies. This is the escape hatch for a customer
+   * whose legitimate volume is above their tier, so raising one account's
+   * ceiling never means loosening it for everyone.
+   */
+  maxTriggerPersistDispatchesPerDay?: number;
   usageUnit?: string;
   userPrice?: {
     USD: number;

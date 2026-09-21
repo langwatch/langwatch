@@ -1,30 +1,24 @@
 /**
  * ClickHouse Analytics Service
  *
- * Implements analytics queries using ClickHouse as the data source.
- * This is the CH equivalent of the ES-based timeseries.ts logic.
+ * Legacy (pre-ADR-034) analytics reads that have no routed replacement:
+ * filter-dropdown options, top-used documents, and feedback events. The
+ * query, the client resolution and the row decoding live in
+ * `LegacyAnalyticsBackendClickHouseRepository`; this service keeps tracing
+ * and the `AnalyticsBackend` contract the app-layer `AnalyticsService`
+ * composes it behind.
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "../../clickhouse/clickhouseClient";
+import type { LegacyAnalyticsBackendRepository } from "~/server/app-layer/analytics/repositories/legacy-analytics-backend.clickhouse.repository";
+import { tryGetApp } from "~/server/app-layer/app";
 import type { FilterField } from "../../filters/types";
-import type { ElasticSearchEvent } from "../../tracer/types";
 import type {
   FeedbacksResult,
   FilterDataResult,
   TimeseriesResult,
   TopDocumentsResult,
 } from "../types";
-import {
-  buildDataForFilterQuery,
-  buildFeedbacksQuery,
-  buildTopDocumentsQuery,
-} from "./aggregation-builder";
 
 /**
  * Default ClickHouse settings applied to all analytics queries.
@@ -56,25 +50,24 @@ export type {
  * Provides analytics queries using ClickHouse.
  */
 export class ClickHouseAnalyticsService {
-  private readonly logger = createLogger("langwatch:analytics:clickhouse");
   private readonly tracer = getLangWatchTracer(
     "langwatch.analytics.clickhouse",
   );
 
   /**
-   * Resolve the ClickHouse client for a given project.
+   * `null` on a deployment without ClickHouse, which is a real configuration
+   * rather than a fault - it fails at the call, with the same message it
+   * always did, instead of at boot.
    */
-  private async resolveClient(
-    projectId: string,
-  ): Promise<ClickHouseClient | null> {
-    return getClickHouseClientForProject(projectId);
-  }
+  constructor(
+    private readonly repository: LegacyAnalyticsBackendRepository | null,
+  ) {}
 
   /**
    * Check if the shared ClickHouse instance is configured (sync, for AnalyticsBackend interface).
    */
   isAvailable(): boolean {
-    return isClickHouseEnabled();
+    return tryGetApp()?.clickhouse.enabled ?? false;
   }
 
   /**
@@ -101,57 +94,21 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getDataForFilter",
       { attributes: { "tenant.id": projectId, "filter.field": field } },
       async (span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
+        if (!this.repository) {
           throw new Error("ClickHouse client not available");
         }
-
-        const { sql, params } = buildDataForFilterQuery(
+        const result = await this.repository.findFilterOptions({
           projectId,
           field,
-          new Date(startDate),
-          new Date(endDate),
+          startDate,
+          endDate,
+          filters,
           key,
           subkey,
           searchQuery,
-          filters,
-        );
-
-        this.logger.debug({ sql, params }, "Executing dataForFilter query");
-
-        try {
-          const result = await clickHouseClient.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-          });
-
-          const rows = (await result.json()) as Array<{
-            field: string;
-            label: string;
-            count: string | number;
-          }>;
-
-          span.setAttribute("result.count", rows.length);
-
-          return {
-            options: rows.map((row) => ({
-              field: row.field,
-              label: row.label,
-              count:
-                typeof row.count === "string"
-                  ? parseInt(row.count, 10)
-                  : row.count,
-            })),
-          };
-        } catch (error) {
-          this.logger.error(
-            { error: error instanceof Error ? error.message : error, sql },
-            "Failed to execute dataForFilter query",
-          );
-          throw error;
-        }
+        });
+        span.setAttribute("result.count", result.options.length);
+        return result;
       },
     );
   }
@@ -176,82 +133,17 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getTopUsedDocuments",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
+        if (!this.repository) {
           throw new Error("ClickHouse client not available");
         }
-
-        const { sql, params } = buildTopDocumentsQuery(
+        const result = await this.repository.findTopDocuments({
           projectId,
-          new Date(startDate),
-          new Date(endDate),
+          startDate,
+          endDate,
           filters,
-        );
-
-        this.logger.debug({ sql, params }, "Executing topDocuments query");
-
-        try {
-          // The query has two parts separated by semicolon
-          const parts = sql.split(";");
-          if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
-            throw new Error(
-              `Expected topDocuments query to have exactly 2 non-empty statements ` +
-                `separated by semicolon, got ${parts.length} parts`,
-            );
-          }
-          const [topDocsSql, totalSql] = parts;
-
-          // Execute both queries
-          const [topDocsResult, totalResult] = await Promise.all([
-            clickHouseClient.query({
-              query: topDocsSql,
-              query_params: params,
-              format: "JSONEachRow",
-              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-            }),
-            clickHouseClient.query({
-              query: totalSql,
-              query_params: params,
-              format: "JSONEachRow",
-              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-            }),
-          ]);
-
-          const topDocs = (await topDocsResult.json()) as Array<{
-            documentId: string;
-            count: string | number;
-            traceId: string;
-            content?: string;
-          }>;
-
-          const totalRows = (await totalResult.json()) as Array<{
-            total: string | number;
-          }>;
-
-          const total = totalRows[0]?.total ?? 0;
-
-          span.setAttribute("document.count", topDocs.length);
-
-          return {
-            topDocuments: topDocs.map((doc) => ({
-              documentId: doc.documentId,
-              count:
-                typeof doc.count === "string"
-                  ? parseInt(doc.count, 10)
-                  : doc.count,
-              traceId: doc.traceId,
-              content: doc.content,
-            })),
-            totalUniqueDocuments:
-              typeof total === "string" ? parseInt(total, 10) : total,
-          };
-        } catch (error) {
-          this.logger.error(
-            { error: error instanceof Error ? error.message : error, sql },
-            "Failed to execute topDocuments query",
-          );
-          throw error;
-        }
+        });
+        span.setAttribute("document.count", result.topDocuments.length);
+        return result;
       },
     );
   }
@@ -276,109 +168,18 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getFeedbacks",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
+        if (!this.repository) {
           throw new Error("ClickHouse client not available");
         }
-
-        const { sql, params } = buildFeedbacksQuery(
+        const result = await this.repository.findFeedbackEvents({
           projectId,
-          new Date(startDate),
-          new Date(endDate),
+          startDate,
+          endDate,
           filters,
-        );
-
-        this.logger.debug({ sql, params }, "Executing feedbacks query");
-
-        try {
-          const result = await clickHouseClient.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-          });
-
-          const rows = (await result.json()) as Array<{
-            trace_id: string;
-            event_id: string;
-            started_at: string | number;
-            event_type: string;
-            attributes: Record<string, string>;
-          }>;
-
-          // Convert to ElasticSearchEvent format
-          const events: ElasticSearchEvent[] = rows.map((row) => {
-            const startedAt =
-              typeof row.started_at === "string"
-                ? parseInt(row.started_at, 10)
-                : row.started_at;
-
-            // Parse attributes into metrics and event_details
-            // Handle both plain keys (vote, score) and namespaced keys (event.metrics.vote, metrics.vote)
-            const metrics: Array<{ key: string; value: number }> = [];
-            const eventDetails: Array<{ key: string; value: string }> = [];
-
-            for (const [key, value] of Object.entries(row.attributes)) {
-              // Check for metric keys - both plain and namespaced forms
-              const isVoteKey =
-                key === "vote" ||
-                key === "metrics.vote" ||
-                key === "event.metrics.vote";
-              const isScoreKey =
-                key === "score" ||
-                key === "metrics.score" ||
-                key === "event.metrics.score";
-
-              if (isVoteKey || isScoreKey) {
-                // Use the plain key name for consistency with ES format
-                const metricKey = isVoteKey ? "vote" : "score";
-                metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
-              } else {
-                eventDetails.push({ key, value });
-              }
-            }
-
-            return {
-              event_id: row.event_id,
-              event_type: row.event_type,
-              project_id: projectId,
-              trace_id: row.trace_id,
-              timestamps: {
-                started_at: startedAt,
-                inserted_at: startedAt,
-                updated_at: startedAt,
-              },
-              metrics,
-              event_details: eventDetails,
-            };
-          });
-
-          span.setAttribute("event.count", events.length);
-
-          return { events };
-        } catch (error) {
-          this.logger.error(
-            { error: error instanceof Error ? error.message : error, sql },
-            "Failed to execute feedbacks query",
-          );
-          throw error;
-        }
+        });
+        span.setAttribute("event.count", result.events.length);
+        return result;
       },
     );
   }
-}
-
-/**
- * Singleton instance
- */
-let clickHouseAnalyticsService: ClickHouseAnalyticsService | null = null;
-
-/**
- * Get the ClickHouse analytics service instance
- */
-export function getClickHouseAnalyticsService(): ClickHouseAnalyticsService {
-  if (!clickHouseAnalyticsService) {
-    clickHouseAnalyticsService = new ClickHouseAnalyticsService();
-  }
-  return clickHouseAnalyticsService;
 }

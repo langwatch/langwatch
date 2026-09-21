@@ -36,9 +36,6 @@ export function CopyInput(
             title: `Your browser does not support clipboard access, please copy the ${props.label} manually`,
             type: "error",
             duration: 2000,
-            meta: {
-              closable: true,
-            },
           });
           return;
         }
@@ -49,9 +46,6 @@ export function CopyInput(
             title: `${props.label} copied to your clipboard`,
             type: "success",
             duration: 2000,
-            meta: {
-              closable: true,
-            },
           });
         })();
       }}

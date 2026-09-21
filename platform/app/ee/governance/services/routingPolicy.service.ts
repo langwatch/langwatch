@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { TRPCError } from "@trpc/server";
 /**
  * RoutingPolicyService — admin-defined routing templates that VirtualKeys
  * reference instead of embedding their own fallback chain.
@@ -28,15 +29,26 @@
  * therefore orders deterministically so that even if a concurrent write
  * briefly leaves two defaults at a scope, resolution always returns the
  * most recently set one rather than an arbitrary row.
+ *
+ * Propagation: a policy's contents are folded into every bundle the
+ * materialiser builds for a VK that references it, so an edit has to
+ * reach the running gateway. `update` and `delete` append a
+ * GatewayChangeEvent in the same transaction as the write; the gateway's
+ * /changes long-poll picks it up and evicts the organization's cached
+ * bundles, which re-materialise against the new policy on the next
+ * request. `Options.ConfigTTL` on the gateway is the safety net behind
+ * that, not the path.
  */
 import {
-  Prisma,
+  type Prisma,
   type PrismaClient,
   type RoutingPolicy,
   type RoutingPolicyScope as RoutingPolicyScopeRow,
   RoutingPolicyScopeType,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
+
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { isLatestAlias } from "~/server/modelProviders/latestAliases";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
@@ -88,16 +100,73 @@ export class RoutingPolicyMustHaveScopeError extends Error {
   }
 }
 
+/**
+ * A policy may only name concrete models. A moving name such as
+ * `openai/latest` resolves in the product, never in the gateway: the resolver
+ * looks a model name up literally, so a stored alias would make every request
+ * that reaches it dispatch a model called "latest".
+ *
+ * The editor already writes the concrete id it resolved. This guards the paths
+ * that do not go through the editor.
+ */
+export class RoutingPolicyModelMustBeConcreteError extends Error {
+  readonly code = "routing_policy_model_must_be_concrete" as const;
+  constructor(
+    readonly field: string,
+    readonly value: string,
+  ) {
+    super(
+      `"${value}" names whichever model is newest rather than a specific one, ` +
+        `so it cannot be stored on a routing policy. Use the model id it currently resolves to.`,
+    );
+    this.name = "RoutingPolicyModelMustBeConcreteError";
+  }
+}
+
+/**
+ * Refuses every moving name a policy could carry, across the default model and
+ * every entry in the name mapping, tiers included.
+ */
+function assertModelsAreConcrete({
+  defaultModel,
+  modelAliases,
+}: {
+  defaultModel?: string | null;
+  modelAliases?: Record<string, string>;
+}): void {
+  if (defaultModel && isLatestAlias(defaultModel.trim())) {
+    throw new RoutingPolicyModelMustBeConcreteError(
+      "defaultModel",
+      defaultModel.trim(),
+    );
+  }
+  for (const [from, to] of Object.entries(modelAliases ?? {})) {
+    if (isLatestAlias(to.trim())) {
+      throw new RoutingPolicyModelMustBeConcreteError(
+        `modelAliases.${from}`,
+        to.trim(),
+      );
+    }
+  }
+}
+
 export interface CreateRoutingPolicyInput {
   organizationId: string;
   scopes: RoutingPolicyScopeEntry[];
   name: string;
   description?: string | null;
   modelProviderIds: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   isDefault?: boolean;
+  /**
+   * Model name mapping. The reserved tier names (complex / reasoning / fast)
+   * are ordinary entries in here; see src/utils/modelTierPresets.ts.
+   */
   modelAliases?: Record<string, string>;
+  /**
+   * The model a reserved tier name resolves to when this policy names no
+   * target of its own for it. Concrete model id, never a moving name.
+   */
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
@@ -108,15 +177,17 @@ export interface UpdateRoutingPolicyInput {
   name?: string;
   description?: string | null;
   modelProviderIds?: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   modelAliases?: Record<string, string>;
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
 
 export class RoutingPolicyService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly changeEvents = new ChangeEventRepository(prisma),
+  ) {}
 
   /**
    * List policies in an org, optionally filtered to those selectable
@@ -159,6 +230,12 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * No change event: a policy nothing references yet cannot appear in any
+   * bundle, and `isDefault` is consulted at VK issuance, never by the
+   * materialiser, so the isDefault clearing below cannot change an
+   * already-issued key's bundle either.
+   */
   async create(
     input: CreateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
@@ -168,6 +245,10 @@ export class RoutingPolicyService {
     if (input.modelProviderIds.length === 0) {
       throw new RoutingPolicyMustHaveProviderError();
     }
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     await this.assertModelProvidersBelongToOrg(
       input.organizationId,
       input.modelProviderIds,
@@ -195,12 +276,9 @@ export class RoutingPolicyService {
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
-          modelAllowlist: input.modelAllowlist
-            ? (input.modelAllowlist as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-          strategy: input.strategy ?? "priority",
           isDefault: input.isDefault ?? false,
           modelAliases: (input.modelAliases ?? {}) as Prisma.InputJsonValue,
+          defaultModel: input.defaultModel ?? null,
           policyRules: (input.policyRules ?? {}) as Prisma.InputJsonValue,
           createdById: input.actorUserId,
           updatedById: input.actorUserId,
@@ -216,10 +294,24 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * Edit a policy and tell the gateway about it.
+   *
+   * The event is unconditional rather than gated on which field moved.
+   * Every stored field except `isDefault` reaches a bundle through the
+   * materialiser (the provider chain, the allowlist, the aliases, the
+   * policy rules), and a gate that has to stay in step with that list is
+   * a gate that will one day drop an edit silently. An event costs one
+   * insert and one cold re-materialise per key.
+   */
   async update(
     input: UpdateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     if (input.modelProviderIds !== undefined) {
       if (input.modelProviderIds.length === 0) {
         throw new RoutingPolicyMustHaveProviderError();
@@ -237,20 +329,41 @@ export class RoutingPolicyService {
     if (input.description !== undefined) data.description = input.description;
     if (input.modelProviderIds !== undefined)
       data.modelProviderIds = input.modelProviderIds as Prisma.InputJsonValue;
-    if (input.modelAllowlist !== undefined)
-      data.modelAllowlist = input.modelAllowlist
-        ? (input.modelAllowlist as Prisma.InputJsonValue)
-        : Prisma.JsonNull;
-    if (input.strategy !== undefined) data.strategy = input.strategy;
     if (input.modelAliases !== undefined)
       data.modelAliases = input.modelAliases as Prisma.InputJsonValue;
+    if (input.defaultModel !== undefined)
+      data.defaultModel = input.defaultModel;
     if (input.policyRules !== undefined)
       data.policyRules = input.policyRules as Prisma.InputJsonValue;
 
-    return await this.prisma.routingPolicy.update({
-      where: { id: existing.id },
-      data,
-      include: { scopes: true },
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.routingPolicy.update({
+        where: { id: existing.id },
+        data,
+        include: { scopes: true },
+      });
+      // The gateway reads a VK's revision only as an ETag today, and it
+      // never sends If-None-Match, so nothing consumes this bump yet. It
+      // still has to happen: /internal/gateway/config already answers 304
+      // to a matching If-None-Match, so the day the gateway starts sending
+      // one, a policy edit that left the revision alone would strand every
+      // referencing key on a 304 forever.
+      await tx.virtualKey.updateMany({
+        where: {
+          organizationId: input.organizationId,
+          routingPolicyId: existing.id,
+        },
+        data: { revision: { increment: 1n } },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: input.organizationId,
+          kind: "ROUTING_POLICY_UPDATED",
+          payload: { routingPolicyId: updated.id },
+        },
+        tx,
+      );
+      return updated;
     });
   }
 
@@ -258,6 +371,12 @@ export class RoutingPolicyService {
    * Make `id` the default for its scope tier. Atomic swap: clears the
    * existing default in the same transaction across every scope row
    * the target policy carries.
+   *
+   * No change event: `isDefault` is read by `list` ordering and by
+   * `resolveDefaultForUser` at VK issuance, and by nothing the
+   * materialiser touches. A key already holds the policy id it was issued
+   * against, so swapping which policy is default cannot change any cached
+   * bundle, and evicting the organization for it would be pure churn.
    */
   async setDefault({
     id,
@@ -292,6 +411,19 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * Delete a policy and release the keys that pointed at it.
+   *
+   * The pointer is cleared explicitly rather than left to Prisma's
+   * `onDelete: SetNull`: `relationMode = "prisma"` means the referential
+   * action is emulated by the client with no SQL foreign key behind it,
+   * and it would only reach `routingPolicyId` anyway. `routingMode` has
+   * to move in the same statement, because POLICY without a policy id is
+   * a state the schema says cannot exist and the materialiser has no
+   * chain to build from. Released keys land on FALLBACK_ALL, the mode
+   * whose behaviour is closest to the multi-provider chain the policy was
+   * already giving them; NONE would silently strip their failover.
+   */
   async delete({
     id,
     organizationId,
@@ -300,7 +432,25 @@ export class RoutingPolicyService {
     organizationId: string;
   }): Promise<void> {
     await this.requireOwn(id, organizationId);
-    await this.prisma.routingPolicy.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.virtualKey.updateMany({
+        where: { organizationId, routingPolicyId: id },
+        data: {
+          routingPolicyId: null,
+          routingMode: "FALLBACK_ALL",
+          revision: { increment: 1n },
+        },
+      });
+      await tx.routingPolicy.delete({ where: { id } });
+      await this.changeEvents.append(
+        {
+          organizationId,
+          kind: "ROUTING_POLICY_DELETED",
+          payload: { routingPolicyId: id },
+        },
+        tx,
+      );
+    });
   }
 
   /**

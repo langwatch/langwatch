@@ -12,8 +12,8 @@
  * reaching whatever guard it was written to exercise — which is exactly how
  * several suites came to assert nothing while still reporting green (#6327).
  */
-import type { PrismaClient } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 
 /**
  * Grants a user real admin rights in an organization, and optionally in one

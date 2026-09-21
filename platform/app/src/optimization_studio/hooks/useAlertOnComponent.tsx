@@ -66,7 +66,6 @@ export const useAlertOnComponent = () => {
         type: "error",
         duration: 5000,
         meta: {
-          closable: true,
           // The copyable error id, which is all a customer gets of the
           // technical detail when the failure carried no code.
           traceId,

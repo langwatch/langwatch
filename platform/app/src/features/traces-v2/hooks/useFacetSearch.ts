@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
@@ -62,7 +63,7 @@ export function useFacetSearch({
     {
       enabled: enabled && !!project?.id && !!facetKey,
       staleTime: staleTimeMs,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 

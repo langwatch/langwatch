@@ -48,7 +48,7 @@ export const CopyMonitorDialog = ({
           sourceProjectId,
         });
       }}
-      isLoading={copyMonitor.isLoading}
+      isLoading={copyMonitor.isPending}
       logError={logger.error.bind(logger)}
     />
   );

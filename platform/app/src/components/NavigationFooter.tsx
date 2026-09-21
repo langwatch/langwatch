@@ -55,22 +55,44 @@ const decodeCursor = (scrollId: string | null): CursorInfo | null => {
 };
 
 /**
- * Custom hook for managing messages navigation footer state and logic
+ * How a list walks its pages. Declared by the caller rather than inferred from
+ * the URL, because inferring it is what broke trace pagination: with the mode
+ * read off `!!scrollId`, the first page of a cursor list looked like an offset
+ * list, so "next" from page one wrote a `pageOffset` the trace API does not
+ * read and silently re-served page one (#6808).
  *
- * Handles both cursor-based and offset-based pagination, URL state management,
- * and provides navigation functions.
+ * - `cursor` — keyset paging via `scrollId`. Trace search: offset paging was
+ *   dropped in the ClickHouse migration and a non-zero `pageOffset` is now
+ *   rejected at the boundary.
+ * - `offset` — real `pageOffset` paging, honoured by the server. The
+ *   experiments list pages this way against Prisma `skip`, and is the only
+ *   caller that does. (The audit log renders the footer component but drives
+ *   it from its own offset state and handlers, so the mode never reaches it.)
  */
-export const useMessagesNavigationFooter = () => {
+export type PaginationMode = "cursor" | "offset";
+
+/**
+ * Custom hook for managing navigation footer state and logic.
+ *
+ * @param mode - see {@link PaginationMode}. Defaults to `offset`, which is the
+ *   behaviour every caller had before the mode existed.
+ */
+export const useMessagesNavigationFooter = (
+  mode: PaginationMode = "offset",
+) => {
   const router = useRouter();
+  const isCursorMode = mode === "cursor";
 
   const [totalHits, setTotalHits] = useState<number>(0);
   const [cursorPageNumber, setCursorPageNumber] = useState<number>(1);
   const cursorStackRef = useRef<string[]>([]);
 
-  // Safely parse URL parameters
+  // In cursor mode a stale `pageOffset` in a bookmarked URL is ignored rather
+  // than obeyed: the server rejects a non-zero one, so reading it here would
+  // turn an old shared link into an error instead of a first page.
   const pageOffset = useMemo(
-    () => parseQueryNumber(router.query.pageOffset, 0),
-    [router.query.pageOffset],
+    () => (isCursorMode ? 0 : parseQueryNumber(router.query.pageOffset, 0)),
+    [router.query.pageOffset, isCursorMode],
   );
 
   const pageSize = useMemo(
@@ -78,24 +100,28 @@ export const useMessagesNavigationFooter = () => {
     [router.query.pageSize],
   );
 
-  const urlScrollId = router.query.scrollId as string | null;
-  const useCursorPagination = !!urlScrollId;
+  const urlScrollId = isCursorMode
+    ? (router.query.scrollId as string | null)
+    : null;
 
   const cursorInfo = useMemo(() => decodeCursor(urlScrollId), [urlScrollId]);
   const estimatedTotalPages = Math.ceil(
     totalHits / (cursorInfo?.pageSize || pageSize),
   );
 
-  // Reset cursor state when switching pagination modes
+  // Back at the first page (no cursor in the URL) the walked-cursor stack is
+  // meaningless — drop it so "previous" cannot pop into a stale scroll.
   useEffect(() => {
-    if (!useCursorPagination) {
+    if (!urlScrollId) {
       setCursorPageNumber(1);
       cursorStackRef.current = [];
     }
-  }, [useCursorPagination]);
+  }, [urlScrollId]);
 
   // Build a query object with pagination params, stripping defaults to keep
   // the URL clean and avoid clobbering other params (like saved view filters).
+  // In cursor mode `pageOffset` is stripped and never written back, so an old
+  // link loses it rather than carrying a value the server will reject.
   const buildPaginationQuery = useCallback(
     (overrides: {
       pageOffset?: number;
@@ -115,13 +141,13 @@ export const useMessagesNavigationFooter = () => {
       const size = overrides.pageSize ?? pageSize;
       const scroll = overrides.scrollId;
 
-      if (offset !== 0) query.pageOffset = offset.toString();
+      if (!isCursorMode && offset !== 0) query.pageOffset = offset.toString();
       if (size !== DEFAULT_PAGE_SIZE) query.pageSize = size.toString();
       if (scroll) query.scrollId = scroll;
 
       return query;
     },
-    [router.query, pageOffset, pageSize],
+    [router.query, pageOffset, pageSize, isCursorMode],
   );
 
   /**
@@ -147,28 +173,31 @@ export const useMessagesNavigationFooter = () => {
           undefined,
           { shallow: true },
         );
-      } else if (useCursorPagination) {
-        // In cursor mode but no more results
         return;
-      } else {
-        // Offset-based pagination
-        void router.push(
-          {
-            pathname: router.pathname,
-            query: buildPaginationQuery({
-              pageOffset: pageOffset + pageSize,
-            }),
-          },
-          undefined,
-          { shallow: true },
-        );
       }
+
+      // In cursor mode, no cursor in the response means there is no next page.
+      // The button is disabled in that state, so this is only reachable by a
+      // stale click — and advancing an offset here is exactly the bug: the
+      // trace API would return page one again, silently.
+      if (isCursorMode) return;
+
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({
+            pageOffset: pageOffset + pageSize,
+          }),
+        },
+        undefined,
+        { shallow: true },
+      );
     },
     [
       router,
       pageOffset,
       pageSize,
-      useCursorPagination,
+      isCursorMode,
       urlScrollId,
       buildPaginationQuery,
     ],
@@ -178,10 +207,10 @@ export const useMessagesNavigationFooter = () => {
    * Navigate to the previous page
    */
   const prevPage = useCallback(() => {
-    if (useCursorPagination) {
+    if (isCursorMode) {
       const stack = cursorStackRef.current;
       if (stack.length > 0) {
-        // Pop the previous cursor and navigate to it
+        // Pop the cursor this scroll came from and navigate back to it.
         const previousScrollId = stack.pop()!;
         setCursorPageNumber((prev) => Math.max(1, prev - 1));
         void router.push(
@@ -192,32 +221,36 @@ export const useMessagesNavigationFooter = () => {
           undefined,
           { shallow: true },
         );
-      } else {
-        // No previous cursor — return to page 1 (offset mode)
-        setCursorPageNumber(1);
-        void router.push(
-          {
-            pathname: router.pathname,
-            query: buildPaginationQuery({ pageOffset: 0, scrollId: null }),
-          },
-          undefined,
-          { shallow: true },
-        );
+        return;
       }
-    } else if (pageOffset > 0) {
-      // Offset-based pagination
+
+      // Nothing walked yet — drop the cursor and land on the first page. Keyset
+      // pagination has no way back other than replaying from the start.
+      setCursorPageNumber(1);
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({ scrollId: null }),
+        },
+        undefined,
+        { shallow: true },
+      );
+      return;
+    }
+
+    if (pageOffset > 0) {
       void router.push(
         {
           pathname: router.pathname,
           query: buildPaginationQuery({
-            pageOffset: pageOffset - pageSize,
+            pageOffset: Math.max(0, pageOffset - pageSize),
           }),
         },
         undefined,
         { shallow: true },
       );
     }
-  }, [router, pageOffset, pageSize, useCursorPagination, buildPaginationQuery]);
+  }, [router, pageOffset, pageSize, isCursorMode, buildPaginationQuery]);
 
   /**
    * Change the page size and reset pagination
@@ -230,6 +263,11 @@ export const useMessagesNavigationFooter = () => {
           pathname: router.pathname,
           query: buildPaginationQuery({
             pageSize: size,
+            // Resizing means starting over in BOTH modes: a cursor describes a
+            // position at the old size, and an offset counts rows at the old
+            // size, so keeping either lands the user in the wrong place. In
+            // cursor mode the offset is stripped from the URL anyway, which is
+            // why this is safe to pass unconditionally.
             pageOffset: 0,
             scrollId: null,
           }),
@@ -269,8 +307,10 @@ export const useMessagesNavigationFooter = () => {
       {
         pathname: router.pathname,
         query: buildPaginationQuery({
-          pageOffset: 0,
           pageSize: DEFAULT_PAGE_SIZE,
+          // A new search is a new result set, so neither a cursor nor an offset
+          // into the old one survives it. Same reasoning as changePageSize.
+          pageOffset: 0,
           scrollId: null,
         }),
       },
@@ -281,10 +321,15 @@ export const useMessagesNavigationFooter = () => {
   }, [router.query.query]);
 
   return {
+    mode,
     totalHits,
     pageOffset,
     pageSize,
-    useCursorPagination,
+    // Past the first page of a cursor list the exact item range is unknowable:
+    // such a URL can be opened cold, so the page counter is local state rather
+    // than something derived from the link. The footer says "page N of about M"
+    // there and gives an exact range everywhere else, where it is exact.
+    isPastFirstPage: !!urlScrollId,
     cursorInfo,
     cursorPageNumber,
     estimatedTotalPages,
@@ -299,10 +344,11 @@ export const useMessagesNavigationFooter = () => {
  * Footer component for messages navigation with pagination controls
  */
 export function MessagesNavigationFooter({
+  mode = "offset",
   totalHits,
-  pageOffset,
+  pageOffset = 0,
   pageSize,
-  useCursorPagination = false,
+  isPastFirstPage = false,
   cursorInfo = null,
   cursorPageNumber = 1,
   estimatedTotalPages = 1,
@@ -311,24 +357,47 @@ export function MessagesNavigationFooter({
   changePageSize,
   scrollId,
 }: {
+  /** See {@link PaginationMode}. Decides which controls mean anything here. */
+  mode?: PaginationMode;
   totalHits: number;
-  pageOffset: number;
+  pageOffset?: number;
   pageSize: number;
-  useCursorPagination?: boolean;
+  /**
+   * True once a cursor list has walked past its first page. Offset lists leave
+   * it false and are described by `pageOffset` alone.
+   */
+  isPastFirstPage?: boolean;
   cursorInfo?: CursorInfo | null;
   cursorPageNumber?: number;
   estimatedTotalPages?: number;
   nextPage: (currentResponseScrollId?: string | null) => void;
   prevPage: () => void;
   changePageSize: (size: number) => void;
+  /**
+   * Cursor for the NEXT page, from the current response. Present only for
+   * cursor lists, where its absence is how "nothing follows this" is said.
+   */
   scrollId?: string | null;
 }) {
-  if (totalHits === 0 && pageOffset === 0 && !useCursorPagination) return null;
+  if (totalHits === 0 && pageOffset === 0 && !isPastFirstPage) return null;
 
-  const isPrevDisabled = useCursorPagination
-    ? cursorPageNumber <= 1
-    : pageOffset === 0;
-  const isNextDisabled = useCursorPagination
+  const isCursorMode = mode === "cursor";
+
+  // A cursor URL can be opened cold — shared, bookmarked, or refreshed — and
+  // the walked-cursor stack only exists in the session that walked it. Keying
+  // "previous" on the counter left that user with a dead button on a page they
+  // could plainly see was not the first. It is keyed on the cursor in the URL
+  // instead: with nothing walked, `prevPage` drops the cursor and returns to
+  // the first page, which is the only place keyset paging can go back to.
+  const isPrevDisabled = isCursorMode ? !isPastFirstPage : pageOffset === 0;
+  // Cold-opened, the counter says 1 while the list shows some later page, so
+  // the position is genuinely unknown rather than known-to-be-one. Saying so is
+  // better than printing a number we would be inventing.
+  const isPositionUnknown = isPastFirstPage && cursorPageNumber <= 1;
+  // A cursor list is out of pages when the response carried no cursor — which
+  // is also true on its first page, so this cannot be keyed on having walked
+  // past page one. An offset list is out when the window reaches the total.
+  const isNextDisabled = isCursorMode
     ? !scrollId
     : pageOffset + pageSize >= totalHits;
 
@@ -357,8 +426,10 @@ export function MessagesNavigationFooter({
 
       <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
-          {useCursorPagination
-            ? `Page ${cursorPageNumber} of ~${estimatedTotalPages} (${totalHits} total items)`
+          {isCursorMode && isPastFirstPage
+            ? isPositionUnknown
+              ? `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`
+              : `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`
             : `${pageOffset + 1}-${Math.min(
                 pageOffset + pageSize,
                 totalHits,

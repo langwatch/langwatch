@@ -8,7 +8,8 @@
  * wrapped in a bordered container, by executing the real render path.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -21,6 +22,21 @@ vi.mock("../../../hooks/useTextTranslation", () => ({
     isLoading: false,
     toggle: () => undefined,
   }),
+}));
+
+// The toolbar checks the annotation permission and reads the field's
+// comments; neither matters to container chrome.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1" },
+    hasPermission: () => false,
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    useQueries: () => [],
+  },
 }));
 
 import { IOViewer } from "../IOViewer";
@@ -48,12 +64,18 @@ function nearestBorderedAncestor(node: HTMLElement | null): HTMLElement | null {
 
 describe("IOViewer Markdown container", () => {
   describe("given Markdown-looking content rendered in the Markdown view", () => {
-    it("wraps the rendered Markdown body in a bordered container", () => {
+    it("wraps the rendered Markdown body in a bordered container", async () => {
+      const user = userEvent.setup();
       render(<IOViewer label="Output" content={MARKDOWN} />, { wrapper });
 
-      // Toggle from the default Pretty view to Markdown (defaults to the
-      // rendered submode). The toggle button label is the format name.
-      fireEvent.click(screen.getByRole("button", { name: /^markdown$/i }));
+      // Switch from the default Pretty view to Markdown (defaults to the
+      // rendered submode) through the format selector's menu.
+      await user.click(
+        screen.getByRole("button", { name: "Output view format" }),
+      );
+      await user.click(
+        await screen.findByRole("menuitem", { name: "Markdown" }),
+      );
 
       // The heading renders as real Markdown (an <h1>), proving we're on the
       // rendered path and not the flush raw-text fallback.

@@ -27,13 +27,13 @@ import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/act
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -259,7 +259,7 @@ describe("license-gate on governance backend", () => {
         // never fires for a caller without permission.
         await expect(
           callerFor(memberUserId).anomalyRules.list({ organizationId }),
-        ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
       });
     });
 

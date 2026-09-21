@@ -30,6 +30,10 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
+				if reason := guardrailsNotApplicable(call.Request.Type); reason != "" {
+					stampGuardrailsNotApplied(call, reason)
+					return next(ctx, call)
+				}
 
 				if err := call.MaterializeBody(); err != nil {
 					return nil, err
@@ -68,6 +72,10 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
+				if reason := guardrailsNotApplicable(call.Request.Type); reason != "" {
+					stampGuardrailsNotApplied(call, reason)
+					return next(ctx, call)
+				}
 
 				verdict, err := pre(ctx, call.Bundle, call.Request)
 				if blockErr := guardrailOutcome(ctx, guardrailOutcomeInput{
@@ -93,6 +101,27 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 			}
 		},
 	}
+}
+
+// guardrailsNotApplicable names the request types a guardrail cannot judge,
+// and why, or "" for every type it can.
+//
+// A realtime session mint carries a session declaration, not a prompt, and
+// the conversation itself never passes through the gateway. Running the
+// key's guardrails against that body would pass a check on content nobody
+// spoke yet and report protection over a socket the gateway cannot see. The
+// caller is told so on the response, because a silently skipped guardrail is
+// the failure that looks exactly like a working one.
+func guardrailsNotApplicable(t domain.RequestType) string {
+	if t == domain.RequestTypeRealtimeSession {
+		return "realtime_session"
+	}
+	return ""
+}
+
+// stampGuardrailsNotApplied records the skip for the response header.
+func stampGuardrailsNotApplied(call *Call, reason string) {
+	call.Meta.Update(func(m *Meta) { m.GuardrailsNotApplied = reason })
 }
 
 type guardrailOutcomeInput struct {

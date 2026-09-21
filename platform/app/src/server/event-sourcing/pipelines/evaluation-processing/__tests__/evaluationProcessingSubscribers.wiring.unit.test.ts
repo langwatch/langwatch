@@ -61,10 +61,10 @@ function buildPipeline() {
 
 describe("evaluation processing pipeline subscriber wiring", () => {
   describe("given the triggerMatch subscriber", () => {
-    it("registers as a fold reactor on evaluationRun with a 10s delay and 30s dedup ttl", () => {
+    it("registers as a fold subscriber on evaluationRun with a 10s delay and 30s dedup ttl", () => {
       const { pipeline } = buildPipeline();
 
-      const entry = pipeline.foldReactors.get("triggerMatch");
+      const entry = pipeline.foldSubscribers.get("triggerMatch");
       expect(entry?.projectionName).toBe("evaluationRun");
       expect(entry?.definition.options?.delay).toBe(10_000);
       expect(entry?.definition.options?.deduplication?.ttlMs).toBe(30_000);
@@ -72,13 +72,13 @@ describe("evaluation processing pipeline subscriber wiring", () => {
 
     it("reacts only to evaluation completed/reported events", () => {
       const { pipeline } = buildPipeline();
-      const entry = pipeline.foldReactors.get("triggerMatch");
-      const shouldReact = entry?.definition.shouldReact;
+      const entry = pipeline.foldSubscribers.get("triggerMatch");
+      const shouldDispatch = entry?.definition.shouldDispatch;
 
       const context = {} as never;
-      expect(shouldReact?.(completedEvent(), context)).toBe(true);
+      expect(shouldDispatch?.(completedEvent(), context)).toBe(true);
       expect(
-        shouldReact?.(
+        shouldDispatch?.(
           {
             ...completedEvent(),
             type: "lw.evaluation.started",
@@ -90,7 +90,7 @@ describe("evaluation processing pipeline subscriber wiring", () => {
 
     it("delegates to automations.triggerMatchHandler with the committed fold state", async () => {
       const { pipeline, triggerMatchHandler } = buildPipeline();
-      const entry = pipeline.foldReactors.get("triggerMatch");
+      const entry = pipeline.foldSubscribers.get("triggerMatch");
       const event = completedEvent();
       const foldState = {
         evaluationId: "eval-1",

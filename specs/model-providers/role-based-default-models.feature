@@ -106,6 +106,97 @@ Feature: Role-based default models with per-scope overrides
     When I click the row's Edit button
     Then the drawer opens with the feature pre-selected and the Delete CTA enabled
 
+  # ============================================================================
+  # Inherit direction + save integrity in the drawer (customer report,
+  # 2026-08-13: org-scope drawer offered "Inherit (from project)", saving
+  # it 500'd, and each save stacked another org row)
+  # ============================================================================
+
+  @integration
+  Scenario: The inherit entry names the wider scope the value comes from
+    Given the organization has a config with DEFAULT set
+    When I open the drawer for a new config scoped to a project
+    Then the Default selector's first entry reads "Inherit (from organization)" with the org's model underneath
+    And picking it leaves the DEFAULT key out of the saved JSON
+    # Inheritance flows from wide to narrow, never the reverse. The
+    # drawer's inherit entry is built ONLY from the server's cascade
+    # answer for the picked scopes, never from the current project's own
+    # resolved values, which is what produced "Inherit (from project)"
+    # on an org-scoped config.
+
+  @integration
+  Scenario: At organization scope the inherit entry reads "Not configured"
+    When I open the drawer for a new config scoped to the organization
+    Then the Default selector's first entry reads "Not configured" with no model attached
+    And no entry claims a value flows down from a narrower scope
+    # There is nothing above the organization to inherit from. The entry
+    # still exists so an org-scope edit can clear a pinned key back to
+    # absent; it just never claims a value flows down from somewhere.
+
+  @integration
+  Scenario: Save is disabled while a new config carries no model at all
+    When I open the drawer for a new config and pick a scope
+    And every role and feature key is left on its inherit entry
+    Then the save button is disabled
+    # An all-inherit new config is a no-op; saving it used to reach the
+    # backend and surface a raw 500. The backend still refuses it with a
+    # handled validation error as the API-caller backstop.
+
+  @integration
+  Scenario: Saving an edit targets the config row that was opened
+    Given the drawer was opened to edit an existing config
+    When I save before the config list query has settled
+    Then the save is disabled until the target config is loaded
+    And the mutation carries that config's id, never a create
+    And it carries the values the target row was loaded with
+    # Deriving the id from an unsettled query made a slow fetch silently
+    # turn an edit into a create, one more duplicate row.
+
+  @integration
+  Scenario: Retargeting the open drawer to another row saves that row's values
+    Given the drawer is open on one config
+    When the row behind it points the drawer at a different config
+    Then the drawer reloads the new row's values
+    And saving writes the new row's values, never the first row's
+    # The drawer is not modal and it is rendered without a key, so the
+    # pencil behind it swaps the target on the same mount. Hydrating
+    # only once would carry the first row's models onto the second.
+
+  @integration
+  Scenario: Editing every key to Inherit tells the user the config was removed
+    Given the drawer was opened to edit an existing config
+    When I set every key to its inherit entry and save
+    Then the toast says the config was removed
+    # The backend deletes an all-inherit config (see
+    # model-default-config-cascade.feature); toasting "Config updated"
+    # while the row disappears reads as data loss.
+
+  @integration
+  Scenario: A cache refresh that fails after the write still reads as saved
+    Given the drawer saved a config
+    When the follow-up cache refresh fails
+    Then the toast still says the config was saved
+    And no error is shown for a write that landed
+    # Saving also refreshes the default-model caches and re-points Langy's
+    # model pill. That refresh runs after the write; a failure there is a
+    # stale open panel, never a failed save.
+
+  @integration
+  Scenario: Adding a config for a scope that already has one says it will replace it
+    Given the organization already has a config
+    When I open the drawer for a new config and pick the organization scope
+    Then a note under the scope picker says the organization's current config will be replaced on save
+
+  @unit
+  Scenario: Config cells resolve inherited values only from the row's own scope chain
+    Given a config attached to project "web-app" in team "Platform"
+    And a config attached to team "Research" carrying FAST
+    When the web-app row's FAST cell resolves its display value
+    Then the Research team's config is not consulted
+    # The cell's cascade walk must match the server resolver's chain:
+    # project → its own team → its own organization. Matching any team's
+    # config displayed values the runtime would never serve.
+
   @integration
   Scenario: Deleting a config via the row menu removes the row
     Given an existing override row in the Default Models table

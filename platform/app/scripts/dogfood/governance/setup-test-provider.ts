@@ -69,9 +69,7 @@ async function main(): Promise<void> {
         },
         name: "developer-default",
         isDefault: true,
-        strategy: "priority",
         modelProviderIds: [providerId],
-        modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
       },
     });
     console.log(

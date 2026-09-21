@@ -10,6 +10,8 @@ import {
   redactSessionJsonl,
   truncateJsonlToByteBudget,
 } from "../../internal/generated/redaction/sessionReport";
+import { normalizeEndpoint } from "../../internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 declare const __CLI_VERSION__: string;
 
@@ -180,12 +182,12 @@ export const reportCommand = async (
     };
   }
 
-  const endpoint = (options.endpoint ?? getEndpoint()).replace(/\/+$/, "");
+  const endpoint = normalizeEndpoint(options.endpoint ?? getEndpoint());
   const apiKey = process.env.LANGWATCH_API_KEY?.trim();
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/bug-reports`, {
+    response = await langwatchFetch(`${endpoint}/api/bug-reports`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

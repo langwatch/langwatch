@@ -70,6 +70,8 @@ def test_prompts_get_falls_back_to_api_when_no_local_file(
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
+            "parameters": {},
         }
 
         with patch("httpx.Client.request") as mock_request:

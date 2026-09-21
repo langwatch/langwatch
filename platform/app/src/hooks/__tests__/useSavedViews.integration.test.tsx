@@ -75,7 +75,7 @@ vi.mock("../../utils/api", () => ({
         useMutation: (...args: unknown[]) => mockUseMutation(...args),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       savedViews: {
         getAll: {
           invalidate: vi.fn(),

@@ -1,15 +1,21 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import { isNativeSocialProvider } from "@ee/sso/providers";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { APIError } from "better-auth/api";
 import {
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { APIError } from "better-auth/api";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -85,6 +91,160 @@ export const beforeUserCreate = async ({
 };
 
 /**
+ * The organization-scoped grant that comes with a default membership.
+ * Idempotent by construction: an identical row already present is skipped,
+ * so calling this twice grants nothing twice, and calling it after a
+ * membership row turned up on its own is the repair.
+ */
+const grantDefaultOrgMembership = ({
+  writer,
+  organizationId,
+  userId,
+}: {
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  userId: string;
+}) =>
+  writer.attachBindings({
+    organizationId,
+    bindings: [
+      {
+        bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        principal: { userId },
+        role: TeamUserRole.MEMBER,
+        customRoleId: null,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    ],
+    // The signup is the product acting on a domain rule, not an
+    // administrator granting access.
+    actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
+    onDuplicate: "skip",
+  });
+
+/**
+ * Success-side announcements once the membership landed: the log line, the
+ * Slack signup event (fire-and-forget), and the nurturing calls.
+ */
+const announceSsoAutoJoin = ({
+  user,
+  org,
+  inviteId,
+}: {
+  user: { id: string; email: string; name: string };
+  org: { id: string; name: string };
+  inviteId: string | null;
+}): void => {
+  logger.info(
+    { userId: user.id, organizationId: org.id, inviteId },
+    inviteId
+      ? "Applied pending invite on SSO signup"
+      : "Auto-added new user to SSO organization (default MEMBER)",
+  );
+
+  void getApp()
+    .notifications.sendSlackSignupEvent({
+      userName: user.name,
+      userEmail: user.email,
+      organizationName: org.name,
+    })
+    .catch(captureException);
+
+  fireSsoAutoAddNurturingCalls({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    organizationId: org.id,
+    organizationName: org.name,
+  });
+};
+
+/**
+ * Membership + grant for one domain-matched organization. A pending invite
+ * wins when one exists (its role and team assignments carry their own
+ * grants); otherwise the default MEMBER membership plus the organization-
+ * scoped grant beside it. P2002 on the membership means a concurrent OAuth
+ * callback or a retry created the row first — treated as success, with the
+ * grant re-asserted rather than assumed, because the concurrent callback
+ * may have died between the two writes.
+ */
+const joinSsoOrganization = async ({
+  prisma,
+  writer,
+  user,
+  org,
+}: {
+  prisma: PrismaClient;
+  writer: GrantsLedgerWriter;
+  user: { id: string; email: string; name: string };
+  org: { id: string; name: string };
+}): Promise<void> => {
+  const pendingInvite = await InviteService.create(
+    prisma,
+  ).findPendingByOrgAndEmail({
+    organizationId: org.id,
+    email: user.email,
+  });
+
+  if (pendingInvite) {
+    await InviteService.create(prisma).applyInvite({
+      userId: user.id,
+      invite: pendingInvite,
+    });
+    announceSsoAutoJoin({ user, org, inviteId: pendingInvite.id });
+    return;
+  }
+
+  // The membership row is not a grant fact and keeps its imperative
+  // write; the organization-scoped grant that comes with it is a ledger
+  // command, emitted once the membership exists (ADR-092).
+  try {
+    await prisma.organizationUser.create({
+      data: {
+        userId: user.id,
+        organizationId: org.id,
+        role: "MEMBER",
+      },
+    });
+  } catch (err) {
+    // P2002 (unique constraint) on THIS insert means another concurrent
+    // OAuth callback or a retry already created this membership. Idempotent
+    // success. The catch guards the membership write alone — a P2002 from
+    // any other constraint (an applied invite's rows, the grant below) is a
+    // real failure and propagates instead of being logged as an
+    // already-present membership.
+    if (
+      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+      err.code !== "P2002"
+    ) {
+      throw err;
+    }
+    logger.info(
+      { userId: user.id, organizationId: org.id },
+      "Auto-add SSO membership was already present (P2002) — treating as success",
+    );
+    // The membership row existing says nothing about the grant beside it:
+    // the concurrent callback that created it may have died in between,
+    // and the two writes no longer share a transaction. Re-assert, which
+    // is a no-op when the other attempt finished.
+    await grantDefaultOrgMembership({
+      writer,
+      organizationId: org.id,
+      userId: user.id,
+    });
+    return;
+  }
+
+  await grantDefaultOrgMembership({
+    writer,
+    organizationId: org.id,
+    userId: user.id,
+  });
+  announceSsoAutoJoin({ user, org, inviteId: null });
+};
+
+/**
  * Called after a new user is created. Fires the `signed_up` analytics event
  * for every new user (fire-and-forget, no-op without POSTHOG_KEY), then, if
  * the user's email domain matches an organization with ssoDomain,
@@ -98,12 +258,16 @@ export const beforeUserCreate = async ({
  *     looking unused.
  *   - Otherwise, fall back to the default behavior and add them as MEMBER.
  *
- * OrganizationUser + RoleBinding writes are wrapped in a single transaction
- * so a partial failure can't leave the user "in the org" with no RoleBinding
- * (which would look like org membership to legacy code but give zero access
- * under RBAC).
+ * The OrganizationUser row and the grant that comes with it can no longer
+ * share a transaction: the membership is a table write and the grant is a
+ * ledger command (ADR-092 delivery-plan PR 2). What replaces the transaction
+ * is a re-assert — the grant write is idempotent, and the P2002 path in
+ * `joinSsoOrganization`, which is a concurrent callback or a retry, runs it
+ * again rather than assuming the other attempt got that far. Otherwise the
+ * user is left "in the org" with no grant: org membership to legacy code,
+ * zero access under RBAC.
  *
- * Outer catch: the whole auto-add is best-effort. If the transaction fails
+ * Outer catch: the whole auto-add is best-effort. If the write fails
  * outright (transient DB issue, concurrent signup we didn't catch via P2002),
  * we LOG and SWALLOW so the signup itself still succeeds — failing would
  * orphan the user (the User row was just committed by the preceding Prisma
@@ -123,9 +287,12 @@ export const beforeUserCreate = async ({
 export const afterUserCreate = async ({
   prisma,
   user,
+  writer = grantsLedgerWriter(),
 }: {
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
+  /** Injectable so a test can watch the seam without a module mock. */
+  writer?: GrantsLedgerWriter;
 }): Promise<void> => {
   // Same distinct_id posthog-js identifies with client-side (the user id),
   // so this server event joins the browser person.
@@ -158,90 +325,93 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    const pendingInvite = await InviteService.create(
-      prisma,
-    ).findPendingByOrgAndEmail({
-      organizationId: org.id,
-      email: user.email,
-    });
-
-    try {
-      await prisma.$transaction(async (tx) => {
-        if (pendingInvite) {
-          const txInviteService = InviteService.create(tx);
-          await txInviteService.applyInvite({
-            userId: user.id,
-            invite: pendingInvite,
-          });
-          return;
-        }
-
-        await tx.organizationUser.create({
-          data: {
-            userId: user.id,
-            organizationId: org.id,
-            role: "MEMBER",
-          },
-        });
-        await tx.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: org.id,
-            userId: user.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: org.id,
-          },
-        });
-      });
-
-      logger.info(
-        {
-          userId: user.id,
-          organizationId: org.id,
-          inviteId: pendingInvite?.id ?? null,
-        },
-        pendingInvite
-          ? "Applied pending invite on SSO signup"
-          : "Auto-added new user to SSO organization (default MEMBER)",
-      );
-
-      void getApp()
-        .notifications.sendSlackSignupEvent({
-          userName: user.name,
-          userEmail: user.email,
-          organizationName: org.name,
-        })
-        .catch(captureException);
-
-      fireSsoAutoAddNurturingCalls({
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        organizationId: org.id,
-        organizationName: org.name,
-      });
-    } catch (err) {
-      // P2002 (unique constraint) means another concurrent OAuth callback
-      // or a retry already created this membership. Idempotent success.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === "P2002"
-      ) {
-        logger.info(
-          { userId: user.id, organizationId: org.id },
-          "Auto-add SSO membership was already present (P2002) — treating as success",
-        );
-        return;
-      }
-      throw err;
-    }
+    await joinSsoOrganization({ prisma, writer, user, org });
   } catch (err) {
     logger.error(
       { err, userId: user.id, domain },
       "Failed to auto-add new user to SSO organization (signup still succeeds)",
     );
   }
+};
+
+/** ADR-117 §3's evidence rule, as the port `beforeAccountCreate` asks it
+ *  through. A provider that asserted nothing — no ID token, or no
+ *  `email_verified` beside the address — refuses nothing. */
+type SignInLinkEvidence = {
+  refusalForLink(input: {
+    userId: string;
+    providerId: string;
+    providerAccountId: string;
+    idToken: string | undefined;
+  }): Promise<string | null>;
+};
+
+/**
+ * ADR-117 §3, asked BEFORE the ssoDomain rules in `beforeAccountCreate`,
+ * because this is not one of them: whether the identity provider's evidence
+ * supports attaching this account to this person is a question every
+ * deployment asks, licensed or not, SSO-enforced or not. Silent on every path
+ * that did not carry the evidence to judge.
+ */
+const refuseLinkOnInsufficientEvidence = async ({
+  userId,
+  account,
+  linkEvidence,
+}: {
+  userId: string;
+  account: {
+    userId: string;
+    providerId: string;
+    accountId: string;
+    idToken?: string;
+  };
+  linkEvidence?: SignInLinkEvidence;
+}): Promise<void> => {
+  const refusal = await linkEvidence?.refusalForLink({
+    userId: account.userId,
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    idToken: account.idToken,
+  });
+  if (!refusal) return;
+
+  logger.warn(
+    { userId, providerId: account.providerId, reason: refusal },
+    "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
+  );
+  // APIError so better-auth carries the code into the callback redirect, where
+  // /auth/error renders the copy registered for it.
+  throw APIError.from("FORBIDDEN", {
+    code: "LINK_NEEDS_APPROVAL",
+    message: "LINK_NEEDS_APPROVAL",
+  });
+};
+
+/**
+ * Whether a provider that does not match the organization's is refused
+ * outright, or only soft-flagged — and which rule decided, for the log line
+ * an operator reads when somebody reports being turned away.
+ *
+ * The account count is asked only where it can change the answer: a native
+ * provider is refused whoever is pressing it, so the query is one this path
+ * stops making rather than makes and ignores.
+ */
+const wrongProviderVerdict = async ({
+  prisma,
+  userId,
+  providerId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  providerId: string;
+}): Promise<{ shouldRefuse: boolean; rule: string }> => {
+  if (isNativeSocialProvider(providerId)) {
+    return { shouldRefuse: true, rule: "native_social_provider" };
+  }
+  const existingAccountCount = await prisma.account.count({
+    where: { userId },
+  });
+  return { shouldRefuse: existingAccountCount === 0, rule: "first_account" };
 };
 
 /**
@@ -258,7 +428,12 @@ export const afterUserCreate = async ({
  *   SSO isn't configured.
  * - existing user + SSO org + correct provider → set pendingSsoSetup=false and
  *   remove stale accounts for this provider that have a different providerAccountId
- * - existing user + SSO org + wrong provider → set pendingSsoSetup=true,
+ * - any user + SSO org + a NATIVE social provider → HARD BLOCK. These buttons
+ *   (Google, GitHub, Microsoft) mount beside the broker rather than through
+ *   it, so no existing member's way in runs through one and refusing locks
+ *   nobody out. Admitting one would give an organization that enforces single
+ *   sign-on a second door, outside the identity provider it deprovisions in.
+ * - existing user + SSO org + wrong BROKERED provider → set pendingSsoSetup=true,
  *   DO NOT hard-block (we let them in so existing users aren't locked out
  *   during a migration), banner is shown in DashboardLayout
  * - no SSO org → let BetterAuth handle account creation normally
@@ -266,13 +441,18 @@ export const afterUserCreate = async ({
 export const beforeAccountCreate = async ({
   prisma,
   account,
+  linkEvidence,
 }: {
   prisma: PrismaClient;
   account: {
     userId: string;
     providerId: string;
     accountId: string;
+    idToken?: string;
   };
+  /** ADR-117 §3's evidence rule. Optional so the many tests that predate it
+   *  keep exercising the SSO-domain behaviour below unchanged. */
+  linkEvidence?: SignInLinkEvidence;
 }): Promise<void> => {
   const user = await prisma.user.findUnique({
     where: { id: account.userId },
@@ -289,6 +469,12 @@ export const beforeAccountCreate = async ({
       message: "USER_DEACTIVATED",
     });
   }
+
+  await refuseLinkOnInsufficientEvidence({
+    userId: user.id,
+    account,
+    linkEvidence,
+  });
 
   // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
   // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
@@ -329,21 +515,23 @@ export const beforeAccountCreate = async ({
     return;
   }
 
-  // Wrong provider for this SSO org. Determine whether this is a first-time
-  // signup (hard block) or an existing user trying a different provider
-  // (soft block via pendingSsoSetup banner).
+  // Wrong provider for this SSO org.
   if (account.providerId !== "credential" && org.ssoProvider) {
-    const existingAccountCount = await prisma.account.count({
-      where: { userId: user.id },
+    const { shouldRefuse, rule } = await wrongProviderVerdict({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
     });
-    if (existingAccountCount === 0) {
+
+    if (shouldRefuse) {
       logger.warn(
         {
           userId: user.id,
           attemptedProvider: account.providerId,
           orgSsoProvider: org.ssoProvider,
+          rule,
         },
-        "Blocked new signup: provider does not match SSO-enforced org",
+        "Refused sign-in: provider does not match SSO-enforced org",
       );
       // Throw APIError so BetterAuth surfaces the specific code in the
       // callback redirect (?error=SSO_PROVIDER_NOT_ALLOWED), which the
@@ -428,6 +616,60 @@ export const afterAccountCreate = async ({
 };
 
 /**
+ * The refusal `beforeAccountCreate` makes, on the path it cannot see.
+ *
+ * better-auth writes an `Account` row the first time a provider is linked and
+ * only UPDATES it on every sign-in after (`handleOAuthUserInfo` takes the
+ * `updateAccount` branch once a row matches the issuer and subject). A guard
+ * that lives on the create path alone therefore closes the door to NEW links
+ * while every link already made keeps letting its holder in — including the
+ * ones the old soft block wrote before this rule existed.
+ *
+ * Native providers only, exactly as on the create path: a brokered sign-in on
+ * the wrong connection is the mid-migration member the soft flag is for.
+ */
+const refuseNativeProviderOnSignIn = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  if (!isNativeSocialProvider(account.providerId)) return;
+  if (!(await platformSSOAllowed())) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: account.userId },
+    select: { email: true },
+  });
+  const domain = extractEmailDomain(user?.email);
+  if (!domain) return;
+
+  const org = await prisma.organization.findUnique({
+    where: { ssoDomain: domain },
+  });
+  // A `ssoProvider` the account already matches is this organization's own
+  // door — an organization pinned to `google` signs in with Google, and
+  // `isSsoProviderMatch` is what says so.
+  if (!org?.ssoProvider || isSsoProviderMatch(org, account)) return;
+
+  logger.warn(
+    {
+      userId: account.userId,
+      attemptedProvider: account.providerId,
+      orgSsoProvider: org.ssoProvider,
+      rule: "native_social_provider",
+      path: "account_update",
+    },
+    "Refused sign-in: provider does not match SSO-enforced org",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "SSO_PROVIDER_NOT_ALLOWED",
+    message: "SSO_PROVIDER_NOT_ALLOWED",
+  });
+};
+
+/**
  * Called after an existing Account row is updated. On an OAuth sign-in via
  * `handleOAuthUserInfo`, BetterAuth refreshes tokens on the linked Account row
  * (`internalAdapter.updateAccount`), which fires this hook.
@@ -453,6 +695,11 @@ export const afterAccountUpdate = async ({
   prisma: PrismaClient;
   account: { userId: string; providerId: string; accountId: string };
 }): Promise<void> => {
+  // Outside the try below, deliberately: this one REFUSES, and a refusal the
+  // reconciliation's catch swallowed would admit the very sign-in it exists
+  // to stop.
+  await refuseNativeProviderOnSignIn({ prisma, account });
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: account.userId },
@@ -502,17 +749,37 @@ export const beforeSessionCreate = async ({
   prisma,
   session,
 }: {
-  prisma: PrismaClient;
+  prisma: {
+    user: {
+      findUnique(args: {
+        where: { id: string };
+        select: {
+          deactivatedAt: true;
+          signupConfirmationPending: true;
+        };
+      }): Promise<{
+        deactivatedAt: Date | null;
+        signupConfirmationPending: boolean;
+      } | null>;
+    };
+  };
   session: { userId: string };
 }): Promise<boolean | void> => {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { deactivatedAt: true },
+    select: { deactivatedAt: true, signupConfirmationPending: true },
   });
   if (user?.deactivatedAt) {
     logger.warn(
       { userId: session.userId },
       "Blocked session create: user deactivated",
+    );
+    return false;
+  }
+  if (user?.signupConfirmationPending) {
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: sign-up confirmation pending",
     );
     return false;
   }

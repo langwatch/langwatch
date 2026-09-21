@@ -1,5 +1,4 @@
 import { createEnvConfig } from "../../env-create.mjs";
-import { parseRedisDbIndex } from "../redis-db-index";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -18,12 +17,19 @@ export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
   return role === "worker" || role === "all";
 }
 
+/** Roles that consume the event queue selected for their process. */
+export function roleConsumesEventQueue(role: ProcessRole | undefined): boolean {
+  return role === "worker" || role === "migration" || role === "all";
+}
+
 /**
- * Whether a reactor with the given `runIn` role filter should run under the
- * current process role. A reactor with no filter runs everywhere. The `"all"`
+ * Whether a subscriber with the given `runIn` role filter should run under the
+ * current process role. A subscriber with no filter runs everywhere. The `"all"`
  * role (dev single-process mode) plays every role, so it satisfies any filter —
- * without this, reactors declared `runIn: ["worker"]` would be excluded in
- * in-process mode and the worker stack would boot but do no reactor work.
+ * without this, subscribers declared `runIn: ["worker"]` would be excluded in
+ * in-process mode and the worker stack would boot but do no subscriber work.
+ * The migration role runs worker subscribers on the canonical queue,
+ * but `roleRunsWorkers` remains false so it starts no general worker runtime.
  */
 export function roleSatisfiesRunIn({
   runIn,
@@ -34,6 +40,9 @@ export function roleSatisfiesRunIn({
 }): boolean {
   if (!runIn || !processRole) return true;
   if (processRole === "all") return true;
+  if (processRole === "migration") {
+    return runIn.includes("migration") || runIn.includes("worker");
+  }
   return runIn.includes(processRole);
 }
 
@@ -45,7 +54,8 @@ export interface AppConfig {
   clickhouseUrl?: string;
   redisUrl?: string;
   redisClusterEndpoints?: string;
-  redisDbIndex?: number;
+  /** Raw `REDIS_DB_INDEX`; `@langwatch/redis-client` validates and applies it. */
+  redisDbIndex?: string;
 
   // Services
   langevalsEndpoint?: string;
@@ -58,12 +68,13 @@ export interface AppConfig {
   hubspotFormId?: string;
 
   // Process role — controls which event-sourcing consumers run.
-  // "web": dispatch commands only (no BullMQ workers)
+  // "web": dispatch commands only (no queue consumers)
   // "worker": full consumers
   // "all": web server + full consumers in one process (dev-only, WORKERS_IN_PROCESS=1)
-  // "migration": direct processCommand() calls, reactors excluded
+  // "migration": allow-listed canonical queue consumer with worker subscribers;
+  // no schedulers, process-manager consumers, or general workers
   // undefined: dispatch-only (web-like) — no consumers
-  // Use `roleRunsWorkers(role)` rather than comparing to "worker" directly.
+  // Use the named role predicates rather than comparing roles directly.
   processRole?: ProcessRole;
 
   // Customer.io nurturing
@@ -92,7 +103,7 @@ export function createAppConfigFromEnv(overrides?: {
     clickhouseUrl: env.CLICKHOUSE_URL,
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
-    redisDbIndex: parseRedisDbIndex(env.REDIS_DB_INDEX),
+    redisDbIndex: env.REDIS_DB_INDEX,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     baseHost: env.BASE_HOST,
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,

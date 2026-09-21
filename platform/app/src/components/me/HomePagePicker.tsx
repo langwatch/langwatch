@@ -88,7 +88,7 @@ export function HomePagePicker({ organizationId }: Props) {
         value: "governance",
         label: "AI Governance overview",
         description: "Always land on the org bird's-eye dashboard",
-        path: "/settings/governance",
+        path: "/governance",
       });
     }
     return opts;

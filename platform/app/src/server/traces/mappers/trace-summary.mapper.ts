@@ -591,7 +591,15 @@ export function mapTraceSummaryToTrace(
     project_id: projectId,
     metadata,
     timestamps: {
-      started_at: summary.occurredAt,
+      // The span timing baseline where the trace has one, otherwise the storage
+      // anchor (ADR-087). A trace whose only signal is a log record has no span
+      // start to report; before the anchor existed it reported the epoch, which
+      // rendered as 1970 in the drawer and the list. The anchor is the time that
+      // trace's first signal was accepted, which is the honest answer.
+      started_at:
+        summary.occurredAt > 0
+          ? summary.occurredAt
+          : (summary.storageAnchorMs ?? 0),
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },

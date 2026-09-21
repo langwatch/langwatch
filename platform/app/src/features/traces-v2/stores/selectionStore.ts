@@ -24,12 +24,22 @@ interface SelectionState {
   size: () => number;
 }
 
+/**
+ * An id made of nothing addresses no trace, and every bulk action downstream
+ * would carry it to the server as if it did. Selection is where the ids leave
+ * the table, so it is where they are refused; what a placeholder id looks like
+ * belongs to the table that mints them, so that filter sits at the component
+ * boundary feeding this store.
+ */
+const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
+
 export const useSelectionStore = create<SelectionState>((set, get) => ({
   mode: "explicit",
   traceIds: new Set<string>(),
 
   toggle: (traceId) =>
     set((state) => {
+      if (!addressesATrace(traceId)) return state;
       const next = new Set(state.traceIds);
       if (state.mode === "all-matching") {
         // Toggling a row drops out of all-matching mode and starts an
@@ -48,7 +58,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
         state.mode === "all-matching"
           ? new Set<string>()
           : new Set(state.traceIds);
-      for (const id of traceIds) {
+      // Only an id that addresses a trace may enter; anything at all may leave,
+      // so a selection can always be emptied.
+      for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
         if (checked) next.add(id);
         else next.delete(id);
       }

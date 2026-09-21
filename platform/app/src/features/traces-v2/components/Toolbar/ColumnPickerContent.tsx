@@ -2,6 +2,7 @@ import { chakra, HStack, Icon, Input, Stack, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Checkbox } from "../../../../components/ui/checkbox";
 import { toaster } from "../../../../components/ui/toaster";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
@@ -22,7 +23,13 @@ import {
 } from "./columnPicker/AddEvalColumnForm";
 import { VisibleOrderStrip } from "./columnPicker/VisibleOrderStrip";
 
-const SECTION_ORDER = ["Standard", "Trace fields", "Evaluations", "Events"];
+const SECTION_ORDER = [
+  "Standard",
+  "Trace fields",
+  "Evaluations",
+  "Events",
+  "Annotations",
+];
 
 const TIME_FORMAT_OPTIONS: { value: TimeColumnFormat; label: string }[] = [
   { value: "relative", label: "Relative" },
@@ -42,6 +49,8 @@ export const ColumnPickerContent: React.FC = () => {
   const reorderColumns = useViewStore((s) => s.reorderColumns);
   const grouping = useViewStore((s) => s.grouping);
   const { options: evaluatorOptions, nameByKey } = useEvaluatorOptions();
+  const { hasPermission } = useOrganizationTeamProject();
+  const canReadAnnotations = hasPermission("annotations:view");
   const [query, setQuery] = useState("");
 
   const isTraceGrouping = grouping === "flat";
@@ -69,9 +78,14 @@ export const ColumnPickerContent: React.FC = () => {
     });
   }, [isTraceGrouping, columnOrder, nameByKey]);
 
+  // A column whose data the reader may not see is not offered at all: adding
+  // it would only ever get them a column that cannot say anything.
   const allColumns = useMemo(
-    () => [...capability.columns, ...evalColumnOptions],
-    [capability.columns, evalColumnOptions],
+    () =>
+      [...capability.columns, ...evalColumnOptions].filter(
+        (column) => column.id !== "annotations" || canReadAnnotations,
+      ),
+    [capability.columns, evalColumnOptions, canReadAnnotations],
   );
   const columnById = useMemo(
     () => new Map(allColumns.map((c) => [c.id, c])),

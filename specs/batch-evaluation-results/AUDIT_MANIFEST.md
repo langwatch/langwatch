@@ -2,7 +2,7 @@
 
 Bundle: tail-b. Tracking: #3458.
 
-Survey result: every scenario describes behaviour that already lives in the platform. UI tables, CSV export, comparison mode, run sidebar, trace cost folding (reactor + projection), python SDK target metadata API, and read-time cost enrichment are all implemented with vitest/pytest coverage. They are tagged unimplemented because no `@scenario <name>` JSDoc / pytest docstring tag binds them to a test yet — Phase 3 will add bindings. (run-comparison.feature already has bindings — zero rows here.)
+Survey result: every scenario describes behaviour that already lives in the platform. UI tables, CSV export, comparison mode, run sidebar, trace cost folding (subscriber + projection), python SDK target metadata API, and read-time cost enrichment are all implemented with vitest/pytest coverage. They are tagged unimplemented because no `@scenario <name>` JSDoc / pytest docstring tag binds them to a test yet — Phase 3 will add bindings. (run-comparison.feature already has bindings — zero rows here.)
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
@@ -35,10 +35,10 @@ Survey result: every scenario describes behaviour that already lives in the plat
 | specs/batch-evaluation-results/batch-evaluation-results.feature | "Display V3 evaluations with multiple targets" | KEEP | SingleRunTable.tsx renders multi-target columns; covered by BatchEvaluationResultsTable.test.tsx |
 | specs/batch-evaluation-results/batch-evaluation-results.feature | "View results in optimization studio panel" | KEEP | optimization_studio/components/ResultsPanel.tsx:303 renders BatchEvaluationResultsTable + run switcher |
 | specs/batch-evaluation-results/batch-evaluation-results.feature | "Open full experiment page from studio" | KEEP | ResultsPanel has a link/button to the full experiment page; bind a small assertion in Phase 3 |
-| specs/batch-evaluation-results/experiment-cost-folding.feature | "evaluation.run_id is hoisted to trace-level attributes" | KEEP | trace-processing pipeline forwards span attributes (traceSummaryAttributes.unit.test.ts pattern); experimentMetricsSync.reactor reads `evaluation.run_id` from trace attrs (line 102). Phase 3 binds a focused hoisting test. |
-| specs/batch-evaluation-results/experiment-cost-folding.feature | "Trace metrics are published to experiment pipeline after stabilisation" | KEEP | experimentMetricsSync.reactor.unit.test.ts "dispatches computeExperimentRunMetrics with cost payload" |
-| specs/batch-evaluation-results/experiment-cost-folding.feature | "Reactor does not fire for traces without evaluation.run_id" | KEEP | experimentMetricsSync.reactor.unit.test.ts "skips without dispatching" (no run_id case) |
-| specs/batch-evaluation-results/experiment-cost-folding.feature | "Reactor does not fire when trace has no cost data" | KEEP | experimentMetricsSync.reactor.unit.test.ts "skips without dispatching when totalCost is null" + "...when totalCost is zero" |
+| specs/batch-evaluation-results/experiment-cost-folding.feature | "evaluation.run_id is hoisted to trace-level attributes" | KEEP | trace-processing pipeline forwards span attributes (traceSummaryAttributes.unit.test.ts pattern); experimentMetricsSync.subscriber reads `evaluation.run_id` from trace attrs (line 102). Phase 3 binds a focused hoisting test. |
+| specs/batch-evaluation-results/experiment-cost-folding.feature | "Trace metrics are published to experiment pipeline after stabilisation" | KEEP | experimentMetricsSync.subscriber.unit.test.ts "dispatches computeExperimentRunMetrics with cost payload" |
+| specs/batch-evaluation-results/experiment-cost-folding.feature | "Subscriber does not fire for traces without evaluation.run_id" | KEEP | experimentMetricsSync.subscriber.unit.test.ts "skips without dispatching" (no run_id case) |
+| specs/batch-evaluation-results/experiment-cost-folding.feature | "Subscriber does not fire when trace has no cost data" | KEEP | experimentMetricsSync.subscriber.unit.test.ts "skips without dispatching when totalCost is null" + "...when totalCost is zero" |
 | specs/batch-evaluation-results/experiment-cost-folding.feature | "Trace cost is accumulated into experiment run TotalCost" | KEEP | experimentRunState.projection.handler.test.ts "accumulates trace cost into TotalCost" |
 | specs/batch-evaluation-results/experiment-cost-folding.feature | "Multiple trace costs accumulate" | KEEP | experimentRunState.projection.handler.test.ts "accumulates multiple trace costs" |
 | specs/batch-evaluation-results/experiment-cost-folding.feature | "Per-trace cost breakdown is maintained" | KEEP | experimentRunState.projection.handler.test.ts "stores per-trace breakdown in TraceMetrics" + "initializes TraceMetrics as empty" |

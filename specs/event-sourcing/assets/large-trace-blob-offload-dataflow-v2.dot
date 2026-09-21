@@ -60,12 +60,12 @@ digraph G {
 
     fold_p [label="fold projection\n→ trace_summaries", fillcolor="#b3e6b3", shape=cylinder, height=0.5];
     map_p [label="map projection\n→ stored_spans", fillcolor="#b3e6b3", shape=cylinder, height=0.5];
-    reactors [label="reactors\n(EvaluationTrigger, etc.)", fillcolor="#cce0cc"];
+    subscribers [label="subscribers\n(EvaluationTrigger, etc.)", fillcolor="#cce0cc"];
   }
 
   proj_queue -> fold_p [label="lean event"];
   proj_queue -> map_p [label="lean event"];
-  proj_queue -> reactors [label="{event, foldState}"];
+  proj_queue -> subscribers [label="{event, foldState}"];
 
   // ============== READS ==============
   subgraph cluster_reads {

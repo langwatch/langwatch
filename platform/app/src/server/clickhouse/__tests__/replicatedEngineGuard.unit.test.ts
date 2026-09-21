@@ -1,7 +1,20 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import ts from "typescript";
+import type {
+  FunctionDeclaration,
+  Node,
+  ObjectLiteralElementLike,
+} from "typescript/unstable/ast";
+import {
+  isFunctionDeclaration,
+  isIdentifier,
+  isObjectLiteralExpression,
+  isPropertyAssignment,
+  isShorthandPropertyAssignment,
+  isStringLiteral,
+} from "typescript/unstable/ast";
 import { describe, expect, it } from "vitest";
+import { parseSourceText } from "~/test-utils/tsAst";
 
 /**
  * Guard: every MergeTree-family engine declared by a ClickHouse migration must
@@ -36,29 +49,25 @@ const GOOSE_SOURCE = readFileSync(
   "utf8",
 );
 
-function propertyName(
-  property: ts.ObjectLiteralElementLike,
-): string | undefined {
+function propertyName(property: ObjectLiteralElementLike): string | undefined {
   if (
-    !ts.isPropertyAssignment(property) &&
-    !ts.isShorthandPropertyAssignment(property)
+    !isPropertyAssignment(property) &&
+    !isShorthandPropertyAssignment(property)
   ) {
     return undefined;
   }
   const name = property.name;
-  return ts.isIdentifier(name) || ts.isStringLiteral(name)
-    ? name.text
-    : undefined;
+  return isIdentifier(name) || isStringLiteral(name) ? name.text : undefined;
 }
 
-function collectObjectLiteralKeys(node: ts.Node, keys: Set<string>): void {
-  if (ts.isObjectLiteralExpression(node)) {
+function collectObjectLiteralKeys(node: Node, keys: Set<string>): void {
+  if (isObjectLiteralExpression(node)) {
     for (const property of node.properties) {
       const name = propertyName(property);
       if (name !== undefined) keys.add(name);
     }
   }
-  ts.forEachChild(node, (child) => collectObjectLiteralKeys(child, keys));
+  node.forEachChild((child) => collectObjectLiteralKeys(child, keys));
 }
 
 /**
@@ -68,15 +77,13 @@ function collectObjectLiteralKeys(node: ts.Node, keys: Set<string>): void {
  * provisioning assertion below.
  */
 const ENV_VAR_KEYS = (() => {
-  const sourceFile = ts.createSourceFile(
-    "goose.ts",
-    GOOSE_SOURCE,
-    ts.ScriptTarget.Latest,
-    true,
-  );
+  const sourceFile = parseSourceText({
+    fileName: "goose.ts",
+    sourceText: GOOSE_SOURCE,
+  });
   const fn = sourceFile.statements.find(
-    (statement): statement is ts.FunctionDeclaration =>
-      ts.isFunctionDeclaration(statement) &&
+    (statement): statement is FunctionDeclaration =>
+      isFunctionDeclaration(statement) &&
       statement.name?.text === "buildMigrationEnvVars",
   );
   if (!fn) {

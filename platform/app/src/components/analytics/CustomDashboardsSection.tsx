@@ -29,7 +29,7 @@ export function CustomDashboardsSection({
   const projectId = project?.id ?? "";
   const currentDashboardId = router.query.dashboard as string | undefined;
   const { openDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
     null,
@@ -85,7 +85,6 @@ export function CustomDashboardsSection({
               title: "Error renaming dashboard",
               type: "error",
               duration: 3000,
-              meta: { closable: true },
             });
           },
         },
@@ -122,7 +121,6 @@ export function CustomDashboardsSection({
             title: "Error reordering dashboards",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },
@@ -138,7 +136,6 @@ export function CustomDashboardsSection({
         title: "Cannot delete the last dashboard",
         type: "warning",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -168,7 +165,7 @@ export function CustomDashboardsSection({
         message="Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted."
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteDashboard.isLoading}
+        loading={deleteDashboard.isPending}
         onConfirm={() => {
           if (!dashboardToDelete) return;
           const dashboardId = dashboardToDelete;
@@ -195,7 +192,6 @@ export function CustomDashboardsSection({
                   title: "Error deleting dashboard",
                   type: "error",
                   duration: 3000,
-                  meta: { closable: true },
                 });
               },
               onSettled: () => setDashboardToDelete(null),

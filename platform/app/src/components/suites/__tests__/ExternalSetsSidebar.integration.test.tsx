@@ -6,20 +6,11 @@
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
-
-// VoiceAgentsCallout inside SuiteSidebar pulls project context via
-// useOrganizationTeamProject, which fires tRPC queries the bare test rig
-// doesn't provide. Stub it so these external-sets tests stay narrow.
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(() => ({
-    project: { id: "project_1" },
-  })),
-}));
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -39,6 +30,10 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "project_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    fields: null,
+    evaluators: null,
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

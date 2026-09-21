@@ -139,9 +139,25 @@ export const useFilterParams = () => {
       Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
     );
     const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
+
+    // Every caller of this changes which rows match, and a keyset cursor
+    // describes a position in the PREVIOUS result set. Carrying it across the
+    // change resumes the new list partway down — the first rows matching the
+    // filter the user just applied are the ones they never see, and the footer
+    // still reads "page 3", so nothing signals it. Dropping the cursor sends
+    // them to the first page of the new results, which is what applying a
+    // filter means.
+    if ("scrollId" in parsed) delete parsed.scrollId;
+    const strippedQs = qs.stringify(parsed, {
+      allowDots: true,
+      arrayFormat: "comma" as const,
+      // @ts-ignore of course it exists
+      allowEmptyArrays: true,
+    });
+
     void router.push(
       { pathname: router.pathname, query: { ...routeParams, ...parsed } },
-      currentPath + "?" + newQs,
+      currentPath + "?" + strippedQs,
       { shallow: true, scroll: false },
     );
   };

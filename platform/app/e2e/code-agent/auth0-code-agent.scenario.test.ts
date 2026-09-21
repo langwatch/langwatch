@@ -151,8 +151,8 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
   it("answers with data from behind the auth wall, without leaking the secret", async () => {
     // The exact config shape the scenario worker's data-prefetcher produces
     // for a code-agent target.
-    const agent = new SerializedCodeAgentAdapter(
-      {
+    const agent = new SerializedCodeAgentAdapter({
+      config: {
         type: "code",
         agentId: "agent_auth0_example",
         code: readFileSync(EXAMPLE_PATH, "utf8"),
@@ -160,7 +160,7 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
         // endpoint coordinates all ride the secrets namespace, so the whole
         // configuration is expressible through Settings -> Secrets and the one
         // mapping below is creatable in the editor UI today (static value
-        // mappings are not — langwatch/langwatch#6371).
+        // mappings are not, see langwatch/langwatch#6371).
         inputs: [{ identifier: "message", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         scenarioMappings: {
@@ -175,9 +175,9 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
           AUTH0_API_URL: apiUrl,
         },
       },
-      NLP_SERVICE_URL,
-      "test-api-key",
-    );
+      nlpServiceUrl: NLP_SERVICE_URL,
+      projectApiKey: "test-api-key",
+    });
 
     const result = await scenario.run({
       name: "auth0 code agent answers from behind the auth wall",

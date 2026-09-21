@@ -8,14 +8,20 @@
  * wrong by one boundary is invisible on screen and wrong in exactly the
  * case that matters, someone sitting exactly on their limit.
  */
-import { type GatewayBudget, Prisma, type PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import {
+  type GatewayBudget,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 import type {
   BucketSpend,
   GatewayBudgetClickHouseRepository,
 } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "../wireMoney";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -52,10 +58,14 @@ function stubProjectBudget(): GatewayBudget {
 }
 
 function bucketsOf(...spends: string[]): BucketSpend[] {
-  return spends.map((spentUsd, i) => ({
-    scopeId: `vk_anchor:user${i + 1}`,
-    spentUsd,
-  }));
+  return spends.map((usd, i) => {
+    const spentNanoUsd = Number(usdToNanoUsd(usd));
+    return {
+      scopeId: `vk_anchor:user${i + 1}`,
+      spentNanoUsd,
+      spentUsd: nanoUsdToDecimalString(spentNanoUsd),
+    };
+  });
 }
 
 function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {

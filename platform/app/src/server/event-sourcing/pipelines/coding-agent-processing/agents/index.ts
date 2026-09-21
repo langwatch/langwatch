@@ -63,3 +63,46 @@ export const LOGS_ONLY_AGENT_IDS: ReadonlySet<string> = new Set(
     (agent) => agent.id,
   ),
 );
+
+/**
+ * The agents whose TOOL RUNS fold from their `tool_result` log events —
+ * every logs-only agent, plus any span-bearing agent that simply has no tool
+ * span (`foldsToolRunsFromEvents` on the definition; codex is the first).
+ * Same string-typed shape and reasoning as {@link LOGS_ONLY_AGENT_IDS}.
+ */
+export const EVENTS_FOLD_TOOL_RUNS_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter(
+    (agent) =>
+      agent.logsOnly === true || agent.foldsToolRunsFromEvents === true,
+  ).map((agent) => agent.id),
+);
+
+/**
+ * Per agent, the tool names that are dispatch plumbing rather than actions
+ * (`wrapperToolNames` on the definition): the session fold declines to count
+ * a tool run under one of these, because every tool invoked through it
+ * reports its own `tool_result`. Keyed by the same string-typed contribution
+ * agent as the sets above.
+ */
+export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<
+  string,
+  ReadonlySet<string>
+> = new Map(
+  CODING_AGENT_REGISTRY.filter(
+    (agent) =>
+      agent.wrapperToolNames !== undefined && agent.wrapperToolNames.length > 0,
+  ).map((agent) => [agent.id, new Set(agent.wrapperToolNames)]),
+);
+
+/**
+ * The agents whose log contributions must carry the provider session key
+ * (`logsRequireSessionKey` on the definition): the log dispatcher skips a
+ * record of theirs that has none instead of falling back to the record's
+ * trace, because for them a keyless record is ambient process telemetry.
+ * Same string-typed shape and reasoning as {@link LOGS_ONLY_AGENT_IDS}.
+ */
+export const LOGS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter(
+    (agent) => agent.logsRequireSessionKey === true,
+  ).map((agent) => agent.id),
+);

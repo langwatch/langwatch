@@ -3,5 +3,6 @@ export {
   ExperimentInitError,
   ExperimentApiError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./experiment.error";

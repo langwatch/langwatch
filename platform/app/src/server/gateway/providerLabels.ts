@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Display names for the ModelProvider rows referenced by provider-filtered

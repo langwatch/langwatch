@@ -34,7 +34,7 @@ import { api } from "~/utils/api";
 function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // State for tracking which evaluator is being deleted
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<{
@@ -61,7 +61,6 @@ function Page() {
         title: "Evaluator updated",
         description: "Evaluator has been updated from source.",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -118,7 +117,6 @@ function Page() {
         description:
           parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -184,7 +182,6 @@ function Page() {
             toaster.create({
               title: "Evaluator deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: (error) =>

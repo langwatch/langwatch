@@ -110,7 +110,7 @@ async function seedOrgWithIngestionSource(orgSlug: string): Promise<SeededOrg> {
     teamId: team.id,
     userId: user.id,
     ingestionSourceId: source.id,
-    ingestSecret,
+    ingestSecret: ingestSecret!,
   };
 }
 

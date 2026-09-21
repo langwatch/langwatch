@@ -22,7 +22,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -118,8 +118,27 @@ let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
+
+// The service resolves its client through getApp().clickhouse now (two-door
+// access); this App stub delegates to the clickhouseClient mock above, so
+// the suite's existing per-tenant wiring keeps working unchanged.
+vi.mock("~/server/app-layer/app", async () => {
+  const clients = await import("~/server/clickhouse/clickhouseClient");
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (tenantId: string) =>
+        clients.getClickHouseClientForTenant(tenantId),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -180,10 +199,12 @@ async function searchViaLegacyList(query: string): Promise<string[]> {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
-  service = new ClickHouseTraceService(
-    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-  );
+  vi.mocked(getClickHouseClientForTenant).mockResolvedValue(ch);
+  service = new ClickHouseTraceService({
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
+  });
 
   await ch.insert({
     table: "trace_summaries",

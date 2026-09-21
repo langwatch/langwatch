@@ -119,7 +119,7 @@ helm upgrade langwatch langwatch/langwatch \
 ```
 
 <Warning>
-Without `--wait`, the migration can move a dataset while an old-version pod is still serving traffic. Any dataset edits made through that old pod after its dataset was migrated will not appear in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual). `--wait` ensures the new pods are serving before the migration starts.
+Without `--wait`, the migration can move a dataset while an old-version pod is still serving traffic. Any dataset edits made through that old pod after its dataset was migrated do not appear in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual). `--wait` ensures the new pods are serving before the migration starts.
 </Warning>
 
 **ArgoCD and Flux users**: no action needed. The migration hook maps to a PostSync hook, which already waits for a healthy rollout before running.
@@ -172,7 +172,7 @@ Existing datasets keep working from PostgreSQL. Remove the value on a later upgr
 
 Rolling back to an older image after the migration is safe for reads: all dataset rows are still in PostgreSQL, so the old version serves them normally.
 
-One caveat: dataset edits made **while rolled back** are written only to PostgreSQL. After you re-upgrade, those edits will not appear in datasets that were already migrated, and reconciling them requires manual work. Keep rollback windows short and avoid dataset edits during them.
+One caveat: dataset edits made **while rolled back** are written only to PostgreSQL. After you re-upgrade, those edits do not appear in datasets that were already migrated, and reconciling them requires manual work. Keep rollback windows short and avoid dataset edits during them.
 
 ## Troubleshooting
 
@@ -195,7 +195,7 @@ The Job retries transient failures automatically, and anything left unmigrated i
 kubectl -n langwatch logs job/langwatch-dataset-s3-migration
 ```
 
-If the Job reports that it is waiting for schema migrations, it means the database schema has not been updated yet; it will complete on the next upgrade once migrations have run.
+If the Job reports that it is waiting for schema migrations, it means the database schema has not been updated yet; it completes on the next upgrade once migrations have run.
 
 ## Getting Help
 

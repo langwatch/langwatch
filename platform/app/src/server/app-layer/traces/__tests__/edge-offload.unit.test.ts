@@ -7,8 +7,9 @@
  *   - payload > 256 KB + PUT fails → fail-open: regular command with full inline; warn log emitted
  *   - warn message contains "oversize protection skipped"
  *
- * These tests FAIL at unit runtime because `maybeSpool` throws "not implemented".
- * They pass typecheck, serving as the TDD contract.
+ * What the fail-open payload then costs the deployment is pinned where the
+ * cap actually runs: recordSpanCommand.oversized.unit.test.ts drives the
+ * command worker over the command this module hands back.
  *
  * BDD structure: describe("given X") → describe("when Y") → it("…").
  * No "should" in it() names (project convention).
@@ -156,6 +157,7 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD (256 KB) and the S3
 
 describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PUT fails", () => {
   describe("when maybeSpool is called", () => {
+    /** @scenario When edge S3 spool PUT fails, ingestion falls back to inline (fail-open) */
     it("returns the regular command with full inline payload (fail-open, no spoolRef)", async () => {
       const data = makeCommandData({ outputSize: 300 * 1024 });
       const blobStore = makeBlobStore({ putSpoolResult: "fail" });

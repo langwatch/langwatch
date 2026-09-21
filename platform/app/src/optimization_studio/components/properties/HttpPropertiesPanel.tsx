@@ -253,6 +253,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     headers,
     auth,
     outputPath,
+    bodyTemplate,
   });
 
   return (

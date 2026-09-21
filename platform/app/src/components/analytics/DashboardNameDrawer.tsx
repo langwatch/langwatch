@@ -72,7 +72,6 @@ export function DashboardNameDrawer({
             title: "Error creating dashboard",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },

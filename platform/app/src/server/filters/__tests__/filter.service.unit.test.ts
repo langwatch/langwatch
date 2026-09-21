@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { FilterOptionsClickHouseRepository } from "~/server/app-layer/filters/repositories/filter-options.clickhouse.repository";
+import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import type { ClickHouseFilterQueryParams } from "../clickhouse";
 import { FilterService, type GetFilterOptionsInput } from "../filter.service";
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-}));
 
 const extractedOptions = [{ field: "opt-1", label: "Option 1", count: 3 }];
 
@@ -43,7 +40,15 @@ vi.mock("../clickhouse", () => ({
   },
 }));
 
-const mockedGetClient = vi.mocked(getClickHouseClientForProject);
+const resolveClient = vi.fn();
+
+/** The service under test, reading through a real repository over a fake client. */
+function serviceOver(client: unknown): FilterService {
+  resolveClient.mockResolvedValue(client);
+  return new FilterService(
+    new FilterOptionsClickHouseRepository(resolveClient),
+  );
+}
 
 function makeInput(
   overrides: Partial<GetFilterOptionsInput> = {},
@@ -70,19 +75,18 @@ describe("FilterService.getFilterOptions", () => {
 
   describe("given an empty projectId", () => {
     it("throws before looking up the ClickHouse client", async () => {
-      const service = FilterService.create();
+      const service = serviceOver(makeClient());
 
       await expect(
         service.getFilterOptions(makeInput({ projectId: "  " })),
       ).rejects.toThrow(/projectId \(tenantId\) must be a non-empty string/);
-      expect(mockedGetClient).not.toHaveBeenCalled();
+      expect(resolveClient).not.toHaveBeenCalled();
     });
   });
 
   describe("given no ClickHouse client is available", () => {
     it("throws a client-unavailable error", async () => {
-      mockedGetClient.mockResolvedValue(null as any);
-      const service = FilterService.create();
+      const service = new FilterService(null);
 
       await expect(service.getFilterOptions(makeInput())).rejects.toThrow(
         /ClickHouse client is not available/,
@@ -93,8 +97,7 @@ describe("FilterService.getFilterOptions", () => {
   describe("given a filter with no ClickHouse support", () => {
     it("resolves to an empty option list without querying", async () => {
       const client = makeClient();
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       const result = await service.getFilterOptions(
         makeInput({ field: "traces.name" }),
@@ -108,8 +111,7 @@ describe("FilterService.getFilterOptions", () => {
   describe("given a key-requiring filter called without a key", () => {
     it("resolves to an empty option list without querying", async () => {
       const client = makeClient();
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       const result = await service.getFilterOptions(
         makeInput({ field: "metadata.value" }),
@@ -123,8 +125,7 @@ describe("FilterService.getFilterOptions", () => {
   describe("given a query missing TenantId isolation", () => {
     it("fails closed without executing the query", async () => {
       const client = makeClient();
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       await expect(
         service.getFilterOptions(makeInput({ field: "spans.type" })),
@@ -136,8 +137,7 @@ describe("FilterService.getFilterOptions", () => {
   describe("when the key contains middle-dot encoded dots", () => {
     it("decodes them back to dots in the query params", async () => {
       const client = makeClient();
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       await service.getFilterOptions(
         makeInput({ field: "metadata.value", key: "foo·bar", subkey: "a·b" }),
@@ -158,12 +158,32 @@ describe("FilterService.getFilterOptions", () => {
   describe("when the query succeeds", () => {
     it("returns the extractResults output", async () => {
       const client = makeClient([{ field: "raw" }]);
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       const result = await service.getFilterOptions(makeInput());
 
       expect(result).toEqual(extractedOptions);
+    });
+  });
+
+  describe("when the platform sheds the query", () => {
+    it("keeps the overload error instead of flattening it", async () => {
+      // The typed error exists so the client can offer retry guidance rather
+      // than "something went wrong". A catch-all that rewrapped it would
+      // throw away the only thing distinguishing shedding from a bad filter.
+      const client = {
+        query: vi.fn().mockRejectedValue(new ClickHouseOverloadedError()),
+      };
+      const service = serviceOver(client);
+
+      const error = await service
+        .getFilterOptions(makeInput())
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ClickHouseOverloadedError);
+      expect((error as ClickHouseOverloadedError).code).toBe(
+        "clickhouse_overloaded",
+      );
     });
   });
 
@@ -176,8 +196,7 @@ describe("FilterService.getFilterOptions", () => {
             new Error("Code: 62. DB::Exception: Syntax error: SELECT secret"),
           ),
       };
-      mockedGetClient.mockResolvedValue(client as any);
-      const service = FilterService.create();
+      const service = serviceOver(client);
 
       const error = await service
         .getFilterOptions(makeInput())

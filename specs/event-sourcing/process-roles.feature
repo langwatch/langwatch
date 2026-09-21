@@ -8,7 +8,7 @@ Feature: Process Roles
     When a pipeline is registered
     Then command queue dispatchers are initialized for sending
     And queue workers for projections are NOT started
-    And queue workers for reactors are NOT started
+    And queue workers for subscribers are NOT started
     And background processing is offloaded to other processes
 
   Scenario: Worker process role
@@ -17,4 +17,4 @@ Feature: Process Roles
     Then command queue dispatchers are initialized for processing
     And queue workers for fold projections are started
     And queue workers for map projections are started
-    And queue workers for reactors are started
+    And queue workers for subscribers are started

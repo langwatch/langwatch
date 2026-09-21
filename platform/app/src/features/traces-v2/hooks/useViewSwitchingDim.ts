@@ -7,13 +7,13 @@ import { useViewStore } from "../stores/viewStore";
 interface DimInputs {
   isFetching: boolean;
   isFetched: boolean;
-  isPreviousData: boolean;
+  isPlaceholderData: boolean;
 }
 
 /**
  * Coordinates the "view switching" dim signal + refresh pulse for the trace
  * list. We dim only when the user explicitly switches view (filter, sort,
- * page, pageSize, or a non-rolling time-range change). `isPreviousData` fires
+ * page, pageSize, or a non-rolling time-range change). `isPlaceholderData` fires
  * on every key change including the rolling-time-range tail update, which
  * would dim every minute on a live view — so we gate it behind a stable
  * "view key" that ignores from/to drift while a label preset is active.
@@ -24,7 +24,7 @@ interface DimInputs {
 export function useViewSwitchingDim({
   isFetching,
   isFetched,
-  isPreviousData,
+  isPlaceholderData,
 }: DimInputs): void {
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const timeRangeFrom = useFilterStore((s) => s.debouncedTimeRange.from);
@@ -107,8 +107,8 @@ export function useViewSwitchingDim({
   }, [viewSwitching, isFetching, isFetched]);
 
   useEffect(() => {
-    setReplacingData(viewSwitching && (isPreviousData || isFetching));
-  }, [viewSwitching, isPreviousData, isFetching, setReplacingData]);
+    setReplacingData(viewSwitching && (isPlaceholderData || isFetching));
+  }, [viewSwitching, isPlaceholderData, isFetching, setReplacingData]);
 
   // Publish refresh state via the freshness store's pulse action so the
   // aurora bar + LiveIndicator spinner show every time the query updates.

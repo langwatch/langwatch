@@ -1,9 +1,7 @@
 import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import {
-  getSourceHealth,
-  GovernanceCliError,
-} from "@/cli/utils/governance/cli-api";
+import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
  * `langwatch ingest health <sourceId> [--json]`
@@ -29,8 +27,7 @@ export async function ingestHealthCommand(
   try {
     result = await getSourceHealth(cfg, sourceId);
   } catch (err) {
-    const msg = err instanceof GovernanceCliError ? err.message : String(err);
-    process.stderr.write(`Error: ${msg}\n`);
+    reportCommandError({ error: err, format: options.json ? "json" : undefined });
     process.exit(1);
   }
 

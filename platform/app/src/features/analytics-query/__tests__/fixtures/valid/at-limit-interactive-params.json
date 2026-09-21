@@ -1,0 +1,79 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"params": [
+		{
+			"name": "p0",
+			"value": 0
+		},
+		{
+			"name": "p1",
+			"value": 1
+		},
+		{
+			"name": "p2",
+			"value": 2
+		},
+		{
+			"name": "p3",
+			"value": 3
+		},
+		{
+			"name": "p4",
+			"value": 4
+		},
+		{
+			"name": "p5",
+			"value": 5
+		},
+		{
+			"name": "p6",
+			"value": 6
+		},
+		{
+			"name": "p7",
+			"value": 7
+		},
+		{
+			"name": "p8",
+			"value": 8
+		},
+		{
+			"name": "p9",
+			"value": 9
+		},
+		{
+			"name": "p10",
+			"value": 10
+		},
+		{
+			"name": "p11",
+			"value": 11
+		},
+		{
+			"name": "p12",
+			"value": 12
+		},
+		{
+			"name": "p13",
+			"value": 13
+		},
+		{
+			"name": "p14",
+			"value": 14
+		},
+		{
+			"name": "p15",
+			"value": 15
+		}
+	],
+	"encoding": {
+		"x": {
+			"field": "model",
+			"type": "nominal"
+		}
+	}
+}

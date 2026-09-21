@@ -1,4 +1,4 @@
-# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI the
+# Langy agent pod image — the worker manager plus the LangWatch CLI the
 # per-session workers shell out to.
 #
 # Built by the `langyagent` matrix entry in
@@ -12,17 +12,17 @@
 # Two-stage build: stage one compiles the Go manager binary from the
 # repo's mono-binary (services/langyagent/ is the package, dispatched via
 # cmd/service). Stage two is the runtime image with all the tooling the
-# workers shell out to (opencode, gh, langwatch CLI).
+# workers shell out to (gh, langwatch CLI).
 
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
 # -----------------------------------------------------------------------------
-# Pin an explicit Go toolchain patch (1.26.5) at or above the go.mod language
-# floor (`go 1.26.5`) so every build uses the same compiler. Bump this tag when
+# Pin an explicit Go toolchain patch (1.26.6) at or above the go.mod language
+# floor (`go 1.26.6`) so every build uses the same compiler. Bump this tag when
 # raising the go.mod floor -- the official images set GOTOOLCHAIN=local, so a
 # tag BELOW the floor does not download a newer toolchain, it fails the build
 # with "go.mod requires go >= X (running go Y)".
-FROM --platform=$BUILDPLATFORM golang:1.26.5-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder
 
 WORKDIR /src
 
@@ -113,10 +113,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY packages/langy ./packages/langy
 COPY sdks/typescript ./sdks/typescript
+# Full source for the langy-worker wrapper: its Bun compile below bundles
+# src/ + the pi SDK from node_modules, so manifests alone are not enough.
+COPY services/langyworker/package.json ./services/langyworker/
+COPY services/langyworker/tsconfig.json ./services/langyworker/
+COPY services/langyworker/tsconfig.build.json ./services/langyworker/
+COPY services/langyworker/src ./services/langyworker/src
+COPY services/langyworker/scripts ./services/langyworker/scripts
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
 COPY packages/api/package.json ./packages/api/
+COPY packages/authz/package.json ./packages/authz/
+COPY packages/authz-server/package.json ./packages/authz-server/
+COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
@@ -129,7 +139,7 @@ COPY skills/package.json ./skills/
 COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
 
 WORKDIR /src
-RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..."
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --filter "@langwatch/langyworker..."
 
 # Back to the SDK for the generator + compile steps below, which resolve their
 # inputs (../../platform/app, ../../services/langevals, ../../feature-map.json)
@@ -150,6 +160,8 @@ COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/s
 COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
 COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
 COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
+COPY platform/app/src/server/scenarios/suite-fields.ts    /src/platform/app/src/server/scenarios/suite-fields.ts
+COPY platform/app/src/server/scenarios/evaluator-attachments.ts /src/platform/app/src/server/scenarios/evaluator-attachments.ts
 COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
@@ -179,12 +191,27 @@ RUN set -eux; \
     bun run scripts/build-cli-binary.ts --target="${bun_target}" --outfile=/out/langwatch; \
     chmod 0755 /out/langwatch
 
+# Compile the langy-worker wrapper (services/langyworker) the same way: one
+# Bun-compiled binary per target arch. The manager spawns one worker per
+# conversation, so spawn-to-ready time rides on the bytecode snapshot here.
+# scripts/build-binary.ts owns the Bun.build compile flags.
+WORKDIR /src/services/langyworker
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) bun_target=bun-linux-x64 ;; \
+      arm64) bun_target=bun-linux-arm64 ;; \
+      *) echo "unsupported TARGETARCH for the langy-worker binary: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /out; \
+    bun run scripts/build-binary.ts --target="${bun_target}" --outfile=/out/langy-worker; \
+    chmod 0755 /out/langy-worker
+
 # -----------------------------------------------------------------------------
 # Stage 2: runtime image.
 # -----------------------------------------------------------------------------
-# Keep the runtime on glibc: the pinned OpenCode release and the Bun-compiled
-# LangWatch CLI are glibc binaries. Debian slim removes Ubuntu's userland
-# overhead without introducing Alpine/musl compatibility surprises.
+# Keep the runtime on glibc: the Bun-compiled worker and LangWatch CLI
+# binaries are glibc binaries. Debian slim removes Ubuntu's userland overhead
+# without introducing Alpine/musl compatibility surprises.
 FROM debian:bookworm-slim
 
 # Pin the CLI version the agent was validated against. Bump it in lockstep with
@@ -193,14 +220,20 @@ FROM debian:bookworm-slim
 # grammar, so a bump means re-checking the command table in
 # services/langyagent/internal/assets/AGENTS.md.
 ARG LANGWATCH_CLI_VERSION=0.31.0
+# `jq` and `python-is-python3` are here because the agent reaches for them by
+# name. The CLI's own `--jq` is a small subset (dot paths and a terminal
+# `| length`) that reads an answer before it is written to disk; anything past
+# that belongs in the shell. Without these three names present, one session
+# lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
+# under a name it did not try.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 util-linux \
+    curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker
-# exfiltration path is removed under ADR-033 Fix A′ — sibling isolation is
-# now enforced by opencode's own per-worker OPENCODE_SERVER_PASSWORD, which
-# needs no netfilter (and works under gVisor, where netfilter is absent).
+# exfiltration path is removed under ADR-033 Fix A′ — a worker has no listener
+# at all, so there is nothing on loopback for a sibling to reach, and this
+# needs no netfilter (which is absent under gVisor anyway).
 
 # GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
 # attributed to the requesting user. The user's short-lived user-to-server
@@ -220,40 +253,8 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
     && rm -rf /var/lib/apt/lists/* \
     && gh --version
 
-# There is no Node runtime dependency here: OpenCode is shipped as its pinned
-# standalone binary and the LangWatch CLI is the Bun-compiled binary above.
-
-# Pin opencode to a specific release artifact + verify sha256. The previous
-# `curl https://opencode.ai/install | bash` shape installed whatever was
-# `latest` at build time — every rebuild silently re-evaluated trust in
-# opencode upstream. opencode runs in every worker with the user's API
-# keys + GitHub user-to-server token in env, so it sits on the same
-# supply-chain surface as gh (already pinned above) and the npm packages.
-#
-# Bump procedure when raising OPENCODE_VERSION:
-#   v=NEW_VERSION
-#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz"  | sha256sum
-#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-arm64.tar.gz" | sha256sum
-# Paste both values below. Dev-cluster nodes are arm64 (Graviton) and CI
-# builds amd64 — both must verify.
-ARG OPENCODE_VERSION=1.17.11
-ARG OPENCODE_SHA256_AMD64=6aefcbbb7f04cdb4642be5208ddbfabb3c3d274f816bf42bff72eea5c244dca2
-ARG OPENCODE_SHA256_ARM64=6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd
-
-RUN set -eux; \
-    arch=$(dpkg --print-architecture); \
-    case "$arch" in \
-      amd64) target=linux-x64; sha=${OPENCODE_SHA256_AMD64} ;; \
-      arm64) target=linux-arm64; sha=${OPENCODE_SHA256_ARM64} ;; \
-      *) echo "Unsupported architecture for opencode pin: $arch" >&2; exit 1 ;; \
-    esac; \
-    url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-${target}.tar.gz"; \
-    curl -fsSL "$url" -o /tmp/opencode.tar.gz; \
-    echo "${sha}  /tmp/opencode.tar.gz" | sha256sum -c -; \
-    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
-    install -m0755 /tmp/opencode /usr/local/bin/opencode; \
-    rm -f /tmp/opencode /tmp/opencode.tar.gz; \
-    opencode --version
+# There is no Node runtime dependency here: the worker and the LangWatch CLI
+# are both Bun-compiled standalone binaries.
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
 # THIS repo's sdks/typescript/ by the cli-builder stage — no longer
@@ -273,9 +274,18 @@ COPY --from=cli-builder /out/langwatch /usr/local/bin/langwatch
 # require) is worse than the npm install it replaced.
 RUN langwatch --version
 
+# The langy-worker wrapper (pi harness): the manager spawns it per conversation
+# when LANGY_PI_WORKER_BINARY_PATH resolves to it (default: `langy-worker` on
+# PATH). Compiled by the cli-builder stage from services/langyworker.
+COPY --from=cli-builder /out/langy-worker /usr/local/bin/langy-worker
+
+# Same rationale as the CLI smoke above: catch an unbundled dynamic require at
+# build time, not at the first worker spawn.
+RUN langy-worker --version
+
 # Drop the Go mono-binary in place; it is the image ENTRYPOINT (below), invoked
 # with the `langyagent` subcommand so it runs the manager as PID 1 DIRECTLY — no
-# shell wrapper. PID 1 is required for the orphan reaper: opencode's children
+# shell wrapper. PID 1 is required for the orphan reaper: a worker's children
 # (gh/git/npm) reparent to the manager on a worker kill, and only PID 1 may reap
 # them.
 COPY --from=builder /out/langyagent /usr/local/bin/langyagent
@@ -301,6 +311,21 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
     chmod 0755 /workspace
 
 ENV HOME=/root
+# The `langwatch` CLI here is a Bun-compiled binary (the cli-builder stage
+# above), and Bun can auto-upload a crash report to a third party. A Bun crash
+# report reprints the process argv, and argv for `langwatch ui call` carries
+# the customer's own payload: prompt text, dataset field names, evaluator ids.
+# That data must never leave this worker, so the upload is turned off here
+# rather than left to the default of whichever platform the image runs on.
+# DO_NOT_TRACK is Bun's documented switch for it and is equivalent to
+# `telemetry = false` in bunfig.toml. It stops the upload only: Bun still
+# prints its crash banner to stderr, which no Bun setting suppresses.
+#
+# The manager passes an allowlisted environment to its workers, and the CLI
+# runs in a worker, so this ENV only reaches it because DO_NOT_TRACK is listed
+# in services/langyagent/internal/workerenv/workerenv.go. Both halves are
+# needed; a test asserts them together.
+ENV DO_NOT_TRACK=1
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/langyagent"]

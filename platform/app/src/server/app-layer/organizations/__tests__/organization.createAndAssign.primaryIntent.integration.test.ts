@@ -105,11 +105,13 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
         )?.primaryIntent;
 
       // undefined leaves the current value untouched
-      await repository.update({ organizationId: orgId, name: "Renamed" });
+      await repository.updateSettings({
+        organizationId: orgId,
+        name: "Renamed",
+      });
       expect(await readIntent()).toBe("AGENT_GOVERNANCE");
 
-      // a value flips it
-      await repository.update({
+      await repository.updateSettings({
         organizationId: orgId,
         name: "Renamed",
         primaryIntent: "LLM_OPS",
@@ -117,7 +119,7 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
       expect(await readIntent()).toBe("LLM_OPS");
 
       // null clears back to legacy behavior
-      await repository.update({
+      await repository.updateSettings({
         organizationId: orgId,
         name: "Renamed",
         primaryIntent: null,

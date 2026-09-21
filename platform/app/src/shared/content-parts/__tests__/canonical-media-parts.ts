@@ -78,6 +78,32 @@ export const EXTRACTABLE_PART_EXAMPLES: CanonicalPartExample[] = [
       source: { type: "data", value: AUDIO_B64, mimeType: "audio/wav" },
     },
   },
+  {
+    name: "Anthropic image block with a base64 source",
+    part: {
+      type: "image",
+      source: { type: "base64", media_type: "image/png", data: PNG_B64 },
+    },
+  },
+  {
+    name: "Anthropic document block with a base64 source",
+    part: {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: PNG_B64,
+      },
+    },
+  },
+  {
+    name: "Gemini inline_data part",
+    part: { inline_data: { mime_type: "application/pdf", data: PNG_B64 } },
+  },
+  {
+    name: "Gemini inlineData part (JavaScript SDK spelling)",
+    part: { inlineData: { mimeType: "image/png", data: PNG_B64 } },
+  },
 ];
 
 /**
@@ -111,6 +137,22 @@ export const NON_EXTRACTABLE_PART_EXAMPLES: CanonicalPartExample[] = [
   {
     name: "string-form external http image_url",
     part: { type: "image_url", image_url: "https://cdn.example/i.png" },
+  },
+  {
+    name: "Anthropic image block pointing at a hosted URL",
+    part: {
+      type: "image",
+      source: { type: "url", url: "https://cdn.example/i.png" },
+    },
+  },
+  {
+    name: "Gemini file_data part naming a provider-hosted file",
+    part: {
+      file_data: {
+        file_uri: "gs://bucket/report.pdf",
+        mime_type: "application/pdf",
+      },
+    },
   },
   {
     name: "text part",

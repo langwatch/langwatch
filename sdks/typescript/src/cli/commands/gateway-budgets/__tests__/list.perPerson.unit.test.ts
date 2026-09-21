@@ -59,12 +59,9 @@ async function renderedTable(
   rows: Array<Record<string, unknown>>,
 ): Promise<string> {
   // `list()` walks the endpoint's pages to exhaustion, so what it hands the
-  // command is the whole listing and its cursor is spent.
-  mockList.mockResolvedValue({
-    budgets: rows,
-    spend_available: true,
-    next_cursor: null,
-  });
+  // command is the whole listing as a plain array, with no cursor left to
+  // carry and no envelope to unwrap.
+  mockList.mockResolvedValue(rows);
   const lines: string[] = [];
   const spy = vi
     .spyOn(console, "log")

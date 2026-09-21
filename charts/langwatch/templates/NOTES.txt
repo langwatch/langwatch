@@ -95,19 +95,26 @@ dev's Personal Workspace at https://<your-host>/me .
     normal runtime, so a worker that escapes its container faces the node
     kernel. Hardening that last step is a sandboxed RuntimeClass:
       https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
-{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
-       that this install is not using. `lookup` is empty during `helm template`
-       and GitOps renders, so this stays silent there rather than guessing. */}}
-{{- $sandboxed := list }}
-{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
-{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
-{{- $sandboxed = append $sandboxed .metadata.name }}
-{{- end }}
-{{- end }}
-{{- if $sandboxed }}
-    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
-      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
-{{- end }}
+{{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
+       cluster's own sandboxed classes would take a cluster-scoped list of
+       RuntimeClass, and `lookup` reports an RBAC denial as a template error
+       rather than as an empty result. Where the installer may not list
+       cluster-scoped resources, that turned this optional hint into a hard
+       UPGRADE FAILED, and a Go template cannot recover from it. So the
+       operator runs the check instead, where a denial costs them nothing.
+       No `helm template` catches a regression here: with no cluster behind
+       the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
+    To see whether this cluster already offers one:
+      kubectl get runtimeclass
+    If that is denied, nothing is broken: it is a cluster-scoped read, which
+    is exactly what a namespace-scoped operator does not have. Langy keeps
+    running as it is — ask whoever administers the cluster whether a class
+    exists to pin.
+    gVisor reports a handler of runsc; Kata ships under several, such as
+    kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
+    platform-specific, so confirm against your platform's documentation
+    rather than the name alone. To pin Langy to a class:
+      langyagent.runtimeClassName=<class>  langyagent.acceptUnsandboxedRuntime=false
 {{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to
@@ -179,6 +186,36 @@ backend for you:
         clusters). Expect a brief downtime per upgrade; set app/workers
         deployment.strategy explicitly to override. Zero-downtime
         upgrades require S3-backed stored objects instead of local-FS.
+{{- if and .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades }}
+      • That rollout is per Deployment, and a helm upgrade rolls both at
+        once. So two hook Jobs keep the workers off the volume while the
+        app rolls: a pre-upgrade Job scales the workers to 0 and waits
+        for their pods to go away, and a post-upgrade Job holds them at 0
+        until the app rollout finishes, then scales them back to
+        workers.replicaCount. Without the second Job the new workers pod
+        follows the still-terminating old app pod back to the old node
+        and wedges the new app pod there. The Jobs need a ServiceAccount
+        token and a small namespaced Role (get on the app and the workers
+        Deployments, patch on the workers' scale, read on pods). Turn
+        them off with
+        app.storedObjects.localFilesystem.serializeUpgrades=false if you
+        order the rollout yourself or your cluster forbids that RBAC. If
+        the pre-upgrade Job fails, the upgrade stops and the workers stay
+        at 0: read the Job logs, then run the upgrade again to bring them
+        back.
+      • Both Jobs run on `helm rollback` too. They cannot cover a
+        rollback to a chart version from before they existed, because
+        helm runs the TARGET revision's hooks: scale
+        {{ .Release.Name }}-workers to 0 by hand before such a downgrade
+        and back up after it.
+{{- else if .Values.workers.enabled }}
+      • Upgrade ordering is OFF
+        (app.storedObjects.localFilesystem.serializeUpgrades=false), and
+        the app and the workers both mount this volume. Scale the workers
+        to 0 yourself before every upgrade and back up after it, or the
+        two rollouts can wedge each other on an RWO multi-attach error on
+        a cluster with more than one node.
+{{- end }}
       • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
@@ -221,6 +258,14 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+    - LWQL_CLICKHOUSE_PASSWORD        (external ClickHouse only; optional —
+    - LWQL_POSTGRES_READER_PASSWORD    if absent, LangWatchQL simply stays
+                                       unprovisioned instead of failing. On
+                                       chart-managed ClickHouse these live in
+                                       the ClickHouse credentials Secret, not
+                                       here — see Section 8.)
+{{- end }}
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
 {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
@@ -256,7 +301,11 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or (include "langwatch.lwql.selfProvisionActive" .) (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+{{- end }}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+      --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
+      --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
@@ -268,4 +317,96 @@ message.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if and .Values.clickhouse.chartManaged (not .Values.autogen.enabled) }}
+{{- $chSecret := include "langwatch.clickhouse.secretName" . }}
+{{- $chLwql := .Values.clickhouse.lwqlAccessModel | default dict }}
+{{- $lwqlKey := $chLwql.passwordSecretKey | default "lwql_password" }}
+{{- $lwqlPgKey := ($chLwql.postgres | default dict).passwordSecretKey | default "lwql_pg_password" }}
+
+  {{ $chSecret }} keys (chart-managed ClickHouse, autogen.enabled=false):
+  With autogen off, templates/clickhouse/url-secret.yaml does NOT render, so
+  the chart never creates the ClickHouse credentials Secret — you must
+  pre-create it. The app composes CLICKHOUSE_URL from `password`, and a
+  replicated cluster shares `clusterSecret` for inter-node/Keeper auth;
+  NOTES never documented these keys before.
+    - password         (ClickHouse `default` user password)
+    - clusterSecret    (inter-node/Keeper auth for replicated clusters)
+{{- if .Values.lwql.enabled }}
+    - {{ $lwqlKey }}       (LangWatchQL restricted identity password)
+    - {{ $lwqlPgKey }}    (LangWatchQL PostgreSQL bridge role password)
+
+  The app mounts {{ $lwqlKey }} / {{ $lwqlPgKey }} from this Secret with
+  optional:true, so a MISSING key is SILENT — no CreateContainerConfigError,
+  the pod boots and langwatch_lwql is simply never created. If LangWatchQL
+  never appears, confirm both keys exist on this Secret.
+{{- end }}
+
+  Pre-create command:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $chSecret }} \
+      --from-literal=password="$(openssl rand -hex 32)" \
+      --from-literal=clusterSecret="$(openssl rand -hex 32)"{{ if .Values.lwql.enabled }} \
+      --from-literal={{ $lwqlKey }}="$(openssl rand -hex 32)" \
+      --from-literal={{ $lwqlPgKey }}="$(openssl rand -hex 32)"{{ end }}
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+8. LangWatchQL (LWQL) — governed analytics SQL
+──────────────────────────────────────────────────────────────────────
+{{- if .Values.lwql.enabled }}
+The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with `lwql_not_enabled`
+while the backend objects sit ready.
+
+{{- if .Values.clickhouse.chartManaged }}
+Whoever owns the ClickHouse server owns the access model. Your ClickHouse is
+chart-managed, so the ClickHouse pods render the LangWatchQL restricted
+identity, its settings profile, grants, tenant row filters and the
+`lwql_postgres` bridge as config at boot — set `clickhouse.lwqlAccessModel.enabled=true`
+on the clickhouse-serverless subchart and supply the two LWQL passwords
+(`lwql_password`, `lwql_pg_password`) in the ClickHouse credentials Secret.
+With autogen.enabled=true the chart generates them; with autogen off you
+pre-create that Secret yourself — Section 7 lists the exact Secret name and
+keys. The application does NOT issue that DDL (one owner per entity name), and
+still creates the views, engine tables and key-map rows it must.
+{{- if eq (include "langwatch.lwql.postgresBridgeDisabled" .) "true" }}
+
+⚠ LangWatchQL Postgres bridge disabled: clickhouse.lwqlAccessModel.postgres.host
+is empty, so the lwql_postgres named collection has no PostgreSQL to dial.
+Postgres-resident LangWatchQL datasets stay unavailable until you set
+clickhouse.lwqlAccessModel.postgres.host (and .database/.user if they differ from
+the lwql_ro reader). Nothing else is affected today — no shipped LangWatchQL view
+reads through this bridge yet (langwatch-saas#7387).
+{{- end }}
+{{- if eq (include "langwatch.lwql.externalPostgresBridgeActive" .) "true" }}
+
+⚠ LangWatchQL Postgres bridge dials your EXTERNAL PostgreSQL as the read-only
+role lwql_ro. The chart does not provision that role on a PostgreSQL it does not
+own, so confirm you have: (1) created lwql_ro on your PostgreSQL — read-only,
+granted SELECT on the approved lwql_* views only, never the superuser; and (2)
+supplied clickhouse.lwqlAccessModel.existingSecret carrying BOTH keys —
+lwql_pg_password (the lwql_ro reader password) AND lwql_password (the
+langwatch_lwql ClickHouse identity password). That one Secret is the source of
+both: ClickHouse mounts it for the lwql_postgres collection AND creates the
+langwatch_lwql identity from it, and the app/workers read the query password
+(LWQL_CLICKHOUSE_PASSWORD) from it too. Both mounts are optional, so a Secret
+missing either key installs without error and silently leaves that identity
+with a password nobody set — the bridge (lwql_pg_password) or every query
+(lwql_password) then stays dead and LangWatchQL datasets fail to load.
+{{- end }}
+{{- else }}
+Your ClickHouse is external, so the chart cannot render config into it: the app
+self-provisions the LangWatchQL backend on every boot — a restricted identity,
+settings profile, row policies, a read-only PostgreSQL role and the analytics
+views. This needs the admin user allowed access-management DDL
+(`access_management`, `named_collection_control`) and the server to declare the
+`custom_` settings prefix. The `langwatch/clickhouse-serverless` image ships
+both; on other servers, add them or set lwql.enabled=false. If the server
+refuses the DDL the app logs it and LangWatchQL stays unavailable — nothing
+else breaks.
+{{- end }}
+{{- else }}
+Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
+and the endpoints refuse every query.
 {{- end }}

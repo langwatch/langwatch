@@ -336,6 +336,15 @@ async function handleBatchCommands<EventType extends Event>(args: {
     );
     const events = await handler.handle(command);
     validateHandlerEvents(events, commandType);
+    // Only a command that contributed events is "handled" for cleanup
+    // purposes, mirroring the single path's `if (events.length > 0)` gate. A
+    // handler may legitimately return nothing — RecordMetricCorrelationCommand
+    // drops a malformed exemplar that way — and running its post-store cleanup
+    // off the back of some OTHER payload's successful append would release a
+    // resource for a command that never became durable.
+    if (events.length === 0) {
+      continue;
+    }
     handledCommands.push(command);
     for (const event of events) {
       allEvents.push(event);

@@ -5,7 +5,7 @@ description: Track whether users leave before the LLM response completes to iden
 
 Waited to finish events are used to determine if users are waiting for the LLM application to finish generating a response or if they leave before it's completed. This is useful for capturing user impatience with regards to the response generation.
 
-Since the user can simply close the window, to track this behavior, you need to send two requests: first with `finished` set as `0` to identify the output has started, and another one with `finished` set as `1` when the output finishes at client side. If `"finished": 1` is never received, LangWatch assumes the user didn't let the AI finish.
+Since the user can close the window, to track this behavior, you need to send two requests: first with `finished` set as `0` to identify the output has started, and another one with `finished` set as `1` when the output finishes at client side. If `"finished": 1` is never received, LangWatch assumes the user didn't let the AI finish.
 
 ## REST API Specification
 

@@ -1,4 +1,4 @@
-import { chakra, HStack, Link } from "@chakra-ui/react";
+import { chakra, HStack, Link, type SystemStyleObject } from "@chakra-ui/react";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -13,6 +13,13 @@ export interface ErrorActionsProps {
    * (ADR-045).
    */
   traceId?: string;
+  /**
+   * The row's colour, and the docs link's. A surface that paints a saturated
+   * fill passes `inherit` for both: the fill already sets a contrast colour,
+   * and an accent has nothing to sit on there.
+   */
+  color?: SystemStyleObject["color"];
+  accentColor?: SystemStyleObject["color"];
 }
 
 /**
@@ -22,7 +29,12 @@ export interface ErrorActionsProps {
  * affordances — the only difference between the two surfaces should be where
  * they sit, not what they let you do.
  */
-export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
+export function ErrorActions({
+  docsUrl,
+  traceId,
+  color = "fg.subtle",
+  accentColor = "orange.fg",
+}: ErrorActionsProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
   // Read the clipboard API after mount, never during render: Node defines
@@ -54,7 +66,7 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
   if (!docsUrl && !traceId) return null;
 
   return (
-    <HStack gap={3} marginTop={2} fontSize="11.5px" color="fg.subtle">
+    <HStack gap={3} marginTop={2} fontSize="11.5px" color={color}>
       {docsUrl && (
         <Link
           href={docsUrl}
@@ -67,7 +79,7 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           fontWeight="560"
           // The one accent, spent on the action — matching Langy's rule that
           // colour goes on the way forward, not on the trouble.
-          color="orange.fg"
+          color={accentColor}
           textDecoration="none"
           _hover={{ textDecoration: "underline" }}
         >
@@ -99,8 +111,9 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           alignItems="center"
           gap={1}
           cursor="pointer"
-          transition="color .12s ease"
-          _hover={{ color: "fg.muted" }}
+          // Underline rather than a colour shift, which needs to know what it
+          // is painted on. This reads the same on a panel and on a fill.
+          _hover={{ textDecoration: "underline" }}
           // No `aria-label`: the visible text already names the action, and an
           // override that says something ELSE ("Error ID copied" over a button
           // reading "Copied") breaks voice control, which targets what the user

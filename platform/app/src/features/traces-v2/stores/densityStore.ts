@@ -12,7 +12,7 @@ const STORAGE_KEY = "langwatch:traces-v2:density:v1";
 // Existing users with an explicit `compact` / `comfortable` choice in
 // localStorage are unaffected — the load() function below only falls
 // back to this default when nothing is persisted yet.
-const DEFAULT_DENSITY: Density = "comfortable";
+export const DEFAULT_DENSITY: Density = "comfortable";
 
 /**
  * Density is a personal preference, not a per-lens or per-URL setting.

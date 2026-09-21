@@ -2,10 +2,11 @@
  * @vitest-environment node
  *
  * Integration coverage for the no-paste convergence — `credential_type`
- * discriminator that lets `langwatch login` mint either:
+ * discriminator that lets `langwatch login` obtain either:
  *
  *   - a device session (existing behavior, default for back-compat) → returns
- *     access+refresh tokens + personal VK; CLI persists to ~/.langwatch/config.json
+ *     access+refresh tokens and no credential; CLI persists to
+ *     ~/.langwatch/config.json
  *   - a project API key (new) → returns the user-picked project's existing
  *     apiKey verbatim; CLI persists `LANGWATCH_API_KEY=...` to $CWD/.env
  *
@@ -17,8 +18,11 @@
  *
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import { prisma } from "~/server/db";
 import {
@@ -52,8 +56,13 @@ async function callExchange(deviceCode: string) {
 }
 
 describe("CLI credential_type discriminator — no-paste convergence", () => {
+  /** The container's connection; /api/auth/cli/* requires one on the App. */
+  let redisConnection: Redis | null = null;
+
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
 
     await prisma.organization.create({
       data: {
@@ -97,6 +106,7 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
   });
 
   afterAll(async () => {
+    await resetApp();
     await prisma.project
       .deleteMany({ where: { id: PROJECT_ID } })
       .catch(() => {});
@@ -183,12 +193,6 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
         deviceCode: dc.device_code,
         userId: USER_ID,
         organizationId: ORG_ID,
-        personalVk: {
-          id: `vk-credtype-${suffix}`,
-          label: "default",
-          secret: `sk-vk-credtype-${suffix}-${"a".repeat(40)}`,
-          base_url: "https://gateway.langwatch.ai",
-        },
       });
       expect(approval.approved).toBe(true);
 
@@ -199,7 +203,9 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
       expect(ex.kind).toBe("device_session");
       expect(ex.access_token).toEqual(expect.stringMatching(/^lw_at_/));
       expect(ex.refresh_token).toEqual(expect.stringMatching(/^lw_rt_/));
-      expect(ex.default_personal_vk).toBeDefined();
+      // Approval carries no virtual key. The CLI asks for one through
+      // POST /api/auth/cli/virtual-key when a tool first uses the gateway.
+      expect(ex.default_personal_vk).toBeUndefined();
       // No api_key field in device_session mode.
       expect(ex.api_key).toBeUndefined();
       expect(ex.endpoint).toEqual(expect.stringMatching(/^https?:\/\//));

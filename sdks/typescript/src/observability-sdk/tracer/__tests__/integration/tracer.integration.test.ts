@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "../..";
-import { NoOpLogger } from "../../../../logger";
+import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
 import * as semconv from "../../../semconv";
-import { setupObservability } from "../../../setup/node";
+import type { setupObservability } from "../../../setup/node";
 
 /**
  * Integration tests for LangWatch tracer with real OpenTelemetry setup.
@@ -55,14 +55,9 @@ describe("Tracer Integration Tests", () => {
 
     // Setup observability with real OpenTelemetry SDK
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
-    observabilityHandle = setupObservability({
+    observabilityHandle = createIntegrationObservability({
       serviceName: "tracer-integration-test",
-      langwatch: "disabled",
       spanProcessors: [spanProcessor],
-      debug: { logger: new NoOpLogger() },
-      advanced: {
-        throwOnSetupError: true,
-      },
       attributes: {
         "test.suite": "tracer-integration",
         "test.environment": "vitest"

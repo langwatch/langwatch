@@ -9,7 +9,7 @@ import slackShared, {
 import webhookShared, {
   type WebhookPreview,
 } from "@langwatch/automations/providers/webhook";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import annotationQueueClient, {
   type AnnotationQueueSlice,
 } from "./annotationQueue/client";

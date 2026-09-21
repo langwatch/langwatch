@@ -12,10 +12,18 @@ Feature: Shared section navigation layout
     And the content column uses only the space remaining beside the local navigation
 
     Examples:
-      | section       |
-      | Automations   |
-      | AI Gateway    |
-      | AI Governance |
+      | section     |
+      | Automations |
+
+  # A fixed-width rail that never shrinks does not degrade on a phone, it
+  # disappears: the content column is left with a handful of pixels and the
+  # page it was framing cannot be read at all.
+  @integration
+  Scenario: The local navigation stops taking a column on a narrow viewport
+    Given I open a section workspace on a phone-width screen
+    Then the local navigation sits above the content instead of beside it
+    And it scrolls sideways rather than pushing the content off the screen
+    And the content column gets the full width of the page
 
   Scenario: Keep product-level and local navigation labels distinct
     Given I open the primary project navigation
@@ -24,3 +32,16 @@ Feature: Shared section navigation layout
     When I open the Automations destination
     Then the first local navigation item is named "Overview"
     And the page heading is named "Overview"
+
+  # The product sidebar already lists the Gateway and Governance pages, so
+  # their local rail would be the same list twice.
+  @integration
+  Scenario: The rail stands down when the product sidebar carries the pages
+    Given I open a Gateway or Governance page
+    Then the local navigation rail is not there
+    And the content takes the full width of the card
+
+  @integration
+  Scenario: A rail of page-local destinations stays
+    Given I open the Automations workspace
+    Then its local navigation rail renders

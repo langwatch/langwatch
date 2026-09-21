@@ -9,7 +9,6 @@
  * the pipeline's own applier.
  */
 
-import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -20,6 +19,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
@@ -48,18 +48,13 @@ import {
 import { WebhookEndpointService } from "../webhookEndpoint.service";
 import { WebhookHealthService } from "../webhookHealth.service";
 
-vi.mock(
-  "~/server/app-layer/automations/delivery/sendWebhook",
-  async (importOriginal) => {
-    const original =
-      await importOriginal<
-        typeof import("~/server/app-layer/automations/delivery/sendWebhook")
-      >();
-    return { ...original, sendWebhook: vi.fn() };
-  },
-);
+vi.mock("~/server/webhooks/sendWebhook", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("~/server/webhooks/sendWebhook")>();
+  return { ...original, sendWebhook: vi.fn() };
+});
 
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
+import { sendWebhook } from "~/server/webhooks/sendWebhook";
 
 const sendWebhookMock = vi.mocked(sendWebhook);
 
@@ -167,6 +162,11 @@ function confirmedEnvelope(
         cache_read_input_tokens: 0,
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
+        cache_creation_1h_tokens: 0,
+        input_audio_tokens: 0,
+        output_audio_tokens: 0,
+        input_chars: 0,
+        audio_ms: 0,
       },
       cost_nano_usd: CONFIRMED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
@@ -193,6 +193,11 @@ function failedEnvelope(requestId: string): ProcessEventEnvelope {
         cache_read_input_tokens: 0,
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
+        cache_creation_1h_tokens: 0,
+        input_audio_tokens: 0,
+        output_audio_tokens: 0,
+        input_chars: 0,
+        audio_ms: 0,
       },
       cost_nano_usd: FAILED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
@@ -319,6 +324,7 @@ beforeEach(() => {
   deps = {
     processStore: store,
     endpoints,
+    prisma,
     getPlan: async () =>
       ({ webhookEndpointsEnabled: true }) as Awaited<
         ReturnType<WebhookDeliveryProcessDeps["getPlan"]>

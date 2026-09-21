@@ -12,7 +12,11 @@ const { publicEnvMock, activePlanMock, ssoGateRef } = vi.hoisted(() => ({
   activePlanMock: vi.fn(),
   ssoGateRef: {
     current: undefined as
-      | { configuredProvider: string | null; licensed: boolean }
+      | {
+          configuredProvider: string | null;
+          licensed: boolean;
+          mounted: boolean;
+        }
       | undefined,
   },
 }));
@@ -48,7 +52,11 @@ describe("<EnterpriseCapabilitiesSection />", () => {
     activePlanMock.mockReturnValue({ isEnterprise: false, isLoading: false });
     // The common shape: no identity provider configured, so there is nothing
     // for the unlicensed-SSO notice to report.
-    ssoGateRef.current = { configuredProvider: null, licensed: true };
+    ssoGateRef.current = {
+      configuredProvider: null,
+      licensed: true,
+      mounted: true,
+    };
   });
 
   afterEach(cleanup);
@@ -135,7 +143,11 @@ describe("<EnterpriseCapabilitiesSection />", () => {
   describe("given single sign-on is configured but the deployment is unlicensed", () => {
     beforeEach(() => {
       selfHosted();
-      ssoGateRef.current = { configuredProvider: "auth0", licensed: false };
+      ssoGateRef.current = {
+        configuredProvider: "auth0",
+        licensed: false,
+        mounted: false,
+      };
     });
 
     /** @scenario An operator whose single sign-on is configured but unlicensed is told so */
@@ -149,21 +161,71 @@ describe("<EnterpriseCapabilitiesSection />", () => {
     });
   });
 
+  /**
+   * A licensed deployment whose provider name is wrong, or whose client
+   * credentials are unset, lands in the same email mode as one that never
+   * configured single sign-on. That is the no-lockout guarantee working, but
+   * the sign-in page cannot say so, and an operator who cannot tell the two
+   * apart may believe federation is being enforced when it is not.
+   */
+  describe("given single sign-on is licensed but the provider could not be started", () => {
+    beforeEach(() => {
+      selfHosted();
+      ssoGateRef.current = {
+        configuredProvider: "cognito",
+        licensed: true,
+        mounted: false,
+      };
+    });
+
+    /** @scenario An operator whose identity provider could not be started is told so */
+    it("names the provider it could not start and says everyone is on email", () => {
+      renderSection();
+
+      expect(screen.getByTestId("sso-not-started-notice")).toBeTruthy();
+      expect(
+        screen.getByText(
+          "Single sign-on is configured but could not be started",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText("cognito")).toBeTruthy();
+      expect(screen.getByText(/signing in by email/i)).toBeTruthy();
+    });
+
+    /** @scenario An operator whose identity provider could not be started is told so */
+    it("points at the two things that cause it rather than at the license", () => {
+      renderSection();
+
+      expect(screen.getByText(/client credentials are set/i)).toBeTruthy();
+      expect(screen.queryByText(/not licensed/i)).toBeNull();
+      expect(screen.queryByTestId("sso-unlicensed-notice")).toBeNull();
+    });
+  });
+
   describe("given single sign-on is configured and licensed", () => {
     it("says nothing, because there is nothing to explain", () => {
       selfHosted();
-      ssoGateRef.current = { configuredProvider: "auth0", licensed: true };
+      ssoGateRef.current = {
+        configuredProvider: "auth0",
+        licensed: true,
+        mounted: true,
+      };
 
       renderSection();
 
       expect(screen.queryByTestId("sso-unlicensed-notice")).toBeNull();
+      expect(screen.queryByTestId("sso-not-started-notice")).toBeNull();
     });
   });
 
   describe("given no identity provider is configured at all", () => {
     it("says nothing, since the deployment never asked for single sign-on", () => {
       selfHosted();
-      ssoGateRef.current = { configuredProvider: null, licensed: true };
+      ssoGateRef.current = {
+        configuredProvider: null,
+        licensed: true,
+        mounted: true,
+      };
 
       renderSection();
 

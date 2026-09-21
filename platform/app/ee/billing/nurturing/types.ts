@@ -1,7 +1,7 @@
 /**
  * Customer.io trait schema contract.
  *
- * Defines the complete data model pushed to Customer.io by reactors and hooks.
+ * Defines the complete data model pushed to Customer.io by subscribers and hooks.
  * All call sites use these typed parameters instead of ad-hoc Record<string, unknown>.
  */
 
@@ -40,7 +40,7 @@ export interface CioPersonTraits {
   utm_content?: string;
   referrer?: string;
 
-  // Trace milestones (customerIoTraceSync reactor)
+  // Trace milestones (customerIoTraceSync subscriber)
   has_traces: boolean;
   sdk_language: string;
   sdk_framework: string;
@@ -50,7 +50,7 @@ export interface CioPersonTraits {
   last_trace_at: string;
   trace_count_updated_at: string;
 
-  // Evaluation milestones (customerIoEvaluationSync reactor)
+  // Evaluation milestones (customerIoEvaluationSync subscriber)
   has_evaluations: boolean;
   evaluation_count: number;
   first_evaluation_at: string;
@@ -60,7 +60,7 @@ export interface CioPersonTraits {
   has_prompts: boolean;
   prompt_count: number;
 
-  // Simulation milestones (customerIoSimulationSync reactor)
+  // Simulation milestones (customerIoSimulationSync subscriber)
   has_simulations: boolean;
   simulation_count: number;
   first_simulation_at: string;
@@ -77,6 +77,19 @@ export interface CioPersonTraits {
   // Billing
   plan: string;
   has_subscription: boolean;
+
+  // Guided onboarding (guidedOnboarding hook and the first-login backfill).
+  // "guided" | "classic"; absent for organizations that predate the experiment.
+  onboarding_variant?: string;
+  // Comma list of the picked paths in pick order, e.g. "gateway,llmops".
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_provider?: string;
+  // "completed" | "skipped"
+  guided_onboarding_tour?: string;
+  // Comma list of the paths whose setup completed.
+  guided_onboarding_completed_paths?: string;
+  guided_onboarding_completed_at?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +102,10 @@ export interface CioOrgTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  onboarding_variant?: string;
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_completed_paths?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +124,13 @@ export type CioEventName =
   | "first_prompt_created"
   | "first_simulation_ran"
   | "joined_via_invite"
-  | "joined_via_sso";
+  | "joined_via_sso"
+  | "onboarding_paths_selected"
+  | "onboarding_path_llmops"
+  | "onboarding_path_coding_agents"
+  | "onboarding_path_gateway"
+  | "onboarding_path_governance"
+  | "guided_onboarding_path_completed";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

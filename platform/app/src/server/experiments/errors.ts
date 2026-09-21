@@ -61,3 +61,147 @@ export class InvalidExperimentConfigurationError extends HandledError {
     this.name = "InvalidExperimentConfigurationError";
   }
 }
+
+/**
+ * Raised when a workbench operation is asked to act on an experiment that is
+ * not an evaluations workbench (a DSPy run, a legacy batch evaluation).
+ *
+ * The caller can act: the id or slug it sent names a different kind of
+ * experiment, so it has to send another one. The REST workbench endpoints
+ * serialise only a `HandledError`, so a plain `Error` here answered a
+ * type mismatch with 500 and a trace id instead of the documented 400.
+ *
+ * `mapExperimentError` on the tRPC router still turns it into BAD_REQUEST,
+ * so the tRPC answer does not change.
+ */
+export class ExperimentTypeMismatchError extends HandledError {
+  declare readonly code: "experiment_type_mismatch";
+
+  constructor() {
+    super(
+      "experiment_type_mismatch",
+      "This experiment is not an evaluation workbench",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "ExperimentTypeMismatchError";
+  }
+}
+
+/**
+ * Raised when a workbench save names a version that is no longer the stored
+ * one: someone else (a person in another tab, or the agent) already saved on
+ * top of the state this writer read. The write is refused BEFORE anything is
+ * written, so the two edits never half-merge.
+ *
+ * `currentVersion` rides in `meta` because reloading is the whole remedy and a
+ * client that already holds the newer state can act on the number without a
+ * second round trip. `actorLabel` rides with it so the page can name who wrote
+ * the newer version instead of telling the reader it came from "somewhere
+ * else" when it came from Langy, in that very tab.
+ */
+export class StaleWorkbenchStateError extends HandledError {
+  declare readonly code: "experiment_stale_workbench_state";
+
+  constructor({
+    currentVersion,
+    actorLabel,
+    runId,
+  }: {
+    currentVersion: number;
+    actorLabel?: string;
+    /**
+     * The run that wrote the newer version, when a run wrote it. A page that
+     * started that run adopts the version instead of standing down, so its own
+     * run's write does not cost the reader their unsaved edits.
+     */
+    runId?: string;
+  }) {
+    super(
+      "experiment_stale_workbench_state",
+      "This evaluation changed since you loaded it",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: {
+          currentVersion,
+          ...(actorLabel !== undefined ? { actorLabel } : {}),
+          ...(runId !== undefined ? { runId } : {}),
+        },
+      },
+    );
+    this.name = "StaleWorkbenchStateError";
+  }
+}
+
+/**
+ * Raised when a workbench save points at a prompt, agent, evaluator, workflow
+ * or dataset that this project does not have. The reference is usually a row
+ * that was deleted while the workbench held it, so the caller can act: remove
+ * the target, or point it at something that exists.
+ *
+ * `refType` and `refId` ride in `meta` so a UI can highlight the offending
+ * target rather than describing it in prose.
+ */
+export class WorkbenchMissingReferenceError extends HandledError {
+  declare readonly code: "experiment_workbench_missing_reference";
+
+  constructor({ refType, refId }: { refType: string; refId: string }) {
+    super(
+      "experiment_workbench_missing_reference",
+      "This evaluation points at something that no longer exists",
+      { httpStatus: 400, fault: "customer", meta: { refType, refId } },
+    );
+    this.name = "WorkbenchMissingReferenceError";
+  }
+}
+
+/**
+ * Raised when a workbench save carries a state that does not match the
+ * persisted schema. Unlike `InvalidExperimentConfigurationError` (a stored
+ * blob nobody typed), this one is the incoming payload, so it is the caller's
+ * to fix and `fault` stays `customer`.
+ *
+ * `issues` is a short summary of the zod issues (path + message), which is
+ * what an agent caller needs to correct its own payload and retry.
+ */
+export class InvalidWorkbenchStateError extends HandledError {
+  declare readonly code: "experiment_invalid_workbench_state";
+
+  constructor({
+    issues,
+  }: {
+    issues: readonly { path: string; message: string }[];
+  }) {
+    super(
+      "experiment_invalid_workbench_state",
+      "This evaluation's setup could not be saved",
+      { httpStatus: 400, fault: "customer", meta: { issues } },
+    );
+    this.name = "InvalidWorkbenchStateError";
+  }
+}
+
+/**
+ * Raised when a restore or a version read names a version number this
+ * experiment never had. Distinct from `experiment_not_found`: the experiment
+ * is there, and the caller only has to pick another entry from its list.
+ */
+export class ExperimentVersionNotFoundError extends NotFoundError {
+  declare readonly code: "experiment_version_not_found";
+
+  constructor({
+    experimentId,
+    version,
+  }: {
+    experimentId: string;
+    version: number;
+  }) {
+    super(
+      "experiment_version_not_found",
+      "Experiment version",
+      String(version),
+      { meta: { experimentId, version } },
+    );
+    this.name = "ExperimentVersionNotFoundError";
+  }
+}

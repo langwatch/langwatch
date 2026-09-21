@@ -105,15 +105,21 @@ function evalRollupAggExpression(
   metric: EvalRollupMetricKey,
   agg: EvalRollupAggregation,
 ): string {
+  // Verdict metrics (score, pass-rate) only read rows whose evaluation
+  // actually ran to completion — an errored run's stray verdict must not
+  // shift the chart (#6833). Matches the legacy per-evaluator path's
+  // `Status = 'processed'` condition, and covers rollup rows written before
+  // the projection zeroed Pass/FailCount on non-processed events.
+  const processed = `${ra}.Status = 'processed'`;
   switch (metric) {
     case "evaluations.evaluation_score":
       switch (agg) {
         case "sum":
-          return `sum(${ra}.ScoreSum)`;
+          return `sumIf(${ra}.ScoreSum, ${processed})`;
         case "avg":
-          return `sum(${ra}.ScoreSum) / nullIf(sum(${ra}.ScoreCount), 0)`;
+          return `sumIf(${ra}.ScoreSum, ${processed}) / nullIf(sumIf(${ra}.ScoreCount, ${processed}), 0)`;
         case "cardinality":
-          return `sum(${ra}.ScoreCount)`;
+          return `sumIf(${ra}.ScoreCount, ${processed})`;
         default: {
           const _exhaustive: never = agg;
           throw new Error(
@@ -126,11 +132,11 @@ function evalRollupAggExpression(
       // and `cardinality` fall through to their additive shapes.
       switch (agg) {
         case "sum":
-          return `sum(${ra}.PassCount)`;
+          return `sumIf(${ra}.PassCount, ${processed})`;
         case "avg":
-          return `sum(${ra}.PassCount) / nullIf(sum(${ra}.PassCount) + sum(${ra}.FailCount), 0)`;
+          return `sumIf(${ra}.PassCount, ${processed}) / nullIf(sumIf(${ra}.PassCount, ${processed}) + sumIf(${ra}.FailCount, ${processed}), 0)`;
         case "cardinality":
-          return `sum(${ra}.PassCount) + sum(${ra}.FailCount)`;
+          return `sumIf(${ra}.PassCount, ${processed}) + sumIf(${ra}.FailCount, ${processed})`;
         default: {
           const _exhaustive: never = agg;
           throw new Error(

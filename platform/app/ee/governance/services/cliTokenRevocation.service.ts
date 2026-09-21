@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { connection as defaultRedisConnection } from "~/server/redis";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
@@ -14,8 +14,9 @@ type RedisLike = Redis | Cluster;
 /**
  * Force-revoke every CLI device-flow token held by a user.
  *
- * Today, `userService.deactivate` calls `revokeAllSessionsForUser` which
- * clears BetterAuth Postgres + Redis sessions used by the web UI. The CLI
+ * Today, `userService.deactivate` revokes every session through
+ * `SessionRevocationService`, which clears the BetterAuth Postgres rows and
+ * the Redis session cache the web UI reads through. The CLI
  * device-flow tokens (`lwcli:access:*` + `lwcli:refresh:*`) live in Redis
  * independently of BetterAuth — minted by `/api/auth/cli/exchange`,
  * rotated by `/api/auth/cli/refresh`, validated by every authenticated
@@ -35,12 +36,34 @@ type RedisLike = Redis | Cluster;
  * `auth-cli.ts:347-348`.
  */
 export class CliTokenRevocationService {
-  constructor(private readonly redis: RedisLike | undefined) {}
+  constructor(private readonly injectedRedis?: RedisLike | null) {}
 
-  static create(
-    redis: RedisLike | undefined = defaultRedisConnection,
-  ): CliTokenRevocationService {
+  /**
+   * Builds the service. Takes a connection when the caller has one; otherwise
+   * the App's is resolved when a revocation actually runs, not here —
+   * constructing this must stay free, because `UserService` builds one as a
+   * default parameter and would otherwise demand an App just to exist.
+   */
+  static create(redis?: RedisLike | null): CliTokenRevocationService {
     return new CliTokenRevocationService(redis);
+  }
+
+  /**
+   * The injected connection, else the App's, resolved at the point of use.
+   *
+   * `getApp`, not `tryGetApp`: revocation is one of the few places where doing
+   * less is a wrong answer rather than a degraded success. The `null` branch
+   * below is safe only because "this deployment configured no Redis" also means
+   * "there are no CLI tokens to revoke" — which is not what "the App is not
+   * initialized" means. Collapsing the two would report a successful revocation
+   * of nothing and leave live CLI credentials working, the same reasoning that
+   * keeps the CLI token revoker on `getApp` (ADR-093).
+   *
+   * Construction stays App-free regardless, because this getter runs during a
+   * revocation rather than at build time.
+   */
+  private get redis(): RedisLike | undefined {
+    return this.injectedRedis ?? getApp().redis ?? void 0;
   }
 
   static userTokensIndexKey(userId: string): string {

@@ -1,8 +1,22 @@
 ---
 title: "Overview"
-description: "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results."
+description: "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs."
 ---
 
 ## Intro
 
-Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
+Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.
+
+## Addressing an evaluator
+
+The `{evaluator}` segment takes any of three things:
+
+- a built-in id, such as `ragas/faithfulness`. Two-segment ids use the two-segment form of the path.
+- the slug of a monitor configured in your project, which brings that monitor's saved settings with it
+- `evaluators/{slug|id}` for an evaluator you saved, including workflow and code evaluators
+
+`GET /api/evaluations/list` returns the built-in ids along with the `data` fields each one requires. For what an individual evaluator scores and which settings it accepts, see its page under Built-in Evaluators.
+
+## Guardrails
+
+`POST /api/guardrails/{evaluator}/evaluate` is the same call in gating mode. Every outcome carries `passed`, including a skip and an evaluator error, so a request you are guarding is never blocked by the guard itself failing. Check `passed` and let the request through when it is true.

@@ -20,16 +20,16 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
-import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
-import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "~/server/modelProviders/iconsMap";
-import { getModelById } from "~/server/modelProviders/registry";
+} from "~/components/modelProviders/iconsMap";
+import { Link } from "~/components/ui/link";
+import { Tooltip } from "~/components/ui/tooltip";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
+import { getModelById, modelProviders } from "~/server/modelProviders/registry";
 import {
   type LangyModelGroup,
   profileLangyModel,
@@ -48,6 +48,13 @@ interface ModelItem {
   isLangyDefault: boolean;
   profile: ReturnType<typeof profileLangyModel>;
 }
+
+/**
+ * Mirrors the composer's mid-turn placeholder ("Langy is working. You can send
+ * when it stops."), so the two mid-turn sentences read as one voice.
+ */
+const TURN_ACTIVE_HINT =
+  "Langy is working. You can switch models when it stops.";
 
 const MODEL_GROUPS: Array<{
   id: LangyModelGroup;
@@ -100,14 +107,20 @@ const MODEL_GROUPS: Array<{
  * `triggerRef` exposes the pill's button so `/model` in the composer palette can
  * open THIS picker rather than the palette growing a second, divergent copy of
  * the model list.
+ *
+ * Memoized: the pill drags the whole Ark combobox (portal, positioner, every
+ * row) through a render even while closed, and its props are stable strings,
+ * arrays and panel-level callbacks — so a composer render for a palette or
+ * turn-phase change stops here.
  */
-export function LangyModelPill({
+export const LangyModelPill = memo(function LangyModelPill({
   ref: triggerRef,
   model,
   options,
   onChange,
   langyDefaultModel,
   disabled = false,
+  disabledReason,
 }: {
   ref?: React.Ref<HTMLButtonElement>;
   /** Current model, `provider/name`. */
@@ -119,6 +132,13 @@ export function LangyModelPill({
   langyDefaultModel?: string | null;
   /** Lock the picker (e.g. while a turn is in flight) — greyed, can't open. */
   disabled?: boolean;
+  /**
+   * Why the picker is locked. A turn in flight is the one reason worth naming
+   * on hover: the model is still in use and the lock ends by itself.
+   * Any other lock (the panel still loading, for one) stays silent, because
+   * "when it stops" would promise something that is not about to happen.
+   */
+  disabledReason?: "turn-active";
 }) {
   // Langy is a licensed codex surface: declaring `langy.chat` re-admits
   // codex models the shared hook fail-closes everywhere else.
@@ -135,6 +155,15 @@ export function LangyModelPill({
     modelOption?.label ||
     model.split("/").slice(1).join("/") ||
     (modelsLoading ? "Models are still loading…" : "Choose model");
+  const providerLabel = hasCurrentProvider
+    ? modelProviders[currentProvider as ProviderKey].name
+    : "";
+  // Same words the pill shows when it is open for business: the provider it
+  // routes through, then the model name it displays on the rail.
+  const modelInUse = providerLabel
+    ? `${providerLabel} · ${currentLabel}`
+    : currentLabel;
+  const lockedByTurn = disabled && disabledReason === "turn-active";
 
   const [query, setQuery] = useState("");
 
@@ -224,129 +253,169 @@ export function LangyModelPill({
       width="auto"
     >
       {/*
-       * The element Ark anchors the listbox to. Ark positions against the
-       * CONTROL, not the trigger — with no Control rendered there is no anchor,
-       * and the listbox lands in the top-left corner of the viewport. (Feeding
-       * it a rect from the trigger ref via `getAnchorRect` doesn't fix it: on
-       * the first open the ref hasn't landed, so the rect is null, and a null
-       * anchor collapses to the origin just the same.)
-       *
-       * `inline-flex` so it hugs the pill instead of stretching the composer
-       * rail. It must generate a layout box — never `display: contents`, which
-       * has no rect to measure.
+       * While a turn runs the pill is greyed and collapsed to a provider glyph,
+       * which is the one moment someone most wants to read WHICH model is
+       * answering. The tooltip says it, and says why the picker will not open.
+       * It hangs off a wrapper rather than the button so the pointer has
+       * somewhere to land even when the button itself is inert.
        */}
-      <Combobox.Control display="inline-flex" width="auto" minWidth={0}>
-        <Combobox.Trigger asChild>
+      <Tooltip
+        content={
+          <Box>
+            <Text textStyle="xs" fontWeight="600">
+              {modelInUse}
+            </Text>
+            <Text textStyle="xs">{TURN_ACTIVE_HINT}</Text>
+          </Box>
+        }
+        disabled={!lockedByTurn}
+        openDelay={300}
+        showArrow
+      >
+        {/* The tooltip's trigger, and nothing else: it hugs the control so the
+            tooltip points at the pill rather than at the rail. */}
+        <Box display="inline-flex" minWidth={0}>
           {/*
-           * COLLAPSED BY DEFAULT: just the provider glyph, so the rail stays a row
-           * of quiet icons and the model name doesn't eat a third of the composer.
-           * It expands on hover — and on `:focus-visible`, so a keyboard user sees
-           * exactly what a mouse user sees before committing — and stays expanded
-           * while the listbox is open (`[data-state="open"]`).
+           * The element Ark anchors the listbox to. Ark positions against the
+           * CONTROL, not the trigger — with no Control rendered there is no
+           * anchor, and the listbox lands in the top-left corner of the
+           * viewport. (Feeding it a rect from the trigger ref via
+           * `getAnchorRect` doesn't fix it: on the first open the ref hasn't
+           * landed, so the rect is null, and a null anchor collapses to the
+           * origin just the same.)
            *
-           * Purely a CSS width transition on a wrapper, so nothing re-renders and
-           * the button never loses focus mid-expand. The full model name is always
-           * in `aria-label`, so the collapsed state is never a loss for assistive
-           * tech — only for pixels.
+           * `inline-flex` so it hugs the pill instead of stretching the
+           * composer rail. It must generate a layout box — never
+           * `display: contents`, which has no rect to measure.
            */}
-          <chakra.button
-            ref={triggerRef}
-            type="button"
-            disabled={disabled}
-            data-testid="langy-model-picker"
-            data-model={model}
-            data-loading={modelsLoading ? "true" : undefined}
-            aria-label={`Model: ${currentLabel}`}
-            display="inline-flex"
-            alignItems="center"
-            gap={0}
-            height="28px"
-            maxWidth="200px"
-            paddingLeft={1.5}
-            paddingRight={1.5}
-            borderRadius="full"
-            borderWidth="1px"
-            borderStyle="solid"
-            borderColor="border.emphasized"
-            background="bg.surface"
-            color="fg.muted"
-            flexShrink={1}
-            minWidth={0}
-            opacity={disabled ? 0.5 : 1}
-            cursor={disabled ? "not-allowed" : "pointer"}
-            transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
-            _hover={
-              disabled
-                ? undefined
-                : { borderColor: "orange.emphasized", color: "fg" }
-            }
-            _focusVisible={{
-              outline: "none",
-              borderColor: "orange.emphasized",
-              color: "fg",
-            }}
-            _disabled={{ pointerEvents: "none" }}
-            css={{
-              "& .model-reveal": {
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                maxWidth: 0,
-                opacity: 0,
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                transition:
-                  "max-width 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease, margin-left 220ms cubic-bezier(0.32, 0.72, 0, 1)",
-              },
-              "&:hover .model-reveal, &:focus-visible .model-reveal, &[data-state='open'] .model-reveal":
-                { maxWidth: "160px", opacity: 1, marginLeft: "6px" },
-              "&[data-loading='true'] .model-reveal": {
-                maxWidth: "180px",
-                opacity: 1,
-                marginLeft: "6px",
-              },
-              "@media (prefers-reduced-motion: reduce)": {
-                "& .model-reveal": { transition: "none" },
-              },
-            }}
-          >
-            {hasCurrentProvider ? (
-              <Box flexShrink={0} display="grid" placeItems="center">
-                <ProviderIconGlyph
-                  provider={currentProvider as ProviderKey}
-                  size="15px"
-                />
-              </Box>
-            ) : (
-              <Box
-                flexShrink={0}
-                display="grid"
-                placeItems="center"
-                color="fg.subtle"
+          <Combobox.Control display="inline-flex" width="auto" minWidth={0}>
+            <Combobox.Trigger asChild>
+              {/*
+               * COLLAPSED BY DEFAULT: just the provider glyph, so the rail stays a row
+               * of quiet icons and the model name doesn't eat a third of the composer.
+               * It expands on hover — and on `:focus-visible`, so a keyboard user sees
+               * exactly what a mouse user sees before committing — and stays expanded
+               * while the listbox is open (`[data-state="open"]`).
+               *
+               * Purely a CSS width transition on a wrapper, so nothing re-renders and
+               * the button never loses focus mid-expand. The full model name is always
+               * in `aria-label`, so the collapsed state is never a loss for assistive
+               * tech — only for pixels.
+               */}
+              <chakra.button
+                ref={triggerRef}
+                type="button"
+                // A natively disabled button receives no pointer events at all, so
+                // the hover that should explain the lock never happens. While a
+                // turn holds the picker the button stays a real, focusable button
+                // marked `aria-disabled`, and the combobox root is what refuses to
+                // open it. Every other lock keeps the native attribute.
+                disabled={disabled && !lockedByTurn}
+                aria-disabled={disabled || undefined}
+                data-testid="langy-model-picker"
+                data-model={model}
+                data-loading={modelsLoading ? "true" : undefined}
+                aria-label={`Model: ${currentLabel}`}
+                display="inline-flex"
+                alignItems="center"
+                gap={0}
+                height="28px"
+                maxWidth="200px"
+                paddingLeft={1.5}
+                paddingRight={1.5}
+                borderRadius="full"
+                borderWidth="1px"
+                borderStyle="solid"
+                borderColor="border.emphasized"
+                background="bg.surface"
+                color="fg.muted"
+                flexShrink={1}
+                minWidth={0}
+                opacity={disabled ? 0.5 : 1}
+                cursor={disabled ? "not-allowed" : "pointer"}
+                transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
+                _hover={
+                  disabled
+                    ? undefined
+                    : { borderColor: "orange.emphasized", color: "fg" }
+                }
+                _focusVisible={{
+                  outline: "none",
+                  borderColor: "orange.emphasized",
+                  color: "fg",
+                }}
+                // Ark marks the trigger `data-disabled` from the locked root, so
+                // this condition covers the turn lock too: dropping pointer events
+                // there would take the hover away from the tooltip that explains
+                // the lock.
+                _disabled={
+                  lockedByTurn
+                    ? { pointerEvents: "auto" }
+                    : { pointerEvents: "none" }
+                }
+                css={{
+                  "& .model-reveal": {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    maxWidth: 0,
+                    opacity: 0,
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    transition:
+                      "max-width 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease, margin-left 220ms cubic-bezier(0.32, 0.72, 0, 1)",
+                  },
+                  "&:hover .model-reveal, &:focus-visible .model-reveal, &[data-state='open'] .model-reveal":
+                    { maxWidth: "160px", opacity: 1, marginLeft: "6px" },
+                  "&[data-loading='true'] .model-reveal": {
+                    maxWidth: "180px",
+                    opacity: 1,
+                    marginLeft: "6px",
+                  },
+                  "@media (prefers-reduced-motion: reduce)": {
+                    "& .model-reveal": { transition: "none" },
+                  },
+                }}
               >
-                {modelsLoading ? (
-                  <LoaderCircle size={15} />
+                {hasCurrentProvider ? (
+                  <Box flexShrink={0} display="grid" placeItems="center">
+                    <ProviderIconGlyph
+                      provider={currentProvider as ProviderKey}
+                      size="15px"
+                    />
+                  </Box>
                 ) : (
-                  <Layers3 size={15} />
+                  <Box
+                    flexShrink={0}
+                    display="grid"
+                    placeItems="center"
+                    color="fg.subtle"
+                  >
+                    {modelsLoading ? (
+                      <LoaderCircle size={15} />
+                    ) : (
+                      <Layers3 size={15} />
+                    )}
+                  </Box>
                 )}
-              </Box>
-            )}
-            <chakra.span className="model-reveal">
-              <Text textStyle="xs" fontWeight="500" truncate>
-                {currentLabel}
-              </Text>
-              <Box
-                color="fg.subtle"
-                flexShrink={0}
-                display="grid"
-                placeItems="center"
-              >
-                <ChevronDown size={12} />
-              </Box>
-            </chakra.span>
-          </chakra.button>
-        </Combobox.Trigger>
-      </Combobox.Control>
+                <chakra.span className="model-reveal">
+                  <Text textStyle="xs" fontWeight="500" truncate>
+                    {currentLabel}
+                  </Text>
+                  <Box
+                    color="fg.subtle"
+                    flexShrink={0}
+                    display="grid"
+                    placeItems="center"
+                  >
+                    <ChevronDown size={12} />
+                  </Box>
+                </chakra.span>
+              </chakra.button>
+            </Combobox.Trigger>
+          </Combobox.Control>
+        </Box>
+      </Tooltip>
       <Portal>
         <Combobox.Positioner>
           <Combobox.Content
@@ -519,7 +588,7 @@ export function LangyModelPill({
       </Portal>
     </Combobox.Root>
   );
-}
+});
 
 function ModelRow({ item }: { item: ModelItem }) {
   const hasProviderIcon = item.provider in modelProviderIcons;

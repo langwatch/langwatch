@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
  * Auto-mints a self-signed cert pair for the local dev HTTPS+HTTP/2 server.
@@ -74,6 +75,7 @@ import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
+import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
@@ -81,16 +83,41 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assertRedisReady } from "./server/app-layer/redis-readiness";
+import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import {
+  buildChartFrameHeaders,
+  buildChartFrameHtml,
+  CHART_FRAME_PATH,
+  generateChartFrameNonce,
+} from "./server/chartSandboxFrame";
+import { ConnectGateway } from "./server/connected-agents/connect.gateway";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
+import {
+  closeConnectedAgentRuntime,
+  getConnectedAgentRuntime,
+} from "./server/connected-agents/runtime";
+import { prisma } from "./server/db";
+import { LocalControlGateway } from "./server/langy-local-control/control.gateway";
+import {
+  closeLocalControlRuntime,
+  getLocalControlSessionCore,
+} from "./server/langy-local-control/runtime";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
+import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
-import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
+import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
+import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
@@ -104,7 +131,17 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
+      // The three root-level OTLP paths a misconfigured exporter posts to are
+      // served by the API (see the handler below), so leaving them out would
+      // hide exactly the traffic worth watching. The OTLP branch is the only
+      // one anchored at the end: the others are deliberately prefixes, while
+      // this one must not let `/v1/traces-anything` in and turn a claim of
+      // three bounded labels into an open set.
+      if (
+        /^\/(?:api|assets|auth|settings|share|v1\/(?:traces|logs|metrics)\/?(?:\?.*)?$|$)/.test(
+          req.url ?? "",
+        )
+      ) {
         return false;
       }
       return true;
@@ -117,7 +154,34 @@ export const metricsMiddleware = promBundle({
   },
 });
 
-export const startApp = async (dir = path.dirname(__dirname)) => {
+/**
+ * Serves the chart sandbox frame document with its own CSP (a fresh nonce per
+ * response). Replaces the app-wide policy and X-Frame-Options for this
+ * response only. See specs/analytics/custom-chart-sandbox-imports.feature.
+ */
+function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
+  // Drop the app-wide policy first so it cannot linger under a different
+  // header name. In dev the app emits Content-Security-Policy-Report-Only
+  // (a distinct header from Content-Security-Policy), which setHeader
+  // below would NOT overwrite — it would stay on the response and spew
+  // violation reports for exactly the CDN scripts this route allows.
+  res.removeHeader("Content-Security-Policy-Report-Only");
+  res.removeHeader("Content-Security-Policy");
+  const nonce = generateChartFrameNonce();
+  for (const [key, value] of Object.entries(
+    buildChartFrameHeaders({ nonce }),
+  )) {
+    res.setHeader(key, value);
+  }
+  res.statusCode = 200;
+  if (req.method === "HEAD") {
+    res.end();
+  } else {
+    res.end(buildChartFrameHtml({ nonce }));
+  }
+}
+
+export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
@@ -149,7 +213,26 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
   // Sign in…" loop with no actionable error for the developer.
-  await verifyRedisReady();
+  //
+  // Exiting is this caller's decision, not the probe's: the web server owns the
+  // process, and one that cannot reach Redis has nothing to serve. The probe
+  // has already logged what and where (ADR-093).
+  try {
+    await assertRedisReady();
+  } catch (err) {
+    // Synchronous stderr before exiting, for the same reason the server error
+    // handler below does it: the probe logs through pino, whose transports are
+    // async worker threads that never flush past `process.exit(1)`. Without
+    // this, an unreachable Redis is an exit(1) with no output anywhere — the
+    // exact onboarding dead-end this check exists to prevent.
+    writeSync(
+      2,
+      `[langwatch:start] Redis is not reachable, exiting: ${
+        err instanceof Error ? (err.stack ?? err.message) : String(err)
+      }\n`,
+    );
+    process.exit(1);
+  }
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
@@ -198,7 +281,17 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  const securityHeaders = buildSecurityHeaders({ dev });
+  // ADR-086: getAssetBase() throws here at boot when the base is misconfigured
+  // — fail fast rather than serve broken asset URLs.
+  const securityHeaders = buildSecurityHeaders({
+    dev,
+    assetOrigin: assetBaseOrigin(getAssetBase()),
+  });
+
+  // The chart sandbox frame document and its own headers carry a fresh nonce
+  // per request (so they can't be built once) — see
+  // server/chartSandboxFrame.ts and
+  // specs/analytics/custom-chart-sandbox-imports.feature.
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
@@ -225,6 +318,21 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
         res.setHeader(key, value);
+      }
+
+      // Chart sandbox frame document: its own permissive CSP replaces the
+      // app-wide one (and X-Frame-Options) for this response, so a widget may
+      // import any https origin. Safe because the frame document always runs at
+      // an opaque origin — the embedding iframe is sandbox="allow-scripts" with
+      // no allow-same-origin, and the frame CSP carries `sandbox allow-scripts`
+      // so a direct top-level navigation is sandboxed too. See
+      // specs/analytics/custom-chart-sandbox-imports.feature.
+      if (
+        (req.method === "GET" || req.method === "HEAD") &&
+        pathname === CHART_FRAME_PATH
+      ) {
+        serveChartFrame(req, res);
+        return;
       }
 
       // MCP routes — intercept before everything
@@ -270,7 +378,22 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       });
 
       // ---- API Routes (all go through Hono) ----
-      if (pathname.startsWith("/api/")) {
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`, which the SPA fallback below answers with the HTML shell
+      // and a 200 — the exporter reads that as success and drops the batch.
+      // Those paths belong to the API, which canonicalises them
+      // (src/server/routes/otel-path-aliases.ts).
+      //
+      // `/.well-known/openapi` and `/llms.txt` are here for the same reason:
+      // they are root-level by convention, which is the whole point of them,
+      // and the SPA fallback would answer both with the HTML shell and a 200.
+      // A discovery URL that returns HTML and calls it success is worse than
+      // one that 404s (src/server/routes/api-discovery.ts).
+      if (
+        pathname.startsWith("/api/") ||
+        canonicalOtlpPath(pathname) !== null ||
+        isRootDiscoveryPath(pathname)
+      ) {
         await apiListener(req, res);
         return;
       }
@@ -312,12 +435,32 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     server = createServer(handler);
   }
 
+  // One upgrade listener, routed by path: the tRPC transport and the
+  // connected agent gateway share the HTTP server, and an unknown path is
+  // answered 404 instead of hanging.
+  const upgradeRouter = createUpgradeRouter(
+    server as ReturnType<typeof createServer>,
+  );
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(
-    server as ReturnType<typeof createServer>,
-  );
+  const wsHandle = setupTRPCWebSocket(upgradeRouter);
+  // Connected agents (ADR-128): the SDK's outbound socket lands here.
+  const connectGateway = new ConnectGateway({
+    runtime: getConnectedAgentRuntime(),
+    prisma,
+    replicaCount: env.LANGWATCH_APP_REPLICAS,
+  });
+  connectGateway.mount(upgradeRouter);
+
+  // Langy local control (ADR-129): the outbound socket of
+  // `langwatch langy --share-control` lands here. Bearer session key, no
+  // Origin check, so the dev proxy and the ingress carry it with no per-path
+  // entry of their own.
+  const localControlGateway = new LocalControlGateway({
+    core: getLocalControlSessionCore(),
+  });
+  localControlGateway.mount(upgradeRouter);
 
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
@@ -369,42 +512,67 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // it just doesn't wait for the still-booting workers to drain).
   let workerHandle: WorkerHandle | undefined;
 
-  // Graceful shutdown
-  const shutdown = async (signal: string) => {
-    logger.info({ signal }, "Received signal, shutting down...");
-    const forceExitTimer = setTimeout(() => {
-      logger.warn("Graceful shutdown timed out after 5s, forcing exit");
-      process.exit(1);
-    }, 5_000);
-    forceExitTimer.unref();
-    // Politely tell WS clients to reconnect *before* tearing down the
-    // socket — gives them tRPC's staggered reconnect path instead of a
-    // hard TCP RST and a thundering herd on the next pod.
-    try {
-      wsHandle.broadcastReconnectNotification();
-      await wsHandle.close();
-    } catch (error) {
-      logger.warn({ error }, "error while closing tRPC websocket server");
-    }
-    server.close();
-    if ("closeAllConnections" in server) server.closeAllConnections();
-    mcpHandler.closeAllSessions();
-    // Drain in-process workers (if any) before closing the shared App below,
-    // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go away.
-    try {
-      await workerHandle?.shutdown();
-    } catch (error) {
-      logger.error({ error }, "error shutting down in-process workers");
-    }
-    try {
-      await Promise.all([getApp().close(), shutdownPostHog()]);
-    } catch (error) {
-      logger.error({ error }, "Failed to close App");
-    }
-    process.exit(0);
-  };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+  // Graceful shutdown. The deadline comes from server/shutdown/budget.ts
+  // rather than a literal here: this handler used to force-exit after 5s,
+  // which is inside the GroupQueue's own drain budget, so under the `all`
+  // role (this process hosting the worker stack) a drain could never finish
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
+
+  installShutdownHandlers((signal) => ({
+    signal,
+    logger,
+    phases: [
+      // Politely tell WS clients to reconnect *before* tearing down the
+      // socket — gives them tRPC's staggered reconnect path instead of a
+      // hard TCP RST and a thundering herd on the next pod.
+      {
+        name: "websockets",
+        run: async () => {
+          wsHandle.broadcastReconnectNotification();
+          await wsHandle.close();
+        },
+      },
+      createHttpServerClosePhase({
+        server,
+        closeSessions: () => mcpHandler.closeAllSessions(),
+        logger,
+      }),
+      // Connected agent sockets close after the HTTP drain, with 1012 so the
+      // SDKs reconnect at once to the next pod. A call in flight outlives any
+      // drain budget, so this phase comes after the drain, not inside it.
+      {
+        name: "connected-agents",
+        run: async () => {
+          await connectGateway.close();
+          await closeLongPollTransport();
+          await closeConnectedAgentRuntime();
+          // The shared folders close the same way and for the same reason: a
+          // local command in flight outlives any drain budget.
+          await localControlGateway.close();
+          await closeLocalControlRuntime();
+        },
+      },
+      // Drain in-process workers (if any) before closing the shared App below,
+      // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
+      // away.
+      {
+        name: "in-process-workers",
+        run: async () => await workerHandle?.shutdown(),
+      },
+      // Carries the queue drain when this process hosts the worker stack, so
+      // it gets the whole budget rather than the default per-phase ceiling;
+      // App.close bounds it from the inside.
+      {
+        name: "app",
+        // See workers.ts: below the watchdog on purpose, so this bound can
+        // actually fire before the process deadline does.
+        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+        run: async () => await getApp().close({ terminating: true }),
+      },
+      { name: "posthog", run: async () => await shutdownPostHog() },
+    ],
+  }));
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");

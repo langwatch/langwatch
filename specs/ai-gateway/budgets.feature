@@ -565,6 +565,115 @@ Feature: AI Gateway — Budgets
     Then the reset fires at 00:00 Europe/Amsterdam, not UTC
 
   # ============================================================================
+  # Anchored budget cycles
+  # ============================================================================
+  #
+  # Cyclic windows are calendar aligned by default: a month budget starts on
+  # the 1st, a week budget on Monday. A budget created with a cycle anchor
+  # cycles from that instant instead, so a customer whose own billing runs
+  # from the 17th gets a gateway period that lines up with their invoice.
+  # The anchor is the phase of the cycle and never moves: it is set at create
+  # and immutable after, because moving it would redraw every period the
+  # budget has already reported and enforced on.
+
+  @unit
+  Scenario: An anchored cycle starts periods at the anchor instant, not the calendar
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    When the clock reads 2026-07-15T00:00Z
+    Then its current period started at 2026-06-17T09:00Z
+    And its next boundary is 2026-07-17T09:00Z
+    And the period rolls at that instant, not at 2026-07-01T00:00Z
+
+  @unit
+  Scenario: A month cycle anchored past the 28th clamps into shorter months and springs back
+    Given a budget with window "month" anchored at 2026-01-31T10:00Z
+    Then its periods start on Jan 31, Feb 28, Mar 31, Apr 30, May 31, Jun 30 and Jul 31, each at 10:00Z
+    And the same anchor in a leap year clamps to Feb 29 instead of Feb 28
+    And every period clamps from the original anchor day, so a short month never moves the billing day permanently
+
+  @unit
+  Scenario: An anchored budget floors every read at its own period start
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    When spend is read for it
+    Then the read is floored at the anchored period start rather than served from the calendar rollup
+    And a budget anchored to a future instant floors at that instant, so its spend reads zero until the period opens
+
+  @unit
+  Scenario: A reset inside an anchored period forgives spend until the next anchored boundary
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    And it was reset at 2026-07-02T14:00Z
+    When spend is read before 2026-07-17T09:00Z
+    Then the read is floored at the reset instant, so the forgiven spend stays forgiven
+    But from 2026-07-17T09:00Z the floor returns to the anchored schedule
+    And the reset never re-phases the cycle
+
+  @unit
+  Scenario: A cycle anchor needs a cyclic window
+    When I create a budget with window "total" or "manual" and a cycle anchor
+    Then creation is rejected with "gateway_budget_cycle_anchor_invalid"
+    And the safe message is "That window does not cycle, so it cannot take a cycle anchor"
+    And the fault is the customer's, so the refusal is routine rather than an incident
+    And "meta.window" echoes the window that was sent, which is the caller's own value
+    And the customer reads that the window has no start date to set, and the two ways out: pick a window that rolls, or drop the start date
+    Because neither window rolls, so there is no cycle for an anchor to phase
+
+  @unit
+  Scenario: The reported period is computed at read time, not stored
+    Given a calendar month budget created in March and never reset
+    When I read it in July
+    Then it reports the July period, not the stored March columns
+    And an anchored budget reports its own anchored bounds
+    And "total" and "manual" budgets keep their stored pair and far-future sentinel
+
+  @integration
+  Scenario: An anchored budget counts spend across a calendar boundary until its own period rolls
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    And a debit occurred at 2026-06-20T00:00Z, inside the anchored period but in the previous calendar month
+    When spend is read at 2026-07-15T18:00Z
+    Then the debit counts, because the anchored period is still open
+    But when spend is read at 2026-07-20T00:00Z it does not, because the anchored period rolled on the 17th
+
+  @integration
+  Scenario: Anchored and calendar siblings on one key total their own periods
+    Given a virtual key carries an anchored month budget and a calendar month budget
+    And a debit was backdated into the anchored period but before the calendar month started
+    When spend is read for both
+    Then the backdated debit counts on the anchored budget only
+    And a fresh debit counts once on each, never twice on either
+
+  @integration
+  Scenario: Resetting an anchored budget rejoins the anchor schedule
+    Given an anchored budget with spend in its current period
+    When I reset it
+    Then its spend reads zero
+    And its reported reset instant is the next anchored boundary, not one window from now
+    And after that boundary passes the floor is back on the anchor's schedule
+
+  @unit
+  Scenario: A breach fires once per anchored period
+    Given an anchored budget that crosses its limit
+    Then the crossing is stamped with the anchored period start, not the calendar one
+    And a second crossing inside the same anchored period is the same event
+    And the first crossing after the anchored rollover is a new one
+
+  @integration
+  Scenario: Creating an anchored budget reports its true cycle on the wire
+    When I create a budget over REST with "cycle_anchor_at" set a few days in the past
+    Then the response echoes "cycle_anchor_at"
+    And "current_period_started_at" and "resets_at" describe the anchored period, not the calendar one
+    And reading the budget back agrees with what create returned
+    And a patch naming "cycle_anchor_at" leaves it untouched, because the anchor is immutable
+
+  @integration
+  Scenario: A cycle anchor is rejected on windows that do not cycle
+    When I create a budget over REST with window "manual" or "total" and "cycle_anchor_at" set
+    Then the request is rejected with 400 and code "gateway_budget_cycle_anchor_invalid"
+    And the body carries the safe message "That window does not cycle, so it cannot take a cycle anchor"
+    And "meta.window" echoes the window that was sent
+    And nothing was created
+    But the same windows are accepted without one
+
+  # ============================================================================
   # Dashboard and spend visibility
   # ============================================================================
 
@@ -636,15 +745,29 @@ Feature: AI Gateway — Budgets
       top 5 virtual keys by spend, top 5 models by spend,
       and a reset countdown
 
-  @visual
-  Scenario: Budget list Scope column resolves target name with VK link
+  @integration
+  Scenario: Budget list Scope column renders the shared scope chip on one line
     Given budgets exist scoped to "organization acme-demo", "team platform",
-      "project gateway-demo", "virtual_key prod-openai", and "principal user@acme.com"
+      "project gateway-demo", "virtual_key prod-openai", "principal user@acme.com",
+      and a per-person allowance anchored on "virtual_key prod-openai"
     When I open the Budgets list
-    Then each row's Scope cell shows the scope-kind badge on top
-    And the scope-target name below (e.g. "acme-demo", "platform", "gateway-demo")
-    And VK-scope rows link to the VK detail page via an orange link
-    And a muted-parenthesised secondary (slug / displayPrefix / email) follows the name
+    Then each row's Scope cell is one line: the scope kind's icon and the target's name
+    And the identifier that used to follow the name in parentheses is only in the chip's tooltip
+    And every kind names itself in its tooltip rather than borrowing the project chip
+
+  @integration
+  Scenario: Budget list links a virtual-key scope to that key
+    Given a budget scoped to "virtual_key prod-openai"
+    When I open the Budgets list
+    Then its Scope cell is a key chip naming "prod-openai"
+    And following it opens that key's detail page
+
+  @integration
+  Scenario: Budget list keeps the per-member marker on a group scope
+    Given a budget scoped to a group of 4 people
+    When I open the Budgets list
+    Then its Scope cell names the group and still marks the limit as per member
+    And the member count is in the chip's tooltip rather than on a second line
 
   @visual
   Scenario: Budget detail header surfaces Audit history even after archive
@@ -686,3 +809,50 @@ Feature: AI Gateway — Budgets
     When I open the AI Gateway section
     Then the "Budgets" nav item is hidden
     And direct URL access returns a 403 page with a "request access" link
+
+  # ============================================================================
+  # Money exactness
+  #
+  # A request is priced once, as an integer number of nano-USD, and the spend
+  # events publish that integer. A budget is the same money seen from the other
+  # side, so the two have to agree to the nano or a customer reconciling their
+  # spend against their cap finds a gap nobody can explain.
+  # ============================================================================
+
+  @integration
+  Scenario: A budget totals a cost that is not a whole number of microdollars
+    Given a virtual key with a monthly budget
+    And the key serves a request priced at 73950 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+    And its spend reads "0.00007395" in dollars
+
+  @integration
+  Scenario: Per-request rounding does not accumulate across requests
+    Given a virtual key with a monthly budget
+    And the key serves three requests each priced at 24650 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+    And not the 75000 that rounding each request first would have reported
+
+  @integration
+  Scenario: A budget reading from its own boundary stays exact
+    Given a virtual key with a manual-window budget
+    And the key serves three requests each priced at 24650 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+
+  @integration
+  Scenario: A budget and its spend events report the same integer
+    Given a virtual key with a monthly budget
+    And the key serves requests priced at amounts below one microdollar
+    When I read the budget over the public API
+    Then spent_nano_usd equals the sum the spend events carry
+    And spent_usd is that integer rendered, not a figure rounded before it
+
+  @unit
+  Scenario: A per-person template reports no total of its own
+    Given a per-person template budget whose seats have spend
+    When I read the template row
+    Then spent_usd and spent_nano_usd are both null
+    And the seats it is watching are reported as end_users_seen and end_users_over

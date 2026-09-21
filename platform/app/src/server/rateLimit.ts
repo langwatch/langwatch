@@ -1,4 +1,5 @@
-import { connection as redisConnection } from "./redis";
+import { tryGetApp } from "./app-layer/app";
+import { rateLimitExceededTotal } from "./rateLimit.metrics";
 
 /**
  * Per-key sliding-window rate limiter. Uses Redis when available
@@ -29,6 +30,18 @@ interface MemoryEntry {
 
 const memoryStore = new Map<string, MemoryEntry>();
 
+/** The calling scope out of a `scope:addr:hash`-shaped key, for the metric's
+ *  low-cardinality label — never the address or hash that follows it. */
+function scopeOf(key: string): string {
+  const i = key.indexOf(":");
+  return i === -1 ? key : key.slice(0, i);
+}
+
+/** Records a denial on the operational counter; a no-op when allowed. */
+function noteExceeded(key: string, allowed: boolean): void {
+  if (!allowed) rateLimitExceededTotal.labels(scopeOf(key)).inc();
+}
+
 /**
  * Opportunistic garbage collection for the in-memory store. The naive
  * implementation only frees an entry when the same key is hit again
@@ -54,19 +67,30 @@ export async function rateLimit(opts: {
   const { key, windowSeconds, max } = opts;
   const now = Date.now();
 
+  // Fail-open by contract: no App or no Redis both mean the per-process
+  // fallback below, never a crash (ADR-093).
+  const redisConnection = tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;
-    const count = await redisConnection.incr(redisKey);
-    if (count === 1) {
-      await redisConnection.expire(redisKey, windowSeconds);
+    try {
+      const count = await redisConnection.incr(redisKey);
+      if (count === 1) {
+        await redisConnection.expire(redisKey, windowSeconds);
+      }
+      const ttl = await redisConnection.ttl(redisKey);
+      const resetAt = now + (ttl > 0 ? ttl : windowSeconds) * 1000;
+      const allowed = count <= max;
+      noteExceeded(key, allowed);
+      return {
+        allowed,
+        remaining: Math.max(0, max - count),
+        resetAt,
+      };
+    } catch {
+      // Redis is an optimisation for a process-wide budget, not an
+      // availability dependency. Fall through to the per-process limiter with
+      // the same observable result shape when any Redis command fails.
     }
-    const ttl = await redisConnection.ttl(redisKey);
-    const resetAt = now + (ttl > 0 ? ttl : windowSeconds) * 1000;
-    return {
-      allowed: count <= max,
-      remaining: Math.max(0, max - count),
-      resetAt,
-    };
   }
 
   sweepExpiredMemoryEntries(now);
@@ -74,15 +98,19 @@ export async function rateLimit(opts: {
   const existing = memoryStore.get(key);
   if (!existing || existing.expiresAt <= now) {
     memoryStore.set(key, { count: 1, expiresAt: now + windowSeconds * 1000 });
+    const allowed = 1 <= max;
+    noteExceeded(key, allowed);
     return {
-      allowed: 1 <= max,
+      allowed,
       remaining: max - 1,
       resetAt: now + windowSeconds * 1000,
     };
   }
   existing.count += 1;
+  const allowed = existing.count <= max;
+  noteExceeded(key, allowed);
   return {
-    allowed: existing.count <= max,
+    allowed,
     remaining: Math.max(0, max - existing.count),
     resetAt: existing.expiresAt,
   };

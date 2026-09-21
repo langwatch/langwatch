@@ -25,7 +25,17 @@ import type { RunGroupSummary } from "./run-history-transforms";
 
 type RunMetricsSummaryProps = {
   summary: RunGroupSummary;
+  /**
+   * How tall the pill is drawn. "md" matches the 32px controls of a header
+   * line, so the pill sits level with the buttons beside it.
+   */
+  size?: "sm" | "md";
 };
+
+const PILL_SIZES = {
+  sm: { height: undefined, paddingX: 2, paddingY: 1, fontSize: "12px" },
+  md: { height: "32px", paddingX: 2.5, paddingY: 0, fontSize: "12.5px" },
+} as const;
 
 /**
  * Builds a parenthetical detail string for non-success counts.
@@ -164,9 +174,13 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
   );
 }
 
-export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
+export function RunMetricsSummary({
+  summary,
+  size = "sm",
+}: RunMetricsSummaryProps) {
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
+  const pill = PILL_SIZES[size];
 
   const isRunning = summary.inProgressCount > 0 || summary.queuedCount > 0;
 
@@ -184,10 +198,11 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
     >
       <HStack
         gap={2}
-        fontSize="12px"
+        fontSize={pill.fontSize}
         color="fg.muted"
-        paddingX={2}
-        paddingY={1}
+        height={pill.height}
+        paddingX={pill.paddingX}
+        paddingY={pill.paddingY}
         borderRadius="lg"
         border="1px solid"
         borderColor="border"

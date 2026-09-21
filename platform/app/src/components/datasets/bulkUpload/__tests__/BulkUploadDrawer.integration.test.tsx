@@ -57,7 +57,7 @@ const getByIdQuery = vi.fn(() => ({
 vi.mock("~/utils/api", () => ({
   api: {
     dataset: { getById: { useQuery: () => getByIdQuery() } },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -42,11 +43,11 @@ func press(t *testing.T, m model, s string) model {
 
 func testActions(downed, destroyed *[]string) Actions {
 	return Actions{
-		Rows: func() []Row {
-			return []Row{
+		Refresh: func() View {
+			return View{Stacks: []Row{
 				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
 				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			}}
 		},
 		Down: func(_ context.Context, slug string) error {
 			*downed = append(*downed, slug)
@@ -59,11 +60,11 @@ func testActions(downed, destroyed *[]string) Actions {
 	}
 }
 
-// mutableActions reads rows through a caller-owned slice pointer so a test can
+// mutableActions reads the view through a caller-owned pointer so a test can
 // reorder or shrink the row set between keypresses, mimicking a refresh tick.
-func mutableActions(rows *[]Row, downed, destroyed *[]string) Actions {
+func mutableActions(view *View, downed, destroyed *[]string) Actions {
 	return Actions{
-		Rows: func() []Row { return *rows },
+		Refresh: func() View { return *view },
 		Down: func(_ context.Context, slug string) error {
 			*downed = append(*downed, slug)
 			return nil
@@ -74,6 +75,8 @@ func mutableActions(rows *[]Row, downed, destroyed *[]string) Actions {
 		},
 	}
 }
+
+func stacksView(rows ...Row) View { return View{Stacks: rows} }
 
 // @scenario "Jumping into a stack's git view from the hub"
 // @scenario "Destruction requires typing the name"
@@ -85,8 +88,8 @@ func TestHubModel(t *testing.T) {
 			m = press(t, m, "j")
 			next, cmd := m.Update(key("enter"))
 			m = next.(model)
-			if m.openDir != "/wt/beta" {
-				t.Errorf("openDir = %q, want /wt/beta", m.openDir)
+			if m.outcome.OpenGitDir != "/wt/beta" {
+				t.Errorf("OpenGitDir = %q, want /wt/beta", m.outcome.OpenGitDir)
 			}
 			if cmd == nil {
 				t.Fatal("enter should quit the hub so the git view can take the terminal")
@@ -158,7 +161,7 @@ func TestHubModel(t *testing.T) {
 	})
 
 	t.Run("given no stacks", func(t *testing.T) {
-		empty := Actions{Rows: func() []Row { return nil }}
+		empty := Actions{Refresh: func() View { return View{} }}
 
 		t.Run("when rendered, it explains how to start one", func(t *testing.T) {
 			m := newModel(context.Background(), empty)
@@ -172,28 +175,192 @@ func TestHubModel(t *testing.T) {
 			for _, k := range []string{"enter", "g", "d", "x", "j", "k"} {
 				m = press(t, m, k)
 			}
-			if m.openDir != "" {
-				t.Errorf("openDir = %q, want empty", m.openDir)
+			if m.outcome.OpenGitDir != "" {
+				t.Errorf("OpenGitDir = %q, want empty", m.outcome.OpenGitDir)
 			}
 		})
 	})
 }
 
+// @scenario "Worktrees without a running stack are listed too"
+// @scenario "Idle worktrees stay out of the way while stacks run"
+func TestHubWorktreeRows(t *testing.T) {
+	view := View{
+		Stacks: []Row{{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true}},
+		Worktrees: []WorktreeRow{
+			{Slug: "", Branch: "main", Dir: "/repo", IsPrimary: true},
+			{Slug: "beta", Branch: "feat/b", Dir: "/wt/beta"},
+		},
+	}
+	var downed, destroyed []string
+
+	t.Run("when stacks are running, the worktrees stay hidden until t", func(t *testing.T) {
+		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
+		out := m.View()
+		if strings.Contains(out, "feat/b") {
+			t.Fatal("idle worktrees should stay out of the way while stacks run")
+		}
+		if !strings.Contains(out, "hidden") {
+			t.Error("the hub should say the worktrees are hidden and how to show them")
+		}
+		m = press(t, m, "t")
+		out = m.View()
+		if !strings.Contains(out, "beta") || !strings.Contains(out, "primary — protected") {
+			t.Error("t should reveal the worktrees with their protection")
+		}
+	})
+
+	t.Run("when no stacks run, the worktrees show by default", func(t *testing.T) {
+		stackless := View{Worktrees: view.Worktrees}
+		m := newModel(context.Background(), mutableActions(&stackless, &downed, &destroyed))
+		if !strings.Contains(m.View(), "beta") {
+			t.Error("with nothing running, the worktrees are the content")
+		}
+	})
+
+	t.Run("when x is typed on a stackless worktree, it destroys by directory", func(t *testing.T) {
+		downed, destroyed = nil, nil
+		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
+		m = press(t, m, "t") // reveal worktrees
+		m = press(t, m, "j") // primary (protected)
+		m = press(t, m, "j") // beta
+		m = press(t, m, "x")
+		for _, ch := range "beta" {
+			m = press(t, m, string(ch))
+		}
+		_ = press(t, m, "enter")
+		if len(destroyed) != 1 || destroyed[0] != "/wt/beta" {
+			t.Errorf("destroyed = %v, want [/wt/beta]", destroyed)
+		}
+	})
+
+	t.Run("when x is pressed on a protected worktree, the hub refuses", func(t *testing.T) {
+		downed, destroyed = nil, nil
+		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
+		m = press(t, m, "t")
+		m = press(t, m, "j") // primary
+		m = press(t, m, "x")
+		if m.mode != modeBrowse {
+			t.Fatal("a protected worktree must not open the destroy prompt")
+		}
+		if !strings.Contains(m.View(), "protected") {
+			t.Error("the refusal should be explained")
+		}
+		if len(destroyed) != 0 {
+			t.Errorf("destroyed = %v, want none", destroyed)
+		}
+	})
+}
+
+// @scenario "Cleanup is one key away"
+// @scenario "The machine dashboard is one key away"
+// @scenario "The daemon's reaping is visible from the hub"
+func TestHubActionsKeys(t *testing.T) {
+	t.Run("when c is pressed with cleanup wired, the hub quits asking for the cleanup handoff", func(t *testing.T) {
+		a := Actions{Refresh: func() View { return View{} }, HasCleanup: true}
+		m := newModel(context.Background(), a)
+		next, cmd := m.Update(key("c"))
+		m = next.(model)
+		if !m.outcome.RunCleanup {
+			t.Fatal("c should ask the caller to run cleanup")
+		}
+		if cmd == nil {
+			t.Fatal("c should quit the hub so cleanup can take the terminal")
+		}
+	})
+
+	t.Run("when c is pressed without cleanup wired, nothing happens", func(t *testing.T) {
+		m := newModel(context.Background(), Actions{Refresh: func() View { return View{} }})
+		m = press(t, m, "c")
+		if m.outcome.RunCleanup {
+			t.Error("cleanup must stay hidden when not wired")
+		}
+	})
+
+	t.Run("when w is pressed, the machine dashboard opens in the browser", func(t *testing.T) {
+		var opened []string
+		a := Actions{
+			Refresh: func() View { return View{} },
+			OpenURL: func(url string) error { opened = append(opened, url); return nil },
+			WebURL:  "https://langwatch.localhost",
+		}
+		m := newModel(context.Background(), a)
+		_ = press(t, m, "w")
+		if len(opened) != 1 || opened[0] != "https://langwatch.localhost" {
+			t.Errorf("opened = %v, want the dashboard", opened)
+		}
+	})
+
+	t.Run("when m is pressed, the monitor panel shows the reaping newest first", func(t *testing.T) {
+		a := Actions{Refresh: func() View {
+			return View{Events: []Event{
+				{At: time.Now().Add(-2 * time.Minute), Kind: "testcontainer", Target: "tc-ryuk", Reason: "leaked by an interrupted test run"},
+				{At: time.Now().Add(-3 * time.Hour), Kind: "stack", Target: "old", Reason: "launcher died"},
+			}}
+		}}
+		m := newModel(context.Background(), a)
+		if strings.Contains(m.View(), "tc-ryuk") {
+			t.Fatal("the monitor panel should start hidden")
+		}
+		m = press(t, m, "m")
+		out := m.View()
+		if !strings.Contains(out, "tc-ryuk") || !strings.Contains(out, "leaked by an interrupted test run") {
+			t.Error("the monitor panel should show what was reaped and why")
+		}
+		if strings.Index(out, "tc-ryuk") > strings.Index(out, "launcher died") {
+			t.Error("events should render newest first")
+		}
+		m = press(t, m, "m")
+		if strings.Contains(m.View(), "tc-ryuk") {
+			t.Error("m again should hide the panel")
+		}
+	})
+}
+
+// @scenario "The hub shows the machine's whole memory picture"
+// @scenario "What is not dev work still shows on the chart"
+func TestHubHeaderShowsTheMachine(t *testing.T) {
+	a := Actions{Refresh: func() View {
+		return View{Summary: Summary{
+			TotalRAM:   16 << 30,
+			StacksRSS:  3 << 30,
+			ServerRSS:  map[string]uint64{"redis": 1 << 30, "clickhouse": 2 << 30},
+			AgentRSS:   4 << 30,
+			AgentCount: 2,
+			ToolingRSS: 1 << 30,
+			OtherRSS:   5 << 30,
+			Pressure:   "amber",
+		}}
+	}}
+	m := newModel(context.Background(), a)
+	out := m.View()
+	for _, want := range []string{"stacks ~3.0GB", "servers ~3.0GB", "agents ~4.0GB (2)", "tooling ~1.0GB", "other ~5.0GB", "amber"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("header should contain %q\n%s", want, out)
+		}
+	}
+	// The chart carries both occupied colors: dev (11/16 of the bar's 24
+	// cells = 16) and other (5/16 = 7), against the dim free track.
+	if !strings.Contains(out, strings.Repeat("█", 16)) {
+		t.Error("the dev slice should fill its share of the bar")
+	}
+}
+
 func TestHubConfirmationFreezesSelectedRow(t *testing.T) {
 	t.Run("given a down prompt open for the top stack", func(t *testing.T) {
 		t.Run("when a refresh reorders the rows before y is pressed, the originally-selected stack is downed", func(t *testing.T) {
-			rows := []Row{
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			view := stacksView(
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+			)
 			var downed, destroyed []string
-			m := newModel(context.Background(), mutableActions(&rows, &downed, &destroyed))
+			m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 			m = press(t, m, "d") // confirm-down for alpha (cursor 0)
 			// a refresh reorders rows so the cursor now points at beta
-			rows = []Row{
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-			}
+			view = stacksView(
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+			)
 			next, _ := m.Update(tickMsg{})
 			m = next.(model)
 			m = press(t, m, "y")
@@ -203,14 +370,14 @@ func TestHubConfirmationFreezesSelectedRow(t *testing.T) {
 		})
 
 		t.Run("when the selected stack disappears before y is pressed, nothing is downed", func(t *testing.T) {
-			rows := []Row{
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			view := stacksView(
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+			)
 			var downed, destroyed []string
-			m := newModel(context.Background(), mutableActions(&rows, &downed, &destroyed))
+			m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 			m = press(t, m, "d")
-			rows = []Row{{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"}}
+			view = stacksView(Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"})
 			next, _ := m.Update(tickMsg{})
 			m = next.(model)
 			m = press(t, m, "y")
@@ -225,18 +392,18 @@ func TestHubConfirmationFreezesSelectedRow(t *testing.T) {
 
 	t.Run("given a destroy prompt open for the top stack", func(t *testing.T) {
 		t.Run("when a refresh reorders the rows before the name is confirmed, the originally-selected worktree is destroyed", func(t *testing.T) {
-			rows := []Row{
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			view := stacksView(
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+			)
 			var downed, destroyed []string
-			m := newModel(context.Background(), mutableActions(&rows, &downed, &destroyed))
+			m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 			m = press(t, m, "x") // confirm-destroy for alpha (cursor 0)
 			// a refresh reorders rows so the cursor now points at beta
-			rows = []Row{
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-			}
+			view = stacksView(
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+			)
 			next, _ := m.Update(tickMsg{})
 			m = next.(model)
 			for _, ch := range "alpha" { // the name shown when the prompt opened
@@ -256,12 +423,12 @@ func TestHubBusyGate(t *testing.T) {
 		// command, so the action stays in flight and busy remains set.
 		setup := func(t *testing.T) (model, *[]string) {
 			t.Helper()
-			rows := []Row{
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			view := stacksView(
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+			)
 			var downed, destroyed []string
-			m := newModel(context.Background(), mutableActions(&rows, &downed, &destroyed))
+			m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 			m = press(t, m, "d")
 			next, cmd := m.Update(key("y"))
 			m = next.(model)
@@ -336,21 +503,21 @@ func TestHubBusyGate(t *testing.T) {
 func TestHubTickRefresh(t *testing.T) {
 	t.Run("given the cursor is on the last of two stacks", func(t *testing.T) {
 		t.Run("when a refresh tick drops a stack, the cursor clamps and View does not panic", func(t *testing.T) {
-			rows := []Row{
-				{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
-				{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
-			}
+			view := stacksView(
+				Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true},
+				Row{Slug: "beta", Dir: "/wt/beta", Branch: "feat/b"},
+			)
 			var downed, destroyed []string
-			m := newModel(context.Background(), mutableActions(&rows, &downed, &destroyed))
+			m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 			m = press(t, m, "j") // cursor -> 1 (beta, last row)
 			if m.cursor != 1 {
 				t.Fatalf("cursor = %d, want 1", m.cursor)
 			}
-			rows = []Row{{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true}}
+			view = stacksView(Row{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true})
 			next, _ := m.Update(tickMsg{})
 			m = next.(model)
-			if len(m.rows) != 1 {
-				t.Errorf("rows = %d, want 1 after refresh", len(m.rows))
+			if len(m.view.Stacks) != 1 {
+				t.Errorf("stacks = %d, want 1 after refresh", len(m.view.Stacks))
 			}
 			if m.cursor != 0 {
 				t.Errorf("cursor = %d, want clamped to 0", m.cursor)

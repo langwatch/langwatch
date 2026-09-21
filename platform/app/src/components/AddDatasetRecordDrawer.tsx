@@ -7,6 +7,7 @@ import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
+import { useAnnotationQueueSessionStore } from "~/features/traces-v2/stores/annotationQueueSessionStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -44,11 +45,15 @@ interface AddDatasetDrawerProps {
  * @param props - Component props
  */
 export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const editDataset = useDisclosure();
-  const { closeDrawer } = useDrawer();
+  // Leaving this drawer hands the reader back to whatever opened it, the
+  // trace they were reading say, rather than clearing the page. Opened with
+  // nothing underneath (a bulk selection, the end-of-queue hand-off), going
+  // back closes the drawer outright.
+  const { goBack } = useDrawer();
 
   // Selected Dataset ID - Local Storage
   const {
@@ -92,11 +97,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     [props.selectedTraceIds, props.traceId],
   );
 
-  // Fetch traces with spans data
+  // Fetch traces with spans data. Reviewer corrections apply here so a dataset
+  // record carries exactly what the reviewer corrected.
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
       projectId: project?.id ?? "",
       traceIds: traceIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project,
@@ -126,7 +133,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
    * Handle drawer close
    */
   const handleOnClose = () => {
-    closeDrawer();
+    goBack();
     reset();
   };
 
@@ -179,9 +186,17 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         onSuccess: () => {
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
-          closeDrawer();
+          // Whoever opened the drawer gets told the records landed, so a flow
+          // that led here can finish itself off.
+          props.onSuccess?.();
+          // The annotation queue's hand-off is the one flow whose next step
+          // outlives this drawer: the walk is over, and the celebration it
+          // crowns waits on the records actually landing.
+          const session = useAnnotationQueueSessionStore.getState();
+          if (session.active) session.noteHandoffAdded();
+          goBack();
           toaster.create({
-            title: "Succesfully added to dataset",
+            title: "Successfully added to dataset",
             description: (
               <Link
                 colorPalette="white"
@@ -193,9 +208,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               </Link>
             ),
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -204,9 +216,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             description:
               "Please check if the rows were not already inserted in the dataset",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -331,7 +340,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 colorPalette="blue"
                 marginTop={6}
                 marginBottom={4}
-                loading={createDatasetRecord.isLoading}
+                loading={createDatasetRecord.isPending}
                 disabled={
                   !selectedDataset ||
                   !tracesWithSpans.data ||

@@ -20,8 +20,8 @@ export type CommandDispatcher<P> = (
  * @example
  * ```ts
  * const dispatch = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
- * // Pass dispatch.fn to reactor deps (before register)
- * const reactor = createReactor({ resolveOrigin: dispatch.fn });
+ * // Pass dispatch.fn to subscriber deps (before register)
+ * const subscriber = createSubscriber({ resolveOrigin: dispatch.fn });
  * // Wire after register
  * dispatch.resolve(traceCommands.resolveOrigin);
  * ```

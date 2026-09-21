@@ -1,4 +1,4 @@
-import { resolver } from "hono-openapi/zod";
+import { resolver } from "hono-openapi";
 import type { RouteResponse } from "./types";
 
 export const buildStandardSuccessResponse = (zodSchema: any): RouteResponse => {

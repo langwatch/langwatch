@@ -6,6 +6,7 @@ const QUEUE_NAME = "test-queue";
 const PREFIX = `${QUEUE_NAME}:gq:`;
 const COUNTER_KEY = `${PREFIX}stats:total-pending`;
 const MARKER_KEY = `${PREFIX}stats:pending-recon-ts`;
+const DRIFT_KEY = `${PREFIX}stats:pending-drift`;
 const SINGLE_FLIGHT_WINDOW_MS = 55_000;
 const LEASE_MS = 30_000;
 
@@ -193,20 +194,30 @@ class FakeRedis {
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
   async evalsha(
     _sha: string,
-    _numKeys: number,
+    numKeys: number,
     key: string,
     ...rest: (string | number)[]
   ): Promise<number> {
     if (key.endsWith("pending-groups")) {
       return this.applyPrune(key, rest as string[]);
     }
-    if (rest.length === 3) {
+    // Three keys is the fenced write (marker, counter, drift); the marker re-arm
+    // takes one. Keyed on the script's own arity rather than on the argument
+    // count, so adding an argument to either does not silently reroute it here.
+    if (numKeys === 3) {
       // Fires in the one window the fence exists for: after the last lease
       // re-arm succeeded, before the write lands.
       this.onBeforeFencedWrite?.();
-      const [counterKey, token, value] = rest as [string, string, string];
+      const [counterKey, driftKey, token, value, drift] = rest as [
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
       if (this.strings.get(key) !== token) return 0;
       this.strings.set(counterKey, String(value));
+      this.strings.set(driftKey, String(drift));
       return 1;
     }
     const [token, ttlMs] = rest as [string, number];
@@ -547,6 +558,19 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         expect(result).toBeNull();
         expect(redis.strings.get(COUNTER_KEY)).toBe("42");
+      });
+
+      /**
+       * @scenario "A pass that loses the marker publishes neither the count nor the drift"
+       *
+       * The drift describes the count published beside it, so it has to be
+       * behind the same ownership check. Written before it, this pass would
+       * announce a drift of 35 for a heal it never landed.
+       */
+      it("publishes no drift either, having published no count", async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(redis.strings.get(DRIFT_KEY)).toBeUndefined();
       });
     });
   });

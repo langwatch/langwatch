@@ -56,14 +56,20 @@ describe("trace dedup OOM safety", () => {
   );
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-  const collectUsageStatsPath = path.resolve(
+  // The org-wide counts moved into a repository so the CH client is reached
+  // through the App instead of resolved inline — see
+  // src/server/clickhouse/__tests__/clientAccessBoundary.unit.test.ts.
+  const instanceUsageStatsRepoPath = path.resolve(
     __dirname,
     "..",
     "..",
-    "collectUsageStats.ts",
+    "app-layer",
+    "usage-stats",
+    "repositories",
+    "instance-usage.clickhouse.repository.ts",
   );
-  const collectUsageStatsSource = fs.readFileSync(
-    collectUsageStatsPath,
+  const instanceUsageStatsRepoSource = fs.readFileSync(
+    instanceUsageStatsRepoPath,
     "utf-8",
   );
 
@@ -242,12 +248,12 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // collectUsageStats.ts: getChScenariosCount
+  // instance-usage.clickhouse.repository.ts: findScenarioRunCount
   // ---------------------------------------------------------------------------
-  describe("getChScenariosCount()", () => {
-    const body = extractFunctionBody(
-      collectUsageStatsSource,
-      "getChScenariosCount",
+  describe("InstanceUsageStatsClickHouseRepository.findScenarioRunCount()", () => {
+    const body = extractMethodBody(
+      instanceUsageStatsRepoSource,
+      "findScenarioRunCount",
     );
 
     describe("when the scenario count query SQL is inspected", () => {

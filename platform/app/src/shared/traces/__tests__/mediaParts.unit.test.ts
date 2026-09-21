@@ -5,7 +5,33 @@ import {
   collectMediaParts,
   isSafeMediaUrl,
   mediaPartToMediaData,
+  parseNotCapturedMedia,
 } from "../mediaParts";
+
+describe("parseNotCapturedMedia", () => {
+  describe("given the summary an engine leaves in place of an attachment", () => {
+    it("reads back the media type and the size", () => {
+      expect(parseNotCapturedMedia("[image/jpeg, 2624 bytes]")).toEqual({
+        mediaType: "image/jpeg",
+        sizeBytes: 2624,
+      });
+      expect(parseNotCapturedMedia("[audio, 48000 bytes]")).toEqual({
+        mediaType: "audio",
+        sizeBytes: 48000,
+      });
+    });
+  });
+
+  describe("given anything else that reached a src", () => {
+    it("reads nothing, so a real failure keeps its own placeholder", () => {
+      expect(parseNotCapturedMedia("/api/files/p1/i1")).toBeNull();
+      expect(parseNotCapturedMedia("data:image/png;base64,QUJD")).toBeNull();
+      expect(parseNotCapturedMedia("javascript:alert(1)")).toBeNull();
+      expect(parseNotCapturedMedia("[image/png]")).toBeNull();
+      expect(parseNotCapturedMedia("[not, a size bytes]")).toBeNull();
+    });
+  });
+});
 
 describe("isSafeMediaUrl", () => {
   /** @scenario A scripted URL in span content never reaches an anchor or element */

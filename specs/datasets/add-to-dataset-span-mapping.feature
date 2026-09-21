@@ -114,6 +114,67 @@ Feature: Span field mapping when adding traces to a dataset
     Then it produces a single row whose spans field is the array of all spans
 
   # ============================================================================
+  # The Expansions switches. Each one is a switch about its own expansion, and
+  # turning them all off is a choice the reader is allowed to make: a mapping
+  # with nothing expanded is the one that keeps one row per trace.
+  # ============================================================================
+
+  @integration
+  Scenario: Each expansion switch toggles only its own expansion
+    Given a mapping that offers both the annotation and the span expansion
+    And both are enabled
+    When I turn off the span expansion
+    Then the span expansion is off
+    And the annotation expansion is still on
+
+  @integration
+  Scenario: The last expansion can be turned off
+    Given a mapping that offers both the annotation and the span expansion
+    And only the span expansion is enabled
+    When I turn off the span expansion
+    Then no expansion is enabled
+    And it stays off
+
+  # A switch is a control of its own, wherever the drawer places it. A field
+  # describes one control and hands that control its id, so a field wrapped
+  # around the mapping and the preview together gave every switch and every
+  # preview checkbox the same id, and a click on one went wherever that id
+  # resolved first, which was usually nowhere the reader aimed.
+  @integration
+  Scenario: An expansion switch answers to its own label in the drawer
+    Given the Add to Dataset drawer with the mapping and the preview side by side
+    When I click the words beside an expansion switch
+    Then that expansion is on
+    And no other switch and no preview checkbox moved
+
+  # A dataset row per trace is what a reader asks for when they add traces to a
+  # dataset; one row per span is a normalisation they opt into.
+  @integration
+  Scenario: The span expansion starts off
+    Given a mapping that offers the span expansion
+    When I open it without having chosen an expansion before
+    Then the span expansion is off
+
+  # A trace carries one annotation or a handful, and asking for them is asking
+  # for each of them, so their expansion is the reading mapping them means. The
+  # spans are the opposite, which is why only some sources come with theirs on.
+  @integration
+  Scenario: Mapping annotations turns their expansion on
+    Given a column that has not been mapped to anything yet
+    When I map it to the annotations source
+    Then the annotation expansion is on
+
+  # An expansion is a choice the reader made, not a property of whichever column
+  # happens to be mapped right now. A source that stops being mapped takes its
+  # switch off the panel, and changing that column back has to bring the reader's
+  # answer back with it rather than start the question over.
+  @integration
+  Scenario: An expansion I turned on survives its column being remapped and mapped back
+    Given a mapping whose span expansion I turned on
+    When I change that column to another source and back to the spans source
+    Then the span expansion is still on
+
+  # ============================================================================
   # The mapping preview renders with the SAME cells as the evaluations
   # workbench dataset table: same heights, JSON values formatted, double-click
   # opens the editor. Mapping a span-heavy trace into a column used to dump

@@ -4,10 +4,18 @@ import { estimateCost } from "../../../tracer/collector/cost";
 import { computeSpanCost } from "../model-cost-matching";
 
 // Catalog rates under test (llmModels.overlay.json): flash v2 $0.05/1k chars,
-// scribe $0.22/hour, gpt-4o-transcribe $0.006/min.
+// scribe $0.22/hour, gpt-4o-transcribe $2.50/$10.00 per million tokens,
+// gpt-transcribe $0.0045/min, gpt-realtime $4/$16 text and $32/$64 audio per
+// million tokens.
 const FLASH_PER_CHAR = 5e-5;
 const SCRIBE_PER_SECOND = 6.11e-5;
-const TRANSCRIBE_PER_SECOND = 1e-4;
+const TRANSCRIBE_AUDIO_IN = 2.5e-6;
+const TRANSCRIBE_OUT = 1e-5;
+const GPT_TRANSCRIBE_PER_SECOND = 7.5e-5;
+const REALTIME_TEXT_IN = 4e-6;
+const REALTIME_TEXT_OUT = 1.6e-5;
+const REALTIME_AUDIO_IN = 3.2e-5;
+const REALTIME_AUDIO_OUT = 6.4e-5;
 
 describe("audio model cost", () => {
   /** @scenario a text-to-speech call is costed by the characters it spoke */
@@ -93,20 +101,115 @@ describe("audio model cost", () => {
     ).toBeUndefined();
   });
 
-  /** @scenario gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate */
-  it("prices gpt-4o-transcribe per second even when token usage is reported", () => {
-    const result = computeSpanCost({
-      attrs: {
-        "gen_ai.request.model": "openai/gpt-4o-transcribe",
-        "gen_ai.usage.audio_seconds": 60,
-      },
-      promptTokens: 100,
-      completionTokens: 20,
+  describe("given a transcribe model that reports audio tokens", () => {
+    describe("when the span is costed", () => {
+      /** @scenario gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate */
+      it("prices gpt-4o-transcribe from the tokens it reports", () => {
+        // The response states the whole input as audio tokens and no duration,
+        // so a per-second entry priced every call at zero.
+        const result = computeSpanCost({
+          attrs: {
+            "gen_ai.request.model": "openai/gpt-4o-transcribe",
+            "gen_ai.usage.input_audio_tokens": 65,
+          },
+          promptTokens: 0,
+          completionTokens: 32,
+        });
+        expect(result).toBeCloseTo(
+          65 * TRANSCRIBE_AUDIO_IN + 32 * TRANSCRIBE_OUT,
+          12,
+        );
+        expect(result).toBeGreaterThan(0);
+      });
     });
-    // The explicit transcribe entry carries zero token rates and a
-    // per-second rate; a gpt-4o prefix match would have priced the
-    // tokens at chat rates instead.
-    expect(result).toBeCloseTo(60 * TRANSCRIBE_PER_SECOND, 10);
+  });
+
+  describe("given a transcribe model priced by the second", () => {
+    describe("when the span is costed", () => {
+      /** @scenario the duration-priced transcribe model bills by the second */
+      it("prices gpt-transcribe per second", () => {
+        const result = computeSpanCost({
+          attrs: {
+            "gen_ai.request.model": "openai/gpt-transcribe",
+            "gen_ai.usage.audio_seconds": 60,
+          },
+          promptTokens: 0,
+          completionTokens: 0,
+        });
+        expect(result).toBeCloseTo(60 * GPT_TRANSCRIBE_PER_SECOND, 12);
+      });
+    });
+  });
+
+  describe("given a span stating audio tokens beside its text totals", () => {
+    describe("when the span is costed", () => {
+      /** @scenario an audio turn costs the audio rate on the trace, not the text rate */
+      it("prices audio tokens apart from the text totals on a span", () => {
+        const attrs = {
+          "gen_ai.request.model": "openai/gpt-realtime",
+          "gen_ai.usage.input_audio_tokens": 800,
+          "gen_ai.usage.output_audio_tokens": 250,
+        };
+        const result = computeSpanCost({
+          attrs,
+          promptTokens: 200,
+          completionTokens: 50,
+        });
+        expect(result).toBeCloseTo(
+          200 * REALTIME_TEXT_IN +
+            50 * REALTIME_TEXT_OUT +
+            800 * REALTIME_AUDIO_IN +
+            250 * REALTIME_AUDIO_OUT,
+          12,
+        );
+
+        // The same 1300 tokens priced flat at the text rate, which is what the
+        // trace charged while the budget charged the audio rate: $0.0088 against
+        // $0.0432, the gap the two surfaces disagreed by.
+        const asIfText = computeSpanCost({
+          attrs: { "gen_ai.request.model": "openai/gpt-realtime" },
+          promptTokens: 1000,
+          completionTokens: 300,
+        });
+        expect(asIfText).toBeCloseTo(0.0088, 12);
+        expect(result).toBeCloseTo(0.0432, 12);
+      });
+    });
+  });
+
+  describe("given several transcribe entries sharing a prefix", () => {
+    describe("when each model id is matched", () => {
+      /** @scenario each transcribe model matches its own rate, not a shorter neighbour's */
+      it("keeps the transcribe entries from capturing each other", () => {
+        // Registry matching is prefix-anchored, so these three ids all start with
+        // one another's stems. Each must land on its own rate.
+        const perSecond = computeSpanCost({
+          attrs: {
+            "gen_ai.request.model": "openai/gpt-transcribe",
+            "gen_ai.usage.audio_seconds": 60,
+          },
+          promptTokens: 0,
+          completionTokens: 0,
+        });
+        expect(perSecond).toBeCloseTo(60 * GPT_TRANSCRIBE_PER_SECOND, 12);
+
+        const mini = computeSpanCost({
+          attrs: { "gen_ai.request.model": "openai/gpt-4o-mini-transcribe" },
+          promptTokens: 0,
+          completionTokens: 100,
+        });
+        expect(mini).toBeCloseTo(100 * 5e-6, 12);
+
+        // A diarize call has no published rate of its own and OpenAI charges it
+        // the same as gpt-4o-transcribe, so the prefix match is the right answer.
+        const diarize = computeSpanCost({
+          attrs: { "gen_ai.request.model": "openai/gpt-4o-transcribe-diarize" },
+          promptTokens: 0,
+          completionTokens: 100,
+        });
+        expect(diarize).toBeCloseTo(100 * TRANSCRIBE_OUT, 12);
+      });
+    });
   });
 
   /** @scenario speech and transcription models are not offered as chat models */

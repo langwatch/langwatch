@@ -9,6 +9,31 @@ from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 from .prompts.types import FetchPolicy
+from .agent import AgentCall, AgentReply, Message, Param, connect_agent
+
+# Imported eagerly rather than lazily like the facades: a webhook receiver
+# verifies a delivery inside a request handler and never calls setup(), and
+# the module costs nothing to import, being standard library only.
+from .api_errors import (
+    LangWatchApiAuthenticationError,
+    LangWatchApiConflictError,
+    LangWatchApiError,
+    LangWatchApiNotFoundError,
+    LangWatchApiPlanLimitError,
+    LangWatchApiServerError,
+    LangWatchApiValidationError,
+)
+from .webhook_signature import (
+    WEBHOOK_DELIVERY_ID_HEADER,
+    WEBHOOK_EVENT_ID_HEADER,
+    WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+    WEBHOOK_SIGNATURE_HEADER,
+    WebhookSignatureExpiredError,
+    WebhookSignatureHeaderError,
+    WebhookSignatureMismatchError,
+    WebhookSignatureVerificationError,
+    verify_webhook_signature,
+)
 
 
 # Type hints for IntelliSense (only imported for typing)
@@ -28,6 +53,8 @@ if TYPE_CHECKING:
     from .agents import AgentsFacade
     from .scenarios import ScenariosFacade
     from .suites import SuitesFacade
+    from .run_plans import RunPlansFacade
+    from .test_suites import TestSuitesFacade
     from .triggers import TriggersFacade
     from .workflows import WorkflowsFacade
     from .dashboards import DashboardsFacade
@@ -37,10 +64,13 @@ if TYPE_CHECKING:
     from .analytics import AnalyticsFacade
     from .traces import TracesFacade
     from .monitors import MonitorsFacade
-    from .gateway_admin import GatewayAdminFacade
+    from .virtual_keys import VirtualKeysFacade
+    from .gateway_budgets import GatewayBudgetsFacade
     from .spend_events import SpendEventsFacade
     from .webhooks import WebhooksFacade
     from .secrets import SecretsFacade
+    from .teams import TeamsFacade
+    from .projects import ProjectsFacade
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
@@ -49,6 +79,8 @@ if TYPE_CHECKING:
     agents: AgentsFacade
     scenarios: ScenariosFacade
     suites: SuitesFacade
+    run_plans: RunPlansFacade
+    test_suites: TestSuitesFacade
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
@@ -58,10 +90,13 @@ if TYPE_CHECKING:
     analytics: AnalyticsFacade
     traces: TracesFacade
     monitors: MonitorsFacade
-    gateway_admin: GatewayAdminFacade
+    virtual_keys: VirtualKeysFacade
+    gateway_budgets: GatewayBudgetsFacade
     spend_events: SpendEventsFacade
     webhooks: WebhooksFacade
     secrets: SecretsFacade
+    teams: TeamsFacade
+    projects: ProjectsFacade
 
 
 @module_property
@@ -93,6 +128,8 @@ _LAZY_FACADES = {
     "agents": (".agents", "AgentsFacade"),
     "scenarios": (".scenarios", "ScenariosFacade"),
     "suites": (".suites", "SuitesFacade"),
+    "run_plans": (".run_plans", "RunPlansFacade"),
+    "test_suites": (".test_suites", "TestSuitesFacade"),
     "triggers": (".triggers", "TriggersFacade"),
     "workflows": (".workflows", "WorkflowsFacade"),
     "dashboards": (".dashboards", "DashboardsFacade"),
@@ -102,10 +139,14 @@ _LAZY_FACADES = {
     "analytics": (".analytics", "AnalyticsFacade"),
     "traces": (".traces", "TracesFacade"),
     "monitors": (".monitors", "MonitorsFacade"),
-    "gateway_admin": (".gateway_admin", "GatewayAdminFacade"),
+    "virtual_keys": (".virtual_keys", "VirtualKeysFacade"),
+    "gateway_budgets": (".gateway_budgets", "GatewayBudgetsFacade"),
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),
+    "cache": (".cache", "CacheFacade"),
+    "teams": (".teams", "TeamsFacade"),
+    "projects": (".projects", "ProjectsFacade"),
 }
 
 
@@ -221,9 +262,17 @@ __all__ = [
     "langchain",
     "dspy",
     "FetchPolicy",
+    "connect_agent",
+    "AgentCall",
+    "AgentReply",
+    "Message",
+    "Param",
+    "agent",
     "agents",
     "scenarios",
     "suites",
+    "run_plans",
+    "test_suites",
     "triggers",
     "workflows",
     "dashboards",
@@ -232,4 +281,29 @@ __all__ = [
     "model_providers",
     "analytics",
     "traces",
+    "virtual_keys",
+    "gateway_budgets",
+    "spend_events",
+    "webhooks",
+    "secrets",
+    "cache",
+    "monitors",
+    "teams",
+    "projects",
+    "verify_webhook_signature",
+    "WebhookSignatureVerificationError",
+    "WebhookSignatureHeaderError",
+    "WebhookSignatureExpiredError",
+    "WebhookSignatureMismatchError",
+    "WEBHOOK_SIGNATURE_HEADER",
+    "WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS",
+    "WEBHOOK_DELIVERY_ID_HEADER",
+    "WEBHOOK_EVENT_ID_HEADER",
+    "LangWatchApiError",
+    "LangWatchApiValidationError",
+    "LangWatchApiAuthenticationError",
+    "LangWatchApiPlanLimitError",
+    "LangWatchApiNotFoundError",
+    "LangWatchApiConflictError",
+    "LangWatchApiServerError",
 ]

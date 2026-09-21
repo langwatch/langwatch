@@ -13,6 +13,7 @@ import { groupBy } from "lodash-es";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { Drawer } from "~/components/ui/drawer";
 import {
   getComplexProps,
@@ -21,7 +22,6 @@ import {
 } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { getDisplayHandle } from "~/prompts/utils/promptHandle";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 export type PromptListDrawerProps = {
   open?: boolean;

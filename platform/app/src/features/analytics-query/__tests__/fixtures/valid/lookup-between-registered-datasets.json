@@ -1,0 +1,30 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"transform": [
+		{
+			"lookup": "model",
+			"from": {
+				"data": {
+					"name": "model_catalog"
+				},
+				"key": "model",
+				"fields": ["vendor"]
+			}
+		}
+	],
+	"mark": "bar",
+	"encoding": {
+		"x": {
+			"field": "vendor",
+			"type": "nominal"
+		},
+		"y": {
+			"field": "total",
+			"type": "quantitative",
+			"aggregate": "sum"
+		}
+	}
+}

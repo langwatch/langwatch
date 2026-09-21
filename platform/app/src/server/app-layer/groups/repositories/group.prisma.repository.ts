@@ -1,13 +1,24 @@
+import type { LedgerActor } from "@langwatch/actor";
 import {
   type Group,
   type GroupMembership,
   type PrismaClient,
   type RoleBinding,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type {
+  AccessListingBindingRow,
+  AccessListingRepository,
+} from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
+  CreatedBinding,
   CreateGroupInput,
   GroupRepository,
   GroupWithDetails,
@@ -15,8 +26,26 @@ import type {
   PaginatedResult,
 } from "./group.repository";
 
+/** The grant a group carries, as the ledger's attach shape reads it. */
+function attachFor(binding: CreateBindingInput) {
+  return {
+    bindingId: binding.id,
+    principal: { groupId: binding.groupId },
+    role: binding.role,
+    customRoleId: binding.customRoleId,
+    scopeType: binding.scopeType,
+    scopeId: binding.scopeId,
+  };
+}
+
 export class PrismaGroupRepository implements GroupRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   async findAllByOrganization({
     organizationId,
@@ -103,29 +132,41 @@ export class PrismaGroupRepository implements GroupRepository {
     group,
     bindings,
     memberIds,
+    actor,
   }: {
     group: CreateGroupInput;
     bindings: CreateBindingInput[];
     memberIds: string[];
+    actor: LedgerActor;
   }): Promise<Group> {
-    return this.prisma.$transaction(async (tx) => {
-      const created = await tx.group.create({ data: group });
-
-      if (bindings.length > 0) {
-        await tx.roleBinding.createMany({ data: bindings });
-      }
+    // The group row and its memberships are not grant facts, so they keep the
+    // transaction; the grants the group carries are one command after it
+    // commits, because the ledger is their only writer.
+    const created = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.group.create({ data: group });
 
       if (memberIds.length > 0) {
         await tx.groupMembership.createMany({
           data: memberIds.map((userId) => ({
-            groupId: created.id,
+            groupId: row.id,
             userId,
           })),
         });
       }
 
-      return created;
+      return row;
     });
+
+    if (bindings.length > 0) {
+      await this.writer.attachBindings({
+        organizationId: group.organizationId,
+        bindings: bindings.map(attachFor),
+        actor,
+        onDuplicate: "skip",
+      });
+    }
+
+    return created;
   }
 
   async rename({
@@ -191,15 +232,43 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async findBindings({ groupId }: { groupId: string }) {
-    return this.prisma.roleBinding.findMany({
-      where: { groupId },
-      include: { customRole: { select: { id: true, name: true } } },
-    });
+  async findBindings({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }): Promise<AccessListingBindingRow[]> {
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's group page is served from the
+    // ledger's own head. The organization now bounds the read, too - the
+    // route has already proven the group belongs to it.
+    return this.accessListing.findGroupBindings({ organizationId, groupId });
   }
 
-  async createBinding(data: CreateBindingInput): Promise<RoleBinding> {
-    return this.prisma.roleBinding.create({ data });
+  async createBinding({
+    data,
+    actor,
+  }: {
+    data: CreateBindingInput;
+    actor: LedgerActor;
+  }): Promise<CreatedBinding> {
+    // "reject", not "skip": the returned id is the caller-minted one, so a
+    // skipped duplicate would hand back an id for a row that was never
+    // created. The service maps `DuplicateBindingError` to the 409 conflict.
+    await this.writer.attachBindings({
+      organizationId: data.organizationId,
+      bindings: [attachFor(data)],
+      actor,
+      onDuplicate: "reject",
+    });
+    return {
+      id: data.id,
+      role: data.role,
+      customRoleId: data.customRoleId,
+      scopeType: data.scopeType,
+      scopeId: data.scopeId,
+    };
   }
 
   async findBinding({
@@ -214,16 +283,42 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async deleteBinding({ id }: { id: string }): Promise<void> {
-    await this.prisma.roleBinding.delete({ where: { id } });
+  async deleteBinding({
+    id,
+    organizationId,
+    actor,
+  }: {
+    id: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.revokeBindings({
+      organizationId,
+      bindingIds: [id],
+      actor,
+      reason: "group binding removed",
+    });
   }
 
   async deleteAllMemberships({ groupId }: { groupId: string }): Promise<void> {
     await this.prisma.groupMembership.deleteMany({ where: { groupId } });
   }
 
-  async deleteAllBindings({ groupId }: { groupId: string }): Promise<void> {
-    await this.prisma.roleBinding.deleteMany({ where: { groupId } });
+  async deleteAllBindings({
+    groupId,
+    organizationId,
+    actor,
+  }: {
+    groupId: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.revokeBindingsWhere({
+      organizationId,
+      where: { groupId },
+      actor,
+      reason: "group deleted",
+    });
   }
 
   async isUserInOrganization({
@@ -260,7 +355,7 @@ export class PrismaGroupRepository implements GroupRepository {
   ): Promise<boolean> {
     // One definition of "this scope reaches a personal workspace", shared with
     // the role-binding paths.
-    return scopesTouchPersonalTeam(this.prisma, scopes);
+    return scopesTouchPersonalTeam({ client: this.prisma, scopes });
   }
 
   async validateScopeInOrganization({

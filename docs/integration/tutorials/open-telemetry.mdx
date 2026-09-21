@@ -1,10 +1,10 @@
 ---
 title: Combining the SDK with OpenTelemetry Spans
-description: Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
+description: LangWatch receives traces from an existing OpenTelemetry setup in Python and TypeScript.
 keywords: OpenTelemetry, OTel, auto-instrumentation, LangWatch, Python, TypeScript, observability, tracing
 ---
 
-The LangWatch SDKs are built entirely on top of the robust [OpenTelemetry (OTel)](https://opentelemetry.io/) standard. This means seamless integration with existing OTel setups and interoperability with the wider OTel ecosystem across both Python and TypeScript environments.
+The LangWatch SDKs are built entirely on top of the [OpenTelemetry (OTel)](https://opentelemetry.io/) standard. They integrate with existing OTel setups and interoperate with the wider OTel ecosystem across both Python and TypeScript environments.
 
 ## LangWatch Spans are OpenTelemetry Spans
 
@@ -13,13 +13,13 @@ It's important to understand that LangWatch traces and spans **are** standard Op
 This foundation provides several benefits:
 - **Interoperability:** Traces generated with LangWatch can be sent to any OTel-compatible backend (Jaeger, Tempo, Datadog, etc.) alongside your other application traces.
 - **Familiar API:** If you're already familiar with OpenTelemetry concepts and APIs, working with LangWatch's manual instrumentation will feel natural.
-- **Leverage Existing Setup:** LangWatch integrates smoothly with your existing OTel `TracerProvider` and instrumentation.
+- **Reuse Existing Setup:** LangWatch integrates with your existing OTel `TracerProvider` and instrumentation.
 
-Perhaps the most significant advantage is that **LangWatch seamlessly integrates with the vast ecosystem of standard OpenTelemetry auto-instrumentation libraries.** This means you can easily combine LangWatch's LLM-specific observability with insights from other parts of your application stack.
+**LangWatch also works with the standard OpenTelemetry auto-instrumentation libraries.** You can combine LangWatch's LLM-specific observability with insights from other parts of your application stack.
 
-## Leverage the OpenTelemetry Ecosystem: Auto-Instrumentation
+## Use the OpenTelemetry Ecosystem: Auto-Instrumentation
 
-One of the most powerful benefits of LangWatch's OpenTelemetry foundation is its **automatic compatibility with the extensive ecosystem of OpenTelemetry auto-instrumentation libraries.**
+The OpenTelemetry foundation gives LangWatch **automatic compatibility with the ecosystem of OpenTelemetry auto-instrumentation libraries.**
 
 When you use standard OTel auto-instrumentation for libraries like web frameworks, databases, or task queues alongside LangWatch, you gain **complete end-to-end visibility** into your LLM application's requests. Because LangWatch and these auto-instrumentors use the same underlying OpenTelemetry tracing system and context propagation mechanisms, spans generated across different parts of your application are automatically linked together into a single, unified trace.
 
@@ -975,6 +975,4 @@ When using OpenTelemetry with LangWatch, consider these performance implications
 3. **Error Handling:** Ensure spans are always ended, even when exceptions occur
 4. **Batch Processing:** Use batch processors for high-volume applications
 5. **Sampling:** Implement sampling to reduce overhead in production
-
-By following these guidelines and leveraging the power of OpenTelemetry's ecosystem, you can achieve comprehensive observability of your LLM applications while maintaining compatibility with existing monitoring infrastructure.
 

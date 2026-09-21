@@ -73,6 +73,12 @@ export interface ProcessDefinition<State> {
   name: string;
   /** State an unseen process key starts from. */
   initialState: State;
+  /**
+   * Whether an evolution that keeps `initialState` and arms no wake may skip
+   * the instance row, the inbox row and the transaction, committing only its
+   * intents. See `ProcessManagerConfig.transient`.
+   */
+  transient?: boolean;
   /** Pure: no I/O, no clocks, no projection reads. */
   evolve(params: {
     previousState: State;

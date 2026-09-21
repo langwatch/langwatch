@@ -103,6 +103,27 @@ export class InvalidActionParamsError extends HandledError {
   }
 }
 
+/**
+ * A trace automation was saved with nothing to narrow it: no structured filter
+ * that selects anything, and no query. Such an automation matches every trace
+ * forever, and its cost is paid per trace by the pipeline, not by whoever saved
+ * it. Alerts and reports are exempt — their condition is a threshold or a
+ * schedule, not a trace filter.
+ */
+export class TriggerFiltersRequiredError extends HandledError {
+  declare readonly code: "trigger_filters_required";
+
+  constructor() {
+    super(
+      "trigger_filters_required",
+      "An automation needs at least one condition. Add a filter or a query, " +
+        "otherwise it would fire on every single trace.",
+      { meta: { field: "filters" }, httpStatus: 422 },
+    );
+    this.name = "TriggerFiltersRequiredError";
+  }
+}
+
 export class MissingSlackWebhookError extends HandledError {
   declare readonly code: "missing_slack_webhook";
 

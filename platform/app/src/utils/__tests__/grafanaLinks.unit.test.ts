@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  grafanaGroupLogsUrl,
+  grafanaGroupTracesUrl,
   grafanaLinksForTrace,
   grafanaLogsUrlByTrace,
   grafanaTraceUrl,
@@ -91,6 +93,54 @@ describe("grafanaLogsUrlByTrace", () => {
     });
     expect(panes.lw.queries[0].expr).toContain(TRACE_ID);
     expect(panes.lw.queries[0].expr).toContain("trace_id");
+  });
+});
+
+describe("group-scoped links", () => {
+  const GROUP_ID = "project_a/map/spanStorage/span-map:91";
+
+  describe("given Grafana is configured", () => {
+    describe("when a group's observability links are built", () => {
+      /** @scenario "The drawer links to the group's traces and logs" */
+      it("queries spans by the group id, and filters log lines to it", () => {
+        const traces = grafanaGroupTracesUrl(GROUP_ID, {
+          baseUrl: "https://observability.langwatch.localhost",
+        });
+        expect(panesOf(traces).panes.lw.queries[0].query).toBe(
+          `{span.queue.group_id="${GROUP_ID}"}`,
+        );
+
+        const logs = grafanaGroupLogsUrl(GROUP_ID, {
+          baseUrl: "https://observability.langwatch.localhost",
+        });
+        expect(panesOf(logs).panes.lw.queries[0].expr).toBe(
+          `{service_name=~".+"} |= "${GROUP_ID}"`,
+        );
+      });
+    });
+  });
+
+  describe("when the group id carries quotes or backslashes", () => {
+    it("escapes them so the query string cannot be broken out of", () => {
+      const hostile = 'group"} || {span.x="y';
+      const traces = grafanaGroupTracesUrl(hostile, {
+        baseUrl: "http://127.0.0.1:3000",
+      });
+      expect(panesOf(traces).panes.lw.queries[0].query).toBe(
+        '{span.queue.group_id="group\\"} || {span.x=\\"y"}',
+      );
+    });
+  });
+
+  describe("when the base URL is malformed", () => {
+    it("fails closed to null like the trace-id builders", () => {
+      expect(
+        grafanaGroupTracesUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" }),
+      ).toBeNull();
+      expect(
+        grafanaGroupLogsUrl(GROUP_ID, { baseUrl: "127.0.0.1:3000" }),
+      ).toBeNull();
+    });
   });
 });
 

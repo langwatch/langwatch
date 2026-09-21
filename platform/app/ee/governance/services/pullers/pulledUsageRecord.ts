@@ -1,0 +1,360 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * The ingest seam: one adapter event in, one priced usage record out
+ * (ADR-088 Decisions 1, 2, 4 and 5).
+ *
+ * This lives with the pullers rather than with the pipeline on purpose. The
+ * pipeline is provider-agnostic and must stay that way; knowing what an
+ * adapter puts in `NormalizedPullEvent.extra` is exactly the adapter-shaped
+ * knowledge that belongs at the boundary.
+ *
+ * Most pulled events are audit records with no money in them, so declaring a
+ * usage item is opt-in: an adapter that has one attaches a `pulled_usage` hint
+ * to `extra`, and everything else returns null and stays audit-only.
+ */
+
+import { createHash } from "node:crypto";
+import {
+  PULLED_USAGE_COST_BASIS,
+  PULLED_USAGE_COST_STATUS,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
+import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import {
+  type PulledUsageQuantities,
+  pricePulledUsage,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
+import { z } from "zod";
+
+import { actorForPulledDay } from "../logic/pulledActorNaming";
+import type { NormalizedPullEvent } from "./pullerAdapter";
+
+/** The key an adapter attaches its usage hint under, inside `extra`. */
+export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
+
+/**
+ * What an adapter must say to turn one of its events into a cost record.
+ *
+ * `dimensions` is the provider's stable natural key with the money and the
+ * quantities left out — the workspace, the model, the granularity, whatever
+ * the provider groups by. It is the only thing the restatement key hashes
+ * (alongside the source and the period), which is what lets a corrected bucket
+ * find the figure it corrects instead of landing beside it. An adapter that
+ * puts a cost or a token count in here breaks that and gets a new key per
+ * correction, so: dimensions only.
+ */
+const pulledUsageHintSchema = z
+  .object({
+    costBasis: z.enum([
+      PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+      PULLED_USAGE_COST_BASIS.COMPUTED,
+    ]),
+    /**
+     * Required on the provider-reported path and meaningless on the computed
+     * one, because a figure we derived is never the invoice. Enforced below
+     * rather than by the type, since the hint arrives as untyped JSON.
+     */
+    costStatus: z
+      .enum([PULLED_USAGE_COST_STATUS.EXACT, PULLED_USAGE_COST_STATUS.ESTIMATE])
+      .optional(),
+    dimensions: z.record(z.string()).refine((d) => Object.keys(d).length > 0, {
+      message: "a pulled usage hint must name at least one dimension to key on",
+    }),
+    /**
+     * The provider's cost as the exact decimal STRING it published, when the
+     * adapter has one. `NormalizedPullEvent.cost_usd` is a `number`, and an
+     * invoice figure that has passed through a JS float has already lost
+     * digits by the time anything downstream can care; a provider that hands
+     * us a string should have every one of them survive to the ledger.
+     */
+    costUsd: z.string().optional(),
+    /**
+     * Which currency `costUsd` is in, ISO 4217. Absent means dollars, which is
+     * what every adapter written before this reported.
+     *
+     * Deliberately NOT a dimension. `dimensions` is the restatement identity,
+     * and a provider that re-denominated a period would mint a fresh key and
+     * add its correction on top of the figure it corrects rather than
+     * replacing it. Currency belongs with the money, not with the coordinates.
+     */
+    currency: z.string().length(3).optional(),
+    /**
+     * The BILLER's own conversion of `costUsd` into dollars, as the exact
+     * decimal string it published. Azure returns this beside the native
+     * amount at its own invoice-grade rate.
+     *
+     * Only ever the biller's number. Absent stays absent — nothing downstream
+     * fills it from a rate of our own. Also not a dimension, for the same
+     * reason as `currency`.
+     */
+    costUsdBiller: z.string().optional(),
+    /**
+     * The agent/application within the source, when the provider names one —
+     * a Genie space, a Copilot bot. Deliberately NOT a dimension: for every
+     * adapter that has one it is derivable from a coordinate that is already
+     * in `dimensions` (Genie's `spaceId`), so putting it there again would
+     * change every restatement key for nothing.
+     */
+    agentId: z.string().optional(),
+    /** Falls back to the event's `target`, which is where models already sit. */
+    model: z.string().optional(),
+    tokensCacheRead: z.number().int().nonnegative().default(0),
+    tokensCacheWrite: z.number().int().nonnegative().default(0),
+  })
+  .superRefine((hint, ctx) => {
+    if (
+      hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED &&
+      !hint.costStatus
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        // Without the path the issue is reported against the whole hint, so an
+        // adapter author reading the error cannot see which field to add.
+        path: ["costStatus"],
+        message:
+          "a provider-reported cost must declare costStatus: only the adapter knows whether the provider's figure is the invoice or an approximation of one",
+      });
+    }
+  });
+
+/** The attribution a record inherits from the source that pulled it. */
+export interface PulledUsageSourceAttribution {
+  ingestionSourceId: string;
+  /** The provider record this came from, e.g. `anthropic_admin`. */
+  sourceType: string;
+  organizationId: string;
+  /** Null when the source is org-wide. Never substituted with anything. */
+  teamId: string | null;
+  /**
+   * When the source was connected — the input to ADR-129's named-or-blank
+   * line, not attribution. See `actorForPulledDay`.
+   */
+  createdAt: Date;
+}
+
+/**
+ * The dimension-only identity two versions of one bucket share.
+ *
+ * Cost and quantities are excluded structurally rather than by discipline:
+ * this function is only ever handed coordinates, so there is no path by which
+ * a money figure reaches the hash. Keys are sorted, so an adapter that lists
+ * its dimensions in a different order on a later pull still matches.
+ *
+ * The source id is in the key because two sources pulling the same provider
+ * workspace are two customers' records, and a shared key would let one
+ * restate the other.
+ */
+function restatementKeyFor({
+  sourceType,
+  ingestionSourceId,
+  periodStartMs,
+  dimensions,
+}: {
+  sourceType: string;
+  ingestionSourceId: string;
+  periodStartMs: number;
+  dimensions: Record<string, string>;
+}): string {
+  const coordinates = [
+    ["source", sourceType],
+    ["ingestionSourceId", ingestionSourceId],
+    ["periodStartMs", String(periodStartMs)],
+    ...Object.entries(dimensions).sort(([a], [b]) => (a < b ? -1 : 1)),
+  ];
+  return createHash("sha256").update(JSON.stringify(coordinates)).digest("hex");
+}
+
+/**
+ * The provider's reported amount together with the currency that names it.
+ *
+ * Three homes, read in falling order of precision, and each one supplies BOTH
+ * halves or neither. Picking the amount from one home and the currency from
+ * another is how a dollar figure ends up denominated in euros: the hint's
+ * `costUsd` means dollars unless the hint's own `currency` says otherwise, and
+ * an adapter that also filled `event.cost_currency` was naming the currency of
+ * `event.cost_amount`, a different number entirely.
+ *
+ *   - The hint's own string is the exact one the adapter kept, so no digit is
+ *     lost to the float `cost_usd` had to be to fit the canonical event shape.
+ *     Its currency is `hint.currency`, and absent there means dollars.
+ *   - The event's billed amount is named by `event.cost_currency`, which
+ *     arrived beside it for exactly this purpose.
+ *   - The dollar field, which since it became optional means DOLLARS or
+ *     nothing, never a stand-in for an amount in another currency.
+ *
+ * Null when no home holds an amount.
+ */
+function reportedMoney({
+  hint,
+  event,
+}: {
+  hint: z.infer<typeof pulledUsageHintSchema>;
+  event: NormalizedPullEvent;
+}): { amount: string; currencyCode: string } | null {
+  if (hint.costUsd !== undefined) {
+    return { amount: hint.costUsd, currencyCode: hint.currency ?? "USD" };
+  }
+  if (event.cost_amount !== undefined) {
+    return {
+      amount: event.cost_amount,
+      currencyCode: event.cost_currency ?? "USD",
+    };
+  }
+  if (event.cost_usd !== undefined) {
+    return { amount: event.cost_usd, currencyCode: "USD" };
+  }
+  return null;
+}
+
+/**
+ * Prices one item on the basis its hint declares, or answers that it cannot.
+ *
+ * Two bases and one refusal. A computed item is priced from its model and its
+ * quantities. A provider-reported one is priced from the amount the provider
+ * actually reported — and null when there is no such amount anywhere, which is
+ * the refusal: an amountless provider-reported item is not a free item, it is
+ * one we hold no price for, and recording it at zero would put a confident
+ * wrong number into a total nothing later corrects.
+ *
+ * Which amount that is, and the currency it is denominated in, is one decision
+ * and not two — see {@link reportedMoney}.
+ */
+function priceOnDeclaredBasis({
+  hint,
+  event,
+  model,
+  quantities,
+}: {
+  hint: z.infer<typeof pulledUsageHintSchema>;
+  event: NormalizedPullEvent;
+  model: string;
+  quantities: PulledUsageQuantities;
+}): ReturnType<typeof pricePulledUsage> | null {
+  if (hint.costBasis !== PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
+    return pricePulledUsage({
+      basis: PULLED_USAGE_COST_BASIS.COMPUTED,
+      model,
+      quantities,
+    });
+  }
+
+  const reported = reportedMoney({ hint, event });
+  if (reported === null) return null;
+
+  return pricePulledUsage({
+    basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+    costUsd: reported.amount,
+    currencyCode: reported.currencyCode,
+    costUsdBiller: hint.costUsdBiller,
+    // Present by the schema's own refinement on this branch.
+    costStatus: hint.costStatus!,
+  });
+}
+
+/**
+ * Turns one adapter event into the record the `RecordPulledUsage` command
+ * takes, or null when the event carries no usage to price.
+ *
+ * Null and throwing mean different things and the difference is deliberate.
+ * Null is "this is an audit event, there was never any money here" — the
+ * normal case, and the caller moves on. A throw is "you declared usage and
+ * then handed me something I cannot key or price", which is an adapter bug:
+ * loud beats quietly filing a customer's money under the wrong bucket, or
+ * under `now`.
+ */
+export function buildPulledUsageRecord({
+  event,
+  source,
+  governanceProjectId,
+  observedAt,
+}: {
+  event: NormalizedPullEvent;
+  source: PulledUsageSourceAttribution;
+  /**
+   * The org's hidden governance project — where the row is STORED, not who
+   * the money belongs to. Separate from `source` because attribution is what
+   * the source knows and the home is what the org has.
+   */
+  governanceProjectId: string;
+  observedAt: Date;
+}): PulledUsageObservedEventData | null {
+  const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
+  if (raw === undefined || raw === null) return null;
+
+  const hint = pulledUsageHintSchema.parse(raw);
+
+  const occurredAtMs = Date.parse(event.event_timestamp);
+  if (!Number.isFinite(occurredAtMs)) {
+    throw new Error(
+      `pulled usage event ${event.source_event_id} has an unparseable bucket timestamp: ${JSON.stringify(event.event_timestamp)}`,
+    );
+  }
+
+  const quantities = {
+    tokensInput: event.tokens_input,
+    tokensOutput: event.tokens_output,
+    tokensCacheRead: hint.tokensCacheRead,
+    tokensCacheWrite: hint.tokensCacheWrite,
+  };
+  const model = hint.model ?? event.target;
+
+  const priced = priceOnDeclaredBasis({ hint, event, model, quantities });
+
+  // A provider-reported item with no amount anywhere is not a free item, it is
+  // an item we hold no price for. Recording it at zero would put a confident
+  // wrong number in a total that nothing later corrects.
+  if (priced === null) return null;
+
+  return {
+    itemKey: event.source_event_id,
+    restatementKey: restatementKeyFor({
+      sourceType: source.sourceType,
+      ingestionSourceId: source.ingestionSourceId,
+      periodStartMs: occurredAtMs,
+      dimensions: hint.dimensions,
+    }),
+    source: source.sourceType,
+    ingestionSourceId: source.ingestionSourceId,
+    organizationId: source.organizationId,
+    teamId: source.teamId,
+    // The row's home: the org's hidden governance project, the same partition
+    // the OCSF audit rows and the ledger's TenantId already use. Nothing
+    // pulled arrives homeless. This says where the row is STORED and not who
+    // owns the money — that stays on organizationId/teamId above, which
+    // `pulledUsageScopeId` reads to pick the ledger's Scope. Members never see
+    // the home: every listing surface excludes kind="internal_governance".
+    // Decision: ADR-128.
+    projectId: governanceProjectId,
+    model,
+    ...quantities,
+    costNanoMinor: priced.costNanoMinor,
+    currencyCode: priced.currencyCode,
+    costNanoUsd: priced.costNanoUsd,
+    rateVersion: priced.rateVersion,
+    costBasis: priced.costBasis,
+    costStatus: priced.costStatus,
+    // The spender, threaded from the adapter's own `actor` field through the
+    // one shared named-or-blank rule (ADR-129). This is what keeps the paused
+    // providers paused without a registry here: Anthropic and Azure emit
+    // `actor: ""` on their money events, so they stay blank structurally, and
+    // an adapter starts naming its spend the day it starts saying who spent.
+    // NOT hashed into `restatementKey` above — identity can change between
+    // pulls, and an actor in the key would mint a second record (ADR-129
+    // Decision 4, on `databricksGenie.puller.ts`'s own precedent).
+    rawActorId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: event.actor ?? "",
+    }),
+    // The agent, from the hint, through the SAME line: the rollup cell is
+    // keyed by this field too, so ADR-129 Decision 2's twice-guard applies to
+    // it verbatim — a day recorded agent-less must stay agent-less.
+    agentId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: hint.agentId ?? "",
+    }),
+    occurredAtMs,
+    observedAtMs: observedAt.getTime(),
+  };
+}

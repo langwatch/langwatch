@@ -13,17 +13,23 @@ const MotionBox = motion.create(Box);
 /**
  * ONE geometry for every pre-work / thinking / status line of a live turn.
  *
- * The startup sequence used to hop between layouts: "Starting up…" drew as the
- * bare thinking line, "Waking Langy up…" as an orb-led status row with its own
+ * The startup sequence used to hop between layouts: the waiting ladder drew as
+ * the bare thinking line, the manager status as an orb-led status row with its own
  * gap and no padding, and the first real work line flipped back — three
  * different left offsets and baselines for what reads as one evolving line.
  * Both components (LangyThinkingLine, StreamingStatusLine) now share this row
  * frame — same leading-indicator slot, same gap, same padding, same text
  * metrics — so the words change and nothing moves.
+ *
+ * The row carries NO vertical padding, and that is what makes the answer land
+ * where the line stood: these lines and the reply's first paragraph are
+ * siblings in the same column, so 2px here plus the block's own margin put the
+ * working line 8px below the text that replaced it, and the whole column
+ * appeared to jump up the moment the answer arrived.
  */
 export const STATUS_LINE_ROW = {
   gap: 2,
-  paddingY: 0.5,
+  paddingY: 0,
   paddingLeft: 0.5,
 } as const;
 

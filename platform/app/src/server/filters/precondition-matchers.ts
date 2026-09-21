@@ -26,6 +26,12 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
+  /**
+   * Raw trace-summary attributes, unfiltered. `metadata.value` falls back to
+   * these so a bare OTEL resource attribute resolves here the same way it
+   * resolves in ClickHouse — see `clickhouse/filter-conditions.ts`.
+   */
+  attributes?: Record<string, string> | null;
   annotationIds?: string[];
   events?: Array<{
     event_type: string;
@@ -91,8 +97,42 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "metadata.labels": (data) => data.labels,
   "metadata.prompt_ids": (data) => data.promptIds,
   "metadata.key": null, // key selector — not matchable
-  "metadata.value": (data, _value, key) =>
-    key ? (data.customMetadata?.[key] ?? null) : null,
+  "metadata.value": (data, _value, key) => {
+    if (!key) return null;
+    const decoded = key.replaceAll("·", ".");
+    const resolved = decoded.startsWith("metadata.")
+      ? decoded.slice("metadata.".length)
+      : decoded.startsWith("langwatch.metadata.")
+        ? decoded.slice("langwatch.metadata.".length)
+        : decoded;
+    if (!resolved) return null;
+
+    // ClickHouse reads three independent attribute keys and ORs them
+    // (clickhouse/filter-conditions.ts "metadata.value"). Read the same three
+    // by the same names so a value the preview counted can still fire a
+    // trigger.
+    //
+    // customMetadata is not enough on its own for two reasons.
+    // extractCustomMetadata drops standard resource prefixes (service., http.,
+    // telemetry., …) entirely, and where several forms of one key are present
+    // it keeps only the highest-priority one — so a trace carrying both
+    // `metadata.env` and `langwatch.metadata.env` exposes one value there
+    // while ClickHouse matches either. It stays in the list as the only source
+    // for callers that carry parsed metadata and no raw attributes.
+    const candidates = [
+      data.attributes?.[`metadata.${decoded}`],
+      data.attributes?.[`langwatch.metadata.${decoded}`],
+      data.attributes?.[decoded],
+      data.customMetadata?.[resolved],
+    ].filter((candidate): candidate is string => candidate != null);
+
+    const distinct = [...new Set(candidates)];
+    if (distinct.length === 0) return null;
+    // One candidate stays a plain string. `matches_regex` tests an array's
+    // JSON encoding alongside its elements, so wrapping a lone value in a list
+    // would widen what an anchored pattern can hit for no reason.
+    return distinct.length === 1 ? distinct[0]! : distinct;
+  },
 
   // Span fields
   "spans.type": (data) => data.spanTypes,

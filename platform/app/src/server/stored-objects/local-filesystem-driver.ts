@@ -46,7 +46,38 @@ function parseFileUri(uri: string): string {
     );
   }
   const parsed = new URL(uri);
-  return decodeURIComponent(parsed.pathname);
+  const decoded = decodeURIComponent(parsed.pathname);
+
+  // Containment check, deliberately AFTER the decode.
+  //
+  // `new URL()` leaves `%2F` encoded, so a URI can look confined and stop being
+  // confined one line later: `…/spool/proj/..%2F..%2Fetc/span` has a single
+  // path segment as far as the URL parser is concerned, and becomes
+  // `…/spool/proj/../../etc/span` the moment it is decoded — which is what
+  // `mkdir`/`writeFile` would then act on. A caller that percent-encodes its
+  // segments is therefore NOT protected by having done so.
+  //
+  // Callers should still keep each segment a single component; this is the
+  // backstop that makes a mistake there fail loudly instead of writing outside
+  // the object root.
+  //
+  // The check is on `..` segments specifically, NOT on "is the decoded path
+  // already canonical". Those are not the same test, and the stricter one is
+  // wrong: a storage root configured with a trailing slash — which
+  // `LANGWATCH_LOCAL_STORAGE_PATH` and the chart's
+  // `app.storedObjects.localFilesystem.path` both accept — mints
+  // `file:///root//project/object`, whose decoded form is non-canonical and
+  // completely harmless. Refusing it would break every local-filesystem write
+  // (dataset uploads, scenario media, the queue's durable blob tier) on those
+  // installs, none of which is what this guard is here for. A redundant
+  // separator is sloppy; only `..` escapes.
+  if (decoded.split("/").includes("..")) {
+    throw new Error(
+      `LocalFilesystemDriver refuses a file: URI whose decoded path contains a ".." segment — ` +
+        `it resolves outside the location it names. Keep every path segment a single component.`,
+    );
+  }
+  return path.resolve(decoded);
 }
 
 /**

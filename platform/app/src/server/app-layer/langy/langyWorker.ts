@@ -1,8 +1,8 @@
 /**
- * Langy worker port — the control plane's HTTP calls to the Go opencode manager
+ * Langy worker port — the control plane's HTTP calls to the Go worker manager
  * that are NOT the turn dispatch itself: a liveness probe (so we can skip minting
  * a session key a live worker would discard) and a fire-and-forget warm (so the
- * opencode spawn overlaps the rest of the turn-start instead of preceding the
+ * worker spawn overlaps the rest of the turn-start instead of preceding the
  * first token).
  *
  * Extracted from routes/langy.ts so the turn-start orchestration lives in the
@@ -25,7 +25,7 @@ const AGENT_WARM_TIMEOUT_MS = 3_000;
  * The dispatch POST returns only the pre-stream STATUS (202 accepted / 409 busy /
  * 428 credentials / 503 at-capacity) — the turn's output flows out-of-band to the
  * relay, not on this response. The manager does a synchronous Acquire+Claim before
- * answering (so the busy-409 is real), which can cold-spawn opencode, so the budget
+ * answering (so the busy-409 is real), which can cold-spawn a worker, so the budget
  * must cover a cold start with margin. Not a per-token deadline — it closes the
  * moment the status lands.
  */

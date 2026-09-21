@@ -1,5 +1,6 @@
 import { Box, Image, Portal, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { Tooltip } from "../components/ui/tooltip";
 
 export const getImageUrl = (str: unknown): string | null => {
@@ -179,6 +180,8 @@ export const ExternalImage = ({
     setIsExpanded(false);
     setIsPositioned(false);
   }, []);
+
+  useEscapeKey({ enabled: isExpanded, onEscape: handleClose });
 
   if (error) {
     return (

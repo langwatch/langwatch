@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
-import type { BugReport } from "@prisma/client";
+import type { BugReport } from "~/generated/prisma/client";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";

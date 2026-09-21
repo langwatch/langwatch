@@ -67,7 +67,6 @@ function ProjectKeyActions({
             title: "API key copied to clipboard",
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
         }}
       >
@@ -129,7 +128,7 @@ export function ApiKeysSection({
   const updateMutation = api.apiKey.update.useMutation();
   const revokeMutation = api.apiKey.revoke.useMutation();
   const regenerateMutation = api.project.regenerateApiKey.useMutation();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const {
     open: isCreateOpen,
@@ -213,7 +212,6 @@ export function ApiKeysSection({
         description: "Select at least one scope for a restricted key.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -228,7 +226,6 @@ export function ApiKeysSection({
           "You have no role bindings in this organization, so there is nothing to grant to a key.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -292,7 +289,6 @@ export function ApiKeysSection({
             title: "API key updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           void queryClient.apiKey.list.invalidate();
         },
@@ -312,7 +308,6 @@ export function ApiKeysSection({
             title: "API key revoked",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           void queryClient.apiKey.list.invalidate();
         },
@@ -341,7 +336,6 @@ export function ApiKeysSection({
               "The previous key no longer works. Update your integrations.",
             type: "warning",
             duration: 6000,
-            meta: { closable: true },
           });
         },
         onError: (error) => {
@@ -363,7 +357,7 @@ export function ApiKeysSection({
   // A fake row with a single PROJECT-scoped binding is synthesised so the same
   // filterProvidersByScope logic can decide.
   const showProjectKey: boolean = useMemo(() => {
-    if (!projectApiKey || !project?.id) return false;
+    if (!canManageProject || !projectApiKey || !project?.id) return false;
     // Synthesize a single-binding row so the project-service-key row reuses the
     // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
     // Intent: keep the cascade rules in ONE place — not a hack to bypass typing.
@@ -377,7 +371,14 @@ export function ApiKeysSection({
         currentProjectId: project?.id,
       }).length > 0
     );
-  }, [projectApiKey, project?.id, scopeFilter, hierarchy, team?.id]);
+  }, [
+    canManageProject,
+    projectApiKey,
+    project?.id,
+    scopeFilter,
+    hierarchy,
+    team?.id,
+  ]);
 
   const getStatus = (key: ApiKeyRow) => {
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
@@ -676,6 +677,7 @@ export function ApiKeysSection({
         {/* Ingestion keys render below the API keys table. */}
         <IngestionKeysSection
           keys={ingestionKeys}
+          allKeys={allApiKeys}
           isAdmin={isAdmin}
           onRevoke={setApiKeyToRevoke}
         />
@@ -683,7 +685,7 @@ export function ApiKeysSection({
 
       <CreateApiKeyDrawer
         isOpen={isCreateOpen && !newToken}
-        isCreating={createMutation.isLoading}
+        isCreating={createMutation.isPending}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
         orgTeams={orgTeams.data ?? []}
@@ -697,7 +699,7 @@ export function ApiKeysSection({
 
       <EditApiKeyDrawer
         apiKey={apiKeyToEdit}
-        isUpdating={updateMutation.isLoading}
+        isUpdating={updateMutation.isPending}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
         orgTeams={orgTeams.data ?? []}
@@ -728,14 +730,14 @@ export function ApiKeysSection({
 
       <RevokeConfirmDialog
         apiKeyId={apiKeyToRevoke}
-        isRevoking={revokeMutation.isLoading}
+        isRevoking={revokeMutation.isPending}
         onCancel={() => setApiKeyToRevoke(null)}
         onConfirm={handleRevoke}
       />
 
       <RegenerateApiKeyDialog
         open={isRotateConfirmOpen}
-        isLoading={regenerateMutation.isLoading}
+        isLoading={regenerateMutation.isPending}
         onClose={() => setIsRotateConfirmOpen(false)}
         onConfirm={handleRotateProjectKey}
       />

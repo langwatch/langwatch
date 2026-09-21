@@ -100,6 +100,165 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then creating an endpoint with an http URL is refused
       And with the flag set the same endpoint is accepted
 
+  Rule: An endpoint delivers over HTTP or to an Amazon SQS queue
+
+    # The delivery machinery is one machinery: the same batching, the same
+    # ladder, the same delivery log, the same signature. Only the last hop
+    # differs, so the transport is what varies and everything above it does
+    # not know which one it got.
+
+    @unit
+    Scenario: A queue delivery is recorded with no response status
+      Given an endpoint that delivers to a queue
+      When a batch is accepted by the queue
+      Then the delivery is recorded as successful
+      And it carries the queue's message id and no response status
+      # A status code is one destination's way of answering. Inventing a 200
+      # for a queue would make the delivery log say something that never
+      # happened.
+
+    @unit
+    Scenario: An HTTPS endpoint keeps the retry rules it always had
+      Given an endpoint that delivers over HTTPS
+      Then a 2xx answer is a successful delivery
+      And 500, 429 and 408 are retried along the ladder
+      And every other answer, a redirect included, retires the batch
+
+    @integration
+    Scenario: An endpoint saved before destinations existed still delivers over HTTPS
+      Given an endpoint saved with only a receiver URL
+      When a batch is delivered
+      Then it is posted to that URL exactly as it was before
+      And its delivery log reads the same as it always did
+
+    @unit
+    Scenario: Both destinations answer to the same hourly dispatch cap
+      Given an organization at its hourly dispatch cap
+      When a batch is delivered to a queue destination
+      Then it is refused as retryable with a back-off
+      # The cap used to live inside the HTTP sender, so a queue destination
+      # would have been uncapped.
+
+    @unit
+    Scenario: A queue message carries the same bytes as the HTTP body
+      Given a batch of envelopes
+      When it is delivered to a queue
+      Then the message body is byte-identical to the body the HTTP transport would post
+      And no outer wrapper is added around it
+      # The same bytes means the same signature verifier and the same golden
+      # vectors on the receiving side.
+
+    @unit
+    Scenario: Signature, delivery id and attempt ride as message attributes
+      Given a signed batch delivered to a queue
+      Then the signature travels under the same name as its HTTP header
+      And so do the delivery id and the delivery attempt
+      And a test fire is marked as one, under its own header name
+      And an ordinary delivery carries no test-fire mark
+      # A consumer sees no attributes at all unless it asks for them by
+      # passing MessageAttributeNames: ["All"] to ReceiveMessage.
+
+    @unit
+    Scenario: A batch too large for one queue message is refused terminally
+      Given a batch whose body and attributes exceed the queue message limit
+      When it is delivered
+      Then the verdict is terminal
+      And the refusal names the batch-size control as the way to fix it
+      # Retrying is pointless: the same bytes will never fit. Splitting is
+      # not available either, because one batch is one message and its id is
+      # the replay-safety key.
+
+    @integration
+    Scenario: A FIFO queue is refused at save time
+      When an endpoint is saved with a queue URL ending in .fifo
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      And the refusal says standard queues only
+      # Our contract is at-least-once with envelope-id dedup, which is what a
+      # standard queue is; we never promised ordering, and FIFO caps at 300
+      # per second.
+
+    @integration
+    Scenario: A queue URL outside the canonical Amazon SQS shape is refused
+      When an endpoint is saved with a queue URL that is not an Amazon SQS queue URL
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      # The SSRF fence never sees this URL, because the AWS SDK dials it, so
+      # the shape is pinned instead.
+
+    @unit
+    Scenario: The region and the account come from the queue URL
+      Given a canonical Amazon SQS queue URL
+      Then its region is read off the URL rather than configured separately
+      And its account id is surfaced so an operator can see whose queue it is
+
+    @integration
+    Scenario: Ambient AWS credentials need the operator opt-in
+      Given the deployment did not set the unsafe ambient-credentials flag
+      Then saving a queue endpoint with no credentials of its own is refused
+      And with the flag set the same endpoint is accepted
+      # Without the gate a customer could name any queue the deployment's own
+      # role can write to.
+
+    @integration
+    Scenario: A queue's secret access key is never readable once saved
+      When an endpoint is saved with a static access key and secret
+      Then no read of the endpoint returns the secret
+      And the secret cannot be recovered from anywhere the endpoint is stored
+
+    # A role outranks a key pair when the endpoint is read, so the direction
+    # that matters is the one INTO the key pair: a stored role that survives
+    # the switch goes on being used while the new key sits unread, and the
+    # update still answers success.
+    @integration
+    Scenario: Switching credential mode drops the mode it left
+      Given a queue endpoint that assumes a role
+      When the update sets a static access key and secret
+      Then the endpoint reports the static mode
+      And the role and its external id are gone from the row
+      And an update naming both modes at once is refused
+
+    @unit
+    Scenario: A missing or forbidden queue is terminal, a throttled one retries
+      Given a queue delivery that failed
+      Then a missing queue or a refused permission is terminal
+      And throttling, a server error and a network failure are retryable
+      And an expired credential is retryable
+
+    # A customer repairs a refused identity in their own account, and LangWatch
+    # is never told. If the repair only takes effect when the process restarts,
+    # the customer sees a queue that stays broken after they fixed it.
+    @unit
+    Scenario: A repaired credential takes effect without a restart
+      Given a queue that refuses the identity the delivery was sent with
+      When the customer corrects the permission on their side
+      Then the next delivery asks for the credential again
+      And a failure that says nothing about the identity reuses the connection
+
+    @integration
+    Scenario: Saving an endpoint names the field its destination kind is missing
+      When an endpoint of a kind is saved without the field that kind requires
+      Then the response status is 400
+      And the refusal names the missing field rather than the whole body
+
+    # An endpoint stores one address. A body carrying both would have half of
+    # it dropped on the way to the row, and a 201 would report a queue as saved
+    # that was never written.
+    @integration
+    Scenario: Saving an endpoint refuses the address of the other destination kind
+      When an endpoint is saved naming one kind and the other kind's address
+      Then the response status is 400
+      And the refusal names the field that does not belong
+
+    @integration
+    Scenario: An endpoint never changes its destination kind
+      Given an endpoint that delivers over HTTP
+      When an update asks for the queue kind
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      # Messages already planned against the old transport are in flight in
+      # the outbox.
+
   Rule: Deliveries are signed and attributable
 
     @unit
@@ -397,3 +556,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the log is filtered to a budget or virtual-key event type
       Then the page is empty and its next cursor is null
       And the route documents that the log does not retain those families
+
+    # The log is a read over the same 13-month spend table the reconciliation
+    # pull reads, so the created range is part of the contract rather than a
+    # filter: unbounded, a single page sorts every month the organization has,
+    # cold storage included.
+
+    @integration
+    Scenario: The events log refuses a read with no created range
+      When the log is read with neither bound, or with only one of them
+      Then the response status is 400
+      And error.code = "validation_error"
+      And the refusal names the bound that is missing
+
+    @integration
+    Scenario: The events log refuses an inverted created range
+      When the log is read with a range that ends before it starts
+      Then the response status is 400
+      And error.code = "validation_error"

@@ -1,0 +1,53 @@
+---
+title: "Overview"
+description: "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+A SCIM token is the credential your identity provider presents to the [SCIM 2.0 endpoints](/api-reference/scim/overview). This API mints them, lists the ones that exist, and revokes them, which is everything you need to rotate a provider's credential without opening the dashboard.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/scim-tokens` | List the organization's SCIM tokens |
+| `POST` | `/api/scim-tokens` | Mint a token, returned once |
+| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token |
+
+## The value is returned once
+
+`POST` is the only response that ever contains the token itself. The list returns the id, the description, when it was created and when it was last used, and never the value or its hash. If the token is lost, mint a new one and revoke the old one.
+
+```bash
+curl -X POST https://app.langwatch.ai/api/scim-tokens \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Okta production"}'
+```
+
+Give each token a description that says where it lives. `lastUsedAt` then tells you which one your provider is actually presenting, which is what makes a rotation safe to finish.
+
+## Rotating
+
+1. Mint a second token and store it in the identity provider.
+2. Watch `lastUsedAt` on the new token move.
+3. Revoke the old one.
+
+Revoking takes effect on the next call: a revoked token stops verifying immediately, and any provider still presenting it starts failing to sync. An id that does not exist, or was already revoked, answers 404 `scim_token_not_found`.
+
+## Tokens are checked against the plan on every call
+
+Entitlement is not only checked when a token is minted. If the Enterprise plan lapses, tokens that already exist stop verifying, and your identity provider's requests are refused. See [SCIM](/api-reference/scim/overview) for what the provider sees.

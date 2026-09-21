@@ -7,6 +7,7 @@ import {
   iconSizeToPixels,
 } from "../../../../../utils/iconSize";
 import type { IconData } from "../../../regions/shared/types";
+import { SELECTED_SURFACE_BG, SELECTED_SURFACE_BORDER } from "./accent-surface";
 
 interface SelectableIconCardProps {
   label: string;
@@ -44,8 +45,14 @@ export function SelectableIconCard(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
     actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
   );
-  const selectedBorderColor = useColorModeValue("orange.400", "orange.800");
-  const selectedBg = useColorModeValue("orange.50", "orange.950/30");
+  const selectedBorderColor = useColorModeValue(
+    SELECTED_SURFACE_BORDER.light,
+    SELECTED_SURFACE_BORDER.dark,
+  );
+  const selectedBg = useColorModeValue(
+    SELECTED_SURFACE_BG.light,
+    SELECTED_SURFACE_BG.dark,
+  );
   const isDark = useColorModeValue(false, true);
 
   const iconSrc =

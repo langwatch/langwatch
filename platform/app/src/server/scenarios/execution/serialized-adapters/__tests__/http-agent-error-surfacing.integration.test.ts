@@ -123,9 +123,9 @@ function makeFakeLogger(): FakeLogger {
 }
 
 function loggerArg(logger: FakeLogger) {
-  return logger as unknown as ConstructorParameters<
-    typeof SerializedHttpAgentAdapter
-  >[1];
+  return logger as unknown as NonNullable<
+    ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+  >;
 }
 
 function collectEntries(logger: FakeLogger): Record<string, unknown>[] {
@@ -168,6 +168,7 @@ function makeConfig(
     url,
     method: "POST",
     headers: [],
+    secrets: {},
     outputPath: "$.message",
     ...overrides,
   };
@@ -202,36 +203,36 @@ describe("given an HTTP agent target pointed at a stub returning 422 with a JSON
 
   describe("when the adapter calls the stub", () => {
     it("includes the request URL in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       await expect(adapter.call(baseInput)).rejects.toThrow(stub.url);
     });
 
     it("includes the response status 422 in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       await expect(adapter.call(baseInput)).rejects.toThrow("422");
     });
 
     /** @scenario HTTP agent error includes response body, URL, and upstream request id */
     it("includes the response body in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       // "invalid input" comes from the JSON body
       await expect(adapter.call(baseInput)).rejects.toThrow("invalid input");
     });
 
     it("includes the x-request-id response header value in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       await expect(adapter.call(baseInput)).rejects.toThrow(REQUEST_ID);
     });
   });
@@ -259,10 +260,10 @@ describe("given an HTTP agent target pointed at a stub returning 500 with a body
   describe("when the adapter calls the stub", () => {
     /** @scenario HTTP agent error truncates large response bodies */
     it("includes a truncated portion of the body in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       let message = "";
       try {
         await adapter.call(baseInput);
@@ -274,10 +275,10 @@ describe("given an HTTP agent target pointed at a stub returning 500 with a body
     });
 
     it("indicates the body was truncated in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       let message = "";
       try {
         await adapter.call(baseInput);
@@ -312,10 +313,10 @@ describe("given an HTTP agent target pointed at a stub returning 502 with a plai
   describe("when the adapter calls the stub", () => {
     /** @scenario HTTP agent error reads non-JSON response bodies as text */
     it("includes the plain-text body content in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       await expect(adapter.call(baseInput)).rejects.toThrow(PLAIN_TEXT_BODY);
     });
   });
@@ -344,10 +345,10 @@ describe("given an HTTP agent target returning 422 with x-amzn-requestid (no x-r
   describe("when the adapter calls the stub", () => {
     /** @scenario HTTP agent error surfaces alternate upstream identifier headers */
     it("includes the x-amzn-requestid header value in the thrown error", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(makeFakeLogger()),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(makeFakeLogger()),
+      });
       await expect(adapter.call(baseInput)).rejects.toThrow(AMZN_ID);
     });
   });
@@ -378,10 +379,10 @@ describe("given a request that sets Authorization and x-api-key headers", () => 
         headers: [{ key: "x-api-key", value: "my-secret-key" }],
         auth: { type: "bearer", token: "super-secret-token" },
       });
-      const adapter = new SerializedHttpAgentAdapter(
+      const adapter = new SerializedHttpAgentAdapter({
         config,
-        loggerArg(makeFakeLogger()),
-      );
+        logger: loggerArg(makeFakeLogger()),
+      });
 
       let message = "";
       try {
@@ -435,20 +436,20 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
   describe("when the adapter calls the stub", () => {
     /** @scenario HTTP agent emits one diagnostic log line per successful call */
     it("emits a structured diagnostic log line on success", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const entries = collectEntries(logger);
       expect(entries.length).toBeGreaterThanOrEqual(1);
     });
 
     it("includes the request URL in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const serialized = JSON.stringify(collectEntries(logger));
       // URL is redacted to origin + pathname; we used a path-less stub URL,
@@ -458,20 +459,20 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
     });
 
     it("includes the HTTP method in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const serialized = JSON.stringify(collectEntries(logger));
       expect(serialized).toMatch(/POST/i);
     });
 
     it("includes the response status 200 in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const hasStatus = collectEntries(logger).some(
         (e) => e.statusCode === 200,
@@ -480,10 +481,10 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
     });
 
     it("includes a durationMs field in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const hasDuration = collectEntries(logger).some(
         (e) => typeof e.durationMs === "number",
@@ -492,10 +493,10 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
     });
 
     it("includes the upstream x-request-id in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const serialized = JSON.stringify(collectEntries(logger));
       expect(serialized).toContain(REQUEST_ID);
@@ -534,20 +535,20 @@ describe("given an HTTP agent target pointed at a stub returning 422 (for diagno
   describe("when the adapter calls the stub", () => {
     /** @scenario HTTP agent emits one diagnostic log line per failing call */
     it("emits a structured diagnostic log line for a failing call", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const entries = collectEntries(logger);
       expect(entries.length).toBeGreaterThanOrEqual(1);
     });
 
     it("includes response status 422 in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const hasStatus = collectEntries(logger).some(
         (e) => e.statusCode === 422,
@@ -556,10 +557,10 @@ describe("given an HTTP agent target pointed at a stub returning 422 (for diagno
     });
 
     it("includes a sample of the response body in the log line", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       const serialized = JSON.stringify(collectEntries(logger));
       // The warn log includes the response body preview.
@@ -594,10 +595,10 @@ describe("given an HTTP agent target pointed at a stub returning a JSON 200 resp
   describe("when the adapter calls the stub", () => {
     it("emits the diagnostic log line", async () => {
       const logger = makeFakeLogger();
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
       expect(collectEntries(logger).length).toBeGreaterThanOrEqual(1);
     });
@@ -606,10 +607,10 @@ describe("given an HTTP agent target pointed at a stub returning a JSON 200 resp
     it("still returns the parsed JSON response to its caller after logging", async () => {
       // Verifies the response value pipeline is unaffected by logging.
       const logger = makeFakeLogger();
-      const adapter = new SerializedHttpAgentAdapter(
-        makeConfig(stub.url),
-        loggerArg(logger),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: makeConfig(stub.url),
+        logger: loggerArg(logger),
+      });
       // outputPath "$.message" extracts { message: "hello from stub" }.message
       const result = await adapter.call(baseInput);
       expect(result).toBe("hello from stub");
@@ -647,7 +648,10 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
         headers: [{ key: "x-api-key", value: "secret-api-key-value" }],
         auth: { type: "bearer", token: "very-secret-bearer-token" },
       });
-      const adapter = new SerializedHttpAgentAdapter(config, loggerArg(logger));
+      const adapter = new SerializedHttpAgentAdapter({
+        config,
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
 
       const serialized = JSON.stringify(collectEntries(logger));
@@ -661,7 +665,10 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
         headers: [{ key: "x-api-key", value: "secret-api-key-value" }],
         auth: { type: "bearer", token: "very-secret-bearer-token" },
       });
-      const adapter = new SerializedHttpAgentAdapter(config, loggerArg(logger));
+      const adapter = new SerializedHttpAgentAdapter({
+        config,
+        logger: loggerArg(logger),
+      });
       await adapter.call(baseInput).catch(() => undefined);
 
       const serialized = JSON.stringify(collectEntries(logger));

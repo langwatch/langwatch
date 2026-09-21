@@ -10,13 +10,17 @@ import {
 } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCircleAlert, LuCircleSlash } from "react-icons/lu";
 import {
   type EvalChipDisplay,
   getEvalChipDisplay,
 } from "~/utils/evaluationResults";
-import type { TraceEvalResult, TraceListEvent } from "../../../types/trace";
+import type {
+  TraceEvalResult,
+  TraceListEventGroup,
+} from "../../../types/trace";
 
 /**
  * Re-exported for callers that already imported from this module — the
@@ -43,6 +47,20 @@ function VerdictSlot({ display }: { display: EvalChipDisplay }) {
     return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
   if (display.status === "error")
     return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
+  if (display.categoryLabel) {
+    return (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="blue.fg"
+        truncate
+        maxWidth="80px"
+        lineHeight="1.2"
+      >
+        {display.categoryLabel}
+      </Text>
+    );
+  }
   if (display.scoreText) {
     return (
       <Text
@@ -114,9 +132,17 @@ export const EvalChip: React.FC<{
   onViewDefinition?: () => void;
 }> = ({ eval_, onFilter, onViewDefinition }) => {
   const display = getEvalChipDisplay(eval_);
+  // Controlled so "View definition" can close the card before it navigates.
+  // Left uncontrolled, the card outlives the drawer it just opened, and the
+  // dismissal that follows the pointer leaving reads to the drawer as an
+  // interaction outside it — so the drawer closed itself a moment after
+  // opening and the URL sprang back to the list.
+  const [open, setOpen] = useState(false);
 
   return (
     <HoverCard.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
       openDelay={200}
       closeDelay={150}
       positioning={{ placement: "top" }}
@@ -227,6 +253,7 @@ export const EvalChip: React.FC<{
                   type="button"
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
+                    setOpen(false);
                     onViewDefinition();
                   }}
                   display="inline-flex"
@@ -256,7 +283,14 @@ export const EvalChip: React.FC<{
   );
 };
 
-export const EventBadge: React.FC<{ event: TraceListEvent }> = ({ event }) => (
+/**
+ * One event name a trace recorded. A repeat count rides on the badge rather
+ * than repeating it — an agent turn can retry a tool hundreds of times, and
+ * "tool.output 237" says all of it in one chip.
+ */
+export const EventBadge: React.FC<{ event: TraceListEventGroup }> = ({
+  event,
+}) => (
   <HStack
     gap={1}
     paddingX={2}
@@ -266,6 +300,14 @@ export const EventBadge: React.FC<{ event: TraceListEvent }> = ({ event }) => (
     borderColor="border"
     bg="bg.panel"
     flexShrink={0}
+    // Truncate at the cell's edge rather than a fixed width: names differ in
+    // their tail far more often than their head (`session_telemetry.rs:236`
+    // vs `:687`), so every pixel clipped early costs a distinction.
+    maxWidth="100%"
+    minWidth={0}
+    title={
+      event.count > 1 ? `${event.name} — ${event.count} times` : event.name
+    }
   >
     <Circle size="6px" bg="blue.solid" flexShrink={0} />
     <Text
@@ -273,10 +315,20 @@ export const EventBadge: React.FC<{ event: TraceListEvent }> = ({ event }) => (
       fontWeight="medium"
       color="fg"
       truncate
-      maxWidth="100px"
       lineHeight="1.2"
     >
       {event.name}
     </Text>
+    {event.count > 1 && (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        lineHeight="1.2"
+        flexShrink={0}
+      >
+        {event.count.toLocaleString()}
+      </Text>
+    )}
   </HStack>
 );

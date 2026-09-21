@@ -60,14 +60,12 @@ export function showErrorToast({
   toaster.create({
     ...(options.id ? { id: options.id } : {}),
     // The shared default is 5s, which is not long enough to read the copy,
-    // decide, and click "Copy error ID" or "Read the docs". It stays
-    // dismissable — `closable` is set below.
+    // decide, and click "Copy error ID" or "Read the docs".
     duration: 12000,
     title: copy.title,
     description: bodyCopy(copy),
     type: "error",
     meta: {
-      closable: true,
       // Consumed by the Toaster's error rendering — the docs link and the
       // copyable error id, which is all a customer gets of the technical
       // detail (raw meta and the reason chain stay server-side).

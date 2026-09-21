@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
 import type {
   Prisma,
   PrismaClient,
   PromptTag,
   PromptTagAssignment,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 
 const logger = createLogger("langwatch:prompt-version-tags");
 

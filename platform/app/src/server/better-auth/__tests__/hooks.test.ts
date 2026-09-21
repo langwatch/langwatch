@@ -1,7 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
@@ -12,6 +14,19 @@ vi.mock("~/server/app-layer/app", () => ({
 
 const { mockTrackServerEvent } = vi.hoisted(() => ({
   mockTrackServerEvent: vi.fn(),
+}));
+
+// The organization grant an SSO auto-join or an applied invite carries is a
+// ledger command (ADR-092 delivery-plan PR 2), so the writer is the seam.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
 }));
 
 vi.mock("~/server/posthog", () => ({
@@ -44,16 +59,27 @@ type PrismaMockOverrides = Record<string, PrismaMockTable | unknown>;
 
 const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
   const base: PrismaMockOverrides = {
+    // Applying an invite opens a transaction of its own — the membership row
+    // and the acceptance land together — and refuses to run on somebody
+    // else's transaction client. `$connect` is what marks this stub as the
+    // root client it stands in for.
+    $connect: vi.fn(),
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
-    organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
+    organizationInvite: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      // The acceptance claim is a compare-and-set: `applyInvite` claims the
+      // row with updateMany and writes the membership only if it matched.
+      // Zero here is the honest default for a mock whose findFirst says
+      // there is no invite to claim.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     organizationUser: {
       create: vi.fn().mockResolvedValue(undefined),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
     roleBinding: {
-      create: vi.fn().mockResolvedValue(undefined),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     user: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -65,15 +91,16 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
     },
   };
   const merged: PrismaMockOverrides = { ...base, ...overrides };
-  // Support both $transaction forms: array form (returns the ops) and
-  // callback form (invokes the callback with this same mock as `tx`, so
-  // tests continue to assert against `prisma.xxx` spies).
+  // One $transaction handling both forms: the array form awaits the
+  // already-started writes, and the callback form hands this same mock back
+  // as `tx`, so tests keep asserting against the `prisma.xxx` spies. An
+  // override that brings its own $transaction wins.
   if (!merged.$transaction) {
     merged.$transaction = vi.fn().mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {
         return (arg as (tx: unknown) => unknown)(merged);
       }
-      return arg;
+      return Promise.all(arg as Promise<unknown>[]);
     });
   }
   return merged as unknown as PrismaClient;
@@ -106,6 +133,10 @@ describe("beforeUserCreate", () => {
 describe("afterUserCreate", () => {
   beforeEach(() => {
     mockTrackServerEvent.mockClear();
+    ledger.attachBindings.mockClear();
+    ledger.revokeBindingsWhere.mockClear();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
   });
 
   describe("for every new user", () => {
@@ -191,6 +222,22 @@ describe("afterUserCreate", () => {
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: { userId: "user_1", organizationId: "org_1", role: "MEMBER" },
       });
+
+      // The organization-scoped grant lands beside the membership row.
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 
@@ -234,9 +281,11 @@ describe("afterUserCreate", () => {
       };
 
       const inviteUpdate = vi.fn().mockResolvedValue(undefined);
+      // Acceptance is the claim, not a later write: applyInvite moves the
+      // row to ACCEPTED and writes the membership in one transaction, so a
+      // matched claim is what the membership hangs off.
+      const inviteClaim = vi.fn().mockResolvedValue({ count: 1 });
       const orgUserCreateMany = vi.fn().mockResolvedValue({ count: 1 });
-      const roleBindingCreate = vi.fn().mockResolvedValue(undefined);
-      const roleBindingDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 
       const prisma = makePrismaMock({
         organization: {
@@ -248,15 +297,12 @@ describe("afterUserCreate", () => {
         organizationInvite: {
           findFirst: vi.fn().mockResolvedValue(pendingInvite),
           update: inviteUpdate,
+          updateMany: inviteClaim,
         },
         organizationUser: {
           create: vi.fn(),
           createMany: orgUserCreateMany,
           count: vi.fn().mockResolvedValue(0),
-        },
-        roleBinding: {
-          create: roleBindingCreate,
-          deleteMany: roleBindingDeleteMany,
         },
       });
 
@@ -280,14 +326,64 @@ describe("afterUserCreate", () => {
         skipDuplicates: true,
       });
 
-      // 3 RoleBinding creates: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
-      expect(roleBindingCreate).toHaveBeenCalledTimes(3);
+      // The grants are the behaviour, the batching shape is not: assert the
+      // emitted bindings — the invite's ORG-scoped ADMIN plus both team
+      // assignments — wherever the writer put them.
+      const emitted = ledger.attachBindings.mock.calls.flatMap(
+        (call: any[]) => call[0].bindings,
+      );
+      expect(emitted).toHaveLength(3);
+      expect(emitted).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "ORGANIZATION",
+            scopeId: "org_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "MEMBER",
+            customRoleId: "cr_1",
+            scopeType: "TEAM",
+            scopeId: "team_2",
+          }),
+        ]),
+      );
+      // The invite's teams still land as one command, so the invitee cannot
+      // land in the first team and not the second.
+      const teamCommand = ledger.attachBindings.mock.calls
+        .map((call: any[]) => call[0])
+        .find((envelope: any) => envelope.bindings[0]?.scopeType === "TEAM");
+      expect(teamCommand.bindings.map((b: any) => b.scopeId)).toEqual([
+        "team_1",
+        "team_2",
+      ]);
 
-      // Invite flipped to ACCEPTED so the link stops looking outstanding.
-      expect(inviteUpdate).toHaveBeenCalledWith({
-        where: { id: "inv_1", organizationId: "org_1" },
-        data: { status: "ACCEPTED" },
-      });
+      // Invite flipped to ACCEPTED so the link stops looking outstanding -
+      // and the claim is guarded, so only an invite that is still open can
+      // be the one this membership came from.
+      expect(inviteClaim).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "PENDING",
+          }),
+          data: expect.objectContaining({
+            status: "ACCEPTED",
+            acceptedByUserId: "user_1",
+          }),
+        }),
+      );
     });
   });
 
@@ -341,6 +437,53 @@ describe("afterUserCreate", () => {
           user: { id: "user_1", email: "u@acme.com", name: "User" },
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a concurrent callback already created the membership row", () => {
+    it("re-asserts the organization grant instead of assuming it landed", async () => {
+      // The membership row and the grant beside it no longer share a
+      // transaction, so the other callback may have died between them. P2002
+      // says the row is there; it says nothing about the grant.
+      const alreadyExists = new Prisma.PrismaClientKnownRequestError(
+        "Unique constraint failed",
+        {
+          code: "P2002",
+          clientVersion: "7.0.0",
+        },
+      );
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+        organizationUser: {
+          create: vi.fn().mockRejectedValue(alreadyExists),
+          count: vi.fn().mockResolvedValue(0),
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "u@acme.com", name: "User" },
+      });
+
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 });
@@ -419,8 +562,8 @@ describe("beforeAccountCreate", () => {
     });
   });
 
-  describe("when an EXISTING user's email domain matches an org with WRONG SSO provider", () => {
-    /** @scenario Existing user with wrong SSO provider gets pending flag */
+  describe("when an EXISTING user's email domain matches an org with a WRONG BROKERED provider", () => {
+    /** @scenario Existing user with wrong brokered SSO provider gets pending flag */
     it("soft-blocks by setting pendingSsoSetup=true without throwing", async () => {
       const update = vi.fn().mockResolvedValue(undefined);
       const prisma = makePrismaMock({
@@ -436,7 +579,7 @@ describe("beforeAccountCreate", () => {
           findUnique: vi.fn().mockResolvedValue({
             id: "org_1",
             ssoDomain: "acme.com",
-            ssoProvider: "okta",
+            ssoProvider: "waad|acme-conn",
           }),
         },
         account: {
@@ -446,15 +589,124 @@ describe("beforeAccountCreate", () => {
         },
       });
 
+      // Through the broker, on one of its other connections: the
+      // mid-migration member this soft flag exists for.
       await beforeAccountCreate({
         prisma,
-        account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
+        },
       });
 
       expect(update).toHaveBeenCalledWith({
         where: { id: "user_1" },
         data: { pendingSsoSetup: true },
       });
+    });
+  });
+
+  describe("when a NATIVE social provider is used at an SSO-enforced domain", () => {
+    const makeNativePrisma = (accountCount: number) => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const count = vi.fn().mockResolvedValue(accountCount);
+      return {
+        update,
+        count,
+        prisma: makePrismaMock({
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "user_1",
+              email: "existing@acme.com",
+              deactivatedAt: null,
+            }),
+            update,
+          },
+          organization: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "org_1",
+              ssoDomain: "acme.com",
+              ssoProvider: "waad|acme-conn",
+            }),
+          },
+          account: { deleteMany: vi.fn(), count },
+        }),
+      };
+    };
+
+    /** @scenario A native social sign-in at an SSO-enforced domain is refused */
+    it("refuses an existing member with SSO_PROVIDER_NOT_ALLOWED", async () => {
+      const { prisma, update } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      // The soft flag is for the broker's migration population, not this one:
+      // a refused sign-in must not also strand them behind a banner.
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An organization pinned to Google still signs in with Google */
+    it("still admits a provider the organization itself pinned", async () => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            // This organization's configured provider IS Google.
+            ssoProvider: "google",
+          }),
+        },
+        account: { deleteMany: vi.fn(), count: vi.fn().mockResolvedValue(1) },
+      });
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("reaches that answer without counting the user's accounts", async () => {
+      const { prisma, count } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "microsoft",
+            accountId: "sub-2",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      expect(count).not.toHaveBeenCalled();
     });
   });
 
@@ -496,6 +748,7 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when a NEW user's email domain matches an SSO-enforced org with WRONG provider", () => {
+    /** @scenario "SSO-domain guard still blocks the wrong provider" */
     it("hard-blocks by throwing SSO_PROVIDER_NOT_ALLOWED", async () => {
       const prisma = makePrismaMock({
         user: {
@@ -722,6 +975,28 @@ describe("afterAccountCreate", () => {
 });
 
 describe("beforeSessionCreate", () => {
+  describe("when sign-up confirmation is pending", () => {
+    /** @scenario Client session flags cannot bypass address confirmation */
+    it("blocks every session mint", async () => {
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            deactivatedAt: null,
+            signupConfirmationPending: true,
+          }),
+          update: vi.fn(),
+        },
+      });
+
+      const result = await beforeSessionCreate({
+        prisma,
+        session: { userId: "user_1" },
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe("when the user is deactivated", () => {
     /** @scenario Deactivated user is blocked from signing in */
     it("blocks the session", async () => {
@@ -746,7 +1021,10 @@ describe("beforeSessionCreate", () => {
     it("allows the session", async () => {
       const prisma = makePrismaMock({
         user: {
-          findUnique: vi.fn().mockResolvedValue({ deactivatedAt: null }),
+          findUnique: vi.fn().mockResolvedValue({
+            deactivatedAt: null,
+            signupConfirmationPending: false,
+          }),
           update: vi.fn(),
         },
       });
@@ -903,6 +1181,73 @@ describe("afterSessionCreate", () => {
 });
 
 describe("afterAccountUpdate", () => {
+  describe("when an ALREADY-LINKED native social account signs in at an SSO-enforced org", () => {
+    const linkedNativePrisma = (ssoProvider: string) =>
+      makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            // The soft block wrote this row before the refusal existed; the
+            // flag is irrelevant to the guard, and set here to prove it.
+            pendingSsoSetup: true,
+          }),
+          update: vi.fn(),
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider,
+          }),
+        },
+        account: { deleteMany: vi.fn() },
+        $transaction: vi.fn().mockImplementation(async (ops: unknown[]) => ops),
+      });
+
+    /** @scenario A native social sign-in on an already-linked account is refused too */
+    it("refuses, because no Account row is created on this path", async () => {
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("waad|acme-conn"),
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+    });
+
+    it("lets a brokered sign-in on the wrong connection through", async () => {
+      // The mid-migration member the soft flag is for: refused here, they
+      // would be sent to a connection they may hold no account in.
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("waad|acme-conn"),
+          account: {
+            userId: "user_1",
+            providerId: "auth0",
+            accountId: "google-oauth2|123",
+          },
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("lets the organization's own pinned provider through", async () => {
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("google"),
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("when the user has pendingSsoSetup=true and the updated account matches the org's SSO provider", () => {
     it("clears pendingSsoSetup and deletes stale non-credential accounts", async () => {
       const deleteMany = vi.fn().mockResolvedValue(undefined);
@@ -984,6 +1329,10 @@ describe("afterAccountUpdate", () => {
   });
 
   describe("when the updated account does NOT match the org's SSO provider", () => {
+    // A BROKERED mismatch: the native case is refused outright now, and is
+    // covered above. This is the mid-migration member who is still let in,
+    // and whose flag stays set because their provider is still not the
+    // organization's.
     it("is a no-op (we do not clear the flag on wrong-provider sign-in)", async () => {
       const deleteMany = vi.fn();
       const update = vi.fn();
@@ -1000,7 +1349,7 @@ describe("afterAccountUpdate", () => {
           findUnique: vi.fn().mockResolvedValue({
             id: "org_1",
             ssoDomain: "acme.com",
-            ssoProvider: "auth0",
+            ssoProvider: "waad|acme-conn",
           }),
         },
         account: { deleteMany },
@@ -1010,8 +1359,8 @@ describe("afterAccountUpdate", () => {
         prisma,
         account: {
           userId: "user_1",
-          providerId: "google",
-          accountId: "google-sub-1",
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
         },
       });
 

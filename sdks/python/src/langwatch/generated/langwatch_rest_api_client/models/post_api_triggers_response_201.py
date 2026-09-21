@@ -38,6 +38,7 @@ class PostApiTriggersResponse201:
             PostApiTriggersResponse201AlertTypeType3Type1):
         created_at (str):
         updated_at (str):
+        platform_url (str):
     """
 
     id: str
@@ -55,6 +56,7 @@ class PostApiTriggersResponse201:
     )
     created_at: str
     updated_at: str
+    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -87,6 +89,8 @@ class PostApiTriggersResponse201:
 
         updated_at = self.updated_at
 
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -101,6 +105,7 @@ class PostApiTriggersResponse201:
                 "alertType": alert_type,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
+                "platformUrl": platform_url,
             }
         )
 
@@ -179,6 +184,8 @@ class PostApiTriggersResponse201:
 
         updated_at = d.pop("updatedAt")
 
+        platform_url = d.pop("platformUrl")
+
         post_api_triggers_response_201 = cls(
             id=id,
             name=name,
@@ -190,6 +197,7 @@ class PostApiTriggersResponse201:
             alert_type=alert_type,
             created_at=created_at,
             updated_at=updated_at,
+            platform_url=platform_url,
         )
 
         post_api_triggers_response_201.additional_properties = d

@@ -62,14 +62,35 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the pod renders successfully
     And the pod is pinned to the sandboxed runtime
 
-  Scenario: A default install on a cluster without the RuntimeClass degrades to Pending, not to unsandboxed
+  Scenario: A default install runs Langy on a cluster that offers no sandboxed runtime
     Given an operator installs the umbrella chart with default values
+    And the cluster offers no sandboxed runtime
+    When the install completes
+    Then every workload runs, Langy included
+    And the install notes state which isolation posture this install got
+    And the install notes explain where a sandboxed runtime comes from on each major cloud
+    And the install notes name the values that pin the pod to one
+    # The defaults are an empty runtimeClassName with acceptUnsandboxedRuntime
+    # true, so Langy is available on any cluster and hardening is a deliberate
+    # later step. Pinning a RuntimeClass the cluster does not define is what
+    # stops the agent running — and that can only happen after an operator has
+    # chosen to pin one, which is the scenario below.
+
+  Scenario: Pinning a RuntimeClass the cluster does not define fails closed, not unsandboxed
+    Given an operator has pinned the langy-agent pod to a sandboxed runtime
     And the cluster defines no matching RuntimeClass
     When the install completes
     Then every other workload runs
-    And the langy-agent pod waits rather than running without its sandbox
-    And the install notes explain where a sandboxed runtime comes from on each major cloud
-    And the install notes name the values that accept running without one
+    And no langy-agent pod runs without its sandbox
+    And the install notes say where the reason is recorded
+    # Not "Pending" — the pod never gets far enough to wait. Kubernetes'
+    # RuntimeClass admission plugin refuses to create a pod naming a class it
+    # cannot find (`pod rejected: RuntimeClass "..." not found`), so the
+    # ReplicaSet's create call is what fails and no pod object exists at all.
+    # That matters to the operator looking for it: `kubectl get pods` lists
+    # nothing, which reads like the install skipped Langy rather than like a
+    # failure. The reason is on the Deployment's ReplicaFailure condition, and
+    # printing that command is what NOTES.txt does here.
 
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod
@@ -80,6 +101,53 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # sandbox. Blanking the runtime while still managed does, and is refused
     # until the operator accepts it (see the scenario above, and
     # specs/langy/langy-selfhost-install.feature for the operator's story).
+
+  # ===========================================================================
+  # Restricted clusters: rendering asks for no permission the operator lacks
+  # ===========================================================================
+
+  # A customer upgrade died here. Their platform team is scoped to the namespace
+  # they install into, and the install notes tried to list the cluster's
+  # RuntimeClasses so they could offer an optional hardening tip. Helm reports a
+  # DENIED lookup as a template error rather than as an empty result, so advice
+  # nobody had asked for took the whole upgrade down:
+  #
+  #   Error: UPGRADE FAILED: template: langwatch/templates/NOTES.txt:102:11:
+  #   ... error calling lookup: runtimeclasses.node.k8s.io is forbidden: User
+  #   "..." cannot list resource "runtimeclasses" in API group "node.k8s.io" at
+  #   the cluster scope
+  #
+  # Nothing in the render matrix catches this. With no cluster behind the
+  # render every lookup returns empty and the branch is simply skipped, so the
+  # failure exists only on a cluster whose RBAC actually refuses — which is to
+  # say, only on the customer's.
+
+  @unit
+  Scenario: A restricted installer can render the chart without cluster-scoped read access
+    Given an operator whose permissions stop at the namespace they install into
+    When they install or upgrade the release
+    Then it completes
+    And it never fails for a permission they were never granted
+    # Enforced by charts/langwatch/tests/restricted-rbac.sh, which reads the
+    # templates instead of rendering them. That is not a shortcut: with no
+    # cluster behind a render every lookup returns empty, so the forbidden
+    # case cannot be reproduced by `helm template` at all. Keeping no
+    # cluster-scoped read in any template is the mechanism; the outcome above
+    # is what it buys.
+
+  @unit
+  Scenario: The install notes never depend on reading the cluster
+    Given an operator whose permissions stop at the namespace they install into
+    When the install finishes and prints its notes
+    Then the notes print
+    And nothing in them can fail the install that has already succeeded
+    #
+    # Deliberately only the one claim. Guidance that would have needed such a
+    # read is printed as a command for the operator to run instead, but that
+    # is not asserted here: the only way to check it is to grep the notes for
+    # the command's own text, which passes by finding a string we wrote rather
+    # than by testing anything. An unenforced Then inside a scenario the parity
+    # checker calls bound is worse than one fewer Then.
 
   # ===========================================================================
   # Local e2e manifest mirrors the production security posture

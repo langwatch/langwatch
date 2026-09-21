@@ -1,5 +1,5 @@
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";

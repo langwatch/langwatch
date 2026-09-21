@@ -13,22 +13,38 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_STREAMING } from "../langy.streaming.constants";
-import { type LangyStreamRedis, LangyTokenBuffer } from "../langyTokenBuffer";
+import {
+  LANGY_EMPTY_TURN_FALLBACK,
+  type LangyStreamRedis,
+  LangyTokenBuffer,
+} from "../langyTokenBuffer";
 
 interface RecordedEntry {
   type: string;
   text?: string;
 }
 
+/**
+ * A stream that reads back what was written, keyed the way redis keys it.
+ * `xrange` used to return `[]` unconditionally, which quietly made any
+ * assertion about reading the stream a test of the fake instead of the code.
+ */
 function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
   const entries: RecordedEntry[] = [];
+  const streams = new Map<string, Array<[string, string[]]>>();
+  let seq = 0;
   const redis: LangyStreamRedis = {
-    xadd: async (_key, ...args) => {
+    xadd: async (key, ...args) => {
       // Payload is the last arg (single `p` field).
-      entries.push(JSON.parse(String(args[args.length - 1])) as RecordedEntry);
-      return "1-1";
+      const payload = String(args[args.length - 1]);
+      entries.push(JSON.parse(payload) as RecordedEntry);
+      const id = `1-${++seq}`;
+      const rows = streams.get(key) ?? [];
+      rows.push([id, ["p", payload]]);
+      streams.set(key, rows);
+      return id;
     },
-    xrange: async () => [],
+    xrange: async (key) => streams.get(key) ?? [],
     expire: async () => 1,
     set: async () => "OK",
     get: async () => null,
@@ -149,6 +165,24 @@ describe("LangyTokenBuffer hybrid flush", () => {
     });
   });
 
+  describe("given a tool call that ran in the developer's shared folder", () => {
+    it("keeps the local marker on the live entry", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendTool({
+        ...ids,
+        id: "call_1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+        local: true,
+      });
+
+      expect(entries.at(-1)).toMatchObject({ type: "tool", local: true });
+    });
+  });
+
   describe("given a provider streams reasoning token by token", () => {
     it("coalesces the live-only reasoning tail, then drains it before the terminal marker", async () => {
       const { redis, entries } = makeRedis();
@@ -164,6 +198,356 @@ describe("LangyTokenBuffer hybrid flush", () => {
         { type: "reasoning", text: "I will inspect this." },
       ]);
       expect(entries.at(-1)?.type).toBe("end");
+    });
+  });
+
+  describe("given a turn ends without the agent writing any text", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      /** @scenario A turn never ends silently */
+      it("emits a visible fallback line before the terminal marker", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        // Tool cards but no prose: the exact shape of the blank replies seen in
+        // production, where the turn succeeds and the panel shows nothing.
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "bash",
+          phase: "end",
+        });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
+        ]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("stays quiet when the turn said its lines through the say tool", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: {
+            text: "All ready! Let me know if there is anything I can help with.",
+          },
+        });
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "end",
+          output: "Said.",
+        });
+        const { backstopped } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("reads the said line off the stream when the ending buffer never saw it", async () => {
+        const { redis, entries } = makeRedis();
+        const starting = new LangyTokenBuffer({ redis });
+        await starting.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: { text: "Running it against your agent now." },
+        });
+
+        const ending = new LangyTokenBuffer({ redis });
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+      });
+
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("says what the card is waiting for when the turn ends on one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendLocalPermission({
+          ...ids,
+          entry: {
+            waitId: "lwait_1",
+            callId: "call_1",
+            summary: "uv sync",
+            pattern: "uv",
+            patterns: ["uv"],
+            reason: "Installs packages",
+            skipOffered: true,
+            workspaceName: "acme-app",
+            hostname: "rogerio-mbp",
+            status: "pending",
+          },
+        });
+        const { text } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(text).toContain("waiting for your answer");
+        expect(text).not.toBe(LANGY_EMPTY_TURN_FALLBACK);
+        expect(deltas(entries).at(-1)?.text).toBe(text);
+      });
+
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("names the code access card when the turn ends on that one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "code_access",
+          phase: "end",
+        });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(deltas(entries).at(-1)?.text).toContain(
+          "how I should reach your code",
+        );
+      });
+
+      /** @scenario A turn never ends silently */
+      it("counts a whitespace-only delta as no text at all", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        // Whitespace is truthy, so this used to satisfy the has-written check
+        // while the panel still rendered nothing the user could read.
+        await buffer.appendChunk({ ...ids, text: "\n\n  " });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toContain(LANGY_EMPTY_TURN_FALLBACK);
+      });
+    });
+
+    describe("when the stream ends for a reason other than the turn finishing", () => {
+      /** @scenario A stream that ends without the turn finishing says nothing */
+      it("stays silent on a user stop, which lands on a partial answer", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        // stopTurn ends the stream on its own buffer instance, one that never
+        // saw a chunk. Reading that as "the turn wrote no reply" put the
+        // fallback after every single stop, including the ones with a real
+        // half-answer above them.
+        const { backstopped } = await buffer.markEnd(ids);
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+    });
+  });
+
+  describe("given the worker reconnects part way through a turn", () => {
+    describe("when the turn finishes on a buffer that never saw the deltas", () => {
+      /** @scenario A turn never ends silently */
+      it("reads the stream rather than its own memory, and stays quiet", async () => {
+        // One redis, two buffers: a buffer is built per relay request, so the
+        // instance that ends the stream is not always the one that filled it.
+        const { redis, entries } = makeRedis();
+        const streamed = new LangyTokenBuffer({ redis });
+        const ending = new LangyTokenBuffer({ redis });
+
+        await streamed.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await streamed.flush(ids);
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: "Found 3 failing traces." },
+        ]);
+      });
+    });
+  });
+
+  describe("given a turn where the agent did write text", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      it("stays out of the way", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await buffer.markEnd(ids);
+
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: "Found 3 failing traces." },
+        ]);
+      });
+
+      it("keeps the whitespace that separates two words", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Found" });
+        await buffer.appendChunk({ ...ids, text: " " });
+        await buffer.appendChunk({ ...ids, text: "3 traces." });
+        await buffer.markEnd(ids);
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toBe("Found 3 traces.");
+      });
+    });
+  });
+
+  describe("given an earlier turn of the conversation answered", () => {
+    describe("when a later turn ends silently", () => {
+      it("emits the fallback again", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "First answer." });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        const second = { conversationId: "conv_1", turnId: "turn_2" };
+        await buffer.markEnd({ ...second, backstopSilentTurn: true });
+
+        expect(deltas(entries).at(-1)).toEqual({
+          type: "delta",
+          text: LANGY_EMPTY_TURN_FALLBACK,
+        });
+      });
+    });
+  });
+
+  describe("given the agent dispatches a UI action", () => {
+    it("lands the typed entry on the live stream exactly as given", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendUiAction({
+        ...ids,
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+
+      expect(entries.at(-1)).toEqual({
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+    });
+  });
+});
+
+/**
+ * A redis double that actually expires. The fake above answers `expire` with 1
+ * and never drops anything, which makes any assertion about the buffer's TTL a
+ * test of the fake, the whole point here is what a key does when its TTL runs
+ * out.
+ */
+function makeExpiringRedis(clock: { now: number }): LangyStreamRedis {
+  const streams = new Map<
+    string,
+    { rows: Array<[string, string[]]>; expiresAt: number | null }
+  >();
+  let seq = 0;
+  const liveStream = (key: string) => {
+    const stream = streams.get(key);
+    if (!stream) return undefined;
+    if (stream.expiresAt !== null && stream.expiresAt <= clock.now) {
+      streams.delete(key);
+      return undefined;
+    }
+    return stream;
+  };
+  return {
+    xadd: async (key, ...args) => {
+      const payload = String(args[args.length - 1]);
+      const stream = liveStream(key) ?? { rows: [], expiresAt: null };
+      const id = `${clock.now}-${++seq}`;
+      stream.rows.push([id, ["p", payload]]);
+      streams.set(key, stream);
+      return id;
+    },
+    xrange: async (key) => liveStream(key)?.rows ?? [],
+    expire: async (key, seconds) => {
+      const stream = liveStream(key);
+      if (!stream) return 0;
+      stream.expiresAt = clock.now + seconds * 1000;
+      return 1;
+    },
+    set: async () => "OK",
+    get: async () => null,
+  };
+}
+
+/**
+ * A tool call the agent waits on, a suite run, a build, produces no frames
+ * for as long as it takes. The worker keeps beating throughout, and the buffer
+ * has to keep the turn's live edge alive on that proof alone: with the TTL
+ * moving on appends only, a turn quiet for longer than STREAM_TTL_SECONDS lost
+ * its whole buffer, so a tab attaching after the wait replayed nothing and the
+ * instruction the agent issued on the far side of the wait reached no one.
+ *
+ * @see specs/langy/langy-dual-stream.feature
+ */
+describe("LangyTokenBuffer under a silent tool call", () => {
+  const silenceMs = LANGY_STREAMING.STREAM_TTL_SECONDS * 1000 + 60_000;
+  const beatMs = 5_000;
+
+  describe("given the worker keeps beating through a tool call longer than the stream TTL", () => {
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("replays the whole turn, the far side of the wait included, to a tab attaching after it", async () => {
+      const clock = { now: 1_000 };
+      const buffer = new LangyTokenBuffer({ redis: makeExpiringRedis(clock) });
+
+      await buffer.appendChunk({ ...ids, text: "Running the suite now." });
+      for (let waited = 0; waited < silenceMs; waited += beatMs) {
+        clock.now += beatMs;
+        await buffer.heartbeat({ ...ids, now: clock.now });
+      }
+      await buffer.appendNavigate({ ...ids, href: "/demo/simulations/run_1" });
+
+      const { reads } = await buffer.readTail({ ...ids });
+      expect(reads.map((read) => read.entry)).toEqual([
+        { type: "delta", text: "Running the suite now." },
+        { type: "navigate", href: "/demo/simulations/run_1" },
+      ]);
+    });
+  });
+
+  describe("given nothing at all proves the turn is alive", () => {
+    it("lets the buffer lapse, so an abandoned turn still self-cleans", async () => {
+      const clock = { now: 1_000 };
+      const buffer = new LangyTokenBuffer({ redis: makeExpiringRedis(clock) });
+
+      await buffer.appendChunk({ ...ids, text: "Running the suite now." });
+      clock.now += silenceMs;
+
+      const { reads } = await buffer.readTail({ ...ids });
+      expect(reads).toEqual([]);
     });
   });
 });

@@ -1,5 +1,10 @@
-import type { Annotation, PrismaClient } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+import type { JsonValue } from "@prisma/client/runtime/client";
+import type { Annotation, PrismaClient } from "~/generated/prisma/client";
+import {
+  type AnnotationAnchorKind,
+  type AnnotationAnchorScope,
+  annotationAnchorScopeWhere,
+} from "./annotationAnchor";
 
 export type CreateAnnotationInput = {
   id: string;
@@ -10,6 +15,15 @@ export type CreateAnnotationInput = {
   isThumbsUp: boolean | null;
   scoreOptions: JsonValue;
   expectedOutput: string | null;
+  /**
+   * Which part of the trace the comment is about. Absent means the trace as a
+   * whole. Fixed when the comment is written: there is no way to move a comment
+   * to another part of the trace, so a card can never quietly start describing
+   * something other than what its author read.
+   */
+  anchorKind?: AnnotationAnchorKind | null;
+  anchorId?: string | null;
+  anchorPath?: string | null;
 };
 
 export type UpdateAnnotationInput = {
@@ -19,12 +33,34 @@ export type UpdateAnnotationInput = {
   comment: string;
   isThumbsUp: boolean | null | undefined;
   scoreOptions: JsonValue;
-  expectedOutput: string | null;
+  /**
+   * The suggested output. Omitted when the save did not carry the field at
+   * all, which leaves the stored suggestion alone; `null` withdraws it.
+   */
+  expectedOutput: string | null | undefined;
 };
 
 export type DeleteAnnotationInput = {
   id: string;
   projectId: string;
+};
+
+/**
+ * One annotation as the trace projections read it: the fields the projection
+ * DSL exposes, plus the anchor, which decides what a suggestion on the comment
+ * is a suggestion for.
+ */
+export type ProjectionAnnotationRow = {
+  id: string;
+  traceId: string;
+  isThumbsUp: boolean | null;
+  comment: string | null;
+  expectedOutput: string | null;
+  scoreOptions: JsonValue;
+  createdAt: Date;
+  anchorKind: string | null;
+  anchorId: string | null;
+  anchorPath: string | null;
 };
 
 /**
@@ -48,7 +84,47 @@ export class AnnotationRepository {
         isThumbsUp: input.isThumbsUp,
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput,
+        anchorKind: input.anchorKind ?? null,
+        anchorId: input.anchorId ?? null,
+        anchorPath: input.anchorPath ?? null,
       },
+    });
+  }
+
+  /**
+   * Annotations for a page of traces as the trace projections read them.
+   * `anchorScope` decides whether a comment left on one part of a trace counts;
+   * the projections that feed the trace table, the export and the dataset
+   * columns read every comment and carry its anchor along with it.
+   */
+  async findAllForProjection({
+    projectId,
+    traceIds,
+    anchorScope,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    anchorScope: AnnotationAnchorScope;
+  }): Promise<ProjectionAnnotationRow[]> {
+    return await this.prisma.annotation.findMany({
+      where: {
+        projectId,
+        traceId: { in: traceIds },
+        ...annotationAnchorScopeWhere(anchorScope),
+      },
+      select: {
+        id: true,
+        traceId: true,
+        isThumbsUp: true,
+        comment: true,
+        expectedOutput: true,
+        scoreOptions: true,
+        createdAt: true,
+        anchorKind: true,
+        anchorId: true,
+        anchorPath: true,
+      },
+      orderBy: { createdAt: "asc" },
     });
   }
 

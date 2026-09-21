@@ -112,7 +112,7 @@ func TestLangyImageEnsureShell(t *testing.T) {
 			if !strings.Contains(sh, "docker image inspect 'langyagent:dev' >/dev/null 2>&1 ||") {
 				t.Fatalf("expected presence-gated build, got: %s", sh)
 			}
-			if !strings.Contains(sh, "docker build -f Dockerfile.langyagent -t 'langyagent:dev' .") {
+			if !strings.Contains(sh, "docker build -f infra/docker/Dockerfile.langyagent -t 'langyagent:dev' .") {
 				t.Fatalf("missing build command: %s", sh)
 			}
 		})
@@ -123,7 +123,7 @@ func TestLangyImageEnsureShell(t *testing.T) {
 			if strings.Contains(sh, "docker image inspect") {
 				t.Fatalf("forced rebuild must not gate on presence: %s", sh)
 			}
-			if !strings.HasPrefix(sh, "docker build -f Dockerfile.langyagent") {
+			if !strings.HasPrefix(sh, "docker build -f infra/docker/Dockerfile.langyagent") {
 				t.Fatalf("expected an unconditional build: %s", sh)
 			}
 		})

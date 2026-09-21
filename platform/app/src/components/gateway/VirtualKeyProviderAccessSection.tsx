@@ -97,7 +97,7 @@ export function VirtualKeyProviderAccessSection({
     [availableProjects, organizationId],
   );
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy),
+    () => resolveEligible({ scopes, providers, hierarchy }),
     [scopes, providers, hierarchy],
   );
   const providerById = useMemo(
@@ -135,9 +135,10 @@ export function VirtualKeyProviderAccessSection({
         : {
             ...value,
             allProviders: false,
-            // Start from everything selected so narrowing is one
-            // uncheck away instead of N re-checks.
-            providerIds: eligible.map((mp) => mp.id),
+            // Unchecking "All providers" clears the selection, so no row
+            // stays checked. The invalid-reason note then asks the operator
+            // to pick at least one provider or re-check "All".
+            providerIds: [],
           },
     );
   };

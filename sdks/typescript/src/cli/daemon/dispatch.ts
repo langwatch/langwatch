@@ -102,6 +102,11 @@ export async function runCli(argv: string[]): Promise<void> {
     // writes truncates them — which would be a spectacular way to break
     // `--format json` for the exact agents this feature exists to serve.
     process.exitCode = outcome.exitCode;
+    // A daemon that took the command and then stopped answering would wedge
+    // the next caller in the same way, so it is asked to stop before this
+    // process leaves. The command is NOT re-run: the deadline has already
+    // spent most of the caller's own budget.
+    if (outcome.evict) await requestStop(identity.socketPath);
     return;
   }
 

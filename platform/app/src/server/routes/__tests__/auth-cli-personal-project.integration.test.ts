@@ -21,7 +21,9 @@
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+import type { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const ids = vi.hoisted(() => {
   const s = Math.random().toString(36).slice(2, 10);
@@ -41,20 +43,37 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The approval route reads probeProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/api/rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
+  getTestClickHouseClient,
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+
+wireDefaultTestApp();
+
+/** The container's connection, handed to the test App the CLI routes read. */
+let redisConnection: Redis | null = null;
 
 const suffix = ids.suffix;
 const USER_ID = ids.USER_ID;
@@ -68,17 +87,29 @@ const SHARED_API_KEY = `sk-lw-mecred-shared-${suffix}-${"a".repeat(28)}`;
 const OTHER_PERSONAL_PROJECT_SLUG = `mecred-personal-other-${suffix}`;
 const OTHER_PERSONAL_API_KEY = `sk-lw-mecred-perso-${suffix}-${"b".repeat(28)}`;
 
-interface ExchangeSuccess {
-  kind: string;
-  access_token: string;
-  refresh_token: string;
-  personal_project?: {
-    id: string;
-    slug: string;
-    name: string;
-    api_key: string;
-  };
-}
+const exchangeSuccessSchema = z
+  .object({
+    kind: z.string(),
+    access_token: z.string(),
+    refresh_token: z.string(),
+    personal_project: z
+      .object({
+        id: z.string(),
+        slug: z.string(),
+        name: z.string(),
+        api_key: z.string(),
+      })
+      .optional(),
+  })
+  .passthrough();
+const personalProjectResponseSchema = z
+  .object({
+    project: z
+      .object({ id: z.string(), api_key: z.string().optional() })
+      .passthrough(),
+  })
+  .passthrough();
+type ExchangeSuccess = z.infer<typeof exchangeSuccessSchema>;
 
 interface DeviceFlowResult {
   approveStatus: number;
@@ -113,7 +144,7 @@ async function runDeviceFlow(): Promise<DeviceFlowResult> {
   return {
     approveStatus: approveRes.status,
     exchangeStatus: exchangeRes.status,
-    exchange: (await exchangeRes.json()) as ExchangeSuccess,
+    exchange: exchangeSuccessSchema.parse(await exchangeRes.json()),
   };
 }
 
@@ -270,6 +301,15 @@ let exchange: ExchangeSuccess;
 
 beforeAll(async () => {
   await startTestContainers();
+  redisConnection = getTestRedisConnection();
+  // The routes and workers under test take their ClickHouse repositories
+  // from the App rather than resolving a client, so the fixture has to
+  // provide one or they fail with "App not initialized".
+  installClickHouseTestApp({
+    resolveClient: async () => getTestClickHouseClient(),
+    // The CLI device flow writes its codes and tokens to Redis.
+    redis: redisConnection,
+  });
   await seedCallerOrg();
   await seedOtherMemberWorkspace();
 
@@ -279,6 +319,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   // organizationId, not principalUserId-in-list: the tenancy guard
   // extension on VirtualKey only honours scalar tenancy predicates; the
   // in-list form is rejected and the catch would hide the leak.
@@ -288,27 +329,22 @@ afterAll(async () => {
     select: { id: true },
   });
   const teamIds = personalTeams.map((t) => t.id);
-  await prisma.roleBinding
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.project
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.teamUser
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { id: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.organizationUser
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { id: ORG_ID } })
-    .catch(() => {});
+  await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+  // The device-session exchange mints a user-scoped CLI ApiKey (plus its
+  // private custom role); ApiKey→Organization is a Restrict relation, so
+  // these must go before the organization delete or it silently no-ops.
+  await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.teamUser.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.team.deleteMany({ where: { id: { in: teamIds } } });
+  await prisma.organizationUser.deleteMany({
+    where: { organizationId: ORG_ID },
+  });
+  await prisma.user.deleteMany({
+    where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+  });
+  await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   await stopTestContainers().catch(() => {});
 });
 
@@ -329,6 +365,17 @@ describe("/me credentials delivery, given a completed device-session exchange", 
     expect(project?.isPersonal).toBe(true);
     expect(project?.ownerUserId).toBe(USER_ID);
     expect(project?.apiKey).toBe(exchange.personal_project!.api_key);
+  });
+
+  /** @scenario device-login exchange stays valid when the personal project key is withheld */
+  it("keeps the device login successful when project administration is absent", async () => {
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+    const flow = await runDeviceFlow();
+    expect(flow.approveStatus).toBe(200);
+    expect(flow.exchangeStatus).toBe(200);
+    expect(flow.exchange.kind).toBe("device_session");
+    expect(flow.exchange.personal_project).toBeUndefined();
+    expect(flow.exchange.access_token).toMatch(/^lw_at_/);
   });
 
   /** @scenario the delivered personal key authenticates /api/me/usage */
@@ -374,13 +421,26 @@ describe("/me credentials delivery, given the lazy personal-project exchange", (
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      project: { id: string; api_key: string };
-    };
+    const body = personalProjectResponseSchema.parse(await res.json());
     // ensure() is idempotent: the lazy exchange resolves the SAME workspace
     // the login exchange created, never a duplicate.
     expect(body.project.id).toBe(exchange.personal_project!.id);
     expect(body.project.api_key).toBe(exchange.personal_project!.api_key);
+  });
+
+  /** @scenario GET /api/auth/cli/personal-project withholds the key without breaking the session */
+  it("returns project identity without api_key and leaves the bearer valid", async () => {
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+    const res = await app.request("/api/auth/cli/personal-project", {
+      headers: { authorization: `Bearer ${exchange.access_token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = personalProjectResponseSchema.parse(await res.json());
+    expect(body.project.id).toBe(exchange.personal_project!.id);
+    expect(body.project.api_key).toBeUndefined();
+    await expect(
+      redisConnection!.get(`lwcli:access:${exchange.access_token}`),
+    ).resolves.not.toBeNull();
   });
 
   it("rejects a missing or garbage bearer", async () => {
@@ -426,6 +486,93 @@ describe("/me credentials delivery, given a token whose user is no longer an act
     expect(after.status).toBe(401);
 
     await prisma.user.deleteMany({ where: { id: offboardId } }).catch(() => {});
+  });
+
+  /** @scenario a disabled member's pre-disable token cannot mint or return a personal key */
+  it("refuses a member whose seat was disabled, revokes the token, and creates nothing", async () => {
+    const disabledId = `usr-disabled-${suffix}`;
+    const token = `lw_at_disabled${suffix.replace(/[^a-z0-9]/gi, "")}`;
+    // Everything the scenario says must not appear: the personal team, its
+    // project, and any role binding in the tenant.
+    const provisioned = async () => ({
+      teams: await personalTeamCount(disabledId),
+      projects: await prisma.project.count({
+        where: {
+          team: { organizationId: ORG_ID },
+          ownerUserId: disabledId,
+          isPersonal: true,
+        },
+      }),
+      bindings: await prisma.roleBinding.count({
+        where: { organizationId: ORG_ID, userId: disabledId },
+      }),
+    });
+
+    try {
+      // An active member when the token was issued; an admin then disabled
+      // the seat. The row stays, with its role — only the access is gone.
+      await seedUserWithCliToken({
+        id: disabledId,
+        email: `disabled-${suffix}@example.com`,
+        name: `Disabled ${suffix}`,
+        token,
+        member: true,
+      });
+      await prisma.organizationUser.updateMany({
+        where: { userId: disabledId, organizationId: ORG_ID },
+        data: { disabledAt: new Date() },
+      });
+      const before = await provisioned();
+
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.status).toBe(403);
+      expect(await provisioned()).toEqual(before);
+      expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+    } finally {
+      await prisma.organizationUser.deleteMany({
+        where: { userId: disabledId, organizationId: ORG_ID },
+      });
+      await prisma.user.deleteMany({ where: { id: disabledId } });
+    }
+  });
+
+  /** @scenario a disabled member's session cannot be renewed */
+  it("refuses to rotate a disabled member's refresh token, and revokes it", async () => {
+    // A session started while active; the seat is disabled afterwards.
+    // Rotation mints a new pair, so it re-derives membership like every
+    // other minting endpoint — otherwise the hour-long access token would
+    // roll forward for ninety days.
+    const flow = await runDeviceFlow();
+    expect(flow.exchangeStatus).toBe(200);
+    const refreshToken = flow.exchange.refresh_token;
+
+    await prisma.organizationUser.updateMany({
+      where: { userId: USER_ID, organizationId: ORG_ID },
+      data: { disabledAt: new Date() },
+    });
+    try {
+      const res = await app.request("/api/auth/cli/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.error).toBe("invalid_grant");
+      expect(body.access_token).toBeUndefined();
+      expect(
+        await redisConnection!.get(`lwcli:refresh:${refreshToken}`),
+      ).toBeNull();
+    } finally {
+      await prisma.organizationUser.updateMany({
+        where: { userId: USER_ID, organizationId: ORG_ID },
+        data: { disabledAt: null },
+      });
+    }
   });
 
   /** @scenario a deactivated user's token cannot mint or return a personal key */
@@ -512,9 +659,9 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
     expect(json.api_key).toBe(exchange.personal_project!.api_key);
   });
 
-  /** @scenario the project-key endpoint refuses a project the caller cannot write to */
-  it("denies a project the caller cannot write, without leaking the key", async () => {
-    vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+  /** @scenario the project-key endpoint refuses a project the caller cannot manage */
+  it("denies a project the caller cannot manage, without leaking the key", async () => {
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
       exchange.access_token,
@@ -523,6 +670,15 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
     expect(status).toBe(403);
     expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+    expect(probeProjectPermission).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          user: expect.objectContaining({ id: USER_ID }),
+        }),
+      }),
+      SHARED_PROJECT_ID,
+      "project:manage",
+    );
   });
 
   it("404s an unknown slug with an error envelope the CLI can distinguish", async () => {

@@ -20,12 +20,9 @@ export const FEATURE_FLAG_CACHE_TTL_MS = 5_000;
  * Cache TTL for backend kill switches in milliseconds.
  *
  * Kill switches are checked on hot paths (per span, per event, per command).
- * They do not need second-level freshness — flipping a kill switch in PostHog
- * propagating in 60s is fine, and the longer TTL prevents per-tenant cache
- * fragmentation from stampeding /flags requests under high traffic.
- *
- * When local evaluation is enabled (POSTHOG_FEATURE_FLAGS_KEY), this only
- * affects the in-memory dedup window; flag values are computed in-process
- * either way.
+ * They do not need second-level freshness — an operator flip taking up to
+ * 60s to propagate is fine, and the longer TTL prevents per-tenant cache
+ * fragmentation from stampeding the store with per-context reads under high
+ * traffic.
  */
 export const KILL_SWITCH_CACHE_TTL_MS = 60_000;

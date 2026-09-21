@@ -424,9 +424,16 @@ describe("rows the judge declined to call", () => {
     const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
 
     expect(column.rowsWithoutVerdict).toBe(2);
-    // The skipped rows still produce no verdict — they are counted, not
-    // resurrected as evidence.
-    expect(Object.keys(column.verdictsByRow)).toEqual(["0"]);
+    // The skipped rows are carried so the page can show the judge's account
+    // of them rather than a bare dash, and they are marked as what they are.
+    // Carried is not the same as counted: `isUnsettled` is what keeps them
+    // out of the Tie bar and out of the fit, which
+    // unsettledComparisonRow.integration.test.tsx pins on the consumers.
+    expect(Object.keys(column.verdictsByRow)).toEqual(["0", "1", "2"]);
+    expect(column.verdictsByRow[0]?.isUnsettled).toBeUndefined();
+    expect(column.verdictsByRow[1]?.isUnsettled).toBe(true);
+    expect(column.verdictsByRow[1]?.winnerId).toBeNull();
+    expect(column.verdictsByRow[1]?.reasoning).toBe("Order-sensitive verdict");
   });
 
   it("reports zero when the judge called every row", () => {

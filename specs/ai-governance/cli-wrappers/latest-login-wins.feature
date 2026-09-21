@@ -18,6 +18,12 @@ Feature: The latest login wins over stale persisted telemetry wiring
   in place to the current login's endpoint and key, on login and on every
   wrapper run. Wiring langwatch did not author is never touched.
 
+  A login alone takes the wiring over only when it is this machine's login
+  against a deployment: a login kept in its own config file
+  (LANGWATCH_CLI_CONFIG) never does, and a login against localhost leaves
+  wiring that reports to a deployment elsewhere until the user runs
+  `langwatch <tool>` on it, which is the wrapper-run half of the rule.
+
   As a developer who switches between LangWatch instances,
   I want every `langwatch <tool>` session to land on the instance I am
   logged into right now, so telemetry never silently goes to a previous
@@ -118,9 +124,94 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Then no ingest key is minted for the refresh
       And no wiring file is rewritten
 
+    @unit @cli-wrappers @latest-login-wins @project-pin
+    Scenario: A project-pinned tool is not re-pointed by a new login
+      Given codex is pinned to a team project (`tool_project_keys.codex`)
+      And codex's persisted wiring points at the pinned instance,
+        which differs from the instance being logged into
+      When the user completes `langwatch login --device`
+      Then codex's wiring is left exactly as it was
+      And no personal ingest key is minted for codex
+      And the unpinned tools are still refreshed
+      # The pin is deliberate scope, not stale personal wiring: latest
+      # login wins applies to the personal path only.
+
     Scenario: a wiring refresh failure never fails the login
       Given persisted wiring points at a previous instance
       And the new instance cannot mint an ingest key for the user yet
       When the user completes `langwatch login --device`
       Then the login still succeeds
       And the stale wiring is left for the next wrapper run to handle
+
+  Rule: a login that is not this machine's login leaves the wiring alone
+    # The wiring under the home (the claude settings env block, the codex
+    # [otel] and gateway blocks, the scoped shell functions) belongs to the
+    # login in the home's default config file. Two logins never take it over.
+
+    @unit @cli-wrappers @latest-login-wins @isolated-config
+    Scenario: A login kept in its own config file never touches the home's wiring
+      Given LANGWATCH_CLI_CONFIG names a config file other than the home's default one
+      And persisted wiring for claude and codex points at another instance
+      When the user completes `langwatch login --device`
+      Then no ingest key is minted for the refresh
+      And the claude settings file and the codex config file are byte for byte what they were
+      And the refresh reports claude and codex as left alone because the login lives in its own config file
+
+    @unit @cli-wrappers @latest-login-wins @isolated-config
+    Scenario: LANGWATCH_CLI_CONFIG naming the home's default file is the machine's login
+      Given LANGWATCH_CLI_CONFIG names the home's default config file
+      And persisted wiring for claude points at a previous instance
+      When the user completes `langwatch login --device` against a new instance
+      Then claude's wiring is rewritten with the new instance's endpoint
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A login on this machine does not take over wiring that reports elsewhere
+      # Decision: a localhost login never takes the wiring over on its own. A
+      # local stack comes and goes, and once it stops every plain tool run
+      # would report to nothing. Running `langwatch <tool>` on that login is
+      # the explicit way to move one tool over.
+      Given persisted wiring for claude and codex points at a deployment that is not on this machine
+      When the user completes `langwatch login --device` against a localhost instance
+      Then no ingest key is minted for the refresh
+      And the claude settings file and the codex config file are byte for byte what they were
+      And the refresh reports claude and codex as left alone because the login is on this machine
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A login on this machine still refreshes wiring that already reports to this machine
+      Given persisted wiring for claude points at a localhost instance on another port
+      When the user completes `langwatch login --device` against a localhost instance
+      Then claude's wiring is rewritten with the new instance's endpoint and a live ingest key
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A host that only starts with localhost is not this machine
+      # The address is parsed and judged by its host. `localhost.acme.test` is
+      # a deployment elsewhere, however its name starts.
+      Given a tool's shell function reports to "https://localhost.acme.test/api/otel"
+      When the user completes `langwatch login --device` against a localhost instance
+      Then the shell function is left exactly as it was
+      And the refresh reports the tool as left alone because the login is on this machine
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A shell function that reports to this machine is refreshed by a login on this machine
+      Given a tool's shell function reports to a localhost instance on another port
+      When the user completes `langwatch login --device` against a localhost instance
+      Then the shell function is rewritten with the new instance's endpoint
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A login on this machine leaves a codex gateway block that routes elsewhere
+      Given the codex config file carries a langwatch gateway block whose base_url is not on this machine
+      When the user completes `langwatch login --device` against a localhost instance
+      Then the gateway block is left exactly as it was
+
+    @unit @cli-wrappers @latest-login-wins @isolated-config
+    Scenario: The login names the config file it writes
+      Given LANGWATCH_CLI_CONFIG names a config file other than the home's default one
+      When the user starts `langwatch login --device`
+      Then the login says it will write that file, not `~/.langwatch/config.json`
+
+    @unit @cli-wrappers @latest-login-wins
+    Scenario: The login says which wiring it left alone and how to move it
+      Given a login left the wiring of claude alone because the login is on this machine
+      When the login prints its summary
+      Then a line says claude's wiring was left as it is because it reports to another LangWatch
+      And a line names `langwatch claude` as the way to report to this one instead

@@ -32,40 +32,56 @@ afterEach(() => {
 });
 
 describe("buildCodexOtelBlock", () => {
-  it("emits the [otel] block bracketed by langwatch markers", () => {
+  it("emits the [otel] block with both signal exporters, traces first", () => {
     const out = buildCodexOtelBlock({
-      endpoint: "https://app.langwatch.ai/api/otel",
+      baseEndpoint: "https://app.langwatch.ai/api/otel",
       ingestionToken: "ik-lw-xxx",
     });
     expect(out).toContain("# >>> langwatch otel begin >>>");
     expect(out).toContain("# <<< langwatch otel end <<<");
     expect(out).toContain("[otel]");
     expect(out).toContain("[otel.trace_exporter.otlp-http]");
-    expect(out).not.toContain("[otel.exporter.otlp-http]");
-    expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel"`);
+    expect(out).toContain(
+      `endpoint = "https://app.langwatch.ai/api/otel/v1/traces"`,
+    );
+    // The EVENTS exporter — codex's tool_result / user_prompt / turn_ttft
+    // records, which the session fold reads — posts to /v1/logs.
+    expect(out).toContain("[otel.exporter.otlp-http]");
+    expect(out).toContain(
+      `endpoint = "https://app.langwatch.ai/api/otel/v1/logs"`,
+    );
+    // Traces stay FIRST: codexOtelBlockEndpoint reads the block's first
+    // endpoint line, and the login staleness compare expects the trace one.
+    expect(out.indexOf("[otel.trace_exporter.otlp-http]")).toBeLessThan(
+      out.indexOf("[otel.exporter.otlp-http]"),
+    );
+    // The prompt-content knob stays unset: codex then redacts prompt text
+    // and still reports its length.
+    expect(out).not.toContain("log_user_prompt");
     expect(out).toContain(`protocol = "json"`);
   });
 
   it("does NOT persist the Authorization header in the toml file", () => {
     const out = buildCodexOtelBlock({
-      endpoint: "https://app.langwatch.ai/api/otel",
+      baseEndpoint: "https://app.langwatch.ai/api/otel",
       ingestionToken: "ik-lw-SECRET-NOT-FOR-DISK",
     });
     expect(out).not.toContain("ik-lw-SECRET-NOT-FOR-DISK");
   });
 
   describe("when includeAuthHeader is true", () => {
-    it("inlines the Authorization header on the trace exporter", () => {
+    it("inlines the Authorization header on both exporters", () => {
       const out = buildCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-PERSISTED-TOKEN",
         },
         { includeAuthHeader: true },
       );
-      expect(out).toContain(
-        `headers = { "Authorization" = "Bearer sk-lw-PERSISTED-TOKEN" }`,
-      );
+      const headerLine = `headers = { "Authorization" = "Bearer sk-lw-PERSISTED-TOKEN" }`;
+      // One header per exporter: a plain codex run posts spans AND events,
+      // and either signal without the header is silently dropped upstream.
+      expect(out.split(headerLine)).toHaveLength(3);
       // Still a well-formed block under the same markers.
       expect(out).toContain("[otel.trace_exporter.otlp-http]");
       expect(out).toContain("# >>> langwatch otel begin >>>");
@@ -81,7 +97,7 @@ describe("writeCodexOtelBlock", () => {
       const filePath = path.join(tmp, "subdir", "config.toml");
       const result = writeCodexOtelBlock(
         {
-          endpoint: "http://localhost:5560/api/otel",
+          baseEndpoint: "http://localhost:5560/api/otel",
           ingestionToken: "ik-lw-zzz",
         },
         { filePath },
@@ -103,7 +119,7 @@ describe("writeCodexOtelBlock", () => {
 
       const result = writeCodexOtelBlock(
         {
-          endpoint: "http://localhost:5560/api/otel",
+          baseEndpoint: "http://localhost:5560/api/otel",
           ingestionToken: "ik-lw-zzz",
         },
         { filePath },
@@ -122,7 +138,7 @@ describe("writeCodexOtelBlock", () => {
       const filePath = path.join(tmp, "config.toml");
       writeCodexOtelBlock(
         {
-          endpoint: "http://localhost:5560/api/otel",
+          baseEndpoint: "http://localhost:5560/api/otel",
           ingestionToken: "ik-lw-zzz",
         },
         { filePath },
@@ -130,7 +146,7 @@ describe("writeCodexOtelBlock", () => {
 
       const result = writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "ik-lw-zzz",
         },
         { filePath },
@@ -147,12 +163,45 @@ describe("writeCodexOtelBlock", () => {
     it("reports 'unchanged' when re-run with the same inputs", () => {
       const filePath = path.join(tmp, "config.toml");
       const inputs = {
-        endpoint: "https://app.langwatch.ai/api/otel",
+        baseEndpoint: "https://app.langwatch.ai/api/otel",
         ingestionToken: "ik-lw-zzz",
       };
       writeCodexOtelBlock(inputs, { filePath });
       const result = writeCodexOtelBlock(inputs, { filePath });
       expect(result.action).toBe("unchanged");
+    });
+
+    /**
+     * `$&`, ``$` `` and `$'` are replacement directives to
+     * `String.prototype.replace`, and the replacement here is built from the
+     * caller's own values. Expanded rather than written out, they splice the
+     * surrounding config back into the block and codex stops parsing the file.
+     */
+    it("writes a dollar sign in the environment label out literally", () => {
+      const filePath = path.join(tmp, "config.toml");
+      const environment = "team$&build$`ci";
+      writeCodexOtelBlock(
+        {
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
+          ingestionToken: "ik-lw-zzz",
+          environment: "first",
+        },
+        { filePath },
+      );
+
+      writeCodexOtelBlock(
+        {
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
+          ingestionToken: "ik-lw-zzz",
+          environment,
+        },
+        { filePath },
+      );
+
+      const contents = fs.readFileSync(filePath, "utf8");
+      expect(contents).toContain('environment = "team$&build$`ci"');
+      expect(contents.match(/langwatch otel begin/g)).toHaveLength(1);
+      expect(contents.match(/^\[otel\]$/gm)).toHaveLength(1);
     });
   });
 
@@ -161,7 +210,7 @@ describe("writeCodexOtelBlock", () => {
       const filePath = path.join(tmp, "config.toml");
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-PERSIST-ME",
         },
         { filePath, persistAuthHeader: true },
@@ -181,7 +230,7 @@ describe("writeCodexOtelBlock", () => {
       expect(fs.statSync(filePath).mode & 0o777).toBe(0o644);
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-SECRET",
         },
         { filePath, persistAuthHeader: true },
@@ -206,7 +255,7 @@ describe("writeCodexOtelBlock", () => {
       expect(() =>
         writeCodexOtelBlock(
           {
-            endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+            baseEndpoint: "https://app.langwatch.ai/api/otel",
             ingestionToken: "sk-lw-SECRET",
           },
           { filePath, persistAuthHeader: true },
@@ -224,7 +273,7 @@ describe("writeCodexOtelBlock", () => {
       // 1) persist opt-in installs the header
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-KEEP-ME",
         },
         { filePath, persistAuthHeader: true },
@@ -233,7 +282,7 @@ describe("writeCodexOtelBlock", () => {
       //    asking for the header (persistAuthHeader omitted)
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-KEEP-ME",
         },
         { filePath },
@@ -250,7 +299,7 @@ describe("writeCodexOtelBlock", () => {
       const filePath = path.join(tmp, "config.toml");
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-RUNTIME-ONLY",
         },
         { filePath },
@@ -284,7 +333,7 @@ describe("writeCodexOtelBlock", () => {
 
       writeCodexOtelBlock(
         {
-          endpoint: "http://localhost:5560/api/otel",
+          baseEndpoint: "http://localhost:5560/api/otel",
           ingestionToken: "ik-lw-zzz",
         },
         { filePath },
@@ -369,7 +418,7 @@ describe("writeCodexGatewayBlock", () => {
     const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
     writeCodexOtelBlock(
       {
-        endpoint: "http://localhost:5560/api/otel",
+        baseEndpoint: "http://localhost:5560/api/otel",
         ingestionToken: "ik-lw-zzz",
       },
       { filePath },
@@ -501,7 +550,7 @@ describe("codexOtelBlockHasAuthHeader", () => {
     const filePath = path.join(tmp, "config.toml");
     writeCodexOtelBlock(
       {
-        endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+        baseEndpoint: "https://app.langwatch.ai/api/otel",
         ingestionToken: "sk-lw-x",
       },
       { filePath },
@@ -510,7 +559,7 @@ describe("codexOtelBlockHasAuthHeader", () => {
 
     writeCodexOtelBlock(
       {
-        endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+        baseEndpoint: "https://app.langwatch.ai/api/otel",
         ingestionToken: "sk-lw-x",
       },
       { filePath, persistAuthHeader: true },
@@ -526,7 +575,7 @@ describe("removeCodexOtelBlock", () => {
       fs.writeFileSync(filePath, 'model = "gpt-5"\n');
       writeCodexOtelBlock(
         {
-          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          baseEndpoint: "https://app.langwatch.ai/api/otel",
           ingestionToken: "sk-lw-SECRET",
         },
         { filePath, persistAuthHeader: true },
@@ -587,7 +636,7 @@ describe("removeCodexGatewayBlock / removeCodexGatewayProfileFile", () => {
     const filePath = path.join(tmp, "config.toml");
     writeCodexOtelBlock(
       {
-        endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+        baseEndpoint: "https://app.langwatch.ai/api/otel",
         ingestionToken: "sk-lw-x",
       },
       { filePath },

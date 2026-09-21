@@ -12,7 +12,7 @@ LangWatch organizes everything around three workspace scopes. Every Virtual Key,
 
 Every workspace lives **inside an organization**. Think of the org as the tenant boundary; the three workspaces are the inner partitions.
 
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
+<Info>**Pairs with:** [Members and Teams](/platform/members-and-teams) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
 
 ## When to pick which
 
@@ -25,9 +25,9 @@ Choose by what the artifact is *for*, not what's convenient.
 | Apply a tighter routing policy to the engineering team only | **Team** | The team scope nests under org and overrides the org default for its members. |
 | Cap spend across "everyone in the org" | **Organization** | Org scope sits above the three workspaces, see [Org-wide budgets](/ai-gateway/budgets). |
 | Cap spend "for marketing only" | **Team** | Same shape as the org cap, narrower scope. |
-| Cap spend for one engineer who's been making noise | **Principal** | A Personal workspace's owner is the principal, pin a budget there. |
+| Cap spend for one engineer | **Principal** | A Personal workspace's owner is the principal, pin a budget there. |
 
-The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` controls which ones developers see entries for.
+The chrome's [Workspace Switcher](#workspace-switcher) shows you the workspaces you can see; the [admin catalog](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` controls which ones developers see entries for.
 
 ## Personal Workspace
 
@@ -52,7 +52,7 @@ What you can't do:
 
 ### Personal-workspace privacy
 
-By default, *other users' Personal Workspaces are invisible to you*: even when you're the org admin in some structural sense. The privacy contract is enforced at four layers:
+By default, *other users' Personal Workspaces are invisible to you*, outside the admin-only surfaces listed at the end of this section. The privacy contract is enforced at four layers:
 
 1. **Picker procedures** (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) strip personal teams owned by other users from the result, AND null-redact other members' email addresses while preserving the caller's own email.
 2. **Workspace data** (`useWorkspaceData` hook) fail-closes on null `ownerUserId`, an orphaned personal team without a clear owner is hidden from everyone.
@@ -70,7 +70,7 @@ Teams are groups of people. They:
 - Inherit the org's default Routing Policy unless a team-scoped policy overrides it.
 - Carry their own audit log scope, budgets, and tool-catalog entries when admin-scoped to the team.
 
-Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/ai-governance/members-and-invites#adding-a-single-member).
+Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/platform/members-and-teams#invite-people).
 
 Teams scope down what an `aiTools:view` permission shows on `/me`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
 
@@ -102,7 +102,7 @@ Click it to expand a tree:
 - Other users' Personal Workspaces are filtered out for non-admins (see [Personal-workspace privacy](#personal-workspace-privacy) above).
 - Two same-named projects in the same scope get a parent-team suffix to keep them distinguishable.
 
-Changing the workspace updates the URL to the corresponding scope and the chrome continues to show the same switcher with the new selection, it's not a modal, it's the chrome's persistent navigation.
+Changing the workspace updates the URL to the corresponding scope and the chrome continues to show the same switcher with the new selection, because the switcher is the chrome's persistent navigation.
 
 ## How budgets attach to workspaces
 
@@ -118,7 +118,7 @@ Budgets are evaluated in scope order, broadest first. A request that would breac
 
 ## How routing policies attach to workspaces
 
-Routing Policies live at `/settings/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
+Routing Policies live at `/gateway/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
 
 Workspace overrides:
 
@@ -133,5 +133,5 @@ A virtual key's effective policy is the deepest applicable: VK > Project > Team 
 - **Make a key, mint VKs in the right scope**: [Personal IDE keys](/ai-gateway/governance/personal-keys), [Virtual Keys](/ai-gateway/virtual-keys).
 - **Cap spend**: [Budgets](/ai-gateway/budgets).
 - **Override the routing chain for a team or project**: [Routing Policies](/ai-gateway/governance/routing-policies).
-- **Audit who did what to which workspace**: [Audit log](/ai-governance/audit-log).
-- **Invite someone into a team**: [Members & invites](/ai-governance/members-and-invites).
+- **Audit who did what to which workspace**: [Audit log](/platform/audit-log).
+- **Invite someone into a team**: [Members and Teams](/platform/members-and-teams).

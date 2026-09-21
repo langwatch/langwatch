@@ -3,6 +3,26 @@ import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
 import {
+  isWorkbenchActionKind,
+  WORKBENCH_ACTIONS,
+  type WorkbenchActionDefinition,
+} from "../actions/manifest";
+import {
+  addColumn as addColumnTransform,
+  assertComparisonColumnAllowed,
+  attachEvaluator,
+  attachTarget,
+  duplicateTarget as duplicateTargetTransform,
+  isTransformError,
+  removeTarget as removeTargetTransform,
+  setCellValue as setCellValueTransform,
+  setEvaluatorMapping as setEvaluatorMappingTransform,
+  setTargetMapping as setTargetMappingTransform,
+  setTargetPrompt as setTargetPromptTransform,
+  type Transform,
+  type WorkbenchState,
+} from "../actions/transforms";
+import {
   createInitialResults,
   createInitialState,
   type DatasetColumn,
@@ -16,7 +36,6 @@ import {
 import {
   deriveComparisonTargetMappings,
   inferAllEvaluatorMappings,
-  inferAllTargetMappings,
   propagateMappingsToNewDataset,
 } from "../utils/mappingInference";
 import {
@@ -53,6 +72,86 @@ const removeMappingsForDataset = (
   return { targets, evaluators };
 };
 
+/**
+ * The persisted slice a transform reads. Excludes results and UI state, which
+ * no transform is allowed to see.
+ */
+const workbenchStateOf = (state: EvaluationsV3State): WorkbenchState => ({
+  name: state.name,
+  datasets: state.datasets,
+  activeDatasetId: state.activeDatasetId,
+  evaluators: state.evaluators,
+  targets: state.targets,
+  experimentId: state.experimentId,
+  experimentSlug: state.experimentSlug,
+});
+
+/** What zustand merges back after a transform ran. */
+const sliceOf = (next: WorkbenchState): PartializedState => ({
+  name: next.name,
+  datasets: next.datasets,
+  activeDatasetId: next.activeDatasetId,
+  evaluators: next.evaluators,
+  targets: next.targets,
+});
+
+/**
+ * Run a pure transform over the current state and hand zustand the slice to
+ * merge back.
+ *
+ * Every store action that has a transform twin goes through here, so the two
+ * can never drift: the browser and the action executor run the same function.
+ * One `set` per action keeps undo granularity exactly as it was — `zundo`
+ * records a history entry per `set`.
+ */
+const runTransform = <Payload, Result>({
+  state,
+  transform,
+  payload,
+}: {
+  state: EvaluationsV3State;
+  transform: Transform<Payload, Result>;
+  payload: Payload;
+}): { slice: PartializedState; result?: Result } => {
+  const { state: next, result } = transform({
+    state: workbenchStateOf(state),
+    payload,
+  });
+  return { slice: sliceOf(next), result };
+};
+
+/**
+ * Same, for the actions whose store contract is "invalid input changes
+ * nothing". A transform refuses with a typed error so an agent gets told why;
+ * the store keeps its silent no-op.
+ */
+const runTransformOrKeep = <Payload, Result>(args: {
+  state: EvaluationsV3State;
+  transform: Transform<Payload, Result>;
+  payload: Payload;
+}): PartializedState | null => {
+  try {
+    return runTransform(args).slice;
+  } catch (error) {
+    if (isTransformError(error)) return null;
+    throw error;
+  }
+};
+
+/**
+ * The same swallow for a store action that holds an invariant itself instead of
+ * through a transform: run the edit, and keep the state untouched when the edit
+ * refuses. Only a refusal is swallowed, so a genuine bug still surfaces.
+ */
+const editOrKeep = <Slice>(edit: () => Slice, keep: Slice): Slice => {
+  try {
+    return edit();
+  } catch (error) {
+    if (isTransformError(error)) return keep;
+    throw error;
+  }
+};
+
 // ============================================================================
 // Store Implementation
 // ============================================================================
@@ -74,6 +173,23 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   setExperimentSlug: (experimentSlug) => {
     set({ experimentSlug });
+  },
+
+  setWorkbenchVersion: (workbenchVersion) => {
+    set({ workbenchVersion });
+  },
+
+  setStaleWorkbench: (staleWorkbench) => {
+    set({ staleWorkbench });
+  },
+
+  rememberRunStartedHere: (runId) => {
+    set((state) => {
+      const known = state.runsStartedHere ?? [];
+      return known.includes(runId)
+        ? {}
+        : { runsStartedHere: [...known, runId] };
+    });
   },
 
   // -------------------------------------------------------------------------
@@ -223,67 +339,26 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     // For inline datasets, update local records
     if (dataset.type === "inline" && dataset.inline) {
-      set((state) => {
-        const records = {
-          ...(state.datasets.find((d) => d.id === datasetId)?.inline?.records ??
-            {}),
-        };
-        const columnValues = [...(records[columnId] ?? [])];
-
-        // Ensure array is long enough
-        while (columnValues.length <= row) {
-          columnValues.push("");
-        }
-
-        columnValues[row] = value;
-        records[columnId] = columnValues;
-
-        return {
-          datasets: state.datasets.map((d) =>
-            d.id === datasetId
-              ? {
-                  ...d,
-                  inline: {
-                    ...d.inline!,
-                    records,
-                  },
-                }
-              : d,
-          ),
-        };
-      });
+      set(
+        (state) =>
+          runTransformOrKeep({
+            state,
+            transform: setCellValueTransform,
+            payload: { datasetId, rowIndex: row, columnId, value },
+          }) ?? state,
+      );
     }
   },
 
   addColumn: (datasetId, column) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (dataset?.type !== "inline" || !dataset.inline) {
-        return state;
-      }
-
-      const rowCount = get().getRowCount(datasetId);
-      const newColumnValues = Array(rowCount).fill("");
-
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? {
-                ...d,
-                columns: [...d.columns, column],
-                inline: {
-                  ...d.inline!,
-                  columns: [...d.inline!.columns, column],
-                  records: {
-                    ...d.inline!.records,
-                    [column.id]: newColumnValues,
-                  },
-                },
-              }
-            : d,
-        ),
-      };
-    });
+    set(
+      (state) =>
+        runTransformOrKeep({
+          state,
+          transform: addColumnTransform,
+          payload: { datasetId, column },
+        }) ?? state,
+    );
   },
 
   removeColumn: (datasetId, columnId) => {
@@ -537,52 +612,68 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   addTarget: (target) => {
+    // Calls the transform's core rather than the transform itself: the store's
+    // callers hand over an already-typed TargetConfig, so re-parsing it against
+    // the action payload schema would reject shapes the UI has always accepted.
+    // The wiring — auto-mapping the target and every evaluator onto it — is the
+    // same code either way.
+    set((state) =>
+      sliceOf(
+        attachTarget({
+          state: workbenchStateOf(state),
+          target: {
+            ...target,
+            // Defensive: callers have shipped targets without these.
+            inputs: target.inputs ?? [],
+            outputs: target.outputs ?? [],
+          },
+        }),
+      ),
+    );
+  },
+
+  applyWorkbenchAction: ({ kind, payload }) => {
+    // Widened to the definition type: the per-kind union makes `transform`
+    // inaccessible because the read/run kinds don't carry one.
+    const definition: WorkbenchActionDefinition | undefined =
+      isWorkbenchActionKind(kind) ? WORKBENCH_ACTIONS[kind] : undefined;
+    const transform = definition?.transform;
+    if (!definition || !transform) {
+      throw new Error(`No transform-backed workbench action "${kind}"`);
+    }
+    const parsed: unknown = definition.payloadSchema.parse(payload);
+    let result: unknown;
     set((state) => {
-      // Ensure inputs is always an array (defensive)
-      const targetWithInputs = {
-        ...target,
-        inputs: target.inputs ?? [],
-      };
-
-      // Auto-map target inputs to dataset columns based on name matching
-      // This only happens when the target is ADDED - not on subsequent edits
-      const autoMappings = inferAllTargetMappings(
-        targetWithInputs,
-        state.datasets,
-      );
-      const targetWithMappings: TargetConfig = {
-        ...targetWithInputs,
-        mappings: {
-          ...targetWithInputs.mappings,
-          ...autoMappings,
-        },
-      };
-
-      // Also auto-map evaluator inputs for this new target
-      const newTargets = [...state.targets, targetWithMappings];
-      const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
-        const newMappings = inferAllEvaluatorMappings(
-          evaluator,
-          state.datasets,
-          [targetWithMappings], // Only auto-map for the new target
-        );
-        // Merge new target mappings into existing evaluator mappings
-        const mergedMappings = { ...evaluator.mappings };
-        for (const [datasetId, targetMappings] of Object.entries(newMappings)) {
-          if (!mergedMappings[datasetId]) {
-            mergedMappings[datasetId] = {};
-          }
-          Object.assign(mergedMappings[datasetId]!, targetMappings);
-        }
-
-        return { ...evaluator, mappings: mergedMappings };
+      const applied = runTransform({
+        state,
+        transform: transform as Transform<unknown, unknown>,
+        payload: parsed,
       });
-
-      return {
-        targets: newTargets,
-        evaluators: evaluatorsWithNewMappings,
-      };
+      result = applied.result;
+      return applied.slice;
     });
+    return result;
+  },
+
+  duplicateTarget: ({ targetId, name }) => {
+    let duplicatedId: string | undefined;
+    set((state) => {
+      try {
+        const { slice, result } = runTransform({
+          state,
+          transform: duplicateTargetTransform,
+          payload: { targetId, name },
+        });
+        duplicatedId = result?.targetId;
+        return slice;
+      } catch (error) {
+        // An unknown target changes nothing, and the caller reads that from
+        // the undefined id rather than from an exception.
+        if (isTransformError(error)) return state;
+        throw error;
+      }
+    });
+    return duplicatedId;
   },
 
   updateTarget: (targetId, updates) => {
@@ -628,67 +719,25 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   removeTarget: (targetId) => {
-    set((state) => {
-      // Removing this target must also drop it from any comparison that
-      // references it as a variant — otherwise the comparison keeps a
-      // phantom entry (ComparisonConfigForm renders nothing for an
-      // unresolvable id, so there's no way to remove it from the UI either)
-      // and the orchestrator's resolveVariants silently produces zero cells
-      // forever, with no error surfaced anywhere.
-      const dropVariant = <T extends { comparison?: { variants: string[] } }>(
-        carrier: T,
-      ): T =>
-        carrier.comparison
-          ? {
-              ...carrier,
-              comparison: {
-                ...carrier.comparison,
-                variants: carrier.comparison.variants.filter(
-                  (v) => v !== targetId,
-                ),
-              },
-            }
-          : carrier;
+    set(
+      (state) =>
+        runTransform({
+          state,
+          transform: removeTargetTransform,
+          payload: { targetId },
+        }).slice,
+    );
+  },
 
-      // Also remove this target's mappings from all evaluators
-      // With per-dataset structure: mappings[datasetId][targetId][inputField]
-      const evaluators = state.evaluators.map((e) => {
-        const newMappings: typeof e.mappings = {};
-        for (const [datasetId, targetMappings] of Object.entries(e.mappings)) {
-          const newTargetMappings = { ...targetMappings };
-          delete newTargetMappings[targetId];
-          newMappings[datasetId] = newTargetMappings;
-        }
-        return dropVariant({ ...e, mappings: newMappings });
-      });
-
-      // Also remove mappings that reference this target from other targets
-      // With per-dataset structure: mappings[datasetId][inputField]
-      const targets = state.targets
-        .filter((r) => r.id !== targetId)
-        .map((target) => {
-          const newMappings: typeof target.mappings = {};
-          for (const [datasetId, fieldMappings] of Object.entries(
-            target.mappings,
-          )) {
-            const newFieldMappings: Record<string, FieldMapping> = {};
-            for (const [field, mapping] of Object.entries(fieldMappings)) {
-              // Keep value mappings and source mappings that don't reference the removed target
-              const isTargetMapping =
-                mapping.type === "source" &&
-                mapping.source === "target" &&
-                mapping.sourceId === targetId;
-              if (!isTargetMapping) {
-                newFieldMappings[field] = mapping;
-              }
-            }
-            newMappings[datasetId] = newFieldMappings;
-          }
-          return dropVariant({ ...target, mappings: newMappings });
-        });
-
-      return { targets, evaluators };
-    });
+  setTargetPrompt: (payload) => {
+    set(
+      (state) =>
+        runTransformOrKeep({
+          state,
+          transform: setTargetPromptTransform,
+          payload,
+        }) ?? state,
+    );
   },
 
   updateTargetComparison: (targetId, comparison) => {
@@ -696,7 +745,16 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const existingTarget = state.targets.find((r) => r.id === targetId);
       // Silently skip non-comparison targets so we never perturb the prompt /
       // agent / plain-evaluator code paths.
-      if (!existingTarget || !isComparisonEvaluator(existingTarget)) {
+      //
+      // A comparison column is always an evaluator target. The target itself
+      // carries no evaluator type (it names a DB evaluator row instead), so the
+      // kind of the target is the type check this seam can make: it stops a
+      // prompt or agent target that somehow holds a stale comparison config
+      // from having derived comparison mappings written onto it.
+      if (
+        existingTarget?.type !== "evaluator" ||
+        !isComparisonEvaluator(existingTarget)
+      ) {
         return state;
       }
 
@@ -749,22 +807,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   setTargetMapping: (targetId, datasetId, inputField, mapping) => {
-    set((state) => ({
-      targets: state.targets.map((r) =>
-        r.id === targetId
-          ? {
-              ...r,
-              mappings: {
-                ...r.mappings,
-                [datasetId]: {
-                  ...(r.mappings[datasetId] ?? {}),
-                  [inputField]: mapping,
-                },
-              },
-            }
-          : r,
-      ),
-    }));
+    set(
+      (state) =>
+        runTransformOrKeep({
+          state,
+          transform: setTargetMappingTransform,
+          payload: { targetId, datasetId, inputField, mapping },
+        }) ?? state,
+    );
   },
 
   removeTargetMapping: (targetId, datasetId, inputField) => {
@@ -789,33 +839,40 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   addEvaluator: (evaluator) => {
-    set((state) => {
-      // Auto-map fields for all datasets and targets
-      const autoMappings = inferAllEvaluatorMappings(
-        evaluator,
-        state.datasets,
-        state.targets,
-      );
-      const evaluatorWithMappings = {
-        ...evaluator,
-        mappings: {
-          ...evaluator.mappings,
-          ...autoMappings,
-        },
-      };
-
-      return {
-        evaluators: [...state.evaluators, evaluatorWithMappings],
-      };
-    });
+    // The transform's core, for the same reason as addTarget: the caller's
+    // EvaluatorConfig is already typed, and the auto-mapping is shared.
+    set((state) =>
+      editOrKeep<PartializedState | EvaluationsV3State>(
+        () =>
+          sliceOf(
+            attachEvaluator({ state: workbenchStateOf(state), evaluator }),
+          ),
+        state,
+      ),
+    );
   },
 
+  /**
+   * A shallow merge, refused when the result would be an evaluator that cannot
+   * be what it now claims to be. `comparison` is the field that decides whether
+   * an evaluator is a column of its own or a chip on every column, so a merge
+   * that writes it onto a plain evaluator changes the kind of the thing, not
+   * one of its settings.
+   */
   updateEvaluator: (evaluatorId, updates) => {
-    set((state) => ({
-      evaluators: state.evaluators.map((e) =>
-        e.id === evaluatorId ? { ...e, ...updates } : e,
+    set((state) =>
+      editOrKeep<Pick<EvaluationsV3State, "evaluators"> | EvaluationsV3State>(
+        () => ({
+          evaluators: state.evaluators.map((e) => {
+            if (e.id !== evaluatorId) return e;
+            const merged = { ...e, ...updates };
+            assertComparisonColumnAllowed(merged);
+            return merged;
+          }),
+        }),
+        state,
       ),
-    }));
+    );
   },
 
   removeEvaluator: (evaluatorId) => {
@@ -835,25 +892,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     inputField,
     mapping,
   ) => {
-    set((state) => ({
-      evaluators: state.evaluators.map((e) =>
-        e.id === evaluatorId
-          ? {
-              ...e,
-              mappings: {
-                ...e.mappings,
-                [datasetId]: {
-                  ...(e.mappings[datasetId] ?? {}),
-                  [targetId]: {
-                    ...(e.mappings[datasetId]?.[targetId] ?? {}),
-                    [inputField]: mapping,
-                  },
-                },
-              },
-            }
-          : e,
-      ),
-    }));
+    set(
+      (state) =>
+        runTransformOrKeep({
+          state,
+          transform: setEvaluatorMappingTransform,
+          payload: { evaluatorId, datasetId, targetId, inputField, mapping },
+        }) ?? state,
+    );
   },
 
   removeEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField) => {
@@ -1232,6 +1278,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       ...createInitialState(),
       experimentId: undefined,
       experimentSlug: undefined,
+      workbenchVersion: undefined,
+      staleWorkbench: undefined,
     });
   },
 

@@ -137,6 +137,27 @@ Feature: Multi-scope model cost overrides
     When a span using that model is ingested for project "web-app"
     Then the span is enriched with the project-level cost rates
 
+  # Enrichment reads the model off a span before canonicalisation, so it has to
+  # know every attribute a model name can arrive under. Coding agents name it
+  # under a bare "model", which is also a common attribute far outside their
+  # telemetry. What enrichment writes outranks even a reported cost, so reading
+  # the loose key everywhere would let a rule a customer already saved begin
+  # pricing spans it never matched, with no migration and nothing to tell them
+  # a dormant rule went live. The loose key is read only for the spans that
+  # need it.
+
+  @unit
+  Scenario: A coding agent's model is found under the attribute it uses
+    Given project "web-app" has a custom cost for "claude-opus-5"
+    When a Claude Code model call naming its model under a bare model attribute is ingested
+    Then the span is enriched with that cost's rates
+
+  @unit
+  Scenario: A dormant cost rule is not woken by an unrelated span's model attribute
+    Given project "web-app" has a custom cost for "claude-opus-5"
+    When an application span that is not a coding agent call carries a bare model attribute of "claude-opus-5"
+    Then the span is not enriched with any cost rates
+
   # ────────────────────────────────────────────────────────────────────────────
   # Migration
   # ────────────────────────────────────────────────────────────────────────────

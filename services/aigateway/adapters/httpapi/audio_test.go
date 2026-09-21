@@ -26,12 +26,12 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-func audioRouter(capture *domain.Request) http.Handler {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
+// audioRouter builds an audio-capable router. Extra credentials are
+// appended to the default bundle so a test asking for a non-OpenAI
+// provider prefix has the matching slot bound — without one the
+// dispatcher rejects the request as model_provider_not_bound before
+// the provider is ever reached.
+func audioRouter(capture *domain.Request, extraCreds ...domain.Credential) http.Handler {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, req *domain.Request, _ domain.Credential) (*domain.Response, error) {
 			if capture != nil {
@@ -57,11 +57,22 @@ func audioRouter(capture *domain.Request) http.Handler {
 		},
 	}
 	return buildRouter(
-		app.WithAuth(auth),
+		app.WithAuth(audioAuth(extraCreds...)),
 		app.WithProviders(provider),
 		app.WithModels(modelresolver.New()),
 		app.WithLogger(zap.NewNop()),
 	)
+}
+
+// audioAuth resolves every key to the default bundle plus extraCreds.
+func audioAuth(extraCreds ...domain.Credential) *mockAuth {
+	return &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			b := testBundle()
+			b.Credentials = append(b.Credentials, extraCreds...)
+			return b, nil
+		},
+	}
 }
 
 func multipartBody(t *testing.T, fields map[string]string, fileField, filename string, fileBytes []byte) (*bytes.Buffer, string) {
@@ -107,7 +118,9 @@ func TestAudioSpeech_ReturnsBinaryAudioWithContentType(t *testing.T) {
 
 func TestAudioSpeech_ElevenLabsModelResolvesToElevenLabsProvider(t *testing.T) {
 	var captured domain.Request
-	router := audioRouter(&captured)
+	router := audioRouter(&captured, domain.Credential{
+		ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
+	})
 
 	body := `{"model":"elevenlabs/eleven_flash_v2","voice":"cjVigY5qzO86Huf0OWal","input":"Hola."}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/audio/speech", strings.NewReader(body))
@@ -414,11 +427,9 @@ func TestAudioSpeech_UpstreamProviderErrorPassesThrough(t *testing.T) {
 			}, nil
 		},
 	}
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
+	auth := audioAuth(domain.Credential{
+		ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
+	})
 	router := buildRouter(
 		app.WithAuth(auth),
 		app.WithProviders(provider),

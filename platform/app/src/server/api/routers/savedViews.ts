@@ -1,8 +1,7 @@
-import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -28,7 +27,7 @@ export const savedViewsRouter = createTRPCRouter({
         kind: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .use(savedViewErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
@@ -72,7 +71,7 @@ export const savedViewsRouter = createTRPCRouter({
         id: z.string().min(1).max(128).optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
@@ -100,7 +99,7 @@ export const savedViewsRouter = createTRPCRouter({
         viewId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
@@ -122,7 +121,7 @@ export const savedViewsRouter = createTRPCRouter({
         name: z.string().min(1).max(255),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
@@ -144,7 +143,7 @@ export const savedViewsRouter = createTRPCRouter({
         viewIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);

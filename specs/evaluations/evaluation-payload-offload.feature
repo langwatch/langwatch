@@ -31,7 +31,7 @@ Feature: Evaluation payload offload
   #     evaluation-column-caps.ts (Inputs -> valid-JSON __lw_truncated marker at
   #     8 MiB; Details/Error/ErrorDetails -> observable text truncation).
   #   - Read resolution seam: EvaluationService.getEvaluationInputs
-  #     (evaluation.service.ts) resolves the marker; folds/reactors get it raw.
+  #     (evaluation.service.ts) resolves the marker; folds/subscribers get it raw.
   #   - Billing ledger: stored_objects.size_bytes, summed by
   #     StoredObjectsService.getStorageUsageByProject; stored_objects added to
   #     MONITORED_TABLES (clickhouse/metrics.ts).

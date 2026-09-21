@@ -10,32 +10,82 @@ from langchain_core.language_models.chat_models import (
 import litellm
 
 
+class RawResponse:
+    """A completion the way the OpenAI client returns it with headers attached.
+
+    langchain_openai reads completions through `with_raw_response.create()`
+    and then calls `parse()` on what comes back; the litellm client has no
+    transport headers to give, so this carries the completion and none.
+    """
+
+    def __init__(self, response):
+        self._response = response
+        self.headers: dict = {}
+
+    def parse(self):
+        return self._response
+
+
+class RawResponses:
+    def __init__(self, client: "LitellmCompletion"):
+        self._client = client
+
+    def create(self, *args, **kwargs):
+        return RawResponse(self._client.create(*args, **kwargs))
+
+
+class AsyncRawResponses:
+    def __init__(self, client: "AsyncLitellmCompletion"):
+        self._client = client
+
+    async def create(self, *args, **kwargs):
+        return RawResponse(await self._client.create(*args, **kwargs))
+
+
 class LitellmCompletion:
     exception: Optional[Exception] = None
     temperature: float = 0
 
-    def __init__(self, temperature: float = 0):
+    def __init__(
+        self,
+        temperature: float = 0,
+        extra_call_kwargs: Optional[dict] = None,
+    ):
         self.temperature = temperature
+        # Call arguments the evaluator pins for every call made through this
+        # client, e.g. the azure api_version that used to be set through the
+        # process environment.
+        self.extra_call_kwargs = extra_call_kwargs or {}
 
     def create(self, *args, **kwargs):
         try:
             if self.temperature:
                 kwargs["temperature"] = self.temperature
             kwargs["drop_params"] = True
+            kwargs.update(self.extra_call_kwargs)
             return litellm.completion(*args, **kwargs)
         except Exception as e:
             self.exception = e
             raise e
+
+    @property
+    def with_raw_response(self) -> RawResponses:
+        return RawResponses(self)
 
 
 class AsyncLitellmCompletion(LitellmCompletion):
     async def create(self, *args, **kwargs):
         return super().create(*args, **kwargs)
 
+    @property
+    def with_raw_response(self) -> AsyncRawResponses:
+        return AsyncRawResponses(self)
+
 
 def model_to_langchain(
     model: str,
     temperature: float = 0,
+    extra_call_kwargs: Optional[dict] = None,
 ) -> BaseChatModel:
     if model.startswith("claude-"):
         model = model.replace("claude-", "anthropic/claude-")
@@ -47,16 +97,24 @@ def model_to_langchain(
         model=model,
         api_key="dummy",  # type: ignore
         temperature=temperature or 0,
-        client=LitellmCompletion(temperature=temperature),
-        async_client=AsyncLitellmCompletion(temperature=temperature),
+        client=LitellmCompletion(
+            temperature=temperature, extra_call_kwargs=extra_call_kwargs
+        ),
+        async_client=AsyncLitellmCompletion(
+            temperature=temperature, extra_call_kwargs=extra_call_kwargs
+        ),
     )
 
 
 class LitellmEmbeddings:
     exception: Optional[Exception] = None
 
+    def __init__(self, extra_call_kwargs: Optional[dict] = None):
+        self.extra_call_kwargs = extra_call_kwargs or {}
+
     def create(self, *args, **kwargs):
         try:
+            kwargs.update(self.extra_call_kwargs)
             result = litellm.embedding(*args, **kwargs)
             return result.model_dump()
         except Exception as e:
@@ -89,9 +147,12 @@ class LitellmEmbeddingsWrapper(OpenAIEmbeddings):
         return self.embed_query(question)
 
 
-def embeddings_model_to_langchain(embeddings_model: str):
+def embeddings_model_to_langchain(
+    embeddings_model: str,
+    extra_call_kwargs: Optional[dict] = None,
+):
     return LitellmEmbeddingsWrapper(
         model=embeddings_model,
         api_key="dummy",  # type: ignore
-        client=LitellmEmbeddings(),
+        client=LitellmEmbeddings(extra_call_kwargs=extra_call_kwargs),
     )

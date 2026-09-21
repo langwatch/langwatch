@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -21,7 +23,10 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 		return fmt.Errorf("semaphore not wired")
 	}
 	slots := domain.TypecheckSlots(o.sys.TotalMemory(), runtime.NumCPU(), slotsOverride)
-	release, slot, err := o.sem.Acquire(ctx, "typecheck", slots)
+	// "checks" is the same semaphore `haven slot run` (and through it every
+	// delegated `pnpm typecheck` / `pnpm lint` on the machine) counts against:
+	// one counter for everything that saturates the cores, ADR-064 + ADR-095.
+	release, slot, err := o.sem.Acquire(ctx, "checks", slots)
 	if err != nil {
 		return err
 	}
@@ -39,7 +44,14 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 	if maxRSSOverrideMB > 0 {
 		rl.MaxRSSBytes = int64(maxRSSOverrideMB) << 20
 	}
-	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, nil, ReapLimits(rl))
+	// The `typecheck` script takes a machine-wide slot of its own
+	// (dev/scripts/check-queue.mjs). We already hold one here, so turn that
+	// gate off for this run: counting it twice would queue it behind itself, and
+	// the reaper's duration ceiling would then be spent waiting rather than
+	// typechecking. The pid marker is what agent shells honor, and it only
+	// convinces a descendant.
+	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid())}
+	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, env, ReapLimits(rl))
 }
 
 // shellQuote single-quotes s for safe interpolation into a `bash -lc` string,

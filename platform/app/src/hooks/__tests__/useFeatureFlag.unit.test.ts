@@ -4,6 +4,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NOT_TARGETED } from "../../server/featureFlag/targeting";
 import { CLIENT_FLAG_STALE_TIME_MS, useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
@@ -35,7 +36,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.isLoading).toBe(true);
@@ -43,7 +47,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -60,7 +67,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -68,7 +78,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -85,7 +98,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.enabled).toBe(true);
@@ -93,7 +109,10 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_ai_gateway_menu_enabled"),
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -132,7 +151,7 @@ describe("useFeatureFlag()", () => {
     });
   });
 
-  describe("when options are not provided", () => {
+  describe("when neither scope targets the read", () => {
     beforeEach(() => {
       mockUseQuery.mockReturnValue({
         data: { enabled: false },
@@ -140,14 +159,19 @@ describe("useFeatureFlag()", () => {
       } as any);
     });
 
-    it("passes undefined for optional params", () => {
-      renderHook(() => useFeatureFlag("release_ui_ai_gateway_menu_enabled"));
+    it("sends null for both scopes", () => {
+      renderHook(() =>
+        useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
+        }),
+      );
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
           flag: "release_ui_ai_gateway_menu_enabled",
-          projectId: undefined,
-          organizationId: undefined,
+          projectId: null,
+          organizationId: null,
         },
         {
           staleTime: CLIENT_FLAG_STALE_TIME_MS,
@@ -171,6 +195,7 @@ describe("useFeatureFlag()", () => {
       renderHook(() =>
         useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
           projectId: undefined,
+          organizationId: undefined,
           enabled: false,
         }),
       );
@@ -186,6 +211,8 @@ describe("useFeatureFlag()", () => {
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
         useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: undefined,
+          organizationId: undefined,
           enabled: false,
         }),
       );
@@ -196,6 +223,8 @@ describe("useFeatureFlag()", () => {
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
         useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+          projectId: undefined,
+          organizationId: undefined,
           enabled: false,
         }),
       );

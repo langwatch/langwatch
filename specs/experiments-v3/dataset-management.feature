@@ -75,6 +75,16 @@ Feature: Dataset management in evaluations workbench
     When I click on the active "Test Data" tab dropdown
     Then I do NOT see "Remove from workbench" option
 
+  # The active tab's menu is where per-dataset actions live. Before it
+  # offered only save and remove, so pointing the workbench at a different
+  # existing dataset hid behind the Add button's menu.
+  @unit
+  Scenario: Switching to another dataset from the active dataset's menu
+    Given the workbench shows its active dataset tab
+    When I open that tab's dropdown menu
+    Then the menu offers "Switch Dataset"
+    And choosing it opens the dataset picker
+
   # ============================================================================
   # Save as dataset
   # ============================================================================

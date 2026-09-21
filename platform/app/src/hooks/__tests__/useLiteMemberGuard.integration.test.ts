@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 
-import { OrganizationUserRole } from "@prisma/client";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useLiteMemberGuard } from "../useLiteMemberGuard";
 
 vi.mock("../useOrganizationTeamProject", () => ({

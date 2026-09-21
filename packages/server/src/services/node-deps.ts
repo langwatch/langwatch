@@ -77,7 +77,24 @@ export async function ensureLangwatchDeps(
 	const workspacePath = join(rootDir, "pnpm-workspace.yaml");
 	const hashFile = join(nodeModulesPath, ".install-hash");
 
-	const distAlreadyBuilt = existsSync(join(distPath, "client"));
+	// Both halves have to be there. dist/client is the served UI; dist/server
+	// holds every artifact executed directly at runtime — the four bundles
+	// (`start:app`, `start:workers`, run-task.sh, the scenario spawn) plus the
+	// migrations goose reads from dist/server/migrations. Gate the skip on all
+	// of them: a partial tree (interrupted build, or one made before a bundle
+	// existed) would otherwise pass and die at boot on the missing piece.
+	const serverArtifacts = [
+		"server.cjs",
+		"workers.cjs",
+		"task.cjs",
+		"scenario-child-process.cjs",
+		"migrations",
+	];
+	const distAlreadyBuilt =
+		existsSync(join(distPath, "client")) &&
+		serverArtifacts.every((artifact) =>
+			existsSync(join(distPath, "server", artifact)),
+		);
 	// Hash key combines the lockfile + workspace definition + package.json —
 	// any of them changing means we need to re-run install. Use sha256 (not
 	// just mtime) because rsync during ensureAppDir resets mtimes. The sequence
@@ -183,11 +200,13 @@ export async function ensureLangwatchDeps(
 	// `pnpm pack`-driven local dogfood and dev checkouts where dist/
 	// doesn't exist yet.
 	if (!distAlreadyBuilt) {
-		// Full prod build: start:prepare:files → build:scenario-child-process → vite build.
+		// Full prod build: start:prepare:files → vite build → build:server.
 		// start:prepare:files generates Prisma client, Zod types, SDK versions,
 		// langevals types (from the source committed in services/langevals/ts-integration/),
-		// and the mcp-server bundle. vite build emits dist/client/ for static serving.
-		// Without dist/client/, every UI route returns 404 and only /api/* works.
+		// the mcp-server bundle and the task registry. vite build emits dist/client/
+		// for static serving; without it every UI route returns 404 and only /api/*
+		// works. build:server emits dist/server/*.cjs — the entry points start:app
+		// and start:workers run on plain node.
 		await execAndPipe(
 			bus,
 			"prepare:langwatch",
@@ -206,9 +225,10 @@ export async function ensureLangwatchDeps(
 	// does after ITS build (install → build → prod-only pass → prisma generate).
 	// This is what drops vite, vitest, playwright, biome and the rest of the
 	// build tooling from the tree the server actually runs — on the order of a
-	// gigabyte — while tsx and prisma stay, because they are runtime
-	// dependencies here (the server boots through tsx, migrations run through
-	// the prisma CLI) and are declared as such.
+	// gigabyte — while prisma stays, because migrations run through the prisma
+	// CLI and it is declared as a runtime dependency. tsx goes out with the
+	// rest: the app and the workers boot from the prebuilt dist/server bundles
+	// on plain node, so the running tree never needs it.
 	//
 	// A re-install with `--prod` rather than `pnpm prune --prod`: prune has no
 	// `--filter`, so in a workspace it reasons about every project rather than

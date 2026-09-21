@@ -80,6 +80,8 @@ vi.mock("~/utils/api", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+      },
+      invite: {
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),
@@ -122,7 +124,7 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetLastSubscription(),
         },
       },
-      useContext: vi.fn(() => ({
+      useUtils: vi.fn(() => ({
         organization: {
           getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() },
         },

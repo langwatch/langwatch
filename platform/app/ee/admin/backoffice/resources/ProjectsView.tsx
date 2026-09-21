@@ -271,7 +271,6 @@ function ProjectEditDrawer({
             title: "Project updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           onClose();
         },

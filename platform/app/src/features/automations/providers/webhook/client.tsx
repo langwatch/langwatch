@@ -67,17 +67,33 @@ function newHeaderRow(partial?: Partial<Omit<HeaderRow, "id">>): HeaderRow {
   };
 }
 
+/** A single stored secret, following the header rows' discipline (ADR-040 §3):
+ *  `kept` means the server held the saved value back, so the input stays empty
+ *  behind a masked placeholder and the save echoes the kept sentinel. */
+interface SecretDraft {
+  value: string;
+  kept: boolean;
+}
+
 export interface WebhookSlice {
   url: string;
   method: WebhookMethod;
   headers: HeaderRow[];
+  signingSecret: SecretDraft;
   template: FieldDraft;
 }
 
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
+const EMPTY_SECRET: SecretDraft = { value: "", kept: false };
 
 function initialSlice(): WebhookSlice {
-  return { url: "", method: "POST", headers: [], template: EMPTY_FIELD };
+  return {
+    url: "",
+    method: "POST",
+    headers: [],
+    signingSecret: EMPTY_SECRET,
+    template: EMPTY_FIELD,
+  };
 }
 
 function isComplete(slice: WebhookSlice): boolean {
@@ -111,6 +127,10 @@ function fromTriggerRow(row: SavedTriggerRow): WebhookSlice {
       ? (params.method as WebhookMethod)
       : "POST",
     headers,
+    signingSecret:
+      params.signingSecret === WEBHOOK_HEADER_VALUE_KEPT
+        ? { value: "", kept: true }
+        : { value: params.signingSecret ?? "", kept: false },
     template: {
       value: params.bodyTemplate ?? "",
       usingDefault: params.bodyTemplate == null,
@@ -134,12 +154,21 @@ function bodyTemplateOf(slice: WebhookSlice): string | null {
   return slice.template.value.trim().length > 0 ? slice.template.value : null;
 }
 
+/** The sentinel for an untouched saved secret, the typed value for a new one,
+ *  and null for an empty field, which turns signing off. */
+function signingSecretOf(slice: WebhookSlice): string | null {
+  if (slice.signingSecret.kept) return WEBHOOK_HEADER_VALUE_KEPT;
+  const typed = slice.signingSecret.value.trim();
+  return typed.length > 0 ? typed : null;
+}
+
 function toActionParams(slice: WebhookSlice): WebhookActionParams {
   return {
     url: slice.url.trim(),
     method: slice.method,
     headers: headersRecord(slice.headers),
     bodyTemplate: bodyTemplateOf(slice),
+    signingSecret: signingSecretOf(slice),
   };
 }
 
@@ -294,6 +323,53 @@ function HeadersEditor({
   );
 }
 
+function SigningSecretField({
+  slice,
+  onChange,
+}: {
+  slice: WebhookSlice;
+  onChange: (next: WebhookSlice) => void;
+}) {
+  const { value, kept } = slice.signingSecret;
+  return (
+    <Field.Root>
+      <Field.Label>Signing secret (optional)</Field.Label>
+      <HStack gap={2} width="full">
+        <Input
+          data-testid="webhook-signing-secret"
+          type="password"
+          autoComplete="off"
+          flex="1"
+          value={value}
+          placeholder={kept ? "•••••• (saved)" : "A secret your endpoint holds"}
+          onChange={(e) =>
+            onChange({
+              ...slice,
+              signingSecret: { value: e.target.value, kept: false },
+            })
+          }
+        />
+        {/* A saved secret leaves the input empty, so turning signing off needs
+            its own control. A typed one clears by emptying the input. */}
+        {kept ? (
+          <IconButton
+            size="sm"
+            variant="ghost"
+            aria-label="Remove signing secret"
+            onClick={() => onChange({ ...slice, signingSecret: EMPTY_SECRET })}
+          >
+            <Trash2 size={14} />
+          </IconButton>
+        ) : null}
+      </HStack>
+      <Field.HelperText>
+        When set, deliveries carry an X-LangWatch-Signature header the receiver
+        can verify. Leave it empty to send unsigned deliveries.
+      </Field.HelperText>
+    </Field.Root>
+  );
+}
+
 const METHOD_ITEMS = WEBHOOK_METHODS.map((m) => ({ value: m, label: m }));
 
 function WebhookConfigForm({
@@ -340,6 +416,7 @@ function WebhookConfigForm({
         />
       </Field.Root>
       <HeadersEditor slice={slice} onChange={onChange} />
+      <SigningSecretField slice={slice} onChange={onChange} />
       {/* Try the real request straight from the destination section; the
           outcome (status code / failure) lands right below the button. */}
       <VStack align="start" gap={2}>

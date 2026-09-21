@@ -610,25 +610,8 @@ Rule: Column visibility and reorder
 #   - the inline summary badges column under "Evals summary column"
 # See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
 
-Rule: Event column display
-  Event columns show counts with exception flags.
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And the Events column is enabled
-
-  Scenario: Events column shows count and exception indicator
-    Given the Events column is enabled
-    And a trace has 3 events including an exception
-    Then the Events column shows "3 ⚠"
-
-  Scenario: Events column shows feedback icon
-    Given a trace has events including a thumbs-up feedback event
-    Then the Events column shows "3 👍"
-
-  Scenario: Clicking events column opens drawer with Events accordion
-    When the user clicks the events count for a trace
-    Then the trace drawer opens with the Events accordion expanded
+# The Events column is owned by specs/traces-v2/trace-list-events-column.feature:
+# what a row shows, where the data comes from, and when it is fetched.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -848,17 +831,12 @@ Rule: Data gating and null handling
     Given a trace has no service set
     Then the Service column shows "—"
 
-  # Not yet implemented as of 2026-05-01 — `tracesV2.list` returns the same
-  # base shape (TraceListItem) regardless of which columns are visible. Eval
-  # scores are bundled into the same response via `evaluations`. Toggling a
-  # column on does not trigger a separate fetch.
+  # `tracesV2.list` returns the same base shape (TraceListItem) regardless of
+  # which columns are visible, and eval scores are bundled into that same
+  # response via `evaluations`. Events are the one exception: they live in
+  # `stored_spans`, not on the summary fold, so they are read on demand — see
+  # specs/traces-v2/trace-list-events-column.feature.
   @planned
   Scenario: Data fetching only queries visible columns
     Given only the default columns are visible
     Then the backend query only fetches fields for visible columns
-
-  @planned
-  Scenario: Enabling an optional column triggers data fetch
-    Given the Events column was hidden
-    When the user enables the Events column
-    Then event count data is fetched for the visible traces

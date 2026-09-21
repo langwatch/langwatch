@@ -99,6 +99,11 @@ const mockHttpAgent: TypedAgent = {
   },
   workflowId: null,
   copiedFromAgentId: null,
+  environment: null,
+  ownerUserId: null,
+  hostLabel: null,
+  identityKey: null,
+  lastSeenAt: null,
   projectId: "test-project-id",
   archivedAt: null,
   createdAt: new Date("2025-01-10T10:00:00Z"),
@@ -120,6 +125,11 @@ const mockCodeAgent: TypedAgent = {
   },
   workflowId: null,
   copiedFromAgentId: null,
+  environment: null,
+  ownerUserId: null,
+  hostLabel: null,
+  identityKey: null,
+  lastSeenAt: null,
   projectId: "test-project-id",
   archivedAt: null,
   createdAt: new Date("2025-01-05T10:00:00Z"),
@@ -213,7 +223,7 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
-    useContext: vi.fn(() => ({
+    useUtils: vi.fn(() => ({
       agents: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },
@@ -288,13 +298,15 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
   it("HTTP agent target displays with a Globe icon (different from code agent)", async () => {
     // Mock agents.getById to return agent names based on ID
     vi.mocked(api.agents.getById.useQuery).mockImplementation((args) => {
-      if (args.id === "http-agent-1") {
+      // v11 hooks accept `skipToken` as the input, so narrow past the union.
+      const { id } = args as { id: string };
+      if (id === "http-agent-1") {
         return {
           data: { name: "My HTTP Agent" },
           isLoading: false,
         } as ReturnType<typeof api.agents.getById.useQuery>;
       }
-      if (args.id === "code-agent-1") {
+      if (id === "code-agent-1") {
         return {
           data: { name: "My Code Agent" },
           isLoading: false,

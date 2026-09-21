@@ -51,7 +51,10 @@ describe("useMessagesNavigationFooter()", () => {
     describe("when navigating forward via cursor then clicking prevPage", () => {
       it("navigates to the previous page instead of jumping to page 1", () => {
         const { result, rerender } = renderHook(() =>
-          useMessagesNavigationFooter(),
+          // Cursor mode is declared, not inferred from the URL: inferring it is
+          // what let the first page of a cursor list behave like an offset list
+          // (#6808). The Traces tab declares it the same way.
+          useMessagesNavigationFooter("cursor"),
         );
 
         const cursor1 = makeCursor(1700000000000, "trace-page2");
@@ -94,7 +97,10 @@ describe("useMessagesNavigationFooter()", () => {
     describe("when navigating forward one page then clicking prevPage", () => {
       it("returns to page 1 correctly since there is no earlier cursor", () => {
         const { result, rerender } = renderHook(() =>
-          useMessagesNavigationFooter(),
+          // Cursor mode is declared, not inferred from the URL: inferring it is
+          // what let the first page of a cursor list behave like an offset list
+          // (#6808). The Traces tab declares it the same way.
+          useMessagesNavigationFooter("cursor"),
         );
 
         const cursor1 = makeCursor(1700000000000, "trace-page2");

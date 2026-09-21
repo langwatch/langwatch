@@ -4,6 +4,7 @@ import type {
   LogParams,
   WarnLogParams,
 } from "@clickhouse/client";
+import { emitVendorLog } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:clickhouse");
@@ -13,29 +14,36 @@ const logger = createLogger("langwatch:clickhouse");
  * share the same console format as the rest of the app (and the Go services)
  * instead of the client's own `[ts][ERROR][@clickhouse/client][module]` lines.
  *
+ * What reaches the log, and what is dropped, is decided by
+ * `@langwatch/clickhouse-client` so every ClickHouse construction site in the
+ * repo answers to the same policy. The short version: the vendor's `error` is
+ * dropped, because the client cannot know whether the caller retried and
+ * succeeded, and no cause is ever attached under a field named `error`,
+ * because that is what Loki reads to decide a record's level.
+ *
  * The client instantiates this with `new ()` (see its `log.LoggerClass`
  * option), so it must have a zero-arg constructor — it borrows the module
  * singleton above. The client gates which levels reach us via `log.level`
  * (defaults to WARN), so `trace`/`debug`/`info` rarely fire in practice.
  */
 export class ClickHouseLogger implements Logger {
-  trace({ module, message, args }: LogParams): void {
-    logger.debug({ module, ...args }, message);
+  trace(params: LogParams): void {
+    emitVendorLog({ sink: logger, level: "trace", record: params });
   }
 
-  debug({ module, message, args }: LogParams): void {
-    logger.debug({ module, ...args }, message);
+  debug(params: LogParams): void {
+    emitVendorLog({ sink: logger, level: "debug", record: params });
   }
 
-  info({ module, message, args }: LogParams): void {
-    logger.info({ module, ...args }, message);
+  info(params: LogParams): void {
+    emitVendorLog({ sink: logger, level: "info", record: params });
   }
 
-  warn({ module, message, args, err }: WarnLogParams): void {
-    logger.warn({ module, ...args, error: err }, message);
+  warn(params: WarnLogParams): void {
+    emitVendorLog({ sink: logger, level: "warn", record: params });
   }
 
-  error({ module, message, args, err }: ErrorLogParams): void {
-    logger.error({ module, ...args, error: err }, message);
+  error(params: ErrorLogParams): void {
+    emitVendorLog({ sink: logger, level: "error", record: params });
   }
 }

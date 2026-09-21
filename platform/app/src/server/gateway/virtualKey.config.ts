@@ -12,15 +12,6 @@ import { z } from "zod";
 export const cacheModeSchema = z.enum(["respect", "force", "disable"]);
 export type CacheMode = z.infer<typeof cacheModeSchema>;
 
-export const fallbackTriggerSchema = z.enum([
-  "5xx",
-  "timeout",
-  "rate_limit_exceeded",
-  "network_error",
-  "circuit_breaker",
-]);
-export type FallbackTrigger = z.infer<typeof fallbackTriggerSchema>;
-
 export const guardrailDirectionSchema = z.enum(["pre", "post", "stream_chunk"]);
 export type GuardrailDirection = z.infer<typeof guardrailDirectionSchema>;
 
@@ -91,19 +82,21 @@ export const virtualKeyConfigSchema = z.object({
       ttlS: z.number().int().nonnegative().default(3600),
     })
     .default({ mode: "respect", ttlS: 3600 }),
+  /**
+   * How many providers one request may be tried against. Which failures are
+   * worth another provider is not configurable: the gateway decides that from
+   * the real upstream outcome, in one place. A per-key trigger list could only
+   * narrow the set, and every narrowing turns a failure the gateway could have
+   * recovered from into one the customer sees.
+   *
+   * Stored configs written before this shape may still carry `on` and
+   * `timeoutMs`; the schema drops them on read.
+   */
   fallback: z
     .object({
-      on: z
-        .array(fallbackTriggerSchema)
-        .default(["5xx", "timeout", "rate_limit_exceeded"]),
-      timeoutMs: z.number().int().positive().default(30000),
       maxAttempts: z.number().int().positive().default(3),
     })
-    .default({
-      on: ["5xx", "timeout", "rate_limit_exceeded"],
-      timeoutMs: 30000,
-      maxAttempts: 3,
-    }),
+    .default({ maxAttempts: 3 }),
   // Attachments to project-scoped GatewayGuardrail rows.
   // Empty array = VK opts out of every project guardrail.
   guardrailAttachments: z.array(guardrailAttachmentSchema).default([]),
@@ -114,6 +107,28 @@ export const virtualKeyConfigSchema = z.object({
       rpd: z.number().int().nullable().default(null),
     })
     .default({ rpm: null, tpm: null, rpd: null }),
+  /**
+   * How many brokered realtime voice sessions this key may hold open at
+   * once. `null` is unlimited.
+   *
+   * Voice needs its own cap because the arrival-rate limits above do not
+   * bound it. `rpm` counts requests as they arrive, and a session mint is
+   * one request that opens a call billing by the minute for as long as it
+   * runs, so a key at 60 rpm can hold sixty ten-minute calls per replica
+   * without tripping anything.
+   *
+   * Deliberately NOT carried on the gateway config bundle. The cap is read
+   * inside the control plane's reserve transaction, next to the count it
+   * gates, so a limit edited a minute ago applies to the next mint. Shipping
+   * it on the bundle would put the limit on the config cache's clock and the
+   * count on the database's, and this chain already carries one field that
+   * is materialized, sent and then dropped at decode with nothing reading it.
+   */
+  realtime: z
+    .object({
+      maxOpenSessions: z.number().int().positive().nullable().default(null),
+    })
+    .default({ maxOpenSessions: null }),
   metadata: z
     .object({
       label: z.string().optional(),

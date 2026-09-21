@@ -43,6 +43,13 @@ const mockAgents = [
     name: "Test HTTP Agent",
     type: "http",
     updatedAt: new Date("2025-01-01"),
+    config: {
+      url: "https://lively-otter.trycloudflare.com",
+      devTunnel: {
+        previousUrl: "https://staging.example.com/agent",
+        connectedAt: "2026-08-15T10:00:00.000Z",
+      },
+    },
   },
   {
     id: "agent-2",
@@ -167,6 +174,27 @@ describe("RunScenarioModal with TargetSelector", () => {
       // Modal remains open
       expect(onClose).not.toHaveBeenCalled();
       expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+    });
+  });
+
+  describe("when an agent points at a local dev tunnel", () => {
+    /** @scenario "A tunneled agent is marked in the simulations target selector" */
+    it("shows the local tunnel badge on that agent only", async () => {
+      renderModal();
+      await openDropdown();
+
+      const dropdown = screen.getByTestId("target-selector-dropdown");
+      expect(dropdown).toHaveTextContent("Local tunnel");
+
+      // Only the agent carrying the devTunnel marker gets the badge.
+      const badges = screen.getAllByText("Local tunnel");
+      expect(badges).toHaveLength(1);
+      expect(screen.getByTestId("target-option-agent-1")).toHaveTextContent(
+        "Local tunnel",
+      );
+      expect(screen.getByTestId("target-option-agent-2")).not.toHaveTextContent(
+        "Local tunnel",
+      );
     });
   });
 

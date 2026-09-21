@@ -1,6 +1,6 @@
 image:
   repository: langwatch/clickhouse-serverless
-  tag: "0.2.0"  # x-release-please-version
+  tag: "0.4.0"  # x-release-please-version
   pullPolicy: IfNotPresent
 
 # Primary inputs — the image auto-tunes all ClickHouse parameters from these
@@ -50,6 +50,72 @@ backup:
   incremental:
     schedule: "0 * * * *"          # every hour
 
+  # Alerting on backup freshness, rendered as Prometheus rules.
+  #
+  # The condition worth paging on is "no recent successful backup", which is not
+  # the same as "a job reported an error". A CronJob that is suspended, deleted,
+  # or silently rescheduled emits no failure event at all, so a failure-only
+  # alert stays quiet while backups stop happening. Every target below therefore
+  # gets a freshness alert as the primary signal; the failure alert is an extra,
+  # faster one that fires within a scrape of a bad run instead of waiting out the
+  # staleness window.
+  #
+  # Requires kube-state-metrics to be scraped by the Prometheus that loads these
+  # rules. Every expression is built from kube_cronjob_* and kube_job_* series;
+  # the chart adds no exporter of its own.
+  monitoring:
+    enabled: false
+
+    # Rendered into every alert as the runbook_url annotation. An alert whose
+    # recipient has nowhere to go gets muted, so this is worth setting.
+    runbookUrl: ""
+
+    # Merged into every alert's labels. Use it for Alertmanager or Grafana
+    # routing keys, e.g. {route: page, team: infra}.
+    additionalLabels: {}
+
+    # How long a backup may look broken before the alert fires. Applies to the
+    # freshness, suspension, and failure alerts.
+    for: "15m"
+
+    # How long the CronJob's metrics may be missing entirely before alerting.
+    # Longer than `for` because a kube-state-metrics restart briefly drops them.
+    absentFor: "30m"
+
+    # Emit a PrometheusRule instead of a plain ConfigMap. Needs the
+    # prometheus-operator CRDs; without them the manifest is rejected at install.
+    prometheusRule:
+      enabled: false
+      # Extra labels on the PrometheusRule object, for the operator's ruleSelector.
+      labels: {}
+
+    # Labels on the rules ConfigMap, for a rules sidecar or a Prometheus
+    # configmap mount to discover it.
+    configMapLabels:
+      langwatch.ai/prometheus-rules: "true"
+
+    # One entry per backup that has to stay fresh.
+    #
+    #   name           label used in alert text and on the `backup` label
+    #   cronjob        CronJob name suffix; the release fullname is prepended,
+    #                  so `backup-full` matches `<release>-clickhouse-backup-full`
+    #   cronjobName    exact CronJob name, for a CronJob this chart does not
+    #                  create and whose name does not start with the release
+    #                  fullname. Mutually exclusive with `cronjob`.
+    #   staleAfterHours  hours without a successful run before the backup counts
+    #                  as broken. Keep it above two scheduling intervals so one
+    #                  retried run does not page.
+    #
+    # A backup mechanism that is not a CronJob in this namespace has no
+    # kube-state-metrics series and cannot be watched from here; see the runbook.
+    targets:
+      - name: full
+        cronjob: backup-full
+        staleAfterHours: 26        # schedule is every 12h
+      - name: incremental
+        cronjob: backup-incremental
+        staleAfterHours: 3         # schedule is hourly
+
 # Authentication
 auth:
   password: ""         # Used as autogen seed when autogen.enabled=true and this is unset
@@ -98,6 +164,46 @@ preflight:
 
 # Advanced: override any computed value (applied last)
 env: {}
+
+# LangWatchQL (LWQL) access model (issue langwatch-saas#1168, Design C).
+#
+# When enabled, the pod renders the langwatch_lwql restricted user, the
+# lwql_restricted profile, its grants, the tenant row filters and the
+# lwql_postgres named collection directly as ClickHouse config, from secrets
+# mounted below. Whoever owns the ClickHouse server owns the access model: a
+# chart-managed server renders it here, so the application does NOT self-provision
+# it (the parent langwatch chart flips LWQL_SELF_PROVISION off for chart-managed
+# ClickHouse). Leave disabled for installs that do not use LangWatchQL.
+#
+# The passwords are mounted from a Secret with optional: true — a Secret missing
+# a key leaves that half unprovisioned (fail-closed) instead of bricking the pod.
+lwqlAccessModel:
+  enabled: false
+  # Database holding the LWQL objects; must match the app's LWQL_DATABASE.
+  database: langwatch
+  # Secret carrying the LWQL passwords. Empty = the ClickHouse auth Secret.
+  existingSecret: ""
+  # Key holding the langwatch_lwql user password (SHA256-hashed at boot).
+  passwordSecretKey: lwql_password
+  # PostgreSQL bridge for the lwql_postgres named collection. An EMPTY host means
+  # the bridge is NOT rendered — this subchart never guesses a host (see
+  # clickhouse-serverless.lwqlPgHost). When installed as the parent langwatch
+  # chart's dependency, that chart's OWN values.yaml supplies the release-derived
+  # host (<release>-postgresql) as its default for this field, so the collection
+  # still renders on the default chart-managed path; that default lives in the
+  # PARENT, not here. Set host to point at an external PostgreSQL. It dials as a
+  # dedicated read-only role (lwql_ro),
+  # never the superuser; the application converges that role from the reader
+  # password. The password key must be present in the Secret (the reader
+  # password cannot be hashed — ClickHouse dials PostgreSQL with it). The parent
+  # langwatch chart overrides database/user to match its own PostgreSQL; these
+  # defaults are for standalone subchart installs.
+  postgres:
+    host: ""
+    port: 5432
+    database: langwatch
+    user: lwql_ro
+    passwordSecretKey: lwql_pg_password
 
 # Keeper resources (only used when replicas > 1)
 keeper:

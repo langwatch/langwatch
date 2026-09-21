@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { PUBLIC_KEY } from "./constants";

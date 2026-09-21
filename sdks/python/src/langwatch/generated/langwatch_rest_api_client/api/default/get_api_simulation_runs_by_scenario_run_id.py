@@ -111,7 +111,7 @@ def _build_response(
 def sync_detailed(
     scenario_run_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiSimulationRunsByScenarioRunIdResponse200
     | GetApiSimulationRunsByScenarioRunIdResponse400
@@ -147,7 +147,7 @@ def sync_detailed(
 def sync(
     scenario_run_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiSimulationRunsByScenarioRunIdResponse200
     | GetApiSimulationRunsByScenarioRunIdResponse400
@@ -179,7 +179,7 @@ def sync(
 async def asyncio_detailed(
     scenario_run_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiSimulationRunsByScenarioRunIdResponse200
     | GetApiSimulationRunsByScenarioRunIdResponse400
@@ -213,7 +213,7 @@ async def asyncio_detailed(
 async def asyncio(
     scenario_run_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiSimulationRunsByScenarioRunIdResponse200
     | GetApiSimulationRunsByScenarioRunIdResponse400

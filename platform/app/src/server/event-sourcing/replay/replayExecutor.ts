@@ -1,4 +1,3 @@
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { TenantId } from "../domain/tenantId";
@@ -85,8 +84,8 @@ export class FoldAccumulator {
   }
 
   apply(event: ReplayEvent): void {
-    // Optimized replay loads events for the union of all projections' event
-    // types per aggregate (one CH query, no eventTypes filter), so each
+    // The replay engine loads events for the union of all selected
+    // projections' event types (one CH query per tenant per batch), so each
     // accumulator must drop events its projection doesn't accept. Without
     // this guard, a fold projection co-discovered with another projection
     // through a different event type would be fed events of types it never
@@ -96,15 +95,12 @@ export class FoldAccumulator {
     const projectionKey = this.projection.key?.(event) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
-    // ADR-022: Apply leanForProjection before the projection handler — same utility
-    // as the live dispatch interposition, ensuring replay and live produce
-    // byte-identical projection state.
-    const leanedEvent = leanForProjection(
-      event as unknown as Event,
-    ) as unknown as ReplayEvent;
-
+    // ADR-022: events arrive already leaned — rowToEvent applies
+    // leanForProjection once at materialization, matching the live dispatch
+    // interposition, so replay and live produce byte-identical state without
+    // re-leaning per (event × projection) here.
     const state = this.keyStates.get(scopedKey) ?? this.projection.init();
-    const newState = this.projection.apply(state, leanedEvent);
+    const newState = this.projection.apply(state, event);
     this.keyStates.set(scopedKey, newState);
     this.keyAggregateIds.set(scopedKey, event.aggregateId);
     this.keyTenantIds.set(scopedKey, event.tenantId);
@@ -181,11 +177,11 @@ interface BufferedMapRecord {
  * keying off `context.aggregateId` behave the same as the non-optimized
  * replay.
  *
- * Map records are append-only and need no cross-page state, so `apply`
- * flushes incrementally: once the buffer reaches `writeBatchSize` the
- * buffered records are written immediately instead of deferring everything
- * to the final `flush()`. Memory is therefore bounded by `writeBatchSize`,
- * not by the number of events in an aggregate batch.
+ * Map records are append-only and need no cross-page state, so the buffer
+ * drains incrementally: `apply` is synchronous (push only) and the streaming
+ * driver awaits `drainIfNeeded()` once the buffer reaches `writeBatchSize`,
+ * so the hot per-event loop carries no await. Memory is therefore bounded by
+ * `writeBatchSize`, not by the number of events in an aggregate batch.
  */
 export class MapAccumulator {
   private byTenant = new Map<string, BufferedMapRecord[]>();
@@ -211,18 +207,13 @@ export class MapAccumulator {
     return this._processed;
   }
 
-  async apply(event: ReplayEvent): Promise<void> {
+  apply(event: ReplayEvent): void {
     if (!this.eventTypeSet.has(event.type)) return;
 
-    // ADR-022: lean the event before the map handler — the same interposition
-    // live dispatch applies and the fold accumulator mirrors — so replayed
-    // records carry previews + event references, not oversized full content.
-    // aggregateId/tenantId still come from the original event (leaning may
-    // strip fields the store context needs).
-    const leanedEvent = leanForProjection(
-      event as unknown as Event,
-    ) as unknown as ReplayEvent;
-    const record = this.projection.map(leanedEvent as any);
+    // ADR-022: events arrive already leaned (rowToEvent leans once at
+    // materialization), so replayed records carry previews + event references,
+    // not oversized full content, without a second lean per projection here.
+    const record = this.projection.map(event as any);
     if (record === null) return;
 
     // Retention is resolved (per tenant) at drain/write time, not here, so
@@ -240,10 +231,17 @@ export class MapAccumulator {
     list.push({ record, context });
     this.bufferedCount++;
     this._processed++;
+  }
 
-    if (this.bufferedCount >= this.writeBatchSize) {
-      await this.drain(this.writeBatchSize);
-    }
+  /**
+   * Drain when the buffer has reached `writeBatchSize`; a no-op (returning
+   * undefined, never a promise) otherwise. The streaming driver calls this
+   * after each `apply` so the hot loop only awaits when a write is actually
+   * due.
+   */
+  drainIfNeeded(): Promise<void> | undefined {
+    if (this.bufferedCount < this.writeBatchSize) return undefined;
+    return this.drain(this.writeBatchSize);
   }
 
   async flush(writeBatchSize = this.writeBatchSize): Promise<void> {
@@ -352,13 +350,10 @@ export class StateAccumulator {
     if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type))
       return;
 
-    // ADR-022: lean before the reducer, exactly as live dispatch and the fold
-    // accumulator do, so a rebuilt row matches the live-folded one.
-    const leanedEvent = leanForProjection(
-      event as unknown as Event,
-    ) as unknown as ReplayEvent;
-
-    const domainEvent = leanedEvent as unknown as Event;
+    // ADR-022: events arrive already leaned (rowToEvent), exactly as live
+    // dispatch leans before its handlers, so a rebuilt row matches the
+    // live-folded one.
+    const domainEvent = event as unknown as Event;
     const projectionKey =
       this.projection.key?.(domainEvent) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);

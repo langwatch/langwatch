@@ -8,11 +8,11 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import type { Span } from "../../../server/tracer/types";
 import { SpanDetails } from "../SpanDetails";
 
@@ -68,7 +68,7 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 

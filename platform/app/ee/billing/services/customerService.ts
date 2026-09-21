@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   CustomerCreationRaceError,
   OrganizationNotFoundError,

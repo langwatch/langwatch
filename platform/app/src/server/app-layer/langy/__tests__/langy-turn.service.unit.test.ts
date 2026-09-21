@@ -1,10 +1,13 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildGuidedKickoffParts } from "~/features/guided-onboarding/kickoff";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "../errors";
@@ -15,6 +18,7 @@ import {
   langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
+import { LANGY_REFERENT_POLICY } from "../langyConversationMemory";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "../langyPromptRegistry";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
@@ -168,6 +172,106 @@ describe("LangyTurnService.startConversationTurn", () => {
     ({ deps, mocks } = makeDeps());
   });
 
+  describe("given a guided onboarding kickoff composed before the tour's key was recorded", () => {
+    const kickoff = buildGuidedKickoffParts({
+      input: {
+        path: "gateway",
+        paths: ["gateway"],
+        orgName: "ACME",
+        tourStatus: "completed",
+        gatewayUrl: "https://gateway.acme.example/v1",
+      },
+    });
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("records and asks the model the brief settled from the stored state, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      expect(guidedKickoffFacts).toHaveBeenCalledWith({
+        organizationId: "org-1",
+      });
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        questionParts: Array<{ text?: string }>;
+        userMessage: { parts: Array<Record<string, unknown>> };
+      };
+      const settledLine =
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.";
+      expect(accepted.questionParts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[0]).toMatchObject({
+        virtualKeyRevealId: "rvl_late",
+      });
+      expect(JSON.stringify(accepted)).not.toContain("none minted by the tour");
+    });
+
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker the settled brief as the prompt, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      const [[stashed]] = mocks.stash.mock.calls as unknown as [
+        [{ prompt: string }],
+      ];
+      expect(stashed.prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+      expect(stashed.prompt).not.toContain("none minted by the tour");
+      expect(stashed.prompt.startsWith("Guided onboarding kickoff.")).toBe(
+        true,
+      );
+    });
+
+    it("records the kickoff as sent when nothing reads the state", async () => {
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        userMessage: { parts: unknown[] };
+      };
+      expect(accepted.userMessage.parts).toEqual(kickoff);
+    });
+
+    it("never reads the state for a message that is not a kickoff", async () => {
+      const guidedKickoffFacts = vi.fn(async () => {
+        throw new Error("not to be read");
+      });
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+      await LangyTurnService.create(deps).startConversationTurn(input());
+      expect(guidedKickoffFacts).not.toHaveBeenCalled();
+      expect(mocks.acceptTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questionParts: [{ type: "text", text: "hi" }],
+        }),
+      );
+    });
+  });
+
+  /** @scenario "A message and its activity bump are one command, not two writes" */
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
     const result = await LangyTurnService.create(deps).startConversationTurn(
       input(),
@@ -200,6 +304,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario "Sending the first message creates the conversation from its events" */
   it("atomically prefixes a new conversation with its owner and run token", async () => {
     mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
 
@@ -214,6 +319,21 @@ describe("LangyTurnService.startConversationTurn", () => {
         userMessage: expect.objectContaining({ role: "user" }),
       }),
     );
+  });
+
+  /** @scenario The first message of a new conversation does not wait for its own projection */
+  it("skips the projection and handoff reads for a new conversation", async () => {
+    mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Both reads are lag-tolerant: asked about a conversation whose projection
+    // cannot exist yet, findByIdVisible spends its whole handoff grace window
+    // (3 x 400ms) before answering "not found", which put a flat 1.2 seconds
+    // in front of every first message.
+    expect(deps.conversations.findByIdVisible).not.toHaveBeenCalled();
+    expect(deps.conversations.getPendingHandoff).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
   });
 
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
@@ -575,7 +695,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     );
 
     const { system, prompt } = dispatchedOf(mocks.dispatch);
-    expect(system).toContain("RESOLVING WHAT THE USER MEANS");
+    expect(system).toContain(LANGY_REFERENT_POLICY);
     // The screen-context DATA precedes the labelled ask inside the message,
     // so the model reads what "this trace" could mean before the words that
     // may say it.
@@ -583,6 +703,61 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       prompt.indexOf("THE USER'S MESSAGE:"),
     );
     expect(prompt.trimEnd().endsWith("hi")).toBe(true);
+  });
+
+  describe("when the page the user is on accepts live UI actions", () => {
+    /** The chip kind that maps to a page manifest today. */
+    const experimentContext = {
+      pageContext: [
+        { kind: "experiment" as const, ref: "my-exp", label: "my-exp" },
+      ],
+    } as StartConversationTurnInput["turnContext"];
+
+    const promptFor = async (isEnabled: boolean) => {
+      vi.spyOn(featureFlagService, "isEnabled").mockImplementation(
+        async (key) => key !== "release_langy_ui_actions" || isEnabled,
+      );
+      const { deps: ownDeps, mocks: ownMocks } = makeDeps();
+      await LangyTurnService.create(ownDeps).startConversationTurn(
+        input({ turnContext: experimentContext }),
+      );
+      return dispatchedOf(ownMocks.dispatch).prompt;
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("offers the UI-action commands while the surface is open", async () => {
+      expect(await promptFor(true)).toContain("langwatch ui actions");
+    });
+
+    /** @scenario With page control rolled back, the agent is never offered the ui commands */
+    it("stays quiet about them while the surface is closed", async () => {
+      // The dispatch route answers a dark 404 with the flag off, so naming the
+      // commands would send the agent to a path that looks undeployed.
+      const prompt = await promptFor(false);
+      expect(prompt).not.toContain("langwatch ui actions");
+      // The rest of the screen context still travels.
+      expect(prompt).toContain("my-exp");
+    });
+
+    it("starts the turn with the channel closed when the flag store fails", async () => {
+      // A flag-store blip must not stop the turn, and it must not advertise a
+      // surface it could not confirm: the route may still be answering a 404.
+      vi.spyOn(featureFlagService, "isEnabled").mockRejectedValue(
+        new Error("flag store unavailable"),
+      );
+      const { deps: ownDeps, mocks: ownMocks } = makeDeps();
+
+      await LangyTurnService.create(ownDeps).startConversationTurn(
+        input({ turnContext: experimentContext }),
+      );
+
+      const prompt = dispatchedOf(ownMocks.dispatch).prompt;
+      expect(prompt).not.toContain("langwatch ui actions");
+      expect(prompt).toContain("my-exp");
+    });
   });
 
   /** @scenario A follow-up turn carries the conversation so far */
@@ -628,9 +803,13 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     // The volatile transcript must NOT ride the system lane: a per-turn
     // system re-writes the provider's cached prefix every turn.
     expect(system).not.toContain("THE CONVERSATION SO FAR");
-    // The ask is labelled so the manager-folded seed can never blur into the
-    // user's own words.
-    expect(prompt).toContain("THE USER'S MESSAGE:\nwhat is my name?");
+    // The label travels at the SEED's tail, not on the prompt: the manager
+    // folds `seed + prompt` into a fresh session's first message, so the
+    // label lands between the transcript and the user's words exactly when
+    // the fold happens — and a resumed session's follow-up stays a bare ask.
+    expect(historySeed).toBeDefined();
+    expect(historySeed?.trimEnd().endsWith("THE USER'S MESSAGE:")).toBe(true);
+    expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
     const stashed = (
@@ -1175,5 +1354,61 @@ describe("when no prompt project is configured", () => {
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
+  });
+});
+
+describe("when a turn requests a skill gated off for the caller", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects with LangySkillNotAvailableError and never dispatches the turn", async () => {
+    // Flag off => the `dashboard-widgets` skill (its `featureFlag`) is gated
+    // off; a turn that explicitly asks for it is refused.
+    vi.spyOn(featureFlagService, "isEnabled").mockResolvedValue(false);
+    const { deps, mocks } = makeDeps();
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(
+        input({
+          turnContext: {
+            pageContext: undefined,
+            skills: [{ id: "dashboard-widgets" }],
+          } as StartConversationTurnInput["turnContext"],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(LangySkillNotAvailableError);
+
+    // The rejected turn is classified once — as `rejected` in the outer catch,
+    // never also as an `error` — and it must not reach dispatch.
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("when the first message adopts a warmed conversation id", () => {
+  /** @scenario The first message adopts the warmed conversation */
+  it("threads adoptUnknownId so the turn lands on the warmed aggregate", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.ensureConversation.mockResolvedValue({
+      id: "conv-warmed",
+      isNew: true,
+    });
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        requestedConversationId: "conv-warmed",
+        adoptConversationId: true,
+      }),
+    );
+
+    expect(mocks.ensureConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conv-warmed",
+        adoptUnknownId: true,
+      }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-warmed" }),
+    );
   });
 });

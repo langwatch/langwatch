@@ -94,7 +94,7 @@ vi.mock("~/utils/api", () => ({
     licenseEnforcement: {
       checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
     },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 

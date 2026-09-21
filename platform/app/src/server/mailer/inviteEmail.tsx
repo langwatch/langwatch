@@ -1,7 +1,7 @@
-import type { Organization } from "@prisma/client";
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
-import { env } from "../../env.mjs";
+import type { Organization } from "~/generated/prisma/client";
+import { buildInviteAcceptUrl } from "../invites/invite-link";
 import { sendEmail } from "./emailSender";
 
 export const sendInviteEmail = async ({
@@ -13,7 +13,7 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
-  const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
+  const acceptInviteUrl = buildInviteAcceptUrl(inviteCode);
 
   const emailHtml = await render(
     <Html lang="en" dir="ltr">

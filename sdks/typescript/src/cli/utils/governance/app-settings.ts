@@ -118,14 +118,15 @@ export function appEnvHasAnyVar(
  * parent directories and the file itself when missing. Preserves
  * every other user-authored top-level key verbatim. Values in
  * `vars` win over pre-existing entries under the same key.
+ *
+ * Throws when the existing file cannot be read as a JSON object, rather than
+ * replacing it. Every caller treats that as best-effort and says so.
  */
 export function installAppEnv(
 	target: AppSettingsTarget,
 	vars: Record<string, string>,
 ): void {
-	fs.mkdirSync(path.dirname(target.path), { recursive: true });
-
-	const settings = readSettings(target.path);
+	const settings = readAppSettingsFileForUpdate(target.path);
 	const existingEnv = settings.env;
 	const nextEnv: Record<string, string> = isPlainObject(existingEnv)
 		? { ...(existingEnv as Record<string, string>) }
@@ -135,7 +136,7 @@ export function installAppEnv(
 	}
 	settings.env = nextEnv;
 
-	fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings });
 }
 
 /**
@@ -184,27 +185,87 @@ export function removeAppEnvVars(
 	} else {
 		settings.env = nextEnv;
 	}
-	fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings });
 	return true;
 }
 
-function readSettings(filePath: string): Record<string, unknown> {
+/**
+ * The settings file's top-level object, as a mutable copy, for a caller about
+ * to write it back.
+ *
+ * A missing file reads as `{}`: there is nothing there to lose. Every other
+ * failure throws, because the write path replaces the file WHOLESALE. The file
+ * belongs to the user, not to us, and it is where they keep everything else
+ * their agent does; trading all of it for a stray comma is not a recovery. The
+ * removal helpers already refuse the same way, by reporting no change.
+ *
+ * Shared with session-context-hooks.ts, which merges a different region of the same
+ * file and must read and write it exactly the way the env block does.
+ */
+export function readAppSettingsFileForUpdate(
+	filePath: string,
+): Record<string, unknown> {
+	let raw: string;
 	try {
-		const raw = fs.readFileSync(filePath, "utf8");
-		const parsed = JSON.parse(raw) as unknown;
-		if (isPlainObject(parsed)) return { ...parsed };
-		return {};
+		raw = fs.readFileSync(filePath, "utf8");
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
+		throw unmergeable(filePath, (err as Error).message);
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw) as unknown;
 	} catch {
-		// ENOENT, malformed JSON — start from an empty object so we
-		// don't lose the user's file to a stray comma. A parse error
-		// does silently drop other keys, which is why the read path
-		// returns {} — the write path replaces the file wholesale.
+		throw unmergeable(filePath, "it is not valid JSON");
+	}
+	if (!isPlainObject(parsed)) {
+		throw unmergeable(filePath, "it does not hold a JSON object");
+	}
+	return { ...parsed };
+}
+
+/**
+ * Write a settings document back, creating parent directories when missing.
+ *
+ * One writer for every caller that edits one of these files, whichever region
+ * of it they own. Indentation, the trailing newline and directory creation are
+ * what the user's own diff shows after we touch their config, so they cannot
+ * depend on which of us wrote it last.
+ */
+export function writeAppSettingsFile({
+	filePath,
+	settings,
+}: {
+	filePath: string;
+	settings: Record<string, unknown>;
+}): void {
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
+}
+
+function unmergeable(filePath: string, why: string): Error {
+	return new Error(
+		`Can't merge into ${filePath}: ${why}. Fix the file and run this again; ` +
+			`writing over it would lose everything else it holds.`,
+	);
+}
+
+/**
+ * The settings file's top-level object for a caller that only wants to look at
+ * it. Anything unreadable answers `{}`, which is the honest answer to "what is
+ * configured here" for a file nothing can parse.
+ */
+export function readAppSettingsFile(filePath: string): Record<string, unknown> {
+	try {
+		return readAppSettingsFileForUpdate(filePath);
+	} catch {
 		return {};
 	}
 }
 
 function readEnvMap(filePath: string): Record<string, string> {
-	const settings = readSettings(filePath);
+	const settings = readAppSettingsFile(filePath);
 	const env = settings.env;
 	if (!isPlainObject(env)) return {};
 	const out: Record<string, string> = {};

@@ -62,8 +62,8 @@ export class EventSourcingService<
     foldProjections,
     stateProjections,
     mapProjections,
-    reactors,
-    mapReactors,
+    foldSubscribers,
+    mapSubscribers,
     subscribers,
     serviceOptions,
     logger,
@@ -238,17 +238,17 @@ export class EventSourcingService<
       }
     }
 
-    // Register reactors on their fold projections
-    if (reactors) {
-      for (const { foldName, definition } of reactors) {
-        this.router.registerReactor(foldName, definition);
+    // Register subscribers on their fold projections
+    if (foldSubscribers) {
+      for (const { foldName, definition } of foldSubscribers) {
+        this.router.registerSubscriber(foldName, definition);
       }
     }
 
-    // Register reactors on their map projections
-    if (mapReactors) {
-      for (const { mapName, definition } of mapReactors) {
-        this.router.registerMapReactor(mapName, definition);
+    // Register subscribers on their map projections
+    if (mapSubscribers) {
+      for (const { mapName, definition } of mapSubscribers) {
+        this.router.registerMapSubscriber(mapName, definition);
       }
     }
 
@@ -278,10 +278,10 @@ export class EventSourcingService<
 
     if (
       globalQueue &&
-      ((reactors && reactors.length > 0) ||
-        (mapReactors && mapReactors.length > 0))
+      ((foldSubscribers && foldSubscribers.length > 0) ||
+        (mapSubscribers && mapSubscribers.length > 0))
     ) {
-      this.router.initializeReactorQueues();
+      this.router.initializeProjectionSubscriberQueues();
     }
 
     // Command queues always initialize — they're needed for dispatching

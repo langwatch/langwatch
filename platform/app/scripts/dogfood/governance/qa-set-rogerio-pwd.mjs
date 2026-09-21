@@ -1,7 +1,10 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { PrismaClient } from "../../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 const email = "rogerio@langwatch.ai";
 const newPassword = "RogerTest123!";
 const hash = await bcrypt.hash(newPassword, 10);
@@ -27,6 +30,10 @@ if (acc) {
       userId: user.id,
       type: "credential",
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: user.id,
       password: hash,
     },

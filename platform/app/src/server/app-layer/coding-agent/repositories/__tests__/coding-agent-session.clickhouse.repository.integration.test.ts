@@ -2,17 +2,24 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the three coding-agent tables (migrations 00051-00054) through
- * their real INSERT/SELECT SQL against ClickHouse. The unit tests cover the
- * query shape and record mapping with a mocked client; this proves the
+ * Round-trips the three coding-agent tables (migrations 00051-00054, 00074)
+ * through their real INSERT/SELECT SQL against ClickHouse. The unit tests cover
+ * the query shape and record mapping with a mocked client; this proves the
  * DDL↔repository column contract — a mismatched column name or type fails a
  * real insert loudly, which no mock can catch — plus the ReplacingMergeTree
  * dedup / last-write-wins semantics ADR-056 relies on. It also covers the
  * ADR-066 additions: the 00053 read-back state columns (sub-agent ids, ordered
  * step start times, previous-call context, converged metric units) that let
- * store.get() reconstruct working state without touching event_log, and the
- * 00054 AppliedEventIds watermark that survives cache loss — including the
- * mixed-deploy read of a pre-00054 row whose body omits the column entirely.
+ * store.get() reconstruct working state without touching event_log, the
+ * 00054 AppliedEventIds watermark that survives cache loss (including the
+ * mixed-deploy read of a pre-00054 row whose body omits the column entirely),
+ * the 00074 context-economics columns (reported rate-limit events,
+ * compactions by trigger, spawn lineage), the 00075 git-context columns
+ * (repository, branch, worktree, title) and the 00077 branch set, including
+ * the read that finds a session under a branch it has since left.
+ *
+ * @see specs/coding-agent/session-git-context.feature
+ * @see specs/coding-agent/pull-request-linkage.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -52,6 +59,17 @@ function sessionRow(
     userId: "user-1",
     terminalType: "xterm",
     entrypoint: "cli",
+    parentSessionId: `${tag}-parent`,
+    isFork: true,
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    gitBranch: "feat/session-git-context",
+    gitBranches: ["main", "feat/session-git-context"],
+    gitWorktree: "widgets-feat",
+    title: "Add git context to the session row",
+    titleSource: "",
+    auxiliary: false,
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -76,6 +94,31 @@ function sessionRow(
     cacheReadTokens: 9_000_000_000,
     cacheCreationTokens: 10,
     costUsd: 1.25,
+    agentReportedCostUsd: 0,
+    usageByContext: [
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "main",
+        inputTokens: 40,
+        outputTokens: 20,
+        cacheReadTokens: 4_000_000_000,
+        cacheCreationTokens: 4,
+        costUsd: 0.5,
+      },
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/session-git-context",
+        inputTokens: 60,
+        outputTokens: 30,
+        cacheReadTokens: 5_000_000_000,
+        cacheCreationTokens: 6,
+        costUsd: 0.75,
+      },
+    ],
     modelCallMs: 5000,
     toolMs: 1234,
     ttftMsTotal: 300,
@@ -85,9 +128,10 @@ function sessionRow(
     activeTimeCliSec: 300,
     toolResultBytes: 4096,
     toolInputBytes: 128,
-    compactions: 0,
+    compactions: 3,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: { auto: 2, manual: 1 },
     peakContextTokens: 9000,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -95,6 +139,7 @@ function sessionRow(
     errorTypes: { ShellError: 1 },
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 2,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 3,
@@ -199,6 +244,13 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(read!.costUsd).toBeCloseTo(1.25);
     expect(read!.commits).toBe(2);
 
+    // Context-economics columns (migration 00074): the trigger map, the
+    // reported rate-limit counter and the spawn lineage all survive the trip.
+    expect(read!.compactionTriggers).toEqual({ auto: 2, manual: 1 });
+    expect(read!.rateLimitEvents).toBe(2);
+    expect(read!.parentSessionId).toBe(`${tag}-parent`);
+    expect(read!.isFork).toBe(true);
+
     // Read-back columns (migration 00053, ADR-066) survive the trip so
     // store.get() can reconstruct working state without touching event_log.
     expect(read!.subAgentIds).toEqual([`${tag}-sub-a`, `${tag}-sub-b`]);
@@ -225,6 +277,69 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     // DateTime64 columns come back without a timezone, so exact-equality is
     // machine-dependent; assert the column is populated and roughly right.
     expect(read!.lastEventOccurredAt).toBeGreaterThan(0);
+  });
+
+  /** @scenario A session folds repo, branch, worktree and title into its row and reads back */
+  it("writes the git context and title and reads them back verbatim", async () => {
+    const row = sessionRow({ sessionId: `${tag}-git` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-git`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.repositoryHost).toBe("github.com");
+    expect(read!.repositoryOwner).toBe("acme");
+    expect(read!.repositoryName).toBe("widgets");
+    expect(read!.gitBranch).toBe("feat/session-git-context");
+    expect(read!.gitWorktree).toBe("widgets-feat");
+    expect(read!.title).toBe("Add git context to the session row");
+  });
+
+  /** @scenario A session row from before the git context columns decodes with empty context */
+  it("decodes a row written before the git context columns with empty context", async () => {
+    const sessionId = `${tag}-pre-git`;
+    // The genuine mixed-deploy read: a writer from before migration 00075
+    // emits a JSONEachRow body with none of the six fields, so ClickHouse
+    // supplies each column's DEFAULT ''. Inserted through the same client the
+    // repository resolves.
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          Agent: "claude_code",
+          ModelCalls: 7,
+          CostUsd: 1.5,
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.repositoryHost).toBe("");
+    expect(read!.repositoryOwner).toBe("");
+    expect(read!.repositoryName).toBe("");
+    expect(read!.gitBranch).toBe("");
+    expect(read!.gitWorktree).toBe("");
+    expect(read!.title).toBe("");
+    // The rest of the session is intact: the missing columns cost nothing
+    // else on the read.
+    expect(read!.agent).toBe("claude_code");
+    expect(read!.modelCalls).toBe(7);
+    expect(read!.costUsd).toBeCloseTo(1.5);
   });
 
   it("dedups a re-folded session to one row (ReplacingMergeTree, no FINAL)", async () => {
@@ -393,6 +508,210 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
 
     expect(withApplied).not.toBeNull();
     expect(withApplied!.appliedEventIds).toEqual([]);
+  });
+
+  /** @scenario The branch set round-trips through the session row */
+  it("writes every branch the session drove and reads them back in order", async () => {
+    const row = sessionRow({ sessionId: `${tag}-branches` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-branches`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.gitBranches).toEqual(["main", "feat/session-git-context"]);
+    // The scalar keeps saying which branch the session ended on.
+    expect(read!.gitBranch).toBe("feat/session-git-context");
+  });
+
+  it("decodes a row written before the branch set column with no branches", async () => {
+    const sessionId = `${tag}-pre-branches`;
+    // A writer from before migration 00077 emits a JSONEachRow body with no
+    // GitBranches field, so ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          GitBranch: "feat/one",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.gitBranches).toEqual([]);
+    expect(read!.gitBranch).toBe("feat/one");
+  });
+
+  /** @scenario The per-context usage round-trips through the session row */
+  it("writes what the session spent under each context and reads it back", async () => {
+    const row = sessionRow({ sessionId: `${tag}-usage-by-context` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-usage-by-context`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual(row.usageByContext);
+  });
+
+  /** @scenario A session row from before the per-context usage column decodes with none */
+  it("decodes a row written before the per-context usage column with no record", async () => {
+    const sessionId = `${tag}-pre-usage-by-context`;
+    // A writer from before migration 00097 emits a JSONEachRow body with no
+    // UsageByContext field, so ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          InputTokens: "100",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual([]);
+    expect(read!.inputTokens).toBe(100);
+  });
+});
+
+describe("coding_agent_sessions by repository branch", () => {
+  // The session both reads look for, written once so either can run alone.
+  beforeAll(async () => {
+    await sessions.upsert(
+      sessionRow({
+        sessionId: `${tag}-moved`,
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        gitBranch: "feat/second",
+        gitBranches: ["feat/first", "feat/second"],
+        title: "Ship both branches",
+      }),
+      30,
+    );
+  });
+
+  /** @scenario A session that moved to another branch is still read for the branch it left */
+  it("lists a session under every branch it drove, not only its last", async () => {
+    const listed = await sessions.listByRepositoryBranch({
+      tenantIds: [tenantId],
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      // The branch the session left behind, which is where its first pull
+      // request was opened.
+      branches: ["feat/first"],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    const found = listed.find((row) => row.sessionId === `${tag}-moved`);
+    expect(found).toBeDefined();
+    // The row still reports the branch it ended on, and now carries the title
+    // the detail names it by.
+    expect(found!.gitBranch).toBe("feat/second");
+    expect(found!.title).toBe("Ship both branches");
+    // And the per-context record the split reads, selected with the row.
+    expect(found!.usageByContext.map((usage) => usage.branch)).toEqual([
+      "main",
+      "feat/session-git-context",
+    ]);
+    // The whole set comes back too, which is what attribution runs the tenure
+    // rule over: matched on a branch it left, the row would otherwise reach the
+    // rollup knowing only a branch that pull request never had.
+    expect(found!.gitBranches).toEqual(["feat/first", "feat/second"]);
+  });
+
+  it("still matches the branch the session ended on", async () => {
+    const listed = await sessions.listByRepositoryBranch({
+      tenantIds: [tenantId],
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      branches: ["feat/second"],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(listed.map((row) => row.sessionId).includes(`${tag}-moved`)).toBe(
+      true,
+    );
+  });
+
+  it("leaves out a session that drove neither branch", async () => {
+    await sessions.upsert(
+      sessionRow({
+        sessionId: `${tag}-elsewhere`,
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        gitBranch: "chore/unrelated",
+        gitBranches: ["chore/unrelated"],
+      }),
+      30,
+    );
+
+    const listed = await sessions.listByRepositoryBranch({
+      tenantIds: [tenantId],
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      branches: ["feat/first"],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(
+      listed.map((row) => row.sessionId).includes(`${tag}-elsewhere`),
+    ).toBe(false);
+  });
+
+  it("fetches the same row shape by session id, whatever repository the row names", async () => {
+    const listed = await sessions.listBySessionIds({
+      tenantIds: [tenantId],
+      sessionIds: [`${tag}-moved`],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.sessionId).toBe(`${tag}-moved`);
+    expect(listed[0]!.gitBranches).toEqual(["feat/first", "feat/second"]);
+    expect(listed[0]!.title).toBe("Ship both branches");
+  });
+
+  it("answers nothing for a session id never folded", async () => {
+    const listed = await sessions.listBySessionIds({
+      tenantIds: [tenantId],
+      sessionIds: [`${tag}-never-existed`],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(listed).toEqual([]);
   });
 });
 
@@ -564,5 +883,147 @@ describe("session_metric_series converged totals (migration 00052)", () => {
       (t) => t.metricName === "claude_code.cost.usage",
     );
     expect(costAfterCorrection?.total).toBeCloseTo(1.1);
+  });
+  describe("codex helper threads", () => {
+    const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
+    const listedIds = async () =>
+      (
+        await sessions.findManyRecent({
+          tenantId,
+          fromMs: window.fromMs,
+          toMs: window.toMs,
+          limit: 50,
+        })
+      ).map((row) => row.sessionId);
+
+    /** @scenario "An auxiliary session is not listed" */
+    it("lists the codex session and not the helper that titled it", async () => {
+      const user = `${tag}-codex-user`;
+      const helper = `${tag}-codex-title-helper`;
+      await sessions.upsert(
+        sessionRow({
+          sessionId: user,
+          agent: "codex",
+          title: "Reply hello",
+          titleSource: "name",
+          models: ["gpt-5.6-sol"],
+        }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: helper,
+          agent: "codex",
+          title: "",
+          titleSource: "",
+          models: ["gpt-5.6-luna"],
+          auxiliary: true,
+          startedAtMs: baseMs + 1_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(user);
+      expect(ids).not.toContain(helper);
+
+      // The helper keeps its row: a session read by id still answers.
+      const read = await sessions.findBySessionId({
+        tenantId,
+        sessionId: helper,
+        window,
+      });
+      expect(read?.auxiliary).toBe(true);
+    });
+
+    /** @scenario "A second session started seconds later is listed on its own" */
+    it("lists two user sessions started seconds apart", async () => {
+      const first = `${tag}-codex-first`;
+      const second = `${tag}-codex-second`;
+      await sessions.upsert(
+        sessionRow({ sessionId: first, agent: "codex", startedAtMs: baseMs }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: second,
+          agent: "codex",
+          startedAtMs: baseMs + 3_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(first);
+      expect(ids).toContain(second);
+    });
+
+    /** @scenario "A session marked auxiliary after it was first stored drops out of the list" */
+    it("drops a session once a later version marks it auxiliary", async () => {
+      const sessionId = `${tag}-codex-marked-late`;
+      // The helper's log events fold before its stamped turn span arrives, so
+      // the first stored version is unmarked.
+      const unmarked = sessionRow({
+        sessionId,
+        agent: "codex",
+        modelCalls: 0,
+        auxiliary: false,
+      });
+      await sessions.upsert(unmarked, 30);
+      expect(await listedIds()).toContain(sessionId);
+
+      await sessions.upsert(
+        {
+          ...unmarked,
+          modelCalls: 1,
+          auxiliary: true,
+          lastEventOccurredAt: baseMs + 40,
+        },
+        30,
+      );
+      expect(await listedIds()).not.toContain(sessionId);
+    });
+
+    /** @scenario "A run of helper threads does not shorten the list" */
+    it("fills the page with visible sessions when helpers are the most recent", async () => {
+      // Its own window, so only these rows answer: the page is the assertion.
+      const pageWindow = { fromMs: baseMs + 15_000, toMs: baseMs + 30_000 };
+      const limit = 3;
+      const visible = [0, 1, 2].map((i) => `${tag}-codex-page-user-${i}`);
+      const helpers = [0, 1, 2, 3].map((i) => `${tag}-codex-page-helper-${i}`);
+
+      for (const [i, sessionId] of visible.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            startedAtMs: baseMs + 20_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+      // Started after every visible session, so an unfiltered page of
+      // `limit * LIST_READ_DEDUP_OVERFETCH` rows is mostly helper threads.
+      for (const [i, sessionId] of helpers.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            auxiliary: true,
+            startedAtMs: baseMs + 25_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+
+      const page = await sessions.findManyRecent({
+        tenantId,
+        fromMs: pageWindow.fromMs,
+        toMs: pageWindow.toMs,
+        limit,
+      });
+
+      expect(page.map((row) => row.sessionId).sort()).toEqual(visible.sort());
+    });
   });
 });

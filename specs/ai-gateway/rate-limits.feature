@@ -61,7 +61,6 @@ Feature: Per-VK rate limits — RPM / RPD ceilings with dimension-aware 429 shap
 
   Scenario: Upstream 429 triggers fallback if the VK has a fallback chain
     Given the VK fallback chain is [openai-primary, anthropic-fallback]
-    And fallback.on includes "rate_limit"
     When the upstream openai-primary returns 429
     Then the gateway attempts anthropic-fallback
     And the final response is from anthropic-fallback (if it succeeds)

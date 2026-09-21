@@ -1,6 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: dogfood-langy-local
 .PHONY: herrgen herrgen-check
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
 .PHONY: _dev-up-deprecation-warning
@@ -60,12 +61,26 @@ help:
 	@echo "    make boxd-preview-down BRANCH=<n>   destroy preview VM"
 	@echo "    make boxd-preview-status BRANCH=<n> VM status + stack state"
 	@echo ""
+	@echo "  Dogfood applications (the customer application Langy works on):"
+	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
+	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
+	@echo "    make dogfood-langy-local lang=langgraph   boot the ACME checkout demo (LangGraph)"
+	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+
+# The demo applications keep their own Makefile; this only picks the folder
+# and forwards `lang`.
+dogfood-langy-local:
+ifeq ($(lang),langgraph)
+	@$(MAKE) -C dev/dogfood/acme-checkout dogfood-langy-local
+else
+	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
+endif
 
 include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
@@ -109,6 +124,16 @@ setup-hooks:
 # launching the gateway, but a flat `. .env` would clobber it back to
 # the hardcoded default and the gateway would hit a dead control-plane
 # port (every VK call → 401 invalid_api_key).
+#
+# For a standalone run (no pnpm dev in the ancestry, so nothing pre-derived
+# LW_GATEWAY_BASE_URL) dev/scripts/lib/derive-gateway-base-url.sh derives it
+# from PORT the same way start.sh does, once .env has had its say. Without
+# this, a bare `make service svc=aigateway` on a non-default-PORT worktree
+# silently falls through to services/aigateway/config.go's compatibility
+# default (http://localhost:5560), correct only for a single worktree on
+# the default port, and wrong everywhere else with no error anywhere: the
+# gateway still proxies LLM traffic and returns 200, it just ships spend,
+# budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= platform/app/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
@@ -117,6 +142,7 @@ service:
 			&& set -a && . $(DEV_ENV_FILE) && set +a \
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
+		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
 
@@ -129,6 +155,7 @@ service-watch:
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
+		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
 			--build.bin "./tmp/$(svc) $(svc)" \
@@ -171,7 +198,10 @@ test-scripts:
 # Mirror the Go services' herr error codes into
 # packages/handled-error/src/codes.generated.ts, so the TypeScript control
 # plane stops compiling when a Go service gains a code with no presentation.
-# Run after adding or renaming a `herr.Code(...)` const. `herrgen-check` is the
+# Run after adding or renaming a `herr.Code(...)` const — and after EDITING one's
+# doc comment, which the generator copies into the emitted file, so a reworded
+# sentence fails `generated` in CI exactly like a new code does.
+# `herrgen-check` is the
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
@@ -235,7 +265,7 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
 
 go-lint:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION)"
@@ -360,9 +390,14 @@ worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
-	pnpm run task generateOpenAPISpec
+	cd platform/app && pnpm run task generateOpenAPISpec
 	cd sdks/typescript && pnpm run generate:openapi-types
 	cd sdks/python && make generate/api-client
+	# The Go client is generated and committed like the other two, and was
+	# missing here — which is why it drifted eight spec commits behind while
+	# TypeScript and Python stayed current. GOWORK=off because sdks/go/client
+	# is its own module and is deliberately absent from the repo-root go.work.
+	cd sdks/go/client && GOWORK=off go generate ./...
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

@@ -28,21 +28,28 @@
  */
 
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+} from "~/generated/prisma/client";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
+  getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;
@@ -55,6 +62,12 @@ describe("user.cliBootstrap integration", () => {
   beforeAll(async () => {
     await startTestContainers();
 
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     await prisma.organization.createMany({
       data: [
         { id: ORG_ID, name: "CliBoot Org", slug: `cliboot-${ns}` },
@@ -104,6 +117,7 @@ describe("user.cliBootstrap integration", () => {
   }, 60_000);
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     const orgIds = [ORG_ID, OTHER_ORG_ID];
     await prisma.aiToolEntry.deleteMany({
       where: { organizationId: { in: orgIds } },
@@ -130,7 +144,7 @@ describe("user.cliBootstrap integration", () => {
     it("rejects via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.cliBootstrap({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

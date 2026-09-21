@@ -1,5 +1,5 @@
 Feature: Governance fold projections atop the unified observability store
-  The /governance dashboard, anomaly reactor, and OCSF SIEM-export read
+  The /governance dashboard, anomaly subscriber, and OCSF SIEM-export read
   paths all consume DERIVED data — fold projections layered on top of
   recorded_spans + log_records. The folds are NOT a parallel source of
   truth; they are pre-aggregated read shapes rebuildable at any time
@@ -10,7 +10,7 @@ Feature: Governance fold projections atop the unified observability store
     governance_ocsf_events     — Actor / Action / Target / Time / Severity per event
 
   Both folds register on the existing trace-processing event-sourcing
-  pipeline (PR #3351 reactor pattern). They observe span/log writes and
+  pipeline (PR #3351 subscriber pattern). They observe span/log writes and
   update derived rows. Filters: events whose `langwatch.origin.kind =
   "ingestion_source"` are governance data; everything else is normal
   application traces and is excluded from the governance folds.
@@ -22,12 +22,12 @@ Feature: Governance fold projections atop the unified observability store
     Given the unified observability substrate is live
     And IngestionSource events stamp `langwatch.origin.kind = "ingestion_source"`
 
-  Rule: governance_kpis fold powers /governance KPI reads + anomaly reactor
+  Rule: governance_kpis fold powers /governance KPI reads + anomaly subscriber
 
     Scenario: a span lands with origin metadata
       Given a Cowork OTel push has just landed in recorded_spans
       And the span's attributes include `langwatch.origin.kind = "ingestion_source"`
-      When the trace-processing pipeline emits the post-fold reactor event
+      When the trace-processing pipeline emits the post-fold subscriber event
       Then the governance_kpis fold updates the (org_id, source_id, hour_bucket) row
       And the row's spendUsd increments by the span's gen_ai.usage.cost_usd
       And the row's tokensInput / tokensOutput increment by the span's token attributes
@@ -35,15 +35,15 @@ Feature: Governance fold projections atop the unified observability store
 
     Scenario: a log_record lands with origin metadata
       Given a Workato webhook has just landed as a log_record
-      When the post-fold reactor fires
+      When the post-fold subscriber fires
       Then the governance_kpis fold updates the (org, source, hour_bucket) row
       And the row reflects the log_record's cost / token attributes (if present)
 
-    Scenario: the anomaly reactor reads the fold (not raw spans/logs)
+    Scenario: the anomaly subscriber reads the fold (not raw spans/logs)
       Given a spend_spike rule with windowSec=86400 and ratioVsBaseline=2.0
-      When the reactor evaluates after each event
-      Then the reactor queries governance_kpis for the rolling window + baseline
-      And the reactor does NOT scan recorded_spans / log_records partitions directly
+      When the subscriber evaluates after each event
+      Then the subscriber queries governance_kpis for the rolling window + baseline
+      And the subscriber does NOT scan recorded_spans / log_records partitions directly
       And the query is cheap (small denormalised table)
 
     Scenario: /governance KPI strip reads the fold
@@ -57,7 +57,7 @@ Feature: Governance fold projections atop the unified observability store
 
     Scenario: a governance event derives an OCSF row
       Given a span/log_record lands with origin metadata
-      When the post-fold reactor fires
+      When the post-fold subscriber fires
       Then governance_ocsf_events emits a row with:
         | actor    | derived from langwatch.user.id / user.email / enduser.id          |
         | action   | derived from span.name or log_record body                          |

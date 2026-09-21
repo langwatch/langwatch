@@ -9,10 +9,16 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-export const runWorkflowCommand = async (
-  id: string,
-  options: { input?: string },
-): Promise<CommandResult | void> => {
+import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+export const runWorkflowCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: { input?: string; param?: string[] };
+}): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   // Parsed before the request, and outside its try: `await response.json()`
@@ -30,6 +36,11 @@ export const runWorkflowCommand = async (
     }
   }
 
+  // A workflow's parameters ARE its entry inputs, so a `--param` pair is the
+  // same record `--input` carries and wins where both name the same key.
+  const parameters = parseRunParameterFlags({ pairs: options.param });
+  if (parameters !== undefined) input = { ...input, ...parameters };
+
   const spinner = createSpinner(`Running workflow "${id}"...`).start();
 
   try {
@@ -37,7 +48,7 @@ export const runWorkflowCommand = async (
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
+    const response = await langwatchFetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

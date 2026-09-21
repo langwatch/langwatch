@@ -20,16 +20,23 @@
  * `GovernanceOcsfExportService.list` so we exercise the full SELECT
  * path that SIEM consumers see.
  *
+ * The actor-placement block below runs the whole derive → store → export
+ * path rather than writing a row by hand: the bug it pins was in the derive
+ * step, and a test that inserted the row itself would decide the very thing
+ * under test.
+ *
  * Spec: specs/ai-gateway/governance/siem-export.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-
+import { createGovernanceOcsfEventsSyncHandler } from "../../subscribers/governanceOcsfEventsSync.subscriber";
 import {
   GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
@@ -166,66 +173,22 @@ describe("OCSF schema-version forward-compat", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Patch the export service's CH resolver via a subclass-like
-      // lambda — easiest is to call the repo directly + run the same
-      // SELECT shape the service issues. The service routes through
-      // `getClickHouseClientForOrganization` which we don't easily
-      // override in a unit-style test. Use the service path
-      // end-to-end by patching its private getClickhouse, OR drive
-      // the SELECT directly. The directly-driven SELECT is closer
-      // to what the prod service does: same column list, same
-      // dedup pattern, same DTO shape.
-      const result = await ch.query({
-        query: `
-          SELECT
-            EventId,
-            OcsfSchemaVersion,
-            TraceId,
-            SourceId,
-            SourceType,
-            ClassUid,
-            CategoryUid,
-            ActivityId,
-            TypeUid,
-            SeverityId,
-            toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
-            ActorUserId,
-            ActorEmail,
-            ActorEnduserId,
-            ActionName,
-            TargetName,
-            AnomalyAlertId,
-            RawOcsfJson
-          FROM governance_ocsf_events
-          WHERE TenantId = {tenantId:String} AND EventId = {eventId:String}
-          LIMIT 1
-        `,
-        query_params: { tenantId: govProjectId, eventId },
-        format: "JSONEachRow",
+      // The export service now takes its ClickHouse repository as a
+      // constructor argument (ADR: repositories reached from the App, not
+      // resolved ad hoc), so it can be pointed at the test client directly
+      // instead of driving the SELECT by hand.
+      const service = GovernanceOcsfExportService.create({
+        prisma,
+        ocsfRepository: repo,
       });
-      const rows = (await result.json()) as Array<{
-        EventId: string;
-        OcsfSchemaVersion: string;
-      }>;
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.OcsfSchemaVersion).toBe("1.1.0");
+      const page = await service.list({
+        organizationId,
+        sinceMs: 0,
+        limit: 10,
+      });
 
-      // The service-layer DTO shape itself: assert the type carries
-      // the field. (Pure type-narrowing — no runtime work needed
-      // beyond the import.)
-      const _service = GovernanceOcsfExportService.create(prisma);
-      type ExportRow =
-        ReturnType<
-          typeof GovernanceOcsfExportService.prototype.list
-        > extends Promise<infer P>
-          ? P extends { events: Array<infer E> }
-            ? E
-            : never
-          : never;
-      const _typeCheck: ExportRow extends { ocsfSchemaVersion: string }
-        ? true
-        : false = true;
-      expect(_typeCheck).toBe(true);
+      const event = page.events.find((e) => e.eventId === eventId);
+      expect(event?.ocsfSchemaVersion).toBe("1.1.0");
     });
   });
 
@@ -285,5 +248,71 @@ describe("OCSF schema-version forward-compat", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]?.OcsfSchemaVersion).toBe("1.1.0");
     });
+  });
+});
+
+describe("actor placement on the derive → export path", () => {
+  /**
+   * A governance trace fold, carrying only the attributes the OCSF
+   * subscriber reads. Cast rather than fully built: the fold state has
+   * ~30 fields and none of the others reach this path.
+   */
+  function govFoldState({
+    traceId,
+    attributes,
+  }: {
+    traceId: string;
+    attributes: Record<string, string>;
+  }): TraceSummaryData {
+    return {
+      traceId,
+      models: [],
+      occurredAt: Date.now() - 100,
+      attributes: {
+        "langwatch.origin.kind": "ingestion_source",
+        "langwatch.ingestion_source.id": `src-${ns}`,
+        "langwatch.ingestion_source.source_type": "otel_generic",
+        ...attributes,
+      },
+    } as unknown as TraceSummaryData;
+  }
+
+  /** @scenario "An actor the trace names by an opaque id is exported as a user id, never as an email" */
+  it("exports an opaque email attribute as the actor's user id, with an empty email", async () => {
+    const repo = new GovernanceOcsfEventsClickHouseRepository(async () => ch);
+    const subscriber = createGovernanceOcsfEventsSyncHandler({
+      governanceOcsfEventsRepository: repo,
+    });
+    const traceId = `trace-${ns}-opaque`;
+    // Named `user.email`, but not an address — and no user id attribute
+    // beside it to hold the identifier instead.
+    const context = {
+      tenantId: govProjectId,
+      aggregateId: traceId,
+      state: govFoldState({
+        traceId,
+        attributes: { "user.email": "user-A1b2C3d4E5" },
+      }),
+    } as TriggerContext<TraceSummaryData>;
+
+    await subscriber({} as unknown as TraceProcessingEvent, context);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const service = GovernanceOcsfExportService.create({
+      prisma,
+      ocsfRepository: repo,
+    });
+    const page = await service.list({
+      organizationId,
+      sinceMs: 0,
+      limit: 50,
+    });
+
+    const exported = page.events.find((e) => e.eventId === traceId);
+    // The row must exist: an absent row would satisfy an "email is empty"
+    // assertion on its own, so the guard is checked before it is trusted.
+    expect(exported).toBeDefined();
+    expect(exported?.actorUserId).toBe("user-A1b2C3d4E5");
+    expect(exported?.actorEmail).toBe("");
   });
 });

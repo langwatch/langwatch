@@ -36,11 +36,11 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Auth cache tiers reported on the auth-cache metrics.
-const (
-	TierL1      = "l1"
-	TierL2Redis = "l2_redis"
-)
+// TierL1 is the auth cache tier reported on the auth-cache metrics. The
+// gateway caches virtual keys in each pod's own memory and nowhere else, so
+// the label carries one value; it stays a label because these metric names
+// are published and an operator's dashboard should not break to save a string.
+const TierL1 = "l1"
 
 // Guardrail verdict label values. Allow/block/modify mirror the control
 // plane's decision; FailOpen is recorded when the guardrail service could
@@ -114,6 +114,10 @@ type Recorder struct {
 	internalRTT    *prometheus.HistogramVec
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
+	clientRejects  *prometheus.CounterVec
+	realtimeMints  *prometheus.CounterVec
+	realtimeLimits *prometheus.CounterVec
+	realtimeErrors *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -186,7 +190,7 @@ func New() *Recorder {
 
 	r.authHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_hits_total",
-		Help: "Virtual-key resolutions served from cache, by tier (l1, l2_redis).",
+		Help: "Virtual-key resolutions served from cache, by tier (l1).",
 	}, []string{"tier"})
 
 	r.authMisses = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -203,6 +207,21 @@ func New() *Recorder {
 		Name: "gateway_budget_blocks_total",
 		Help: "Requests rejected by budget precheck, labeled by the scope whose limit was breached.",
 	}, []string{"scope"})
+
+	r.realtimeMints = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_mints_total",
+		Help: "Realtime voice session mint attempts, by vendor and outcome (minted, session_limit, registry_unavailable, provider_error). outcome=\"minted\" counts sessions admitted at mint, not billable usage: what a session costs is decided later by the vendor's report, and a session that never reports settles as unknown rather than zero.",
+	}, []string{"vendor", "outcome"})
+
+	r.realtimeLimits = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_session_limit_blocks_total",
+		Help: "Mints refused because a virtual key already held its maximum open voice sessions. A rise means some key's cap is too low for its traffic, or that its sessions are not being closed. Which key is in the trace and the structured log; it is not a label, because virtual keys are tenant-created and unbounded.",
+	}, []string{})
+
+	r.realtimeErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_registry_errors_total",
+		Help: "Failed calls to the control plane's voice-session record, by operation (reserve, correlate, release, usage). A reserve failure refuses the mint; a correlate failure costs the session its exact join key to the vendor's report.",
+	}, []string{"operation"})
 
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_hits_total",
@@ -235,6 +254,11 @@ func New() *Recorder {
 		Help: "Requests denied by a gateway rate limit, by the dimension that tripped (rpm, rpd) and the virtual key.",
 	}, []string{"dimension", "vk_id"})
 
+	r.clientRejects = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_client_rejects_total",
+		Help: "Requests the gateway itself rejected as the caller's fault, by gateway error code and virtual key.",
+	}, []string{"code", "vk_id"})
+
 	r.register(
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "gateway_draining",
@@ -265,6 +289,8 @@ func New() *Recorder {
 		r.authHits, r.authMisses, r.authLookups,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
+		r.clientRejects,
+		r.realtimeMints, r.realtimeLimits, r.realtimeErrors,
 	)
 	return r
 }
@@ -517,6 +543,40 @@ func (r *Recorder) RecordBudgetBlock(scope string) {
 	r.budgetBlocks.WithLabelValues(orUnknown(scope)).Inc()
 }
 
+// RecordRealtimeMint exists because a voice session leaves no other trace at
+// the moment it opens. Media never crosses the gateway, so this counter and
+// the session row are the only evidence a mint happened, and the outcome split
+// is what separates "the vendor refused" from "we refused" during an incident.
+func (r *Recorder) RecordRealtimeMint(vendor, outcome string) {
+	if r == nil {
+		return
+	}
+	r.realtimeMints.WithLabelValues(orUnknown(vendor), orUnknown(outcome)).Inc()
+}
+
+// RecordRealtimeSessionLimitBlock is kept apart from the mint counter because
+// it is the one refusal an operator can fix from the dashboard. A customer
+// reporting that voice "randomly stops working" is answered by this line
+// moving, and no query over the mint counter's outcome label is as direct.
+func (r *Recorder) RecordRealtimeSessionLimitBlock() {
+	if r == nil {
+		return
+	}
+	r.realtimeLimits.WithLabelValues().Inc()
+}
+
+// RecordRealtimeRegistryError is the alarm for the failure mode that costs
+// money silently. A reserve failure refuses the mint and the caller sees it; a
+// correlate or release failure returns 200 to a caller who will never know the
+// session lost its join key to the vendor's bill, or that it still counts
+// against the key's cap. Nothing downstream of those two reports them.
+func (r *Recorder) RecordRealtimeRegistryError(operation string) {
+	if r == nil {
+		return
+	}
+	r.realtimeErrors.WithLabelValues(orUnknown(operation)).Inc()
+}
+
 // RecordCacheOutcome counts prompt-cache effectiveness for one response.
 func (r *Recorder) RecordCacheOutcome(usage domain.Usage) {
 	if r == nil {
@@ -564,6 +624,24 @@ func (r *Recorder) RecordRateLimitDenied(dimension, vkID string) {
 		return
 	}
 	r.rateLimits.WithLabelValues(orUnknown(dimension), orUnknown(vkID)).Inc()
+}
+
+// RecordClientReject counts a request the gateway rejected as the caller's
+// fault, keyed by the error code and the virtual key that sent it.
+//
+// The label set is the whole point, so it is worth being explicit about what
+// is NOT here. Project and model are both omitted: project is redundant with
+// the key (a virtual key belongs to exactly one project, and the log line
+// already carries both), and model is caller-controlled on a key that permits
+// arbitrary names, which is the same unbounded-label trap modelLabel exists to
+// cap. Code is a closed enum of the gateway's own codes, and vk_id is minted
+// by the control plane and bounded by the keys a deployment has issued, which
+// is the pairing gateway_rate_limit_denied_total already uses.
+func (r *Recorder) RecordClientReject(code, vkID string) {
+	if r == nil {
+		return
+	}
+	r.clientRejects.WithLabelValues(orUnknown(code), orUnknown(vkID)).Inc()
 }
 
 // StreamOpened marks a streaming response as open.

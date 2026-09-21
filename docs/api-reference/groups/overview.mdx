@@ -3,15 +3,15 @@ title: 'Overview'
 description: 'Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.'
 ---
 
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 ## Intro
 
 The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
 
 Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
-
-<Info>
-Groups are an **Enterprise** feature. Contact your account team to enable them.
-</Info>
 
 ## Authentication
 
@@ -92,3 +92,17 @@ Bindings can target three scope levels:
 | `PROJECT` | Access to a specific project only |
 
 Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`).
+
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `group_not_found` | 404 | No such group in this organization |
+| `scim_managed_group` | 409 | The group is provisioned over SCIM, so it is renamed, changed and deleted in the directory |
+| `user_not_in_organization` | 422 | The user is not a member here |
+| `group_member_already_added` | 409 | They are already in the group |
+| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
+| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
+| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
+| `role_binding_not_found` | 404 | No such binding on this group |
+| `personal_workspace_not_managed_here` | 403 | The scope is somebody's personal workspace |

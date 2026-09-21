@@ -4,7 +4,10 @@ import {
 } from "@slack/webhook";
 import type { TriggerNotifier } from "~/server/app-layer/automations/trigger-template.service";
 import { sendEmail } from "~/server/mailer/emailSender";
-import { assertWebhookDelivered, sendWebhook } from "./sendWebhook";
+import {
+  assertWebhookDelivered,
+  sendWebhook,
+} from "~/server/webhooks/sendWebhook";
 import { postSlackChatMessage } from "./slackWebApi";
 import { isSlackWebhookUrl } from "./slackWebhookGuard";
 
@@ -30,7 +33,14 @@ export const liveTriggerNotifier: TriggerNotifier = {
       payload as IncomingWebhookSendArguments,
     );
   },
-  async sendWebhook({ url, method, headers, body, triggerName }) {
+  async sendWebhook({
+    url,
+    method,
+    headers,
+    signingSecrets,
+    body,
+    triggerName,
+  }) {
     // The full SSRF-fenced sender — same path a real fire takes — with the
     // non-suppressible test-fire marker header (ADR-040 §1). Non-2xx throws
     // the classified DispatchError so the author sees what the endpoint said.
@@ -38,6 +48,7 @@ export const liveTriggerNotifier: TriggerNotifier = {
       url,
       method,
       headers,
+      signingSecrets,
       body,
       triggerName,
       testFire: true,

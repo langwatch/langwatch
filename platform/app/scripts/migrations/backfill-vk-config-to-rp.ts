@@ -133,7 +133,6 @@ async function backfillAliasesAndRules(
       name: rpName,
       description: `Auto-migrated from VirtualKey ${vkId} (${vkName}) on R3 backfill.`,
       modelProviderIds: [],
-      strategy: "priority",
       // Legacy single-scope columns mirror the primary scope; the
       // join table below is the new source of truth.
       scope: primary.scopeType,

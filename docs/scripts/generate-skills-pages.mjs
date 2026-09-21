@@ -1,7 +1,8 @@
-// Generates the skill accordion markup inside docs/skills pages, between
+// Generates the skill accordion markup inside docs pages, between
 // {/* lw-generated:<section>:start */} and {/* lw-generated:<section>:end */}
 // markers, from docs/skills/skills-pages-manifest.json plus the compiled
-// prompts in skills/_compiled/.
+// prompts in skills/_compiled/. Manifest keys are docs-root-relative paths,
+// so any docs page can carry a generated section.
 //
 // The markup is plain lowercase HTML elements on purpose: Mintlify only
 // server-renders page content, never components imported from snippets, and
@@ -26,8 +27,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const docsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(docsRoot, "..");
 const compiledDir = path.join(repoRoot, "skills", "_compiled");
-const pagesDir = path.join(docsRoot, "skills");
-const manifest = JSON.parse(fs.readFileSync(path.join(pagesDir, "skills-pages-manifest.json"), "utf8"));
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8")
+);
+
+// `--list-pages` prints the repo-relative pages this script writes. The
+// pre-commit hook stages them and CI checks them for staleness, so both read
+// the list from here instead of keeping their own copy that the manifest can
+// grow past. It returns instead of calling process.exit, which can truncate a
+// piped stdout before it drains.
+const listPages = process.argv.includes("--list-pages");
 
 // Escape text that lands in JSX text position so MDX cannot reinterpret it
 // as markup, expressions, or markdown emphasis.
@@ -76,8 +85,8 @@ function cmdBox({ copyValue, code, track, trackProps }) {
   ].join("\n");
 }
 
-function renderAccordion(entry) {
-  const { title, boldPrefix, skill, slashCommand, promptFile } = entry;
+function renderAccordion(entry, open = false) {
+  const { title, boldPrefix, skill, slashCommand, promptFile, static: isStatic } = entry;
   const prompt = fs.readFileSync(path.join(compiledDir, promptFile), "utf8");
   const installCmd = skill ? `npx skills add ${skill}` : null;
   const skillPath = skill ? skill.replace("langwatch/skills/", "") : null;
@@ -86,11 +95,29 @@ function renderAccordion(entry) {
     : escapeText(title);
 
   const lines = [];
-  lines.push(`<div className="lw-accordion">`);
-  lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
-  lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
-  lines.push(`    ${ICONS.chevron}`);
-  lines.push(`  </div>`);
+  if (isStatic) {
+    // A static card is always open: no toggle affordance, and posthog.js
+    // skips .lw-accordion-static in its header click handler.
+    lines.push(`<div className="lw-accordion lw-accordion-static" data-open="true">`);
+    lines.push(`  <div className="lw-accordion-header">`);
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`  </div>`);
+  } else if (open) {
+    // A section with a single accordion opens it by default: the skill is
+    // the page's whole point, and a collapsed header hides it behind a
+    // click for no reason. posthog.js toggles data-open either way.
+    lines.push(`<div className="lw-accordion" data-open="true">`);
+    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">`);
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`    ${ICONS.chevron}`);
+    lines.push(`  </div>`);
+  } else {
+    lines.push(`<div className="lw-accordion">`);
+    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`    ${ICONS.chevron}`);
+    lines.push(`  </div>`);
+  }
   lines.push(`  <div className="lw-accordion-body">`);
 
   if (installCmd) {
@@ -172,9 +199,20 @@ function renderAccordion(entry) {
   return lines.join("\n");
 }
 
+if (listPages) {
+  for (const pageFile of Object.keys(manifest)) console.log(`docs/${pageFile}`);
+}
+
 let failed = false;
-for (const [pageFile, sections] of Object.entries(manifest)) {
-  const pagePath = path.join(pagesDir, pageFile);
+for (const [pageFile, sections] of listPages ? [] : Object.entries(manifest)) {
+  const pagePath = path.join(docsRoot, pageFile);
+  if (!fs.existsSync(pagePath)) {
+    // A manifest entry whose page is missing, which is what an uncommitted new
+    // page looks like to a fresh checkout. Name it rather than throwing ENOENT.
+    console.error(`ERROR: the manifest names docs/${pageFile}, which does not exist`);
+    failed = true;
+    continue;
+  }
   let content = fs.readFileSync(pagePath, "utf8");
   for (const [sectionId, entries] of Object.entries(sections)) {
     const start = `{/* lw-generated:${sectionId}:start */}`;
@@ -186,10 +224,12 @@ for (const [pageFile, sections] of Object.entries(manifest)) {
       failed = true;
       continue;
     }
-    const generated = entries.map(renderAccordion).join("\n\n");
+    const generated = entries
+      .map((entry) => renderAccordion(entry, entries.length === 1))
+      .join("\n\n");
     content = content.slice(0, startIdx + start.length) + "\n\n" + generated + "\n\n" + content.slice(endIdx);
   }
   fs.writeFileSync(pagePath, content);
-  console.log(`Generated skill accordions in docs/skills/${pageFile}`);
+  console.log(`Generated skill accordions in docs/${pageFile}`);
 }
 if (failed) process.exit(1);

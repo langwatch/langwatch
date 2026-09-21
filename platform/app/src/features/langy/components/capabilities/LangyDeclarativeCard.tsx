@@ -25,6 +25,7 @@ import {
 } from "../../hooks/useCapabilityData";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { StreamingStatCard } from "../StreamingStatCard";
+import type { CapabilityFact } from "./capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
@@ -67,7 +68,19 @@ function labelize(key: string): string {
 }
 
 /** A row/document's human name, checked in the order a reader would want. */
-const NAME_KEYS = ["name", "title", "displayName", "label", "handle", "slug"];
+// `kind` sits last: it is a discriminator, not a title, so it only names a row
+// that has no better name. It earns its place because a catalog keyed by kind
+// (the UI actions a page accepts) otherwise rendered as "UI action 1",
+// "UI action 2", which tells the reader nothing about any of them.
+const NAME_KEYS = [
+  "name",
+  "title",
+  "displayName",
+  "label",
+  "handle",
+  "slug",
+  "kind",
+];
 /** A row/document's id, however this endpoint spelled it. */
 const ROW_ID_KEYS = ["id", "trace_id", "traceId", "runId", "slug", "key"];
 
@@ -112,6 +125,13 @@ const FACT_PRIORITY = [
 ];
 
 /**
+ * Ids that only correlate two log lines. A reader cannot open one, search for
+ * one, or act on one, so a card that spends a row on it spends the row on
+ * nothing.
+ */
+const CORRELATION_ONLY_KEYS = new Set(["actionId", "action_id"]);
+
+/**
  * The label→value pairs a single resource is worth summarising with. A fact
  * whose value the card already shows as its title is skipped — "Faithfulness"
  * twice in one card says nothing new.
@@ -129,6 +149,7 @@ function factsOf(
 
   const push = (key: string) => {
     if (seen.has(key) || facts.length >= MAX_FACTS) return;
+    if (CORRELATION_ONLY_KEYS.has(key)) return;
     const value = displayValue(record[key]);
     if (value === null || value === omitValue) return;
     seen.add(key);
@@ -138,6 +159,42 @@ function factsOf(
   for (const key of FACT_PRIORITY) push(key);
   for (const key of Object.keys(record)) push(key);
   return facts;
+}
+
+/**
+ * The facts a catalog row named, in its order and its words, and nothing the
+ * document carries beyond them.
+ */
+function namedFactsOf(
+  document: unknown,
+  specs: readonly CapabilityFact[],
+  { omitValue }: { omitValue?: string | null } = {},
+): { label: string; value: string }[] {
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    return [];
+  }
+  const record = document as Record<string, unknown>;
+  const facts: { label: string; value: string }[] = [];
+  for (const spec of specs) {
+    const raw = record[spec.key];
+    const value = spec.values?.[String(raw)] ?? displayValue(raw);
+    if (value === null || value === undefined || value === omitValue) continue;
+    facts.push({ label: spec.label, value });
+  }
+  return facts;
+}
+
+/** A row's status, in the catalog's words when the resource names them. */
+function rowStatusOf(
+  descriptor: CapabilityDescriptor,
+  row: unknown,
+): string | null {
+  const raw = firstString(row, ["status", "state", "description"]);
+  if (raw === null) return null;
+  const spec = descriptor.facts?.find(
+    (fact) => fact.key === "status" || fact.key === "state",
+  );
+  return spec?.values?.[raw] ?? raw;
 }
 
 /** The labelled figures a document reports: its own numbers, or its row count. */
@@ -286,7 +343,7 @@ function RowsBody({
         const primary =
           name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
         const secondary =
-          firstString(row, ["status", "state", "description"]) ??
+          rowStatusOf(descriptor, row) ??
           (name && id && id !== name ? id : null);
         return (
           <CapabilityRow
@@ -331,9 +388,10 @@ function FactsBody({
   }
 
   // The card's title already shows the resource's name — don't repeat it.
-  const facts = factsOf(document, {
-    omitValue: firstString(document, NAME_KEYS),
-  });
+  const omitValue = firstString(document, NAME_KEYS);
+  const facts = descriptor.facts
+    ? namedFactsOf(document, descriptor.facts, { omitValue })
+    : factsOf(document, { omitValue });
   if (facts.length === 0) {
     return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
   }
@@ -579,8 +637,12 @@ function HydratedRowsCard({
   projectSlug: string | null;
 }) {
   const { noun } = descriptor;
+  // `returned` is how many rows came back and is what the skeletons stand in
+  // for. It is NOT the size of the result: an oversized read is reduced before
+  // it is recorded, so the title takes the digest's total and falls back to the
+  // sample only when there is no total to have.
   const returned = digest?.counts?.returned ?? null;
-  const total = hydration.totalCount ?? returned;
+  const total = hydration.totalCount ?? digest?.counts?.total ?? returned;
   const title =
     total !== null
       ? `${total.toLocaleString()} ${total === 1 ? noun.singular : noun.plural}`
@@ -758,5 +820,29 @@ function readTitle({
     }
     return capitalize(noun.plural);
   }
-  return name ?? id ?? capitalize(noun.singular);
+  return (
+    dispatchedActionTitle(document) ?? name ?? id ?? capitalize(noun.singular)
+  );
+}
+
+/**
+ * A page action is titled by the action it carried out.
+ *
+ * `ui call` answers with a dispatch outcome: which action, where it ran, and
+ * what it changed. None of that is a resource with a name, so the resource
+ * noun titled every one of them "UI action" and a reader watching Langy
+ * duplicate a column, rewrite its prompt and run it saw the same three words
+ * three times. The kind is the one field that says what happened, so it
+ * becomes the title, in words: `workbench.duplicateTarget` reads as "Duplicate
+ * target". `executedVia` is what marks the payload as a dispatch outcome
+ * rather than some other document that happens to carry a `kind`.
+ */
+function dispatchedActionTitle(document: unknown): string | null {
+  if (!document || typeof document !== "object") return null;
+  const record = document as Record<string, unknown>;
+  if (typeof record.executedVia !== "string") return null;
+  const kind = record.kind;
+  if (typeof kind !== "string" || kind.trim() === "") return null;
+  const action = kind.slice(kind.lastIndexOf(".") + 1);
+  return action === "" ? null : capitalize(labelize(action));
 }

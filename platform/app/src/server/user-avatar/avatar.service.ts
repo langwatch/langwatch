@@ -28,7 +28,7 @@
  */
 
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
   AVATAR_OWNER_KIND,

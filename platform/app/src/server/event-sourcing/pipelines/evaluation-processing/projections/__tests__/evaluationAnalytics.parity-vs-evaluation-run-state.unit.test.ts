@@ -136,6 +136,39 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
     });
   });
 
+  describe("given an atomic reported event carrying an errored run's stray verdict", () => {
+    it("both folds agree the verdict is null (#6833 — the gate is shared)", () => {
+      const slim = new EvaluationAnalyticsFoldProjection({
+        store: { store: async () => {}, get: async () => null },
+      });
+      const runFold = new EvaluationRunFoldProjection({
+        store: { store: async () => {}, get: async () => null },
+      });
+
+      const errored = {
+        ...makeReported(),
+        data: {
+          ...makeReported().data,
+          status: "error",
+          passed: false,
+          score: 0.4,
+        },
+      } as unknown as EvaluationReportedEvent;
+
+      const slimState = slim.handleEvaluationReported(errored, slim.init());
+      const runState = runFold.handleEvaluationReported(
+        errored,
+        runFold.init(),
+      );
+
+      expect(slimState.passed).toBeNull();
+      expect(slimState.score).toBeNull();
+      expect(runState.passed).toBeNull();
+      expect(runState.score).toBeNull();
+      expect(slimState.status).toBe(runState.status);
+    });
+  });
+
   describe("given an atomic reported event", () => {
     it("agrees on every shared field", () => {
       const slim = new EvaluationAnalyticsFoldProjection({

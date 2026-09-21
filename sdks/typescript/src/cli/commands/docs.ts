@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { langwatchFetch } from "../../internal/http/langwatchFetch";
 
 const LANGWATCH_DOCS_BASE = "https://langwatch.ai/docs";
 const LANGWATCH_DOCS_INDEX = "https://langwatch.ai/docs/llms.txt";
@@ -52,7 +53,7 @@ export function normalizeDocsUrl(input: string | undefined, kind: DocsKind): str
 async function fetchAndPrint(url: string): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await langwatchFetch(url, {
       headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.5" },
     });
   } catch (error) {

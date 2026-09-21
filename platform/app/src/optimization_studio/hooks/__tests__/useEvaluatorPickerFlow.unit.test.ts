@@ -60,7 +60,7 @@ vi.mock("~/server/evaluations/evaluators", () => ({
         passed: { description: "True if output matches expected" },
       },
     },
-    "legacy/ragas_answer_relevancy": {
+    "ragas/response_relevancy": {
       name: "Answer Relevancy",
       requiredFields: ["input", "output"],
       optionalFields: ["contexts"],
@@ -515,7 +515,7 @@ describe("useEvaluatorPickerFlow()", () => {
         editorCallbacks.onSave({
           id: "ragas-eval-id",
           name: "Answer Relevancy",
-          evaluatorType: "legacy/ragas_answer_relevancy",
+          evaluatorType: "ragas/response_relevancy",
         });
       });
 

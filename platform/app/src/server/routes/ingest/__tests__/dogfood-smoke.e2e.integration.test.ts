@@ -37,13 +37,13 @@
  */
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -160,7 +160,7 @@ async function seedOrg(suffix: string): Promise<SeededOrg> {
     teamId: team.id,
     adminUserId: admin.id,
     ingestionSourceId: source.id,
-    ingestSecret,
+    ingestSecret: ingestSecret!,
   };
 }
 

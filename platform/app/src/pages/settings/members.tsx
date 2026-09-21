@@ -14,24 +14,28 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import {
-  type OrganizationUserRole,
-  RoleBindingScopeType,
-} from "@prisma/client";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import {
+  type OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
+import { DomainJoinCard } from "../../components/members/DomainJoinCard";
 import { InvitesTable } from "../../components/members/InvitesTable";
+import { JoinRequestsTable } from "../../components/members/JoinRequestsTable";
+import { useJoinRequests } from "../../components/members/useJoinRequests";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
+import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -103,7 +107,7 @@ function MembersList({
   const department = useDepartmentColumn(organization.id);
   const showDepartment = department.show && hasOrganizationManagePermission;
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [selectedMember, setSelectedMember] = useState<{
     userId: string;
@@ -121,13 +125,12 @@ function MembersList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const pendingInvites =
-    api.organization.getOrganizationPendingInvites.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      { enabled: !!organization },
-    );
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: !!organization },
+  );
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
@@ -145,10 +148,9 @@ function MembersList({
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   // The add-member flow (create invites) now lives in the invite drawer; the
-  // page keeps these handlers for the invites table's approve / reject / delete.
-  const { approveInvite, rejectInvite, deleteInvite } = useInviteActions({
+  // page keeps these handlers for the invites table's resend / revoke.
+  const { resendInvite, revokeInvite } = useInviteActions({
     organizationId: organization.id,
-    isAdmin: hasOrganizationManagePermission,
     hasEmailProvider: hasEmailProvider ?? false,
     onInviteCreated: setSelectedInvites,
     onClose: () => {},
@@ -172,9 +174,6 @@ function MembersList({
             description: "The member has been removed from the organization.",
             type: "success",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
@@ -186,6 +185,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.limits.getUsage.invalidate();
           void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
@@ -194,9 +194,6 @@ function MembersList({
             description: "Please try that again",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -213,6 +210,7 @@ function MembersList({
             tags: { organizationId: organization.id },
           });
         });
+      void queryClient.limits.getUsage.invalidate();
       void queryClient.licenseEnforcement.checkLimit.invalidate();
     },
   });
@@ -273,21 +271,19 @@ function MembersList({
   const canDisableMember = (memberId: string) =>
     hasOrganizationManagePermission && memberId !== user?.id;
 
-  const sentInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "PENDING",
-      ),
+  const invites = useMemo(
+    () => pendingInvites.data ?? [],
     [pendingInvites.data],
   );
 
-  const waitingApprovalInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "WAITING_APPROVAL",
-      ),
-    [pendingInvites.data],
-  );
+  // One panel, two directions (D12): an invitation is the organization
+  // reaching out, a request is somebody reaching in, and an admin answers
+  // both in the same place. Renders nothing when nothing is waiting — which
+  // is also what the flag being off looks like from here.
+  const joinRequests = useJoinRequests({
+    organizationId: organization.id,
+    canManage: hasOrganizationManagePermission,
+  });
 
   return (
     <SettingsLayout>
@@ -314,6 +310,12 @@ function MembersList({
             </HStack>
           )}
         </HStack>
+        {hasOrganizationManagePermission && (
+          <MemberSeatUsage
+            organizationId={organization.id}
+            activePlan={activePlan}
+          />
+        )}
         <Card.Root width="full" overflow="hidden">
           {/*
             Card wraps the table in overflowX="auto" so the row never
@@ -444,16 +446,31 @@ function MembersList({
           </Card.Body>
         </Card.Root>
 
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={sentInvites}
+        {hasOrganizationManagePermission && (
+          <DomainJoinCard
+            key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+            domainJoin={joinRequests.joining.domainJoin}
+            joinDomains={joinRequests.joining.joinDomains}
+            saving={joinRequests.savingJoining}
+            onSave={joinRequests.setJoining}
+          />
+        )}
+
+        <JoinRequestsTable
+          requests={joinRequests.requests}
           isAdmin={hasOrganizationManagePermission}
-          currentUserId={user?.id ?? ""}
+          answeringId={joinRequests.answeringId}
+          onApprove={joinRequests.approve}
+          onReject={joinRequests.reject}
+        />
+
+        <InvitesTable
+          invites={invites}
+          isAdmin={hasOrganizationManagePermission}
           teams={teams}
-          onApprove={approveInvite}
-          onReject={rejectInvite}
           onViewInviteLink={viewInviteLink}
-          onDeleteInvite={deleteInvite}
+          onResendInvite={resendInvite}
+          onRevokeInvite={revokeInvite}
         />
       </VStack>
 

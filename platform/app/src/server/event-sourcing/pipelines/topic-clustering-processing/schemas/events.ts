@@ -12,7 +12,7 @@ import {
 
 /**
  * The `[occurredAtMs, traceId]` ClickHouse pagination cursor a full page
- * hands to the next one (the same shape the BullMQ payload used to carry).
+ * hands to the next one.
  */
 export const topicClusteringSearchAfterSchema = z.tuple([
   z.number(),

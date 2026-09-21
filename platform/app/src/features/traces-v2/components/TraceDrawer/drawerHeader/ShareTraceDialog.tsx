@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
 import { useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import {
@@ -25,6 +24,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import {
   type ShareExpiryOption,
   type ShareVisibilityOption,
@@ -116,7 +116,6 @@ function ShareLinkRow({
           description: url,
           type: "success",
           duration: 2500,
-          meta: { closable: true },
         });
         return;
       }
@@ -128,7 +127,6 @@ function ShareLinkRow({
           "Clipboard access is restricted. This can happen on non-HTTPS domains.",
         type: "error",
         duration: 6000,
-        meta: { closable: true },
       });
     }
   };

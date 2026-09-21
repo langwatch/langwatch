@@ -63,7 +63,7 @@ export interface GatewaySpendProcessingPipelineDeps {
  *
  * Projection: gatewaySpend (fold) → `gateway_spend`, one row per request,
  * rated in the fold to integer nano-USD. Consumption is projections + (in
- * M2) a process manager, no reactors, per the post-event-work ADR line.
+ * M2) a process manager, no subscribers, per the post-event-work ADR line.
  */
 export function createGatewaySpendProcessingPipeline(
   deps: GatewaySpendProcessingPipelineDeps,
@@ -79,6 +79,10 @@ export function createGatewaySpendProcessingPipeline(
     .withCommand("confirmSpend", ConfirmSpendCommand)
     .withCommand("failSpend", FailSpendCommand)
     .withCommand("settleSpend", SettleSpendCommand);
+  // No daily cost rollup here, on purpose. The governance cost screen reads
+  // the metered lane straight off `gateway_spend` (the per-request ledger this
+  // pipeline projects), so a rollup half for it summarized cells nothing ever
+  // read. The rollup fold stays on the pulled-usage pipeline alone.
   if (deps.webhookDelivery) {
     pipeline = pipeline.withProcessManager(
       WEBHOOK_DELIVERY_PROCESS_NAME,

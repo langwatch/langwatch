@@ -80,7 +80,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
       },
@@ -93,6 +93,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test" },
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 describe("Drawer Navigation", () => {

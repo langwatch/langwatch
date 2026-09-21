@@ -17,6 +17,10 @@ on:
       - "dev/lint/**"
       - ".github/workflows/coderabbit-config-check.yml"
 
+concurrency:
+  group: coderabbit-config-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -26,11 +30,11 @@ jobs:
     steps:
       # Actions are SHA-pinned (langwatch org policy requires full-SHA pins;
       # tag refs like @v4 fail to start). Same SHAs other repo workflows use.
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
           persist-credentials: false # read-only job, no git ops — don't persist the token
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -51,5 +55,10 @@ jobs:
         run: |
           python3 -c "import yaml; d=yaml.safe_load(open('dev/lint/semgrep/langwatch.yml')); r=next(x for x in d['rules'] if x['id']=='pii-in-logger-call'); r.pop('paths', None); yaml.safe_dump({'rules':[r]}, open('/tmp/pii_only.yml','w'))"
           n=$(semgrep --config /tmp/pii_only.yml dev/lint/semgrep/tests/pii-in-logger-call.ts --json --quiet | python3 -c "import sys, json; print(len(json.load(sys.stdin)['results']))")
-          echo "pii-in-logger-call matched $n line(s) in the fixture (expect 5)"
-          test "$n" -eq 5
+          echo "pii-in-logger-call matched $n line(s) in the fixture (expect 4)"
+          # 4, not 5: the userId case was removed when identifiers were made
+          # explicitly loggable. The fixture still contains userId,
+          # organizationId and projectId lines as `ok:` cases, so re-adding an
+          # identifier pattern to the rule pushes this count back above 4 and
+          # fails here rather than quietly reinstating the false positive.
+          test "$n" -eq 4

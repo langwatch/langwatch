@@ -1,0 +1,464 @@
+Feature: The identifier model - identity as an event-sourced pipeline
+  As the LangWatch platform
+  I need every sign-in method a user holds recorded as an event-sourced
+  identifier with a queryable lifecycle
+  So that routing, linking, SSO connections and Auth0 migrations have real
+  identity data to build on, while sign-in itself never changes behavior
+
+  # D01 of the identity platform program (ADR-101, revised 2026-08-20,
+  # re-based on ADR-110 2026-08-23;
+  # dev/docs/identity-platform/D01-identity-pipeline-and-identifiers.md).
+  #
+  # The truth split - no table mixes truths, ADR-022/015 stand unamended:
+  #
+  #   ClickHouse event_log ──fold──► Identifier (PG, pure event-truth,
+  #        │  (the command is staged        whole-row replay, born clean)
+  #        │   onto the queue; the queued
+  #        │   run appends AND folds)
+  #        └── never carries secrets; emails yes (erasure wipes them, R11)
+  #
+  #   Session / VerificationToken (PG) - pure row-truth protocol tables
+  #   written by repositories; never projections, never in replay.
+  #
+  #   Account (PG) - under ADR-116 a projection of the same log for as long
+  #   as it exists: the fold owns its linkage columns, better-auth its
+  #   secret columns, and the table retires when the identity storage
+  #   adapter's last phase lands
+  #   (specs/identity/identity-storage-adapter.feature).
+  #
+  # Rollout is ADR-110's shape re-tenanted to users - one migration, and
+  # finishing it IS the switch: the ceremonies sit behind a per-user write
+  # gate that ships CLOSED and opens only when the user's backfill is
+  # finalized (migrated is HELD: the proof found the projection behind or
+  # disagreeing, and the next pass heals it). Enrollment is a switch, not a
+  # programme: the ops page enrolls organizations and their members migrate;
+  # there is no everyone-else cohort. Wiring the ceremonies changes nothing
+  # on its own.
+  #
+  # The ceremonies bind to better-auth's own databaseHooks - account
+  # create/delete and user delete - so better-auth keeps the stock
+  # prismaAdapter. A `before` hook runs while no row exists and can refuse,
+  # which is what keeps veto-before-write true. All three are gated, and an
+  # unenrolled organization therefore behaves byte-for-byte as it did before
+  # any of this existed: no events, no extra reads of its own, no extra
+  # columns written.
+
+  Background:
+    Given the identity pipeline is registered with the event-sourcing framework
+    And a user "sam" exists with a Google account row and email "sam@acme.com"
+
+  @unit
+  Scenario: An identity command round-trips the whole pipeline
+    When an attach_identifier command is dispatched for "sam" through the framework
+    Then an identity event is appended under tenant "sam"
+    And the fold applies it to the Identifier projection
+    And the projection cursor advances past the event
+
+  # Normalization folds case and trims, and it KEEPS a plus tag: the tag is
+  # part of the address. Stripping it merged an address somebody chose to keep
+  # separable into one they may already hold, and made the product lie -- the
+  # screen naming the tagged address while the confirmation went to the bare
+  # one, which on a domain that does not implement subaddressing is a mailbox
+  # they cannot read.
+  @unit
+  Scenario: Attaching an identifier records the fact and the projection row
+    When an attach_identifier command is handled for "sam" with provider "google" and value "Sam.J+x@Acme.com"
+    Then an identifier_attached event is emitted with the normalized email "sam.j+x@acme.com"
+    And the event payload carries the domain "acme.com" and an HMAC identifier hash
+    And the event payload carries no password, token, or other secret
+    And folding the event produces an Identifier row in state VERIFIED
+
+  @unit
+  Scenario: Identifier ids are deterministic so backfill and live emission converge
+    When the same attach fact is emitted twice with the same business time
+    Then both events name the same identifier id
+    And folding both produces exactly one Identifier row
+
+  @unit
+  Scenario: A retried command dedupes at the event store
+    When an attach_identifier command with commandId "idcmd_1" is handled twice
+    Then both emissions carry the idempotency key "idcmd_1:0"
+
+  @unit
+  Scenario: An identity ceremony stages its command and waits for the fold
+    Given "sam"'s identifier backfill has latched
+    When an attach ceremony commits its facts
+    Then the command is staged onto "sam"'s queue lane
+    And the staged run is what appends, so exactly one event lands per fact
+    And the ceremony waits, bounded, for the fold to move the projection cursor
+    But the ceremony never appends or writes the projection itself
+
+  @unit
+  Scenario: A ceremony whose command cannot be staged fails
+    Given the group queue cannot accept the staged command
+    When an attach ceremony commits its facts
+    Then the ceremony fails, because nothing would append or fold its facts
+    And no event is written, so a retry states the same facts once
+
+  @unit
+  Scenario: A lagging fold does not fail the ceremony
+    Given the fold does not land inside the convergence window
+    When an attach ceremony commits its facts
+    Then the ceremony still succeeds and the timeout is counted
+    And the projection converges when the queue drains
+
+  @unit
+  Scenario: A fact the heads already carry is not stated again
+    Given "sam"'s projection has folded at least once
+    And "sam"'s Google identifier is already folded into the projection
+    When the same attach is handled again, from a staged re-run or a later backfill pass
+    Then no event is emitted and nothing is appended, applied, or staged
+    And an attach for an identifier the projection lacks is still emitted
+
+  @unit
+  Scenario: A sign-up states its identifier against the credential it just opened
+    Given "sam" registers with an address and a password
+    When the account is opened
+    Then the identifier is stated against that same credential, never a second one
+    And the backfill, which links by the credential, converges on one row
+
+  @unit
+  Scenario: Signing up makes the address routable before the fold lands
+    Given "sam" is a newborn whose projection has never folded
+    When a sign-up commits the attach of "sam"'s credential identifier
+    Then the Identifier row is written before the command is staged, and no cursor is written with it
+    And the front door can route the address while the fold is still in the queue
+    And when the fold lands it overwrites the same row whole and sets the cursor
+
+  @unit
+  Scenario: A newborn's provisional head does not silence its own attach
+    Given "sam" is a newborn whose provisional Identifier row is already written
+    When the queued run re-runs the attach guard against those heads
+    Then the attach event is still emitted and appended, and the cursor advances
+    But a user whose projection has folded gets no provisional write, and a restated attach still emits nothing
+
+  @unit
+  Scenario: A provisional head with no event is restated by the next pass
+    Given a newborn's provisional row was written and then staging failed
+    Then the row exists with no event behind it, and a replay before the next pass would drop it
+    When the next pass states the same attach again
+    Then the guard emits it, because the projection has still never folded
+
+  @unit
+  Scenario: Every identity event rides the pipeline's declared aggregate type
+    When each identity command emits its event
+    Then the event store's own aggregate-type check accepts every one against the pipeline
+
+  @unit
+  Scenario: Exactly one PRIMARY identifier per user
+    Given "sam" holds a VERIFIED identifier "work" and a PRIMARY identifier "personal"
+    When a mark_primary command is handled for "work"
+    Then "work" becomes PRIMARY and "personal" returns to VERIFIED
+
+  @unit
+  Scenario: A PRIMARY identifier never detaches directly
+    Given "sam" holds a PRIMARY identifier "personal"
+    When a detach_identifier command is handled for "personal"
+    Then the command is refused and no event is emitted
+
+  @unit
+  Scenario: A detached identifier is a tombstone, forever resolvable
+    Given "sam" holds a VERIFIED identifier "work" and a PRIMARY identifier "personal"
+    When a detach_identifier command is handled for "work"
+    Then the Identifier row for "work" remains with state DETACHED and a detachedAt timestamp
+
+  # A backup code is a second step past a way in, never a way in by itself: it
+  # is asked for only once somebody has already been let as far as a challenge,
+  # and no message can be sent to it. So what is LEFT when an identifier is
+  # removed is counted from the identifiers alone, and somebody holding ten
+  # unspent codes and one address still has exactly one way in. Removing the
+  # last identifier for an account with a second factor set up is the case this
+  # would be got wrong in: it looks like an account with two credentials and it
+  # is an account with one.
+  @unit
+  Scenario: Backup codes never count as a way into the account
+    Given "sam" holds one VERIFIED identifier and no other
+    And "sam" has two-step verification enabled with unspent backup codes
+    When a detach_identifier command is handled for that identifier
+    Then the command is refused, because removing it would strand "sam"
+    And no event is emitted, so the identifier still signs them in
+
+  @unit
+  Scenario: A verification refused because another user holds the address
+    Given another user already holds a VERIFIED identifier for "sam.j@acme.com"
+    When a verify_identifier command is handled for "sam"'s ATTACHED identifier with the same value
+    Then the command is refused with the handled code "identity_email_in_use"
+    And no event is emitted
+
+  @unit
+  Scenario: Two concurrent verifications of one address: the loser is refused before any fact
+    Given two users hold an ATTACHED identifier for the same address
+    And the first verification has taken the address lock
+    When the second verification is handled
+    Then it is refused with the handled code "identity_email_in_use"
+    And no event is emitted for it, so the log records no losing verification
+
+  @unit
+  Scenario: A retried verification holds the lock it already took
+    Given a verification took the address lock and is retried under the same command id
+    When the retry is handled
+    Then the lock reads as this command's own and the identifier verifies
+
+  @unit
+  Scenario: Two VERIFIED arrivals for one address: exactly one holds it
+    Given two users' identity providers call back with the same address
+    And neither user's projection yet carries the other's identifier
+    When both arrivals are handled
+    Then exactly one of them ends VERIFIED
+    And the other dead-ends, so no address has two proven holders
+    And replaying both emissions reaches the same two states
+
+  @unit
+  Scenario: A VERIFIED arrival that loses the address lock dead-ends
+    Given another user holds the address lock for "sam.j@acme.com"
+    When an OAuth identifier arrives VERIFIED for "sam" with the same value
+    Then the identifier arrives ATTACHED and dead-ends in the same emission
+    And no refusal is raised, because an IdP callback has no caller to act on one
+
+  @unit
+  Scenario: An email attach takes no address lock
+    When an email identifier is attached for "sam"
+    Then no address lock is taken
+    And nobody can hold an address by attaching it unverified
+
+  @unit
+  Scenario: Replay rebuilds the Identifier projection identically
+    Given "sam"'s identity history holds attach, verify, primary-change and detach events
+    When the Identifier projection is rebuilt from the event log alone
+    Then every rebuilt row equals the live row, whole-row
+
+  @unit
+  Scenario: Erasure wipes values and leaves a replayable tombstone
+    Given "sam" holds two identifiers
+    When an erase_user command is handled for "sam"
+    Then a user_erased event names both identifier ids
+    And folding the erasure wipes value and hash fields from "sam"'s Identifier rows
+    And replaying "sam"'s history reproduces the tombstone, never the email
+
+  @unit
+  Scenario: The write gate ships closed for every user
+    Given the identity ceremonies are wired and no backfill has run
+    When better-auth writes any row for "sam"
+    Then the row is written exactly as it would be with no ceremonies wired
+    And no identity command is dispatched and no event is emitted
+
+  @unit
+  Scenario: A latched user's domain-significant writes produce events structurally
+    Given "sam"'s identifier backfill has latched
+    When better-auth is about to create an account row for "sam"
+    Then the attach ceremony runs as an identity command before the row exists
+    And a vetoed ceremony refuses the row write too
+    And the ceremony pins the row's id, so the backfill later derives the same identifier id
+
+  @unit
+  Scenario: Deleting a latched user runs the erase ceremony before the row delete
+    Given "sam"'s identifier backfill has latched
+    When better-auth is about to delete "sam"'s user row
+    Then the erase ceremony runs as an identity command before the row delete
+    And better-auth runs the hook once per row it resolved, so a batch delete cannot skip one
+
+  @unit
+  Scenario: Deleting an unlatched user runs no ceremony; the erasure service reconciles
+    Given "sam"'s identifier backfill has not latched
+    When better-auth is about to delete "sam"'s user row
+    Then the row is deleted exactly as it would be with no ceremonies wired
+    And no identity command is dispatched
+
+  @unit
+  Scenario: An Account row no identifier mirrors still deletes
+    Given "sam"'s identifier backfill has latched
+    And no unambiguous Identifier mirrors the Account row being deleted
+    When better-auth is about to delete that row
+    Then no detach command is dispatched and the row delete proceeds
+    And the backfill's next pass detaches whatever the row's absence implies
+
+  @unit
+  Scenario: Signing up on an unmigrated organization writes nothing extra
+    Given "sam"'s organization has not been enrolled
+    When better-auth creates "sam"'s user row
+    Then no identity ceremony runs and no identity column is written
+    And the backfill mints their userHashKey when it adopts them
+
+  @unit
+  Scenario: Email verification completes only with the ceremony's proof
+    Given "sam" starts an email verification from a browser holding a PKCE verifier
+    When the emailed magic link is opened with a GET request
+    Then nothing is verified
+    When completion is posted with the token and the matching verifier
+    Then the identifier verifies via a verify_identifier command
+
+  @unit
+  Scenario: A verification token is pinned to the identifier it was minted for
+    Given a verification record minted for identifier "work"
+    When completion is posted naming identifier "personal" with that token
+    Then the completion is refused and no identifier verifies
+
+  @unit
+  Scenario: A mail scanner's prefetch cannot verify an identifier
+    Given a verification email delivered through a link-scanning gateway
+    When the scanner fetches the magic link
+    Then the identifier remains unverified and the token remains unconsumed
+
+  # The two ways a proof stops being a proof. A link left in an inbox is the
+  # ordinary one, and the only thing it costs is asking for another; a link
+  # opened twice is the one that matters, because a mailbox somebody else
+  # reaches later must not still carry a working proof.
+  @unit
+  Scenario: A verification proof expires unspent
+    Given a verification link that was never opened
+    When it is opened after the ceremony's lifetime has passed
+    Then the completion is refused as expired, and a fresh link is the way on
+
+  @unit
+  Scenario: A verification proof spends once
+    Given a verification completed with the emailed token and its matching verifier
+    When the identical completion is posted a second time
+    Then the second is refused as invalid, because the proof no longer exists
+
+  @unit
+  Scenario: The backfill adopts existing accounts and proves itself per user
+    Given "sam" has legacy Account rows and a User.email
+    When the identity backfill migrates "sam"
+    Then adoption events carry each source row's own business time
+    And "sam" is finalized only when the fold-built rows match what the live rows imply
+    And a disagreement holds "sam" at migrated with the outstanding identifiers named
+
+  @unit
+  Scenario: The backfill detaches identifiers whose account row is gone
+    Given "sam"'s Google account was adopted on an earlier pass
+    And the Google Account row has since been deleted
+    When the identity backfill migrates "sam" again
+    Then the Google identifier is detached with a command id stable across retries
+    And the email identifier, which has no account row, is left alone
+    And a further pass detaches nothing
+
+  # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
+  # states the person's identity AT GOOGLE, wrapped in the broker's
+  # namespace. Unfolding it at adoption is what lets the native provider's
+  # callback resolve a user who has only ever signed in through the broker:
+  # no linking ceremony, no second account, sign-in works on the first day
+  # the native provider is mounted.
+  @unit
+  Scenario: An Auth0-brokered social account is adopted under its own provider too
+    Given "sam" has an Auth0 Account row whose subject names a Google identity
+    When the identity backfill migrates "sam"
+    Then a Google identifier is adopted beside the Auth0 one, carrying the upstream subject
+    And it carries the issuer Google itself asserts, so the native callback resolves "sam"
+    And an Auth0 subject naming no known upstream derives nothing
+    And deleting the Auth0 Account row detaches the derived identifier with it
+
+  # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
+  # question identity now owns, so a finalized user's email comes from their
+  # identifiers and the column is a stale copy. One switch forks both
+  # directions: the user whose ceremonies emit events is exactly the user
+  # whose identifiers were proven against their legacy rows.
+
+  @unit
+  Scenario: The legacy email field answers from the identifiers
+    Given "sam"'s identifier backfill has finalized
+    And "sam" holds a PRIMARY identifier and a more recently VERIFIED one
+    When anything reads "sam"'s user email
+    Then the PRIMARY identifier's value answers
+    And with no PRIMARY, the most recently VERIFIED one answers instead
+
+  @unit
+  Scenario: An unproven address never answers the legacy email field
+    Given "sam" holds only ATTACHED, DETACHED or DEAD_END identifiers
+    When anything reads "sam"'s user email
+    Then no identifier answers, so the legacy column stands
+    And attaching an address can therefore never redirect "sam"'s mail
+
+  # ADR-116: `Account` is a PROJECTION of the event log, alongside
+  # `Identifier`. During the bridge phase better-auth reads and writes it
+  # with the completely stock adapter - nothing intercepts it - and the fold
+  # owns its linkage columns. One truth, two projections, until the table
+  # retires with the identity storage adapter's last phase.
+
+  @unit
+  Scenario: better-auth reads an account through its own storage
+    Given "sam"'s organization has finalized
+    When better-auth signs "sam" in
+    Then its own joined read of the user and their accounts completes
+    And nothing sits in front of it to answer differently
+
+  @unit
+  Scenario: A password change states nothing, because a secret is not a fact
+    Given "sam"'s organization has finalized
+    When "sam" changes their password
+    Then better-auth rewrites its own row
+    And no identity command is dispatched
+
+  @integration
+  Scenario: The fold projects the linkage columns of Account
+    Given "sam" holds a live identifier carrying an account id and a subject
+    When the identity fold stores the projection
+    Then the Account row carries the user, provider and subject the fact names
+    And the fold writes no other column
+
+  @integration
+  Scenario: The projected Account row keeps better-auth's own provider id
+    Given "sam" holds a live identifier attached through the provider "auth0"
+    And the identifier vocabulary folds that provider into "oidc"
+    When the identity fold stores the projection
+    Then the Account row's provider is still "auth0"
+    And better-auth's own lookup by provider and subject finds the row
+
+  @integration
+  Scenario: A replay never overwrites a credential the fold cannot know
+    Given an Account row holds an access token better-auth refreshed
+    When the fold re-asserts that row from the event log
+    Then the token is left exactly as it was
+    And a from-scratch replay therefore restores linkage but not secrets
+
+  @integration
+  Scenario: A tombstoned identifier projects to no Account row
+    Given "sam" holds a DETACHED identifier for a provider subject
+    When the identity fold stores the projection
+    Then the Account row that identifier projected to is gone
+    And no row is created for a tombstone
+
+  @integration
+  Scenario: The fold reports a user it cannot find, and projects anyway
+    Given the log carries "sam"'s linkage but no User row carries "sam"
+    When the identity fold stores the projection
+    Then the projection rows are written, so it stays complete
+    And the anomaly is reported, rather than being a branch nobody can see
+
+  @unit
+  Scenario: The gate costs nothing before anyone is enrolled
+    Given no user has finalized the identifier backfill
+    When any number of users are checked against the gate
+    Then one read per pod settles it for all of them
+    And no per-user migration row is read at all
+    And the short-circuit disables itself once the first user finalizes
+
+  @unit
+  Scenario: An unmigrated user keeps the legacy email column
+    Given "sam"'s identifier backfill has not finalized
+    When anything reads "sam"'s user email
+    Then the projection is not consulted at all
+    And the legacy column answers, exactly as it does today
+
+  @unit
+  Scenario: An unreadable projection never fails a request
+    Given the Identifier projection cannot be read
+    When anything reads "sam"'s user email
+    Then the legacy column answers and the request proceeds
+    And the fallback is logged, because it is otherwise silent
+
+  @unit
+  Scenario: Finalizing a user's backfill opens their write gate
+    Given "sam"'s backfill pass concludes with matching rows
+    When the migration state records "sam" as finalized
+    Then the write gate answers open for "sam"
+    But a user held at migrated stays closed
+    And an operator rollback closes it again
+
+  @unit
+  Scenario: Organization enrollment is what puts a user in the backfill's cohort
+    Given the installation is cloud
+    And "acme" is enrolled in the identifier backfill and "globex" is not
+    When a migration pass computes its user cohort
+    Then every member of "acme" is in the cohort
+    And a user who belongs only to "globex" is not
+    And a user outside every organization is not, and stays on the legacy path

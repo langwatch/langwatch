@@ -22,9 +22,12 @@ const fakeRedis = {
   expire: (...a: unknown[]) => expire(...a),
 };
 
-vi.mock("../../redis", () => ({
-  get connection() {
-    return (globalThis as { __TEST_REDIS__?: unknown }).__TEST_REDIS__ ?? null;
+// The limiter reads its connection off the App and fails open without one, so
+// the App is where each test plants (or withholds) the fake.
+vi.mock("../../app-layer/app", () => ({
+  tryGetApp() {
+    const redis = (globalThis as { __TEST_REDIS__?: unknown }).__TEST_REDIS__;
+    return redis ? { redis } : null;
   },
 }));
 

@@ -2,7 +2,11 @@ import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import { Prisma, type PrismaClient, type Trigger } from "@prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+  type Trigger,
+} from "~/generated/prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 import {
   type GraphTriggerSentRepository,
@@ -111,6 +115,25 @@ export class PrismaTriggerRepository implements TriggerRepository {
       select: { id: true },
     });
     return existing !== null;
+  }
+
+  async findClaimedTraceIds({
+    triggerId,
+    traceIds,
+    projectId,
+  }: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    if (traceIds.length === 0) return new Set();
+    const rows = await this.prisma.triggerSent.findMany({
+      where: { triggerId, projectId, traceId: { in: traceIds } },
+      select: { traceId: true },
+    });
+    return new Set(
+      rows.flatMap((row) => (row.traceId === null ? [] : [row.traceId])),
+    );
   }
 
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {

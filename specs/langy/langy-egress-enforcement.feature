@@ -146,6 +146,25 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     But it remains monitor-only rather than allow-listed
 
   # ===========================================================================
+  # Traffic the worker's own tools would start
+  #
+  # The `langwatch` CLI in the worker image is compiled with Bun, and Bun can
+  # auto-upload a crash report to a third party. A Bun crash report reprints
+  # the process argv, and argv for `langwatch ui call` carries the customer's
+  # own payload: prompt text, dataset field names, evaluator ids. That upload
+  # must never be one platform default away from happening, so the image turns
+  # it off, and the worker environment carries the setting to the process that
+  # needs it.
+  # ===========================================================================
+
+  @unit
+  Scenario: The CLI never uploads a crash report out of a worker
+    Given the worker image turns the runtime's crash-report upload off
+    When the manager builds a worker environment
+    Then the worker inherits that setting
+    And the CLI in the worker cannot upload the argv it was called with
+
+  # ===========================================================================
   # Rung 3 limitation — cooperative L7, honestly bounded
   # ===========================================================================
 

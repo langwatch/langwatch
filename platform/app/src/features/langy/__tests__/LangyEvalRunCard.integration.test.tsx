@@ -1,5 +1,6 @@
 /**
  * @vitest-environment jsdom
+ * @vitest-environment-options { "url": "https://app.langwatch.ai/" }
  *
  * The scenario-run card's "Open in Simulations" link used to always point at
  * the simulations INDEX page, whatever run the card was actually showing —
@@ -9,10 +10,11 @@
  * router when it does.
  *
  * @see specs/langy/langy-agent-driven-navigation.feature
+ * @see specs/langy/langy-capability-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 vi.mock("~/utils/compat/next-router", () => ({
@@ -48,20 +50,139 @@ function renderCard(output: unknown) {
   );
 }
 
-beforeEach(() => {
-  // `CapabilityDeepLinkChip` compares a CLI result's `platformUrl` against
-  // `window.location.origin` (BASE_HOST isn't exposed to the client bundle)
-  // to decide whether the link belongs to this instance.
-  Object.defineProperty(window, "location", {
-    value: { origin: "https://app.langwatch.ai" },
-    writable: true,
-    configurable: true,
-  });
-});
+// `CapabilityDeepLinkChip` compares a CLI result's `platformUrl` against
+// `window.location.origin` (BASE_HOST isn't exposed to the client bundle) to
+// decide whether the link belongs to this instance. The origin comes from the
+// document's own URL, declared in the docblock above, rather than from a stand-in
+// object assigned over `window.location` — jsdom defines `location` as a
+// non-configurable accessor, so replacing it throws outright once the file runs
+// in a VM context, and a real URL is the more faithful fixture in any case.
 
 afterEach(() => {
   cleanup();
   pushMock.mockClear();
+});
+
+describe("Feature: a run card reports the run, not the data the run returned", () => {
+  describe("given the failing rows of a run that succeeded", () => {
+    /** @scenario "A run card reads its state from the run, not from its rows" */
+    it("shows no failure, and counts the rows instead of printing their JSON", () => {
+      renderCard(
+        JSON.stringify({
+          runId: "silent-ideal-owl",
+          progress: 20,
+          total: 20,
+          meta: { filter: "failed" },
+          evaluations: [
+            {
+              targetId: "target-1",
+              passed: false,
+              details: "the reply failed to name the refund window",
+            },
+            { targetId: "target-1", passed: true, details: "matches" },
+          ],
+        }),
+      );
+
+      expect(screen.queryByText("failed")).toBeNull();
+      expect(screen.getByText("20 of 20 rows")).toBeDefined();
+      expect(screen.getByText("1 of 2 evaluations passed")).toBeDefined();
+      expect(screen.queryByText(/"evaluations"/)).toBeNull();
+    });
+  });
+
+  describe("given the run's own status document", () => {
+    it("shows the status the run reported for itself", () => {
+      renderCard(
+        JSON.stringify({
+          runId: "silent-ideal-owl",
+          status: "completed",
+          progress: 20,
+          total: 20,
+        }),
+      );
+
+      expect(screen.getByText("completed")).toBeDefined();
+    });
+  });
+
+  describe("given the CLI's suite run document, waited for", () => {
+    const suiteRun = (over: Record<string, unknown>) => ({
+      results: [
+        {
+          scenarioRunId: "scenariorun_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          verdict: "success",
+        },
+        {
+          scenarioRunId: "scenariorun_2",
+          scenarioId: "scenario_2",
+          status: "FAILED",
+          verdict: "failure",
+        },
+        {
+          scenarioRunId: "scenariorun_3",
+          scenarioId: "scenario_3",
+          status: "SUCCESS",
+          verdict: "success",
+        },
+      ],
+      scheduled: true,
+      batchRunId: "scenariobatch_1",
+      jobCount: 3,
+      skippedArchived: { scenarios: [], targets: [] },
+      runPlanId: "suite_1",
+      planName: "Full regression acme-checkout · development",
+      platformUrl:
+        "https://app.langwatch.ai/acme/agent-testing/results/full-regression",
+      ...over,
+    });
+
+    /** @scenario "A run card carries the run's aggregate, not one row's verdict" */
+    it("wears the batch's state and counts, never one row's verdict", () => {
+      renderCard(
+        suiteRun({
+          outcome: "failed",
+          tallies: { total: 3, completed: 3, passed: 2, failed: 1 },
+        }),
+      );
+
+      expect(screen.getByText("completed")).toBeDefined();
+      expect(screen.getByText("67%")).toBeDefined();
+      expect(screen.getByText("2 of 3 passed, 1 failed")).toBeDefined();
+      expect(screen.queryByText("FAILED")).toBeNull();
+      expect(screen.queryByText("failed")).toBeNull();
+    });
+
+    /** @scenario "A run card carries the run's aggregate, not one row's verdict" */
+    it("reads a clean batch, a scheduled one and one the wait gave up on", () => {
+      const { unmount } = renderCard(
+        suiteRun({
+          outcome: "passed",
+          tallies: { total: 3, completed: 3, passed: 3, failed: 0 },
+        }),
+      );
+      expect(screen.getByText("completed")).toBeDefined();
+      expect(screen.getByText("100%")).toBeDefined();
+      expect(screen.getByText("3 of 3 passed")).toBeDefined();
+      unmount();
+
+      const scheduled = renderCard(suiteRun({ outcome: "scheduled" }));
+      expect(screen.getByText("scheduled")).toBeDefined();
+      expect(screen.getByText("3 runs scheduled")).toBeDefined();
+      scheduled.unmount();
+
+      renderCard(
+        suiteRun({
+          outcome: "timeout",
+          tallies: { total: 3, completed: 1, passed: 1, failed: 0 },
+        }),
+      );
+      expect(screen.getByText("timed out")).toBeDefined();
+      expect(screen.getByText("1 of 3 passed")).toBeDefined();
+    });
+  });
 });
 
 describe("Feature: the platform's link for a resource addresses that resource, not an index", () => {

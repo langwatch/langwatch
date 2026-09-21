@@ -32,10 +32,11 @@
  * derivations (which read the bare names directly) were unaffected.
  *
  * The body-parsing helpers (extractAssistantTextFromResponseBody,
- * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody)
- * and the isConversationalQuerySource gate live here as the home of
- * claude_code body knowledge, and are imported by the ingest-time derivation
- * and the read-time span enrichment. The langwatch wrapper sets all 4
+ * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody,
+ * extractSessionTitleFromResponseBody) and the isConversationalQuerySource
+ * gate live here as the home of claude_code body knowledge, and are imported
+ * by the ingest-time derivation, the coding-agent log dispatcher and the
+ * read-time span enrichment. The langwatch wrapper sets all 4
  * OTEL_LOG_* unlock knobs (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS +
  * RAW_API_BODIES) so the bodies carry input/output text on every turn.
  */
@@ -54,8 +55,12 @@ const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
 
-/** The CLI's own native model-call span — see the span-side doc above. */
-const LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
+/**
+ * The CLI's own native model-call span, see the span-side doc above. It is
+ * the span that names its model under a bare `model` attribute, which is why
+ * cost enrichment needs it by name.
+ */
+export const CLAUDE_CODE_LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
 
 /**
  * Claude Code emits an `api_response_body` event for EVERY model call it
@@ -103,13 +108,39 @@ export const isConversationalQuerySource = (
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
+/**
+ * Whether a Claude Code call's cache writes buy hour-long entries.
+ *
+ * Anthropic bills an hour-long cache entry at 2x the input rate and a
+ * five-minute one at 1.25x, and the llm_request span states how many tokens
+ * were written but not how long they live. The lifetime follows the call's
+ * request context, measured against Claude Code's live traffic: a main-thread
+ * request (`llm_request.context: "interaction"`, `query_source:
+ * "repl_main_thread"` on the log side) writes hour-long entries, a sub-agent
+ * request (`"tool"` / `agent:*`) writes five-minute ones, and utility calls
+ * write nothing. An unknown context prices short-lived, which never
+ * overstates.
+ *
+ * The provider can change this policy without notice. The session fold keeps
+ * the cost the agent reports about itself next to the computed one, and the
+ * two drifting apart is the alarm that this rule went stale.
+ */
+export const claudeCacheWritesLongLived = ({
+  llmRequestContext,
+  querySource,
+}: {
+  llmRequestContext?: string | null;
+  querySource?: string | null;
+}): boolean =>
+  llmRequestContext === "interaction" || querySource === "repl_main_thread";
+
 export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   readonly id = "claude-code";
 
   apply(ctx: ExtractorContext): void {
     // Gateway-proxied claude_code traffic already arrives as gen_ai.* spans
     // (GenAIExtractor's job) — only the CLI's own native span needs lifting.
-    if (ctx.span.name !== LLM_REQUEST_SPAN_NAME) return;
+    if (ctx.span.name !== CLAUDE_CODE_LLM_REQUEST_SPAN_NAME) return;
 
     const attrs = ctx.bag.attrs;
     let fired = false;
@@ -132,6 +163,28 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       "cache_creation_tokens",
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     );
+    // The span states how many tokens were written to the cache but not how
+    // long they live; the lifetime follows the call's request context (see
+    // claudeCacheWritesLongLived). A main-thread call's writes are stamped
+    // hour-long so computeSpanCost prices them at 2x input rather than the
+    // five-minute 1.25x, which undercounted every cache-heavy turn by about a
+    // third. setAttrIfAbsent keeps a provider-stated split, should the span
+    // ever start carrying one, ahead of this rule.
+    const cacheWriteTokens = asNumber(attrs.get("cache_creation_tokens"));
+    if (
+      cacheWriteTokens !== null &&
+      cacheWriteTokens > 0 &&
+      claudeCacheWritesLongLived({
+        llmRequestContext: asString(attrs.get("llm_request.context")),
+        querySource: asString(attrs.get("query_source")),
+      })
+    ) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS,
+        cacheWriteTokens,
+      );
+      fired = true;
+    }
 
     const model = attrs.get("model");
     if (typeof model === "string" && model.length > 0) {
@@ -286,6 +339,42 @@ export function extractAssistantTextFromResponseBody(
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/**
+ * How much of a generated title is kept. Titles are a phrase, so anything past
+ * this is either a model that ignored the instruction or a body that is not a
+ * title at all; the cap bounds what lands in a durable session column either
+ * way.
+ */
+const MAX_SESSION_TITLE_CHARS = 512;
+
+/**
+ * The conversation title out of a `generate_session_title` response body.
+ *
+ * Claude generates the title with a haiku utility call whose reply is a
+ * `{"title": "..."}` JSON object inside the assistant text block. Any deviation
+ * answers null: an unparseable or truncated body, a reply that is not JSON, a
+ * shape without a string `title`, or an empty one. Never throws: the caller is
+ * on the ingest path, where one odd body must not cost a record.
+ *
+ * The CALLER decides which bodies are titles (the `query_source` gate); this
+ * only reads the shape.
+ */
+export function extractSessionTitleFromResponseBody(
+  raw: string,
+): string | null {
+  const text = extractAssistantTextFromResponseBody(raw);
+  if (text === null) return null;
+  const parsed = safeParse(text);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const title = (parsed as { title?: unknown }).title;
+  if (typeof title !== "string") return null;
+  const trimmed = title.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed.slice(0, MAX_SESSION_TITLE_CHARS);
 }
 
 /**

@@ -12,10 +12,22 @@ export const handleGroupError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
+  // A handled error's status lives on `httpStatus`; without reading it, a
+  // 402 plan refusal would be logged as a 500 while the response says 402.
+  // Same order as the response dispatch below, and as the api-keys handler.
   const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+    error instanceof HttpError
+      ? error.status
+      : HandledError.isHandled(error)
+        ? (error.httpStatus as ContentfulStatusCode)
+        : (error.status ?? 500);
 
-  logger.error(
+  // A refusal the caller can act on is their fact, not our outage: the
+  // Enterprise gate answers 402 from every route in this family, and logging
+  // all of them at error level buries the real failures under routine ones.
+  const log = status >= 500 ? logger.error : logger.warn;
+  log.call(
+    logger,
     {
       path: c.req.path,
       method: c.req.method,

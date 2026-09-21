@@ -221,16 +221,26 @@ export function createTestJobData(
       criteria: ["Must respond politely"],
       labels: ["integration-test", "otel-isolation"],
     },
+    parameters: {},
     adapterData: {
       type: "http",
       agentId: "test-agent",
       url: "http://localhost:9999/api/test", // Won't actually be called in error scenario
       method: "POST",
       headers: [],
+      secrets: {},
     },
     modelParams: {
       api_key: "test-api-key",
       model: "openai/gpt-4o-mini",
+    },
+    simulatorModelParams: {
+      api_key: "test-api-key",
+      model: "openai/gpt-5-mini",
+    },
+    judgeModelParams: {
+      api_key: "test-api-key",
+      model: "openai/gpt-5-mini",
     },
     nlpServiceUrl: "http://localhost:8080",
     target: { type: "http", referenceId: "test-agent" },

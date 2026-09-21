@@ -29,7 +29,7 @@ export function useLicenseActions({
   // destroyed the toast on its way: the restart instruction below is the one
   // thing an operator has to read, and it was being torn off the screen
   // milliseconds after it appeared.
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const refreshPlanDerivedState = () => {
     void trpc.invalidate();
   };
@@ -76,7 +76,7 @@ export function useLicenseActions({
   return {
     upload,
     remove,
-    isUploading: uploadMutation.isLoading,
-    isRemoving: removeMutation.isLoading,
+    isUploading: uploadMutation.isPending,
+    isRemoving: removeMutation.isPending,
   };
 }

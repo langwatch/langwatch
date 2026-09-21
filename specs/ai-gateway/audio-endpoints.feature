@@ -89,6 +89,77 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     And no provider is contacted
 
   # ============================================================
+  # Group: ElevenLabs' own audio paths, mirrored
+  # ============================================================
+
+  # The OpenAI-shaped routes above cover a caller willing to write
+  # OpenAI-shaped requests. An ElevenLabs SDK is not: it posts to that
+  # vendor's own paths with that vendor's own body, so its traffic went
+  # straight to the vendor and none of it was metered. These two routes
+  # mirror the vendor's paths so an ElevenLabs SDK reaches the gateway by
+  # base URL alone. Bifrost cannot forward them (its ElevenLabs provider
+  # answers Passthrough with unsupported-operation), so the gateway calls
+  # the vendor itself the way the session mint does.
+
+  @unit
+  Scenario: An ElevenLabs SDK reaches the native audio routes unchanged
+    When the client POSTs /v1/text-to-speech/{voice_id} with the ElevenLabs wire shape
+    And it authenticates with the xi-api-key header the SDK already sends
+    Then the response is 200 with the vendor's audio bytes and its own Content-Type
+    And the voice from the URL path and the caller's query string both reach the vendor
+    And the model resolves through the virtual key's aliases and allowlist like every other route
+
+  @unit
+  Scenario: ElevenLabs' own synthesis path reaches the vendor unchanged
+    When the gateway dispatches a native synthesis request
+    Then every field of the caller's body, including voice settings, is forwarded as written
+    And the one exception is "model_id", which carries the model resolution settled on
+    And no "model" field is invented, because no ElevenLabs endpoint reads one
+    And the character count of the spoken text is the usage measure reported
+    # The vendor's character-cost response header is credits under the
+    # account's own plan, not characters, and it already carries the model's
+    # price factor, so rating it per character would apply that factor twice.
+
+  @unit
+  Scenario: ElevenLabs' own transcription path reaches the vendor unchanged
+    When the gateway dispatches a native transcription request
+    Then every text form part the caller sent is carried through to the vendor
+    And the one exception is "model_id", which carries the model resolution settled on
+    And the audio duration the vendor states is the usage measure reported
+    And a request naming a cloud_storage_url instead of a file is accepted
+
+  @unit
+  Scenario: Asynchronous transcription is refused rather than billed at zero
+    When the client sends a "webhook" part asking the vendor to answer later
+    Then the gateway responds 400 naming the webhook part, and contacts no provider
+    # The vendor's early answer carries no duration and no word timings, so the
+    # spend record would confirm at zero seconds for audio the customer was
+    # charged for, and the gateway has no settlement path for the delivery that
+    # follows.
+
+  @unit
+  Scenario: A native ElevenLabs route refuses a key with no ElevenLabs credential
+    Given a virtual key holding no ElevenLabs credential
+    When the client calls either native route
+    Then the request is refused and no provider is contacted
+    # The body is this vendor's own wire, so falling back would spend a
+    # credential the caller never named on an API that cannot read it.
+
+  @integration
+  Scenario: A native ElevenLabs synthesis call bills the characters it spoke
+    When the client synthesizes speech through /v1/text-to-speech/{voice_id}
+    Then the response carries real audio the vendor produced
+    And the spend record carries the character count in input_chars
+    And the rated cost equals the characters times the model's per-character rate
+
+  @integration
+  Scenario: A native ElevenLabs transcription call bills the seconds it heard
+    When the client transcribes audio through /v1/speech-to-text
+    Then the response carries the transcript the vendor produced
+    And the spend record carries the audio duration in audio_ms
+    And the rated cost equals the duration times the model's per-second rate
+
+  # ============================================================
   # Group: Governance (the same pipeline as chat)
   # ============================================================
 
@@ -115,7 +186,22 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     Given a virtual key over its budget, or over its rate limit
     When the client calls either audio endpoint
     Then the request is blocked with the same error the chat endpoint emits
-    And an allowed call's spend is recorded against the same budget
+
+  @integration
+  Scenario: A character-priced call debits the budget it was admitted under
+    Given a virtual key with a budget and a character-priced speech model
+    When the client synthesizes speech through the gateway
+    Then the call's character count reaches the spend record
+    And the budget moves by the characters times the model's per-character rate
+    # A quantity that stops before the spend wire rates at zero, so a
+    # call that cost real money debits nothing at all.
+
+  @integration
+  Scenario: A duration-priced transcription debits the budget it was admitted under
+    Given a virtual key with a budget and a second-priced transcription model
+    When the client transcribes audio through the gateway
+    Then the audio duration reaches the spend record
+    And the budget moves by the duration times the model's per-second rate
 
   @integration
   Scenario: Upstream provider errors pass through transparently
@@ -139,6 +225,14 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     When a transcription request completes
     Then a gateway span is exported with the resolved model
     And the span carries the audio duration (or the provider's token usage when reported) as the measure STT is priced by
+
+  @integration
+  Scenario: A span states its audio tokens apart from its text tokens
+    Given a model that answers in audio tokens and prices them above text
+    When the call completes
+    Then the span carries the audio token counts under their own attributes
+    And the text token attributes exclude them, as the cache counts already are
+    And the trace cost equals the cost the budget was charged
 
   # ============================================================
   # Group: Dogfood (proven with the Scenario voice harness)

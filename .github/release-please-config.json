@@ -23,13 +23,28 @@
         "values.yaml"
       ]
     },
+    "infra/clickhouse-serverless": {
+      "release-type": "simple",
+      "package-name": "clickhouse-serverless-image",
+      "prerelease": false,
+      "component": "clickhouse-serverless-image",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {"type": "feat",     "section": "Features"},
+        {"type": "fix",      "section": "Bug Fixes"},
+        {"type": "chore",    "section": "Miscellaneous",    "hidden": false},
+        {"type": "docs",     "section": "Documentation",    "hidden": false},
+        {"type": "refactor", "section": "Code Refactoring", "hidden": false}
+      ]
+    },
     "sdks/go": {
       "release-type": "go",
       "package-name": "langwatch-go",
-      "prerelease": true,
-      "component": "sdk-go",
+      "prerelease": false,
+      "component": "sdks/go",
       "include-component-in-tag": true,
-      "tag-separator": "@",
+      "tag-separator": "/",
       "changelog-sections": [
         {
           "type": "feat",
@@ -242,11 +257,51 @@
           "type": "toml",
           "path": "evaluators/presidio/pyproject.toml",
           "jsonpath": "$.project.version"
+        }
+      ]
+    },
+    "plugins/langwatch": {
+      "release-type": "node",
+      "package-name": "@langwatch/agent-plugin",
+      "prerelease": false,
+      "component": "agent-plugin",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
         },
         {
-          "type": "toml",
-          "path": "evaluators/legacy/pyproject.toml",
-          "jsonpath": "$.project.version"
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/plugin.json",
+          "jsonpath": "$.version"
         }
       ]
     },
@@ -263,8 +318,10 @@
         "mcp/typescript",
         "services/langevals",
         "charts/clickhouse-serverless",
+        "infra/clickhouse-serverless",
         "sdks/python",
         "skills",
+        "plugins/langwatch",
         ".github",
         ".cursor",
         "assets"
@@ -376,5 +433,14 @@
     }
   },
   "bootstrap-sha": "HEAD",
-  "separate-pull-requests": true
+  "separate-pull-requests": true,
+  "draft-pull-request": true,
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "clickhouse-serverless",
+      "components": ["clickhouse-serverless", "clickhouse-serverless-image"],
+      "merge": false
+    }
+  ]
 }

@@ -5,9 +5,12 @@ import {
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
+  MAX_BLOB_BYTES,
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
+import { resolveDispatchAllowListRedisKey } from "./dispatch-scope";
+import { gqJobsDispatchedOverrideTotal } from "./metrics";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -411,6 +414,57 @@ local function gqRoutingMeta(jobDataJson)
     return data["__pipelineName"], data["__jobType"], data["__jobName"]
   end
   return nil, nil, nil
+end
+`;
+
+// What a staged job will weigh once a worker holds it, which is NOT its stored
+// length: a body over the inline ceiling lives in the blob store and leaves a
+// ~200-byte reference behind, and a body over the compression threshold is
+// stored compressed. The encoder records the pre-compression, pre-offload
+// payload size in the envelope header (`s`), so the drain's byte budget can be
+// about the batch a worker will actually assemble rather than about Redis
+// occupancy.
+//
+// A value with no `s` gets the reading that cannot let the batch overshoot,
+// not simply its stored length: legacy bare JSON and a plain inline body
+// (`e:"j"`) ARE their stored length, but a pre-`s` compressed or offloaded body
+// is a fraction of one and the value does not say by how much. Those are worth
+// the payload cap, so they drain alone for the length of a rolling deploy
+// rather than reinstating the very blindness `s` closes — in the window where
+// the most jobs are queued. See the TS twin `readJobPayloadBytes` in
+// `jobEnvelope.ts` for the full reasoning.
+//
+// The two are one budget read from two ends, so an envelope-format change —
+// new prefix, renamed header field, different length-prefix encoding — has to
+// land in both or they silently disagree.
+const PAYLOAD_SIZE_HELPER_LUA = `
+local function gqPayloadSize(value)
+  local prefix = string.sub(value, 1, 4)
+  if prefix == "GQ1|" or prefix == "GQ2|" then
+    local barIdx = string.find(value, "|", 5, true)
+    if barIdx then
+      local headerLen = tonumber(string.sub(value, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" then
+          local s = header["s"]
+          -- Non-negative integer within JS's safe-integer range, which is what
+          -- the TS twin's Number.isSafeInteger admits — the same set, or the
+          -- two ends of one budget disagree on a value. NaN fails the >= 0
+          -- test, and the upper bound is what rejects infinity: cjson decodes
+          -- 1e999 to inf, and math.floor(inf) == inf would pass an integer
+          -- check on its own.
+          if type(s) == "number" and s >= 0 and s <= ${Number.MAX_SAFE_INTEGER} and s == math.floor(s) then
+            return s
+          end
+          if header["e"] ~= "j" then
+            return ${MAX_BLOB_BYTES}
+          end
+        end
+      end
+    end
+  end
+  return #value
 end
 `;
 
@@ -863,6 +917,7 @@ local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
 local totalPendingKey  = KEYS[4]
+local allowedGroupsKey = KEYS[5]
 
 local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
@@ -877,6 +932,7 @@ local staticCap      = tonumber(ARGV[5]) or 0
 -- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
 -- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
+local restrictedDispatch = ARGV[7] == "1"
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
@@ -935,7 +991,12 @@ local function scanBatch(effCap, bypassPark, dispatched)
   local tenantCapCache = {}
 
   while scanned < scanBudget and dispatched < maxJobs do
-    local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    local groups
+    if not restrictedDispatch then
+      groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    else
+      groups = redis.call("ZRANGE", allowedGroupsKey, offset, offset + pageSize - 1)
+    end
     if #groups == 0 then break end
     scanned = scanned + #groups
 
@@ -947,9 +1008,28 @@ local function scanBatch(effCap, bypassPark, dispatched)
     -- tenant, the scan could page past a quiet tenant's only group and return
     -- empty while eligible work existed.
     local removed = 0
+    local removedAllowed = 0
 
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
+
+      -- A preflight's complete target set is registered before its root command.
+      -- Keep every target in the candidate index until the preflight key expires:
+      -- an older worker may enqueue a downstream job without knowing how to add
+      -- it back. Moving examined targets to the tail gives pending targets a
+      -- bounded path through a set that also contains not-yet-enqueued groups.
+      if restrictedDispatch then
+        redis.call("ZADD", allowedGroupsKey, nowMs, groupId)
+        removedAllowed = removedAllowed + 1
+      end
+
+      local readyScore = nil
+      local groupDue = true
+      if restrictedDispatch then
+        readyScore = redis.call("ZSCORE", readyKey, groupId)
+        groupDue = readyScore and tonumber(readyScore) <= nowMs
+      end
+      if groupDue then
 
       -- Tenant cap check (no-op when effCap == 0). capTenantId resolved
       -- regardless of bypassPark so the slot is still recorded; only the PARK
@@ -973,7 +1053,6 @@ local function scanBatch(effCap, bypassPark, dispatched)
           end
         end
       end
-
       -- Tenant-level pause: park OUT of ready instead of skip-in-place so a large
       -- paused backlog cannot plug the bounded scan and starve others.
       local tenantPaused = false
@@ -1072,7 +1151,8 @@ local function scanBatch(effCap, bypassPark, dispatched)
             end
             removed = removed + 1
           end
-        end
+      end
+      end
       end
       end
     end
@@ -1080,13 +1160,23 @@ local function scanBatch(effCap, bypassPark, dispatched)
     if #groups < pageSize then break end
     -- Advance only past the entries that stayed in the due window; the removed
     -- ones shifted everything after them left by exactly that many positions.
-    offset = offset + #groups - removed
+    if not restrictedDispatch then
+      offset = offset + #groups - removed
+    else
+      offset = offset + #groups - removedAllowed
+    end
   end
 
   return dispatched
 end
 
 local dispatched = scanBatch(tenantCap, false, 0)
+
+-- Slots this eval filled by overriding the cap, reported alongside the results.
+-- Without it a high parked count is unreadable: "the cap is throttling work"
+-- and "the fleet is saturated so the override had no slot to give" produce the
+-- same gauge, and only this number tells them apart.
+local overrideDispatched = 0
 
 -- Work-conserving override: spare local slots remain (dispatched < maxJobs) but
 -- nothing more was admittable under the cap, while over-cap work sits parked.
@@ -1096,10 +1186,12 @@ local dispatched = scanBatch(tenantCap, false, 0)
 -- remaining slots; this pod's free-slot budget keeps the fleet total at G.
 if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
   unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, maxJobs - dispatched)
+  local beforeOverride = dispatched
   dispatched = scanBatch(tenantCap, true, dispatched)
+  overrideDispatched = dispatched - beforeOverride
 end
 
-return results
+return {results, overrideDispatched}
 `;
 
 /**
@@ -1118,16 +1210,21 @@ return results
  *     coalesced batch stays inside the downstream append/flush budget. A job
  *     too large to fit is LEFT in staging (it becomes its own later dispatch),
  *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
- *     the pre-ADR-066 behaviour). Sizes are the stored envelope's `#value`,
- *     which is the append-shaped quantity — for the small inline appends this
- *     targets it equals the payload size.
+ *     the pre-ADR-066 behaviour). Sizes are the envelope header's recorded
+ *     payload size (`s`), falling back to the stored `#value` for values that
+ *     carry none — see `gqPayloadSize`. `#value` alone is NOT the append-shaped
+ *     quantity: a compressed or offloaded body stores a fraction of what the
+ *     batch then holds in memory, which let a 256-wide batch of megabyte
+ *     payloads pass a 4 MiB budget untouched.
  *
  * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
  * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
  * NOT mark anything active and does NOT re-score ready — the caller's active
  * job remains the one that frees the group on COMPLETE.
  */
-const DRAIN_GROUP_LUA = `
+const DRAIN_GROUP_LUA =
+  PAYLOAD_SIZE_HELPER_LUA +
+  `
 local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -1157,7 +1254,12 @@ while i < #entries do
   local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
   local size = 0
   if jobDataJson then
-    size = #jobDataJson
+    -- Only pay the header parse when the budget can actually bind.
+    if maxBytes > 0 then
+      size = gqPayloadSize(jobDataJson)
+    else
+      size = #jobDataJson
+    end
   end
 
   -- Byte bound: stop before the first job that would overflow the budget.
@@ -1408,6 +1510,129 @@ end
 return 1
 `;
 
+/**
+ * Poison guard, claim side (specs/event-sourcing/poison-group-park-guard.feature).
+ *
+ * Records this worker's ownership of a group's claim and returns the number of
+ * CONFIRMED worker deaths the group has caused.
+ *
+ * The guard this replaced counted claims and subtracted a delete: a strike was
+ * written before decode and deleted on every path where the process survived,
+ * so a surviving strike WAS the death signal. That inference is only sound if
+ * the delete is guaranteed, and it is not — it is issued fire-and-forget, and
+ * `process.exit(0)` discards whatever Redis has not yet read. Prod ran ~10
+ * groups a day into the blocked set that way, every one of them healthy: the
+ * park logs sat hours from the nearest deploy, on pods with zero restarts,
+ * for jobs whose p99 is 25ms and which had never once retried.
+ *
+ * So the evidence is positive here. The marker names the process that holds
+ * the claim; that process publishes `alive` on a heartbeat and overwrites it
+ * with `retired` when it shuts down gracefully. A leftover marker resolves to:
+ *
+ *   owner is this worker  -> our own lapsed lease under a slow job. Not a death.
+ *   owner is `alive`      -> still running; its clear is late or its lease
+ *                            lapsed while it works. Not a death.
+ *   owner is `retired`    -> shut down on purpose. Not a death.
+ *   owner has no beacon   -> was claiming, never retired, no longer heartbeats.
+ *                            THAT is a death, and the only thing counted.
+ *
+ * A dropped clear, a torn-down connection and an abandoned drain all land in
+ * the middle three branches, so none of them can park a healthy group; a pod
+ * the job actually killed lands in the fourth, and a crash-looping group parks
+ * in the same number of laps as before.
+ *
+ * Two honest limits on those two claims:
+ *
+ *  - "Nothing healthy parks" holds against every failure of OUR writes, not
+ *    against Redis itself being gone. An outage longer than
+ *    WORKER_LIVENESS_TTL_SECONDS expires every healthy beacon, and a handoff
+ *    claimed in the window after recovery but before the previous owner's next
+ *    refresh reads as a death. Reaching a park still needs the threshold met
+ *    with no completed job in between (a release resets the marker), so this is
+ *    strictly better than the guard it replaces rather than impossible. The
+ *    same shape applies if `retireWorker` times out during a shutdown. The park
+ *    log carries the observed state so an operator can tell the two apart.
+ *
+ *  - "The same number of laps" is about crash-loops specifically. A job that
+ *    hangs with the event loop free is NOT counted when a routine SIGTERM
+ *    overlaps it: the tombstone is written before the platform's SIGKILL, so
+ *    that kill reads as a planned exit. That is deliberate — hangs are the
+ *    exhausted-retries path's problem, not this guard's
+ *    (specs/event-sourcing/poison-group-park-guard.feature).
+ *
+ * Detection also rests on an inequality between constants that live apart:
+ * a dead worker's beacon must expire BEFORE its group is redispatched, i.e.
+ * WORKER_LIVENESS_TTL_SECONDS must stay under the redispatch floor
+ * (`activeTtlSec` minus one heartbeat interval). Pinned by
+ * groupQueue.workerLiveness.unit.test.ts so a future retune of either side
+ * cannot silently invert it.
+ */
+const CLAIM_GUARD_LUA = `
+local claimKey = KEYS[1]
+
+local keyPrefix   = ARGV[1]
+local workerId    = ARGV[2]
+local stagedJobId = ARGV[3]
+local ttlSec      = tonumber(ARGV[4])
+
+local previous  = redis.call("HMGET", claimKey, "owner", "deaths")
+local prevOwner = previous[1]
+local deaths    = tonumber(previous[2] or "0") or 0
+
+local observed = "none"
+if prevOwner then
+  if prevOwner == workerId then
+    observed = "self"
+  else
+    -- GET returns false for a missing key: no beacon at all is the death.
+    -- Either state ("alive" or "retired") is an ordinary outcome.
+    local state = redis.call("GET", keyPrefix .. "worker:" .. prevOwner)
+    if state then
+      observed = state
+    else
+      observed = "gone"
+      deaths = deaths + 1
+    end
+  end
+end
+
+redis.call(
+  "HSET", claimKey,
+  "owner", workerId,
+  "deaths", tostring(deaths),
+  "stagedJobId", stagedJobId
+)
+redis.call("EXPIRE", claimKey, ttlSec)
+
+-- The state is returned so the park log can say WHY a group was parked. A real
+-- crash-loop and a Redis outage that expired healthy beacons both arrive here
+-- as "gone"; only the run of observations tells an operator which one it was.
+return { deaths, observed }
+`;
+
+/**
+ * Release a claim marker, but only if this worker still owns it.
+ *
+ * The unconditional DEL this replaced assumed the releasing worker was still
+ * the owner. It is not always: heartbeat failures are warn-and-continue, so a
+ * worker paused or partitioned past the active-key TTL keeps running while its
+ * group is redispatched to someone else. When its job finally returned, its
+ * release deleted the NEW owner's marker — erasing both the owner and the
+ * accrued death count, so a genuinely poisoned group silently lost its
+ * progress toward the threshold and parked later than it should.
+ *
+ * Same shape as a Redlock release, and the same fix: compare-and-delete.
+ */
+const RELEASE_CLAIM_LUA = `
+local claimKey = KEYS[1]
+local workerId = ARGV[1]
+
+if redis.call("HGET", claimKey, "owner") == workerId then
+  return redis.call("DEL", claimKey)
+end
+return 0
+`;
+
 const RETRY_RESTAGE_LUA =
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -1611,34 +1836,56 @@ export function readTenantCap(): number {
 
 /**
  * Poison guard (specs/event-sourcing/poison-group-park-guard.feature): a group
- * is parked once this many consecutive claims ended with the process dying
- * before the strike could be cleared. Deaths tolerated = threshold; the claim
- * after that parks. Kept small: every extra strike is another fleet-wide
- * worker crash. Interleaved victims of someone else's poison clear their
- * single strike on their next healthy claim, so only the group that keeps
- * killing workers ever reaches the threshold.
+ * is parked once this many claims found their predecessor's worker dead.
+ * Deaths tolerated = threshold; the claim that observes the last one parks.
+ * Kept small: every extra death is another fleet-wide worker crash.
+ *
+ * A death is CONFIRMED, never inferred. See {@link CLAIM_GUARD_LUA}: the claim
+ * marker names the process that owns it, and that process publishes its own
+ * liveness (`alive`, heartbeated) and its own exit (`retired`, written by the
+ * graceful shutdown). A leftover marker is only booked as a death when its
+ * owner is in neither state.
  */
-export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
+export const DEFAULT_CONFIRMED_DEATH_THRESHOLD = 3;
 
 /**
- * Strikes self-expire so a burst of unrelated worker deaths (node eviction,
- * OOM of a neighbour) can't park a healthy group hours later. Refreshed on
- * every claim, so an actively-crash-looping group never loses its count.
+ * The claim marker self-expires so a group cannot be parked by evidence from
+ * an outage hours in the past. Refreshed on every claim, so an actively
+ * crash-looping group never loses its count.
  */
-export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
+export const CLAIM_MARKER_TTL_SECONDS = 60 * 60;
+
+/**
+ * How long a worker's `alive` beacon survives without a refresh. Must exceed
+ * {@link WORKER_LIVENESS_REFRESH_MS} by enough that a couple of lost writes (a
+ * Redis blip, a GC pause) do not read as a death — an absent beacon is the one
+ * piece of evidence that CAN park a group, so it has to mean the process is
+ * genuinely gone rather than briefly unlucky.
+ */
+export const WORKER_LIVENESS_TTL_SECONDS = 90;
+
+/** Beacon refresh interval. Three refreshes fit inside the TTL above. */
+export const WORKER_LIVENESS_REFRESH_MS = 30_000;
+
+/**
+ * How long a graceful shutdown's `retired` tombstone survives. Must outlive the
+ * claim marker: a marker left by a pod that retired an hour ago must still
+ * resolve to "shut down cleanly" rather than decaying into "died".
+ */
+export const WORKER_RETIRED_TTL_SECONDS = CLAIM_MARKER_TTL_SECONDS * 2;
 
 /**
  * Read the poison-guard strike threshold from the environment.
  *
  * Semantics (mirrors readTenantCap):
- *   - env unset / empty / non-numeric / negative → DEFAULT_CLAIM_STRIKE_THRESHOLD
+ *   - env unset / empty / non-numeric / negative → DEFAULT_CONFIRMED_DEATH_THRESHOLD
  *   - env = "0" → 0 (explicit kill switch - guard disabled)
  *   - env = positive integer → that integer
  */
-export function readClaimStrikeThreshold(): number {
+export function readConfirmedDeathThreshold(): number {
   return readNonNegativeIntEnv({
     name: "LANGWATCH_GQ_POISON_STRIKE_THRESHOLD",
-    fallback: DEFAULT_CLAIM_STRIKE_THRESHOLD,
+    fallback: DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   });
 }
 
@@ -1665,8 +1912,34 @@ export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
 export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
 
 /**
+ * Splits one dispatch may perform before bisection gives up and hands the
+ * remainder to the normal retry/backoff path.
+ *
+ * Sized to cover every useful descent (isolating one unprocessable payload in a
+ * 256 batch costs 8 splits; converging to sub-batches of 8 costs 31) while
+ * cutting off the pathological singleton-degradation walk (~2N calls) that
+ * would otherwise run under the group lock for the whole tree.
+ */
+export const DEFAULT_BISECTION_SPLITS_PER_DISPATCH = 32;
+
+/**
+ * Read the bisection split budget from the environment. Mirrors
+ * {@link readGroupQuarantineThreshold}:
+ *   - unset / empty / non-numeric / negative → DEFAULT_BISECTION_SPLITS_PER_DISPATCH
+ *   - "0" → 0 (explicit kill switch — a failing batch is never split, which is
+ *     exactly the pre-bisection behaviour, recoverable without a deploy)
+ *   - positive integer → that integer
+ */
+export function readBisectionSplitBudget(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_BISECTION_SPLIT_BUDGET",
+    fallback: DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
+  });
+}
+
+/**
  * Read the group-quarantine failure-streak threshold from the environment.
- * Mirrors {@link readClaimStrikeThreshold}:
+ * Mirrors {@link readConfirmedDeathThreshold}:
  *   - unset / empty / non-numeric / negative → DEFAULT_GROUP_QUARANTINE_THRESHOLD
  *   - "0" → 0 (explicit kill switch — the breaker is disabled)
  *   - positive integer → that integer
@@ -1724,11 +1997,58 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
+
+const REGISTER_PREFLIGHT_TARGETS_LUA = `
+local targetKey = KEYS[1]
+local candidatesKey = KEYS[2]
+local signalKey = KEYS[3]
+local ttlSec = tonumber(ARGV[1])
+for index = 2, #ARGV do
+  local groupId = ARGV[index]
+  redis.call("SADD", targetKey, groupId)
+  -- Registration puts a target ahead of the dispatch loop's wall-clock
+  -- rotation scores. This also re-activates a target when an older worker
+  -- stages it without knowing the preflight protocol.
+  redis.call("ZADD", candidatesKey, index - 1, groupId)
+end
+redis.call("EXPIRE", targetKey, ttlSec)
+redis.call("EXPIRE", candidatesKey, ttlSec)
+redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
+return #ARGV - 1
+`;
+const registerPreflightTargetsScript = new CachedLuaScript(
+  REGISTER_PREFLIGHT_TARGETS_LUA,
+);
+
+const INSPECT_PREFLIGHT_TARGETS_LUA = `
+local targetKey = KEYS[1]
+local blockedKey = KEYS[2]
+local keyPrefix = ARGV[1]
+local groups = redis.call("SMEMBERS", targetKey)
+local pending = 0
+local active = 0
+local failed = 0
+local blocked = 0
+for _, groupId in ipairs(groups) do
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  pending = pending + redis.call("ZCARD", groupPrefix .. ":jobs")
+  active = active + redis.call("EXISTS", groupPrefix .. ":active")
+  failed = failed + redis.call("EXISTS", groupPrefix .. ":error")
+  blocked = blocked + redis.call("SISMEMBER", blockedKey, groupId)
+end
+return {pending, active, failed, blocked, #groups}
+`;
+const inspectPreflightTargetsScript = new CachedLuaScript(
+  INSPECT_PREFLIGHT_TARGETS_LUA,
+);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
+const claimGuardScript = new CachedLuaScript(CLAIM_GUARD_LUA);
+const releaseClaimScript = new CachedLuaScript(RELEASE_CLAIM_LUA);
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
@@ -1949,10 +2269,12 @@ export class GroupStagingScripts {
     nowMs,
     activeTtlSec,
     maxJobs,
+    allowedGroupsKey,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
+    allowedGroupsKey?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -1963,30 +2285,67 @@ export class GroupStagingScripts {
 
     const result = await dispatchBatchScript.run(
       this.redis,
-      4,
+      5,
       readyKey,
       blockedKey,
       pausedJobKey,
       totalPendingKey,
+      resolveDispatchAllowListRedisKey({
+        keyPrefix: this.keyPrefix,
+        allowedGroupsKey,
+      }),
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
       String(maxJobs),
       String(tenantCap),
       String(readGlobalBudget()),
+      allowedGroupsKey ? "1" : "",
     );
 
-    if (!result || !Array.isArray(result) || result.length < 4) {
+    // The script returns [flatResults, overrideDispatched]. The count rides
+    // back with the results rather than living in a Redis key because a
+    // Prometheus counter has to be per-process: one shared key reported by
+    // every pod would multiply under sum(), the way the blocked-groups gauge
+    // already does.
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    const [rawResults, rawOverride] = result as [unknown, unknown];
+    const flat = Array.isArray(rawResults) ? rawResults : [];
+
+    // A layout the script cannot produce (partial tuples) means the reply is
+    // corrupt: don't count anything from it, and dispatch nothing.
+    if (flat.length % 4 !== 0) {
+      return [];
+    }
+
+    // Override dispatches are a subset of this batch's dispatches, so the
+    // count can never exceed the tuples that came back with it.
+    const overrideDispatched = Number(rawOverride);
+    if (
+      Number.isSafeInteger(overrideDispatched) &&
+      overrideDispatched > 0 &&
+      overrideDispatched <= flat.length / 4
+    ) {
+      gqJobsDispatchedOverrideTotal.inc(
+        { queue_name: this.queueName },
+        overrideDispatched,
+      );
+    }
+
+    if (flat.length === 0) {
       return [];
     }
 
     const dispatched: DispatchResult[] = [];
-    for (let i = 0; i < result.length; i += 4) {
+    for (let i = 0; i < flat.length; i += 4) {
       dispatched.push({
-        stagedJobId: String(result[i]),
-        groupId: String(result[i + 1]),
-        jobDataJson: String(result[i + 2]),
-        originalScore: Number(result[i + 3]),
+        stagedJobId: String(flat[i]),
+        groupId: String(flat[i + 1]),
+        jobDataJson: String(flat[i + 2]),
+        originalScore: Number(flat[i + 3]),
       });
     }
 
@@ -2266,36 +2625,133 @@ export class GroupStagingScripts {
     await this.redis.srem(`${this.keyPrefix}paused-jobs`, key);
   }
 
-  private claimStrikesKey(groupId: string): string {
-    return `${this.keyPrefix}group:${groupId}:strikes`;
+  private claimMarkerKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:claim`;
+  }
+
+  private workerBeaconKey(workerId: string): string {
+    return `${this.keyPrefix}worker:${workerId}`;
   }
 
   /**
-   * Poison-guard claim strike (specs/event-sourcing/poison-group-park-guard.feature).
-   * Recorded when a worker claims a group's job, cleared on every code path
-   * where the process survives - so only groups whose jobs kill the process
-   * (event-loop seizure → liveness kill) accumulate a count. The TTL keeps an
-   * old strike from parking a healthy group long after an unrelated death.
-   *
-   * @returns the strike count including this claim
+   * Publish this worker's liveness beacon. Called once before the worker takes
+   * its first claim and refreshed on {@link WORKER_LIVENESS_REFRESH_MS}: the
+   * beacon is what stops another worker booking this one's leftover claim
+   * markers as deaths, so it has to exist before the claims do.
    */
-  async recordClaimStrike(groupId: string): Promise<number> {
-    const key = this.claimStrikesKey(groupId);
-    const results = await this.redis
-      .multi()
-      .incr(key)
-      .expire(key, CLAIM_STRIKE_TTL_SECONDS)
-      .exec();
-    const count = results?.[0]?.[1];
-    return typeof count === "number" ? count : 0;
+  async recordWorkerAlive(workerId: string): Promise<void> {
+    await this.redis.set(
+      this.workerBeaconKey(workerId),
+      "alive",
+      "EX",
+      WORKER_LIVENESS_TTL_SECONDS,
+    );
   }
 
-  async clearClaimStrikes(groupId: string): Promise<void> {
-    await this.redis.del(this.claimStrikesKey(groupId));
+  /**
+   * Replace this worker's beacon with a retirement tombstone. A planned exit is
+   * not a worker death, and the tombstone is what says so to whoever inherits
+   * the claim markers this process leaves behind. Outlives the marker itself
+   * (see {@link WORKER_RETIRED_TTL_SECONDS}), so the answer cannot decay from
+   * "retired" into "died" while a marker still refers to it.
+   *
+   * The caller MUST stop the liveness heartbeat first, or a refresh landing
+   * after this write would restore a short-lived `alive` that then expires.
+   */
+  async retireWorker(workerId: string): Promise<void> {
+    await this.redis.set(
+      this.workerBeaconKey(workerId),
+      "retired",
+      "EX",
+      WORKER_RETIRED_TTL_SECONDS,
+    );
   }
 
-  async getClaimStrikes(groupId: string): Promise<number> {
-    const raw = await this.redis.get(this.claimStrikesKey(groupId));
+  /**
+   * Take ownership of a group's claim and report how many worker deaths this
+   * group has now confirmably caused. See {@link CLAIM_GUARD_LUA} for why the
+   * count is derived from the previous owner's beacon rather than from the
+   * absence of a delete.
+   *
+   * @returns the confirmed-death count for the group including any death this
+   *   claim just observed, and what this claim found the previous owner to be —
+   *   `none` (no marker), `self`, `alive`, `retired`, or `gone` (the state that
+   *   books a death). The state is diagnostic only: it is what lets a park line
+   *   distinguish a real crash-loop from a Redis outage that expired healthy
+   *   beacons, which otherwise read identically.
+   */
+  async recordClaim({
+    groupId,
+    workerId,
+    stagedJobId,
+  }: {
+    groupId: string;
+    workerId: string;
+    stagedJobId: string;
+  }): Promise<{ deaths: number; lastOwnerState: string }> {
+    const result = await claimGuardScript.run(
+      this.redis,
+      // Declared as a KEY, not derived in Lua: ioredis routes a cluster EVAL by
+      // its KEYS, so a zero-key script lands on an arbitrary node and the
+      // derived accesses can fall outside the slot that node owns. The beacon
+      // key stays derived from `keyPrefix`, which carries the same hash tag.
+      1,
+      this.claimMarkerKey(groupId),
+      this.keyPrefix,
+      workerId,
+      stagedJobId,
+      String(CLAIM_MARKER_TTL_SECONDS),
+    );
+    const [deaths, lastOwnerState] = Array.isArray(result) ? result : [];
+    return {
+      deaths: typeof deaths === "number" ? deaths : 0,
+      lastOwnerState: typeof lastOwnerState === "string" ? lastOwnerState : "",
+    };
+  }
+
+  /**
+   * Release this worker's claim marker, if it is still the owner.
+   *
+   * Losing this write is harmless: the marker it would have removed still names
+   * a live (or cleanly retired) owner, so the next claim reads it as ordinary
+   * rather than as a death.
+   *
+   * Deleting it when we are NOT the owner is not harmless, which is why this is
+   * a compare-and-delete — see {@link RELEASE_CLAIM_LUA}.
+   */
+  async releaseClaim({
+    groupId,
+    workerId,
+  }: {
+    groupId: string;
+    workerId: string;
+  }): Promise<void> {
+    await releaseClaimScript.run(
+      this.redis,
+      1,
+      this.claimMarkerKey(groupId),
+      workerId,
+    );
+  }
+
+  /**
+   * Drop the claim marker whoever owns it.
+   *
+   * Only for parking, where the group leaves the dispatch path entirely and the
+   * marker must not survive to re-park the group on the operator's next
+   * unblock. An ownership check here would reintroduce exactly that: the park
+   * can run on a claim this worker never recorded (the guard stands down when
+   * its beacon is unconfirmed, and the oversized-payload park does not consult
+   * the guard at all), and the marker would then be left sitting at the
+   * threshold.
+   */
+  async discardClaim(groupId: string): Promise<void> {
+    await this.redis.del(this.claimMarkerKey(groupId));
+  }
+
+  /** Confirmed worker deaths recorded against a group. */
+  async getConfirmedDeaths(groupId: string): Promise<number> {
+    const raw = await this.redis.hget(this.claimMarkerKey(groupId), "deaths");
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
   }
@@ -2367,6 +2823,48 @@ export class GroupStagingScripts {
     return this.redis.zcard(`${this.keyPrefix}ready`);
   }
 
+  async inspectPreflightTargets(targetKey: string): Promise<{
+    pending: number;
+    active: number;
+    failed: number;
+    blocked: number;
+    groups: number;
+  }> {
+    const result = (await inspectPreflightTargetsScript.run(
+      this.redis,
+      2,
+      targetKey,
+      `${this.keyPrefix}blocked`,
+      this.keyPrefix,
+    )) as number[];
+    return {
+      pending: Number(result[0] ?? 0),
+      active: Number(result[1] ?? 0),
+      failed: Number(result[2] ?? 0),
+      blocked: Number(result[3] ?? 0),
+      groups: Number(result[4] ?? 0),
+    };
+  }
+
+  async registerPreflightTargets({
+    targetKey,
+    groupIds,
+  }: {
+    targetKey: string;
+    groupIds: readonly string[];
+  }): Promise<void> {
+    if (groupIds.length === 0) return;
+    await registerPreflightTargetsScript.run(
+      this.redis,
+      3,
+      targetKey,
+      `${targetKey}:candidates`,
+      this.getSignalKey(),
+      "3600",
+      ...groupIds,
+    );
+  }
+
   /**
    * Earliest dispatch-after score in the ready set, or null when empty.
    * The dispatcher clamps its BRPOP fallback to this so groups staged
@@ -2400,4 +2898,16 @@ export class GroupStagingScripts {
  */
 export function pendingGroupsKey(keyPrefix: string): string {
   return `${keyPrefix}pending-groups`;
+}
+
+/**
+ * Key holding the drift the last reconcile pass measured for this queue, from
+ * its key prefix (`<name>:gq:`).
+ *
+ * Shared rather than per-process because the reconcile is single-flighted: only
+ * the instance that wins the marker computes a drift, so any other instance
+ * reporting its own local figure reports zero for a queue it never recomputed.
+ */
+export function pendingDriftKey(keyPrefix: string): string {
+  return `${keyPrefix}stats:pending-drift`;
 }

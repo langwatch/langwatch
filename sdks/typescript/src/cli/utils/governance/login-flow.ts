@@ -21,14 +21,22 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import {
+	type BudgetOverviewResponse,
 	type CliBootstrapResponse,
 	extractLookupIdFromToken,
+	getBudgetOverview,
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
-import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
+import {
+	type GovernanceConfig,
+	displayConfigPath,
+	loadConfig,
+	saveConfig,
+} from "./config";
 import {
 	type CredentialType,
 	DeviceFlowError,
@@ -39,15 +47,25 @@ import {
 } from "./device-flow";
 import { rememberProjectName } from "../identityNotice";
 import { formatLoginCeremony } from "./login-ceremony";
-import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
+import {
+	keptWiringLines,
+	refreshTelemetryWiringForLogin,
+} from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
-	/** Credential type to mint. Defaults to 'device_session' for back-compat. */
+	/** Credential type to request. Defaults to 'device_session' for back-compat. */
 	kind?: CredentialType;
 	/** Optional browser override (LANGWATCH_BROWSER also honoured). */
 	browser?: string;
 	/** Pre-loaded config to mutate; defaults to `loadConfig()`. */
 	cfg?: GovernanceConfig;
+	/**
+	 * The login runs as a step of another command, which words the sign-in
+	 * itself. Prints the address to open, the code and who signed in, plus any
+	 * change to the machine's tool wiring. The header, the AI tools, the model
+	 * providers, the budgets and the dashboard line are left to `langwatch login`.
+	 */
+	isQuiet?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -64,21 +82,24 @@ export async function runUnifiedLoginFlow(
 	const kind: CredentialType = opts.kind ?? "device_session";
 	const cfg = opts.cfg ?? loadConfig();
 	const baseUrl = cfg.control_plane_url;
+	const isQuiet = opts.isQuiet === true;
 
-	console.log(chalk.blue("🔐 LangWatch login"));
-	console.log(chalk.gray(`Control plane: ${baseUrl}`));
-	console.log(
-		chalk.gray(
-			kind === "project_api_key"
-				? "Mode: project SDK API key (will write .env)"
-				: "Mode: device session (will write ~/.langwatch/config.json)",
-		),
-	);
+	if (!isQuiet) {
+		console.log(chalk.blue("🔐 LangWatch login"));
+		console.log(chalk.gray(`Control plane: ${baseUrl}`));
+		console.log(
+			chalk.gray(
+				kind === "project_api_key"
+					? "Mode: project SDK API key (will write .env)"
+					: `Mode: device session (will write ${displayConfigPath()})`,
+			),
+		);
+	}
 
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
 		dc.verification_uri_complete ??
-		`${dc.verification_uri.replace(/\/+$/, "")}?user_code=${encodeURIComponent(dc.user_code)}`;
+		`${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;
 
 	console.log();
 	console.log(chalk.cyan(`Opening: ${verifyURL}`));
@@ -157,10 +178,15 @@ export async function runUnifiedLoginFlow(
 						cfg.default_personal_ingest_keys,
 					)) {
 						const lookupId = extractLookupIdFromToken(entry.secret ?? "");
-						if (lookupId && liveSet.has(`${sourceType}:${lookupId}`)) {
+						if (lookupId === undefined) {
+							// Not a personal ik-lw- token: a credential the user placed
+							// here by hand. It cannot be matched against the personal
+							// listing, so it is kept, never dropped as stale.
+							reconciled[sourceType] = entry;
+						} else if (liveSet.has(`${sourceType}:${lookupId}`)) {
 							reconciled[sourceType] = entry;
 						} else {
-							// Entry is stale (revoked or lookupId missing) — omit from reconciled
+							// Revoked on the platform — omit from reconciled.
 							changed = true;
 						}
 					}
@@ -192,9 +218,45 @@ export async function runUnifiedLoginFlow(
 						console.log(chalk.gray(`  • ${label}`));
 					}
 				}
+				for (const warning of refresh.warnings ?? []) {
+					console.warn(chalk.yellow(`  ${warning}`));
+				}
+				if (refresh.kept) {
+					console.log();
+					for (const line of keptWiringLines(refresh.kept)) {
+						console.log(chalk.gray(`  ${line}`));
+					}
+				}
 			} catch {
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
+
+			if (isQuiet) return cfg;
+
+			// Per-budget epilogue data. Every budget that binds this key,
+			// labelled with its scope, so the ceremony never presents the
+			// whole organization's cap as if it were personal. Null on older
+			// servers without the endpoint; the ceremony then falls back to
+			// the /bootstrap collapsed line.
+			const budgetOverview = await fetchBudgetOverviewSafely(cfg);
+
+			// Three states, named rather than nested: undefined means the
+			// server predates the overview endpoint and the ceremony may
+			// fall back to the legacy line; an empty list means the member
+			// has no gateway access, which renders nothing budget-related
+			// and stops the legacy line resurfacing it.
+			const ceremonyBudgets = !budgetOverview
+				? undefined
+				: budgetOverview.gatewayAccess
+					? budgetOverview.budgets.map((b) => ({
+							spentUsd: Number.parseFloat(b.spentUsd) || 0,
+							limitUsd: Number.parseFloat(b.limitUsd) || 0,
+							window: b.window,
+							scopePhrase: b.scopePhrase,
+							providerLabel: b.providerLabel,
+							resetsAt: b.resetsAt,
+						}))
+					: [];
 
 			console.log();
 			const ceremonyLines = formatLoginCeremony({
@@ -210,6 +272,8 @@ export async function runUnifiedLoginFlow(
 								usedUsd: bootstrap.budget.monthlyUsedUsd,
 							}
 						: undefined,
+				budgets: ceremonyBudgets,
+				budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
 			});
 			for (const line of ceremonyLines) {
 				console.log(line);
@@ -222,7 +286,7 @@ export async function runUnifiedLoginFlow(
 
 		// kind === 'api_key' — write to project-local .env (NO copy-paste)
 		spinner.succeed(
-			`API key generated for project ${chalk.bold(result.project.name)}`,
+			`Connected to project ${chalk.bold(result.project.name)}`,
 		);
 		// Seed the identity notice's credential-to-project-name cache while the
 		// server is telling us the name anyway, so the first api-key notice
@@ -321,8 +385,27 @@ function persistDeviceSession(
 			validated_at: Math.floor(Date.now() / 1000),
 		};
 	}
+	// The user-scoped login key, and what it reaches. The previous login's key
+	// goes first for the same reason its personal project does: it belongs to
+	// the user who logged in before, and keeping it would authenticate the new
+	// session as them. A server that ships no key leaves both fields absent,
+	// which is what puts the resolver back on the personal-project path.
+	delete cfg.cli_api_key;
+	delete cfg.cli_api_key_scope;
+	if (result.cli_api_key) {
+		cfg.cli_api_key = result.cli_api_key;
+		if (result.cli_api_key_scope) {
+			cfg.cli_api_key_scope = {
+				kind: result.cli_api_key_scope.kind,
+				project_ids: result.cli_api_key_scope.project_ids ?? [],
+				...(Array.isArray(result.cli_api_key_scope.permissions)
+					? { permissions: result.cli_api_key_scope.permissions }
+					: {}),
+			};
+		}
+	}
 	if (result.endpoint) {
-		cfg.control_plane_url = result.endpoint.replace(/\/+$/, "");
+		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}
 }
 
@@ -365,6 +448,29 @@ async function fetchBootstrapSafely(
 	try {
 		return await getCliBootstrap(cfg);
 	} catch {
+		return null;
+	}
+}
+
+/**
+ * The login has already succeeded by the time this runs, so the epilogue
+ * gets a deadline rather than the user's patience: a control plane that
+ * accepts the connection and never answers would otherwise stop the
+ * ceremony from printing at all.
+ */
+const BUDGET_OVERVIEW_TIMEOUT_MS = 5_000;
+
+async function fetchBudgetOverviewSafely(
+	cfg: GovernanceConfig,
+): Promise<BudgetOverviewResponse | null> {
+	try {
+		return await getBudgetOverview(cfg, {
+			timeoutMs: BUDGET_OVERVIEW_TIMEOUT_MS,
+		});
+	} catch {
+		// The epilogue is decoration on a login that already succeeded:
+		// a timeout, a refused connection or a 5xx all fall back to the
+		// legacy collapsed line rather than failing the login.
 		return null;
 	}
 }

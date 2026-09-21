@@ -1,6 +1,6 @@
 import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
-import { topLevelNavigationCommands } from "../command-registry";
+
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,
@@ -9,6 +9,7 @@ import { findEasterEgg } from "../easterEggs";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
 import type { GroupedRecentItems } from "../useRecentItems";
+import { useTopLevelNavigationCommands } from "./useCommandFeatureFlags";
 import type { FilteredCommands } from "./useFilteredCommands";
 import type { FilteredProject } from "./useFilteredProjects";
 
@@ -32,7 +33,7 @@ export function useCommandBarItems(
   easterEggItem: ListItem | null;
   askLangyItem: ListItem | null;
 } {
-  const availableTopLevelNav = topLevelNavigationCommands;
+  const availableTopLevelNav = useTopLevelNavigationCommands();
 
   // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
   // (not a static registry command) so it can carry the live query and only

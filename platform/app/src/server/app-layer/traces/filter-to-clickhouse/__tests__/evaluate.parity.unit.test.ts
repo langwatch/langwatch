@@ -314,6 +314,24 @@ const cases: Case[] = [
     expected: true,
   },
   {
+    name: "evaluatorVerdict skipped is its own bucket",
+    query: "evaluatorVerdict:skipped",
+    trace: makeTrace(
+      {},
+      { evaluations: [makeEval({ status: "skipped", passed: null })] },
+    ),
+    expected: true,
+  },
+  {
+    name: "evaluatorVerdict:unknown misses a skipped run",
+    query: "evaluatorVerdict:unknown",
+    trace: makeTrace(
+      {},
+      { evaluations: [makeEval({ status: "skipped", passed: null })] },
+    ),
+    expected: false,
+  },
+  {
     name: "evaluatorScore range over the loaded runs",
     query: "evaluatorScore:[0.5 TO 1]",
     trace: makeTrace({}, { evaluations: [makeEval({ score: 0.7 })] }),

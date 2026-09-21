@@ -1,7 +1,7 @@
 ---
 title: Capturing Evaluations & Guardrails
 sidebarTitle: Evaluations & Guardrails
-description: Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
+description: LangWatch logs custom evaluations, triggers managed evaluations, and runs guardrails.
 keywords: Custom Evaluations, Managed Evaluations, Guardrails, LangWatch Evaluations, add_evaluation, evaluate, async_evaluate, Evaluation Metric, Evaluation Score, Evaluation Pass/Fail, Evaluation Label, Evaluation Details, Evaluation Cost, Evaluation Status, Evaluation Error, Evaluation Timestamps, Evaluation Type, Guardrail
 ---
 
@@ -78,12 +78,12 @@ if __name__ == "__main__":
 
 The `add_evaluation()` method is available on both `LangWatchSpan` and `LangWatchTrace` objects (when using on a trace, you must specify the target `span`). For detailed parameter descriptions, please refer to the API reference:
 
-- [`LangWatchSpan.add_evaluation()`](/integration/python/reference#add_evaluation-1)
-- [`LangWatchTrace.add_evaluation()`](/integration/python/reference#add_evaluation)
+- [`LangWatchSpan.add_evaluation()`](/integration/python/reference#langwatchspan-object-methods)
+- [`LangWatchTrace.add_evaluation()`](/integration/python/reference#langwatchtrace-object-methods)
 
 ## 2. Server-Side Managed Evaluations (`evaluate` & `async_evaluate`)
 
-LangWatch allows you to trigger evaluations that are performed by the LangWatch backend. These can be [built-in evaluators](/evaluations/evaluators/list) (e.g., for faithfulness, relevance) or [custom evaluators you define](/evaluations/evaluators/custom-evaluators) in your LangWatch project settings.
+LangWatch allows you to trigger evaluations that are performed by the LangWatch backend. These can be [built-in evaluators](/evaluations/evaluators/list) (e.g., for faithfulness, relevance) or [custom evaluators you define](/evaluations/evaluators/custom-scoring) in your LangWatch project settings.
 
 You use the `evaluate()` (synchronous) or `async_evaluate()` (asynchronous) functions for this. These functions send the necessary data to the LangWatch API, which then processes the evaluation. These server-side evaluations are a core part of setting up [real-time monitoring and evaluations in production](/evaluations/online-evaluation/setup-monitors).
 
@@ -155,14 +155,16 @@ if __name__ == "__main__":
 
 The `evaluate()` and `async_evaluate()` methods are available on both `LangWatchSpan` and `LangWatchTrace` objects. They can also be imported from `langwatch.evaluations` and called as `langwatch.evaluate()` or `langwatch.async_evaluate()`, where you would then explicitly pass the `span` or `trace` argument. For detailed parameter descriptions, refer to the API reference:
 
-- [`LangWatchSpan.evaluate()`](/integration/python/reference#evaluate-1) and [`LangWatchSpan.async_evaluate()`](/integration/python/reference#async_evaluate-1)
-- [`LangWatchTrace.evaluate()`](/integration/python/reference#evaluate) and [`LangWatchTrace.async_evaluate()`](/integration/python/reference#async_evaluate)
+- [`LangWatchSpan.evaluate()`](/integration/python/reference#langwatchspan-object-methods) and [`LangWatchSpan.async_evaluate()`](/integration/python/reference#langwatchspan-object-methods)
+- [`LangWatchTrace.evaluate()`](/integration/python/reference#langwatchtrace-object-methods) and [`LangWatchTrace.async_evaluate()`](/integration/python/reference#langwatchtrace-object-methods)
 
 <Tip>
   **Understanding the `data` Parameter:**
 
   The core parameters like `slug`, `data`, `settings`, `as_guardrail`, `span`, and `trace` are generally consistent.
-  For the `data` parameter specifically: while `BasicEvaluateData` is commonly used to provide a standardized structure for `input`, `output`, and `contexts` (which many built-in or common evaluators expect), it's important to know that `data` can be **any dictionary**. This flexibility allows you to pass arbitrary data structures tailored to custom server-side evaluators you might define. Using `BasicEvaluateData` with fields like `expected_output` is particularly useful when [evaluating if the LLM is generating the right answers](/evaluations/experiments/ui/answer-correctness) against a set of expected outputs. For scenarios where a golden answer isn't available, LangWatch also supports more open-ended evaluations, such as using an [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge).
+  For the `data` parameter specifically: `BasicEvaluateData` gives `input`, `output` and `contexts` a standardized structure, which is what many built-in evaluators expect. But `data` can be **any dictionary**, so you can pass arbitrary structures tailored to the custom server-side evaluators you define.
+
+  `BasicEvaluateData` with fields like `expected_output` is useful when [evaluating if the LLM is generating the right answers](/evaluations/experiments/ui/answer-correctness) against a set of expected outputs. Where a golden answer is not available, use an open-ended evaluation instead, such as [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge).
 </Tip>
 
 The `slug` parameter refers to the unique identifier of the evaluator configured in your LangWatch project settings. You can find a list of available evaluator types and learn how to configure them in our [LLM Evaluation documentation](/evaluations/evaluators/list).
@@ -190,7 +192,9 @@ if pii_check_result.passed is False:
     # Take action: sanitize response, return a canned message, etc.
     return "Response redacted due to PII."
 ```
-A key behavior of `as_guardrail=True` for server-side evaluations is that if the *evaluation process itself* encounters an error (e.g., the evaluator service is down), the result will have `status="error"` but `passed` will default to `True`. This is a fail-safe to prevent your application from breaking due to an issue in the guardrail execution itself, assuming a "pass by default on error" stance is desired. For more on setting up safety-focused real-time evaluations like PII detection or prompt injection monitors, see our guide on [Setting up Real-Time Evaluations](/evaluations/online-evaluation/setup-monitors).
+`as_guardrail=True` changes what happens when the *evaluation process itself* fails, for example when the evaluator service is down. The result carries `status="error"` and `passed` defaults to `True`, so a broken guardrail does not break your application. That is a "pass by default on error" stance, which is the right one when the guardrail is advisory rather than a hard gate.
+
+For safety-focused real-time evaluations such as PII detection or prompt injection monitors, see [Setting up Real-Time Evaluations](/evaluations/online-evaluation/setup-monitors).
 
 **Using Client-Side `add_evaluation` as Guardrails:**
 Set `is_guardrail=True` when calling `add_evaluation`.
@@ -235,5 +239,3 @@ These spans will contain the evaluation's name, result (score, passed, label), d
     - **Server-Side**: Evaluate RAG system outputs for ["Context Relevancy" and "Faithfulness"](/evaluations/evaluators/list) using managed evaluators.
 - **A/B Testing**: Log custom metrics or trigger standard evaluations for different model versions or prompts to compare their performance.
 - **Feedback Integration**: `add_evaluation` can be used to pipe scores from an external human review platform directly into the relevant trace.
-
-By combining these methods, you can build a robust evaluation and guardrailing strategy tailored to your application's needs, all observable within LangWatch.

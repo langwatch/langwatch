@@ -56,6 +56,16 @@ Feature: The Langy home
     And exactly one such canvas is on the page
     And the current announcement reads as a single line across the block's top
 
+  # The results carry a line above them in the raised Cmd+K bar, where the
+  # field and the list share one card and the line is the boundary between
+  # them. Here the results are their own panel under the field, so that line
+  # became a second edge a few pixels inside the panel's own.
+  Scenario: The results panel draws one edge, not two
+    Given the Langy home renders
+    When I type into the field
+    Then the results hang under it as one panel with one border
+    And no further line runs above the first group
+
   Scenario: The example asks are the ones Langy actually offers
     Given the Langy home renders
     Then the row beneath the composer offers three example asks
@@ -85,6 +95,17 @@ Feature: The Langy home
     And one quiet line tells me how to get access
     And the example asks are not shown
 
+  # The field starts conversations and the panel's composer continues them.
+  # Offered together, a line typed here while the panel was open on a
+  # conversation went into a new one.
+  Scenario: The field stands down while a conversation is open
+    Given the Langy home renders
+    And the Langy panel is open on a conversation, or a question I handed over is on its way
+    Then the ask field is not offered
+    And a quiet line offers to continue that conversation
+    And choosing it opens the panel and puts the cursor in its composer, and starts nothing
+    And the example asks step aside, keeping their room
+
   Scenario: A project with nothing in it yet still opens with the composer
     Given the Langy home renders
     And the project has never received a trace
@@ -99,8 +120,13 @@ Feature: The Langy home
     Given the Langy home renders
     And the project has never received a trace
     Then a prominent send-your-first-trace control sits above the example asks
-    And it offers Langy's walkthrough, a prompt for my coding agent, and the docs
+    And it offers the same routes in the same order as every empty page: the
+      prompt for my coding agent first, Langy's walkthrough second, the docs third
+    And the prompt it copies is the tracing skill, led by the project's keys,
+      falling back to the install line while the skill is still on its way
+      (specs/skills/empty-state-skill-setup.feature)
     And the walkthrough route is withheld when I cannot start conversations
+    And the control's glyphs count the routes it opens with
 
   Scenario: A populated project keeps the quiet onboarding route
     Given the Langy home renders

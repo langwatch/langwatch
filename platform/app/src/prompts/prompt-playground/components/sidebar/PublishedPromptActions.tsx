@@ -55,7 +55,7 @@ export function PublishedPromptActions({
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
   const duplicatePrompt = api.prompts.duplicate.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Cascade-resolved model for new-tab "view history" prompts.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
@@ -81,9 +81,6 @@ export function PublishedPromptActions({
           promptHandle,
         )}" has been updated from source.`,
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
     } catch (error) {
       showErrorToast({
@@ -108,9 +105,6 @@ export function PublishedPromptActions({
           promptHandle,
         )}" was duplicated as "${getDisplayHandle(duplicated.handle)}"`,
         type: "success",
-        meta: {
-          closable: true,
-        },
       });
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't duplicate the prompt" });

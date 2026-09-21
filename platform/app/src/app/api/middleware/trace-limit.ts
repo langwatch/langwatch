@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
+import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
 import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:api:middleware:trace-limit");
@@ -30,6 +31,9 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
         await getApp().usageLimits.notifyPlanLimitReached({
           organizationId: team.organizationId,
           planName: activePlan.name ?? "free",
+          usageUnit: result.usageUnit,
+          current: result.count,
+          max: result.maxMessagesPerMonth,
         });
       }
     } catch (error) {
@@ -49,7 +53,11 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
       "Project has reached plan limit",
     );
 
-    return c.json({ error: "ERR_PLAN_LIMIT", message: result.message }, 429);
+    throw new PlanLimitExceededError(result.message, {
+      currentMonthMessagesCount: result.count,
+      maxMessagesPerMonth: result.maxMessagesPerMonth,
+      activePlanName: result.planName,
+    });
   }
 
   await next();

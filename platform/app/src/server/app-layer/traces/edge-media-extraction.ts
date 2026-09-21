@@ -43,6 +43,7 @@ import type {
   OtlpSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { getEdgeMediaExtractFailOpenCounter } from "~/server/metrics";
 import type { ExtractedRef } from "~/server/stored-objects/content-extractor";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
@@ -82,6 +83,9 @@ async function defaultIsEnabled(projectId: string): Promise<boolean> {
   return await featureFlagService.isEnabled("release_trace_media_extraction", {
     distinctId: projectId,
     projectId,
+    // A per-project opt-in on the ingestion path. It takes no organization
+    // lookup, so only the project targets it.
+    organizationId: NOT_TARGETED,
   });
 }
 

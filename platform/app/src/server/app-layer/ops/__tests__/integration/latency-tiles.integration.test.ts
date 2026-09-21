@@ -1,6 +1,10 @@
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  latencyAllTimeKey,
+  latencyMinuteBucketKey,
+} from "~/shared/ops/latency";
+import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
@@ -12,6 +16,7 @@ import {
   NullQueueRepository,
   type QueueRepository,
 } from "../../repositories/queue.repository";
+import { SnapshotRedisRepository } from "../../snapshot/snapshot.repository";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -187,6 +192,74 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           );
           expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(
             data.latencyP99Ms,
+          );
+        } finally {
+          collector.stop();
+        }
+      });
+    });
+  });
+
+  describe("given completions recorded into the time-bucketed histograms", () => {
+    describe("when the writer's detail cycle runs", () => {
+      /** @scenario "Windowed percentiles ride the detail artifact" */
+      it("publishes hour, day, week, and all-time percentiles a reader can serve", async () => {
+        const { queue, name } = createQueue({
+          process: async () => {
+            await new Promise((r) => setTimeout(r, 15));
+          },
+        });
+        await queue.waitUntilReady();
+
+        for (let i = 0; i < 5; i++) {
+          await queue.send({ id: `w${i}`, groupId: `g${i}` });
+        }
+        await waitForLatencyCount(name, 5, 5000);
+
+        // The completions must have landed in all three histogram tiers.
+        const allTime = await redis.hgetall(latencyAllTimeKey(name));
+        expect(Object.keys(allTime).length).toBeGreaterThan(0);
+        const minute = await redis.hgetall(
+          latencyMinuteBucketKey(name, Date.now()),
+        );
+        expect(Object.keys(minute).length).toBeGreaterThan(0);
+
+        const queueRepoStub: QueueRepository = Object.assign(
+          new NullQueueRepository(),
+          {
+            discoverQueueNames: async () => [name],
+          },
+        );
+        const snapshotRepo = new SnapshotRedisRepository(redis);
+        const collector = new OpsMetricsCollector({
+          redis,
+          queueRepo: queueRepoStub,
+          snapshotRepo,
+        });
+        try {
+          await collector.discoverQueues();
+          // First collect acquires the lease and kicks the (unawaited) detail
+          // cycle; poll until the artifact lands.
+          await collector.collect();
+          const start = Date.now();
+          while (!collector.getLatestDetail() && Date.now() - start < 5000) {
+            await new Promise((r) => setTimeout(r, 50));
+          }
+
+          const windows = collector.getLatestDetail()?.latencyWindows;
+          expect(windows?.hour?.count).toBeGreaterThanOrEqual(5);
+          expect(windows?.hour?.p50Ms).toBeGreaterThan(0);
+          expect(windows?.day?.count).toBe(windows?.hour?.count);
+          expect(windows?.week?.count).toBe(windows?.hour?.count);
+          expect(windows?.allTime?.p99Ms).toBeGreaterThanOrEqual(
+            windows?.allTime?.p50Ms ?? 0,
+          );
+
+          // The reader path: the persisted artifact round-trips through the
+          // wire schema with the windows intact — what any pod would serve.
+          const served = await snapshotRepo.readDetail();
+          expect(served?.latencyWindows?.hour?.p50Ms).toBe(
+            windows?.hour?.p50Ms,
           );
         } finally {
           collector.stop();

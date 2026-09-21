@@ -213,7 +213,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
           projectSlug: "acme",
           resourceId: "trace_1",
         }),
-      ).toBe("/acme/messages/trace_1");
+      ).toBe("/acme/traces/trace_1");
     });
   });
 

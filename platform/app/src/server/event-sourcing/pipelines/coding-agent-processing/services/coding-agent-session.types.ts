@@ -20,6 +20,7 @@
  * an error class). That invariant is what makes it safe to summarise a session of
  * unknown size — it is the same one that let us delete MAX_PROCESSED_SPANS.
  */
+import { z } from "zod";
 
 /** One thing the agent did, in the order it did it. */
 export interface SessionStep {
@@ -33,6 +34,17 @@ export interface SessionStep {
 }
 
 /**
+ * Who set the session's `title`, in rank order: the harness's own session
+ * name beats the generated conversation title beats the prompt-derived name.
+ *
+ * A schema rather than a bare union because the value is also decoded back
+ * from a row column, so the names have to exist at runtime. One declaration
+ * serves both, and the two cannot drift apart.
+ */
+export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
+export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
+
+/**
  * One converged metric unit, as its contribution delivered it. A cumulative
  * series is one unit (its latest total wins); a delta point is its own unit
  * (each sums once). Replace-not-increment per ADR-056 §5.
@@ -44,6 +56,58 @@ export interface MetricSeriesFact {
   decision: string | null;
   language: string | null;
   value: number;
+}
+
+/**
+ * What a session spent under one declared working context: the repository
+ * and branch a model call was stamped with, and the call's tokens and
+ * computed cost summed over every call stamped the same way. Never
+ * negative, never a share: the amounts are the calls' own.
+ */
+export interface SessionContextUsage {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
+
+/**
+ * How many working contexts one session's usage record holds. Wider than
+ * `MAX_SET` because a long-lived agent that declares a branch per pull
+ * request reaches fifty in weeks, and a context past the bound is usage the
+ * pull-request read can no longer place; each entry is a few short strings
+ * and five numbers.
+ *
+ * Both sides of the record need it: the fold stops opening contexts here, and
+ * the read recognises a record of exactly this size as saturated and stops
+ * trusting the gap between the counters and the record to be the session's
+ * pre-declaration usage.
+ */
+export const MAX_USAGE_CONTEXTS = 200;
+
+/**
+ * The key one context's usage is kept under. Repository fields are compared
+ * case-folded everywhere the usage is read, so they are folded here too, and
+ * a remote spelled two ways stays one context; a branch name is case
+ * sensitive and kept verbatim.
+ */
+export function contextUsageKey(context: {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+}): string {
+  return [
+    context.repositoryHost.toLowerCase(),
+    context.repositoryOwner.toLowerCase(),
+    context.repositoryName.toLowerCase(),
+    context.branch,
+  ].join("\0");
 }
 
 export interface CodingAgentSessionData {
@@ -68,6 +132,62 @@ export interface CodingAgentSessionData {
    * them this stays null rather than guessing.
    */
   userId: string | null;
+  /**
+   * Spawn lineage, when the agent stamps it: the session that spawned this
+   * one, and whether this session FORKED the parent's context (inheriting the
+   * whole window, and its cost) rather than starting fresh. No agent observed
+   * to date stamps lineage, so these stay null/false: empty means it was
+   * never reported, not that the session has no parent.
+   */
+  parentSessionId: string | null;
+  isFork: boolean;
+  /**
+   * True once any contribution carried the auxiliary fact: the thread was one
+   * the agent ran for itself (codex's thread title generator, its recap), not
+   * a session the user held. Sticky, because the fact rides the thread's
+   * request span and its turn span and log events land in other export
+   * batches, in either order. An auxiliary session keeps its row and its
+   * priced traces; the Sessions list omits it.
+   */
+  auxiliary: boolean;
+  /**
+   * Where the session ran and what it was called, from the LangWatch companion
+   * event (`langwatch.session_context`) and the agent's generated title.
+   *
+   * Semantics differ per field, on purpose:
+   *   - repository host / owner / name and worktree are ONCE-SET. A session is
+   *     one checkout; a later event naming a different repository is a
+   *     correlation accident, not a move, so the first answer stands.
+   *   - branch is LAST-WRITE-WINS. A session that starts on the default branch
+   *     and cuts a feature branch mid-run belongs to the branch it ended on,
+   *     which is the one its pull request comes from.
+   *   - `gitBranches` is the bounded first-seen set of EVERY branch reported,
+   *     the whole history the scalar above keeps only the present tense of. A
+   *     session that lands one change and moves on drove both branches, and
+   *     both of their pull requests.
+   *   - title is LAST-NON-EMPTY-WINS within its source rank: the harness's
+   *     own session name outranks the generated conversation title, which
+   *     outranks the prompt-derived name.
+   *
+   * Degradation, stated: agents with no companion emitter carry nulls here.
+   * Null means nothing reported it, never "this session has no repository".
+   */
+  repositoryHost: string | null;
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+  gitBranches: string[];
+  gitWorktree: string | null;
+  title: string | null;
+  /**
+   * Which source set `title`. Its own field rather than an inference,
+   * because the fold's state is decoded back from the row (ADR-066) and the
+   * title alone cannot say whether a later generated title may replace it —
+   * getting that wrong renames a session away from the name its harness
+   * holds. Null on a row from before the column, which ranks as `generated`
+   * (the strongest source that existed then).
+   */
+  titleSource: SessionTitleSource | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -119,7 +239,30 @@ export interface CodingAgentSessionData {
    * cache is burning money in a way raw token counts do not show.
    */
   cacheCreationTokens: number;
+  /**
+   * Priced from the session's own tokens against the model registry — the
+   * same formula the trace pipeline applies to the same calls, so a session
+   * and its traces state one figure. A logs-only agent, with no token-bearing
+   * span to compute from, carries its reported cost here instead.
+   */
   costUsd: number;
+  /**
+   * What the agent says it was billed, summed off its api_request events.
+   * Kept beside the computed cost, never shown as it: the two drifting apart
+   * per model is the alarm that a price went stale — ours or theirs.
+   */
+  agentReportedCostUsd: number;
+  /**
+   * What the session spent under each working context it declared, keyed by
+   * `contextUsageKey`: the tokens and computed cost of every model call
+   * stamped with that repository and branch. Bounded, first seen first. The
+   * cumulative counters above stay the amount; this record says WHERE it
+   * went, which is what lets one session's cost split across the pull
+   * requests it drove (pull-request-linkage.feature). A call with no stamp
+   * charges no context, so the difference between the counters and this
+   * record's sum is what the session spent before it declared anything.
+   */
+  usageByContext: Record<string, SessionContextUsage>;
 
   // ── Time ──────────────────────────────────────────────────────────────
   /** Wall-clock inside model calls, and inside tools. */
@@ -145,6 +288,12 @@ export interface CodingAgentSessionData {
   compactions: number;
   compactionTokensBefore: number;
   compactionTokensAfter: number;
+  /**
+   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}`. A session
+   * that keeps auto-compacting is out of headroom, one the user compacts is
+   * being STEERED; "unknown" buckets telemetry predating the attribute.
+   */
+  compactionTriggers: Record<string, number>;
   /**
    * The biggest single model call's context (`cacheReadTokens +
    * cacheCreationTokens` for that ONE call) — "how big did the context
@@ -178,6 +327,13 @@ export interface CodingAgentSessionData {
   apiErrors: number;
   /** Rate limits (429) — worth telling apart from every other failure. */
   rateLimited: number;
+  /**
+   * Rate-limit EVENTS the agent reported (`rate_limit_event` /
+   * `rate_limit_info`), kept apart from the 429-inferred `rateLimited` above:
+   * the event also fires on warnings and status updates, so the two counters
+   * answer different questions.
+   */
+  rateLimitEvents: number;
   retriesExhausted: number;
   /** Total wall-clock burned on retries. Time paid for nothing. */
   retryMs: number;

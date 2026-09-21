@@ -10,10 +10,9 @@
 import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import {
   isAbortLikeError,
@@ -133,8 +132,8 @@ secured
 
     const { prompt, currentScenario, projectId } = body;
 
-    const hasPermission = await hasProjectPermission(
-      { prisma, session },
+    const hasPermission = await probeProjectPermission(
+      { session },
       projectId,
       "scenarios:manage",
     );

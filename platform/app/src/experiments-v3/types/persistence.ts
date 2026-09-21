@@ -15,14 +15,21 @@ import {
  * Schema for persisted results.
  * Arrays can contain null/undefined for rows that haven't been executed.
  * Uses targetRowMetadataSchema from types.ts as single source of truth.
+ *
+ * Each group defaults to empty so `results: {}` means "no results yet", which
+ * is how a caller outside the editor clears a run. The load path already
+ * treats a missing group that way, so accepting it here keeps a state that
+ * came out of the API valid when it goes back in.
  */
 export const persistedResultsSchema = z.object({
   runId: z.string().optional(),
   versionId: z.string().optional(),
-  targetOutputs: z.record(z.array(z.unknown())),
-  targetMetadata: z.record(z.array(targetRowMetadataSchema.nullish())),
-  evaluatorResults: z.record(z.record(z.array(z.unknown()))),
-  errors: z.record(z.array(z.string().nullish())),
+  targetOutputs: z.record(z.array(z.unknown())).default({}),
+  targetMetadata: z
+    .record(z.array(targetRowMetadataSchema.nullish()))
+    .default({}),
+  evaluatorResults: z.record(z.record(z.array(z.unknown()))).default({}),
+  errors: z.record(z.array(z.string().nullish())).default({}),
 });
 
 /**

@@ -95,7 +95,7 @@ let mockSavedPrompts: Record<string, unknown> = {};
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       experiments: {
         getAllForEvaluationsList: { invalidate: vi.fn() },
       },

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker-build.tsbuildinfo",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src/**/*.ts", "package.json"],
+  "exclude": ["src/**/*.test.ts"]
+}

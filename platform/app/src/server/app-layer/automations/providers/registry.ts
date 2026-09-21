@@ -3,7 +3,7 @@ import datasetShared from "@langwatch/automations/providers/dataset";
 import emailShared from "@langwatch/automations/providers/email";
 import slackShared from "@langwatch/automations/providers/slack";
 import webhookShared from "@langwatch/automations/providers/webhook";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import annotationQueueServer from "./annotationQueue/server";
 import datasetServer from "./dataset/server";
 import emailServer from "./email/server";

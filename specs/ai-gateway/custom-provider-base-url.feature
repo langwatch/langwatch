@@ -96,3 +96,17 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     When traffic flows through all of them
     Then every request reaches the endpoint configured for its project
     And the gateway keeps serving them without growing its resource use unboundedly
+
+  Rule: A custom prefix keeps the whole model name after it
+
+    Self-hosted servers and proxies serve models whose own ids contain a
+    slash ("stealth/ox-alpha", "meta-llama/Llama-3-70B"). The "custom/" prefix
+    names the provider and everything after it is the model, so the id the
+    server knows arrives intact.
+
+    @unit
+    Scenario: A custom-prefixed model keeps every segment after the prefix
+      Given a virtual key whose provider slot is the custom provider
+      When a chat completion for "custom/stealth/ox-alpha" is sent through the gateway
+      Then the model sent upstream is "stealth/ox-alpha"
+      And the request reaches the custom provider

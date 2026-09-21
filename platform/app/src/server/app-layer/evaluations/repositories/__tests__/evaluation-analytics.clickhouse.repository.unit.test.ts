@@ -30,7 +30,10 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
-import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import {
+  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type EvaluationAnalyticsRow,
+} from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import {
   capturingInsertClient,
   clientReturning,
@@ -232,7 +235,17 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
           table: TABLE,
           outcome: "hit",
         });
-        const { repository } = makeOrderingRepository([]);
+        // A row, so this is a genuine hit — an empty read is its own outcome
+        // now (see below), and asserting `hit` off an empty fake would pin
+        // the wrong half of the contract.
+        const { repository } = makeOrderingRepository([
+          tiedVersion({
+            occurredAt: "2026-07-24 12:00:00.000",
+            startedAt: "1750000000000",
+            completedAt: "0",
+            appliedEventIds: ["a"],
+          }),
+        ]);
 
         await repository.findByEvaluationIdWithApplied({
           tenantId: TENANT_ID,
@@ -242,6 +255,37 @@ describe("EvaluationAnalyticsClickHouseRepository windowed read", () => {
 
         expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
           before + 1,
+        );
+      });
+
+      /**
+       * This read declares its window authoritative (`fallback: "none"`), so a
+       * miss never widens and has no widen outcome to appear as. It is counted
+       * as a miss instead of folded into `hit`.
+       */
+      /** @scenario a bounded miss is recorded as a miss, not as an answer */
+      it("counts an empty window as a miss, not as a hit", async () => {
+        const beforeEmpty = await windowedReadCount({
+          table: TABLE,
+          outcome: "windowed_empty",
+        });
+        const beforeHit = await windowedReadCount({
+          table: TABLE,
+          outcome: "hit",
+        });
+        const { repository } = makeOrderingRepository([]);
+
+        await repository.findByEvaluationIdWithApplied({
+          tenantId: TENANT_ID,
+          evaluationId: EVALUATION_ID,
+          window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
+        });
+
+        expect(
+          await windowedReadCount({ table: TABLE, outcome: "windowed_empty" }),
+        ).toBe(beforeEmpty + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
+          beforeHit,
         );
       });
 
@@ -326,7 +370,7 @@ describe("EvaluationAnalyticsClickHouseRepository insert settings", () => {
   const ROW: EvaluationAnalyticsRow = {
     tenantId: TENANT_ID,
     evaluationId: EVALUATION_ID,
-    version: "2026-07-27",
+    version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
     occurredAtMs: 1_750_000_000_000,
     createdAtMs: 1_750_000_000_000,
     updatedAtMs: 1_750_000_000_000,

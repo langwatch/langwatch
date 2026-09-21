@@ -34,7 +34,15 @@ Langy runs `langwatch trace search` and `langwatch analytics query` over the rel
 - "What changed in my token spend after the last deploy?"
 - "Can I move this feature to a cheaper model without losing quality?"
 
-For a cheaper-model migration, Langy pulls the traces for that feature, then writes an [evaluation or a Scenario test](/langy/scenario-tests-and-evals) that measures the current behavior so the swap is proven, not guessed.
+For a cheaper-model migration, Langy pulls the traces for that feature, then writes an [evaluation or a Scenario test](/langy/scenario-tests-and-evals) that measures the current behavior, so you can compare the cheaper model against it.
+
+### Optimize a prompt
+
+- "Optimize the support classifier prompt."
+- "Can you improve this prompt's pass rate?"
+- "Try a better version of this prompt and compare."
+
+Langy scores the current prompt, duplicates it, rewrites the duplicate, and reruns both against your evaluator. See [Prompt Optimization](/langy/prompt-optimization).
 
 ### Set up testing and evals
 
@@ -65,7 +73,7 @@ Langy reads the trace, writes a failing Scenario test that captures the problem,
   </Step>
 </Steps>
 
-Each tool call streams into the turn as an activity card, so you see the CLI command it ran and its typed result, not a black box.
+Each tool call streams into the turn as an activity card, so you see the CLI command it ran and its typed result.
 
 <Frame caption="The Langy panel mid-turn, running real tool work. Each CLI call appears as an activity in the conversation.">
   ![Langy running tool work](/images/langy/chat/chat-toolwork.png)
@@ -73,7 +81,7 @@ Each tool call streams into the turn as an activity card, so you see the CLI com
 
 When Langy runs a Scenario simulation, the result appears as a run card in the chat with its outcome, duration, and cost.
 
-<Frame caption="A live simulation-run card inside chat: outcome SUCCESS with duration and cost, and a link to open the run in Simulations.">
+<Frame caption="A live simulation-run card inside chat: outcome SUCCESS with duration and cost, and a link to open the run in Agent Testing > Results.">
   ![Simulation run card in chat](/images/langy/chat/simulation-run-card.png)
 </Frame>
 
@@ -87,8 +95,8 @@ The panel stays docked while you move through the app, so you can open a trace a
 
 ## Choose what Langy can see
 
-Context is explicit. The `# Context` chip on the composer lets you choose what Langy can see, and the chips shown are exactly the context the model receives, nothing hidden.
+Context is explicit. The `# Context` chip on the composer lets you choose what Langy can see, and the chips shown are exactly the context the model receives.
 
 ## Stop a turn
 
-You can stop a turn at any point. Stopping ends the turn for real: Langy stops the work in progress and keeps the partial output it already produced. Start a new turn to continue from there.
+You can stop a turn at any point. Stopping ends the turn: Langy stops the work in progress and keeps the partial output it already produced. Start a new turn to continue from there.

@@ -44,7 +44,7 @@ const NEWCOUNT_INVALIDATE_DEBOUNCE_MS = 10_000;
  */
 export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
   const setSseConnectionState = useSseStatusStore(
     (s) => s.setSseConnectionState,

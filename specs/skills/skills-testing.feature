@@ -4,20 +4,21 @@ Feature: Scenario tests for skills quality assurance
   We want every skill to have scenario tests proving it works
   So that we can compound improvements with confidence and catch regressions
 
-  # All `@unimplemented` scenarios in this file describe live Claude
-  # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
-  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # The scenarios in this file describe live Claude Code-driven scenario
+  # tests under `skills/_tests/*.scenario.test.ts` (e.g.
+  # `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
   # `level-up.scenario.test.ts`, `agent-performance.scenario.test.ts`,
-  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
-  # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
-  # spawn an actual Claude Code agent against a fixture codebase.
+  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The tests
+  # spawn an actual Claude Code agent against a fixture codebase, so they
+  # are skipped in CI (`it.skipIf(isCI)`) and run on a developer machine.
   #
-  # The `check-feature-parity` script's DEFAULT_TEST_ROOTS does not
-  # include `skills/_tests/`, so JSDoc `@scenario` annotations in
-  # those files would not currently bind. Expanding the test roots
-  # is the right structural fix for this domain — tracked outside
-  # this PR. Until then, scenarios stay `@unimplemented` (with this
-  # justifying note) rather than being orphaned.
+  # `skills/_tests` is one of the parity checker's test roots, so a
+  # `@scenario` annotation in those files binds the scenario it names.
+  #
+  # What we ship in a skill is instructions, so the outcome a scenario
+  # here observes is what the coding agent does after reading them: the
+  # commands it runs and the code it writes. Naming them is the behavior,
+  # not an implementation detail of the test.
 
   Background:
     Given scenario tests live in skills/_tests/
@@ -29,12 +30,20 @@ Feature: Scenario tests for skills quality assurance
   # Test infrastructure
   # ──────────────────────────────────────────────────
 
-  Scenario: Claude Code agent adapter exists for skill testing
-    Given a reusable Claude Code agent adapter exists in skills/_tests/
-    Then it spawns Claude Code with the skill loaded
+  Scenario: The skill tests drive Claude Code through the Scenario SDK adapter
+    Given the tests build their agent with claudeCodeAgent from @langwatch/scenario
+    Then it spawns Claude Code with the installed skills pointed at from CLAUDE.md
     And it makes the locally-built `langwatch` CLI available on PATH (so new commands like `docs` and `scenario-docs` are exercised)
     And it runs in a temporary directory with the fixture codebase
-    And it captures Claude Code's output for assertion
+    And it returns each turn as messages with tool-call and tool-result parts, so the judge and the run view see what the agent ran
+    And it keeps the batch id of the suite and the keys a test withholds out of the agent's environment
+
+  @integration
+  Scenario: No Claude Code process outlives the test harness
+    Given a scenario test is running Claude Code
+    When the vitest worker that spawned it is killed
+    Then Claude Code and every process it started are stopped
+    And nothing is left running under pid 1 from that test
 
   Scenario: Fixture codebases cover the framework matrix
     Given fixture codebases exist for the key combinations:
@@ -149,6 +158,41 @@ Feature: Scenario tests for skills quality assurance
     Then the agent uses `langwatch scenario create` (and related CLI commands) to create scenarios
     And the agent does NOT try to write code files
     And the agent does NOT use any MCP tools
+
+  # ──────────────────────────────────────────────────
+  # Connect-agent skill tests
+  # ──────────────────────────────────────────────────
+
+  @connect-agent @integration @unimplemented
+  Scenario: Connect-agent skill wires a FastAPI agent for platform simulations
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch scenarios"
+    Then the agent makes the chat endpoint adopt the incoming W3C traceparent header
+    And the agent adds a dedicated scenario key check against the Authorization Bearer header
+    And the agent keeps the existing session authentication in place for normal traffic
+    And the agent attempts to register the endpoint with `langwatch agent create --type http`
+    And the agent does not claim a suite run succeeded when the platform is unreachable
+
+  @connect-agent @integration
+  Scenario: Connect-agent skill decorates the agent function instead of registering a URL
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch simulations"
+    Then the agent adds langwatch.connect_agent to the function that runs the agent
+    And the agent reads the agent row back with `langwatch agent list` or `langwatch agent get`
+    And no `langwatch agent create` command runs
+    And the agent does not claim the agent is online without reading its status
+
+  @scenarios @connect-agent @integration
+  Scenario: The scenarios skill proposes scenarios from the levers of a connected agent
+    Given the fixture "python-connected-agent" runs and is online as a connected agent
+    And the skill "scenarios" is loaded
+    When Claude Code receives "add scenario tests for my connected agent on the platform"
+    Then the agent reads the run parameters the agent declares with `langwatch agent get` or `langwatch agent list`
+    And the agent creates the scenarios with `langwatch scenario create` and writes no test files
+    And at least one scenario depends on the customer plan and the plan travels as `--param plan=` or a `?plan=` target suffix
+    And the agent names the comparison run across the model options
 
   # ──────────────────────────────────────────────────
   # Prompts skill tests

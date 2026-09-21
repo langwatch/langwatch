@@ -30,6 +30,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 interface CredentialHolder {
   apiKey?: string;
+  projectId?: string;
 }
 
 const storage = new AsyncLocalStorage<CredentialHolder>();
@@ -73,9 +74,32 @@ export function scopedApiKey(): string | undefined {
 }
 
 /**
+ * Publish the project the current request targets. A user-scoped API key
+ * (`sk-lw-{lookupId}_{secret}`) carries no project identity of its own, so the
+ * server resolves the role binding from the project the request names: the
+ * resolver decides which project that is (the personal one by default,
+ * `--project <id|slug>` otherwise) and every client built afterwards reads it
+ * from here. Same request scoping as the key, for the same reason — two
+ * concurrent daemon requests can target different projects.
+ */
+export function setResolvedProjectId(projectId: string | undefined): void {
+  currentHolder().projectId = projectId;
+}
+
+/**
+ * The project id resolved for the current request, or undefined when nothing
+ * has resolved in this context. Client factories fall back to
+ * `LANGWATCH_PROJECT_ID` then, exactly as a plain SDK embed does.
+ */
+export function scopedProjectId(): string | undefined {
+  return currentHolder().projectId;
+}
+
+/**
  * Clear the process-local fallback holder. Test-only: a unit test that sets a
  * key outside any scope would otherwise leak it into the next test.
  */
 export function resetFallbackCredentialHolder(): void {
   fallbackHolder.apiKey = undefined;
+  fallbackHolder.projectId = undefined;
 }

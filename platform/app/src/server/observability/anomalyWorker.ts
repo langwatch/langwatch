@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+import { tryGetApp } from "../app-layer/app";
 import { featureFlagService } from "../featureFlag";
-import { connection } from "../redis";
 import { AnomalyDetector } from "./anomalyDetector";
 import { AnomalyStateStore } from "./anomalyState";
 import { TenantRateTracker } from "./tenantRateTracker";
@@ -20,6 +20,7 @@ export interface AnomalyWorkerHandle {
  * must degrade gracefully.
  */
 export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     logger.warn("Redis connection unavailable, anomaly worker disabled");
     return undefined;
@@ -63,7 +64,7 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
         logger.info(result, "anomaly tick");
       }
     } catch (err) {
-      logger.error(
+      logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "anomaly detector tick failed (will retry on next interval)",
       );

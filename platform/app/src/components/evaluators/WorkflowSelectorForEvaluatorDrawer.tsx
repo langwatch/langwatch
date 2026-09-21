@@ -64,7 +64,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const router = useRouter();
   const emojiPicker = useDisclosure();
 

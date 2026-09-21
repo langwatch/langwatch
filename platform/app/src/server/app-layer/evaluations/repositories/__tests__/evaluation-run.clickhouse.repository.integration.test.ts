@@ -59,7 +59,9 @@ beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse test container not available");
   ch = rawClient;
-  repo = new EvaluationRunClickHouseRepository(async () => ch);
+  repo = new EvaluationRunClickHouseRepository({
+    resolveClient: async () => ch,
+  });
 
   // Two versions of the same evaluation: the dedup must return the latest
   // (v2), and the ScheduledAt resolve (argMax over UpdatedAt) must pick v2's
@@ -114,9 +116,9 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository(
-      async () => recordingClient,
-    );
+    const recordingRepo = new EvaluationRunClickHouseRepository({
+      resolveClient: async () => recordingClient,
+    });
 
     const result = await recordingRepo.getByEvaluationId({
       tenantId,
@@ -134,7 +136,7 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
     expect(heavyQuery!).toContain("ScheduledAt >=");
   });
 
-  it("returns null and stays unbounded for an evaluation that does not exist", async () => {
+  it("returns null and stays bounded for an evaluation that does not exist", async () => {
     const queries: string[] = [];
     const recordingClient = new Proxy(ch, {
       get(target, prop, receiver) {
@@ -149,9 +151,9 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository(
-      async () => recordingClient,
-    );
+    const recordingRepo = new EvaluationRunClickHouseRepository({
+      resolveClient: async () => recordingClient,
+    });
 
     const result = await recordingRepo.getByEvaluationId({
       tenantId,
@@ -159,10 +161,17 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
     });
 
     expect(result).toBeNull();
-    // Resolve finds nothing (epoch default), so the heavy read keeps its
-    // previous unbounded behaviour rather than guessing a window.
+    // Resolve finds nothing (epoch default). The heavy read is floored at the
+    // tenant's retention horizon rather than left unbounded: a miss means the
+    // resolver already searched `>= floor` with no upper bound and found
+    // nothing, so no row above the floor exists for this read to find either,
+    // and an unbounded scan here was the largest single source of cold-scan
+    // queries in production.
     const heavyQuery = queries.find((q) => q.includes("PREWHERE"));
     expect(heavyQuery).toBeDefined();
-    expect(heavyQuery!).not.toContain("ScheduledAt >=");
+    expect(heavyQuery!).toContain("ScheduledAt >=");
+    // Open-ended above, so an evaluation scheduled into the future is still
+    // findable.
+    expect(heavyQuery!).not.toContain("ScheduledAt <=");
   });
 });

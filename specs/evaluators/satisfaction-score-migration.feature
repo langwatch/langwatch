@@ -10,10 +10,10 @@ Feature: Migrate satisfaction score to sentiment evaluator
   # dashboard no longer shows satisfaction graph; trace processing
   # pipeline no longer emits satisfaction events) need a fresh test
   # against the post-migration analytics page render and the trace
-  # pipeline's reactor list.
+  # pipeline's subscriber list.
 
   Background:
-    The satisfaction score was previously computed by a reactor in the trace processing pipeline,
+    The satisfaction score was previously computed by a subscriber in the trace processing pipeline,
     calling out to langwatch_nlp's sentiment analysis endpoint. This is being migrated to a
     standalone "sentiment" evaluator in langevals/ so it can be used like any other evaluator.
 
@@ -44,5 +44,5 @@ Feature: Migrate satisfaction score to sentiment evaluator
   Scenario: Trace processing pipeline no longer computes satisfaction score
     Given the trace processing pipeline
     When a new trace is ingested
-    Then no satisfaction score reactor is triggered
+    Then no satisfaction score subscriber is triggered
     And no satisfaction score event is emitted

@@ -12,10 +12,22 @@ export const handleApiKeyError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
+  // Same order as the response dispatch below, so the logged status is always
+  // the status the caller received. The groups handler resolves it the same
+  // way, so one error cannot report two statuses across the two families.
   const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+    error instanceof HttpError
+      ? error.status
+      : HandledError.isHandled(error)
+        ? (error.httpStatus as ContentfulStatusCode)
+        : (error.status ?? 500);
 
-  logger.error(
+  // A refusal the caller can act on is their fact, not our outage: logging a
+  // 404 or a 422 at error level with a "[500]" in the sentence buries the real
+  // failures under the routine ones.
+  const log = status >= 500 ? logger.error : logger.warn;
+  log.call(
+    logger,
     {
       path: c.req.path,
       method: c.req.method,

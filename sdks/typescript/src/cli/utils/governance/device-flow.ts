@@ -10,6 +10,7 @@
 
 import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 
 export interface DeviceCode {
   device_code: string;
@@ -58,6 +59,21 @@ export interface ExchangePersonalProject {
 }
 
 /**
+ * What the minted `cli_api_key` reaches. `organization` covers every project
+ * of the organization and carries an empty `project_ids`; `projects` names the
+ * exact ids the user picked on the authorize screen.
+ */
+export interface ExchangeCliApiKeyScope {
+  kind: "organization" | "projects";
+  project_ids: string[];
+  /**
+   * The permission slugs the key was minted with. Absent on servers that
+   * predate the field; `whoami` then reports only the reach.
+   */
+  permissions?: string[];
+}
+
+/**
  * The CLI device-code flow can mint two distinct credential types:
  *   - "device_session" — the user-scoped OAuth-style access+refresh
  *     token pair used by `langwatch claude/codex/...` wrappers.
@@ -81,6 +97,13 @@ export interface ExchangeDeviceSessionResult {
   organization: ExchangeOrganization;
   default_personal_vk?: ExchangePersonalVK;
   personal_project?: ExchangePersonalProject;
+  /**
+   * The user-scoped API key minted for this login, reaching every project the
+   * user selected while approving. Absent on servers that predate the feature,
+   * and the CLI then authenticates with the personal project's own key.
+   */
+  cli_api_key?: string;
+  cli_api_key_scope?: ExchangeCliApiKeyScope;
   endpoint?: string;
 }
 
@@ -220,9 +243,115 @@ export async function exchange(
 }
 
 /**
- * Poll `exchange` at the cadence the server requested until the user
- * approves, denies, or the device-code expires. Honours RFC 8628 §3.5
- * by doubling the polling interval on `slow_down` responses.
+ * `GET /api/auth/cli/device-approval` — a stream that emits one frame the
+ * moment the browser approves or denies the code. It carries no credential;
+ * it only says "poll now", which is what turns the wait from "up to the poll
+ * interval" into "as fast as the round trip".
+ *
+ * Resolves when a frame arrives, and never otherwise: a server that predates
+ * the route, a proxy that buffers the body, or a dropped connection all leave
+ * the poll timer in charge rather than making it fire early.
+ */
+function watchDeviceApproval({
+  opts,
+  deviceCode,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+}): { settled: Promise<void>; close: () => void } {
+  const controller = new AbortController();
+  const settled = new Promise<void>((resolve) => {
+    readApprovalStream({ opts, deviceCode, signal: controller.signal }).then(
+      (sawFrame) => {
+        if (sawFrame) resolve();
+      },
+      () => {
+        // Never settles: polling stays in charge.
+      },
+    );
+  });
+  return { settled, close: () => controller.abort() };
+}
+
+/** Whether the approval stream delivered a frame before it ended. */
+async function readApprovalStream({
+  opts,
+  deviceCode,
+  signal,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+  /** Aborts the read once the login is over, so the socket is not left open. */
+  signal: AbortSignal;
+}): Promise<boolean> {
+  const base = normalizeEndpoint(opts.baseUrl);
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(
+    `${base}/api/auth/cli/device-approval?device_code=${encodeURIComponent(deviceCode)}`,
+    {
+      headers: { Accept: "text/event-stream", Origin: base },
+      signal,
+    },
+  );
+  if (!res.ok || !res.body) return false;
+
+  const reader = (
+    res.body as ReadableStream<Uint8Array>
+  ).getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return false;
+      buffered += decoder.decode(value, { stream: true });
+      // Any data frame means "the code settled, poll now". The payload does
+      // not decide anything: /exchange is what says approved or denied.
+      if (/^data:.*\S/m.test(buffered)) return true;
+    }
+  } finally {
+    void reader.cancel().catch(() => {
+      // The stream is already going away.
+    });
+  }
+}
+
+/** Sleep, cut short by the approval signal when one is still worth racing. */
+async function waitForNextPoll({
+  ms,
+  approval,
+}: {
+  ms: number;
+  approval: Promise<void> | null;
+}): Promise<void> {
+  if (!approval) {
+    await wait(ms);
+    return;
+  }
+  const timer = new AbortController();
+  try {
+    await Promise.race([
+      wait(ms, undefined, { signal: timer.signal }).catch(() => {
+        // Aborted because the approval landed first.
+      }),
+      approval,
+    ]);
+  } finally {
+    timer.abort();
+  }
+}
+
+/**
+ * Poll `exchange` until the user approves, denies, or the device-code
+ * expires. Honours RFC 8628 §3.5 by doubling the polling interval on
+ * `slow_down` responses.
+ *
+ * Two things keep the wait short. The first poll goes out immediately, since
+ * a login approved while the browser was still opening should not cost a
+ * whole interval; and the approval stream cuts every later wait short the
+ * moment the browser settles the code. Both are accelerators over the same
+ * timer, so a server or network that supports neither still logs in at the
+ * cadence the server asked for.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,
@@ -232,22 +361,51 @@ export async function pollUntilDone(
   const ceiling = 60_000;
   const deadline = Date.now() + dc.expires_in * 1000;
 
-  for (;;) {
-    if (Date.now() > deadline) {
-      throw new DeviceFlowError("expired", "authorization request expired");
-    }
-    await wait(interval);
-    try {
-      return await exchange(opts, dc.device_code);
-    } catch (err) {
-      if (!(err instanceof DeviceFlowError)) throw err;
-      if (err.kind === "pending") continue;
-      if (err.kind === "slow_down") {
-        interval = Math.min(interval * 2, ceiling);
-        continue;
+  const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
+  const approval = watch.settled;
+  // A signal fires once, so it is tracked in two parts. `signalled` says the
+  // frame arrived, `spent` says a poll has already been let through because
+  // of it. A frame that lands while an /exchange is in flight therefore still
+  // shortens the next wait instead of being dropped, and once it is spent the
+  // loop stops racing an already-resolved promise, which would otherwise turn
+  // into a hot poll if /exchange somehow still answered `pending`.
+  let signalled = false;
+  let spent = false;
+  void approval.then(() => {
+    signalled = true;
+  });
+
+  try {
+    let firstPoll = true;
+    for (;;) {
+      if (Date.now() > deadline) {
+        throw new DeviceFlowError("expired", "authorization request expired");
       }
-      throw err;
+      if (firstPoll) {
+        firstPoll = false;
+      } else if (signalled && !spent) {
+        // The browser settled the code while the previous poll was in
+        // flight. Poll again straight away rather than sleeping out an
+        // interval the signal exists to skip.
+        spent = true;
+      } else {
+        await waitForNextPoll({ ms: interval, approval: spent ? null : approval });
+        if (signalled) spent = true;
+      }
+      try {
+        return await exchange(opts, dc.device_code);
+      } catch (err) {
+        if (!(err instanceof DeviceFlowError)) throw err;
+        if (err.kind === "pending") continue;
+        if (err.kind === "slow_down") {
+          interval = Math.min(interval * 2, ceiling);
+          continue;
+        }
+        throw err;
+      }
     }
+  } finally {
+    watch.close();
   }
 }
 
@@ -302,7 +460,7 @@ async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown)
 }
 
 function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<Response> {
-  const url = opts.baseUrl.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(opts.baseUrl) + path;
   const f = opts.fetchImpl ?? fetch;
   return f(url, {
     method: "POST",
@@ -312,7 +470,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
       // Origin enforcement on the server requires this for non-browser
       // clients. The base URL is the same as the control plane, so
       // mirroring it as Origin satisfies the same-origin gate.
-      Origin: opts.baseUrl.replace(/\/+$/, ""),
+      Origin: normalizeEndpoint(opts.baseUrl),
     },
     body: JSON.stringify(body ?? {}),
   });

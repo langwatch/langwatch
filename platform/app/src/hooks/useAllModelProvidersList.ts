@@ -51,7 +51,7 @@ const NO_PROVIDERS: readonly MaybeStoredModelProvider[] = [];
  *     moment the query *errors* (a 403 under `retry: false`), so a permission
  *     failure shows the (empty) surface instead of spinning forever.
  *
- *     Deliberately NOT `isInitialLoading` (`isLoading && isFetching`), which
+ *     Deliberately NOT `isLoading` (`isLoading && isFetching`), which
  *     is false for a disabled query and would make the drawer skip its
  *     spinner and mount the form off an empty list — the exact failure this
  *     signal exists to prevent.

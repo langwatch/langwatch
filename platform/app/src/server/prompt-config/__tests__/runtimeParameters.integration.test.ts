@@ -1,7 +1,7 @@
-import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 import { prisma } from "~/server/db";
 import { PromptService, type VersionedPrompt } from "../prompt.service";

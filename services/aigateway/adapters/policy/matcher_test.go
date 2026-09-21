@@ -123,48 +123,133 @@ func TestCheck_ExtractMCPNames_StringEntries(t *testing.T) {
 	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
 }
 
-func TestCheck_ModelDenyMatches(t *testing.T) {
+func TestCheckModel_DenyMatches(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "gpt-4o"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+}
+
+func TestCheckModel_DenyNoMatch(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "claude-haiku-4-5"})
+	assert.NoError(t, err)
+}
+
+func TestCheckModel_AllowRestricts(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+	}
+
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "gpt-4o"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+}
+
+func TestCheckModel_AllowMatch(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+	}
+
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "claude-haiku-4-5"})
+	assert.NoError(t, err)
+}
+
+// A model rule must not be judged against the body's raw model name: that is
+// the string the caller typed, and an alias naming a denied model would walk
+// straight past the rule.
+//
+// @scenario "A model deny rule judges the model an alias resolved to"
+func TestCheck_IgnoresModelRules(t *testing.T) {
 	m := NewMatcher()
 	rules := []domain.PolicyRule{
 		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
 	}
 	body := []byte(`{"model":"gpt-4o","messages":[]}`)
 
-	err := m.Check(context.Background(), rules, body)
-	require.Error(t, err)
-	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+	assert.NoError(t, m.Check(context.Background(), rules, body))
 }
 
-func TestCheck_ModelDenyNoMatch(t *testing.T) {
+// @scenario "A model deny rule judges the model an alias resolved to"
+func TestCheckModel_DenyReachesTheModelBehindAnAlias(t *testing.T) {
 	m := NewMatcher()
 	rules := []domain.PolicyRule{
 		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
 	}
-	body := []byte(`{"model":"claude-haiku-4-5","messages":[]}`)
 
-	err := m.Check(context.Background(), rules, body)
-	assert.NoError(t, err)
-}
-
-func TestCheck_ModelAllowRestricts(t *testing.T) {
-	m := NewMatcher()
-	rules := []domain.PolicyRule{
-		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
-	}
-	body := []byte(`{"model":"gpt-4o","messages":[]}`)
-
-	err := m.Check(context.Background(), rules, body)
+	// The caller asked for "safe-model"; the alias resolved it to gpt-4o.
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{
+		ModelID:    "gpt-4o",
+		Source:     domain.ModelSourceAlias,
+		ProviderID: domain.ProviderOpenAI,
+	})
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
 }
 
-func TestCheck_ModelAllowMatch(t *testing.T) {
+// @scenario "A model rule matches either spelling of the same model"
+func TestCheckModel_JudgesBothSpellings(t *testing.T) {
+	m := NewMatcher()
+	ctx := context.Background()
+
+	t.Run("a provider-qualified deny rule reaches a bare resolved id", func(t *testing.T) {
+		rules := []domain.PolicyRule{
+			{Pattern: "^openai/gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+		}
+		err := m.CheckModel(ctx, rules, domain.ResolvedModel{
+			ModelID: "gpt-4o", ProviderID: domain.ProviderOpenAI,
+		})
+		require.Error(t, err)
+		assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+	})
+
+	t.Run("a bare allow rule satisfies a provider-qualified model", func(t *testing.T) {
+		rules := []domain.PolicyRule{
+			{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+		}
+		assert.NoError(t, m.CheckModel(ctx, rules, domain.ResolvedModel{
+			ModelID: "claude-haiku-4-5", ProviderID: domain.ProviderAnthropic,
+		}))
+	})
+}
+
+// A pattern the platform cannot read must refuse the request wherever it sits
+// in the list. Matching before compiling would make enforcement depend on rule
+// order: the good pattern here answers first, and the broken one is only
+// noticed for models the good one misses.
+func TestCheckModel_InvalidAllowPatternAfterAMatchStillFailsClosed(t *testing.T) {
 	m := NewMatcher()
 	rules := []domain.PolicyRule{
-		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+		{Pattern: "^gpt-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+		{Pattern: "(unterminated", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
 	}
-	body := []byte(`{"model":"claude-haiku-4-5","messages":[]}`)
 
-	err := m.Check(context.Background(), rules, body)
-	assert.NoError(t, err)
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "gpt-5-mini"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrInternal))
+}
+
+func TestCheckModel_InvalidDenyPatternAfterAMatchStillFailsClosed(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+		{Pattern: "(unterminated", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+
+	// The first rule matches, so a lazy compile would answer "blocked" and
+	// never reach the broken one. Either answer refuses the request, but only
+	// the internal error tells the operator their rule set is unreadable.
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "claude-haiku-4-5"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrInternal))
 }

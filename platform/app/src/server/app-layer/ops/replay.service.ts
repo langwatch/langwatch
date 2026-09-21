@@ -302,13 +302,12 @@ export class ReplayService {
             }
           },
         };
-        result =
-          selectedStateProjections.length > 0
-            ? await runtime.service.replay(replayConfig, replayCallbacks)
-            : await runtime.service.replayOptimized(
-                replayConfig,
-                replayCallbacks,
-              );
+        // One entry point for every selection: folds and maps run through the
+        // shared batch engine (each batch's events loaded once), and any state
+        // projections rebuild afterwards in their own paused lane. Selecting a
+        // state projection no longer demotes the run's folds and maps to a
+        // one-load-per-projection path.
+        result = await runtime.service.replay(replayConfig, replayCallbacks);
       } finally {
         clearInterval(heartbeat);
       }

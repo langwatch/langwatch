@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  budgetPeriodFloorMs,
-  currentPeriodStart,
-} from "../budget.clickhouse.repository";
+import { budgetPeriodFloorMs, currentPeriodStart } from "../budgetPeriod";
 import { nextResetAt, shouldResetBudget } from "../budgetWindow";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
@@ -37,6 +34,7 @@ describe("budgetPeriodFloorMs", () => {
           window: "MANUAL",
           currentPeriodStartedAt: boundary,
           lastResetAt: null,
+          cycleAnchorAt: null,
         },
         NOW,
       ),
@@ -50,6 +48,7 @@ describe("budgetPeriodFloorMs", () => {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
           lastResetAt: boundary,
+          cycleAnchorAt: null,
         },
         NOW,
       ),
@@ -61,6 +60,7 @@ describe("budgetPeriodFloorMs", () => {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
           lastResetAt: boundary,
+          cycleAnchorAt: null,
         },
         new Date("2026-08-02T00:00:00.000Z"),
       ),
@@ -74,6 +74,7 @@ describe("budgetPeriodFloorMs", () => {
           window: "TOTAL",
           currentPeriodStartedAt: boundary,
           lastResetAt: null,
+          cycleAnchorAt: null,
         },
         NOW,
       ),
@@ -84,6 +85,7 @@ describe("budgetPeriodFloorMs", () => {
           window: "MONTH",
           currentPeriodStartedAt: boundary,
           lastResetAt: null,
+          cycleAnchorAt: null,
         },
         NOW,
       ),

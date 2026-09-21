@@ -18,28 +18,81 @@
  *   the first value, then to a stringified result.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
+import {
+  createNlpFetchDispatcher,
+  type FetchInitWithDispatcher,
+  resolveFloorFetchTimeoutMs,
+  resolveMaxFetchTimeoutMs,
+} from "../../../nlpgo/timeouts";
+import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
-/** Timeout for NLP service requests (2 minutes) — matches code adapter. */
-const NLP_FETCH_TIMEOUT_MS = 120_000;
+/**
+ * How long to wait on the NLP service for one turn.
+ *
+ * This adapter has no per-agent `timeoutMs` budget to add headroom above
+ * (unlike the code adapter's `CodeAgentData`, `WorkflowAgentData` carries
+ * none) — so the deadline is simply the floor, bounded by the platform's
+ * operator-configurable maximum. See `../../../nlpgo/timeouts.ts` for what
+ * the floor derives from and why: it used to be this file's own hardcoded
+ * `NLP_FETCH_TIMEOUT_MS = 120_000`, entirely independent of the code
+ * adapter's copy and with no env override, which is exactly the drift that
+ * caused a live production timeout when the engine's own ceiling was
+ * raised and this one wasn't told.
+ */
+function fetchTimeoutMs(): number {
+  return Math.min(resolveMaxFetchTimeoutMs(), resolveFloorFetchTimeoutMs());
+}
 
 /**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
-export class SerializedWorkflowAgentAdapter extends AgentAdapter {
+export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
-  constructor(
-    private readonly config: WorkflowAgentData,
-    private readonly nlpServiceUrl: string,
-    private readonly apiKey: string,
-  ) {
+  private readonly config: WorkflowAgentData;
+  private readonly nlpServiceUrl: string;
+  /**
+   * The LangWatch platform API key (project.apiKey), sent as
+   * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
+   * on its callbacks into the platform (agentblock/workflow_runner.go,
+   * evaluatorblock/executor.go, engine.go) — never an LLM provider
+   * credential, so it must not be sourced from litellm params (issue #6634).
+   */
+  private readonly projectApiKey: string;
+  /**
+   * The run's resolved parameter values. They reach the workflow twice, and
+   * both are needed: as entry inputs, which is how a published workflow wires
+   * a value on to its downstream nodes, and on the workflow itself as
+   * `params`, which is how a code node inside it reads `params.NAME` with the
+   * value's native type intact.
+   */
+  private readonly parameters: RunParameterValues;
+
+  constructor({
+    config,
+    nlpServiceUrl,
+    projectApiKey,
+    parameters,
+  }: {
+    config: WorkflowAgentData;
+    nlpServiceUrl: string;
+    projectApiKey: string;
+    parameters?: RunParameterValues;
+  }) {
     super();
+    this.config = config;
+    this.nlpServiceUrl = nlpServiceUrl;
+    this.projectApiKey = projectApiKey;
+    this.parameters = parameters ?? {};
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -58,6 +111,51 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
   private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+    // A declared input wins over a parameter of the same name. Spread the other
+    // way round and a parameter called `input` would quietly replace the
+    // conversation turn the target is supposed to answer, and the run would
+    // read as an agent that ignored the user.
+    return {
+      ...this.parametersAsEntryInputs(),
+      ...this.resolveMappedInputValues(agentInput),
+    };
+  }
+
+  /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so a code node inside the workflow can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
+  }
+
+  /**
+   * The run's parameters as entry inputs. Entry inputs are strings on the
+   * wire, so a number or a boolean is coerced here; a code node that wants the
+   * native value reads it from `params.NAME` instead.
+   */
+  private parametersAsEntryInputs(): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(this.parameters).map(([name, value]) => [
+        name,
+        String(value),
+      ]),
+    );
+  }
+
+  private resolveMappedInputValues(
+    agentInput: AgentInput,
+  ): Record<string, string> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
@@ -112,8 +210,9 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       {};
     const workflow = {
       ...this.config.workflow,
-      api_key: this.apiKey,
+      api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
+      params: this.turnParameters(),
     };
 
     const event = {
@@ -129,32 +228,15 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), NLP_FETCH_TIMEOUT_MS);
+    const timeoutMs = fetchTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let response: Response;
-      try {
-        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        const cause =
-          fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
-            : "";
-        throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError)
-          }${cause}`,
-        );
-      }
+      const response = await this.postExecuteSync({
+        body: JSON.stringify(event),
+        signal: controller.signal,
+        timeoutMs,
+      });
 
       if (!response.ok) {
         let errorMessage = "";
@@ -184,6 +266,46 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       return result.result;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private async postExecuteSync({
+    body,
+    signal,
+    timeoutMs,
+  }: {
+    body: string;
+    signal: AbortSignal;
+    timeoutMs: number;
+  }): Promise<UndiciResponse> {
+    try {
+      const fetchInit: FetchInitWithDispatcher = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal,
+        dispatcher: createNlpFetchDispatcher({ timeoutMs }),
+      };
+      // undici's own fetch, not the global one: Node's global fetch is bound
+      // to the undici bundled with Node, which rejects a dispatcher built by
+      // this package with "invalid onRequestStart method" (see
+      // mailer/providers/resend.ts for the same fix).
+      return await undiciFetch(
+        `${this.nlpServiceUrl}/go/studio/execute_sync`,
+        fetchInit,
+      );
+    } catch (fetchError) {
+      const cause =
+        fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String(
+              (fetchError as Error & { cause?: unknown }).cause,
+            )})`
+          : "";
+      throw new Error(
+        `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
+          fetchError instanceof Error ? fetchError.message : String(fetchError)
+        }${cause}`,
+      );
     }
   }
 

@@ -89,6 +89,54 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names the granularity step when that is the parameter supplied", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["dashboard_context_granularity_seconds"] },
+        }),
+      );
+
+      expect(description).toContain("dashboard_context_granularity_seconds");
+      // The bug this pins: the copy named the window pair unconditionally, so
+      // a caller that sent only the step was told to remove two parameters it
+      // had never sent.
+      expect(description).not.toContain("dashboard_context_period_start");
+      expect(description).not.toContain("dashboard_context_period_end");
+    });
+
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names every supplied reserved parameter, and agrees in number", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: {
+            parameters: [
+              "dashboard_context_period_start",
+              "dashboard_context_period_end",
+            ],
+          },
+        }),
+      );
+
+      expect(description).toContain(
+        "dashboard_context_period_start and dashboard_context_period_end",
+      );
+      expect(description).toContain("come from");
+      expect(description).toContain("Remove them");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("still says something useful when the supplied names are absent", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "lwql_reserved_parameter_supplied", meta: {} }),
+      );
+
+      expect(title.length).toBeGreaterThan(0);
+      expect(description).toContain("Remove them from your parameters");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("ignores meta of the wrong type rather than rendering it", () => {
       const { description } = explainHandledError(
@@ -96,6 +144,204 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toBe("");
+    });
+
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
+    it.each([
+      ["chat", "POST /v1/chat/completions"],
+      ["messages", "POST /v1/messages"],
+      ["responses", "POST /v1/responses"],
+      ["embeddings", "POST /v1/embeddings"],
+      ["speech", "POST /v1/audio/speech"],
+      ["transcription", "multipart form"],
+      ["passthrough", "Gemini request URL"],
+    ])("explains where a %s request expects its model", (requestType, expected) => {
+      const { description } = explainHandledError(
+        shape({ code: "missing_model", meta: { request_type: requestType } }),
+      );
+
+      expect(description).toContain(expected);
+    });
+
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
+    it("uses surface-neutral missing-model copy for an unknown request type", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "missing_model",
+          meta: { request_type: "future_surface" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Set the model where this endpoint expects it, then try again.",
+      );
+    });
+  });
+
+  describe("when a seat allowance is what ran out", () => {
+    /** @scenario Running out of Lite Member seats names that allowance */
+    it("names which seats ran out and the reversible way to free one", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "membersLite", current: 3, max: 3 },
+        }),
+      );
+
+      // An admin reaching this is reconciling down to their plan, so "upgrade"
+      // on its own is the one answer they came here to avoid.
+      expect(description).toContain("Lite Member seats");
+      expect(description).toContain("disable a membership");
+      expect(description).toContain("reversible");
+    });
+
+    /** @scenario Running out of Lite Member seats names that allowance */
+    it("names the full member seats when those are the ones in use", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "members", current: 15, max: 15 },
+        }),
+      );
+
+      expect(description).toContain("full member seats");
+    });
+
+    it("keeps the generic plan-limit line for every other allowance", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "messagesPerMonth" },
+        }),
+      );
+
+      expect(description).toBe("Upgrade your plan to raise it.");
+    });
+  });
+
+  describe("when a team would be left without an admin", () => {
+    /** @scenario Refusing to leave a team without an admin names the team */
+    it("names the team and the one step that clears it", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "team_last_admin_required",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain('"developers"');
+      expect(description).toContain("Admin role");
+    });
+
+    /** @scenario Refusing to leave a team without an admin names the team */
+    it("still says something useful when the team has no name to give", () => {
+      const { description } = explainHandledError(
+        shape({ code: "team_last_admin_required", httpStatus: 409, meta: {} }),
+      );
+
+      expect(description).toContain("This team");
+      expect(description).not.toContain("undefined");
+    });
+
+    /** @scenario Being the last admin oneself is a different sentence */
+    it("tells the last admin of a team to promote somebody before leaving it", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "cannot_remove_self_as_last_admin",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain('"developers"');
+      expect(description).toContain("first");
+      // Nobody can do this for them, so copy that points at somebody else is
+      // pointing at the reader.
+      expect(description).not.toMatch(/ask|contact|support/i);
+    });
+
+    /** @scenario A Lite Member seat that only allows Viewer says so as itself */
+    it("explains that the seat is what limits the team role", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lite_member_viewer_only",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain("Viewer");
+      expect(description).toContain("full member seat");
+    });
+
+    /** @scenario None of these refusals reach the customer as check-your-input */
+    it.each([
+      "team_last_admin_required",
+      "cannot_remove_self_as_last_admin",
+      "lite_member_viewer_only",
+    ])("does not present %s as a bad input", (code) => {
+      const { title, description } = explainHandledError(
+        shape({ code, httpStatus: 409, meta: {} }),
+      );
+
+      // What each of these used to read as, before they carried a code of their
+      // own: the sentence the server wrote was dropped on the wire and the
+      // registry had only `validation_error` left to go on.
+      expect(title).not.toBe("Check your input");
+      expect(description).not.toContain("Some of the values aren't valid");
+    });
+  });
+
+  describe("given a deployment whose dataset storage is not writable", () => {
+    /** @scenario The customer reads copy written for the code */
+    it("says nothing was saved and that an administrator has to act", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "storage_not_writable", httpStatus: 500 }),
+      );
+
+      expect(title).not.toContain("storage_not_writable");
+      expect(description).toContain("Nothing was saved");
+      expect(description).toContain("administrator");
+      expect(description).not.toContain("S3_BUCKET_NAME");
+      expect(description).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
+    });
+  });
+
+  describe("given a permission card that was already answered", () => {
+    /** @scenario "A card that was already answered says which answer closed it" */
+    it("names the answer that closed it, and never says Langy gave up", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "langy_wait_expired",
+          httpStatus: 410,
+          meta: {
+            waitId: "lwait_1",
+            outcome: "answered",
+            decision: "allow_pattern",
+          },
+        }),
+      );
+
+      expect(description).toContain("allowed this pattern for the session");
+      expect(description).not.toContain("stopped waiting");
+    });
+
+    describe("when nobody answered in time", () => {
+      it("still says Langy stopped waiting", () => {
+        const { description } = explainHandledError(
+          shape({
+            code: "langy_wait_expired",
+            httpStatus: 410,
+            meta: { waitId: "lwait_1", outcome: "expired" },
+          }),
+        );
+
+        expect(description).toContain("stopped waiting");
+      });
     });
   });
 
@@ -170,6 +416,72 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a mediated LLM call the gateway forwarded from a provider", () => {
+    const reason = (code: string) => ({ code, kind: code });
+
+    /** @scenario "A provider-refused credential gets its own remediation copy" */
+    it.each([
+      "upstream_unauthorized",
+      "upstream_forbidden",
+    ])("explains a %s reason as a rejected credential", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("key or its permissions");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("upstream_rate_limited")],
+        }),
+      );
+
+      expect(description).toContain("rate-limiting");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it.each([
+      "rate_limit_exceeded",
+      "rate_limit_error",
+      "RESOURCE_EXHAUSTED",
+    ])("explains the provider's own %s code as the same wait-and-retry", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("rate-limiting");
+      expect(description).toContain("pick a model with more room");
+    });
+
+    /** @scenario "A provider outage gets its own remediation copy" */
+    it.each([
+      "upstream_unavailable",
+      "upstream_timeout",
+    ])("explains a %s reason as a provider outage", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("temporarily unavailable");
+    });
+
+    /** @scenario "An unrecognised upstream reason falls back to the generic retry line" */
+    it("falls back to the generic line for a reason it does not classify", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("some_new_provider_code")],
+        }),
+      );
+
+      expect(description).toBe("Try again, or pick a different model.");
+    });
+  });
+
   describe("given a validation error naming fields", () => {
     it("never names a field the customer can't see", () => {
       // zod flattens to the INPUT SCHEMA's keys, so every procedure's
@@ -228,6 +540,27 @@ describe("explainHandledError", () => {
       expect(description).toBe(
         "Map all of its required fields before running it.",
       );
+    });
+
+    it("names the model when the rejected field is the per-send modelOverride", () => {
+      // The Langy composer sends the picked model as `modelOverride`; the
+      // customer is looking at a model picker, so the card says "the model".
+      const { title, description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: {
+              modelOverride: [
+                "modelOverride must be in 'provider/model' shape",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("There's a problem with the model.");
     });
 
     it("names them the way the screen does, not the way the schema does", () => {
@@ -373,6 +706,12 @@ describe("explainHandledError", () => {
        * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // `reason` is the sentence parameter-spec.ts wrote for this exact
+        // declaration ("it is a turn field the platform sends on every
+        // call"), authored here and never relayed from the SDK. The shape
+        // check picks its sentence from the rule that failed rather than
+        // repeating the schema's own message, which names the parameter.
+        agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
@@ -382,6 +721,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // `reason` is the sentence the agent test prefetch or the type check
+        // wrote for this exact agent ("Only HTTP, code, workflow and connected
+        // agents can be tested"). Authored in `agent-test-run.ts` and
+        // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
+        agent_test_refused: new Set(["reason"]),
       };
 
       /**
@@ -449,6 +793,57 @@ describe("explainHandledError", () => {
         expect(title[0], `${code} title`).toBe(title[0]?.toUpperCase());
         expect(title.endsWith("."), `${code} title`).toBe(false);
       }
+    });
+  });
+});
+
+describe("agent_payload_too_large", () => {
+  describe("when the session is what broke the cap", () => {
+    /** @scenario "A session above the cap is refused with a typed error" */
+    it("tells the reader to return a small session value", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "session", sizeBytes: 70002, limitBytes: 65536 },
+        }),
+      );
+
+      expect(description).toContain("session");
+      expect(description).toContain("conversation id");
+      expect(description).not.toContain("attachments");
+    });
+  });
+
+  describe("when the result is what broke the cap", () => {
+    it("names the result and keeps the trimming advice", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "result" },
+        }),
+      );
+
+      expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("agent_test_refused", () => {
+  describe("when the reason is longer than a sentence", () => {
+    /** @scenario "Technical detail stops at the trace id" */
+    it("clamps it, the way every server-supplied sentence here is clamped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_test_refused",
+          httpStatus: 400,
+          meta: { reason: "a".repeat(400) },
+        }),
+      );
+
+      expect(description).toContain("\u2026");
+      expect(description.length).toBeLessThan(300);
     });
   });
 });

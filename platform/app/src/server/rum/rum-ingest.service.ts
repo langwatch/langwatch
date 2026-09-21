@@ -23,7 +23,7 @@ import {
   RUM_MAX_BODY_BYTES,
   RUM_MAX_SPANS,
   RUM_SERVICE_NAME,
-} from "@langwatch/react-rum";
+} from "@langwatch/react-rum/constants";
 import { rateLimit } from "~/server/rateLimit";
 
 const logger = createLogger("langwatch:rum:ingest");

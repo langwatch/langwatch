@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { langyTranscriptRuns } from "~/features/langy/logic/langyTranscript";
 import { buildFinalAssistantParts } from "../langy-final-parts";
 
 /** A well-formed stats block, fenced the way the model emits it. */
@@ -36,6 +37,22 @@ describe("buildFinalAssistantParts", () => {
         },
         { type: "text", text: "done", role: "assistant" },
       ]);
+    });
+
+    it("records that a call ran in the developer's shared folder", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok", local: true }],
+      });
+      expect(parts[0]).toMatchObject({ type: "tool-bash", local: true });
+    });
+
+    it("leaves a sandbox call unmarked", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok" }],
+      });
+      expect(parts[0]).not.toHaveProperty("local");
     });
 
     it("maps an errored tool call to output-error with errorText from output", () => {
@@ -278,6 +295,263 @@ describe("buildFinalAssistantParts", () => {
       expect(buildFinalAssistantParts({ text })).toEqual([
         { type: "text", text, role: "assistant" },
       ]);
+    });
+  });
+
+  describe("given the turn's own account of what happened when", () => {
+    const twoCalls = [
+      { id: "c1", name: "search", output: "found" },
+      { id: "c2", name: "run", output: "ok" },
+    ];
+
+    /** @scenario "The record keeps the paragraphs written between the calls" */
+    it("records the paragraphs and the calls in the order they happened", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Both are policy gaps.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+          { kind: "text", text: "Both are policy gaps." },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "text",
+        "tool-search",
+        "text",
+        "tool-run",
+        "text",
+      ]);
+      expect(parts.map((part) => ("text" in part ? part.text : null))).toEqual([
+        "Reading the failed rows.",
+        null,
+        "Now running the candidate.",
+        null,
+        "Both are policy gaps.",
+      ]);
+    });
+
+    /** @scenario "The record keeps the paragraphs written between the calls" */
+    it("keeps the reply once, not once per source", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.filter((part) => part.type === "text")).toHaveLength(1);
+    });
+
+    it("prefers the agent's own reply over the copy the stream caught", () => {
+      // The last text on the stream is whatever had streamed when the turn
+      // ended; `text` is the reply the agent asked to keep.
+      const parts = buildFinalAssistantParts({
+        text: "Improved the pass rate from 30% to 100%.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Improved the pass ra" },
+        ],
+      });
+      expect(parts).toEqual([
+        {
+          type: "tool-search",
+          toolCallId: "c1",
+          state: "output-available",
+          output: "found",
+        },
+        {
+          type: "text",
+          text: "Improved the pass rate from 30% to 100%.",
+          role: "assistant",
+        },
+      ]);
+    });
+
+    it("keeps a call the account never named, rather than dropping it", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Looking." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.map((part) => part.type)).toEqual([
+        "text",
+        "tool-search",
+        "tool-run",
+        "text",
+      ]);
+    });
+
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("does not repeat its narration when the turn ended on a call", () => {
+      // A turn that goes quiet after its last call hands over its WHOLE
+      // narration as the reply, because there is no closing paragraph to hand
+      // over instead. Appending it after the account would print every
+      // paragraph a second time.
+      const parts = buildFinalAssistantParts({
+        text: "Reading the failed rows.\nNow running the candidate.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "text",
+        "tool-search",
+        "text",
+        "tool-run",
+      ]);
+      expect(parts.map((part) => ("text" in part ? part.text : null))).toEqual([
+        "Reading the failed rows.",
+        null,
+        "Now running the candidate.",
+        null,
+      ]);
+    });
+
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("keeps the reply when a turn ending on a call wrote no prose of its own", () => {
+      // Nothing was written between the calls, so `text` is the only prose
+      // there is and dropping it would record a turn that said nothing.
+      const parts = buildFinalAssistantParts({
+        text: "Annotation added.",
+        toolCalls: [twoCalls[0]!],
+        order: [{ kind: "tool", id: "c1" }],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["tool-search", "text"]);
+    });
+
+    it("drops a blank paragraph rather than recording an empty block", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "text", text: "   " },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["tool-search", "text"]);
+    });
+
+    /** @scenario "A reloaded turn reads the same as the turn that was watched" */
+    it("records a turn the panel reads back in the order it happened", () => {
+      // The reload path end to end, minus the pixels: what the record keeps,
+      // handed to the split the panel draws a turn with
+      // (features/langy/logic/langyTranscript).
+      const parts = buildFinalAssistantParts({
+        text: "Both are policy gaps.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+          { kind: "text", text: "Both are policy gaps." },
+        ],
+      });
+
+      expect(langyTranscriptRuns(parts).map((run) => run.kind)).toEqual([
+        "answer",
+        "activity",
+        "answer",
+        "activity",
+        "answer",
+      ]);
+    });
+
+    /** @scenario "A turn with no ordered account on hand records what it always did" */
+    it("records its calls before its reply when there is no account", () => {
+      const withoutOrder = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+      });
+      const withEmptyOrder = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+        order: [],
+      });
+      expect(withEmptyOrder).toEqual(withoutOrder);
+      expect(withoutOrder.map((part) => part.type)).toEqual([
+        "tool-search",
+        "tool-run",
+        "text",
+      ]);
+    });
+  });
+  describe("given a turn that said its lines and then wrote them again", () => {
+    const said =
+      "I opened a pull request with the tracing change: https://example.test/acme/pull/3. You can merge it already.";
+    const branch =
+      "I left branch langy/acme-checkout checked out: the agent you started runs on it.";
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("records the said lines and a reply emptied of their repeats", () => {
+      const parts = buildFinalAssistantParts({
+        text: `${said}\n${branch}`,
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: said }, output: "Said." },
+          { id: "s2", name: "say", input: { text: branch }, output: "Said." },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "tool-say",
+        "tool-say",
+        "text",
+      ]);
+      expect(parts.at(-1)).toEqual({
+        type: "text",
+        text: "",
+        role: "assistant",
+      });
+    });
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("keeps a closing sentence the turn had not said yet", () => {
+      const parts = buildFinalAssistantParts({
+        text: `${said}\nAnything else I can help with?`,
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: said }, output: "Said." },
+        ],
+      });
+
+      expect(parts.at(-1)).toMatchObject({
+        text: "Anything else I can help with?",
+      });
+    });
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("drops a said line that a question card asks as its own question", () => {
+      const proposal =
+        "The first one I'd write is Guest completes checkout, because it is the golden path.";
+      const parts = buildFinalAssistantParts({
+        text: "",
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: proposal }, output: "Said." },
+          {
+            id: "q1",
+            name: "question",
+            input: { questions: [{ question: proposal, bare: true }] },
+            output: "answered",
+          },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual(["tool-question", "text"]);
     });
   });
 });

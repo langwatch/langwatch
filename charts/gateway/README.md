@@ -90,7 +90,7 @@ it is a public-facing, tenant-controlled egress workload, so there is no
 configuration under which projecting a cluster credential into it is correct.
 
 Many `values.yaml` knobs are exposed as forward-compat for v1.1 and
-have no effect in v1 (e.g. `cache.lruSize`, `redis.url`,
+have no effect in v1 (e.g. `cache.lruSize`,
 `bifrost.poolSize`, `admin.addr`, `guardrails.*`). They are
 intentionally kept in the values surface so operator runbooks built
 today survive v1.1 without re-pinning. See

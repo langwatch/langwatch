@@ -1,4 +1,4 @@
-import type { OrganizationIntent } from "@prisma/client";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 import type { Attribution } from "~/utils/attribution";
 
 // Enum values are identities, not positions — order comes from
@@ -9,6 +9,10 @@ export enum OnboardingScreenIndex {
   DESIRES = 2,
   ROLE = 3,
   INTENT = 4,
+  /** The takeover screens of the guided variant: Langy speaks, no card. */
+  HELLO = 5,
+  VALUE = 6,
+  PROVIDER = 7,
 }
 
 export enum ProductScreenIndex {
@@ -87,7 +91,7 @@ export interface OnboardingScreen {
   component: React.ComponentType<any>;
   heading: string;
   subHeading?: string;
-  widthVariant?: "narrow" | "full";
+  widthVariant?: "narrow" | "guided" | "full";
 }
 
 export interface FormItem<T> {
@@ -111,7 +115,7 @@ export interface OnboardingNavigation {
   canProceed: () => boolean;
 }
 
-export type OnboardingFlowVariant = "full" | "self_hosted";
+export type OnboardingFlowVariant = "full" | "self_hosted" | "guided";
 
 export interface OnboardingFlowConfig {
   variant: OnboardingFlowVariant;

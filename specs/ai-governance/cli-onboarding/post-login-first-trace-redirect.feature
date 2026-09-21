@@ -39,9 +39,9 @@ Feature: Post-login first-trace watch on the CLI authorize page
     And the page does not navigate away
 
   @bdd @cli-onboarding @first-trace @integration
-  Scenario: Generating a project API key does not start the first-trace watcher
+  Scenario: Sending a project API key keeps the success card still, with no waiting line and no redirect
     Given the CLI requested a project API key instead of a device session
-    When the user generates the key
+    When the user sends the key to the CLI
     Then the API key success card renders without any waiting status line
     And the page does not navigate away
 

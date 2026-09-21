@@ -6,7 +6,6 @@ import {
   getBugReportById,
 } from "~/server/app-layer/bug-reports/bug-report.service";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
-import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -34,7 +33,9 @@ export const bugReportsRouter = createTRPCRouter({
         search: z.string().max(200).optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "bug reports are filed by the session user about the app itself",
+    })
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       requireAdmin(user);
@@ -55,7 +56,9 @@ export const bugReportsRouter = createTRPCRouter({
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason: "bug reports are filed by the session user about the app itself",
+    })
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       requireAdmin(user);

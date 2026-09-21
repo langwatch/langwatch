@@ -12,27 +12,36 @@
  *
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
 
 import { CliTokenRevocationService } from "../cliTokenRevocation.service";
+
+/** The container's connection, handed to the test App the service defaults to. */
+let redisConnection: Redis | null = null;
 
 describe("CliTokenRevocationService.revokeForUser", () => {
   const ns = nanoid(8);
 
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
     if (!redisConnection) {
       throw new Error("Redis connection unavailable in test env");
     }
+    // CliTokenRevocationService.create() defaults to the App's connection.
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
   });
 
   afterAll(async () => {
+    await resetApp();
     await stopTestContainers();
   });
 

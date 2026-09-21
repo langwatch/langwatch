@@ -367,7 +367,7 @@ describe("filterBlockKit", () => {
                 { type: "link", url: "javascript:alert(1)", text: "x" },
                 {
                   type: "link",
-                  url: "https://app.langwatch.ai/acme/messages/t1",
+                  url: "https://app.langwatch.ai/acme/traces/t1",
                   text: "ok",
                 },
               ],
@@ -379,7 +379,7 @@ describe("filterBlockKit", () => {
       expect(section?.elements).toEqual([
         {
           type: "link",
-          url: "https://app.langwatch.ai/acme/messages/t1",
+          url: "https://app.langwatch.ai/acme/traces/t1",
           text: "ok",
         },
       ]);

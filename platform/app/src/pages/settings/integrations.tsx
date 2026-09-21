@@ -1,13 +1,13 @@
 /**
- * Settings → Integrations. v0 surfaces the Langy ↔ GitHub App installation:
- * install the app, see which GitHub accounts and repositories Langy can reach,
- * and open GitHub to change or remove the installation. Future integrations
- * slot in here as additional cards.
+ * Settings → Integrations. v0 surfaces the organization's GitHub connection:
+ * connect the app, see which GitHub accounts and repositories it reaches, and
+ * open GitHub to change or remove the installation. Future integrations slot in
+ * here as additional cards.
  *
  * The same install endpoint serves the in-chat popup flow; this page uses the
  * redirect-mode variant so a full-page round-trip lands back here.
  *
- * Spec: specs/langy/langy-github-install.feature. Issue: #4747.
+ * Spec: specs/integrations/github-connection.feature.
  */
 import {
   Badge,
@@ -22,6 +22,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
+import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 
 import SettingsLayout from "../../components/SettingsLayout";
@@ -41,7 +42,7 @@ export default withPermissionGuard("organization:manage", {
 })(IntegrationsSettings);
 
 function IntegrationsContent({ organizationId }: { organizationId: string }) {
-  const status = api.langyGithub.getInstallStatus.useQuery({ organizationId });
+  const status = api.github.getConnectionStatus.useQuery({ organizationId });
   const router = useRouter();
 
   useEffect(() => {
@@ -63,11 +64,14 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.githubError]);
 
+  // The server hands back the install entry point, so the App slug and the
+  // shape of the flow stay off the client.
+  const installUrl = status.data?.installUrl;
+
   const onInstall = () => {
+    if (!installUrl) return;
     const ret = encodeURIComponent("/settings/integrations#github");
-    window.location.href = `/api/github-langy/install?mode=redirect&organizationId=${encodeURIComponent(
-      organizationId,
-    )}&return=${ret}`;
+    window.location.href = `${installUrl}&mode=redirect&return=${ret}`;
   };
 
   const configured = status.data?.configured ?? true;
@@ -90,9 +94,10 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                 ) : null}
               </HStack>
               <Text fontSize="sm" color="fg.muted">
-                Lets Langy open pull requests on the repositories you choose.
-                Pull requests are made by the LangWatch app and credit you as
-                the requester.
+                Lets LangWatch open pull requests on the repositories you
+                choose, and link coding agent sessions to the pull requests they
+                produced. Pull requests are made by the LangWatch app and credit
+                you as the requester.
               </Text>
 
               {!configured ? (
@@ -103,9 +108,10 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                 <Button
                   variant="solid"
                   onClick={onInstall}
+                  disabled={!installUrl}
                   alignSelf="flex-start"
                 >
-                  Install the LangWatch GitHub App
+                  Connect GitHub
                 </Button>
               ) : (
                 <VStack align="stretch" gap={3}>
@@ -121,17 +127,63 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                     variant="outline"
                     size="sm"
                     onClick={onInstall}
+                    disabled={!installUrl}
                     alignSelf="flex-start"
                   >
                     Add another account
                   </Button>
                 </VStack>
               )}
+
+              <LangyCodeAccessPreference />
             </VStack>
           </Card.Body>
         </Card.Root>
       </VStack>
     </SettingsLayout>
+  );
+}
+
+/**
+ * The remembered answer to "how should Langy reach my code" (ADR-129). The
+ * choice is made in the chat, so this line only appears once one is stored,
+ * and its one job is to let the reader take it back.
+ */
+function LangyCodeAccessPreference() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const preference = api.langy.getCodeAccessPreference.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId, retry: false },
+  );
+  const clear = api.langy.setCodeAccessPreference.useMutation({
+    onSuccess: () => void preference.refetch(),
+    onError: (error) =>
+      showErrorToast({ error, title: "Could not clear the choice" }),
+  });
+
+  if (preference.data?.preference !== "github" || !projectId) return null;
+
+  return (
+    <HStack
+      gap={3}
+      justifyContent="space-between"
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={3}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        Langy uses GitHub for code changes
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={clear.isPending}
+        onClick={() => clear.mutate({ projectId, preference: null })}
+      >
+        Change
+      </Button>
+    </HStack>
   );
 }
 
@@ -158,7 +210,7 @@ function InstallationRow({
   // until GitHub's confirmation lands — without a hint, that reads as the
   // Disconnect button doing nothing.
   const [uninstallStarted, setUninstallStarted] = useState(false);
-  const disconnect = api.langyGithub.disconnect.useMutation({
+  const disconnect = api.github.disconnect.useMutation({
     onSuccess: (data) => {
       // We can't uninstall via the API — open GitHub's uninstall page. The
       // webhook removes the local record once GitHub confirms.

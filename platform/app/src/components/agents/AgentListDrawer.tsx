@@ -13,6 +13,7 @@ import {
   Code,
   Globe,
   MessageSquare,
+  Mic,
   MoreVertical,
   Pencil,
   Plus,
@@ -31,14 +32,15 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentType, TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
 export type AgentListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (agent: TypedAgent) => void;
-  onEdit?: (agent: TypedAgent) => void;
+  onSelect?: (agent: AgentWithFields) => void;
+  onEdit?: (agent: AgentWithFields) => void;
   onCreateNew?: () => void;
 };
 
@@ -54,7 +56,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get flow callbacks for this drawer (set by parent flows like useAgentPickerFlow)
   const flowCallbacks = getFlowCallbacks("agentList");
@@ -103,7 +105,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
           ? "Also deleted: 1 workflow"
           : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: () => {
@@ -115,12 +116,12 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     },
   });
 
-  const handleSelectAgent = (agent: TypedAgent) => {
+  const handleSelectAgent = (agent: AgentWithFields) => {
     onSelect?.(agent);
     onClose();
   };
 
-  const handleEditAgent = (agent: TypedAgent) => {
+  const handleEditAgent = (agent: AgentWithFields) => {
     if (onEdit) {
       onEdit(agent);
       return;
@@ -163,7 +164,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             toaster.create({
               title: "Agent deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: () => {
@@ -302,18 +302,27 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 // Agent Card Component
 // ============================================================================
 
-const agentTypeIcons: Record<string, typeof MessageSquare> = {
+/**
+ * The icon and the label per agent type. Both maps are keyed by the whole
+ * enum, so a new agent type does not compile until it names its icon and its
+ * word here, and no fallback stands in for it in silence.
+ */
+const agentTypeIcons: Record<AgentType, typeof MessageSquare> = {
   signature: MessageSquare,
   code: Code,
   workflow: Workflow,
   http: Globe,
+  connected: Bot,
+  voice: Mic,
 };
 
-const agentTypeLabels: Record<string, string> = {
+const agentTypeLabels: Record<AgentType, string> = {
   signature: "Prompt",
   code: "Code",
   workflow: "Workflow",
   http: "HTTP",
+  connected: "Connected",
+  voice: "Voice agent",
 };
 
 type AgentCardProps = {
@@ -324,8 +333,8 @@ type AgentCardProps = {
 };
 
 function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
-  const Icon = agentTypeIcons[agent.type] ?? Bot;
-  const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
+  const Icon = agentTypeIcons[agent.type];
+  const typeLabel = agentTypeLabels[agent.type];
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (

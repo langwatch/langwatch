@@ -12,9 +12,60 @@ import { buildTimeseriesQuery } from "../aggregation-builder";
 import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
+/**
+ * Splits a SELECT list into its items. Commas inside a call cannot split an
+ * item, so parenthesised groups are emptied first, innermost outwards, until
+ * none are left: a plain `split(",")` would otherwise tear
+ * `map('k', SpanAttributes['k']) AS SpanAttributes` in half at its inner comma
+ * and make the whole-map assertion below meaningless.
+ *
+ * Emptying rather than removing keeps each item's shape, so
+ * `map(...) AS SpanAttributes` stays distinguishable from a bare
+ * `SpanAttributes`, which is the whole point of the assertion.
+ *
+ * Quoted strings are emptied first: an attribute key is arbitrary text, so a
+ * key like `'tool(args)'` would otherwise contribute an unbalanced parenthesis
+ * and leave its enclosing call un-emptied.
+ */
+function selectListItems(selectList: string): string[] {
+  let flattened = selectList.replace(/'[^']*'/g, "''");
+  let previous = "";
+  while (flattened !== previous) {
+    previous = flattened;
+    flattened = flattened.replace(/\([^()]*\)/g, "()");
+  }
+  return flattened.split(",").map((item) => item.trim());
+}
+
 describe("column-pruning", () => {
   beforeEach(() => {
     resetParamCounter();
+  });
+
+  // The whole-map assertions below are only as trustworthy as the split they
+  // rely on, so pin it here rather than inferring it from a passing assertion.
+  describe("given a SELECT list is split into items", () => {
+    it("keeps a reconstructed map as one item", () => {
+      expect(
+        selectListItems(
+          "TraceId, map('k', SpanAttributes['k']) AS SpanAttributes",
+        ),
+      ).toEqual(["TraceId", "map() AS SpanAttributes"]);
+    });
+
+    it("keeps it as one item when the key contains parentheses", () => {
+      expect(
+        selectListItems(
+          "TraceId, map('tool(args)', SpanAttributes['tool(args)']) AS SpanAttributes",
+        ),
+      ).toEqual(["TraceId", "map() AS SpanAttributes"]);
+    });
+
+    it("still surfaces a whole-map projection in any position", () => {
+      expect(selectListItems("SpanAttributes, TraceId, DurationMs")).toContain(
+        "SpanAttributes",
+      );
+    });
   });
 
   const baseInput = {
@@ -273,6 +324,40 @@ describe("column-pruning", () => {
 
         expect(result.sql).not.toContain("ss.Input");
         expect(result.sql).not.toContain("ss.Output");
+      });
+
+      /** @scenario Stored spans JOIN materializes only the referenced SpanAttributes key */
+      it("projects a narrow SpanAttributes map instead of the whole column", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "metadata.span_type",
+        });
+
+        // The JOIN subquery reconstructs a map of only the referenced key so the
+        // wide SpanAttributes values never reach the join buffer.
+        expect(result.sql).toContain(
+          "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+        );
+        // The bare whole-map column is never selected into the subquery, in
+        // any position. Checked against the extracted SELECT list rather than
+        // the raw SQL, so a mid-list `SpanAttributes,` cannot slip through the
+        // way an end-of-list-only pattern would.
+        const storedSpansSelect =
+          /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(result.sql)
+            ?.groups?.list;
+        expect(storedSpansSelect).toBeDefined();
+        const selectedItems = selectListItems(storedSpansSelect!);
+        expect(selectedItems).not.toContain("SpanAttributes");
+        // Outer accesses still resolve against the reconstructed map.
+        expect(result.sql).toContain(
+          "ss.SpanAttributes['langwatch.span.type']",
+        );
       });
     });
 

@@ -3,6 +3,7 @@ import { LIVE_WINDOW_MS } from "../constants/freshness";
 import { useTraceViewer } from "../context/TraceViewerContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
+import { useDrawerProjectId } from "./useDrawerProjectId";
 
 /**
  * Shared base wiring for the per-trace tRPC queries fired off the open
@@ -27,18 +28,26 @@ export function useTraceQueryArgs() {
   const storeTraceId = useDrawerStore((s) => s.traceId);
   const traceId = viewer.traceId ?? storeTraceId;
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const projectId = useDrawerProjectId();
 
   const isLive =
     occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
 
   const queryArgs = {
-    projectId: project?.id ?? "",
+    projectId,
     traceId: traceId ?? "",
     ...(occurredAtMs !== null ? { occurredAtMs } : {}),
   };
 
-  const isReady =
-    !!project?.id && !!traceId && !isPreviewTraceId(traceId ?? "");
+  const isReady = !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "");
 
-  return { project, traceId, occurredAtMs, isLive, isReady, queryArgs };
+  return {
+    project,
+    projectId,
+    traceId,
+    occurredAtMs,
+    isLive,
+    isReady,
+    queryArgs,
+  };
 }

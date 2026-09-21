@@ -140,6 +140,27 @@ export const traceSummaryDataSchema = z.object({
    * over.
    */
   rootMetadataFromFallback: z.boolean().optional(),
+  /**
+   * The trace's STORAGE ANCHOR, epoch ms (0 / absent = nothing observed yet).
+   *
+   * Written to `trace_summaries.OccurredAt`, which is the table's weekly
+   * partition key and its TTL anchor (00002). Frozen on the FIRST contribution
+   * that carries a usable business time - a span, a log record, a metric
+   * correlation, an annotation, a topic assignment, an origin resolution, a
+   * rename - and never moved afterwards (ADR-071's rule, applied to this table
+   * by ADR-087).
+   *
+   * Deliberately separate from `occurredAt` below. That one is span-seeded and
+   * is the timing baseline; only spans may touch it, because `SpanTimingService`
+   * reads `occurredAt > 0` as "a span has seeded the baseline" and measures
+   * `totalDurationMs` from it. Sharing one field between the two jobs is what
+   * put log-only traces (Claude Code / Codex "Path B") in partition 196952 with
+   * a TTL deadline of `1970 + retention`, already past.
+   *
+   * Optional because the list reads build this shape straight from query rows
+   * and every pre-ADR-087 caller predates the field; treat absent as 0.
+   */
+  storageAnchorMs: z.number().optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

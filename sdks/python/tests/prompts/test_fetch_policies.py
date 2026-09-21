@@ -118,6 +118,8 @@ def test_cache_ttl_returns_cached_version_before_expiration(
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
+            "parameters": {},
         }
 
         with patch("httpx.Client.request") as mock_request:
@@ -248,6 +250,8 @@ def test_default_policy_fetches_from_api_when_no_local_file_exists(
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
+            "parameters": {},
         }
 
         with patch("httpx.Client.request") as mock_request:
@@ -299,6 +303,8 @@ def test_always_fetch_returns_server_prompt(empty_dir: Path, clean_langwatch):
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
+            "parameters": {},
         }
 
         with patch("httpx.Client.request") as mock_request:
@@ -384,6 +390,8 @@ def test_cache_ttl_refetches_after_expiration(empty_dir: Path, clean_langwatch):
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
+            "parameters": {},
         }
 
         with (

@@ -17,12 +17,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Experiment, ExperimentType, type Project } from "@prisma/client";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
-
 import { Link } from "~/components/ui/link";
+import {
+  type Experiment,
+  ExperimentType,
+  type Project,
+} from "~/generated/prisma/client";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

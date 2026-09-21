@@ -15,7 +15,6 @@ vi.mock("~/server/metrics", async (importOriginal) => {
 
 import { incrementEsFoldPostStoreFailure } from "~/server/metrics";
 import type { Event } from "../../domain/types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -24,11 +23,12 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
 import { ProjectionRouter } from "../projectionRouter";
 
 /**
- * A fold's state is written durably before its reactors are dispatched, so a
- * reactor failure fails the job without un-writing it and the queue redelivers
+ * A fold's state is written durably before its subscribers are dispatched, so a
+ * subscriber failure fails the job without un-writing it and the queue redelivers
  * events the store already holds. Folds accumulate (trace summary does
  * `spanCount + 1` and sums cost), so the re-apply double-counts.
  *
@@ -63,18 +63,20 @@ describe("fold failures after the state was stored", () => {
     );
 
   /**
-   * No reactor queues, so the router runs the reactor inline; a rejecting
+   * No subscriber queues, so the router runs the subscriber inline; a rejecting
    * handle is collected and rethrown as an AggregateError — the same shape a
    * Redis blip on queue send produces, since both funnel into the same errors[].
    */
   function buildFoldQueues({
-    shouldReactorFail = false,
+    shouldSubscriberFail = false,
     shouldStoreFail = false,
   }: {
-    shouldReactorFail?: boolean;
+    shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
   }): ReturnType<typeof vi.fn> {
-    const queueManager = createMockQueueManager({ hasReactorQueues: false });
+    const queueManager = createMockQueueManager({
+      hasProjectionSubscriberQueues: false,
+    });
     const router = new ProjectionRouter<Event>(
       TEST_CONSTANTS.AGGREGATE_TYPE,
       TEST_CONSTANTS.PIPELINE_NAME,
@@ -95,15 +97,15 @@ describe("fold failures after the state was stored", () => {
       apply: (state: { count: number }) => ({ count: state.count + 1 }),
     });
 
-    const reactor: ReactorDefinition<Event> = {
-      name: "flakyReactor",
-      handle: shouldReactorFail
-        ? vi.fn().mockRejectedValue(new Error("reactor boom"))
+    const subscriber: SubscriberDispatchDefinition<Event> = {
+      name: "flakySubscriber",
+      handle: shouldSubscriberFail
+        ? vi.fn().mockRejectedValue(new Error("subscriber boom"))
         : vi.fn().mockResolvedValue(undefined),
     };
 
     router.registerFoldProjection(fold);
-    router.registerReactor("counter", reactor);
+    router.registerSubscriber("counter", subscriber);
     router.initializeFoldQueues();
 
     return queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
@@ -112,7 +114,7 @@ describe("fold failures after the state was stored", () => {
   /** The coalesced path — `processFoldProjectionBatch`. */
   async function dispatchBatch(options: {
     batch: Event[];
-    shouldReactorFail?: boolean;
+    shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
     const onEventBatch = buildFoldQueues(options).mock.calls[0]?.[2] as (
@@ -129,7 +131,7 @@ describe("fold failures after the state was stored", () => {
   /** The single-event path — `processFoldProjectionEvent`, same wrapper. */
   async function dispatchSingle(options: {
     event: Event;
-    shouldReactorFail?: boolean;
+    shouldSubscriberFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
     const onEvent = buildFoldQueues(options).mock.calls[0]?.[1] as (
@@ -143,9 +145,9 @@ describe("fold failures after the state was stored", () => {
     );
   }
 
-  describe("when a reactor throws after the fold state was stored", () => {
+  describe("when a subscriber throws after the fold state was stored", () => {
     it("counts the failure as post-store, labelled by stage", async () => {
-      await dispatchBatch({ batch: events(3), shouldReactorFail: true });
+      await dispatchBatch({ batch: events(3), shouldSubscriberFail: true });
 
       expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
         projectionName: "counter",
@@ -156,14 +158,17 @@ describe("fold failures after the state was stored", () => {
     it("rethrows so the queue still retries the job", async () => {
       const error = await dispatchBatch({
         batch: events(3),
-        shouldReactorFail: true,
+        shouldSubscriberFail: true,
       });
 
       expect(error).toBeInstanceOf(Error);
     });
 
     it("counts it on the single-event path too, not only the batch path", async () => {
-      await dispatchSingle({ event: events(1)[0]!, shouldReactorFail: true });
+      await dispatchSingle({
+        event: events(1)[0]!,
+        shouldSubscriberFail: true,
+      });
 
       expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
         projectionName: "counter",
@@ -172,9 +177,9 @@ describe("fold failures after the state was stored", () => {
     });
   });
 
-  describe("when every reactor succeeds", () => {
+  describe("when every subscriber succeeds", () => {
     it("counts nothing, because no state was left behind a failed job", async () => {
-      await dispatchBatch({ batch: events(3), shouldReactorFail: false });
+      await dispatchBatch({ batch: events(3), shouldSubscriberFail: false });
 
       expect(incrementEsFoldPostStoreFailure).not.toHaveBeenCalled();
     });

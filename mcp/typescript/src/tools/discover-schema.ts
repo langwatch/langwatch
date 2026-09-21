@@ -1,25 +1,64 @@
-import { filterFields } from "../schemas/filter-fields.js";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
 import { analyticsGroups } from "../schemas/analytics-groups.js";
+import { analyticsMetrics } from "../schemas/analytics-metrics.js";
+import {
+  getQueryReference,
+  type QueryReferenceResponse,
+} from "../langwatch-api-query.js";
+import { markdownTable } from "../utils/markdown-table.js";
 
 export type Category =
   | "filters"
+  | "lwql"
   | "metrics"
   | "aggregations"
   | "groups"
   | "all";
 
 /**
- * Formats the LangWatch analytics schema into human-readable markdown.
+ * Categories whose answer comes from the platform rather than from this
+ * package.
  *
- * Returns documentation for the requested category of schema elements
- * (filter fields, metrics, aggregation types, or group-by options).
+ * The distinction is why `formatSchema` is async: the filter fields and the
+ * analytics SQL schema are the platform's own registries, read from
+ * `GET /api/v1/query/reference`, and they need the API key. The metrics,
+ * aggregations and group-by lists are still static tables in this package and
+ * answer without one.
+ *
+ * The filter half used to be static too — a hand-copied list of 24 field names
+ * in `schemas/filter-fields.ts` — and it drifted in both directions with
+ * nothing able to notice. That file is gone.
  */
-export function formatSchema(category: Category): string {
+const PLATFORM_BACKED: ReadonlySet<Category> = new Set([
+  "filters",
+  "lwql",
+  "all",
+]);
+
+export function needsQueryReference(category: Category): boolean {
+  return PLATFORM_BACKED.has(category);
+}
+
+/**
+ * Formats the LangWatch query schema into markdown an agent can act on.
+ *
+ * `reference` is required for the platform-backed categories and ignored by the
+ * others, so a caller that already fetched it for one category can reuse it.
+ */
+export async function formatSchema(
+  category: Category,
+  reference?: QueryReferenceResponse,
+): Promise<string> {
   const sections: string[] = [];
+  const resolved =
+    needsQueryReference(category) && !reference
+      ? await getQueryReference()
+      : reference;
 
   if (category === "filters" || category === "all") {
-    sections.push(formatFilters());
+    sections.push(formatFilters(resolved));
+  }
+  if (category === "lwql" || category === "all") {
+    sections.push(formatLangWatchQL(resolved));
   }
   if (category === "metrics" || category === "all") {
     sections.push(formatMetrics());
@@ -30,22 +69,137 @@ export function formatSchema(category: Category): string {
   if (category === "groups" || category === "all") {
     sections.push(formatGroups());
   }
+  if (category === "all" && resolved) {
+    sections.push(formatDecisionTable(resolved));
+  }
 
   return sections.join("\n\n");
 }
 
-function formatFilters(): string {
-  const lines = ["## Available Filter Fields", ""];
-  lines.push(
-    "Use these in the `filters` parameter of `search_traces` and `get_analytics`."
-  );
-  lines.push('Format: `{ "field_name": ["value1", "value2"] }`');
-  lines.push("");
-  for (const f of filterFields) {
-    lines.push(
-      `- **${f.field}**: ${f.description}${f.example ? ` (e.g., \`${f.example}\`)` : ""}`
-    );
+function formatFilters(reference?: QueryReferenceResponse): string {
+  if (!reference) {
+    return "## Trace Filter Fields\n\nUnavailable: the platform could not be reached.";
   }
+  const lines = ["## Trace Filter Fields", ""];
+  lines.push(
+    "Send one of these as the `filter` parameter of `search_traces`, in the language the Trace Explorer's search bar speaks: `status:error AND model:gpt-*`.",
+  );
+  lines.push(
+    "The `filters` parameter is the older per-field map and still works; both are combined when you send both.",
+  );
+  lines.push("");
+  lines.push(
+    markdownTable({
+      headers: ["Field", "Type", "Group", "Known values"],
+      rows: reference.traceFilter.fields.map((field) => ({
+        Field: field.name,
+        Type: field.valueType,
+        Group: field.group ?? "",
+        "Known values":
+          field.knownValues.length > 0
+            ? field.knownValues.join(", ")
+            : field.facetable
+              ? "open set, read them from GET /api/traces/facets"
+              : "",
+      })),
+    }),
+  );
+  lines.push("");
+  lines.push("### Attribute namespaces", "");
+  lines.push(
+    markdownTable({
+      headers: ["Prefix", "Matches", "Older spellings"],
+      rows: reference.traceFilter.dynamicPrefixes.map((prefix) => ({
+        Prefix: `${prefix.prefix}<key>`,
+        Matches: prefix.description,
+        "Older spellings": prefix.aliases.join(", "),
+      })),
+    }),
+  );
+  lines.push("");
+  lines.push("### Syntax", "");
+  lines.push(reference.traceFilter.syntax);
+  lines.push("");
+  lines.push("### Worked filters", "");
+  for (const example of reference.examples.filter(
+    (candidate) => candidate.language === "trace-filter",
+  )) {
+    lines.push(`- \`${example.text}\` — ${example.title}`);
+  }
+  return lines.join("\n");
+}
+
+function formatLangWatchQL(reference?: QueryReferenceResponse): string {
+  if (!reference) {
+    return "## Analytics SQL\n\nUnavailable: the platform could not be reached.";
+  }
+  if (!reference.lwql.enabled) {
+    return [
+      "## Analytics SQL",
+      "",
+      "Not enabled for this project, so `run_query` will refuse. Use `search_traces` and `get_analytics` instead.",
+    ].join("\n");
+  }
+  const lines = ["## Analytics SQL", ""];
+  lines.push(
+    "Run one read-only SELECT with `run_query`. The statement is executed as written: nothing rewrites it.",
+  );
+  lines.push(
+    `Ceilings: ${reference.lwql.limits.maxRowsReturned} rows, ${reference.lwql.limits.maxExecutionTimeSeconds} seconds. ${reference.lwql.limits.pagination}`,
+  );
+  lines.push("");
+  for (const view of reference.lwql.schema.views) {
+    lines.push(`### ${view.name}`);
+    lines.push(`${view.description} One row is: ${view.grain}`);
+    lines.push(
+      `Filter on \`${view.timeColumn}\` to prune partitions. Join keys: ${view.joinKeys.join(", ") || "none"}.`,
+    );
+    lines.push("");
+    lines.push(
+      markdownTable({
+        headers: ["Column", "Type", "Available", "Description"],
+        rows: view.columns.map((column) => ({
+          Column: column.name,
+          Type: column.type,
+          Available: column.available
+            ? "yes"
+            : `needs ${column.gates.join(", ")}`,
+          Description: column.description,
+        })),
+      }),
+    );
+    lines.push("");
+  }
+  lines.push("### Worked statements", "");
+  for (const example of reference.examples.filter(
+    (candidate) => candidate.language === "lwql",
+  )) {
+    lines.push(`**${example.title}**${example.available ? "" : ` (needs ${example.requires.gates.join(", ")})`}`);
+    lines.push("```sql");
+    lines.push(example.text);
+    lines.push("```");
+    for (const parameter of example.parameters) {
+      lines.push(
+        `- \`{${parameter.name}:${parameter.type}}\` — ${parameter.description}`,
+      );
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function formatDecisionTable(reference: QueryReferenceResponse): string {
+  const lines = ["## Which one to reach for", ""];
+  lines.push(
+    markdownTable({
+      headers: ["When you want", "Use", "Why"],
+      rows: reference.decisionTable.map((row) => ({
+        "When you want": row.when,
+        Use: row.use,
+        Why: row.why,
+      })),
+    }),
+  );
   return lines.join("\n");
 }
 

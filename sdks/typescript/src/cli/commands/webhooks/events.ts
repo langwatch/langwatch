@@ -6,6 +6,15 @@ import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
+import { parseInstantOrNull } from "../../utils/instant";
+
+const parseInstant = ({ value, flag }: { value: string; flag: string }): number => {
+  const parsed = parseInstantOrNull(value);
+  if (parsed !== null) return parsed;
+  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
+  process.exit(1);
+};
+
 export const webhookEventsCommand = async (options: {
   type?: string;
   from?: string;
@@ -14,17 +23,23 @@ export const webhookEventsCommand = async (options: {
   limit?: string;
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  // Parse flags before the spinner starts: bad input must produce a clean
+  // structured error, not frames interleaved with a dying spinner.
+  // The log is a ranged read by contract; default to the 24 hours before
+  // whatever `to` resolved to, so `--to` alone reads the day before the
+  // instant the caller named rather than a range ending before it starts.
+  const to = options.to !== undefined ? parseInstant({ value: options.to, flag: "--to" }) : Date.now();
+  const from =
+    options.from !== undefined
+      ? parseInstant({ value: options.from, flag: "--from" })
+      : to - 24 * 60 * 60 * 1000;
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Fetching emitted events...").start();
   try {
-    const parseInstantValue = (value: string): number => {
-      const parsed = Date.parse(value);
-      return Number.isNaN(parsed) ? Number(value) : parsed;
-    };
-    const page = await service.events({
+    const page = await service.eventsPage({
       type: options.type,
-      from: options.from !== undefined ? parseInstantValue(options.from) : undefined,
-      to: options.to !== undefined ? parseInstantValue(options.to) : undefined,
+      from,
+      to,
       cursor: options.cursor,
       limit: options.limit !== undefined ? Number(options.limit) : undefined,
     });

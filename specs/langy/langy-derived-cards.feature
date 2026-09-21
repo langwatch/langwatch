@@ -81,11 +81,16 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # Derived is visible, measured stays measured
   # ===========================================================================
 
+  # The frame marks a VIEW OF DATA Langy composed (a timeseries, a table,
+  # stats): its tooltip says the figures are the reader's and the grouping is
+  # Langy's suggestion. A question is an ask, not a view, so it wears no
+  # frame: see specs/langy/langy-choice-questions.feature.
   Scenario: Every derived card wears its provenance
-    Given any card Langy wrote itself
+    Given any card Langy composed from the project's data
     When it renders
     Then its chrome visibly marks it as derived by Langy
     And it is distinguishable at a glance from a platform-measured card
+    And a choices card wears no such frame
 
   Scenario: A derived card offers verification instead of pretending
     Given a derived card whose data the platform could compute for real
@@ -118,3 +123,23 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
     When the turn settles and the stamped part arrives
     Then exactly one card renders, reconciled by the card's identity
     And on any disagreement the settled part's content wins
+
+  @integration
+  Scenario: A settled turn's cards reach the reader who watched it stream
+    Given a turn this browser streamed whose reply carried card fences
+    When the turn settles and the panel keeps the copy it streamed
+    Then the reader sees the same cards a reader who opened it later sees
+    And the reader never has to reload the page to see them
+
+  @integration
+  Scenario: A loosely written opening still draws a card
+    Given a turn streaming a card whose opening fence carries a space before the tag
+    When the fence validates
+    Then a forming card renders
+    And the reader never sees the card's JSON as a code block
+
+  @unit
+  Scenario: The pre-scan accepts every opening the grammar accepts
+    Given text that the fence grammar opens a card block in
+    When the cheap pre-scan is asked whether the text could hold a card
+    Then it answers yes for every such opening

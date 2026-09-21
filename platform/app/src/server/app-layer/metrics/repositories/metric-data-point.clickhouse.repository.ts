@@ -7,6 +7,7 @@ import {
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup";
 import {
   comparePoints,
+  type MetricRollupSourcePoint,
   type MetricSequencePoint,
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
@@ -24,10 +25,10 @@ import type {
   SeriesTotalByPointAttribute,
 } from "./metric-data-point.repository";
 import {
-  AUTHORITATIVE_SELECT,
-  fromRaw,
+  fromRollupRow,
   fromSeekRow,
-  type RawMetricRow,
+  ROLLUP_SELECT,
+  type RollupSourceRow,
   rawRow,
   rollupRow,
   SEEK_SELECT,
@@ -45,11 +46,224 @@ const logger = createLogger(
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 /**
- * How many index seeks one rollup query may fold together. High enough that a
- * full coalesced chunk costs a handful of round trips instead of hundreds, low
- * enough that no single statement grows unbounded with the chunk.
+ * The upper cap on what one rollup query folds together: series per set of
+ * array parameters for the successor read, and — halved — buckets per request
+ * for the affected-bucket read. No statement grows with either number any more,
+ * so this bounds how much one request may *read*, not how large it may be.
+ *
+ * Size is bounded separately, and first, by {@link SUCCESSOR_PARAM_BUDGET_CHARS}:
+ * the successor read splits as soon as the encoded parameters would outgrow
+ * that budget, which on this table's 64-character identifiers happens well
+ * before 64 series. Raising this number therefore widens a read; it cannot make
+ * a request larger than the byte budget allows.
  */
 const SEEKS_PER_QUERY = 64;
+
+/**
+ * The ceiling one successor request's encoded `param_*` entries must stay
+ * under, measured the way `@clickhouse/client` measures it: `formatQueryParams`
+ * per value, then `new URLSearchParams(entries).toString().length`.
+ *
+ * The client has a threshold of its own, `MAX_URL_BIND_PARAM_LENGTH` = 4096,
+ * above which it can route parameters through a multipart body instead of the
+ * URL — but only when `use_multipart_params_auto` is on, and nothing here turns
+ * it on, so `param_*` entries ride the URL at any length. This budget therefore
+ * has to hold on its own, and it sits below the client's with enough headroom
+ * that a longer identifier or an added scalar cannot cross the client's ceiling
+ * without crossing this one first.
+ */
+const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
+
+/**
+ * How far behind a bucket the first predecessor seek looks before the second
+ * one widens to the retention window.
+ *
+ * An hour, which is two orders of magnitude more than the rollup interval and
+ * so covers any series still being written to, however coarsely it is scraped.
+ * It is a latency/partition trade and nothing depends on the exact value: too
+ * small only sends more buckets into the second pass, too large only widens
+ * the first, and either way the pair reads the same range and the fold sees
+ * the same predecessor.
+ */
+const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
+
+/**
+ * The seeks whose predecessor the near pass failed to find.
+ *
+ * A bucket whose near pass returned nothing in [start - lookbackMs, start) has
+ * no stored point in that window at all — the branch returns the newest there
+ * is — so whatever precedes it is older than the window, and only then is the
+ * wide seek worth its partitions.
+ *
+ * A row from a neighbouring affected bucket answers this just as well: if
+ * anything at all sits in the window, then the newest thing in it does too,
+ * and that is precisely what the near seek returned. So the check is against
+ * every point the pass collected, indexed by series to keep it off the
+ * seeks × points path.
+ */
+function seeksWithoutPredecessor({
+  seeks,
+  points,
+  lookbackMs,
+}: {
+  seeks: readonly { seriesId: string; start: number }[];
+  points: Iterable<MetricRollupSourcePoint>;
+  lookbackMs: number;
+}): { seriesId: string; start: number }[] {
+  const seenBySeries = new Map<string, number[]>();
+  for (const point of points) {
+    const times = seenBySeries.get(point.seriesId);
+    if (times) times.push(point.timeUnixMs);
+    else seenBySeries.set(point.seriesId, [point.timeUnixMs]);
+  }
+  return seeks.filter(
+    ({ seriesId, start }) =>
+      !(seenBySeries.get(seriesId) ?? []).some(
+        (timeUnixMs) => timeUnixMs < start && timeUnixMs >= start - lookbackMs,
+      ),
+  );
+}
+
+/**
+ * The successor read's whole statement, emitted once at module load rather than
+ * rebuilt per chunk, because nothing in it varies with the chunk any more.
+ *
+ * Every per-point value now travels as an array parameter, so the statement is
+ * a fixed ~2.4 KB and the request binds eleven `param_*` entries whatever the
+ * chunk holds. The shape this replaced grew four parameters and a full branch
+ * per point: at {@link SEEKS_PER_QUERY} that is 256 parameters and tens of
+ * kilobytes.
+ *
+ * A fixed statement is not on its own a bound on the request. The arrays' own
+ * contents still grow with the number of series, and they ride the URL as
+ * `param_*` entries, so {@link successorSeekChunks} splits on the encoded bytes
+ * those arrays produce ({@link SUCCESSOR_PARAM_BUDGET_CHARS}) rather than on a
+ * series count. Bounding the quantity that actually travels is the point; a
+ * smaller-but-still-unbounded request would only move the day it is crossed
+ * again.
+ *
+ * Two branches, and the split is what keeps the reads bounded. Every point in
+ * the chunk is already stored when this runs, so within one series the
+ * successor of every chunk point except the newest must land at or before the
+ * next chunk point - it cannot be further away than a row we know is there.
+ * Only the newest chunk point in a series needs an open-ended look forward.
+ * So the first branch reads the chunk's own span, and the second is a single
+ * `LIMIT 1 BY SeriesId` seek past the end of it. `affectedBucketsBySeries`
+ * takes the minimum of the union, so returning the whole span rather than one
+ * row per point cannot change which successor a point resolves to.
+ *
+ * SEEK_SELECT appears exactly once, in the `series_points` CTE, and that CTE
+ * carries the tenant, series and lower-bound predicates itself - TenantId
+ * first, matching the table's sort key - so the branches add only the
+ * comparisons that need the joined span. Correctness therefore does not depend
+ * on predicate pushdown; the CTE is already the seek.
+ *
+ * Written once, executed twice: ClickHouse substitutes a non-recursive `WITH`
+ * at each reference, and both union operands reference `series_points`, so the
+ * FINAL scan over `metric_data_points` runs once per branch. One scan under a
+ * single `WHERE (span-interior OR past-span)` would halve that, at the cost of
+ * the `LIMIT 1 BY` no longer applying per operand - which is exactly what keeps
+ * the look forward to one row per series. Measure before trading.
+ *
+ * Each branch does add the one constant bound its own half can prove, because
+ * a bound reached only through the join cannot prune partitions and
+ * `metric_data_points` partitions by `toYearWeek(TimeUnixMs)`. A span row sits
+ * below its series' far end, so it sits below `latestSpanEnd`, the furthest of
+ * them; a row past the far end sits above `earliestSpanEnd`, the nearest. Both
+ * are pure upside: pushed down they prune, left in place they are a cheap
+ * filter over rows the branch discards anyway. Range-filtering TimeUnixMs under FINAL is
+ * safe here because it is part of the dedup key - a different TimeUnixMs is a
+ * different row, never a later version of this one, so no version can drift
+ * out of the window (the movable-column trap in
+ * dev/docs/best_practices/clickhouse-queries.md).
+ *
+ * The `LIMIT 1 BY` is the narrow kind that doc permits, not the kind it bans:
+ * the branch selects the six sequence columns and nothing heavy, so a granule
+ * costs nothing to materialise. Do not let it grow a payload, attribute or
+ * bucket column - at that point it becomes the anti-pattern and wants the
+ * IN-tuple form instead.
+ *
+ * What those three bounds do NOT do is bound the read per series. All three are
+ * chunk-global: one backfilled point in one series lowers `scanFrom` for every
+ * series in the request, and the branch that looks past a span end is
+ * `[earliestSpanEnd, ∞)` per series under FINAL, terminating only on the
+ * `LIMIT 1 BY` rather than on an index range. So a chunk that pairs one late
+ * series with live ones reads more than the live ones needed, and the wider the
+ * chunk the more series pay for it. A per-series bounded lookahead - a join-side
+ * `SpanToTime + <window>` upper bound, with a fallback seek for the series the
+ * bounded branch returns nothing for - would fix both halves. It is left to its
+ * own change deliberately: it needs `EXPLAIN indexes=1` against a real server
+ * and equivalence coverage the parameter-level model in the unit tests cannot
+ * give it, and getting it wrong loses successors rather than costing time.
+ */
+const SUCCESSOR_SEEK_QUERY = `
+  WITH spans AS (
+    SELECT
+      span.1 AS SpanSeriesId,
+      fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
+      toUInt64(span.3) AS SpanFromNano,
+      span.4 AS SpanFromPoint,
+      fromUnixTimestamp64Milli(span.5) AS SpanToTime,
+      toUInt64(span.6) AS SpanToNano,
+      span.7 AS SpanToPoint
+    FROM (
+      SELECT arrayJoin(arrayZip(
+        {seriesIds:Array(String)},
+        {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
+        {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
+      )) AS span
+    )
+  ),
+  series_points AS (
+    SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
+    FROM metric_data_points FINAL
+    WHERE TenantId = {tenantId:String}
+      AND SeriesId IN {seriesIds:Array(String)}
+      AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
+  )
+  SELECT * FROM (
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
+       AND ${orderedAfter("From")} AND ${orderedBefore("To")})
+    UNION ALL
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
+       AND ${orderedAfter("To")}
+     ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
+       series_points.TimeUnixNano ASC, series_points.PointId ASC
+     LIMIT 1 BY SeriesId)
+  )
+`;
+
+/**
+ * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
+ * against one end of a joined span. Written out rather than as a tuple
+ * comparison so the emitted predicate is the one the per-branch seeks already
+ * proved in production.
+ *
+ * It reads `series_points.SeekTime` and never `TimeUnixMs`, which is why the
+ * CTE keeps the raw `DateTime64` under that second name: SEEK_SELECT already
+ * binds `TimeUnixMs` to its epoch-milli alias, so a comparison written against
+ * that name would compare against the alias instead of the column. Do not
+ * "simplify" `SeekTime` away.
+ */
+function orderedAfter(bound: "From" | "To"): string {
+  return `(series_points.SeekTime > spans.Span${bound}Time
+     OR (series_points.SeekTime = spans.Span${bound}Time
+       AND (series_points.TimeUnixNano > spans.Span${bound}Nano
+         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+           AND series_points.PointId > spans.Span${bound}Point))))`;
+}
+
+function orderedBefore(bound: "From" | "To"): string {
+  return `(series_points.SeekTime < spans.Span${bound}Time
+     OR (series_points.SeekTime = spans.Span${bound}Time
+       AND (series_points.TimeUnixNano < spans.Span${bound}Nano
+         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+           AND series_points.PointId < spans.Span${bound}Point))))`;
+}
 
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -123,6 +337,152 @@ function affectedBucketsForSeries({
     }
   }
   return affected;
+}
+
+/**
+ * A series' chunk points reduced to the two that bound them. The successor read
+ * needs nothing else: everything between them it reads wholesale, and only the
+ * newest needs a look past the end of the chunk.
+ */
+interface SeriesSpan {
+  seriesId: string;
+  first: CanonicalMetricDataPoint;
+  last: CanonicalMetricDataPoint;
+}
+
+function seriesSpans(
+  points: readonly CanonicalMetricDataPoint[],
+): SeriesSpan[] {
+  return [...groupBySeries(points)].map(([seriesId, seriesPoints]) => {
+    const sorted = [...seriesPoints].sort(comparePoints);
+    return {
+      seriesId,
+      first: sorted[0]!,
+      last: sorted[sorted.length - 1]!,
+    };
+  });
+}
+
+/**
+ * Eleven parameters, whatever the chunk holds - seven of them arrays the server
+ * zips back into one row per series.
+ *
+ * Three are the constant time bounds the statement prunes partitions with, and
+ * they are the widest each scope can prove: `scanFrom` the earliest span start
+ * for the shared CTE, `latestSpanEnd` for the branch that reads within the
+ * spans, `earliestSpanEnd` for the branch that reads past them. The last two
+ * are both derived from span *ends* - the earliest span start is `scanFrom` -
+ * so widening either to a span start is a change of meaning, not a typo fix.
+ * Nanosecond values travel as strings because they exceed what a JSON number
+ * carries exactly; the statement casts them back with `toUInt64`.
+ */
+function successorSeekParams({
+  tenantId,
+  spans,
+}: {
+  tenantId: string;
+  spans: readonly SeriesSpan[];
+}): Record<string, unknown> {
+  return {
+    tenantId,
+    seriesIds: spans.map((span) => span.seriesId),
+    fromTimes: spans.map((span) => span.first.timeUnixMs),
+    fromNanos: spans.map((span) => span.first.timeUnixNano),
+    fromPoints: spans.map((span) => span.first.pointId),
+    toTimes: spans.map((span) => span.last.timeUnixMs),
+    toNanos: spans.map((span) => span.last.timeUnixNano),
+    toPoints: spans.map((span) => span.last.pointId),
+    scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
+    earliestSpanEnd: Math.min(...spans.map((span) => span.last.timeUnixMs)),
+    latestSpanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
+  };
+}
+
+/**
+ * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file
+ * binds - strings, numbers, and arrays of either. Mirrored rather than imported
+ * because the client exports it only from a path inside its `dist` tree.
+ *
+ * The unit test re-measures every request this chunker emits with the client's
+ * own `formatQueryParams`, so a divergence that made this under-measure fails
+ * there rather than silently shipping an oversized request. Over-measuring only
+ * costs a smaller chunk.
+ */
+function formatParamValue({
+  value,
+  isInArray = false,
+}: {
+  value: unknown;
+  isInArray?: boolean;
+}): string {
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    const escaped = value
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/\t/g, "\\t")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r");
+    return isInArray ? `'${escaped}'` : escaped;
+  }
+  if (Array.isArray(value)) {
+    return `[${value
+      .map((element) => formatParamValue({ value: element, isInArray: true }))
+      .join(",")}]`;
+  }
+  throw new Error(
+    `Unsupported successor-seek parameter shape: ${typeof value}. Only strings, numbers and arrays of them are measurable against the request budget.`,
+  );
+}
+
+/** How long a request's `param_*` entries encode to, in URL characters. */
+function encodedParamLength(params: Record<string, unknown>): number {
+  return new URLSearchParams(
+    Object.entries(params).map(([name, value]): [string, string] => [
+      `param_${name}`,
+      formatParamValue({ value }),
+    ]),
+  ).toString().length;
+}
+
+/**
+ * Where the successor read splits: encoded parameter bytes first,
+ * {@link SEEKS_PER_QUERY} series as the upper cap.
+ *
+ * Series count is the wrong quantity to bound a request by. A series
+ * contributes seven values, three of them 64-character identifiers, so what
+ * fits in one request depends on the identifiers rather than on the count -
+ * which is how a shape that looked bounded at 64 series produced a request
+ * larger than the per-point shape it replaced. Measuring what actually travels
+ * keeps the request bounded whatever the batch holds.
+ *
+ * A single series whose own parameters exceed the budget is still sent alone:
+ * correctness first, and this table's identifier widths cannot reach that.
+ */
+function successorSeekChunks({
+  tenantId,
+  spans,
+}: {
+  tenantId: string;
+  spans: readonly SeriesSpan[];
+}): SeriesSpan[][] {
+  const chunks: SeriesSpan[][] = [];
+  let current: SeriesSpan[] = [];
+  for (const span of spans) {
+    const candidate = [...current, span];
+    const outgrown =
+      candidate.length > SEEKS_PER_QUERY ||
+      encodedParamLength(successorSeekParams({ tenantId, spans: candidate })) >
+        SUCCESSOR_PARAM_BUDGET_CHARS;
+    if (outgrown && current.length > 0) {
+      chunks.push(current);
+      current = [span];
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
 }
 
 /** The first point ordering strictly after `point`, from a sorted array. */
@@ -203,7 +563,12 @@ export class MetricDataPointClickHouseRepository
         clickhouse_settings: INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      // Warning, not error: this rethrows, so the caller decides the outcome.
+      // Under the worker queue that caller retries, and most of these attempts
+      // land on a later one. The error-level record belongs to whoever gives
+      // up — GroupQueue's "Group blocked after exhausted retries".
+      // See specs/observability/retryable-failure-log-level.feature.
+      logger.warn(
         {
           tenantId: points[0]!.tenantId,
           pointCount: points.length,
@@ -291,7 +656,6 @@ export class MetricDataPointClickHouseRepository
     const authoritative = await this.pointsForAffectedBuckets({
       affectedBySeries,
       tenantId: points[0]!.tenantId,
-      organizationId: points[0]!.organizationId,
       retentionDays,
     });
 
@@ -411,21 +775,22 @@ export class MetricDataPointClickHouseRepository
   }
 
   /**
-   * The stored point immediately after each of `points` within its own series.
-   * That successor is the only neighbour able to pull a second bucket into the
+   * The stored points that can succeed any of `points` within their own series.
+   * A successor is the only neighbour able to pull a second bucket into the
    * affected set, so it is the only one worth a read — an earlier revision also
    * fetched each point's predecessor and then discarded it.
    *
-   * ORDER BY leads with TimeUnixMs to match the table's sort key
-   * (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId). TimeUnixMs is
-   * derived from TimeUnixNano, so the row order is unchanged — but
-   * optimize_read_in_order is syntactic and cannot infer that, so ordering on
-   * TimeUnixNano alone made ClickHouse materialise and sort every point in
-   * the series (each carrying a ZSTD CanonicalPayload) to return one row.
-   * TimeUnixMs is table-qualified throughout: SEEK_SELECT aliases
-   * toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
-   * resolves to that alias (epoch millis), never matching a DateTime64
-   * bound — the same pitfall log-record-storage documents.
+   * The statement is {@link SUCCESSOR_SEEK_QUERY}, which does not vary with the
+   * chunk. What chunking bounds is the request: {@link successorSeekChunks}
+   * splits the series so the encoded parameters stay inside
+   * {@link SUCCESSOR_PARAM_BUDGET_CHARS}, since the statement travels in the
+   * body but the parameters travel in the URL.
+   *
+   * The read stays payload-free (SEEK_SELECT, never the full row): running
+   * FINAL over a series while materialising the megabyte-scale payload column
+   * is what pushed one query past the server's per-query memory cap
+   * (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). The seek only exists to order
+   * points and locate buckets.
    */
   private async successorsOf(
     points: CanonicalMetricDataPoint[],
@@ -434,27 +799,13 @@ export class MetricDataPointClickHouseRepository
     const client = await this.resolveClient(tenantId);
     const found: MetricSequencePoint[] = [];
 
-    for (const chunk of chunked(points, SEEKS_PER_QUERY)) {
-      const params: Record<string, unknown> = { tenantId };
-      const selects = chunk.map((point, index) => {
-        params[`series${index}`] = point.seriesId;
-        params[`time${index}`] = new Date(point.timeUnixMs);
-        params[`nano${index}`] = point.timeUnixNano;
-        params[`point${index}`] = point.pointId;
-        // SEEK_SELECT, never the full row: each branch runs FINAL over its
-        // series, and materialising the megabyte-scale payload column across
-        // SEEKS_PER_QUERY branches is what pushed one query past the server's
-        // per-query memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted).
-        // The seek only exists to order points and locate buckets.
-        return `(SELECT ${SEEK_SELECT}
-          FROM metric_data_points FINAL
-          WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-            AND (metric_data_points.TimeUnixMs > {time${index}:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time${index}:DateTime64(3)} AND (TimeUnixNano > {nano${index}:UInt64} OR (TimeUnixNano = {nano${index}:UInt64} AND PointId > {point${index}:String}))))
-          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 1)`;
-      });
+    for (const spans of successorSeekChunks({
+      tenantId,
+      spans: seriesSpans(points),
+    })) {
       const result = await client.query({
-        query: selects.join("\n UNION ALL\n"),
-        query_params: params,
+        query: SUCCESSOR_SEEK_QUERY,
+        query_params: successorSeekParams({ tenantId, spans }),
         format: "JSONEachRow",
       });
       for (const row of await result.json<SeekMetricRow>()) {
@@ -470,29 +821,45 @@ export class MetricDataPointClickHouseRepository
    * narrow ranges rather than one span: a late point and a distant next sample
    * would otherwise scan every partition between them only to discard the rows.
    *
-   * The predecessor seek is bounded below by the series' retention window: a
-   * predecessor older than that is expired (or about to be), and the fold
-   * already treats an absent predecessor as a reset/gap. Without the bound a
-   * sparse series pays a reverse scan across every partition — including
-   * S3-tiered cold storage — hunting for a row that no longer matters.
+   * The predecessor is sought in two passes, near before far, because the far
+   * pass is the expensive one and a bucket in a series that is being written to
+   * does not need it. The first pass looks back
+   * {@link PREDECESSOR_LOOKBACK_MS}; the second looks from there to the edge of
+   * retention, and only for the buckets the first pass left without a
+   * predecessor. The two ranges abut and do not overlap, so their union is the
+   * single retention-wide range this replaced — the same rows, reached without
+   * making every bucket pay the wide read.
+   *
+   * Two cases do reach the far pass every time, and both are bounded. A series
+   * whose first points are arriving has no predecessor at any distance, so its
+   * buckets fall through and the wide seek returns nothing; under series churn
+   * this is the common path, not the rare one, and it costs one extra round
+   * trip on top of what the single-pass read already cost. A gap longer than
+   * the near window is the other, and it is the case the far pass exists for.
+   * Neither is a regression, but neither is rare either.
+   *
+   * What the wide read costs is partitions. The table partitions by ISO week,
+   * so a retention-wide reverse seek opens every weekly part the series appears
+   * in — on the default retention, seven of them — to return one row. An hour
+   * of lookback opens one, or two across a week boundary. A live series is
+   * resolved by the near pass; only a series with an hour-wide hole in it pays
+   * for the far one, and it pays exactly what it paid before.
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
     tenantId,
-    organizationId,
     retentionDays,
   }: {
     affectedBySeries: ReadonlyMap<string, ReadonlySet<number>>;
     tenantId: string;
-    organizationId: string;
     retentionDays: number;
-  }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
+  }): Promise<Map<string, MetricRollupSourcePoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
       [...buckets]
         .sort((a, b) => a - b)
         .map((start) => ({ seriesId, start }) as const),
     );
-    const found = new Map<string, CanonicalMetricDataPoint[]>();
+    const found = new Map<string, MetricRollupSourcePoint[]>();
     if (seeks.length === 0) return found;
 
     const client = await this.resolveClient(tenantId);
@@ -500,50 +867,40 @@ export class MetricDataPointClickHouseRepository
     // the ranges overlap by design; the fold needs each point exactly once.
     // Identity is (series, point) because one query now spans many series, and
     // a point id is only ever unique within its own.
-    const unique = new Map<string, CanonicalMetricDataPoint>();
+    const unique = new Map<string, MetricRollupSourcePoint>();
 
-    // Each seek contributes two statements, so half the budget keeps a single
-    // query's statement count at the same ceiling the successor seeks use.
-    for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
-      const params: Record<string, unknown> = { tenantId };
-      const selects = chunk.flatMap(({ seriesId, start }, index) => {
-        params[`series${index}`] = seriesId;
-        params[`from${index}`] = new Date(start);
-        params[`to${index}`] = new Date(start + METRIC_ROLLUP_INTERVAL_MS);
-        params[`cutoff${index}`] = new Date(
-          start - retentionDays * 24 * 60 * 60 * 1000,
-        );
-        // AUTHORITATIVE_SELECT: everything the fold reads, without the
-        // payload column — the fold never touches it, and it is the column
-        // that made these FINAL reads memory-heavy.
-        return [
-          `(SELECT ${AUTHORITATIVE_SELECT}
-            FROM metric_data_points FINAL
-            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
-              AND metric_data_points.TimeUnixMs >= {cutoff${index}:DateTime64(3)}
-            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
-          `(SELECT ${AUTHORITATIVE_SELECT}
-            FROM metric_data_points FINAL
-            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
-              AND metric_data_points.TimeUnixMs < {to${index}:DateTime64(3)}
-            ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
-        ];
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+    // A retention window shorter than the near pass would make that pass read
+    // past the edge of retention, so the near pass never reaches further than
+    // retention does and the far pass has nothing left to cover.
+    const nearMs = Math.min(PREDECESSOR_LOOKBACK_MS, retentionMs);
+
+    await this.readAffectedBuckets({
+      client,
+      tenantId,
+      seeks,
+      unique,
+      predecessor: { fromMs: nearMs, toMs: 0 },
+      shouldReadBucketRows: true,
+    });
+
+    const unresolved =
+      nearMs >= retentionMs
+        ? []
+        : seeksWithoutPredecessor({
+            seeks,
+            points: unique.values(),
+            lookbackMs: nearMs,
+          });
+    if (unresolved.length > 0) {
+      await this.readAffectedBuckets({
+        client,
+        tenantId,
+        seeks: unresolved,
+        unique,
+        predecessor: { fromMs: retentionMs, toMs: nearMs },
+        shouldReadBucketRows: false,
       });
-      const result = await client.query({
-        query: selects.join("\n UNION ALL\n"),
-        query_params: params,
-        format: "JSONEachRow",
-      });
-      for (const row of await result.json<
-        Omit<RawMetricRow, "CanonicalPayload">
-      >()) {
-        unique.set(
-          `${row.SeriesId}\u0000${row.PointId}`,
-          fromRaw({ row, organizationId }),
-        );
-      }
     }
 
     for (const point of unique.values()) {
@@ -552,5 +909,89 @@ export class MetricDataPointClickHouseRepository
       else found.set(point.seriesId, [point]);
     }
     return found;
+  }
+
+  /**
+   * One pass of the affected-bucket read, collecting into `unique`.
+   *
+   * `predecessor` is the half-open window behind each bucket start the reverse
+   * seek may look in, as distances rather than instants so both bounds stay
+   * shared scalars however many buckets the chunk holds. `shouldReadBucketRows` is
+   * off for a pass that only widens the predecessor search: those buckets'
+   * own rows are already in hand, and re-reading them would double the
+   * statement to return what it just returned.
+   */
+  private async readAffectedBuckets({
+    client,
+    tenantId,
+    seeks,
+    unique,
+    predecessor,
+    shouldReadBucketRows,
+  }: {
+    client: Awaited<ReturnType<ClickHouseClientResolver>>;
+    tenantId: string;
+    seeks: readonly { seriesId: string; start: number }[];
+    unique: Map<string, MetricRollupSourcePoint>;
+    predecessor: { fromMs: number; toMs: number };
+    shouldReadBucketRows: boolean;
+  }): Promise<void> {
+    // Half the cap, and the divisor is a size bound rather than a
+    // statement-count one: the successor read emits one statement whatever its
+    // chunk holds, so there is no statement ceiling left here to match. What
+    // there is: this read binds two parameters per bucket, one of them a
+    // 64-character series identifier, so 32 buckets encode to roughly 3.5k
+    // characters of `param_*` entries - inside the client's own 4096-character
+    // ceiling on them, where 64 buckets would be half as far outside it again.
+    for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
+      // Shared scalars replace the per-seek end and cutoff bounds: all were
+      // derived from the bucket start, so the server can derive them too and
+      // the parameter fan-out stays at two per bucket whatever the chunk holds.
+      const params: Record<string, unknown> = {
+        tenantId,
+        bucketMs: METRIC_ROLLUP_INTERVAL_MS,
+        lookbackFromMs: predecessor.fromMs,
+        lookbackToMs: predecessor.toMs,
+      };
+      const selects = chunk.flatMap(({ seriesId, start }, index) => {
+        params[`series${index}`] = seriesId;
+        params[`from${index}`] = start;
+        // Both branches keep a seek per bucket rather than folding into one
+        // joined statement the way the successor read does. The predecessor
+        // branch is why: its bounds are per-seek, and a join can only apply
+        // those after the rows are read, so the single-row reverse index seek
+        // would become a read of every point in the series across the whole
+        // window - the memory class #6493 fixed.
+        // The successor read folds safely because every bound there is the
+        // chunk's own span. ROLLUP_SELECT is exactly what the fold reads and
+        // nothing else: FINAL materialises every selected column for every row
+        // a granule covers, so a column the fold ignores is decompressed
+        // millions of times to be discarded.
+        const predecessorSeek = `(SELECT ${ROLLUP_SELECT}
+            FROM metric_data_points FINAL
+            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
+              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
+              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
+            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`;
+        if (!shouldReadBucketRows) return [predecessorSeek];
+        return [
+          predecessorSeek,
+          `(SELECT ${ROLLUP_SELECT}
+            FROM metric_data_points FINAL
+            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
+              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
+              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} + {bucketMs:Int64})
+            ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
+        ];
+      });
+      const result = await client.query({
+        query: selects.join("\n UNION ALL\n"),
+        query_params: params,
+        format: "JSONEachRow",
+      });
+      for (const row of await result.json<RollupSourceRow>()) {
+        unique.set(`${row.SeriesId}\u0000${row.PointId}`, fromRollupRow(row));
+      }
+    }
   }
 }

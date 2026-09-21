@@ -75,6 +75,58 @@ describe("redactEssentialPiiInText", () => {
     });
   });
 
+  describe("given a phone-shaped digit run inside a longer token", () => {
+    /** @scenario "An identifier mentioned inside a sentence keeps its digits" */
+    it("keeps an identifier that carries letters whole", () => {
+      const input = "note hosted-eu-20260812-09 attached";
+      const { text, redactedCount } = redact(input);
+      expect(text).toBe(input);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps the digits of a prefixed session id", () => {
+      const input = "session sess_2026081209 opened";
+      expect(redact(input).text).toBe(input);
+    });
+
+    /** @scenario "A digit run that reads as a phone number is still redacted in a sentence" */
+    it("still redacts the same digits standing on their own", () => {
+      expect(redact("ref 2026081209 checkpoint").text).toBe(
+        "ref [PHONE_NUMBER] checkpoint",
+      );
+      expect(redact("call 2026081209 now").text).toBe(
+        "call [PHONE_NUMBER] now",
+      );
+    });
+
+    it("still redacts a digit run split by a separator, with no letters around", () => {
+      expect(redact("dial 20260812-09 please").text).toBe(
+        "dial [PHONE_NUMBER] please",
+      );
+    });
+
+    it("still redacts a spaced international number after a letter run", () => {
+      const { text } = redact("mobile: +31 6 12345678");
+      expect(text).toContain("[PHONE_NUMBER]");
+      expect(text).not.toContain("12345678");
+    });
+
+    it("still redacts a number carried by minified JSON, and keeps an id in the same payload", () => {
+      const { text } = redact(
+        '{"id":"hosted-eu-20260812-09","phone":"+14155552671"}',
+      );
+      expect(text).toBe(
+        '{"id":"hosted-eu-20260812-09","phone":"[PHONE_NUMBER]"}',
+      );
+    });
+
+    it("still redacts a number in a URL path", () => {
+      expect(redact("see https://acme.example/u/2026081209 now").text).toBe(
+        "see https://acme.example/u/[PHONE_NUMBER] now",
+      );
+    });
+  });
+
   describe("given a bare nine-digit run", () => {
     it("leaves it intact without context", () => {
       const input = "ref 123456789 logged";
@@ -94,6 +146,32 @@ describe("redactEssentialPiiInText", () => {
         "to 0x52908400098527886E0F7030069857D2E4169EE7 now",
       );
       expect(text).toContain("[CRYPTO]");
+    });
+
+    it("redacts a lowercase segwit address", () => {
+      const { text } = redact(
+        "send to bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4 today",
+      );
+      expect(text).toContain("[CRYPTO]");
+    });
+
+    // BIP-173 makes an address case-insensitive and QR encoders emit the
+    // uppercase form, because uppercase fits a QR alphanumeric segment. A
+    // lowercase-only pattern reads that form as ordinary text.
+    /** @scenario "An uppercase segwit address is redacted like its lowercase form" */
+    it("redacts an uppercase segwit address", () => {
+      const { text } = redact(
+        "send to BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4 today",
+      );
+      expect(text).toContain("[CRYPTO]");
+    });
+
+    // Mixed case is invalid per BIP-173, and the pattern must not become so
+    // loose that the legacy alternative starts accepting `0`, `O`, `I` and `l`
+    // — the four characters base58 leaves out precisely to avoid confusion.
+    it("leaves a mixed case segwit address alone", () => {
+      const input = "send to BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7Kv8f3t4 today";
+      expect(redact(input).text).toBe(input);
     });
   });
 
@@ -215,6 +293,56 @@ describe("redactEssentialPiiInText", () => {
         "mail test@example.com cpf 529.982.247-25",
       );
       expect(redactedCount).toBe(2);
+    });
+  });
+
+  describe("when the text is one attribute value", () => {
+    const asValue = (text: string) =>
+      redactEssentialPiiInText({ text, isAttributeValue: true });
+
+    describe("given a value that is exclusively one identifier-shaped token", () => {
+      it.each([
+        "hosted-eu-20260812-09",
+        "550e8400-e29b-41d4-a716-446655440000",
+        "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+        "pod-10.0.0.1",
+        "cache-1:ab:cd:ef",
+        "license-AB1234567",
+      ])("leaves %s exactly as it was sent", (value) => {
+        const { text, redactedCount } = asValue(value);
+        expect(text).toBe(value);
+        expect(redactedCount).toBe(0);
+      });
+    });
+
+    describe("given a value the recognizers can prove", () => {
+      it("still redacts a checksum-valid card behind an identifier prefix", () => {
+        expect(asValue("ref-4111111111111111").text).toBe("ref-[CREDIT_CARD]");
+      });
+
+      it("still redacts an email address that holds digits", () => {
+        expect(asValue("jane.doe1985@example.com").text).toBe(
+          "[EMAIL_ADDRESS]",
+        );
+      });
+    });
+
+    describe("given a value with no letters in it", () => {
+      it.each([
+        "+31 6 12345678",
+        "20260812-09",
+        "2026081209",
+      ])("still redacts %s", (value) => {
+        expect(asValue(value).text).toBe("[PHONE_NUMBER]");
+      });
+    });
+
+    describe("given a value that is a sentence rather than one token", () => {
+      it("redacts as it does anywhere else", () => {
+        expect(asValue("ref 2026081209 checkpoint").text).toBe(
+          "ref [PHONE_NUMBER] checkpoint",
+        );
+      });
     });
   });
 });

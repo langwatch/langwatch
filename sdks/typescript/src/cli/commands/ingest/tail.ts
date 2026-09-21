@@ -3,9 +3,9 @@ import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 import {
   getEventsForSource,
-  GovernanceCliError,
   type ActivityEventDetailRow,
 } from "@/cli/utils/governance/cli-api";
+import { readCommandError, reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
  * `langwatch ingest tail <sourceId> [--limit N] [--follow] [--json]`
@@ -37,11 +37,7 @@ export async function ingestTailCommand(
   try {
     initial = await getEventsForSource(cfg, sourceId, { limit });
   } catch (err) {
-    if (err instanceof GovernanceCliError) {
-      process.stderr.write(`Error: ${err.message}\n`);
-      process.exit(err.status === 404 ? 1 : 1);
-    }
-    process.stderr.write(`Error: ${String(err)}\n`);
+    reportCommandError({ error: err, format: options.json ? "json" : undefined });
     process.exit(1);
   }
 
@@ -88,8 +84,12 @@ export async function ingestTailCommand(
       // eventId at the cursorIso boundary.
       next = await getEventsForSource(cfg, sourceId, { limit: 50 });
     } catch (err) {
-      // Transient errors shouldn't kill the follow; print + retry.
-      const msg = err instanceof GovernanceCliError ? err.message : String(err);
+      // Transient errors shouldn't kill the follow; print + retry. This is a
+      // deliberate non-terminal warning (the loop continues), so it stays a
+      // one-line yellow write rather than the full reportCommandError block —
+      // but the message is read through the same handled-error reader (scrubbed,
+      // domain-aware) as the terminal path.
+      const msg = readCommandError(err).message;
       process.stderr.write(chalk.yellow(`warn: ${msg} (retrying)\n`));
       continue;
     }

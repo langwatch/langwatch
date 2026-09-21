@@ -4,9 +4,13 @@ Feature: Metadata tag filtering in traces panel
   So that I can quickly find related traces by metadata value
 
   # The @unit pure-logic scenarios are bound via existing
-  # `buildMetadataFilterParams.unit.test.ts`. The @e2e clicking
-  # interaction needs a Playwright E2E or page-level integration test
-  # against the trace details panel.
+  # `buildMetadataFilterParams.unit.test.ts`. That helper outlived the legacy
+  # trace details panel it was written for — the analytics custom graph builds
+  # its drill-down filters with it — so the logic below is still live.
+  #
+  # The @e2e clicking interaction needs a Playwright E2E or page-level
+  # integration test against the Trace Explorer, which is the trace surface
+  # now that the legacy panel is gone.
 
   # E2E: Happy path demonstrating user interaction with real UI
 
@@ -15,7 +19,7 @@ Feature: Metadata tag filtering in traces panel
     Given I am viewing a trace with user_id "user-123"
     When I click the "user_id" metadata tag
     Then the URL updates with the filter "user_id=user-123"
-    And the traces panel refreshes to show filtered results
+    And the trace list refreshes to show filtered results
 
   # Unit: Pure logic for building filter params
 

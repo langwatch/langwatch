@@ -73,7 +73,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
       | user.name                | non-empty string                            |
       | organization.id          | "acme"                                      |
       | organization.name        | non-empty string                            |
-      | default_personal_vk      | the personal VK that was auto-issued at login |
+    And the body carries no `default_personal_vk`, because login issues no virtual key
 
   @bdd @cli @device-flow @poll
   Scenario: CLI exchange returns 428 while user has not yet completed approval
@@ -108,6 +108,95 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the response body suggests the safe `interval` value
 
   # ---------------------------------------------------------------------------
+  # Approval latency — the wait is the round trip, not the poll interval
+  #
+  # Polling alone made the CLI wait out its whole interval after an approval
+  # the user had already given. The first poll now goes out immediately, and a
+  # stream tells the CLI to poll the moment the browser settles the code. Both
+  # are accelerators over the same timer: a server or network that supports
+  # neither still logs in at the interval it was given.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The CLI asks once before it starts waiting
+    Given the CLI has a device_code and the user approves in the browser at once
+    When the CLI starts waiting for the approval
+    Then it polls "/api/auth/cli/exchange" before its first wait
+    And the login finishes without costing a whole poll interval
+
+  @unit
+  Scenario: The approval stream cuts the wait short
+    Given the CLI is waiting between polls
+    When the approval stream emits a frame for its device_code
+    Then the CLI polls "/api/auth/cli/exchange" straight away
+    And it does not treat the frame as the approval itself
+
+  @unit
+  Scenario: A server without the approval stream still logs in
+    Given the control plane has no "/api/auth/cli/device-approval" route
+    When the CLI waits for the approval
+    Then it keeps polling at the interval the server asked for
+    And the missing stream changes nothing about the outcome
+
+  @integration
+  Scenario: The approval stream tells the CLI to poll the moment the browser settles the code
+    Given the CLI is on "/api/auth/cli/device-approval" for its device_code
+    When the browser approves or denies that code
+    Then the stream emits the settled status, approved or denied
+    And a code that settled before the stream opened emits at once
+    And an unknown code is reported as expired rather than held open
+    And the pod refuses a new stream once it holds too many, so the CLI polls
+
+  @integration
+  Scenario: A publication is lost if the stream has not subscribed yet
+    Given a device code settles before the stream subscribes to its channel
+    When the stream subscribes afterwards
+    Then it hears nothing, because the channel keeps no history
+    And this is why the stream re-reads the code once its channel is live
+    And a settlement published after that point is always heard, so the re-read
+      covers the whole gap
+
+  @integration
+  Scenario: A poll on a settled device code is answered, not rate limited
+    Given the CLI polled once and is inside the per-device poll window
+    When the code is approved or denied and the CLI polls again straight away
+    Then the response carries the settled outcome instead of 429
+    And a code still pending inside that window is told to slow down
+
+  @integration
+  Scenario: Two exchanges racing the same approval redeem it once
+    Given a device code has been approved
+    When two exchange calls for that code arrive at the same time
+    Then exactly one of them receives the credential
+    And the other is told to slow down instead of receiving a second one
+
+  # WHAT THE FENCE COSTS, AND WHERE IT IS PAID. The redemption claim is held
+  # for long enough to cover the whole handout, so releasing it correctly is
+  # the difference between a CLI that retries and one that waits half a minute
+  # for nothing — and between one credential per approval and two.
+
+  @integration
+  Scenario: A refused exchange releases the claim so the CLI can retry
+    Given an approved device code whose exchange cannot be completed yet
+    When the CLI polls and is told the authorization is still pending
+    Then the claim is released rather than held to its timeout
+    And the next poll is answered the same way instead of being told to slow down
+
+  @integration
+  Scenario: A successful exchange keeps its claim until it expires on its own
+    Given a device code that has just been exchanged for its credential
+    When another caller reaches the redemption holding a record it read beforehand
+    Then it is told to slow down rather than handed a second credential
+    And the claim is left to expire on its own, which is what fences that caller out
+
+  @unit
+  Scenario: An approval that lands during a poll still cuts the next wait short
+    Given the CLI has a poll in flight
+    When the approval stream emits a frame before that poll answers
+    Then the next poll goes out without waiting the interval
+    And the frame is spent by that poll, so the loop keeps its interval afterwards
+
+  # ---------------------------------------------------------------------------
   # Token persistence and refresh
   # ---------------------------------------------------------------------------
 
@@ -117,7 +206,8 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     Then the access_token is stored in "~/.langwatch/config" with 0600 perms
     And the refresh_token is stored in the OS keyring on macOS/Windows
     And on Linux without keyring, the refresh_token is stored in the same file with 0600 perms
-    And the config file records `user.email`, `organization.id`, and `default_personal_vk`
+    And the config file records `user.email` and `organization.id`
+    And the config file records no `default_personal_vk` until a tool first uses the gateway
 
   @bdd @cli @refresh
   Scenario: CLI refreshes the access token before it expires
@@ -138,6 +228,47 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the CLI exits non-zero
 
   # ---------------------------------------------------------------------------
+  # Personal virtual key: issued on first gateway use
+  # ---------------------------------------------------------------------------
+  # Login proves identity and nothing more. The personal virtual key is a
+  # billable, revocable credential, so it is minted only when a tool actually
+  # resolves to gateway mode, through POST /api/auth/cli/virtual-key. Minting
+  # at login instead left one extra VirtualKey row behind on every re-login,
+  # and gave a key to users who only ever send traces.
+
+  @integration @cli @personal-keys
+  Scenario: The personal virtual key is issued on first gateway use, not at login
+    Given user "jane@acme.com" has never logged in via the CLI
+    When she completes the device-code flow successfully
+    Then no personal virtual key exists for her in organization "acme"
+    When the CLI POSTs to "/api/auth/cli/virtual-key" with her access token
+    Then the response status is 201
+    And the response body contains `id`, `secret` and `prefix`
+    And exactly one personal virtual key named "default" exists for her
+
+  @integration @cli @personal-keys
+  Scenario: A second machine asks for a key of its own
+    Given user "jane@acme.com" already holds her default personal virtual key
+    When her second machine POSTs to "/api/auth/cli/virtual-key" with `device_label`
+    Then the response status is 201
+    And a further personal virtual key is issued, named after the device label
+    And the default key keeps working
+
+  @integration @cli @personal-keys
+  Scenario: Asking for a personal virtual key with no providers configured is refused
+    Given organization "acme" has no model provider reachable by Jane
+    When the CLI POSTs to "/api/auth/cli/virtual-key" with her access token
+    Then the response status is 409
+    And the response body contains `{ "error": "no_eligible_providers" }`
+    And no personal virtual key is created
+
+  @integration @cli @personal-keys
+  Scenario: Logging in again creates no virtual keys
+    Given user "jane@acme.com" has logged in on this machine before
+    When she runs "langwatch login" again and approves the device
+    Then the number of personal virtual keys she owns does not change
+
+  # ---------------------------------------------------------------------------
   # Logout
   # ---------------------------------------------------------------------------
 
@@ -149,6 +280,32 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the server revokes both the access_token and refresh_token
     And the CLI deletes "~/.langwatch/config" and the OS keyring entry
     And the CLI prints "Logged out"
+
+  # ---------------------------------------------------------------------------
+  # Login completion when the organization carries deleted accounts
+  # ---------------------------------------------------------------------------
+  # Membership rows survive the deletion of the account behind them, so an org
+  # can list an admin nobody can email. Login completion must still hand the
+  # CLI its policy map, otherwise the wrapper caches nothing and enforces
+  # nothing.
+
+  @integration @cli @bootstrap
+  Scenario: Login completes when the earliest admin account is gone
+    Given organization "acme" lists two admins
+    And the account behind the admin who joined first has been deleted
+    When Jane completes login and the CLI asks for its bootstrap data
+    Then login completion succeeds
+    And the "contact your admin" address is the remaining admin's email
+    And the CLI receives a policy entry for every tool it can run
+
+  @integration @cli @bootstrap
+  Scenario: Login completes when every admin account is gone
+    Given organization "acme" lists one admin
+    And the account behind that admin has been deleted
+    When Jane completes login and the CLI asks for its bootstrap data
+    Then login completion succeeds
+    And no "contact your admin" address is offered
+    And the CLI receives a policy entry for every tool it can run
 
   # ---------------------------------------------------------------------------
   # Multi-org user (out of scope this iteration but pinned for design clarity)

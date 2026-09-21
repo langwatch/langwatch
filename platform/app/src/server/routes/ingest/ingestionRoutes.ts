@@ -50,19 +50,15 @@ import type {
   IExportTraceServiceRequest,
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
-import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
+import type { IngestionSource } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { usdToNanoUsd } from "~/server/gateway/wireMoney";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -710,19 +706,10 @@ secured
           });
           costEventCount = events.length;
 
-          if (events.length > 0 && isClickHouseEnabled()) {
+          const budgetCHRepo =
+            events.length > 0 ? getApp().gateway.budgets : undefined;
+          if (events.length > 0 && budgetCHRepo) {
             const budgetRepo = new GatewayBudgetRepository(prisma);
-            const budgetCHRepo = new GatewayBudgetClickHouseRepository(
-              async (projectId) => {
-                const client = await getClickHouseClientForProject(projectId);
-                if (!client) {
-                  throw new Error(
-                    `ClickHouse enabled but no client for project ${projectId}`,
-                  );
-                }
-                return client;
-              },
-            );
             const changeEvents = new ChangeEventRepository(prisma);
 
             for (const event of events) {
@@ -794,6 +781,22 @@ secured
                 ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
+                // The reported cost is a decimal string, so it is pinned to
+                // an integer once, here, and every total downstream adds
+                // those integers rather than re-deriving from decimals.
+                const nano = usdToNanoUsd(event.costUsd);
+                const nanoNum = Number(nano);
+                if (!Number.isSafeInteger(nanoNum)) {
+                  logger.error(
+                    {
+                      costUsd: event.costUsd,
+                      nanoUsd: nano.toString(),
+                      requestId: event.requestId,
+                    },
+                    "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping debit row to avoid silent rounding",
+                  );
+                  continue;
+                }
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,
@@ -802,7 +805,7 @@ secured
                   window: b.window,
                   virtualKeyId: sentinelVK,
                   gatewayRequestId: event.requestId,
-                  amountUsd: event.costUsd.toFixed(10),
+                  amountNanoUsd: nanoNum,
                   tokensInput: event.inputTokens,
                   tokensOutput: event.outputTokens,
                   tokensCacheRead: event.cacheReadTokens,

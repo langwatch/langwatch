@@ -45,6 +45,10 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithMetrics(deps.Metrics),
 		app.WithCircuitBreaker(deps.Breaker),
 		app.WithLogger(deps.Logger),
+		// The control plane owns the record of open realtime voice sessions:
+		// a session outlives the request that minted it, and its per-key cap
+		// has to be counted somewhere every replica sees.
+		app.WithRealtimeSessions(deps.ControlPlane),
 	}
 	// Appended conditionally on the concrete type: a nil adapter wrapped in
 	// the interface would defeat the app's nil check.

@@ -27,6 +27,7 @@ function conversationRow(
     status: "idle",
     currentTurnId: null,
     lastError: null,
+    lastModel: null,
     messageCount: 0,
     lastActivityAtMs: 1,
     createdAtMs: 1,
@@ -44,6 +45,7 @@ function makeConversationRepo(
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
     findPendingHandoff: vi.fn().mockResolvedValue(null),
     findRunToken: vi.fn().mockResolvedValue(null),
+    hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
@@ -60,6 +62,8 @@ describe("LangyMessageService", () => {
       conversation: conversationRow({ userId: "user-2", isShared: true }),
     },
   ])("when the conversation is $visibility", ({ conversation }) => {
+    /** @scenario "Restoring a conversation returns its messages in order" */
+    /** @scenario "Every conversation read is scoped to the project" */
     it("returns messages after checking project, user, and conversation scope", async () => {
       const rows = [
         {

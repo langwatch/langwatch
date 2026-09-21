@@ -19,7 +19,7 @@ import {
  */
 test.describe("Invitation Approval - Admin Creates Immediate Invite", () => {
   // Member-invitation requires an org plan with maxMembers>=2. A no-license
-  // self-hosted org resolves to FREE_PLAN (maxMembers=1), so createInviteRequest
+  // self-hosted org resolves to FREE_PLAN (maxMembers=1), so createInvites
   // 403s. withEnterpriseLicense() activates a test ENTERPRISE license
   // (maxMembers=100) before each test and removes it after, scoping the raised
   // cap to this suite. See tests/license.fixture.ts. (#1802)

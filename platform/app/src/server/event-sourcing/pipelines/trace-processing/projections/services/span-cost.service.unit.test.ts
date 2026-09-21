@@ -132,3 +132,59 @@ describe("SpanCostService — bundled (non-billable) cost classification", () =>
     });
   });
 });
+
+// The trace-level cache rollup reads the canonical dotted cache keys. After
+// canonicalisation maps the Go SDK's flat gen_ai.usage.cached_input_tokens onto
+// gen_ai.usage.cache_read.input_tokens, the per-span cache-read count reaches
+// this rollup and is summed across the trace.
+//
+// Spec: specs/ai-gateway/cache-token-telemetry.feature
+describe("SpanCostService — cache token rollup", () => {
+  describe("given a span carrying the canonical dotted cache keys", () => {
+    it("surfaces the cache-read and cache-creation token counts", () => {
+      const result = service.extractCacheTokens(
+        costedSpan({
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 510,
+            "gen_ai.usage.cache_read.input_tokens": 37127,
+            "gen_ai.usage.cache_creation.input_tokens": 14,
+          },
+        }),
+      );
+
+      expect(result.cacheReadTokens).toBe(37127);
+      expect(result.cacheCreationTokens).toBe(14);
+    });
+  });
+
+  describe("given a span carrying both the canonical key and the legacy alias", () => {
+    it("prefers the canonical dotted count over the legacy alias", () => {
+      const result = service.extractCacheTokens(
+        costedSpan({
+          spanAttributes: {
+            "gen_ai.usage.cache_read.input_tokens": 37127,
+            "gen_ai.usage.cached_tokens": 999,
+          },
+        }),
+      );
+
+      expect(result.cacheReadTokens).toBe(37127);
+    });
+  });
+
+  describe("given a span whose canonical cache-read count is zero", () => {
+    it("falls back to the legacy alias and leaves cache-creation at zero", () => {
+      const result = service.extractCacheTokens(
+        costedSpan({
+          spanAttributes: {
+            "gen_ai.usage.cache_read.input_tokens": 0,
+            "gen_ai.usage.cached_tokens": 42,
+          },
+        }),
+      );
+
+      expect(result.cacheReadTokens).toBe(42);
+      expect(result.cacheCreationTokens).toBe(0);
+    });
+  });
+});

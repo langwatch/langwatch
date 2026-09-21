@@ -7,10 +7,9 @@ import {
 } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
-import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useFirstTraceWatch } from "../../hooks/useFirstTraceWatch";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -35,6 +34,8 @@ import {
 } from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
+import { ExportConfigDialog } from "../ExportConfigDialog";
+import { ExportProgress } from "../ExportProgress";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { FindBar } from "../FindBar";
@@ -102,6 +103,9 @@ export const TracesPage: React.FC = () => {
 
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
+  // Keeps `hasAnyTraces` fresh while it is false, so the page leaves the
+  // integrate pane when the first trace lands instead of on the next reload.
+  useFirstTraceWatch();
   const setupDismissedByProject = useOnboardingStore(
     (s) => s.setupDismissedByProject,
   );

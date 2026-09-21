@@ -73,12 +73,28 @@ export interface FacetValueAggregates {
   labelValues?: { value: string; count: number }[];
 }
 
+/**
+ * Per-event-name metric value tallies the event facet attaches so its
+ * sidebar drilldown (thumbs_up_down → vote values) renders from the
+ * discover payload without a second query. One entry per metric key seen
+ * on the event, values as stored — verbatim strings, never reformatted —
+ * so a click round-trips exactly into `event.attribute.<key>:<value>`.
+ */
+export interface EventMetricValues {
+  /** Full storage key, e.g. `event.metrics.vote` — the UI strips the
+   *  prefix for display but filters on the full key. */
+  key: string;
+  values: { value: string; count: number }[];
+}
+
 export interface CategoricalFacetResult {
   values: {
     value: string;
     label?: string;
     count: number;
     aggregates?: FacetValueAggregates;
+    /** Set only by the event facet — see {@link EventMetricValues}. */
+    eventMetrics?: EventMetricValues[];
   }[];
   totalDistinct: number;
 }
@@ -199,6 +215,35 @@ export interface TraceListRepository {
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult>;
+
+  /**
+   * Distinct values for a single event-attribute key, read from
+   * `stored_spans.Events.Attributes` — the store the `event.attribute.`
+   * filter actually queries. Same sampling strategy and injection-safety
+   * contract as {@link findAttributeValues}.
+   */
+  findEventAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult>;
+
+  /**
+   * Distinct values for a single span-attribute key, read from
+   * `stored_spans.SpanAttributes`. Same sampling strategy and
+   * injection-safety contract as {@link findAttributeValues}.
+   */
+  findSpanAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult>;
 }
 
 export class NullTraceListRepository implements TraceListRepository {
@@ -233,6 +278,12 @@ export class NullTraceListRepository implements TraceListRepository {
     return { categoricals: {}, ranges: {} };
   }
   async findAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+  async findEventAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+  async findSpanAttributeValues(): Promise<CategoricalFacetResult> {
     return { values: [], totalDistinct: 0 };
   }
 }

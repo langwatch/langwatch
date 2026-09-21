@@ -59,12 +59,20 @@ const MP_ANTHROPIC_BASE_ID = `mp-mat-anthropic-base-${suffix}`;
 const ANTHROPIC_BASE_URL_OVERRIDE = "http://vllm-anthropic:8000";
 const MP_ANTHROPIC_PLAIN_ID = `mp-mat-anthropic-plain-${suffix}`;
 const MP_ANTHROPIC_KEYLESS_ID = `mp-mat-anthropic-keyless-${suffix}`;
+const MP_SAFETY_ID = `mp-mat-safety-${suffix}`;
 const RP_ID = `rp-mat-${suffix}`;
+// A dispatchable, org-scoped provider the routing policy deliberately leaves
+// OUT of its modelProviderIds. Scope-reachable, so savable in a key's
+// allowlist, but the policy must keep it out of the dispatch chain.
+const MP_POLICY_OMITTED_ID = `mp-mat-omitted-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
 const VK_NO_RP_ID = `vk-mat-norp-${suffix}`;
 const VK_NO_PROJECT_ID = `vk-mat-noproj-${suffix}`;
 const VK_TAGSTORM_ID = `vk-mat-tagstorm-${suffix}`;
+// A VK on the routing policy whose allowlist names the policy-omitted
+// provider. Dispatch must still exclude it.
+const VK_POLICY_ALLOWLIST_ID = `vk-mat-policy-allow-${suffix}`;
 
 describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   beforeAll(async () => {
@@ -253,6 +261,41 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // Safety-type provider (azure_safety): holds evaluator credentials,
+    // not chat-dispatchable — must never appear in a gateway bundle's
+    // providers[] (the Go router has no Bifrost adapter for it).
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_SAFETY_ID,
+        name: "azure-safety",
+        provider: "azure_safety",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          AZURE_CONTENT_SAFETY_ENDPOINT: "https://safety.example.com",
+          AZURE_CONTENT_SAFETY_KEY: "safety-key",
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // Dispatchable + scope-reachable, but intentionally NOT in the routing
+    // policy below. A key can still allowlist it; the policy keeps it out of
+    // dispatch.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_POLICY_OMITTED_ID,
+        name: "openai-omitted",
+        provider: "openai",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: { OPENAI_API_KEY: "sk-omitted-test" },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -276,7 +319,6 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           urls: { deny: [], allow: null },
           models: { deny: [], allow: null },
         },
-        strategy: "priority",
         isDefault: true,
       },
     });
@@ -304,6 +346,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_1",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         routingPolicyId: RP_ID,
         config: {
           guardrailAttachments: [
@@ -333,6 +378,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_4",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
         config: {
           metadata: {
             tags: [
@@ -359,14 +405,16 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_2",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
         config: {},
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
         },
       },
     });
-    // VK 3 — org-scoped (no trace project). Exercises the guardrails:[]
-    // empty-state branch when traceProject resolves to null.
+    // VK 3 — org-scoped with no destination, the shape a key written before
+    // the destination was stored can still be in. Exercises the
+    // guardrails:[] empty-state branch when the pointer is null.
     await prisma.virtualKey.create({
       data: {
         id: VK_NO_PROJECT_ID,
@@ -383,12 +431,40 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // VK 5 — on the routing policy, project-scoped, with an allowlist that
+    // names the policy-omitted provider. Dispatch must still exclude it: the
+    // policy narrows the chain even though the allowlist would keep it.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_POLICY_ALLOWLIST_ID,
+        organizationId: ORG_ID,
+        name: "vk-policy-allowlist",
+        hashedSecret: `hash-policy-allow-${suffix}`,
+        displayPrefix: "lw_vk_live_xxx_5",
+        principalUserId: USER_ID,
+        createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
+        routingPolicyId: RP_ID,
+        config: { providersAllowed: [MP_ID, MP_POLICY_OMITTED_ID] },
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      },
+    });
   }, 60_000);
 
   afterAll(async () => {
     await prisma.virtualKey.deleteMany({
       where: {
-        id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID, VK_TAGSTORM_ID] },
+        id: {
+          in: [
+            VK_ID,
+            VK_NO_RP_ID,
+            VK_NO_PROJECT_ID,
+            VK_TAGSTORM_ID,
+            VK_POLICY_ALLOWLIST_ID,
+          ],
+        },
       },
     });
     await prisma.gatewayGuardrail.deleteMany({
@@ -411,6 +487,8 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       MP_ANTHROPIC_BASE_ID,
       MP_ANTHROPIC_PLAIN_ID,
       MP_ANTHROPIC_KEYLESS_ID,
+      MP_SAFETY_ID,
+      MP_POLICY_OMITTED_ID,
     ];
     await prisma.modelProviderScope.deleteMany({
       where: {
@@ -603,6 +681,21 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   });
 
   describe("when materialising a VK with no linked RoutingPolicy", () => {
+    /** @scenario Safety-type providers are excluded from gateway dispatch chains */
+    it("excludes safety-type providers (azure_safety) from the dispatch chain", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      // Naming the LLM provider that must survive, rather than just
+      // asserting a non-empty list, keeps this from passing vacuously if
+      // the filter ever drops dispatchable providers too.
+      expect(bundle.providers.map((p) => p.id)).toContain(MP_ID);
+      expect(bundle.providers.map((p) => p.id)).not.toContain(MP_SAFETY_ID);
+      expect(bundle.fallback.chain).toContain(MP_ID);
+      expect(bundle.fallback.chain).not.toContain(MP_SAFETY_ID);
+    });
+
     it("returns empty model_aliases + normalized empty policy_rules", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
@@ -663,6 +756,72 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(bundle.guardrail_attachments).toEqual([]);
       // RP still hydrates the policy side regardless of traceProject.
       expect(bundle.model_aliases).toEqual({ "gpt-5": "gpt-5-mini" });
+    });
+  });
+
+  describe("when a VK on a routing policy allowlists a provider the policy omits", () => {
+    /** @scenario The routing policy still narrows the dispatch chain when the allowlist names an omitted provider */
+    it("excludes the policy-omitted provider from dispatch even though the allowlist names it", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_POLICY_ALLOWLIST_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+
+      const dispatchIds = bundle.providers.map((p) => p.id);
+      // The allowlist named MP_ID and the policy-omitted provider; only MP_ID
+      // survives, because the routing policy keeps the omitted provider out of
+      // dispatch regardless of the allowlist. The allowlist narrows within the
+      // policy's set, it cannot widen past it.
+      expect(dispatchIds).toContain(MP_ID);
+      expect(dispatchIds).not.toContain(MP_POLICY_OMITTED_ID);
+      expect(bundle.fallback.chain).not.toContain(MP_POLICY_OMITTED_ID);
+    });
+
+    /** @scenario The bundle names why each undispatchable provider was dropped */
+    it("names why each undispatchable provider was dropped, so the gateway can say the reason", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_POLICY_ALLOWLIST_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+
+      // Routing dropped the policy-omitted provider: scope-reachable and
+      // allowed, but not in the policy's own list.
+      expect(bundle.routing_excluded_providers).toEqual([
+        { id: MP_POLICY_OMITTED_ID, type: "openai" },
+      ]);
+      // Provider access dropped every scope-reachable dispatchable provider
+      // the allowlist leaves out. The non-dispatchable safety provider is not
+      // scope-reachable for dispatch, so it is in neither list.
+      expect(
+        new Set(bundle.access_excluded_providers.map((p) => p.id)),
+      ).toEqual(
+        new Set([
+          MP_CUSTOM_ID,
+          MP_OPENAI_BASE_ID,
+          MP_ANTHROPIC_BASE_ID,
+          MP_ANTHROPIC_PLAIN_ID,
+          MP_ANTHROPIC_KEYLESS_ID,
+        ]),
+      );
+      expect(bundle.access_excluded_providers.map((p) => p.id)).not.toContain(
+        MP_SAFETY_ID,
+      );
+      expect(bundle.routing_policy_name).toBe(`mat-rp-${suffix}`);
+    });
+  });
+
+  describe("when a VK reaches every provider it is scoped to", () => {
+    it("reports no provider exclusions and no routing policy name", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+
+      // No allowlist and no routing policy: nothing is dropped, so there is no
+      // reason to name.
+      expect(bundle.routing_excluded_providers).toEqual([]);
+      expect(bundle.access_excluded_providers).toEqual([]);
+      expect(bundle.routing_policy_name).toBeNull();
     });
   });
 });

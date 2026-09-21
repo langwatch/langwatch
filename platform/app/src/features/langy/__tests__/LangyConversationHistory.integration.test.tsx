@@ -4,6 +4,7 @@
  * Integration tests for LangyPanel conversation history, the turn failures it
  * must not swallow, and stopping a turn.
  * Specs: specs/langy/langy-baseline.feature,
+ *        specs/langy/langy-navigation-persistence.feature,
  *        specs/langy/langy-stop-and-resume.feature
  *
  * Boundary mocks: useOrganizationTeamProject (project context),
@@ -23,6 +24,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ChatTransport, UIMessage } from "ai";
 import {
   afterEach,
   beforeEach,
@@ -106,6 +108,10 @@ const spies = {
         turnId: string;
       }) => void
     >(),
+  // The two turn mutations, as the panel's transport calls them at send time.
+  continueMutation:
+    vi.fn<(input: { projectId: string; conversationId: string }) => void>(),
+  createMutation: vi.fn<(input: { projectId: string }) => void>(),
 };
 
 // Invalidation channel: utils.langy.list.invalidate() bumps a version every
@@ -157,6 +163,9 @@ const chatRef = {
     parts: Array<{ type: string; text: string }>;
   }>,
   sendMessage: vi.fn(),
+  // What the panel handed useChat, for the test that drives a real send
+  // through the panel's own transport.
+  chatOptions: null as unknown,
   stop: vi.fn(),
   status: "ready" as "ready" | "submitted" | "streaming" | "error",
   setMessages: vi.fn(),
@@ -166,16 +175,19 @@ const chatRef = {
 };
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: () => ({
-    messages: chatRef.messages,
-    sendMessage: chatRef.sendMessage,
-    stop: chatRef.stop,
-    status: chatRef.status,
-    setMessages: chatRef.setMessages,
-    error: chatRef.error,
-    clearError: chatRef.clearError,
-    regenerate: chatRef.regenerate,
-  }),
+  useChat: (options: unknown) => {
+    chatRef.chatOptions = options;
+    return {
+      messages: chatRef.messages,
+      sendMessage: chatRef.sendMessage,
+      stop: chatRef.stop,
+      status: chatRef.status,
+      setMessages: chatRef.setMessages,
+      error: chatRef.error,
+      clearError: chatRef.clearError,
+      regenerate: chatRef.regenerate,
+    };
+  },
 }));
 
 vi.mock("ai", () => ({
@@ -205,7 +217,7 @@ vi.mock("~/utils/api", async () => {
   // pull their own tRPC queries these tests do not care about; the shared
   // harness answers every one of them inert. Only the langy surface and the
   // model picker below are explicit.
-  const { createTrpcUtils, withFallback } = await import(
+  const { createTrpcUtils, modelProviderRouter, withFallback } = await import(
     "./support/langyApiMock"
   );
 
@@ -262,14 +274,13 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      // isInitialLoading, not isLoading: React Query v4 reports a DISABLED
+      // isLoading, not isLoading: React Query v4 reports a DISABLED
       // query as status "loading" forever, and the panel deliberately disables
-      // the list while closed — so the production hook reads isInitialLoading.
+      // the list while closed — so the production hook reads isLoading.
       // Mirror that: only a query that is BOTH enabled AND still loading counts.
-      isInitialLoading: enabled && state.status === "loading",
       isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -395,11 +406,10 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      isInitialLoading:
+      isLoading:
         enabled && state.status === "loading" && state.data === undefined,
-      isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: state.status === "loading" && state.data !== undefined,
+      isPlaceholderData: state.status === "loading" && state.data !== undefined,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -493,6 +503,20 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
+      // ADR-129: the panel reads the shared folder and answers a
+      // question card's wait; neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
       stopTurn: {
         useMutation: () => ({
           mutateAsync: async (variables: {
@@ -526,30 +550,14 @@ vi.mock("~/utils/api", async () => {
     // no-ops that only need to EXIST at render time.
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        // A resolved model is configured: these tests exercise conversation
-        // history on a usable Langy, so langyNeedsModel must be false (else
-        // LangySidebar renders the inline model-setup screen over the panel).
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({
-          data: { providers: [] },
-          isLoading: false,
-        }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         // Feature off in these tests — the header GitHub button hides
         // itself (isLoading=false, data=undefined) and stays out of the way.
         useQuery: () => ({
@@ -564,7 +572,36 @@ vi.mock("~/utils/api", async () => {
     },
   };
 
-  return { api: withFallback(explicitApi) };
+  // The transport's own client. The turn mutations answer with ids and the
+  // stream subscription stays silent, so a send is observed at the mutation
+  // the transport chose and the conversation id it carried.
+  const trpcClient = {
+    langy: {
+      continueConversation: {
+        mutate: async (input: {
+          projectId: string;
+          conversationId: string;
+        }) => {
+          spies.continueMutation(input);
+          return {
+            conversationId: input.conversationId,
+            turnId: "turn-continued",
+          };
+        },
+      },
+      createConversation: {
+        mutate: async (input: { projectId: string }) => {
+          spies.createMutation(input);
+          return { conversationId: "conv-created", turnId: "turn-created" };
+        },
+      },
+      onTurnStream: {
+        subscribe: () => ({ unsubscribe: () => undefined }),
+      },
+    },
+  };
+
+  return { api: withFallback(explicitApi), trpcClient };
 });
 
 import { toaster } from "~/components/ui/toaster";
@@ -712,6 +749,8 @@ beforeEach(() => {
   spies.deleteMutation.mockReset();
   spies.listInvalidate.mockReset();
   spies.stopMutation.mockReset();
+  spies.continueMutation.mockReset();
+  spies.createMutation.mockReset();
   scenarioRef.current = {
     conversations: [],
     messagesById: {},
@@ -738,6 +777,8 @@ beforeEach(() => {
     activeTurnId: null,
     settledTurnId: null,
     backendSawTurnInFlight: false,
+    stopPending: false,
+    draft: "",
   });
 });
 
@@ -869,6 +910,50 @@ describe("LangyPanel conversation history", () => {
           const passed = lastCall?.[0] as UIMessageLike[] | undefined;
           expect(passed?.[0]?.parts?.[0]?.text).toBe("hello from older");
         });
+      });
+
+      /** @scenario "A message typed into a reopened conversation continues it" */
+      it("sends a typed message into that conversation, never a new one", async () => {
+        installScenario({ conversations, messagesById });
+        renderPanel();
+        await openHistory();
+        chatRef.setMessages.mockClear();
+        await openRecentOption(/Older chat/i);
+        await waitFor(() => {
+          expect(chatRef.setMessages).toHaveBeenCalled();
+        });
+        // The send runs through the panel's own transport, the way useChat
+        // drives it, so the conversation id is the one the transport reads
+        // at send time and not the one the test would pass.
+        chatRef.sendMessage.mockImplementation(
+          async (message: { role: string; parts: unknown[] }) => {
+            const { transport } = chatRef.chatOptions as {
+              transport: ChatTransport<UIMessage>;
+            };
+            await transport.sendMessages({
+              trigger: "submit-message",
+              chatId: "chat",
+              messageId: "m-typed",
+              messages: [{ id: "m-typed", ...message } as UIMessage],
+              abortSignal: new AbortController().signal,
+            });
+          },
+        );
+        const field = await screen.findByPlaceholderText(
+          "Ask Langy or describe what you want…",
+        );
+        await userEvent.type(field, "Go ahead.");
+        fireEvent.keyDown(field, { key: "Enter" });
+
+        await waitFor(() => {
+          expect(spies.continueMutation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              projectId: "project-demo",
+              conversationId: "conv-old",
+            }),
+          );
+        });
+        expect(spies.createMutation).not.toHaveBeenCalled();
       });
     });
 
@@ -1293,8 +1378,8 @@ describe("LangyPanel stopping a turn", () => {
   });
 
   describe("given a turn is in flight but the record cannot name it yet", () => {
-    /** @scenario Stop says nothing it cannot back up */
-    it("dispatches nothing and refuses to show it is stopping", async () => {
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("keeps the stop and sends it once the record names the turn", async () => {
       installScenario({
         conversations,
         messagesById,
@@ -1304,13 +1389,92 @@ describe("LangyPanel stopping a turn", () => {
       await openLiveConversation();
       await userEvent.click(await stopButton());
 
+      // Nothing to name yet, so nothing goes out — and the user is not sent
+      // away with "try again in a moment" either.
       expect(spies.stopMutation).not.toHaveBeenCalled();
-      // The lie under test: a "Stopping" spinner with no request behind it.
       expect(
-        screen.queryByRole("button", { name: "Stopping" }),
-      ).not.toBeInTheDocument();
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+      expect(toaster.create).not.toHaveBeenCalled();
+
+      // The intent is held, ready for the id: nothing was lost and nothing was
+      // claimed that did not happen.
+      expect(useLangyStore.getState().stopPending).toBe(true);
+    });
+  });
+
+  describe("given I just sent a message and the turn has no id yet", () => {
+    const composer = () =>
+      screen.findByPlaceholderText("Ask Langy or describe what you want…");
+
+    async function sendMessage(): Promise<void> {
+      installScenario({ conversations: [], messagesById: {} });
+      renderPanel();
+      const field = await composer();
+      await userEvent.type(field, "explain this trace");
+      fireEvent.keyDown(field, { key: "Enter" });
+    }
+
+    /** @scenario Stop is available the moment I send */
+    it("offers Stop before Langy has answered with the turn's id", async () => {
+      await sendMessage();
+
       expect(await stopButton()).toBeEnabled();
-      expect(toaster.create).toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    });
+
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("keeps the stop and sends it the moment the turn is identified", async () => {
+      await sendMessage();
+      await userEvent.click(await stopButton());
+
+      expect(spies.stopMutation).not.toHaveBeenCalled();
+      expect(
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+
+      // The mutation answered: the transport adopts the ids.
+      act(() => {
+        useLangyStore
+          .getState()
+          .beginTurn({ conversationId: "conv-fresh", turnId: "turn-fresh" });
+      });
+
+      await waitFor(() => {
+        expect(spies.stopMutation).toHaveBeenCalledWith({
+          projectId: "project-demo",
+          conversationId: "conv-fresh",
+          turnId: "turn-fresh",
+        });
+      });
+      expect(toaster.create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A send that fails before the turn is identified hands the control back */
+    it("hands the control and the words back when the send fails", async () => {
+      let failSend: (error: Error) => void = () => undefined;
+      chatRef.sendMessage.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          failSend = reject;
+        }),
+      );
+
+      await sendMessage();
+      await userEvent.click(await stopButton());
+      expect(
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        failSend(new Error("the send never landed"));
+        await Promise.resolve();
+      });
+
+      // Nothing ever ran, so nothing is stopped — and the question is back in
+      // the field rather than lost.
+      expect(spies.stopMutation).not.toHaveBeenCalled();
+      expect(await screen.findByRole("button", { name: "Send" })).toBeTruthy();
+      expect(useLangyStore.getState().draft).toBe("explain this trace");
     });
   });
 

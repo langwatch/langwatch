@@ -139,9 +139,6 @@ export function WorkflowCard({
             title: "Workflow updated",
             description: `Workflow "${name}" has been updated from source.`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: (error) =>
@@ -197,7 +194,6 @@ export function WorkflowCard({
                   ? `Also deleted: ${parts.join(", ")}`
                   : undefined,
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: (error) =>
@@ -217,7 +213,6 @@ export function WorkflowCard({
             toaster.create({
               title: `Workflow "${name}" deleted`,
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: (error) =>

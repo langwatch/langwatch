@@ -13,7 +13,7 @@ Workato pushes job-completed webhooks. The receiver is wired and persists each d
 - **Receiver:** `POST /api/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload (Workato's exact webhook envelope).
-- **Persistence:** one governance event per delivery, with `eventType: agent.action`, `actor`/`target` empty, and the verbatim payload in `rawPayload`. The CLI tail will show one row per Workato webhook hit and the per-source detail page will let you expand the row to see the raw envelope.
+- **Persistence:** one governance event per delivery, with `eventType: agent.action`, `actor`/`target` empty, and the verbatim payload in `rawPayload`. The CLI tail shows one row per Workato webhook hit and the per-source detail page lets you expand the row to see the raw envelope.
 - **Status flip:** flips `awaiting_first_event` → `active` after the first webhook is received.
 
 ## What the admin configures upstream
@@ -53,7 +53,7 @@ In Workato: **Connection Profile → Webhook destination**, paste the webhook UR
 }
 ```
 
-So the CLI tail row will look like:
+So the CLI tail row looks like:
 
 ```text
 2026-04-27T08:00:00.000Z  agent.action   →
@@ -76,7 +76,7 @@ So the CLI tail row will look like:
 langwatch ingest tail <sourceId> --follow
 ```
 
-Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/settings/governance/ingestion-sources/<sourceId>` will show the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
+Hit a Workato recipe that's connected to the webhook, you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/governance/ingestion-sources/<sourceId>` shows the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
 
 If you want to dry-run without a Workato recipe:
 

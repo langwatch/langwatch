@@ -1,0 +1,54 @@
+---
+title: "Overview"
+description: "Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Organization API reads and updates the organization your API key belongs to. There is no organization id in the path: the credential decides which organization you are addressing, so the same script runs unchanged against any organization once you swap the key.
+
+`PATCH` is partial. Only the fields you send are written, and the response body is exactly what a following `GET` returns, so a provisioning tool can compare what it asked for against what it got.
+
+## Authentication
+
+Requires an **organization-level API key**. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Reading needs `organization:view`; updating needs `organization:manage`. A key without the permission is refused with HTTP 403 and the code `insufficient_permissions`.
+
+## Endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `GET` | `/api/organization` | `organization:view` | Read the organization profile |
+| `PATCH` | `/api/organization` | `organization:manage` | Update part of the organization profile |
+
+Members and invites are families of their own: see [Members](/api-reference/members/overview) and [Invites](/api-reference/invites/overview).
+
+## What this API does not own
+
+- **Single sign-on settings.** The single sign-on domain and provider are not returned and cannot be set here. Claiming a domain reroutes signups for everyone on it, so it stays with the LangWatch team.
+- **The stored-object secret.** `s3SecretAccessKey` is accepted on `PATCH` and never read back, the same way a password field works. Every other storage field round-trips.
+
+## Typical flow
+
+```bash
+# Read the profile
+curl https://app.langwatch.ai/api/organization \
+  -H "Authorization: Bearer sk-lw-..."
+
+# Rename it and set a support contact, leaving everything else alone
+curl -X PATCH https://app.langwatch.ai/api/organization \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme", "supportContact": "support@acme.example"}'
+```
+
+Setting `traceSharingEnabled` to `false` revokes every trace share link already handed out across the organization's projects, not only the ones created from then on, so a trace someone shared externally stops resolving straight away.

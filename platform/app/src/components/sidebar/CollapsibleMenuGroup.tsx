@@ -7,12 +7,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import type { Project } from "~/generated/prisma/client";
 import { trackEvent } from "../../utils/tracking";
-import { ICON_SIZE, MENU_ITEM_HEIGHT, SideMenuLink } from "./SideMenuLink";
+import { SideMenuLink } from "./SideMenuLink";
+import { useSideMenuDensity } from "./sideMenuDensity";
 
 export type CollapsibleMenuChild = {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
@@ -44,6 +45,7 @@ export const CollapsibleMenuGroup = ({
   beta,
   betaLabel,
 }: CollapsibleMenuGroupProps) => {
+  const density = useSideMenuDensity();
   const isAnyChildActive = children.some((child) => child.isActive);
   const [isExpanded, setIsExpanded] = useState(
     defaultExpanded || isAnyChildActive,
@@ -84,9 +86,9 @@ export const CollapsibleMenuGroup = ({
           >
             <HStack
               width={showLabel ? "full" : "auto"}
-              height={MENU_ITEM_HEIGHT}
-              gap={3}
-              paddingX={3}
+              height={density.height}
+              gap={density.gap}
+              paddingX={density.paddingX}
               borderRadius="lg"
               backgroundColor="transparent"
               _hover={{
@@ -99,18 +101,18 @@ export const CollapsibleMenuGroup = ({
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                width={`${ICON_SIZE}px`}
-                height={`${ICON_SIZE}px`}
+                width={`${density.iconSize}px`}
+                height={`${density.iconSize}px`}
               >
                 <Icon
-                  size={ICON_SIZE}
+                  size={density.iconSize}
                   color="var(--chakra-colors-nav-fg-muted)"
                 />
               </Box>
               {showLabel && (
                 <>
                   <Text
-                    fontSize="14px"
+                    fontSize={density.fontSize}
                     fontWeight="normal"
                     color="nav.fg"
                     whiteSpace="nowrap"

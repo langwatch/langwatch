@@ -11,7 +11,82 @@ export const OPENAI_EMBEDDING_DIMENSION = 1536;
 
 export const DEFAULT_TOPIC_CLUSTERING_MODEL = "openai/gpt-5.2";
 
-export const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
+/**
+ * The credential fields that carry no secret, listed by exact name.
+ *
+ * Everything a provider stores in `customKeys` is treated as a secret unless
+ * it appears here, so a provider that adds a field gets it masked with no
+ * further action. The list holds connection configuration the settings form
+ * has to render back to be editable: endpoints, API versions, regions, cloud
+ * project and location pairs, and the `MANAGED` marker.
+ *
+ * Add a name here only after checking that its value cannot authenticate
+ * anything. `modelProviderHelpers.isSecretCredentialField` is the single
+ * reader, and `credentialFieldClassification.unit.test.ts` walks the provider
+ * registry to keep this list and the registry in step.
+ */
+export const PUBLIC_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
+  "ANTHROPIC_BASE_URL",
+  "AWS_REGION_NAME",
+  "AZURE_API_GATEWAY_BASE_URL",
+  "AZURE_API_GATEWAY_VERSION",
+  "AZURE_CONTENT_SAFETY_ENDPOINT",
+  "AZURE_OPENAI_API_VERSION",
+  "AZURE_OPENAI_ENDPOINT",
+  "CUSTOM_BASE_URL",
+  "GEMINI_LOCATION",
+  "GEMINI_PROJECT",
+  "GOOGLE_AGENT_PLATFORM_LOCATION",
+  "GOOGLE_AGENT_PLATFORM_PROJECT",
+  "MANAGED",
+  "OPENAI_BASE_URL",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_FROM_NUMBER",
+  "VERTEXAI_LOCATION",
+  "VERTEXAI_PROJECT",
+]);
+
+/**
+ * Name fragments that mark a field as a credential whatever else is decided
+ * about it. A field matching one of these can never be added to
+ * `PUBLIC_CREDENTIAL_FIELDS`; the classification test enforces that, so an
+ * allowlist entry cannot re-expose a secret by mistake.
+ */
+export const SECRET_CREDENTIAL_MARKERS = [
+  "KEY",
+  "TOKEN",
+  "SECRET",
+  "PASSWORD",
+  "CREDENTIAL",
+] as const;
+
+/**
+ * Credentials whose exact bytes are the contract, so the whitespace around
+ * them is not noise to strip.
+ *
+ * Trimming is safe for a credential spent as an HTTP header or a query
+ * parameter: both discard the padding anyway, so stripping it early only
+ * spares the client rejecting the value outright. It is not safe for one
+ * spent as cryptographic key material, where every byte is part of the key
+ * and the platform cannot check its copy against the vendor's.
+ *
+ * `ELEVENLABS_WEBHOOK_SECRET` is the HMAC key in `verifyElevenLabsSignature`
+ * (`server/routes/elevenlabs.ts`), so the signing happens here.
+ * `AWS_SECRET_ACCESS_KEY` is signed with elsewhere: it leaves this process at
+ * `gateway/config.materialiser.ts` (as `secret_key`) and at
+ * `api/routers/modelProviders.utils.ts`, and is the root of the SigV4 signing
+ * chain downstream. In both cases one changed byte changes every signature
+ * computed from it.
+ *
+ * `customKeys.trimCredentials` is the single reader, and
+ * `credentialFieldClassification.unit.test.ts` walks the provider registry to
+ * keep this list and the registry in step: a field renamed there and left
+ * behind here would silently start getting trimmed again.
+ */
+export const EXACT_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
+  "AWS_SECRET_ACCESS_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+]);
 
 export const MASKED_KEY_PLACEHOLDER = "HAS_KEY••••••••••••••••••••••••";
 
@@ -69,4 +144,7 @@ export const KSUID_RESOURCES = {
   PROCESS_MANAGER_OUTBOX: "pmoutbox",
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
+  TRACE_EDIT_OVERLAY: "traceedit",
+  INSTANT_EVAL_RUN: "instanteval",
+  INSTANT_EVAL_QUERY: "instantevalquery",
 } as const;

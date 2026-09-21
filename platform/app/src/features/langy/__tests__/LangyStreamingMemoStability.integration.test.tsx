@@ -84,6 +84,7 @@ vi.mock("@ai-sdk/react", async () => {
         stop: () => undefined,
         clearError: () => undefined,
         regenerate: () => undefined,
+        resumeStream: () => Promise.resolve(),
       };
     },
   };
@@ -160,6 +161,12 @@ vi.mock("~/utils/api", async () => {
       useUtils: () => trpcUtils,
       useContext: () => trpcUtils,
       modelProvider: {
+        setRoleAssignmentForScope: {
+          useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+        },
+        setFeatureOverrideForScope: {
+          useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+        },
         getResolvedDefault: {
           useQuery: () => ({
             data: { model: "openai/gpt-5-mini" },
@@ -173,8 +180,8 @@ vi.mock("~/utils/api", async () => {
       virtualKeys: {
         list: { useQuery: () => ({ data: undefined, isLoading: false }) },
       },
-      langyGithub: {
-        getInstallStatus: {
+      github: {
+        getConnectionStatus: {
           useQuery: () => ({
             data: undefined,
             isLoading: false,

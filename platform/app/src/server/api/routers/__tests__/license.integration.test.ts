@@ -5,11 +5,6 @@
  * Tests the router layer including permissions and error handling.
  */
 
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -20,6 +15,12 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import {
   ENTERPRISE_TEMPLATE,
   LicenseHandler,
@@ -47,6 +48,8 @@ import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
@@ -261,7 +264,7 @@ describe("License Router Integration", () => {
         adminCaller.license.getStatus({
           organizationId: "non-existent-org-id",
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("throws error for empty organizationId", async () => {
@@ -330,7 +333,7 @@ describe("License Router Integration", () => {
           organizationId,
           licenseKey: VALID_LICENSE_KEY,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("throws UNAUTHORIZED for non-existent organization", async () => {
@@ -340,7 +343,7 @@ describe("License Router Integration", () => {
           organizationId: "non-existent-org-id",
           licenseKey: VALID_LICENSE_KEY,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -384,14 +387,14 @@ describe("License Router Integration", () => {
       // Member has organization:view but not organization:manage, so permission check throws UNAUTHORIZED
       await expect(
         memberCaller.license.remove({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("throws UNAUTHORIZED for non-existent organization", async () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
         adminCaller.license.remove({ organizationId: "non-existent-org-id" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -594,7 +597,7 @@ describe("License Router Integration", () => {
     it("throws UNAUTHORIZED when member tries to generate", async () => {
       await expect(
         memberCaller.license.generate(getValidInput()),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });

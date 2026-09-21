@@ -5,9 +5,10 @@
  * end-to-end cascade resolution, single-organization anchoring, cache
  * invalidation on writes, and custom-pattern vetting.
  */
-import type { Project } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
@@ -268,6 +269,59 @@ describe("DataPrivacyPolicyService integration", () => {
             },
           }),
         ).rejects.toThrow(/not a valid regular expression/);
+      });
+    });
+
+    describe("when a custom secret pattern is over-broad", () => {
+      // Redaction rewrites the text at ingestion, so a pattern that matches
+      // ordinary prose destroys trace content and cannot be undone.
+      const catchAlls = [".*", ".+", "\\w+", "[a-z]+", "[\\s\\S]*"];
+
+      const saveWithPattern = (pattern: string) =>
+        service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            secrets: { enabled: true, customPatterns: [pattern] },
+          },
+        });
+
+      /** @scenario "An over-broad custom secret pattern is rejected when saving the rule" */
+      it("rejects a pattern that would erase ordinary text, storing nothing", async () => {
+        for (const pattern of catchAlls) {
+          await expect(saveWithPattern(pattern)).rejects.toThrow(
+            InvalidDataPrivacyConfigError,
+          );
+        }
+
+        const rows = await repository.findAllInOrganization({
+          organizationId,
+        });
+        expect(rows).toHaveLength(0);
+      });
+
+      // The wording lives in three places (this service, the settings page and
+      // the presentation registry), so it is pinned once rather than on every
+      // case above, which assert the type instead.
+      it("names the reason in the message a customer reads", async () => {
+        await expect(saveWithPattern(".*")).rejects.toThrow(
+          /also matches ordinary text/,
+        );
+      });
+
+      it("still accepts a pattern that names an actual credential shape", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              secrets: {
+                enabled: true,
+                customPatterns: ["acme_live_[a-z0-9]{8,}"],
+              },
+            },
+          }),
+        ).resolves.toBeDefined();
       });
     });
 

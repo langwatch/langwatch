@@ -139,6 +139,76 @@ Feature: Payload cost governs the scheduling plane
     Then the attempt fails into the queue's retry
     And the work is never mistaken for a shape the build does know
 
+  # The rolling-deploy hazard, stated as behaviour. A newer worker can stage a
+  # shape an older one has never heard of. Treating "I don't know this" as "not
+  # for me" completes the job — no throw, no retry, no counter, no log — and the
+  # contribution is gone. The old worker cannot process the shape, but it can
+  # refuse to swallow it, which is what turns a silent loss into a retry that
+  # the next worker drains.
+  @unit
+  Scenario: a staged shape from a newer build is refused, never quietly completed
+    Given queued work staged in a shape only a newer build produces
+    When a worker that predates that shape processes it
+    Then the attempt fails into the queue's retry
+    And the work is not reported as done
+    And it is never counted as an event this subscriber had no interest in
+
+  # The distinction that keeps the scenario above from swallowing real work:
+  # "a relevant event I decline" and "a shape I cannot read" are different
+  # answers, and only the first is allowed to complete quietly.
+  @unit
+  Scenario: an event the subscriber declines is still completed quietly
+    Given queued work carrying an event of a kind this build does know
+    And the subscriber considers that event not relevant
+    When the subscriber processes it
+    Then the work completes without producing a result
+    And the attempt does not fail into the queue's retry
+
+  # --- A pointer is not the only way to stay cheap ---
+
+  # A pointer keeps the queue cheap but buys a dependency: the payload has to be
+  # readable by the time the work runs, and when it isn't, the work retries
+  # against a store it does not control. Work whose result is a small, bounded
+  # derivation can carry the derivation instead — cheap for the same reason a
+  # pointer is cheap, and with nothing left to race.
+  #
+  # This is the PRODUCER half. It is live: the deploy-order rule two scenarios
+  # up required the consumer half to be on every worker for a full release
+  # first, which it has been since #6621, so the seam now stages this shape
+  # instead of the pointer.
+  @unit
+  Scenario: work whose result is a bounded derivation carries it instead of a pointer
+    Given a relevant event whose payload is large
+    And the subscriber's whole result is a derivation drawn from a fixed, closed vocabulary
+    When the event is published
+    Then the queued work carries that derivation
+    And the queued work does not grow with the size of the payload it came from
+    And the subscriber produces its result without reading the payload back
+
+  # The consumer half of the shape above, live one release ahead of it: a
+  # worker must already complete carried-result work correctly — staged by the
+  # NEXT build — before anything produces it.
+  @unit
+  Scenario: work carrying its finished result completes without reading anything back
+    Given queued work that carries the subscriber's finished result
+    When the subscriber processes it
+    Then the result is delivered as it was carried
+    And the payload's store is never read
+    And the work completes even if the payload's store write never landed
+
+  # The guard that stops this from becoming "queue the payload again": the
+  # vocabulary is closed, so a caller cannot widen it into carrying content by
+  # adding a field that happens to be large. The derivation itself is live in
+  # this release — the full-event path lifts with the same closed vocabulary
+  # the staged shape will carry.
+  @unit
+  Scenario: a carried derivation never carries content
+    Given an event whose payload contains large content alongside small facts
+    When the subscriber's result is derived from that event
+    Then the derivation holds the small facts
+    And the derivation holds none of the content
+    And the content remains readable from the payload's canonical store
+
   @unit
   Scenario: an event whose payload cannot be pointed at is still processed
     Given a relevant event that carries no identity to find its payload by
@@ -158,9 +228,10 @@ Feature: Payload cost governs the scheduling plane
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 
-  @planned
-  # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: offloaded payloads
-  # stage as small stubs, and byte budgets count the stub, not the payload.
+  @integration
+  # ADR-069 phase 2, shipped: the encoder records the pre-compression,
+  # pre-offload payload size on the envelope header, and the coalescing drain
+  # spends its byte budget against that rather than the stored value's length.
   Scenario: an offloaded payload's reference advertises its true cost
     Given a job whose payload is offloaded to blob storage
     When the job is staged

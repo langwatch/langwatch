@@ -7,9 +7,10 @@ import {
   useViewStore,
 } from "../stores/viewStore";
 
-/** Discriminator stored on each SavedView row so the new traces v2 lens
- * persistence doesn't collide with the legacy /messages page filter
- * views. Mirrored server-side in `saved-view.service.ts`. */
+/** Discriminator stored on each SavedView row so the traces v2 lens
+ * persistence doesn't collide with the v1 filter views — rows left behind by
+ * the removed legacy Traces page, and still written by Analytics. Mirrored
+ * server-side in `saved-view.service.ts`. */
 const KIND = "v2-traces-lens";
 
 /**

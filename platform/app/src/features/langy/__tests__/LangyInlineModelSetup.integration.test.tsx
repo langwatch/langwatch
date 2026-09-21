@@ -36,6 +36,12 @@ const projectRef = {
   } | null,
 };
 
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the panel, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
@@ -158,12 +164,17 @@ const refetchResolvedDefault = vi.fn(() => {
 
 vi.mock("~/utils/api", () => ({
   api: {
+    onboarding: {
+      attachConversation: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+      },
+    },
     useUtils: () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },
       },
-      langyGithub: {
-        getInstallStatus: { invalidate: () => Promise.resolve() },
+      github: {
+        getConnectionStatus: { invalidate: () => Promise.resolve() },
       },
     }),
     useContext: () => ({
@@ -178,8 +189,8 @@ vi.mock("~/utils/api", () => ({
         detail: { setData: () => undefined },
       },
     }),
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {
@@ -205,6 +216,20 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
+      // ADR-129: the panel reads the shared folder and answers a
+      // question card's wait; neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
@@ -217,9 +242,9 @@ vi.mock("~/utils/api", () => ({
       list: {
         useInfiniteQuery: () => ({
           data: { pages: [{ items: [], nextCursor: null }] },
-          isInitialLoading: false,
+          isLoading: false,
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
           isFetched: true,
           isError: false,
           error: null,
@@ -231,6 +256,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,

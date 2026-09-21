@@ -37,6 +37,7 @@
  */
 import { env } from "~/env.mjs";
 import { getS3ConfigForProject } from "~/server/dataplane-s3";
+import { resolveAzureCredentials } from "./azure-credentials";
 
 export type ProjectStorageDestination =
   | { kind: "s3"; bucket: string }
@@ -52,53 +53,28 @@ export type ProjectStorageDestination =
 const DEFAULT_LOCAL_FS_ROOT = "/var/lib/langwatch/objects";
 
 /**
- * Thrown when `STORED_OBJECTS_BACKEND=azure` is set but one or more of the
- * three required Azure config vars is missing. Fails loud, naming exactly
- * which var(s) are missing — no silent fallback to S3 or the local
- * filesystem, which would risk writing a tenant's bytes to the wrong place
- * (or the ephemeral container layer) without the operator noticing.
- */
-export class AzureBackendMisconfiguredError extends Error {
-  readonly missingVariables: string[];
-
-  constructor(missingVariables: string[]) {
-    super(
-      `STORED_OBJECTS_BACKEND=azure requires ${missingVariables.join(", ")} to be set. ` +
-        "Refusing to silently fall back to S3 or the local filesystem.",
-    );
-    this.name = "AzureBackendMisconfiguredError";
-    this.missingVariables = missingVariables;
-  }
-}
-
-/**
  * Resolves the azure destination from env, or throws
- * `AzureBackendMisconfiguredError` naming every missing required var.
- * Called only once `env.STORED_OBJECTS_BACKEND === "azure"` has already
- * been checked by the caller.
+ * `AzureBackendMisconfiguredError` (from `azure-credentials.ts` — the one
+ * place that decides whether Azure config is complete, for every auth
+ * mode) naming every missing/contradictory var. Called only once
+ * `env.STORED_OBJECTS_BACKEND === "azure"` has already been checked by the
+ * caller.
  */
 function resolveAzureDestination(): ProjectStorageDestination {
-  // Trim before the emptiness check, matching the global-S3 branch below: a
-  // whitespace-only value (trivially produced by a YAML block scalar or a
-  // padded Kubernetes secret) would otherwise pass as "set" and mint URIs
-  // with a blank account or container.
-  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
-  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
-  const container = env.AZURE_BLOB_CONTAINER?.trim();
-
-  const missingVariables: string[] = [];
-  if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
-  if (!accountKey) missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
-  if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
-
-  if (missingVariables.length > 0) {
-    throw new AzureBackendMisconfiguredError(missingVariables);
-  }
+  // The default `purpose: "write"` is what makes the assertion below sound:
+  // only the write arm requires AZURE_BLOB_CONTAINER, because only a write
+  // needs to be told where to go. Resolving with `purpose: "read"` here would
+  // leave the container unvalidated and this `!` unfounded.
+  const credentials = resolveAzureCredentials({ purpose: "write" });
+  // Validated above, though never carried on the credential itself — that
+  // describes how to authenticate to the account, not which container a caller
+  // addresses within it.
+  const container = env.AZURE_BLOB_CONTAINER!.trim();
 
   return {
     kind: "azure",
-    accountName: accountName!,
-    container: container!,
+    accountName: credentials.accountName,
+    container,
   };
 }
 
@@ -187,4 +163,70 @@ const STORAGE_URI_IN_TEXT = /\b(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi;
  */
 export function redactStorageUrisInText(text: string): string {
   return text.replace(STORAGE_URI_IN_TEXT, (uri) => redactStorageUri(uri));
+}
+
+/**
+ * Authorization material that must never reach a log sink, an error message,
+ * or a trace attribute:
+ *
+ *   Bearer <jwt>            — a live credential for the token's whole lifetime.
+ *   SharedKey account:sig   — the HMAC signature, plus the account name.
+ *   <assertion>...          — the federated token exchanged for the above.
+ *
+ * This matters because object-store errors are quoted verbatim: Azure answers
+ * a failed shared-key request with an AuthenticationFailed body that echoes
+ * the signed string back, and a bearer 401 can carry the presented token in
+ * the WWW-Authenticate error detail. Anything derived from a response body or
+ * a thrown SDK error goes through here before it is surfaced.
+ */
+// A credential after an auth scheme. The {20,} floor keeps ordinary prose
+// intact — "SharedKey authentication is disabled" must not become
+// "SharedKey ***" — while every real token comfortably exceeds it.
+const AUTHORIZATION_MATERIAL_IN_TEXT =
+  /\b(Bearer|SharedKey|SharedKeyLite)\s+[A-Za-z0-9\-._~+/=:]{20,}/gi;
+
+// The identity endpoint speaks JSON and form-encoding, not XML: an error
+// quoting a token response or a request body carries the credential as a
+// key/value pair, which the scheme pattern above never sees.
+const CREDENTIAL_FIELD_IN_TEXT =
+  /\b(access_token|id_token|refresh_token|client_assertion|assertion|client_secret)\b("?)(\s*[=:]\s*)("?)[A-Za-z0-9\-._~+/=]{20,}("?)/gi;
+
+// Azure echoes signed-request detail back in XML error bodies. The tag may
+// carry attributes (xml:space="preserve"), so the name match must not
+// assume the tag closes immediately after it.
+const XML_ASSERTION_IN_TEXT =
+  /<(AuthenticationErrorDetail|assertion|client_assertion)\b[^>]*>[\s\S]*?<\/\1>/gi;
+
+export function redactAuthorizationMaterial(text: string): string {
+  return (
+    text
+      .replace(
+        AUTHORIZATION_MATERIAL_IN_TEXT,
+        (_m, scheme: string) => `${scheme} ***`,
+      )
+      // Each quote is captured and re-emitted rather than assumed: consuming the
+      // key's closing quote without restoring it turned
+      // `"access_token":"…"` into `"access_token:"***"`, which redacts the
+      // token but leaves JSON a downstream log parser can no longer read.
+      // Captures arrive as a rest array: `String.replace` fixes this callback's
+      // arity at one-per-group (plus offset and subject), so naming each group
+      // as its own parameter trips the max-parameter rule on a signature the
+      // regex dictates rather than the design.
+      .replace(CREDENTIAL_FIELD_IN_TEXT, (_m, ...captures: string[]) => {
+        const [field, keyQuote, separator, openQuote, closeQuote] = captures;
+        return `${field}${keyQuote}${separator}${openQuote}***${closeQuote}`;
+      })
+      .replace(
+        XML_ASSERTION_IN_TEXT,
+        (_m, tag: string) => `<${tag}>***</${tag}>`,
+      )
+  );
+}
+
+/**
+ * The redaction every storage error text should pass through: tenant-identifying
+ * URIs AND authorization material. Callers should not have to remember both.
+ */
+export function redactStorageErrorText(text: string): string {
+  return redactAuthorizationMaterial(redactStorageUrisInText(text));
 }

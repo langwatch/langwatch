@@ -70,8 +70,8 @@ footer.
 
 ## Canonical examples
 
-- `src/pages/settings/governance/departments.tsx` (departments row)
+- `src/pages/governance/departments.tsx` (departments row)
 - `src/pages/settings/model-providers.tsx` (provider row, with a permission
   tooltip on the trigger)
-- `src/components/settings/governance/ToolCatalogEditor.tsx` (AI tool catalog
+- `src/components/governance/ToolCatalogEditor.tsx` (AI tool catalog
   tile row: Edit / Enable-Disable / Delete-archive)

@@ -53,8 +53,8 @@ const SCHEMA = defineCommandSchema(
  * Command handler for computing simulation run metrics.
  *
  * Supports two modes:
- * 1. ECST mode: metrics provided in payload (from trace-side reactor) - emits event directly
- * 2. Pull mode: no metrics in payload (from simulation-side reactor) - reads trace summary
+ * 1. ECST mode: metrics provided in payload (from trace-side subscriber) - emits event directly
+ * 2. Pull mode: no metrics in payload (from simulation-side subscriber) - reads trace summary
  *
  * When a trace summary is not yet available, schedules a deferred retry.
  *
@@ -112,9 +112,21 @@ export class ComputeRunMetricsCommand
             occurredAt: Date.now(),
           });
         } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics computation, giving up",
+          // Error, not warn: giving up here means this run's cost and
+          // latency never exist. No later event repairs it — the retry was
+          // the only path — so a run silently carries no metrics forever.
+          // Logged with everything needed to find it, and with the window
+          // that was actually waited, because "the trace was slower than the
+          // budget" and "the trace never arrived" need different responses.
+          logger.error(
+            {
+              tenantId,
+              scenarioRunId,
+              traceId,
+              attempts: MAX_RETRIES,
+              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
+            },
+            "Gave up computing trace metrics: the trace summary never arrived, so this run has no cost or latency",
           );
         }
 
@@ -155,9 +167,15 @@ export class ComputeRunMetricsCommand
             occurredAt: Date.now(),
           });
         } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics (summary empty), giving up",
+          logger.error(
+            {
+              tenantId,
+              scenarioRunId,
+              traceId,
+              attempts: MAX_RETRIES,
+              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
+            },
+            "Gave up computing trace metrics: the trace summary stayed empty, so this run has no cost or latency",
           );
         }
 

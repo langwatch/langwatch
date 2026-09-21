@@ -104,6 +104,74 @@ describe("evaluationAnalytics fold projection — slim row derivation", () => {
     });
   });
 
+  describe("given a completed event with a non-processed status carrying a verdict", () => {
+    it("writes passed and score as null when status is error", () => {
+      const fold = makeFold();
+      let state = fold.init();
+      state = fold.handleEvaluationCompleted(
+        createEvaluationCompletedEvent({
+          status: "error",
+          passed: false,
+          score: 0.1,
+        }),
+        state,
+      );
+
+      const row = projectFromState({
+        ...state,
+        LastEventOccurredAt: 1_002_500,
+      });
+      expect(row.status).toBe("error");
+      expect(row.passed).toBeNull();
+      expect(row.score).toBeNull();
+    });
+
+    it("writes passed and score as null when status is skipped", () => {
+      const fold = makeFold();
+      let state = fold.init();
+      state = fold.handleEvaluationCompleted(
+        createEvaluationCompletedEvent({
+          status: "skipped",
+          passed: true,
+          score: 1,
+        }),
+        state,
+      );
+
+      const row = projectFromState({
+        ...state,
+        LastEventOccurredAt: 1_002_500,
+      });
+      expect(row.status).toBe("skipped");
+      expect(row.passed).toBeNull();
+      expect(row.score).toBeNull();
+    });
+  });
+
+  describe("given an atomic reported event with a non-processed status carrying a verdict", () => {
+    it("writes passed and score as null", () => {
+      const fold = makeFold();
+      let state = fold.init();
+      state = fold.handleEvaluationReported(
+        createEvaluationReportedEvent({
+          evaluationId: "eval-3",
+          status: "error",
+          passed: false,
+          score: 0.2,
+        }),
+        state,
+      );
+
+      const row = projectFromState({
+        ...state,
+        LastEventOccurredAt: 1_100_000,
+      });
+      expect(row.status).toBe("error");
+      expect(row.passed).toBeNull();
+      expect(row.score).toBeNull();
+    });
+  });
+
   describe("given an atomic EvaluationReported event", () => {
     it("stamps identity + result in one shot and sets duration to 0", () => {
       const fold = makeFold();

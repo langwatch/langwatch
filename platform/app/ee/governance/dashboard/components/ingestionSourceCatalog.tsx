@@ -1,0 +1,435 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+// Type-only import: erased at compile time, so the server module (which
+// would crash a client bundle) never actually loads. Same pattern as
+// iconsMap.tsx deriving its keys from the server model-provider registry.
+import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+// biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
+import React from "react";
+import { Anthropic } from "~/components/icons/Anthropic";
+import { AWS } from "~/components/icons/AWS";
+import { Custom } from "~/components/icons/Custom";
+import { Databricks } from "~/components/icons/Databricks";
+import { Microsoft } from "~/components/icons/Microsoft";
+import { OpenAI } from "~/components/icons/OpenAI";
+import { OpenTelemetry } from "~/components/icons/OpenTelemetry";
+import { Workato } from "~/components/icons/Workato";
+import { IconGlyph } from "~/components/ui/IconGlyph";
+
+/**
+ * The single catalog of ingestion-source types the governance UI offers:
+ * label, vendor mark, delivery mode, and the customer-facing group each type
+ * sits under. The Add source menu, the composer, and the configured-source
+ * list all read from here, so the offer can never drift between surfaces.
+ *
+ * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ */
+
+export type { SourceType };
+
+export type SourceMode = "push" | "pull" | "s3";
+
+/**
+ * The two groups a customer reads. `mode` stays the internal delivery truth
+ * (adapters and endpoints care about push vs pull vs s3); the group is the
+ * plain-language fold of it: events either arrive on their own or LangWatch
+ * goes and gets them. S3 drops are fetched on a cadence too, so they sit
+ * with the scheduled group rather than earning a third technical heading.
+ */
+export type SourceGroup = "realtime" | "scheduled";
+
+export const SOURCE_GROUP_META: Record<
+  SourceGroup,
+  { title: string; blurb: string }
+> = {
+  realtime: {
+    title: "Real-time streams",
+    blurb: "These platforms send events to LangWatch as they happen.",
+  },
+  scheduled: {
+    title: "Synced on a schedule",
+    blurb:
+      "LangWatch fetches new activity from these platforms on a regular cadence, including audit files dropped in cloud storage.",
+  },
+};
+
+export function groupForMode(mode: SourceMode): SourceGroup {
+  return mode === "push" ? "realtime" : "scheduled";
+}
+
+export interface SourceTypeOption {
+  value: SourceType;
+  label: string;
+  mode: SourceMode;
+  blurb: string;
+  icon: React.ReactNode;
+  /**
+   * True when this source's events are conversations that can be read in
+   * the trace explorer, so a trace destination is worth offering.
+   *
+   * Read `routesConversations` rather than this field — it enforces the
+   * push-mode exclusion the flag alone cannot. See ADR-088 Decision 8.
+   */
+  routesConversations?: boolean;
+  /**
+   * True when this source type may no longer be chosen for a new source,
+   * but rows already configured on it still exist and must keep rendering.
+   * Covers both a type that was retired and one that was offered before it
+   * worked: either way, choosing it buys an admin a source that stays
+   * silent, so it leaves the picker and keeps its definition.
+   *
+   * Deprecating rather than deleting is deliberate. The completeness guard
+   * below requires every `SourceType` to appear here, and `SOURCE_TYPE_LABEL`
+   * is built from this list and read without a fallback on the inventory
+   * page — so removing an entry stops the build, and forcing it through
+   * would turn an existing source's name into a blank.
+   */
+  deprecated?: boolean;
+  /**
+   * True when the thing this type reads is gone or was never worth reading,
+   * so no amount of work on our side would make it deliver data. Retired
+   * types are always deprecated too; the extra flag says WHY, and the why is
+   * load-bearing: a deprecated type that merely has not been finished is one
+   * we still owe a working configuration path, and the builder-coverage
+   * guard holds us to that. A retired one we owe nothing but a way to
+   * archive the rows already on it.
+   *
+   * Not a place to park a type that is broken. "Broken" is the case the
+   * guard exists to catch.
+   */
+  retired?: boolean;
+  /**
+   * True when this type is left out of the sample Sources table, while
+   * staying fully on offer everywhere else.
+   *
+   * NOT A DEPRECATION, and the distinction matters to whoever reads this
+   * next: a type flagged here is current, is pickable in the Add source
+   * menu, and keeps its icon, its blurb and its configuration path. The
+   * only thing it loses is a row in a mock-up. Do not "finish the job" by
+   * adding `deprecated` alongside it.
+   *
+   * The reason is that the sample table and the menu answer different
+   * questions. The menu answers "what can I connect", and should be
+   * complete. The sample answers "what does a connected fleet look like",
+   * and is illustrative — so a type whose presence there reads as a claim
+   * about this deployment rather than as an example can be held back
+   * without being withdrawn from the product.
+   */
+  shouldOmitFromSample?: boolean;
+}
+
+// `satisfies` (not a type annotation) so each entry's `value` keeps its
+// literal type — the completeness guard below needs the narrow union.
+export const SOURCE_TYPE_OPTIONS = [
+  {
+    value: "otel_generic",
+    label: "Generic OpenTelemetry",
+    mode: "push",
+    blurb:
+      "Anything that speaks OTLP/HTTP. Simplest setup - paste an OTLP URL + bearer token into the upstream agent's exporter config.",
+    icon: <OpenTelemetry />,
+  },
+  {
+    value: "claude_code",
+    label: "Claude Code (Anthropic OAuth)",
+    mode: "push",
+    blurb:
+      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat - distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
+    icon: <Anthropic />,
+  },
+  {
+    value: "claude_cowork",
+    label: "Anthropic Claude (Cowork)",
+    mode: "push",
+    blurb:
+      "Claude Cowork pushes telemetry via OTLP. Configure under Anthropic Admin Console → Cowork → Telemetry.",
+    icon: <Anthropic />,
+    // Held out of the sample table by product decision, not retired: the
+    // type is live and stays in the Add source menu. The sample previously
+    // carried a row invented from a tool card and called it "Claude Cowork",
+    // a name the product uses nowhere, and the owner read the mock-up as a
+    // claim that this deployment had such a connection. Keeping it off the
+    // sample settles that without touching what customers can configure.
+    shouldOmitFromSample: true,
+  },
+  {
+    value: "workato",
+    label: "Workato",
+    mode: "push",
+    blurb:
+      "Workato pushes job-completed webhooks. Generate an HMAC shared secret, paste into Workato → Connection Profile → Webhook destination.",
+    icon: <Workato />,
+  },
+  {
+    value: "copilot_studio",
+    label: "Microsoft Copilot Studio (Purview)",
+    mode: "pull",
+    blurb:
+      "Retired. This source polled Microsoft's directory audit, which records changes to the directory and has never contained a Copilot conversation.",
+    icon: <Microsoft />,
+    // Kept so existing rows keep their label and the guards below still
+    // compile; filtered out of the picker by `gatedSourceTypeOptions`.
+    deprecated: true,
+    // Retired rather than unfinished: directory audit has never carried a
+    // Copilot conversation, so there is no version of this source that
+    // works. Its setup form asks for an app registration the frozen adapter
+    // config cannot use either — and neither will be fixed, because the
+    // source that replaced it reads the conversations directly.
+    retired: true,
+  },
+  {
+    value: "copilot_studio_dataverse",
+    label: "Microsoft Copilot Studio",
+    mode: "pull",
+    blurb:
+      "Reads Copilot Studio conversations from your Power Platform environment. Needs an app registration with a client secret and a Dataverse role that can read the conversation transcript and bot tables — no directory permission of any kind.",
+    icon: <Microsoft />,
+    routesConversations: true,
+  },
+  {
+    value: "openai_compliance",
+    label: "OpenAI Enterprise Compliance",
+    mode: "s3",
+    blurb: "Not available. Choosing this source would never deliver any data.",
+    icon: <OpenAI />,
+    // Offered before the path behind it was finished, so an admin who picked
+    // it got a source that stayed silent. Kept rather than deleted for the
+    // same reason as the Copilot entry above: the completeness guard below
+    // and `SOURCE_TYPE_LABEL` both need it.
+    deprecated: true,
+  },
+  {
+    value: "openai_admin",
+    label: "OpenAI Admin",
+    mode: "pull",
+    blurb:
+      "Reads your OpenAI organization's daily spend with an Admin API key (sk-admin-...), broken down by project, line item, the person who spent it and the API key it was billed to. A regular project key is refused. Only ever create one per organization — a second source would count the same spend twice.",
+    icon: <OpenAI />,
+  },
+  {
+    value: "claude_compliance",
+    label: "Anthropic Claude Enterprise Compliance",
+    mode: "pull",
+    blurb: "Not offered for new sources.",
+    icon: <Anthropic />,
+    // Not retired: the workspace key now reaches the adapter as the token it
+    // reads, so the path behind this type is whole. It stays out of the
+    // picker because nothing has yet pulled a real tenant's compliance log
+    // end to end, and offering it is a separate call from fixing it. The
+    // blurb no longer says a source here would never deliver data, because
+    // after the fix that is not true.
+    deprecated: true,
+  },
+  {
+    value: "anthropic_admin",
+    // Named after the product. Which report a source pulls is a question the
+    // composer asks two fields later, where the admin can actually answer it;
+    // the old "(usage & cost)" put the answer in a menu that offered no
+    // choice between them.
+    label: "Anthropic Admin API",
+    mode: "pull",
+    blurb:
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
+    icon: <Anthropic />,
+  },
+  {
+    value: "databricks_genie",
+    label: "Databricks AI/BI Genie",
+    mode: "pull",
+    blurb:
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
+    icon: <Databricks />,
+    routesConversations: true,
+  },
+  {
+    value: "s3_custom",
+    label: "Custom S3 audit log",
+    mode: "s3",
+    blurb:
+      "For homegrown agent systems writing audit logs to S3. Provide a parser DSL describing how each line maps to OCSF ActivityEvent fields.",
+    icon: <AWS />,
+  },
+  {
+    value: "http_custom",
+    label: "Custom HTTP audit-log API",
+    mode: "pull",
+    blurb:
+      "Bring-your-own paginated REST audit-log API. Declare URL + auth + cursor + JSON-path field mappings; the universal HTTP-polling adapter handles paging + retries + OCSF fold.",
+    icon: <Custom />,
+  },
+] satisfies SourceTypeOption[];
+
+// Compile-time completeness guard: if the server grows a source type the
+// catalog doesn't offer, this line stops building. The runtime cast in
+// SOURCE_TYPE_LABEL below is only sound because of it.
+type UncataloguedSourceType = Exclude<
+  SourceType,
+  (typeof SOURCE_TYPE_OPTIONS)[number]["value"]
+>;
+const _catalogIsComplete: UncataloguedSourceType extends never ? true : never =
+  true;
+void _catalogIsComplete;
+
+export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
+  SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
+) as Record<SourceType, string>;
+
+export const PROTOCOL_LABEL: Record<SourceMode, string> = {
+  push: "OTel push",
+  pull: "API pull",
+  s3: "S3 pull",
+};
+
+export function modeForSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): SourceMode {
+  return (
+    SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull"
+  );
+}
+
+export function needsIngestSecret({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  const opt = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  if (!opt) return true;
+  return opt.mode === "push" || sourceType === "s3_custom";
+}
+
+// Compile-time guard: routing runs inside `writePulledEvents`
+// (`pullers/pullerWorker.ts:325`), which nothing on the push path ever calls.
+// A push-mode entry claiming `routesConversations` would put a picker in the
+// drawer that changes nothing a customer can observe, so it stops the build
+// here rather than shipping a dead control. Bracketed so the `never` case
+// does not go vacuously true.
+type PushTypeClaimingConversations = Extract<
+  (typeof SOURCE_TYPE_OPTIONS)[number],
+  { mode: "push"; routesConversations: true }
+>;
+const _noPushTypeRoutesConversations: [PushTypeClaimingConversations] extends [
+  never,
+]
+  ? true
+  : never = true;
+void _noPushTypeRoutesConversations;
+
+/**
+ * Whether a source of this type produces conversations that land in a trace
+ * destination — and therefore whether the drawers should offer a destination
+ * picker at all.
+ *
+ * Today the answer is Genie alone, because the worker routes only events
+ * whose action is `genie_query` (`pullers/genieTraceMapper.ts:239`). That gate
+ * lives in server code this bundle must not import, so the two are kept in
+ * step by declaration plus test rather than by a shared constant — see
+ * `__tests__/conversationRoutingSourceTypes.unit.test.ts`. An adapter that
+ * starts emitting conversations must flip its entry here in the same change.
+ */
+export function routesConversations(sourceType: SourceType): boolean {
+  const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  return option?.routesConversations === true;
+}
+
+/**
+ * The source types the product actually offers today, in catalog order.
+ *
+ * The one place a retired type is filtered out, so every surface asking "what
+ * can a customer have" gets the same answer: the Add source menu through
+ * `gatedSourceTypeOptions`, and the Sources tab's sample rows through
+ * {@link sampleSourceTypeOptions}, which narrows this list further rather
+ * than re-deriving it. A second filter written at a callsite is how a retired
+ * type reappears on one screen after being pulled from another.
+ */
+export function offeredSourceTypeOptions(): SourceTypeOption[] {
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated);
+}
+
+/**
+ * The source types the sample Sources table shows, in catalog order.
+ *
+ * A strict subset of {@link offeredSourceTypeOptions}: derived from it, so a
+ * type can never reach the sample without being on offer, and narrowed by
+ * `shouldOmitFromSample` so a type can be held back from the mock-up while staying
+ * in the Add source menu. Read this from the sample and the wider helper from
+ * the menu — the gap between the two is the point, and collapsing them would
+ * put a held-back type back on screen.
+ */
+export function sampleSourceTypeOptions(): SourceTypeOption[] {
+  return offeredSourceTypeOptions().filter(
+    (option) => !option.shouldOmitFromSample,
+  );
+}
+
+export interface GatedSourceTypeOption extends SourceTypeOption {
+  /** Locked types render in the menu but cannot be picked. */
+  locked: boolean;
+}
+
+/**
+ * The one plan gate. Non-enterprise plans may only create Generic
+ * OpenTelemetry sources; every other type stays visible so the menu can say
+ * what an Enterprise plan unlocks, but is inert. The Add source menu is the
+ * only surface that reads this list, and the composer is only reachable
+ * through the menu's onPick — so this one gate covers both. Never re-filter
+ * SOURCE_TYPE_OPTIONS at a callsite, or a locked type leaks through.
+ */
+export function gatedSourceTypeOptions({
+  isEnterprise,
+}: {
+  isEnterprise: boolean;
+}): GatedSourceTypeOption[] {
+  return offeredSourceTypeOptions().map((option) => ({
+    ...option,
+    locked: !isEnterprise && option.value !== "otel_generic",
+  }));
+}
+
+/**
+ * Vendor marks that are flat near-black monochrome and would vanish on the
+ * dark theme. Brand-coloured marks (Databricks red, Workato teal, Microsoft
+ * primaries, AWS yellow) read fine in both modes and are left alone. Same
+ * approach as MONOCHROME_PROVIDER_ICONS in
+ * src/components/modelProviders/iconsMap.tsx.
+ */
+const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
+  "otel_generic",
+  "claude_code",
+  "claude_cowork",
+  "claude_compliance",
+  "anthropic_admin",
+  "openai_compliance",
+  "openai_admin",
+  "http_custom",
+]);
+
+/** Renders a source type's vendor mark at a fixed size, dark-mode safe. */
+export function SourceTypeIconGlyph({
+  sourceType,
+  size = "16px",
+  testId,
+}: {
+  sourceType: SourceType;
+  size?: string | number;
+  /**
+   * Named by the caller rather than fixed here: this renders on the menu, the
+   * composer, the list rows and the edit title, and one id shared by all of
+   * them would make `getByTestId` ambiguous the first time two appear on one
+   * screen. Callers that nothing queries pass nothing.
+   */
+  testId?: string;
+}) {
+  const icon = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.icon;
+  if (!icon) return null;
+  return (
+    <IconGlyph
+      icon={icon}
+      monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
+      size={size}
+      testId={testId}
+    />
+  );
+}

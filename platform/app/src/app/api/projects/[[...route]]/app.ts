@@ -1,15 +1,19 @@
-import type { Organization } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import {
+  anyAuthenticated,
   createOrgApp,
   requires,
-  requiresOnProject,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
+import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   DestinationTeamNotFoundError,
+  GovernanceProjectProtectedError,
+  governanceProjectRouteViolation,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
@@ -18,7 +22,6 @@ import {
   TeamNotInOrganizationError,
 } from "~/server/app-layer/projects/project.service";
 import { prisma } from "~/server/db";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
@@ -30,6 +33,15 @@ import {
   NotFoundError,
 } from "../../shared/errors";
 import { handleProjectError } from "./error-handler";
+import {
+  ARCHIVE_PROJECT,
+  CREATE_PROJECT,
+  GET_PROJECT,
+  GET_PROJECT_API_KEY,
+  LIST_PROJECTS,
+  REGENERATE_PROJECT_API_KEY,
+  UPDATE_PROJECT,
+} from "./openapi";
 
 patchZodOpenapi();
 
@@ -43,11 +55,30 @@ const paginationQuerySchema = z.object({
 
 const createProjectSchema = z
   .object({
-    name: z.string().min(1, "name is required").max(255),
-    teamId: z.string().min(1).optional(),
-    newTeamName: z.string().min(1).max(255).optional(),
-    language: z.string().min(1, "language is required"),
-    framework: z.string().min(1, "framework is required"),
+    name: z
+      .string()
+      .min(1, "name is required")
+      .max(255)
+      .describe("Project name"),
+    teamId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Id of an existing team to put the project in"),
+    newTeamName: z
+      .string()
+      .min(1)
+      .max(255)
+      .optional()
+      .describe("Create a team with this name and put the project in it"),
+    language: z
+      .string()
+      .min(1, "language is required")
+      .describe("Programming language, such as python or typescript"),
+    framework: z
+      .string()
+      .min(1, "framework is required")
+      .describe("Framework in use, such as langchain or openai"),
   })
   .refine((data) => data.teamId || data.newTeamName, {
     message: "Either teamId or newTeamName must be provided",
@@ -57,7 +88,11 @@ const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   language: z.string().optional(),
   framework: z.string().optional(),
-  teamId: z.string().min(1).optional(),
+  teamId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Moves the project to this team"),
 });
 
 function projectResponse(project: {
@@ -88,117 +123,168 @@ const secured = createOrgApp<ExtraVariables>({
 
 secured.hono.onError(handleProjectError);
 
-secured.access(requires("project:view")).get(
-  "/",
-  projectServiceMiddleware,
-  describeRoute({
-    description:
-      "List all non-archived projects for the organization (paginated)",
-  }),
-  zValidator("query", paginationQuerySchema),
-  async (c) => {
-    const organization = c.get("organization") as Organization;
-    const { page, limit } = c.req.valid("query");
-    const service = c.get("projectService") as ProjectService;
+// The listing is not gated on organization-wide `project:view`: a credential
+// whose view does not reach org scope gets a 200 with exactly the projects it
+// holds `project:view` on (key bindings ∩ owner ceiling, resolved by
+// `resolveVisibleProjects`) instead of a 403. Content, not access, is what the
+// permission decides here, so the policy is anyAuthenticated and the handler
+// does the scoping — the same shape the model-defaults family uses.
+// Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
+secured
+  .access(anyAuthenticated())
+  .get(
+    "/",
+    projectServiceMiddleware,
+    describeRoute(LIST_PROJECTS),
+    zValidator("query", paginationQuerySchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const { page, limit } = c.req.valid("query");
+      const service = c.get("projectService") as ProjectService;
 
-    const result = await service.listByOrganization({
-      organizationId: organization.id,
-      page,
-      limit,
-    });
+      // Read the resolved credential itself rather than the loose context
+      // key: this family authenticates organization API keys only, so
+      // `apiKeyId` is always a real key here, and taking it from the typed
+      // token is what keeps that true if the family ever grows another
+      // credential class.
+      const resolved = c.get("orgResolvedToken") as OrgResolvedToken;
 
-    return c.json({
-      data: result.data.map(projectResponse),
-      pagination: result.pagination,
-    });
-  },
-);
-
-secured.access(requires("project:create")).post(
-  "/",
-  projectServiceMiddleware,
-  apiKeyServiceMiddleware,
-  describeRoute({
-    description:
-      "Create a new project in an existing team or create a new team inline",
-  }),
-  zValidator("json", createProjectSchema),
-  async (c) => {
-    const organization = c.get("organization") as Organization;
-    const body = c.req.valid("json");
-    const service = c.get("projectService") as ProjectService;
-    const userId = c.get("apiKeyUserId") as string | null;
-
-    let project;
-    try {
-      project = await service.create({
+      const visible = await resolveVisibleProjects({
+        prisma,
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId,
         organizationId: organization.id,
-        userId,
-        teamId: body.teamId,
-        newTeamName: body.newTeamName,
-        name: body.name,
-        language: body.language,
-        framework: body.framework,
       });
-    } catch (error) {
-      if (error instanceof TeamNotInOrganizationError) {
-        throw new BadRequestError(error.message);
-      }
-      if (error instanceof PersonalWorkspaceBoundaryError) {
-        throw new ForbiddenError(error.message);
-      }
-      if (error instanceof ProjectSlugConflictError) {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      throw error;
-    }
 
-    const apiKeyService = c.get("apiKeyService") as ApiKeyService;
-    const serviceKey = await apiKeyService.create({
-      name: `${project.name} Service Key`,
-      userId: null,
-      createdByUserId: userId,
-      organizationId: organization.id,
-      permissionMode: "all",
-      bindings: [
+      const result = await service.listByOrganization({
+        organizationId: organization.id,
+        page,
+        limit,
+        ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
+      });
+
+      return c.json({
+        data: result.data.map(projectResponse),
+        pagination: result.pagination,
+      });
+    },
+  );
+
+secured
+  .access(requires("project:create"))
+  .post(
+    "/",
+    projectServiceMiddleware,
+    apiKeyServiceMiddleware,
+    describeRoute(CREATE_PROJECT),
+    zValidator("json", createProjectSchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
+      const service = c.get("projectService") as ProjectService;
+      const userId = c.get("apiKeyUserId") as string | null;
+
+      let project;
+      try {
+        project = await service.create({
+          organizationId: organization.id,
+          userId,
+          teamId: body.teamId,
+          newTeamName: body.newTeamName,
+          name: body.name,
+          language: body.language,
+          framework: body.framework,
+        });
+      } catch (error) {
+        if (error instanceof TeamNotInOrganizationError) {
+          throw new BadRequestError(error.message);
+        }
+        if (error instanceof PersonalWorkspaceBoundaryError) {
+          throw new ForbiddenError(error.message);
+        }
+        if (error instanceof ProjectSlugConflictError) {
+          return c.json({ error: "Conflict", message: error.message }, 409);
+        }
+        throw error;
+      }
+
+      const apiKeyService = c.get("apiKeyService") as ApiKeyService;
+      const serviceKey = await apiKeyService.create({
+        name: `${project.name} Service Key`,
+        userId: null,
+        createdByUserId: userId,
+        organizationId: organization.id,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: "ADMIN",
+            scopeType: "PROJECT",
+            scopeId: project.id,
+          },
+        ],
+      });
+
+      return c.json(
         {
-          role: "ADMIN",
-          scopeType: "PROJECT",
-          scopeId: project.id,
+          ...projectResponse(project),
+          serviceApiKey: serviceKey.token,
+          serviceApiKeyId: serviceKey.apiKey.id,
         },
-      ],
-    });
+        201,
+      );
+    },
+  );
 
-    return c.json(
-      {
-        ...projectResponse(project),
-        serviceApiKey: serviceKey.token,
-        serviceApiKeyId: serviceKey.apiKey.id,
-      },
-      201,
-    );
-  },
-);
+/**
+ * One project of this organization, addressed by id — and never the hidden
+ * governance project.
+ *
+ * The governance project is excluded from every listing surface, so answering a
+ * read about it is the one thing left that would confirm it exists. It reads as
+ * not found, which is what it is as far as this API is concerned: the id
+ * belongs to an internal tenancy record, not to a workspace anybody can open
+ * (ADR-128 §11).
+ */
+async function readableProject({
+  id,
+  organizationId,
+  service,
+}: {
+  id: string;
+  organizationId: string;
+  service: ProjectService;
+}) {
+  const project = await service.getWithTeam(id);
+  if (
+    !project ||
+    project.team.organizationId !== organizationId ||
+    governanceProjectRouteViolation(project.kind)
+  ) {
+    throw new NotFoundError("Project not found");
+  }
+  return project;
+}
 
-secured.access(requires("project:view")).get(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description: "Get a project by its id",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const service = c.get("projectService") as ProjectService;
+secured
+  .access(requires("project:view"))
+  .get(
+    "/:id",
+    projectServiceMiddleware,
+    describeRoute(GET_PROJECT),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
 
-    const project = await service.getWithTeam(id);
-    if (!project || project.team.organizationId !== organization.id) {
-      throw new NotFoundError("Project not found");
-    }
+      const project = await readableProject({
+        id,
+        organizationId: organization.id,
+        service,
+      });
 
-    return c.json(projectResponse(project));
-  },
-);
+      return c.json(projectResponse(project));
+    },
+  );
 
 /** The service's update failures, as the status codes they mean. */
 function asProjectUpdateHttpError(error: unknown): unknown {
@@ -211,130 +297,108 @@ function asProjectUpdateHttpError(error: unknown): unknown {
   if (error instanceof PersonalWorkspaceBoundaryError) {
     return new ForbiddenError(error.message);
   }
+  // A write names an id the caller already holds, so the refusal says what the
+  // record is rather than pretending it is missing — a mystery 404 on a project
+  // an admin can see the id of is a support ticket.
+  if (error instanceof GovernanceProjectProtectedError) {
+    return new ForbiddenError(error.message);
+  }
   return error;
 }
 
-secured.access(requires("project:update")).patch(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description:
-      "Update a project by its id, including moving it to another team with teamId",
-  }),
-  zValidator("json", updateProjectSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const body = c.req.valid("json");
-    const service = c.get("projectService") as ProjectService;
-
-    let project;
-    try {
-      project = await service.update({
-        id,
-        organizationId: organization.id,
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.language !== undefined && { language: body.language }),
-          ...(body.framework !== undefined && { framework: body.framework }),
-          ...(body.teamId !== undefined && { teamId: body.teamId }),
-        },
-      });
-    } catch (error) {
-      throw asProjectUpdateHttpError(error);
-    }
-
-    return c.json(projectResponse(project));
-  },
-);
-
-secured.access(requires("project:delete")).delete(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description: "Archive a project (soft-delete)",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const service = c.get("projectService") as ProjectService;
-
-    let project;
-    try {
-      project = await service.archive({
-        id,
-        organizationId: organization.id,
-      });
-    } catch (error) {
-      if (error instanceof ProjectNotFoundError) {
-        throw new NotFoundError("Project not found");
-      }
-      if (error instanceof PersonalProjectProtectedError) {
-        throw new ForbiddenError(error.message);
-      }
-      throw error;
-    }
-
-    return c.json({
-      id: project.id,
-      name: project.name,
-      archivedAt: project.archivedAt,
-    });
-  },
-);
-
-// ── API Key management ───────────────────────────────────────────────────────
-
-/**
- * The base key is a project-level write credential, so reading it is gated
- * with `project:update` to match the access it grants — not `project:view`.
- * `requiresOnProject` resolves that at the named project's scope rather than
- * the organization's, so one org-wide grant does not reach every project.
- */
 secured
-  .access(requiresOnProject("project:update"))
-  .get(
-    "/:id/api-key",
+  .access(requires("project:update"))
+  .patch(
+    "/:id",
     projectServiceMiddleware,
-    describeRoute({ description: "Get the project API key" }),
+    describeRoute(UPDATE_PROJECT),
+    zValidator("json", updateProjectSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
+      let project;
+      try {
+        project = await service.update({
+          id,
+          organizationId: organization.id,
+          data: {
+            ...(body.name !== undefined && { name: body.name }),
+            ...(body.language !== undefined && { language: body.language }),
+            ...(body.framework !== undefined && { framework: body.framework }),
+            ...(body.teamId !== undefined && { teamId: body.teamId }),
+          },
+        });
+      } catch (error) {
+        throw asProjectUpdateHttpError(error);
       }
 
-      return c.json({ apiKey: project.apiKey });
+      return c.json(projectResponse(project));
     },
   );
 
 secured
-  .access(requires("project:manage"))
-  .post(
-    "/:id/regenerate-api-key",
+  .access(requires("project:delete"))
+  .delete(
+    "/:id",
     projectServiceMiddleware,
-    describeRoute({ description: "Regenerate the project API key" }),
+    describeRoute(ARCHIVE_PROJECT),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
+      let project;
+      try {
+        project = await service.archive({
+          id,
+          organizationId: organization.id,
+        });
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError) {
+          throw new NotFoundError("Project not found");
+        }
+        if (
+          error instanceof PersonalProjectProtectedError ||
+          error instanceof GovernanceProjectProtectedError
+        ) {
+          throw new ForbiddenError(error.message);
+        }
+        throw error;
       }
 
-      const newApiKey = generateApiKey();
-      await prisma.project.update({
-        where: { id },
-        data: { apiKey: newApiKey },
+      return c.json({
+        id: project.id,
+        name: project.name,
+        archivedAt: project.archivedAt,
       });
-
-      return c.json({ apiKey: newApiKey });
     },
+  );
+
+// ── API Key management ───────────────────────────────────────────────────────
+
+function refuseLegacyProjectKeyApiToken(): never {
+  throw new ForbiddenError(
+    "A signed-in project administrator must manage the base API key in the browser",
+  );
+}
+
+secured
+  .access(anyAuthenticated())
+  .get(
+    "/:id/api-key",
+    describeRoute(GET_PROJECT_API_KEY),
+    refuseLegacyProjectKeyApiToken,
+  );
+
+secured
+  .access(anyAuthenticated())
+  .post(
+    "/:id/regenerate-api-key",
+    describeRoute(REGENERATE_PROJECT_API_KEY),
+    refuseLegacyProjectKeyApiToken,
   );
 
 export const app = secured.hono;

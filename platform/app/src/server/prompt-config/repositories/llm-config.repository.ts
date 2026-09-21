@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -100,13 +100,28 @@ export class LlmConfigRepository {
           },
           take: 1,
         },
-        _count: {
-          select: {
-            copiedPrompts: true,
-          },
-        },
       },
     });
+
+    // Do not fold this into a `_count` include on the query above: Prisma
+    // builds that as an uncorrelated join that aggregates the whole table on
+    // every call, which took seconds in production. One grouped count over
+    // the listed prompt ids returns the same numbers at index cost. It counts
+    // live copies only, the same set pushToCopies can reach.
+    const copyCounts =
+      configs.length > 0
+        ? await this.prisma.llmPromptConfig.groupBy({
+            by: ["copiedFromPromptId"],
+            where: {
+              copiedFromPromptId: { in: configs.map((config) => config.id) },
+              deletedAt: null,
+            },
+            _count: { _all: true },
+          })
+        : [];
+    const copiesByPromptId = new Map(
+      copyCounts.map((count) => [count.copiedFromPromptId, count._count._all]),
+    );
 
     // This is a quick and dirty way to handle the fact that some configs
     // may have been corrupted. They will have to be fixed manually.
@@ -126,6 +141,9 @@ export class LlmConfigRepository {
           const rawVersion = config.versions[0]!;
           return {
             ...config,
+            _count: {
+              copiedPrompts: copiesByPromptId.get(config.id) ?? 0,
+            },
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
               runtimeParameters: parseRuntimeParameters(

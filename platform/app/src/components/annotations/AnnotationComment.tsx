@@ -13,7 +13,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
@@ -21,7 +20,9 @@ import {
   type UseFormWatch,
   useForm,
 } from "react-hook-form";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
+import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
@@ -48,7 +49,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   const commentState = useAnnotationCommentStore();
   const { traceId, action, annotationId, expectedOutput } = commentState;
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const session = useSession();
 
@@ -103,6 +104,10 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     }
   }, [getAnnotation.data, action]);
 
+  const invalidateAnnotationReads = useAnnotationInvalidation({
+    traceId: traceId ?? "",
+  });
+
   const onSubmit = (data: Annotation) => {
     const filteredScoreOptions = Object.fromEntries(
       Object.entries(data.scoreOptions ?? {}).filter(
@@ -126,16 +131,13 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
             void queryClient.annotation.getAll.invalidate();
 
             toaster.create({
               title: "Annotation Updated",
               description: `You have successfully updated the annotation`,
               type: "success",
-              meta: {
-                closable: true,
-              },
             });
 
             reset();
@@ -147,9 +149,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Error",
               description: "Error updating annotation",
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           },
         },
@@ -165,15 +164,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
 
             toaster.create({
               title: "Annotation Created",
               description: `You have successfully created an annotation`,
               type: "success",
-              meta: {
-                closable: true,
-              },
             });
 
             reset();
@@ -184,9 +180,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Error",
               description: "Error creating annotation",
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           },
         },
@@ -202,15 +195,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       },
       {
         onSuccess: () => {
-          void queryClient.annotation.getByTraceId.invalidate();
+          invalidateAnnotationReads();
 
           toaster.create({
             title: "Annotation Deleted",
             description: `You have successfully deleted the annotation`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
           commentState.resetComment();
         },
@@ -303,7 +293,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                             handleDelete();
                           }}
                         >
-                          {deleteAnnotation.isLoading ||
+                          {deleteAnnotation.isPending ||
                           getAnnotation.isLoading ? (
                             <Spinner size="sm" />
                           ) : (
@@ -362,8 +352,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     minWidth="fit-content"
                     size="sm"
                     loading={
-                      createAnnotation.isLoading ||
-                      updateAnnotation.isLoading ||
+                      createAnnotation.isPending ||
+                      updateAnnotation.isPending ||
                       getAnnotation.isLoading
                     }
                   >

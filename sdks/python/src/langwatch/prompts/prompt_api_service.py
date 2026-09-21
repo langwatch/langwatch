@@ -39,6 +39,9 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body_
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body_outputs_item import (
     PostApiPromptsBodyOutputsItem,
 )
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body_parameters import (
+    PostApiPromptsBodyParameters,
+)
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body_scope import (
     PostApiPromptsBodyScope,
 )
@@ -57,6 +60,9 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
 )
 from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_outputs_item import (
     PutApiPromptsByIdBodyOutputsItem,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_parameters import (
+    PutApiPromptsByIdBodyParameters,
 )
 from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
     PutApiPromptsByIdResponse200,
@@ -302,7 +308,11 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
-                parameters=parameters if parameters is not None else UNSET,
+                parameters=(
+                    PostApiPromptsBodyParameters.from_dict(parameters)
+                    if parameters is not None
+                    else UNSET
+                ),
             ),
         )
         ok = unwrap_response(
@@ -379,7 +389,11 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
-                parameters=parameters if parameters is not None else UNSET,
+                parameters=(
+                    PutApiPromptsByIdBodyParameters.from_dict(parameters)
+                    if parameters is not None
+                    else UNSET
+                ),
             ),
         )
 

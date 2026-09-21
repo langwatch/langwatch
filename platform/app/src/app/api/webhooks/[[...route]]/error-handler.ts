@@ -1,7 +1,3 @@
-import {
-  WebhookEndpointNotFoundError,
-  WebhookEndpointValidationError,
-} from "@ee/webhooks/webhookEndpoint.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -9,7 +5,6 @@ import {
   canonicalErrorFor,
   requestTraceIds,
 } from "../../shared/canonical-error";
-import { apiErrorBody } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:webhooks:errors");
 
@@ -17,40 +12,18 @@ const logger = createLogger("langwatch:api:webhooks:errors");
  * Every refusal from the webhook platform leaves as the canonical envelope
  * (`~/app/api/shared/canonical-error`).
  *
- * The two domain errors are named here rather than left to the generic
- * status-derived mapping: `not_found` tells a caller nothing about WHICH
- * lookup missed, and an endpoint id is the only one these routes take.
+ * The surface's two domain failures carry their own codes because they are
+ * `HandledError`s (`@ee/webhooks/webhookEndpoint.service`), so the shared
+ * mapper names them without this boundary knowing they exist. That matters
+ * beyond tidiness: the codes registry guard only sees codes declared on
+ * handled errors, so a code named by hand here would be one nothing checks
+ * has customer-facing copy.
  */
 export const handleWebhookApiError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
   const trace = requestTraceIds(c);
-
-  const domain = ((): { status: ContentfulStatusCode; code: string } | null => {
-    if (error instanceof WebhookEndpointNotFoundError) {
-      return { status: 404, code: "webhook_endpoint_not_found" };
-    }
-    if (error instanceof WebhookEndpointValidationError) {
-      return { status: 400, code: "webhook_endpoint_invalid" };
-    }
-    return null;
-  })();
-
-  if (domain) {
-    return c.json(
-      apiErrorBody({
-        status: domain.status,
-        code: domain.code,
-        message:
-          error instanceof WebhookEndpointNotFoundError
-            ? "Webhook endpoint not found"
-            : error.message,
-        ...trace,
-      }),
-      domain.status,
-    );
-  }
 
   const { status, body } = canonicalErrorFor(error, trace);
   logger.error(

@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import type {
   ProjectedTopic,

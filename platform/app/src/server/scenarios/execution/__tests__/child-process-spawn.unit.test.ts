@@ -24,6 +24,8 @@ const mockLogger = vi.hoisted(() => ({
 vi.mock("fs", () => ({
   default: {
     existsSync: vi.fn(),
+    statSync: vi.fn(),
+    readdirSync: vi.fn(),
   },
 }));
 
@@ -39,6 +41,8 @@ const PACKAGE_ROOT = "/app/platform/app";
 describe("resolveChildProcessSpawn", () => {
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReset();
+    vi.mocked(fs.statSync).mockReset();
+    vi.mocked(fs.readdirSync).mockReset();
     mockLogger.info.mockReset();
     mockLogger.debug.mockReset();
     mockLogger.error.mockReset();
@@ -54,6 +58,7 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
       });
 
+      /** @scenario 'Processor spawns child process using the pre-compiled bundle in production' */
       it("invokes node with the path to the compiled bundle", () => {
         const result = resolveChildProcessSpawn({
           packageRoot: PACKAGE_ROOT,
@@ -62,7 +67,12 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(result.command).toBe("node");
         expect(result.args).toEqual([
-          path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+          path.join(
+            PACKAGE_ROOT,
+            "dist",
+            "server",
+            "scenario-child-process.cjs",
+          ),
         ]);
       });
 
@@ -85,7 +95,7 @@ describe("resolveChildProcessSpawn", () => {
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
             bundlePath: expect.stringContaining(
-              "dist/scenario-child-process.js",
+              "dist/server/scenario-child-process.cjs",
             ),
           }),
           expect.stringContaining("pre-compiled bundle"),
@@ -98,6 +108,7 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
       });
 
+      /** @scenario 'Processor falls back to tsx with loud logging when bundle is missing in production' */
       it("falls back to tsx instead of crashing", () => {
         const result = resolveChildProcessSpawn({
           packageRoot: PACKAGE_ROOT,
@@ -118,7 +129,12 @@ describe("resolveChildProcessSpawn", () => {
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
             bundlePath: expect.stringContaining(
-              path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+              path.join(
+                PACKAGE_ROOT,
+                "dist",
+                "server",
+                "scenario-child-process.cjs",
+              ),
             ),
           }),
           expect.stringContaining("NOT FOUND"),
@@ -133,14 +149,71 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.any(Object),
-          expect.stringContaining("build:scenario-child-process"),
+          expect.stringContaining("build:server"),
         );
       });
     });
   });
 
   describe("when NODE_ENV is development", () => {
+    const BUNDLE = path.join(
+      PACKAGE_ROOT,
+      "dist",
+      "server",
+      "scenario-child-process.cjs",
+    );
+
+    /**
+     * Bundle at `bundleMtimeMs`, one child source at `sourceMtimeMs`. Omitting
+     * the bundle mtime makes statSync throw for it, standing in for "not built".
+     */
+    const givenMtimes = ({
+      bundleMtimeMs,
+      sourceMtimeMs,
+    }: {
+      bundleMtimeMs?: number;
+      sourceMtimeMs: number;
+    }) => {
+      vi.mocked(fs.statSync).mockImplementation(((target: string) => {
+        if (target === BUNDLE) {
+          if (bundleMtimeMs === undefined) throw new Error("ENOENT");
+          return { mtimeMs: bundleMtimeMs };
+        }
+        return { mtimeMs: sourceMtimeMs };
+      }) as unknown as typeof fs.statSync);
+      vi.mocked(fs.readdirSync).mockImplementation((() => [
+        { name: "scenario-child-process.ts", isDirectory: () => false },
+      ]) as unknown as typeof fs.readdirSync);
+    };
+
+    it("invokes node with the bundle when it is newer than every child source", () => {
+      givenMtimes({ bundleMtimeMs: 2000, sourceMtimeMs: 1000 });
+
+      const result = resolveChildProcessSpawn({
+        packageRoot: PACKAGE_ROOT,
+        nodeEnv: "development",
+      });
+
+      expect(result.command).toBe("node");
+      expect(result.args).toEqual([BUNDLE]);
+    });
+
+    it("falls back to tsx when a child source is newer than the bundle", () => {
+      // The point of the fallback: an edit takes effect on the next spawn and
+      // never silently runs the previously built code.
+      givenMtimes({ bundleMtimeMs: 1000, sourceMtimeMs: 2000 });
+
+      expect(
+        resolveChildProcessSpawn({
+          packageRoot: PACKAGE_ROOT,
+          nodeEnv: "development",
+        }).command,
+      ).toBe("pnpm");
+    });
+
+    /** @scenario 'Processor spawns child process using tsx in development' */
     it("invokes pnpm exec tsx with the TypeScript source file", () => {
+      givenMtimes({ sourceMtimeMs: 1000 });
       const result = resolveChildProcessSpawn({
         packageRoot: PACKAGE_ROOT,
         nodeEnv: "development",

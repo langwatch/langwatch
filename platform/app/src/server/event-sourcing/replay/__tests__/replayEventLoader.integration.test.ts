@@ -5,6 +5,7 @@ import {
   stopTestContainers,
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
+import type { ReplayEvent } from "../replayEventLoader";
 import {
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,
@@ -12,8 +13,28 @@ import {
   discoverAffectedAggregates,
   getAggregateOccurredAtBounds,
   getBoundedCutoffs,
-  loadEventsForAggregatesBulk,
+  streamEventsForAggregatesBulk,
 } from "../replayEventLoader";
+
+/** Collect a streamed bulk load into per-aggregate-key event lists. */
+async function collectStreamedEvents(
+  params: Omit<Parameters<typeof streamEventsForAggregatesBulk>[0], "onEvent">,
+): Promise<Map<string, ReplayEvent[]>> {
+  const grouped = new Map<string, ReplayEvent[]>();
+  await streamEventsForAggregatesBulk({
+    ...params,
+    onEvent: (event) => {
+      const key = `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`;
+      let list = grouped.get(key);
+      if (!list) {
+        list = [];
+        grouped.set(key, list);
+      }
+      list.push(event);
+    },
+  });
+  return grouped;
+}
 
 describe("replayEventLoader", () => {
   let tenantId: string;
@@ -631,7 +652,7 @@ describe("replayEventLoader", () => {
         expect(cutoffs.has(`${tenantId}:test:agg-2`)).toBe(false);
       });
 
-      it("loadEventsForAggregatesBulk excludes events outside the bounds", async () => {
+      it("streamEventsForAggregatesBulk excludes events outside the bounds", async () => {
         const client = getTestClickHouseClient()!;
         const cutoffs = await batchGetCutoffEventIds({
           client,
@@ -640,10 +661,11 @@ describe("replayEventLoader", () => {
           eventTypes: ["test.event"],
         });
 
-        const bounded = await loadEventsForAggregatesBulk({
+        const bounded = await collectStreamedEvents({
           client,
           tenantId,
           aggregateIds: ["agg-1", "agg-2"],
+          eventTypes: ["test.event"],
           cutoffs,
           occurredAtBounds: narrowBounds,
         });
@@ -655,7 +677,7 @@ describe("replayEventLoader", () => {
       });
     });
 
-    it("loadEventsForAggregatesBulk returns the same events as unbounded", async () => {
+    it("streamEventsForAggregatesBulk returns the same events as unbounded", async () => {
       const client = getTestClickHouseClient()!;
       const bounds = await getAggregateOccurredAtBounds({
         client,
@@ -671,17 +693,19 @@ describe("replayEventLoader", () => {
         occurredAtBounds: bounds!,
       });
 
-      const bounded = await loadEventsForAggregatesBulk({
+      const bounded = await collectStreamedEvents({
         client,
         tenantId,
         aggregateIds: ["agg-1", "agg-2"],
+        eventTypes: ["test.event"],
         cutoffs,
         occurredAtBounds: bounds!,
       });
-      const unbounded = await loadEventsForAggregatesBulk({
+      const unbounded = await collectStreamedEvents({
         client,
         tenantId,
         aggregateIds: ["agg-1", "agg-2"],
+        eventTypes: ["test.event"],
         cutoffs,
       });
 

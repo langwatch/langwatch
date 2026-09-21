@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";

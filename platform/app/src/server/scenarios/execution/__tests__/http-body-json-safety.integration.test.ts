@@ -107,6 +107,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
       url: srv.url,
       method: "POST",
       headers: [],
+      secrets: {},
       outputPath: "$.choices[0].message.content",
       ...overrides,
     };
@@ -127,12 +128,12 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
     describe("when the adapter calls the webhook", () => {
       /** @scenario Adapter posts a parseable body to a real HTTP endpoint */
       it("sends a body the server can JSON-parse (no HTTP 422)", async () => {
-        const adapter = new SerializedHttpAgentAdapter(
-          config({
+        const adapter = new SerializedHttpAgentAdapter({
+          config: config({
             bodyTemplate:
               '{"chatInput": "{{ input }}", "sessionId": "{{ threadId }}"}',
           }),
-        );
+        });
         const awkward =
           'Please summarize:\n\n"Q3 results"\nwith a path C:\\reports\\q3';
 
@@ -150,12 +151,12 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
   describe("given the default thread_id + messages template", () => {
     describe("when a turn contains newlines and quotes", () => {
       it("still posts a parseable body", async () => {
-        const adapter = new SerializedHttpAgentAdapter(
-          config({
+        const adapter = new SerializedHttpAgentAdapter({
+          config: config({
             bodyTemplate:
               '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
           }),
-        );
+        });
 
         await adapter.call(input('line\nbreak and a "quote"'));
 

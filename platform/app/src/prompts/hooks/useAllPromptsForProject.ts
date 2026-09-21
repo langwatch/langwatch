@@ -14,6 +14,10 @@ export function useAllPromptsForProject() {
     },
     {
       enabled: !!projectId,
+      // The prompt catalog is regularly the slowest query on a screen, and
+      // in a batched request every sibling call waits for the slowest
+      // member. This one travels alone so it cannot hold anything else up.
+      trpc: { context: { skipBatch: true } },
     },
   );
 }

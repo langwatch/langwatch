@@ -93,7 +93,7 @@ export class TraceAnalyticsRollupClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: row.tenantId,
           error: error instanceof Error ? error.message : String(error),
@@ -141,7 +141,7 @@ export class TraceAnalyticsRollupClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           count: rows.length,
           error: error instanceof Error ? error.message : String(error),

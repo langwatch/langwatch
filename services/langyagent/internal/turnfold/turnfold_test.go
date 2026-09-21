@@ -69,6 +69,90 @@ func TestAccumulator_AssemblesToolCallsInOrder(t *testing.T) {
 	}
 }
 
+// The local marker of an end frame survives into the durable tool call, and a
+// sandbox call carries none.
+func TestAccumulator_KeepsTheLocalMarker(t *testing.T) {
+	acc := New()
+	for _, f := range []frames.Frame{
+		ff(frames.ToolStart("a", "bash", "", "", nil)),
+		ff(frames.ToolEndLocal("a", "bash", nil, false, "pushed", 0)),
+		ff(frames.ToolStart("b", "bash", "", "", nil)),
+		ff(frames.ToolEnd("b", "bash", nil, false, "ok", 0)),
+	} {
+		acc.Observe(f)
+	}
+	_, tools := acc.Result()
+	if len(tools) != 2 {
+		t.Fatalf("expected two tool calls, got %d", len(tools))
+	}
+	if !tools[0].Local {
+		t.Errorf("the folder call must keep its local marker: %+v", tools[0])
+	}
+	if tools[1].Local {
+		t.Errorf("the sandbox call must carry no local marker: %+v", tools[1])
+	}
+}
+
+func TestAccumulator_DropsPreToolNarration(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Running the analytics query now…")),
+		ff(frames.ToolStart("a", "run", "", "", nil)),
+		ff(frames.ToolEnd("a", "run", nil, false, "ok", 0)),
+		ff(frames.Delta("p95 latency doubled yesterday.")),
+	)
+	text, _ := acc.Result()
+	if text != "p95 latency doubled yesterday." {
+		t.Errorf("text = %q, want only the post-tool answer", text)
+	}
+}
+
+// Whitespace is not an answer. A model that emits a stray newline after its
+// last tool call has said nothing, so the fold must treat it the same as
+// silence and fall back — otherwise the user's reply becomes "\n  \n".
+func TestAccumulator_KeepsFullTextWhenPostToolDeltaIsBlank(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Annotation added.")),
+		ff(frames.ToolStart("a", "annotate", "", "", nil)),
+		ff(frames.ToolEnd("a", "annotate", nil, false, "ok", 0)),
+		ff(frames.Delta("\n  \n")),
+	)
+	text, _ := acc.Result()
+	if text != "Annotation added." {
+		t.Errorf("text = %q, want full concatenation fallback", text)
+	}
+}
+
+// The post-tool segment usually opens with the newline that separated it from
+// the tool call. That leading whitespace is an artifact of the stream, not part
+// of the answer, and it renders as a blank line at the top of the reply.
+func TestAccumulator_TrimsLeadingWhitespaceFromPostToolAnswer(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.ToolStart("a", "run", "", "", nil)),
+		ff(frames.ToolEnd("a", "run", nil, false, "ok", 0)),
+		ff(frames.Delta("\n\np95 doubled.")),
+	)
+	text, _ := acc.Result()
+	if text != "p95 doubled." {
+		t.Errorf("text = %q, want the leading newlines trimmed", text)
+	}
+}
+
+func TestAccumulator_KeepsFullTextWhenSilentAfterLastTool(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Annotation added.")),
+		ff(frames.ToolStart("a", "annotate", "", "", nil)),
+		ff(frames.ToolEnd("a", "annotate", nil, false, "ok", 0)),
+	)
+	text, _ := acc.Result()
+	if text != "Annotation added." {
+		t.Errorf("text = %q, want full concatenation fallback", text)
+	}
+}
+
 func TestAccumulator_IgnoresNonAccumulatingFrames(t *testing.T) {
 	acc := New()
 	feed(acc,

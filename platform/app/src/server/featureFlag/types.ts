@@ -1,27 +1,39 @@
 import type { FeatureFlagKey } from "./registry";
+import type { FeatureFlagTargetId } from "./targeting";
 
 /**
  * Options for evaluating a single feature flag.
  *
- * `distinctId` is the only required field — every flag resolution
- * needs an identity to evaluate against (PostHog user targeting,
- * audit log, cache key salting). The rest are optional knobs.
+ * `distinctId` identifies the caller (audit log, cache key salting).
+ * `projectId` and `organizationId` are the targeting identity of the
+ * read and are both required: a targeting rule that names a scope the
+ * read left out can never match, so leaving one out turns a rollout
+ * into a silent no-op. A caller with no such scope passes
+ * `NOT_TARGETED`.
  */
 export interface FeatureFlagEvaluateOptions {
   distinctId: string;
+  /**
+   * The signed-in user's email, for an email domain targeting rule. Only a
+   * read made on behalf of a session passes it; a job, an API key or a
+   * sign-up leaves it out, and no domain rule can match that read. Typed to
+   * take the session's own field as is.
+   */
+  userEmail?: string | null;
   /**
    * Overrides the registry default for unregistered keys (registered
    * flags always use their `defaultValue` from `registry.ts`).
    */
   defaultValue?: boolean;
-  projectId?: string;
-  organizationId?: string;
+  /** The project this read is about, or `NOT_TARGETED`. */
+  projectId: FeatureFlagTargetId;
+  /** The organization this read is about, or `NOT_TARGETED`. */
+  organizationId: FeatureFlagTargetId;
   /**
    * Override the cache TTL (ms) for this evaluation. Used by hot-path
-   * callers (kill switches checked per span/event) to avoid stampeding
-   * PostHog with one /flags request per cache key per 5 seconds when
-   * local evaluation is unavailable. Falls back to the service default
-   * when omitted.
+   * callers (kill switches checked per span/event) to control how
+   * often the backing store is re-queried. Falls back to the service
+   * default when omitted.
    */
   cacheTtlMs?: number;
 }
@@ -31,10 +43,10 @@ export interface FeatureFlagEvaluateOptions {
  *
  * `flagKey` is `FeatureFlagKey` so every call site is forced to use a
  * registered key — the whole point of moving flags off PostHog onto
- * env + postgres. The legacy PostHog and memory implementations widen
- * the parameter to `string` internally to keep handling arbitrary keys
- * at runtime (back-compat fallback for flags not yet migrated), which
- * is allowed because method parameters are bivariant in class
+ * env + postgres. The legacy memory implementation widens the
+ * parameter to `string` internally to keep handling arbitrary keys at
+ * runtime (back-compat fallback for flags not yet migrated), which is
+ * allowed because method parameters are bivariant in class
  * implementations. New callers must register the flag first.
  */
 export interface FeatureFlagServiceInterface {

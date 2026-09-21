@@ -234,10 +234,10 @@ describe("CLI E2E", () => {
           const tagName = createUniqueTagName();
           await langwatch.prompts.tags.create({ name: tagName });
 
-          const result = await cli.runInteractive(
-            `prompt tag delete ${tagName}`,
-            [tagName],
-          );
+          const result = await cli.runInteractive({
+            command: `prompt tag delete ${tagName}`,
+            inputs: [tagName],
+          });
 
           expectCliResultSuccess(result);
           expect(result.output).toContain("Deleted tag:");
@@ -253,10 +253,10 @@ describe("CLI E2E", () => {
           await langwatch.prompts.tags.create({ name: tagName });
 
           try {
-            const result = await cli.runInteractive(
-              `prompt tag delete ${tagName}`,
-              ["wrong-name"],
-            );
+            const result = await cli.runInteractive({
+              command: `prompt tag delete ${tagName}`,
+              inputs: ["wrong-name"],
+            });
 
             expect(result.success).toBe(true);
             expect(result.output).toContain("Aborted");
@@ -294,10 +294,10 @@ describe("CLI E2E", () => {
             const initResult = cli.run("prompt init");
             expectCliResultSuccess(initResult);
 
-            const addResult = await cli.runInteractive(
-              `prompt add ${handle}@latest`,
-              ["y"],
-            );
+            const addResult = await cli.runInteractive({
+              command: `prompt add ${handle}@latest`,
+              inputs: ["y"],
+            });
             expectCliResultSuccess(addResult);
 
             const pullResult = cli.run(`prompt pull --tag ${tagName}`);

@@ -15,7 +15,7 @@
 - **Plugin architecture.** `LLMPlugin` interface with `PreLLMHook` / `PostLLMHook` / streaming chunk hook is the foundation our guardrail system runs on. We call `guardrail-check` over HTTP rather than using their dynamic `.so` plugin loader (we're already in Go, no need for the .so machinery).
 - **MCP gateway (tool discovery, approval controls, OAuth).** Confirms "gateway that speaks MCP" is a valid product direction. Our MCP handling is narrower for v1: regex-based `policy_rules.mcp` allow/deny at the gateway. Full MCP orchestration (approval workflow, OAuth, custom hosting) is post-v1.
 - **Observability via Prometheus + OpenTelemetry.** We copy this shape 1:1. `/metrics` for Prometheus, OTLP exporter with `langwatch.project_id` routing.
-- **Enterprise features: adaptive load balancing, HA clustering, IdP integration, RBAC, audit logs, VPC deployments.** LangWatch already has SSO/SCIM/RBAC/audit. VPC deployment = our helm chart. Adaptive load balancing = our fallback chain + circuit breaker. HA clustering = horizontal scale + shared Redis L2 auth cache.
+- **Enterprise features: adaptive load balancing, HA clustering, IdP integration, RBAC, audit logs, VPC deployments.** LangWatch already has SSO/SCIM/RBAC/audit. VPC deployment = our helm chart. Adaptive load balancing = our fallback chain + circuit breaker. HA clustering = horizontal scale, each pod stateless with its own auth cache.
 
 ### What we reject or defer
 

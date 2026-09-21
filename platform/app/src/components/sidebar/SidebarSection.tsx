@@ -1,7 +1,8 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@chakra-ui/react";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 
+import { SideMenuSectionLabel } from "./SideMenuSectionLabel";
 import { useSidebarSectionState } from "./useSidebarSectionState";
 
 export { getSidebarSectionStorageKey } from "./useSidebarSectionState";
@@ -13,6 +14,8 @@ type SidebarSectionProps = {
   showExpanded: boolean;
   defaultExpanded?: boolean;
   projectId?: string;
+  /** The `data-tour` target the guided tour spotlights: the label and the items together. */
+  tourId?: string;
 };
 
 export const SidebarSection = ({
@@ -22,6 +25,7 @@ export const SidebarSection = ({
   showExpanded,
   defaultExpanded = true,
   projectId,
+  tourId,
 }: SidebarSectionProps) => {
   const { isExpanded, toggleSection } = useSidebarSectionState({
     id,
@@ -31,7 +35,7 @@ export const SidebarSection = ({
   });
 
   return (
-    <VStack width="full" gap={0.5} align="start">
+    <VStack width="full" gap={0.5} align="start" data-tour={tourId}>
       <SidebarSectionToggle
         isExpanded={isExpanded}
         label={label}
@@ -78,16 +82,7 @@ const SidebarSectionToggle = ({
         color="gray.500"
         _hover={{ color: "nav.fg" }}
       >
-        {showExpanded && (
-          <Text
-            fontSize="11px"
-            fontWeight="medium"
-            textTransform="uppercase"
-            whiteSpace="nowrap"
-          >
-            {label}
-          </Text>
-        )}
+        {showExpanded && <SideMenuSectionLabel label={label} />}
         {!isExpanded && (
           <Box opacity={0.5} display="flex">
             <ChevronRight size={13} aria-hidden="true" />

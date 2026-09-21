@@ -13,7 +13,7 @@
  * `GatewayConfigPayload.revision` so operators see the same shape whether
  * they're inspecting bundles or audit rows.
  */
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 
 export function serializeRowForAudit<T extends Record<string, unknown>>(
   row: T,

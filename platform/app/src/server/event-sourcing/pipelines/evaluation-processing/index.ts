@@ -12,8 +12,6 @@ export type { EvaluationProcessingPipelineDeps } from "./pipeline";
 export { createEvaluationProcessingPipeline } from "./pipeline";
 // Projections
 export * from "./projections";
-// Repositories
-export * from "./repositories";
 // Schemas
 export * from "./schemas/commands";
 export * from "./schemas/constants";

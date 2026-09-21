@@ -1,7 +1,6 @@
-import type { Project } from "@prisma/client";
 import { z } from "zod";
+import type { Project } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission } from "../rbac";
 
 export const costsRouter = createTRPCRouter({
   getAggregatedCostsForOrganization: protectedProcedure
@@ -12,7 +11,7 @@ export const costsRouter = createTRPCRouter({
         endDate: z.number(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const { startDate, endDate } = input;
       const prisma = ctx.prisma;
@@ -25,6 +24,11 @@ export const costsRouter = createTRPCRouter({
 
       const userProjects = await prisma.project.findMany({
         where: {
+          // Pulled provider cost is STORED under the org's governance project
+          // but OWNED by a team or the org (ADR-128), so dropping the home
+          // here hides a row members must never see without hiding the money
+          // — that reaches this view under its own scope.
+          kind: { not: "internal_governance" },
           OR: [
             {
               team: {

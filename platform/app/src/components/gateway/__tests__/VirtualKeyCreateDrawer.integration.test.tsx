@@ -11,11 +11,12 @@
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useTourRegistry } from "~/features/guided-onboarding/tour/tourRegistry";
 import { VirtualKeyCreateDrawer } from "../VirtualKeyCreateDrawer";
 
 const ORG_ID = "org-acme";
@@ -41,12 +42,25 @@ type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } =
-  vi.hoisted(() => ({
-    createMutateAsync: vi.fn(),
-    applicableBudgetsData: { rows: [] as ApplicableBudget[] },
-    capturedApplicableInputs: [] as unknown[],
-  }));
+const {
+  createMutateAsync,
+  createMutationOptions,
+  listInvalidate,
+  guidedStateInvalidate,
+  applicableBudgetsData,
+  capturedApplicableInputs,
+  recordVirtualKeyReveal,
+} = vi.hoisted(() => ({
+  createMutateAsync: vi.fn(),
+  recordVirtualKeyReveal: vi.fn(async () => undefined),
+  guidedStateInvalidate: vi.fn(async () => undefined),
+  createMutationOptions: {
+    current: null as { onSuccess?: (result: unknown) => unknown } | null,
+  },
+  listInvalidate: vi.fn(async () => undefined),
+  applicableBudgetsData: { rows: [] as ApplicableBudget[] },
+  capturedApplicableInputs: [] as unknown[],
+}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -75,18 +89,42 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       virtualKeys: {
-        list: { invalidate: async () => undefined },
+        list: {
+          invalidate: listInvalidate,
+          getData: () => listedKeys,
+        },
         applicableBudgets: { invalidate: async () => undefined },
       },
+      onboarding: {
+        getGuidedState: { invalidate: guidedStateInvalidate },
+      },
     }),
-    virtualKeys: {
-      create: {
+    onboarding: {
+      recordVirtualKeyReveal: {
         useMutation: () => ({
-          mutateAsync: createMutateAsync,
+          mutateAsync: recordVirtualKeyReveal,
           isPending: false,
         }),
+      },
+    },
+    virtualKeys: {
+      create: {
+        /* like react-query, mutateAsync settles only once onSuccess has */
+        useMutation: (options: {
+          onSuccess?: (result: unknown) => unknown;
+        }) => {
+          createMutationOptions.current = options;
+          return {
+            mutateAsync: async (input: unknown) => {
+              const result = await createMutateAsync(input);
+              await options.onSuccess?.(result);
+              return result;
+            },
+            isPending: false,
+          };
+        },
       },
       applicableBudgets: {
         useQuery: (input: unknown, opts?: { enabled?: boolean }) => {
@@ -150,17 +188,21 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+let listedKeys: { name: string }[] = [];
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderDrawer = () =>
+const renderDrawer = (
+  onCreated: (created: unknown) => void = () => undefined,
+) =>
   render(
     <VirtualKeyCreateDrawer
       organizationId={ORG_ID}
       open
       onOpenChange={() => undefined}
-      onCreated={() => undefined}
+      onCreated={onCreated}
     />,
     { wrapper: Wrapper },
   );
@@ -184,9 +226,176 @@ describe("given the new-virtual-key drawer", () => {
     });
     applicableBudgetsData.rows = [];
     capturedApplicableInputs.length = 0;
+    listedKeys = [];
+    listInvalidate.mockReset();
+    listInvalidate.mockResolvedValue(undefined);
+    createMutationOptions.current = null;
+    recordVirtualKeyReveal.mockReset();
+    recordVirtualKeyReveal.mockResolvedValue(undefined);
+    guidedStateInvalidate.mockClear();
   });
 
   afterEach(() => cleanup());
+
+  describe("when the guided tour types the key name", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const typeThroughTheTour = (wanted: string) => {
+      act(() => {
+        useTourRegistry.getState().actions.typeVirtualKeyName?.(wanted);
+      });
+      act(() => vi.advanceTimersByTime(60 * (wanted.length + 3)));
+      return (
+        screen.getByPlaceholderText("e.g. codex-prod") as HTMLInputElement
+      ).value;
+    };
+
+    /** @scenario a replay of the gateway tour never mints a duplicate key name */
+    it("types the wanted name when no listed key carries it", () => {
+      listedKeys = [{ name: "staging-app" }];
+      renderDrawer();
+      expect(typeThroughTheTour("production-app")).toBe("production-app");
+    });
+
+    /** @scenario a replay of the gateway tour never mints a duplicate key name */
+    it("types the first free suffix when the name is already taken", () => {
+      listedKeys = [{ name: "production-app" }, { name: "production-app-2" }];
+      renderDrawer();
+      expect(typeThroughTheTour("production-app")).toBe("production-app-3");
+    });
+  });
+
+  describe("when the guided tour submits the key", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const submitThroughTheTour = () => {
+      act(() => {
+        useTourRegistry
+          .getState()
+          .actions.typeVirtualKeyName?.("production-app");
+      });
+      act(() => vi.advanceTimersByTime(60 * 20));
+      let request: Promise<void> | undefined;
+      act(() => {
+        request = useTourRegistry.getState().actions.submitVirtualKeyCreate?.();
+      });
+      return request;
+    };
+
+    /** @scenario the submit action reports when the create has answered */
+    it("hands back the create request, settled once the secret is handed over", async () => {
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      expect(request).toBeInstanceOf(Promise);
+      expect(onCreated).not.toHaveBeenCalled();
+      await act(async () => {
+        await request;
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+    });
+
+    /** @scenario the tour's key is recorded for Langy by its reveal id */
+    it("asks the create for a one-time reveal and records it on the guided state", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(lastCreateInput()).toMatchObject({ revealOnce: true });
+      expect(recordVirtualKeyReveal).toHaveBeenCalledWith({
+        organizationId: ORG_ID,
+        name: "production-app",
+        preview: "vk-lw-01HZX9N",
+        revealId: "rvl_abc",
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+    });
+
+    /** @scenario the tour's action settles once the key is recorded */
+    it("settles the tour action only after the record landed, then refreshes the guided state", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      let recorded: () => void = () => undefined;
+      recordVirtualKeyReveal.mockReturnValue(
+        new Promise<undefined>((resolve) => {
+          recorded = () => resolve(undefined);
+        }),
+      );
+      renderDrawer(vi.fn());
+      let settled = false;
+      const request = Promise.resolve(submitThroughTheTour()).then(() => {
+        settled = true;
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(recordVirtualKeyReveal).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+      expect(guidedStateInvalidate).not.toHaveBeenCalled();
+
+      recorded();
+      await act(async () => {
+        await request;
+      });
+      expect(settled).toBe(true);
+      expect(guidedStateInvalidate).toHaveBeenCalledWith({
+        organizationId: ORG_ID,
+      });
+    });
+
+    it("still hands the secret to the dialog when the record fails", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      recordVirtualKeyReveal.mockRejectedValue(new Error("offline"));
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+      expect(guidedStateInvalidate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario the secret shows as soon as the create answers */
+    it("hands the secret over while the key list is still refreshing", async () => {
+      listInvalidate.mockReturnValue(new Promise<undefined>(() => undefined));
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(listInvalidate).toHaveBeenCalledWith({ organizationId: ORG_ID });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+    });
+  });
 
   describe("when it opens for the current project", () => {
     /** @scenario The drawer states where this key's traces and costs will land */
@@ -387,9 +596,9 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      // Unticking All starts from everything selected; narrowing is one
-      // uncheck away.
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
+      // Unchecking "All providers" clears the selection; pick one provider to
+      // narrow the key to exactly it.
+      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
@@ -403,9 +612,9 @@ describe("given the new-virtual-key drawer", () => {
     it("refuses to save and says why", async () => {
       renderDrawer();
 
+      // Unchecking "All providers" clears the selection, so no provider is
+      // picked and the drawer refuses the save.
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
       expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(
@@ -508,6 +717,134 @@ describe("given the new-virtual-key drawer", () => {
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
       expect(lastCreateInput().routingMode).toBe("POLICY");
       expect(lastCreateInput().routingPolicyId).toBe("policy-eu");
+    });
+  });
+
+  describe("when the expiration is left alone", () => {
+    /** @scenario "The drawer offers an expiration and defaults to never" */
+    it("says the key never expires and sends no date", async () => {
+      renderDrawer();
+
+      expect(
+        (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
+      ).toBe("");
+      expect(
+        screen.getByTestId("vk-expiration-resolved").textContent,
+      ).toContain("This key never expires");
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect(lastCreateInput().expiresAt).toBeUndefined();
+    });
+  });
+
+  describe("when a period is picked", () => {
+    /** @scenario "Picking a period states the date the key stops working" */
+    it("states the resolved date and sends it with the key", async () => {
+      renderDrawer();
+
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "7",
+      );
+
+      const expected = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("vk-expiration-resolved").textContent,
+        ).toContain(
+          expected.toLocaleDateString("en-US", {
+            weekday: "short",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            timeZone: "UTC",
+          }),
+        );
+      });
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      const sent = lastCreateInput().expiresAt as Date;
+      // Within a minute of seven days out: the drawer resolves the period
+      // as the person picks it, not as the request is built.
+      expect(Math.abs(sent.getTime() - expected.getTime())).toBeLessThan(
+        60_000,
+      );
+    });
+  });
+
+  describe("when a custom date is picked", () => {
+    /** @scenario "A custom date expires the key at the end of that day" */
+    it("keeps the key working for the whole of that day", async () => {
+      renderDrawer();
+
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+      const dateInput = await screen.findByTestId("vk-expiration-date");
+      await userEvent.type(dateInput, "2030-08-20");
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect((lastCreateInput().expiresAt as Date).toISOString()).toBe(
+        "2030-08-20T23:59:59.999Z",
+      );
+    });
+
+    it("holds the save until a date is actually typed", async () => {
+      renderDrawer();
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      });
+      expect(createMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the server refuses the date", () => {
+    /** @scenario "An expiration date in the past is refused" */
+    it("paints the complaint under the expiration field", async () => {
+      createMutateAsync.mockRejectedValueOnce({
+        data: {
+          error: {
+            code: "virtual_key_expiry_in_past",
+            httpStatus: 400,
+            meta: {
+              fieldErrors: { expiresAt: ["Pick a date in the future"] },
+            },
+          },
+        },
+      });
+      renderDrawer();
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+      await userEvent.type(
+        await screen.findByTestId("vk-expiration-date"),
+        "2030-08-20",
+      );
+      await submit();
+
+      await waitFor(() => {
+        expect(screen.getByText("Pick a date in the future")).toBeTruthy();
+      });
     });
   });
 });

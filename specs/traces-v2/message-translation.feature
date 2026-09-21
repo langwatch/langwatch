@@ -51,24 +51,33 @@ Feature: Message translation in the trace details drawer
       When the user clicks the action again before it finishes
       Then no additional translation requests are made
 
-  Rule: Conversation tab turns
+  Rule: Conversation tab messages
 
-    Scenario: Per-turn Translate action in the hover action row
+    Each message carries its own Translate in the boxed action cluster, so a
+    reader flips exactly the side they cannot read. The cluster is part of
+    reading a conversation, so it is offered and behaves the same in both
+    places a conversation is read: the drawer's Conversation tab, and the
+    annotation queue.
+
+    @integration
+    Scenario: Each message translates independently
       Given the trace drawer is open on the Conversation tab
-      When the user hovers a turn
-      Then the turn's action row shows a "Translate" action
-      And clicking it translates that turn's user and assistant bubbles
+      When the user translates a turn's user message
+      Then that message shows its translation
+      And the turn's reply stays untranslated until translated on its own
 
-    Scenario: Translate action does not require annotation permissions
+    @integration
+    Scenario: Translate does not require annotation permissions
       Given the user lacks "annotations:manage"
-      When they hover a turn
-      Then the action row still shows the "Translate" action
+      When they hover a message
+      Then its cluster still shows the "Translate" action
       And the annotation actions stay hidden
 
-    Scenario: Toggling a translated turn back
-      Given a turn is showing its translation
-      When the user clicks the turn's "Translate" action again
-      Then the original bubbles are restored without a network request
+    @integration
+    Scenario: Toggling a translated message back
+      Given a message is showing its translation
+      When the user clicks its "Translate" action again
+      Then the original text is restored without a network request
 
   Rule: Conversation Context panel
 

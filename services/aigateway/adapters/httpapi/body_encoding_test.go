@@ -391,7 +391,7 @@ func TestRouter_PeekLane_CompressionBombPastThePeekWindow(t *testing.T) {
 func TestRouter_GeminiPassthrough_DecodesBodyAndDropsEncodingHeader(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 	var got *domain.Request

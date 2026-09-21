@@ -1,4 +1,4 @@
-import type { PrismaClient, ShareLink } from "@prisma/client";
+import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import type {
   CreateShareLinkParams,
   ShareRepository,
@@ -113,20 +113,35 @@ export class PrismaShareRepository implements ShareRepository {
     projectId: string;
     maxViews: number | null;
   }): Promise<boolean> {
-    // updateMany (not update) so the where clause can carry projectId — the
-    // multitenancy guard rejects writes scoped only by primary key — and so
-    // the view-cap condition rides in the same atomic statement: concurrent
-    // opens of a capped link race on the row lock, and the loser matches
-    // zero rows instead of over-consuming.
-    const result = await this.prisma.shareLink.updateMany({
-      where: {
-        id,
-        projectId,
-        ...(maxViews != null ? { viewCount: { lt: maxViews } } : {}),
-      },
-      data: { viewCount: { increment: 1 } },
-    });
-    return result.count > 0;
+    // `update` with the cap in its (filtered-unique) where, NOT `updateMany`:
+    // Prisma 7's compiler splits a conditional `updateMany` into a SELECT of
+    // matching ids and an UPDATE keyed on those ids alone — the cap condition
+    // does not ride the UPDATE, so concurrent opens of a capped link all
+    // increment past it (read-then-write, not compare-and-swap). `update`
+    // keeps its full filter on the UPDATE statement, where Postgres
+    // re-evaluates it after the lock wait: the loser matches zero rows and
+    // surfaces as P2025 instead of over-consuming. The projectId predicate is
+    // the tenancy fence, same as every other query here.
+    try {
+      await this.prisma.shareLink.update({
+        where: {
+          id,
+          projectId,
+          ...(maxViews != null ? { viewCount: { lt: maxViews } } : {}),
+        },
+        data: { viewCount: { increment: 1 } },
+      });
+      return true;
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "P2025"
+      ) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async deleteById({

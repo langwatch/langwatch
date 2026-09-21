@@ -6,11 +6,7 @@ description: Filter which spans are exported to LangWatch using presets or expli
 keywords: langwatch, typescript, javascript, filtering, spans, traces, observability, presets, criteria, DSL
 ---
 
-You don’t need every span. Filter out the noise and ship the useful bits. LangWatch lets you keep AI and business spans while dropping framework chatter.
-
-<Info>
-Introduced in `langwatch@0.8.0`.
-</Info>
+A trace filter decides which spans the LangWatch exporter sends. Use filters to keep AI and business spans while dropping framework chatter.
 
 ## Defaults
 
@@ -167,5 +163,5 @@ import type { TraceFilter, Criteria, Match } from "langwatch";
 ```
 
 <Tip>
-Use simple matchers (`equals`, `startsWith`) where possible; regex is powerful but slower and harder to read.
+Use simple matchers (`equals`, `startsWith`) where possible; regex matches more patterns but is slower and harder to read.
 </Tip>

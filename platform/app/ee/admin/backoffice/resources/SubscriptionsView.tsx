@@ -13,7 +13,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PlanTypes, SubscriptionStatus } from "@prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -21,6 +20,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { PlanTypes, SubscriptionStatus } from "~/generated/prisma/client";
 import {
   BackofficeTable,
   dateInputToISO,
@@ -348,7 +348,6 @@ function SubscriptionDrawer({
         title: "Organization is required",
         type: "error",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -370,7 +369,6 @@ function SubscriptionDrawer({
           mode === "edit" ? "Subscription updated" : "Subscription created",
         type: "success",
         duration: 3000,
-        meta: { closable: true },
       });
       onClose();
     };

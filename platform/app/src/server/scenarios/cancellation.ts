@@ -2,19 +2,23 @@
  * Scenario run cancellation logic.
  *
  * Uses event-sourcing for cancellation: dispatches cancel_requested events
- * which are processed by the pipeline (fold projection + reactor). The
- * reactor broadcasts to all workers via Redis pub/sub. Each worker checks
- * if it owns the scenario and kills its child process.
+ * which are processed by the simulationRunExecution process manager
+ * (ADR-052). The process manager publishes the cancellation to all workers
+ * via Redis pub/sub (outbox-durable, with retries); each worker checks if it
+ * owns the scenario and kills its child process. A cancel-grace wake
+ * force-terminates the run if no worker ever confirms.
  *
  * - Active jobs: killed by the worker that owns the child process
- * - Queued jobs: cancelled immediately via finished(CANCELLED) event
- *   (no worker will ever execute them)
+ * - Queued jobs: finished CANCELLED straight away rather than waiting out the
+ *   grace window. They are still broadcast: a run is submitted to the pool
+ *   when it is queued, so it may be buffered behind a busy slot, and the
+ *   broadcast is what stops the pool spawning it.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
 import { createLogger } from "@langwatch/observability";
-import { isCancellableStatus, ScenarioRunStatus } from "./scenario-event.enums";
+import { isCancellableStatus } from "./scenario-event.enums";
 import type { ScenarioRunData } from "./scenario-event.types";
 
 const logger = createLogger("langwatch:scenarios:cancellation");
@@ -60,44 +64,30 @@ export interface CancellationServiceDeps {
     scenarioRunId: string;
     occurredAt: number;
   }) => Promise<void>;
-  /** Dispatch a finished event with CANCELLED status. Used for queued jobs that no worker will pick up. */
-  dispatchFinishRun: (params: {
-    tenantId: string;
-    scenarioRunId: string;
-    status: string;
-    occurredAt: number;
-  }) => Promise<void>;
 }
-
-/** Statuses that are queued but not yet picked up by a worker. */
-const QUEUED_STATUSES = new Set<string>([
-  ScenarioRunStatus.QUEUED,
-  ScenarioRunStatus.PENDING,
-]);
 
 /**
  * Service responsible for cancelling scenario runs via event-sourcing.
  *
- * Dispatches cancel_requested events. The pipeline reactor broadcasts
- * to workers, and the worker owning the scenario kills its child process.
+ * Dispatches cancel_requested events. The simulationRunExecution process
+ * manager publishes the cancellation to workers, and the worker owning the
+ * scenario kills its child process.
  */
 export class ScenarioCancellationService {
   private readonly getRunsForBatch: CancellationServiceDeps["getRunsForBatch"];
   private readonly dispatchCancelRequested: CancellationServiceDeps["dispatchCancelRequested"];
-  private readonly dispatchFinishRun: CancellationServiceDeps["dispatchFinishRun"];
 
   constructor(deps: CancellationServiceDeps) {
     this.getRunsForBatch = deps.getRunsForBatch;
     this.dispatchCancelRequested = deps.dispatchCancelRequested;
-    this.dispatchFinishRun = deps.dispatchFinishRun;
   }
 
   /**
    * Cancel a single scenario run.
    *
    * 1. Check fold projection — if already terminal, skip
-   * 2. Dispatch cancel_requested event (always — sets flag + triggers reactor broadcast)
-   * 3. If queued/pending, also dispatch finished(CANCELLED) — no worker will ever act
+   * 2. Dispatch cancel_requested event — the process manager takes it from
+   *    there (worker broadcast + force-terminal backstop)
    */
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
@@ -124,23 +114,16 @@ export class ScenarioCancellationService {
 
     const now = Date.now();
 
-    // Dispatch cancel_requested event — reactor will broadcast to all workers
+    // Dispatch cancel_requested event — the process manager broadcasts to all
+    // workers and finishes a queued run CANCELLED itself rather than waiting
+    // out the grace window. Queued still gets the broadcast: a run is
+    // submitted to the pool the moment it is queued, so a worker may already
+    // be holding it behind a busy slot.
     await this.dispatchCancelRequested({
       tenantId: projectId,
       scenarioRunId,
       occurredAt: now,
     });
-
-    // For queued/pending jobs that haven't been picked up yet, also write
-    // the terminal event immediately — no worker will ever execute them
-    if (run && QUEUED_STATUSES.has(run.status)) {
-      await this.dispatchFinishRun({
-        tenantId: projectId,
-        scenarioRunId,
-        status: ScenarioRunStatus.CANCELLED,
-        occurredAt: now + 1, // +1ms to ensure ordering after cancel_requested
-      });
-    }
 
     logger.info(
       { projectId, scenarioRunId, status: run?.status },

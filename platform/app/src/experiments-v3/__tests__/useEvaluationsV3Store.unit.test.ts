@@ -6,6 +6,7 @@ import {
   type DatasetReference,
   DEFAULT_TEST_DATA_ID,
   type EvaluatorConfig,
+  type LocalPromptConfig,
   type TargetConfig,
 } from "../types";
 
@@ -251,6 +252,13 @@ describe("useEvaluationsV3Store", () => {
       mappings: {},
     });
 
+    const createTestPromptConfig = (): LocalPromptConfig => ({
+      llm: { model: "openai/gpt-5-mini" },
+      messages: [{ role: "user", content: "Answer {{input}}" }],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+    });
+
     it("adds a target", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
@@ -319,6 +327,39 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.targets).toHaveLength(0);
+    });
+
+    it("writes a target's prompt draft", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      store.setTargetPrompt({
+        targetId: "target-1",
+        localPromptConfig: createTestPromptConfig(),
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const target = state.targets.find((t) => t.id === "target-1");
+      expect(target?.localPromptConfig?.messages[0]?.content).toBe(
+        "Answer {{input}}",
+      );
+    });
+
+    // The UI store answers an unknown id with a silent no-op. Only
+    // applyWorkbenchAction reports the refusal, because its caller is a machine
+    // that needs the reason.
+    it("keeps the targets untouched when the prompt names an unknown target", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      const before = useEvaluationsV3Store.getState().targets;
+
+      expect(() =>
+        store.setTargetPrompt({
+          targetId: "target-does-not-exist",
+          localPromptConfig: createTestPromptConfig(),
+        }),
+      ).not.toThrow();
+
+      expect(useEvaluationsV3Store.getState().targets).toEqual(before);
     });
 
     it("sets target mapping for specific dataset", () => {
@@ -462,6 +503,84 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators).toHaveLength(0);
+    });
+
+    describe("when an update would make a plain evaluator a comparison column", () => {
+      const comparison = {
+        variants: ["target-1", "target-2"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [] as ("cost" | "duration")[],
+        randomizeOrder: true,
+      };
+
+      /** @scenario "Only the comparison judge can be a standalone comparison column" */
+      it("keeps the evaluator attached to every target column", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator(createTestEvaluator("eval-1"));
+
+        store.updateEvaluator("eval-1", { comparison });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.comparison,
+        ).toBeUndefined();
+      });
+
+      it("keeps every other edit in that same call out of the store", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator(createTestEvaluator("eval-1"));
+
+        store.updateEvaluator("eval-1", {
+          comparison,
+          inputs: [{ identifier: "renamed_output", type: "str" }],
+        });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.inputs[0]?.identifier,
+        ).toBe("output");
+      });
+    });
+
+    describe("when the evaluator is the comparison judge", () => {
+      it("writes the comparison config", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator({
+          ...createTestEvaluator("eval-1"),
+          evaluatorType: "langevals/select_best_compare",
+        });
+
+        store.updateEvaluator("eval-1", {
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: false,
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.comparison?.variants,
+        ).toEqual(["target-1", "target-2"]);
+      });
+    });
+
+    describe("when a plain evaluator is added with a comparison config", () => {
+      /** @scenario "Only the comparison judge can be a standalone comparison column" */
+      it("is not added at all", () => {
+        const store = useEvaluationsV3Store.getState();
+
+        store.addEvaluator({
+          ...createTestEvaluator("eval-1"),
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: false,
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        expect(useEvaluationsV3Store.getState().evaluators).toHaveLength(0);
+      });
     });
   });
 

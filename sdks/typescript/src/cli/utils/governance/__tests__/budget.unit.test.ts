@@ -95,8 +95,23 @@ describe("renderBudgetExceeded", () => {
     expect(out).toContain("You've used $500.00 of your $500.00 monthly budget.");
     expect(out).toContain("To continue, ask your team admin to raise your limit.");
     expect(out).toContain("Admin: platform-team@miro.com");
-    expect(out).toContain("Need urgent access? Run:");
-    expect(out).toContain("langwatch request-increase");
+    expect(out).toContain("Need urgent access? Request an increase:");
+    expect(out).toContain("http://app.example/me/budget/request");
+  });
+
+  /** @scenario "The box falls back to the static request page when the payload has no signed URL" */
+  it("falls back to the static request page when the payload has no signed URL", () => {
+    const out = renderBudgetExceeded(
+      { ...baseEvent, request_increase_url: "" },
+      { fallbackUrl: "http://app.example/me/budget/request" },
+    );
+    expect(out).toContain("Need urgent access? Request an increase:");
+    expect(out).toContain("http://app.example/me/budget/request");
+  });
+
+  it("omits the request block when no URL is known at all", () => {
+    const out = renderBudgetExceeded({ ...baseEvent, request_increase_url: "" });
+    expect(out).not.toContain("Need urgent access?");
   });
 
   it("defaults period to 'month' when empty", () => {

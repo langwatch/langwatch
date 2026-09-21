@@ -1,6 +1,6 @@
 import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { type ReactNode, useRef } from "react";
-import { LuChevronDown } from "react-icons/lu";
+import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import {
@@ -43,6 +43,7 @@ export function Section({
   value,
   title,
   count,
+  commentCount,
   empty,
   children,
   isFirst,
@@ -52,6 +53,12 @@ export function Section({
   value: string;
   title: string;
   count?: number;
+  /**
+   * How many comments the parts inside this section carry. A section a reader
+   * left closed would otherwise hide every comment left in it, and the point of
+   * a comment is that the next reader finds it.
+   */
+  commentCount?: number;
   /**
    * When true (and there's no count), render an "(empty)" tag inline with the
    * title so users can see at a glance there's nothing inside without having
@@ -153,6 +160,22 @@ export function Section({
           {count != null && count > 0 && (
             <Badge size="xs" variant="subtle" colorPalette="gray">
               {count}
+            </Badge>
+          )}
+          {commentCount != null && commentCount > 0 && (
+            <Badge
+              size="xs"
+              variant="subtle"
+              colorPalette="purple"
+              gap={1}
+              aria-label={
+                commentCount === 1
+                  ? "1 comment in this section"
+                  : `${commentCount} comments in this section`
+              }
+            >
+              <Icon as={LuMessageSquare} boxSize={2.5} />
+              {commentCount}
             </Badge>
           )}
           {empty && (count == null || count === 0) && (

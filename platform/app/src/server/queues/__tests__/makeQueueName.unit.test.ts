@@ -2,12 +2,10 @@
  * @vitest-environment node
  *
  * Redis Cluster hash-tag semantics for queue names. Redis Cluster
- * distributes keys across slots by hashing the key name; BullMQ uses
+ * distributes keys across slots by hashing the key name; GroupQueue uses
  * multiple keys per queue, so without a {hash tag} those keys can land on
  * different slots and every multi-key Lua script fails with CROSSSLOT.
- * These assertions are the regression net for queues still on BullMQ —
- * unit-level intent recovered from the deleted
- * background/__tests__/redis-cluster.integration.test.ts.
+ * These assertions are the regression net for every declared queue name.
  *
  * @see specs/background/redis-cluster-compatibility.feature
  */
@@ -47,7 +45,7 @@ describe("makeQueueName", () => {
 });
 
 describe("queue name constants", () => {
-  describe("when checking every queue that runs on BullMQ", () => {
+  describe("when checking every declared queue name", () => {
     /** @scenario Every queue name produced by the system contains a hash tag */
     it.each([
       ["SCENARIO_QUEUE", SCENARIO_QUEUE.NAME],

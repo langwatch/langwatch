@@ -1,4 +1,5 @@
 import type { TraceEvalResult, TraceListItem } from "../types/trace";
+import { NO_TRACE_EVENTS } from "../types/trace";
 
 interface TraceListPayload {
   items: unknown[];
@@ -7,10 +8,13 @@ interface TraceListPayload {
 
 /**
  * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows:
- * attach each trace's evaluations and default the optional spanCount /
- * events fields. Shared by the full /traces list (`useTraceListQuery`)
- * and the compact personal recent-activity table so both render
- * identical rows from the same source.
+ * attach each trace's evaluations and default the optional spanCount field.
+ * Shared by the full /traces list (`useTraceListQuery`) and the compact
+ * personal recent-activity table so both render identical rows from the
+ * same source.
+ *
+ * Rows start eventless: events are not on the trace summary, so the list
+ * reads them separately (`useTraceListEvents`) and merges them in.
  */
 export function mapTraceListPayload(
   data: TraceListPayload | undefined,
@@ -29,6 +33,6 @@ export function mapTraceListPayload(
       passed: e.passed,
       label: e.label,
     })),
-    events: item.events ?? [],
+    events: item.events ?? NO_TRACE_EVENTS,
   }));
 }

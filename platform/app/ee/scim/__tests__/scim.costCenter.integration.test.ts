@@ -25,7 +25,7 @@ describe("ScimService department auto-assignment", () => {
   const ns = `scim-dept-${nanoid(8)}`;
   const ORG_ID = `org-${ns}`;
 
-  const scim = () => ScimService.create(prisma);
+  const scim = () => ScimService.create({ prisma });
   const departments = () => DepartmentService.create(prisma);
 
   const createRequest = (

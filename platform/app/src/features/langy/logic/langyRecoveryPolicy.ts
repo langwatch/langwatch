@@ -146,7 +146,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     retry: true,
     attempts: WORKER_RESTART_WAITS.length,
     delayMs: schedule(WORKER_RESTART_WAITS),
-    recoveringMessage: "Langy restarted — picking up where it left off…",
+    recoveringMessage: "Langy restarted. Picking up where it left off…",
   },
 
   // The turn blew its budget. Worth exactly one more go: if the question is
@@ -196,7 +196,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_agent_unavailable: terminal("langy_agent_unavailable"),
   langy_agent_at_capacity: terminal("langy_agent_at_capacity"),
 
-  // TERMINAL. The opencode session backing this turn is gone; the manager
+  // TERMINAL. The agent session backing this turn is gone; the manager
   // recycles the worker and the next turn gets a fresh session. Re-driving the
   // SAME turn walks straight back into the same wall. The user sends again — a
   // new turn, a new session — and the card says exactly that.
@@ -233,6 +233,13 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // entries rather than the `?? terminal` fallback so the coverage test pins them.
   langy_model_not_configured: terminal("langy_model_not_configured"),
   langy_model_not_allowed: terminal("langy_model_not_allowed"),
+
+  // The same wall, found later: the turn started because the model passed the
+  // allowlist, and the gateway then answered that no provider serves it. The
+  // explainer re-keys that reason chain to this kind. Deterministic in the way
+  // that matters — the identical turn asks for the identical model and gets the
+  // identical answer — so the card offers the model settings and no retry.
+  langy_model_unavailable: terminal("langy_model_unavailable"),
   langy_egress_misconfigured: terminal("langy_egress_misconfigured"),
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
@@ -302,7 +309,7 @@ export function canAutoRecover({
  * Tool names that CHANGE something. Langy's catalog splits cleanly: reads are
  * `search_*` / `get_*` / `list_*`, writes are `create_*` / `update_*` /
  * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
- * GitHub PR path and the raw file/shell tools opencode exposes.
+ * GitHub PR path and the raw file/shell tools the worker exposes.
  */
 const MUTATING_TOOL_PREFIXES = [
   "create_",

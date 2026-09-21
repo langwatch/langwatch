@@ -1,25 +1,22 @@
+import { describeRoute } from "hono-openapi";
+import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import {
   type Organization,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
   BindingNotFoundError,
-  DuplicateMemberError,
   GroupNotFoundError,
-  type GroupRestService,
-  ScimManagedGroupError,
-  ScopeNotInOrganizationError,
-  UserNotInOrganizationError,
-} from "~/server/app-layer/groups/group.service";
+} from "~/server/app-layer/groups/errors";
+import type { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { requireEnterprisePlanRest } from "../../middleware/enterprise-gate";
 import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
 import { groupServiceMiddleware } from "../../middleware/group-service";
-import { BadRequestError, NotFoundError } from "../../shared/errors";
 import { handleGroupError } from "./error-handler";
 
 patchZodOpenapi();
@@ -65,12 +62,22 @@ const secured = createOrgApp<GroupServiceMiddlewareVariables>({
 
 secured.hono.onError(handleGroupError);
 
+/**
+ * Groups are an Enterprise capability, so every route carries this gate.
+ * Per-route and after the `.access(...)` chain on purpose: the gate reads the
+ * organization that org auth resolved onto the context, so an app-level
+ * `.use` would run before authentication and find nothing, and the RBAC
+ * denial should fire before the plan denial anyway.
+ */
+const enterpriseGate = requireEnterprisePlanRest("GROUPS");
+
 // ── List groups ──────────────────────────────────────────────────────────────
 
 secured
   .access(requires("organization:manage"))
   .get(
     "/",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List all groups for the organization" }),
     zValidator("query", paginationQuerySchema),
@@ -114,6 +121,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Create a new group" }),
     zValidator("json", createGroupSchema),
@@ -127,6 +135,7 @@ secured
         name: body.name,
         bindings: body.bindings,
         memberIds: body.memberIds,
+        actor: orgRequestLedgerActor(c),
       });
 
       return c.json(
@@ -148,6 +157,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Get a group with members and bindings" }),
     async (c) => {
@@ -159,7 +169,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       return c.json({
         id: group.id,
@@ -190,6 +200,7 @@ secured
   .access(requires("organization:manage"))
   .patch(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Rename a group" }),
     zValidator("json", updateGroupSchema),
@@ -199,26 +210,16 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        const group = await service.rename({
-          id,
-          organizationId: organization.id,
-          name: body.name,
-        });
-        return c.json({
-          id: group.id,
-          name: group.name,
-          slug: group.slug,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScimManagedGroupError) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      const group = await service.rename({
+        id,
+        organizationId: organization.id,
+        name: body.name,
+      });
+      return c.json({
+        id: group.id,
+        name: group.name,
+        slug: group.slug,
+      });
     },
   );
 
@@ -228,6 +229,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Delete a group" }),
     async (c) => {
@@ -235,14 +237,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.delete({ id, organizationId: organization.id });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        throw error;
-      }
+      await service.delete({
+        id,
+        organizationId: organization.id,
+        actor: orgRequestLedgerActor(c),
+      });
 
       return c.json({ success: true });
     },
@@ -254,6 +253,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id/members",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List members of a group" }),
     async (c) => {
@@ -265,7 +265,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       const members = await service.getMembers({ groupId: id });
       return c.json({
@@ -282,6 +282,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/:id/members",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Add a member to a group" }),
     zValidator("json", addMemberSchema),
@@ -291,25 +292,11 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.addMember({
-          groupId: id,
-          organizationId: organization.id,
-          userId: body.userId,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (
-          error instanceof ScimManagedGroupError ||
-          error instanceof UserNotInOrganizationError ||
-          error instanceof DuplicateMemberError
-        ) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      await service.addMember({
+        groupId: id,
+        organizationId: organization.id,
+        userId: body.userId,
+      });
 
       return c.json({ success: true }, 201);
     },
@@ -319,6 +306,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id/members/:userId",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Remove a member from a group" }),
     async (c) => {
@@ -326,21 +314,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.removeMember({
-          groupId: id,
-          organizationId: organization.id,
-          userId,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScimManagedGroupError) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      await service.removeMember({
+        groupId: id,
+        organizationId: organization.id,
+        userId,
+      });
 
       return c.json({ success: true });
     },
@@ -352,6 +330,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id/bindings",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List role bindings for a group" }),
     async (c) => {
@@ -363,9 +342,12 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
-      const bindings = await service.getBindings({ groupId: id });
+      const bindings = await service.getBindings({
+        organizationId: organization.id,
+        groupId: id,
+      });
       return c.json({
         data: bindings.map((b) => ({
           id: b.id,
@@ -383,6 +365,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/:id/bindings",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Add a role binding to a group" }),
     zValidator("json", addBindingSchema),
@@ -392,33 +375,24 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        const binding = await service.addBinding({
-          groupId: id,
-          organizationId: organization.id,
-          role: body.role,
-          customRoleId: body.customRoleId,
-          scopeType: body.scopeType,
-          scopeId: body.scopeId,
-        });
-        return c.json(
-          {
-            id: binding.id,
-            role: binding.role,
-            scopeType: binding.scopeType,
-            scopeId: binding.scopeId,
-          },
-          201,
-        );
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScopeNotInOrganizationError) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      const binding = await service.addBinding({
+        groupId: id,
+        organizationId: organization.id,
+        role: body.role,
+        customRoleId: body.customRoleId,
+        scopeType: body.scopeType,
+        scopeId: body.scopeId,
+        actor: orgRequestLedgerActor(c),
+      });
+      return c.json(
+        {
+          id: binding.id,
+          role: binding.role,
+          scopeType: binding.scopeType,
+          scopeId: binding.scopeId,
+        },
+        201,
+      );
     },
   );
 
@@ -426,6 +400,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id/bindings/:bindingId",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Remove a role binding from a group" }),
     async (c) => {
@@ -437,26 +412,20 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       const bindingBelongsToGroup = group.roleBindings.some(
         (b) => b.id === bindingId,
       );
       if (!bindingBelongsToGroup) {
-        throw new NotFoundError("Binding not found on this group");
+        throw new BindingNotFoundError(bindingId);
       }
 
-      try {
-        await service.removeBinding({
-          bindingId,
-          organizationId: organization.id,
-        });
-      } catch (error) {
-        if (error instanceof BindingNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        throw error;
-      }
+      await service.removeBinding({
+        bindingId,
+        organizationId: organization.id,
+        actor: orgRequestLedgerActor(c),
+      });
 
       return c.json({ success: true });
     },

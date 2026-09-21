@@ -91,15 +91,15 @@ This can be imported directly into LangWatch platform datasets.
 ## Step 5: Validate Dataset Quality
 
 Before using the dataset:
-1. Check topic coverage — are all knowledge base topics represented?
-2. Verify answers are actually in the context — no hallucinated expected outputs
-3. Check question diversity — not all the same type
+1. Check topic coverage: are all knowledge base topics represented?
+2. Verify answers are actually in the context, with no hallucinated expected outputs
+3. Check question diversity: not all the same type
 4. Verify negative cases have appropriate "I don't know" expected outputs
 5. Run a quick experiment to baseline accuracy
 
 ## Common Mistakes
 - Do NOT generate questions without reading the actual knowledge base first
-- Do NOT skip negative cases — testing "I don't know" is crucial for RAG
-- Do NOT use the same question pattern for every entry — diversify types
+- Do NOT skip negative cases. Testing "I don't know" is crucial for RAG
+- Do NOT use the same question pattern for every entry. Diversify types
 - Do NOT forget to include the relevant context per row
 - Do NOT generate expected outputs that aren't actually in the knowledge base

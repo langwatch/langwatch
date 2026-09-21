@@ -48,6 +48,21 @@ const ENDPOINT = process.env.LANGWATCH_TEST_AZURE_ENDPOINT;
 const hasRealAzure = Boolean(ACCOUNT_NAME && ACCOUNT_KEY && CONTAINER);
 const describeRealAzure = hasRealAzure ? describe : describe.skip;
 
+/**
+ * Token-mode (Entra) verification against a real account. Separate switch from
+ * the shared-key one above because it needs a DIFFERENT account posture —
+ * ideally one with `allowSharedKeyAccess=false`, where the shared-key suite
+ * cannot pass by construction.
+ *
+ * `azureCli` is the mode a developer can actually run: it borrows the identity
+ * from `az login`. The AKS path (`workloadIdentity`) is the same code with a
+ * different credential class, so exercising this proves the bearer request
+ * shape Azure accepts — the thing no mocked test and no emulator can.
+ */
+const TOKEN_MODE_ACCOUNT = process.env.LANGWATCH_TEST_AZURE_TOKEN_ACCOUNT_NAME;
+const hasTokenModeAzure = Boolean(TOKEN_MODE_ACCOUNT && CONTAINER);
+const describeTokenAzure = hasTokenModeAzure ? describe : describe.skip;
+
 /** Unique per run so parallel runs and leftovers never collide. */
 const RUN_ID = crypto.randomBytes(6).toString("hex");
 const PROJECT = `test-realazure-${RUN_ID}`;
@@ -69,6 +84,7 @@ function uriFor(bytes: Buffer): string {
 beforeAll(() => {
   if (!hasRealAzure) return;
   driver = new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: ACCOUNT_NAME!,
     accountKey: ACCOUNT_KEY!,
     // Undefined for public Azure — the driver then derives the host-style
@@ -173,6 +189,73 @@ describeRealAzure(
           bytes.toString("utf8"),
         );
       });
+    });
+  },
+);
+
+describeTokenAzure(
+  "AzureBlobDriver against real Azure Blob using an Entra identity",
+  () => {
+    const tokenUris: string[] = [];
+
+    function tokenDriver() {
+      return new AzureBlobDriver({
+        mode: "azureCli",
+        accountName: TOKEN_MODE_ACCOUNT!,
+      });
+    }
+
+    function tokenUriFor(bytes: Buffer): string {
+      const uri = mintAzureBlobUri({
+        accountName: TOKEN_MODE_ACCOUNT!,
+        container: CONTAINER!,
+        projectId: `test-token-${RUN_ID}`,
+        sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+      });
+      tokenUris.push(uri);
+      return uri;
+    }
+
+    afterAll(async () => {
+      if (!hasTokenModeAzure) return;
+      await Promise.allSettled(
+        tokenUris.map((uri) => tokenDriver().delete(uri)),
+      );
+    });
+
+    describe("given an account that refuses shared-key authentication", () => {
+      /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
+      it("writes, reads, sizes and deletes using a bearer token", async () => {
+        const driver = tokenDriver();
+        const bytes = Buffer.from(`entra round-trip ${RUN_ID}`, "utf8");
+        const uri = tokenUriFor(bytes);
+
+        await driver.put(uri, bytes, "text/plain");
+        expect(await driver.exists(uri)).toBe(true);
+        expect(await driver.head(uri)).toBe(bytes.length);
+
+        const stream = await driver.get(uri);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(
+          bytes.toString("utf8"),
+        );
+
+        await driver.delete(uri);
+        expect(await driver.exists(uri)).toBe(false);
+      }, 60_000);
+
+      /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
+      it("stores a zero-byte blob, the case that broke shared-key signing", async () => {
+        const driver = tokenDriver();
+        const bytes = Buffer.alloc(0);
+        const uri = tokenUriFor(bytes);
+
+        await driver.put(uri, bytes, "application/octet-stream");
+
+        expect(await driver.exists(uri)).toBe(true);
+        expect(await driver.head(uri)).toBe(0);
+      }, 60_000);
     });
   },
 );

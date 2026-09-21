@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Old links under the legacy `/[project]/messages/[trace]` path must land on
- * the Trace Explorer. The trace deep link opens the Trace Explorer drawer for
- * that trace; the span deep link additionally carries the selected span. Only
- * the router is harnessed — the real redirect components run.
+ * Old links under the legacy `/[project]/messages` paths must land on the
+ * Trace Explorer. The index redirect carries the link's filters across; the
+ * trace deep link opens the Trace Explorer drawer for that trace; the span
+ * deep link additionally carries the selected span. Only the router is
+ * harnessed — the real redirect components run.
  */
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +19,65 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 import TraceDetailsWithSpanRedirect from "../[trace]/[openTab]/[span]";
 import TraceDetailsRedirect from "../[trace]/index";
+import LegacyTracesRedirect from "../index";
+
+describe("legacy Traces index redirect", () => {
+  beforeEach(() => {
+    mockReplace.mockClear();
+    mockQuery = {};
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when opening a bare legacy Traces link", () => {
+    /** @scenario "The legacy Traces path lands on the Trace Explorer" */
+    it("redirects to the Trace Explorer", () => {
+      mockQuery = { project: "acme" };
+
+      render(<LegacyTracesRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: "/acme/traces",
+        query: {},
+      });
+    });
+  });
+
+  describe("when the legacy Traces link carries filters", () => {
+    /** @scenario "A filtered legacy Traces link keeps what it was filtered by" */
+    it("carries everything but the project slug across", () => {
+      mockQuery = {
+        project: "acme",
+        startDate: "2026-08-01",
+        endDate: "2026-08-07",
+        "metadata.env": "prod",
+      };
+
+      render(<LegacyTracesRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: "/acme/traces",
+        query: {
+          startDate: "2026-08-01",
+          endDate: "2026-08-07",
+          "metadata.env": "prod",
+        },
+      });
+    });
+  });
+
+  describe("when the link is malformed", () => {
+    it("redirects to not-found when the project slug is missing", () => {
+      mockQuery = {};
+
+      render(<LegacyTracesRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith("/404");
+    });
+  });
+});
 
 describe("legacy trace deep-link redirects", () => {
   beforeEach(() => {

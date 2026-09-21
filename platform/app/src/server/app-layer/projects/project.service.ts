@@ -1,12 +1,23 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { Project } from "~/generated/prisma/client";
+import { lwqlTenantCapability } from "~/server/analytics/lwql/capability";
+import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
+import type { LwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
+import {
+  type LwqlKeyMapRow,
+  lwqlKeyMapTableQualifiedName,
+  productionLangWatchQLNames,
+} from "~/server/analytics/lwql/provisioning";
+import { parseConnectionUrl } from "~/server/clickhouse/goose";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import { mintProjectSlug } from "./projectSlug";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -27,12 +38,21 @@ export interface OrgAdminResolution {
   userId: string | null;
   organizationId: string | null;
   firstMessage: boolean;
+  /**
+   * Which onboarding the organization went through, so a milestone tracked
+   * against the admin can be split by variant. Null before the experiment.
+   */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 const NULL_RESOLUTION: OrgAdminResolution = {
   userId: null,
   organizationId: null,
   firstMessage: false,
+  onboardingVariant: null,
+  organizationCreatedAt: null,
 };
 
 export class ProjectNotFoundError extends Error {
@@ -57,6 +77,11 @@ export class PersonalWorkspaceBoundaryError extends Error {
 
 export class PersonalProjectProtectedError extends Error {
   name = "PersonalProjectProtectedError" as const;
+}
+
+/** Raised when a generic project route is aimed at the governance project. */
+export class GovernanceProjectProtectedError extends Error {
+  name = "GovernanceProjectProtectedError" as const;
 }
 
 /** The refusal a personal project gives to anything that would move it out. */
@@ -119,6 +144,51 @@ export function personalWorkspaceArchiveViolation(
   return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
 }
 
+/** The refusal the hidden governance project gives to a generic project route. */
+export const GOVERNANCE_PROJECT_ROUTE_REFUSAL =
+  "This project is an internal governance record, not a workspace. It cannot be renamed, moved, archived, or re-keyed through the projects API.";
+
+/**
+ * The one `Project.kind` value that generic project routes must refuse.
+ *
+ * Spelled here rather than imported from the governance service so this module
+ * — reached by ingest, the REST API and tRPC — carries no dependency on the
+ * enterprise tree. The two are pinned together by
+ * `governanceProjectKindGuard.unit.test.ts`.
+ */
+export const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
+
+/**
+ * Whether this project is the organization's hidden governance record, and the
+ * reason to refuse the operation if it is.
+ *
+ * The hiding invariant used to be enforced only on the LIST surface: the
+ * governance project is filtered out of the picker, `/api/v1/projects`, RBAC
+ * pickers and billing exports, but `PATCH /api/projects/:id` and the archive
+ * paths guarded personal projects and never looked at `kind` at all. So a
+ * project nobody can SEE was still reachable by id, and archiving it was one
+ * request away.
+ *
+ * That is worse than it sounds, because of which id it is: the governance
+ * project's id is the ClickHouse `TenantId` every governance row is keyed by.
+ * Archiving it makes `resolveGovProjectId` return null forever while the write
+ * path keeps landing rows under the same id — the cost screen goes blank and an
+ * erasure job walks zero tenants and reports success (ADR-128 §11).
+ * `GovernanceTenantHistory` makes that survivable; this guard makes it rare.
+ *
+ * A free function, and shared, for the reason the personal-workspace guards
+ * beside it are: the tRPC router writes Prisma directly and never passes
+ * through this service, and an invariant enforced twice is an invariant that
+ * eventually diverges.
+ */
+export function governanceProjectRouteViolation(
+  kind: string | null | undefined,
+): string | null {
+  return kind === INTERNAL_GOVERNANCE_PROJECT_KIND
+    ? GOVERNANCE_PROJECT_ROUTE_REFUSAL
+    : null;
+}
+
 /**
  * Whether creating a project in this team would put a second project in a
  * personal workspace, and the reason to give back if it would.
@@ -138,6 +208,22 @@ export function personalWorkspaceCreateViolation(
     : null;
 }
 
+/**
+ * How stale a coding-agent recency column has to be before it is rewritten.
+ *
+ * The columns are read against a window of days, so the moment inside that
+ * window is not information anyone acts on. An hour keeps the busiest project
+ * to twenty-four writes a day per column while still moving the value long
+ * before the window closes on it.
+ */
+export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
+
+/** What a caller recording coding-agent activity knows: the project, and when. */
+export interface TouchCodingAgentActivityParams {
+  projectId: string;
+  at: Date;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -149,7 +235,15 @@ export interface CreateProjectParams {
 }
 
 export class ProjectService {
-  constructor(readonly repo: ProjectRepository) {}
+  constructor(
+    readonly repo: ProjectRepository,
+    /**
+     * Absent only where the caller cannot reach ClickHouse at all. A new
+     * project's key-map row is then left to the deploy-time backfill, the
+     * same way a failed write is.
+     */
+    private readonly lwqlKeyMap?: LwqlKeyMapRepository,
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
@@ -181,6 +275,28 @@ export class ProjectService {
     if (violation) {
       throw new PersonalWorkspaceBoundaryError(violation);
     }
+  }
+
+  /**
+   * Refuses a mutation aimed at the organization's hidden governance project.
+   *
+   * Read scoped to the organization, like the personal-workspace guards: an
+   * unscoped read would let a caller tell a governance project from an ordinary
+   * one in somebody else's organization by the refusal alone. A project this
+   * organization does not own falls through to the repository, which scopes its
+   * own write and reports it as not found.
+   */
+  private async assertNotGovernanceProject({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    const current = await this.repo.getWithTeam(id);
+    if (!current || current.team.organizationId !== organizationId) return;
+    const violation = governanceProjectRouteViolation(current.kind);
+    if (violation) throw new GovernanceProjectProtectedError(violation);
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
@@ -228,10 +344,7 @@ export class ProjectService {
 
     const projectNanoId = nanoid();
     const projectId = `project_${projectNanoId}`;
-    const slug =
-      slugify(params.name, { lower: true, strict: true }) +
-      "-" +
-      projectNanoId.substring(0, 6);
+    const slug = mintProjectSlug({ name: params.name, projectNanoId });
 
     const existing = await this.repo.findBySlugInTeam({ slug, teamId });
     if (existing) {
@@ -240,7 +353,7 @@ export class ProjectService {
       );
     }
 
-    return this.repo.create({
+    const project = await this.repo.create({
       id: projectId,
       name: params.name,
       slug,
@@ -249,6 +362,63 @@ export class ProjectService {
       teamId,
       apiKey: generateApiKey(),
     });
+
+    await this.syncLwqlKeyMapRow(project);
+
+    return project;
+  }
+
+  /**
+   * Best-effort: inserts this project's key-map row immediately, so it can
+   * authenticate to LangWatchQL without waiting for the next scheduled
+   * provisioning backfill (`src/tasks/provisionLwql.ts`). Never throws — a
+   * failure here must not block project creation; the backfill task picks up
+   * any row this misses on its next run. No-ops when LWQL is not configured.
+   */
+  private async syncLwqlKeyMapRow(project: Project): Promise<void> {
+    const connection = lwqlConnectionFromEnv();
+    if (!connection) return;
+
+    if (!project.lwqlKey) {
+      logger.error(
+        { projectId: project.id },
+        "new project has an empty lwqlKey — cannot sync its LangWatchQL key-map row; it will not be able to authenticate to LangWatchQL until this is corrected",
+      );
+      return;
+    }
+
+    try {
+      const names = productionLangWatchQLNames({ connection });
+      // Same qualification as the deploy-time task: the key-map table is
+      // always migration 00084's, under the app's own ClickHouse database —
+      // not `names.database`. See `lwqlKeyMapTableQualifiedName`'s doc
+      // comment.
+      const { database: sourceDatabase } = parseConnectionUrl();
+      const row: LwqlKeyMapRow = {
+        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
+        TenantId: project.id,
+      };
+      if (!this.lwqlKeyMap) {
+        throw new Error(
+          "No LangWatchQL key-map repository is wired — the row was not written",
+        );
+      }
+      await this.lwqlKeyMap.insertRow({
+        table: lwqlKeyMapTableQualifiedName({
+          names,
+          sourceDatabase,
+        }),
+        row,
+      });
+    } catch (error) {
+      logger.error(
+        { projectId: project.id, error },
+        "failed to sync lwql key-map row for new project; continuing — the scheduled provisioning backfill will pick it up",
+      );
+      captureException(new Error("Failed to sync lwql key-map row"), {
+        extra: { projectId: project.id, error },
+      });
+    }
   }
 
   async update({
@@ -260,6 +430,8 @@ export class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
+    await this.assertNotGovernanceProject({ id, organizationId });
+
     if (data.teamId) {
       const team = await this.repo.findActiveTeamInOrganization({
         teamId: data.teamId,
@@ -303,6 +475,8 @@ export class ProjectService {
     id: string;
     organizationId: string;
   }): Promise<Project> {
+    await this.assertNotGovernanceProject({ id, organizationId });
+
     // Scoped to this organization for the same reason the move guard is.
     const existing = await this.repo.getWithTeam(id);
     const archiveViolation =
@@ -322,7 +496,7 @@ export class ProjectService {
         projectId: id,
       });
     } catch (error) {
-      logger.warn(
+      logger.error(
         { projectId: id, error },
         "deleteOwnedBy failed during project archive; continuing with archive — orphan bytes may need manual cleanup",
       );
@@ -337,6 +511,8 @@ export class ProjectService {
     organizationId: string;
     page: number;
     limit: number;
+    /** See {@link ProjectRepository.findAllByOrganization}. */
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return this.repo.findAllByOrganization(params);
   }
@@ -347,6 +523,39 @@ export class ProjectService {
 
   async updateMetadata(input: UpdateProjectMetadataInput): Promise<void> {
     return this.repo.updateMetadata(input);
+  }
+
+  /**
+   * Record that a coding-agent session was folded for this project.
+   *
+   * Level-triggered and rate limited by {@link CODING_AGENT_ACTIVITY_TOUCH_MS}:
+   * the only reader is a recency window measured in days, so a project that
+   * folds a thousand sessions in an hour is worth exactly one write.
+   */
+  async touchCodingAgentSessionSeen({
+    projectId,
+    at,
+  }: TouchCodingAgentActivityParams): Promise<void> {
+    return this.repo.touchCodingAgentSessionSeen({
+      projectId,
+      at,
+      staleBefore: new Date(at.getTime() - CODING_AGENT_ACTIVITY_TOUCH_MS),
+    });
+  }
+
+  /**
+   * Record that a pull request was mapped for a branch a session in this
+   * project ran on. Same rate limit, its own column.
+   */
+  async touchCodingAgentPullRequestSeen({
+    projectId,
+    at,
+  }: TouchCodingAgentActivityParams): Promise<void> {
+    return this.repo.touchCodingAgentPullRequestSeen({
+      projectId,
+      at,
+      staleBefore: new Date(at.getTime() - CODING_AGENT_ACTIVITY_TOUCH_MS),
+    });
   }
 
   async searchByQuery(params: {
@@ -391,6 +600,8 @@ export class ProjectService {
         userId: result.adminUserId,
         organizationId: result.organizationId,
         firstMessage: result.firstMessage,
+        onboardingVariant: result.onboardingVariant,
+        organizationCreatedAt: result.organizationCreatedAt,
       };
     } catch (error) {
       logger.error(

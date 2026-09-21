@@ -17,6 +17,7 @@ import {
   BarChart3,
   Bot,
   Boxes,
+  Building2,
   Check,
   CheckSquare,
   Coins,
@@ -36,6 +37,7 @@ import {
   SlidersHorizontal,
   Tag,
   Trash2,
+  Users,
   Waypoints,
   Workflow,
   Zap,
@@ -76,6 +78,7 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   apiKeys: Key,
   modelProviders: Cpu,
   gateway: Network,
+  organization: Building2,
   platform: Boxes,
 };
 
@@ -90,6 +93,8 @@ const CATALOG_ICON: Record<CapabilityIconName, LucideIcon> = {
   radioTower: RadioTower,
   shieldCheck: ShieldCheck,
   slidersHorizontal: SlidersHorizontal,
+  users: Users,
+  building: Building2,
 };
 
 // Overline colour + icon per tone. `read` leans on the surface icon (or the

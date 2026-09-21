@@ -180,11 +180,11 @@ export default function ProjectOnboarding() {
             <Button
               colorPalette="orange"
               type="submit"
-              disabled={createProject.isLoading || createProject.isSuccess}
+              disabled={createProject.isPending || createProject.isSuccess}
             >
               {createProject.isSuccess
                 ? "Created"
-                : createProject.isLoading
+                : createProject.isPending
                   ? "Loading..."
                   : "Next"}
             </Button>

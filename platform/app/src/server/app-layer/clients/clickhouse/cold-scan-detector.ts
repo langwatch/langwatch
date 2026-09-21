@@ -53,12 +53,18 @@ export const TIME_PARTITIONED_TABLES = {
   evaluation_runs: ["ScheduledAt"],
   coding_agent_sessions: ["StartedAt"],
   coding_agent_trace_sessions: ["OccurredAt"],
+  coding_agent_session_events: ["TimeUnixMs"],
   session_metric_series: ["AsOf"],
 
   // Run / experiment tables.
   experiment_runs: ["StartedAt"],
   experiment_run_items: ["OccurredAt"],
   simulation_runs: ["StartedAt"],
+  simulation_run_metrics: ["OccurredAt"],
+  // The rollup prunes on its plain `PartitionMonth` anchor, not `OccurredAt`:
+  // that column is an AggregateFunction state there and cannot be a partition
+  // expression.
+  simulation_run_metrics_rollup: ["PartitionMonth"],
   suite_runs: ["StartedAt"],
   dspy_steps: ["CreatedAt"],
 
@@ -70,10 +76,21 @@ export const TIME_PARTITIONED_TABLES = {
   gateway_spend: ["OccurredAt"],
   gateway_budget_scope_totals: ["PeriodStart"],
   governance_kpis: ["HourBucket"],
+  // The daily cost rollup: month-partitioned on `Day`, and exempt from tenant
+  // retention in favour of a fixed 13-month TTL, so the cold end of this table
+  // is always thirteen months deep. Every read has to range on `Day` — asking
+  // it for a tenant alone reads all of them.
+  governance_cost_rollup_1d: ["Day"],
   automation_audit: ["OccurredAt"],
   langy_analytics_events: ["OccurredAt"],
   langy_messages: ["CreatedAt"],
   stored_objects: ["created_at"],
+  // Instant Eval judgements: month-partitioned on `CreatedAt`, and kept
+  // indefinitely by default, so the cold end of this table grows without
+  // bound. A read by run id alone is not a sort-key range that prunes
+  // anything, since `RunId` sits behind `TenantId` and nothing bounds the
+  // partition, so every read ranges on `CreatedAt` as well.
+  instant_eval_judgments: ["CreatedAt"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Strip line and block comments so they can't hide or fake a predicate. */

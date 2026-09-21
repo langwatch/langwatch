@@ -65,6 +65,8 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackSignupEvent: mockSendSlackSignupEvent,

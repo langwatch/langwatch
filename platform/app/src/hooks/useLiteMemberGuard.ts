@@ -1,4 +1,4 @@
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**

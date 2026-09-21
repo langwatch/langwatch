@@ -1,0 +1,40 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": {
+		"type": "line",
+		"point": true
+	},
+	"encoding": {
+		"x": {
+			"field": "bucket",
+			"type": "temporal",
+			"title": "Time"
+		},
+		"y": {
+			"field": "total",
+			"type": "quantitative",
+			"title": "Total"
+		},
+		"color": {
+			"field": "series",
+			"type": "nominal"
+		},
+		"tooltip": [
+			{
+				"field": "bucket",
+				"type": "temporal"
+			},
+			{
+				"field": "series",
+				"type": "nominal"
+			},
+			{
+				"field": "total",
+				"type": "quantitative"
+			}
+		]
+	}
+}

@@ -6,6 +6,43 @@ on:
       - main
   workflow_dispatch:
 
+# This one is not hypothetical: 12 of the last 60 runs were still in flight
+# when the next merge to main started another. release-please reads the commits
+# since the last release and then creates-or-updates a release PR per package,
+# so two overlapping runs compute their plan from the same history and race on
+# the same PRs — the observable results are a duplicate release PR, or one run
+# reverting the other's version bump.
+#
+# Why the release PRs open as drafts (`draft-pull-request` in
+# release-please-config.json, which is strict JSON and cannot hold this note).
+#
+# "creates-or-updates ... per package" above is also a CI cost. Every merge to
+# main force-pushes each affected release branch, and a release PR's diff is a
+# changelog plus version fields in `package.json`, `platform/app/package.json`
+# and three `Chart.yaml`s. Nine workflows path-filter on `package.json` —
+# correctly, since a dependency bump touches exactly those files — and a path
+# filter cannot tell a version bump from a dependency bump. So a nine-file
+# metadata change pulled the full suite: ten test shards, four kind-cluster
+# e2e legs, both CodeQL systems. Measured at 88 check runs per push, against
+# ~21 merges to main a day, on eight of these branches at once.
+#
+# Twelve workflows already route their heavy jobs through the `heavy` output of
+# .github/actions/detect-changes, which is false on a draft. Opening these PRs
+# as drafts therefore buys the whole reduction with no new mechanism, and the
+# full suite still runs before anything ships: marking the PR ready to review
+# fires `ready_for_review`, which those workflows list in their
+# `pull_request.types` precisely so the heavy jobs get their run then. A draft
+# cannot be merged, so "ready" is the same click as "I am releasing this".
+#
+# Setting it here rather than by hand matters on the NEXT cycle: release-please
+# updates an existing release PR, but once one merges it opens a fresh PR for
+# the following version, and that one would be non-draft again.
+concurrency:
+  group: release-please-sdks-${{ github.ref }}
+  # Queue, never cancel. A cancelled run can land between "PR created" and
+  # "labels and body written", leaving a release PR that nothing will finish.
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write

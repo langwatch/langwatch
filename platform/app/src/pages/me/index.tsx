@@ -12,6 +12,13 @@ import { useState } from "react";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
+import {
+  type BudgetOverviewItemView,
+  BudgetOverviewList,
+  budgetDescription,
+  isBudgetBreached,
+  isBudgetNearLimit,
+} from "~/components/me/BudgetOverviewList";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
 import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
 import MyLayout from "~/components/me/MyLayout";
@@ -20,11 +27,14 @@ import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { PersonalWorkspaceViewOnlyNotice } from "~/components/me/PersonalWorkspaceViewOnlyNotice";
 import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import Head from "~/utils/compat/next-head";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
@@ -41,6 +51,7 @@ function MyUsagePage() {
   const {
     summary,
     budget,
+    budgetOverview,
     spendByDay,
     spendByTool,
     personalProjectId,
@@ -86,6 +97,9 @@ function MyUsagePage() {
       </Head>
 
       <VStack align="stretch" gap={6} width="full">
+        <PersonalWorkspaceViewOnlyNotice />
+        <GuidedOnboardingOffer space="me" />
+
         <VStack
           id={PERSONAL_AI_TOOLS_ANCHOR}
           align="stretch"
@@ -121,22 +135,12 @@ function MyUsagePage() {
           <ConnectYourAgentButton projectId={personalProjectId} />
         </HStack>
 
-        {budget.status === "exceeded" && (
-          <BudgetExceededBanner
-            spentUsd={budget.spentUsd}
-            limitUsd={budget.limitUsd}
-            period={budget.period}
-            scope={budget.scope}
-            requestIncreaseUrl={budget.requestIncreaseUrl}
-            adminEmail={budget.adminEmail}
-          />
-        )}
-        {budget.status === "warning" && budget.limitUsd > 0 && (
-          <BudgetBanner
-            tone="yellow"
-            title="Approaching budget"
-            message={`You've used ${Math.round((budget.spentUsd / budget.limitUsd) * 100)}% of your ${budget.period} ${budget.scope} budget.`}
-          />
+        <BudgetStateBanners budgetOverview={budgetOverview} budget={budget} />
+
+        {budgetOverview.gatewayAccess && budgetOverview.budgets.length > 0 && (
+          <SectionCard title="Budgets that apply to you">
+            <BudgetOverviewList items={budgetOverview.budgets} />
+          </SectionCard>
         )}
 
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
@@ -321,7 +325,19 @@ function MyUsagePage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Coding-agent usage (last 30 days)">
+        <SectionCard
+          title="Coding-agent usage (last 30 days)"
+          action={
+            <HStack gap={4}>
+              <Link href="/me/sessions" fontSize="sm" color="blue.fg">
+                View sessions
+              </Link>
+              <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
+                View pull requests
+              </Link>
+            </HStack>
+          }
+        >
           {personalProjectId ? (
             <CodingAgentUsageContent projectId={personalProjectId} />
           ) : (
@@ -386,10 +402,13 @@ function SummaryCard({
 function SectionCard({
   title,
   children,
+  action,
   flushContent = false,
 }: {
   title: string;
   children: React.ReactNode;
+  /** Optional trailing element on the title row, e.g. a link deeper in. */
+  action?: React.ReactNode;
   // When set, the content area spans the full card width (no side padding)
   // and is divided from the title by a top border. Used for an embedded
   // table that should read edge-to-edge while the title stays inset.
@@ -403,15 +422,13 @@ function SectionCard({
         borderRadius="md"
         overflow="hidden"
       >
-        <Text
-          fontSize="sm"
-          fontWeight="semibold"
-          paddingX={4}
-          paddingTop={4}
-          paddingBottom={3}
-        >
-          {title}
-        </Text>
+        <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {title}
+          </Text>
+          <Spacer />
+          {action}
+        </HStack>
         <Box borderTopWidth="1px" borderTopColor="border.muted">
           {children}
         </Box>
@@ -426,11 +443,69 @@ function SectionCard({
       borderRadius="md"
       padding={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" marginBottom={3}>
-        {title}
-      </Text>
+      <HStack marginBottom={3}>
+        <Text fontSize="sm" fontWeight="semibold">
+          {title}
+        </Text>
+        <Spacer />
+        {action}
+      </HStack>
       {children}
     </Box>
+  );
+}
+
+/**
+ * Breach and warning banners, derived from the overview items - the same
+ * source as the budgets list - so a banner can say exactly WHICH budget
+ * is binding ("monthly personal budget" vs "monthly organization budget")
+ * instead of a collapsed unlabeled number. Items arrive most-binding
+ * first; the first breached/warning one wins. The legacy personalBudget
+ * state contributes only the contact affordances (request-increase URL,
+ * admin email) on the red banner.
+ */
+function BudgetStateBanners({
+  budgetOverview,
+  budget,
+}: {
+  budgetOverview: ReturnType<typeof usePersonalContext>["budgetOverview"];
+  budget: ReturnType<typeof usePersonalContext>["budget"];
+}) {
+  const breachedItem = budgetOverview.budgets.find(isBudgetBreached);
+  if (breachedItem) {
+    return <BreachedBudgetBanner item={breachedItem} budget={budget} />;
+  }
+  const warningItem = budgetOverview.budgets.find(isBudgetNearLimit);
+  if (!warningItem) return null;
+  return (
+    <BudgetBanner
+      tone="yellow"
+      title="Approaching budget"
+      message={`You've used ${fmtUsd(Number.parseFloat(warningItem.spentUsd) || 0)} of your ${fmtUsd(Number.parseFloat(warningItem.limitUsd) || 0)} ${budgetDescription(warningItem)}.`}
+    />
+  );
+}
+
+function BreachedBudgetBanner({
+  item,
+  budget,
+}: {
+  item: BudgetOverviewItemView;
+  budget: ReturnType<typeof usePersonalContext>["budget"];
+}) {
+  return (
+    <BudgetExceededBanner
+      spentUsd={Number.parseFloat(item.spentUsd) || 0}
+      limitUsd={Number.parseFloat(item.limitUsd) || 0}
+      period={item.window.toLowerCase()}
+      scope={item.scopeClass}
+      requestIncreaseUrl={
+        "requestIncreaseUrl" in budget
+          ? (budget.requestIncreaseUrl ?? null)
+          : null
+      }
+      adminEmail={"adminEmail" in budget ? (budget.adminEmail ?? null) : null}
+    />
   );
 }
 

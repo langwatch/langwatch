@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
-import { logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
+import { logs, createNoopLogger } from "@opentelemetry/api-logs";
 import { type LangWatchLogRecord } from "../types";
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 
@@ -8,14 +8,26 @@ vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
     getLoggerProvider: vi.fn(),
   },
-  NoopLoggerProvider: vi.fn().mockImplementation(function () {
-    return {
-      getLogger: vi.fn().mockReturnValue({
-        emit: vi.fn(),
-      }),
-    };
+  // `NoopLoggerProvider` was dropped from the package's public exports;
+  // `createNoopLogger` is its replacement.
+  createNoopLogger: vi.fn().mockReturnValue({
+    emit: vi.fn(),
+    enabled: vi.fn().mockReturnValue(false),
   }),
 }));
+
+describe("LangWatchLoggerInternal enabled()", () => {
+  it("delegates enabled state to the wrapped logger", () => {
+    const wrappedLogger = {
+      emit: vi.fn(),
+      enabled: vi.fn().mockReturnValue(true),
+    };
+    const logger = createLangWatchLogger(wrappedLogger as any);
+
+    expect(logger.enabled()).toBe(true);
+    expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
+  });
+});
 
 
 
@@ -96,8 +108,13 @@ describe("LangWatch Logger", () => {
     });
 
     it("uses NoOp logger when no provider is set", () => {
-      // Reset to use NoOp logger
-      new NoopLoggerProvider();
+      // An earlier test in this suite calls `setLangWatchLoggerProvider`, which
+      // mutates module-level state that `resetObservabilitySdkConfig` doesn't
+      // touch. Reset it explicitly here so this test actually exercises the
+      // NoOp path instead of a leftover custom provider.
+      setLangWatchLoggerProvider({
+        getLogger: () => createNoopLogger(),
+      });
 
       const logger = getLangWatchLogger("test-logger");
 

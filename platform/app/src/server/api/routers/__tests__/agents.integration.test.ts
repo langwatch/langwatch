@@ -5,11 +5,16 @@
  * Tests the actual CRUD operations through the tRPC layer.
  * Config formats must be DSL-compatible for direct execution.
  */
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AgentService } from "~/server/agents/agent.service";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
@@ -517,6 +522,82 @@ describe("Agents Endpoints", () => {
       expect(copyAfter?.name).toBe("Sync Source Synced");
       const config = copyAfter?.config as typeof signatureConfig;
       expect(config?.prompt).toBe("Synced prompt");
+    });
+  });
+
+  describe("testRun", () => {
+    describe("when Test agent is requested for an http agent", () => {
+      /** @scenario "The mutation answers with the run ids" */
+      it("answers with the run ids and queues the run in the agent test set", async () => {
+        const agent = await caller.agents.create({
+          projectId,
+          name: "Test Run HTTP Agent",
+          type: "http",
+          config: httpConfig,
+        });
+
+        const result = await caller.agents.testRun({
+          projectId,
+          agentId: agent.id,
+        });
+
+        expect(result.scenarioRunId).toMatch(/^scenariorun_/);
+        expect(result.batchRunId).toMatch(/^scenariobatch_/);
+        expect(result.setId).toBe(`__internal__${projectId}__agent-test`);
+        expect(
+          await prisma.scenario.count({
+            where: { projectId, name: { contains: "Test Run HTTP Agent" } },
+          }),
+        ).toBe(0);
+      });
+    });
+
+    describe("when Test agent is requested for a connected agent no process is holding", () => {
+      /** @scenario "The API refuses to test an offline connected agent" */
+      it("refuses with agent_offline", async () => {
+        const agent = await AgentService.create(prisma).registerConnected({
+          id: `agent_${nanoid()}`,
+          projectId,
+          name: "offline-agent",
+          config: {
+            parameters: [],
+            sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+          },
+          identity: {
+            environment: "production",
+            ownerUserId: null,
+            hostLabel: null,
+            identityKey: `offline-agent@production-${nanoid(6)}`,
+          },
+        });
+
+        await expect(
+          caller.agents.testRun({ projectId, agentId: agent.id }),
+        ).rejects.toMatchObject({
+          cause: {
+            code: "agent_offline",
+            meta: { agentName: "offline-agent", environment: "production" },
+          },
+        });
+      });
+    });
+
+    describe("when Test agent is requested for a prompt agent", () => {
+      it("refuses: only HTTP, code, workflow and connected agents run", async () => {
+        const agent = await caller.agents.create({
+          projectId,
+          name: "Test Run Prompt Agent",
+          type: "signature",
+          config: signatureConfig,
+        });
+
+        await expect(
+          caller.agents.testRun({ projectId, agentId: agent.id }),
+        ).rejects.toMatchObject({
+          code: "UNPROCESSABLE_CONTENT",
+          cause: { code: "agent_test_refused" },
+        });
+      });
     });
   });
 });

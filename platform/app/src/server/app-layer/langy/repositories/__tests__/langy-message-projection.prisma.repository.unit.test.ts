@@ -1,6 +1,6 @@
 import type { LangyMessageProjectionRecord } from "@langwatch/langy";
-import type { LangyMessageProjection } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { LangyMessageProjection } from "~/generated/prisma/client";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
@@ -45,6 +45,7 @@ function row(projectId = "project-1"): Row {
 }
 
 describe("PrismaLangyMessageProjectionRepository", () => {
+  /** @scenario "Retrying the same send does not double-count" */
   it("uses a tenant-scoped upsert so retrying the same event is idempotent", async () => {
     const upsert = vi.fn<Upsert>(async () => row());
     const client = {
@@ -72,6 +73,7 @@ describe("PrismaLangyMessageProjectionRepository", () => {
     expect(upsert).toHaveBeenNthCalledWith(2, expected);
   });
 
+  /** @scenario "Every conversation read is scoped to the project" */
   it("does not share a message key between projects", async () => {
     const upsert = vi.fn<Upsert>(async () => row());
     const client = {

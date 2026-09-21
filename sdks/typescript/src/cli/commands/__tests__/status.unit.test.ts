@@ -94,7 +94,19 @@ const mockGatewayFetch = ({
       return {
         ok: true,
         status: 200,
-        json: async () => ({ data: budgets, spend_available: spendAvailable }),
+        json: async () => ({
+          // Mirrors the server: a page it could not total serves both spend
+          // fields as null rather than a stale figure a caller could read as
+          // real money (budget.dto.ts). The flag and the nulls always agree.
+          data: spendAvailable
+            ? budgets
+            : budgets.map((budget) => ({
+                ...(budget as Record<string, unknown>),
+                spent_usd: null,
+                spent_nano_usd: null,
+              })),
+          spend_available: spendAvailable,
+        }),
       };
     }
     return { ok: true, status: 200, json: async () => [{ id: "1" }] };

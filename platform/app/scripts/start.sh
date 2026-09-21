@@ -37,10 +37,15 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # with `override: true` after this runs, which would put the committed 5560
   # back, so the app realigns again on the other side of that load in
   # `alignDevAuthUrlsToPort` (src/env-create.mjs). Keep the two in step.
+  #
+  # LANGWATCH_ENDPOINT is the address the app hands out as itself (the Langy
+  # worker callback, scenario child processes, setup snippets), so it follows
+  # the same port for the same reason.
   if [ -n "$PORT" ]; then
     export BASE_HOST="http://localhost:${PORT}"
     export NEXTAUTH_URL="http://localhost:${PORT}"
-    echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+    export LANGWATCH_ENDPOINT="http://localhost:${PORT}"
+    echo "  ✓ BASE_HOST=NEXTAUTH_URL=LANGWATCH_ENDPOINT=${BASE_HOST} (auto-aligned to PORT=${PORT})"
   fi
 
   # AI Gateway port + URL auto-derivation. Default layout:
@@ -83,30 +88,46 @@ if [[ "$NODE_ENV" = "development" ]]; then
   echo "  ✓ gateway: port=${GATEWAY_PORT_DERIVED} cp=${GATEWAY_CONTROL_PLANE_URL:-(unset, using LW_GATEWAY_BASE_URL)} public=${LW_GATEWAY_PUBLIC_URL}"
 fi
 
-# DOTENV_CONFIG_QUIET silences dotenv v17's promotional "injected env" banner
-# for lanes that load it via `import "dotenv/config"` (e.g. workers.ts, which
-# must keep that side-effect import first). server.mts / vite.config.ts pass
-# `quiet: true` explicitly.
-RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true DOTENV_CONFIG_QUIET=true"
+RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
+
+# Unset NODE_ENV means production. Export it — rather than prefixing it onto
+# individual lane commands — so every child observes the same value, including
+# `start:prepare:db` below, which runs outside RUNTIME_ENV.
 if [ -z "$NODE_ENV" ]; then
-  RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
+  export NODE_ENV=production
 fi
 
 # `-s` silences pnpm's own `> pkg@ver script` lifecycle banner so each lane's
 # output starts with real logs, not the script header. Child stdout is untouched.
-START_APP_COMMAND="pnpm -s run start:app"
+#
+# Dev runs the app from source via tsx (hot reload); production runs the
+# pre-built bundle on plain node (runtime:app -> node dist/server/server.cjs), so
+# the prod image ships no tsx. Same split for the standalone workers lane below.
+if [[ "$NODE_ENV" = "development" ]]; then
+  START_APP_COMMAND="pnpm -s run runtime:app:dev"
+else
+  START_APP_COMMAND="pnpm -s run runtime:app"
+fi
 
 # Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
-# inside `start:app` (the app boots with the "all" role) instead of a separate
+# inside `runtime:app` (the app boots with the "all" role) instead of a separate
 # concurrently lane. When it's set we skip the standalone workers command below
-# and let start:app inherit the flag from the environment. Production never sets
+# and let runtime:app inherit the flag from the environment. Production never sets
 # this — it runs web and worker as separate deployments.
 START_WORKERS_COMMAND=""
 if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
   export WORKERS_IN_PROCESS
   echo "  ✓ workers: in-process (WORKERS_IN_PROCESS=1) — no separate worker lane"
 elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
+  # Standalone workers lane (dev uses it via concurrently; prod normally runs
+  # workers as a separate deployment). Pick the entry point the same way as the
+  # app: tsx only for an explicit development env, the bundle otherwise — the
+  # prod image has no tsx, so START_WORKERS=1 there must not select it.
+  if [[ "$NODE_ENV" = "development" ]]; then
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers:dev && exit 1"
+  else
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers && exit 1"
+  fi
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.
@@ -130,6 +151,15 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
     echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually"
   elif lsof -i ":$_GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "  ✓ aigateway: already running on :$_GATEWAY_PORT, reusing"
+    # A reused gateway ships ITS OWN spend, budget and auth traffic to
+    # whatever control plane it was started with, which is not necessarily
+    # this worktree's, the process could belong to another worktree or be
+    # a stale leftover, and nothing about a proxying, 200-returning gateway
+    # reveals that on its own. Ask it directly (scripts/check-gateway-
+    # control-plane.ts, backed by GET /debug/control-plane) and warn loudly
+    # on any mismatch, or when it cannot be asked at all. Never blocks
+    # startup: the check has its own short timeout and always exits 0.
+    tsx "$(dirname "$0")/check-gateway-control-plane.ts" "$_GATEWAY_PORT" "$LW_GATEWAY_BASE_URL"
   else
     START_GATEWAY_COMMAND="make -C ../.. service svc=aigateway"
     echo "  ✓ aigateway: auto-start on :$_GATEWAY_PORT"
@@ -144,8 +174,16 @@ fi
 # silently when that port is already taken (another worktree / a manual run),
 # when LANGWATCH_NLP_SERVICE points at an external host, when the Go toolchain
 # isn't on PATH, and via LANGWATCH_SKIP_NLP=1.
+#
+# The address has to come out of the env files, not just the shell: the Node
+# entry points load .env (then the .env.portless overlay) with `override: true`
+# AFTER this script runs, so a pinned LANGWATCH_NLP_SERVICE is what the app
+# dials while this shell sees nothing at all. Reading it here is what keeps the
+# engine and the app on one port.
 START_NLP_COMMAND=""
 if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
+  . "$(dirname "$0")/../../../dev/scripts/lib/resolve-nlp-service.sh"
+  resolve_nlp_service "$(dirname "$0")/.."
   _NLP_PORT=""
   if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
     _NLP_PORT=$((_APP_PORT + 1))
@@ -168,7 +206,31 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
   fi
 fi
 
-pnpm run start:prepare:db
+# langyagent (Go agent manager). Bundled into pnpm dev so a chat with Langy in
+# a local app reaches a live manager instead of a dead port. The manager itself
+# is cheap: no database client, about 30 MB idle, and it spawns a worker only
+# when a person chats. The lane caps that pool to the local size.
+#
+# The decision has more branches than the lanes above, so it lives in
+# dev/scripts/lib/plan-langy-lane.sh: langyagent takes its listen port from
+# PORT, which is the app's here, and fails fast without its secret and roots.
+# Opt-out: LANGWATCH_SKIP_LANGY=1.
+START_LANGY_COMMAND=""
+if [[ "$NODE_ENV" = "development" ]]; then
+  . "$(dirname "$0")/../../../dev/scripts/lib/plan-langy-lane.sh"
+  plan_langy_lane "$(dirname "$0")/.." "$_APP_PORT"
+  if [ "$LANGY_LANE_DECISION" = "start" ]; then
+    START_LANGY_COMMAND=$(langy_lane_command "../.." "$LANGY_LANE_PORT")
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  elif [[ "$LANGY_LANE_REASON" == skipped* ]]; then
+    echo "  ! langyagent: $LANGY_LANE_REASON"
+  else
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  fi
+fi
+
+source "$(dirname "$0")/start-runtime.sh"
+run_startup_preflight
 
 COMMANDS=()
 NAMES=()
@@ -188,6 +250,10 @@ if [ -n "$START_NLP_COMMAND" ]; then
   COMMANDS+=("$START_NLP_COMMAND")
   NAMES+=("nlpgo")
 fi
+if [ -n "$START_LANGY_COMMAND" ]; then
+  COMMANDS+=("$START_LANGY_COMMAND")
+  NAMES+=("langy")
+fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
   NAMES+=("api")
@@ -198,5 +264,5 @@ if [ ${#COMMANDS[@]} -eq 1 ]; then
   eval "$RUNTIME_ENV exec $START_APP_COMMAND"
 else
   NAMES_STR=$(IFS=,; echo "${NAMES[*]}")
-  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,cyan" "${COMMANDS[@]}"
+  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,red,cyan" "${COMMANDS[@]}"
 fi

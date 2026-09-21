@@ -19,6 +19,11 @@
         "noUncheckedIndexedAccess": true,
         "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
         "allowSyntheticDefaultImports": true,
+        // tsup's dts worker sets `baseUrl` itself, and TypeScript 6 makes that
+        // a hard error rather than a warning — this package cannot build
+        // without the transition flag until a d.ts bundler exists that speaks
+        // the TypeScript 7 API. See ADR-099.
+        "ignoreDeprecations": "6.0",
         "paths": {
             "@/*": ["./src/*"]
         }

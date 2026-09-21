@@ -2,7 +2,13 @@
 
 **Date:** 2026-06-10
 
-**Status:** Accepted
+**Status:** Accepted — **renamed by [ADR-098](./098-post-event-work-subscribers-and-process-managers.md).**
+
+The decision below stands unchanged: a pure, synchronous predicate gates the
+enqueue, and a throwing predicate fails open. Only the vocabulary moved. Read
+"reactor" as "subscriber", `shouldReact` as `shouldDispatch`, and
+`dispatchToReactors` as `dispatchToSubscribers`. The `es_reactor_total`
+counter this ADR names is deliberately unrenamed — dashboards key on it.
 
 ## Context
 
@@ -35,7 +41,7 @@ dispatch. The exact value a predicate sees at enqueue time is the value
 can change between the two, so a decision made at dispatch cannot be
 invalidated by execution-time drift.
 
-See [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+See [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)
 for the behavioural contract this decision supports.
 
 ## Decision
@@ -136,4 +142,4 @@ that condition belongs in `handle()`.
   state, so predicates reading `foldState.attributes` see the same values
   the handler does even on cache-rehydrated paths; ADR-021 held this
   before being superseded)
-- Spec: [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+- Spec: [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)

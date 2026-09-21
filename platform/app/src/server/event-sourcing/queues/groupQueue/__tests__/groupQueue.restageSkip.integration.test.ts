@@ -20,8 +20,8 @@ import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 import { gqJobsDroppedTotal, gqJobsRetriedTotal } from "../metrics";
 import {
-  incompressible,
   InMemoryObjectStore,
+  incompressible,
   PerUriTransientFailureStore,
 } from "./blobTestDoubles";
 
@@ -48,8 +48,10 @@ type TestPayload = {
 // Tenant prefix for groupIds so GQ2 (content-addressed, tenant-namespaced)
 // offload activates -- see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
 const TENANT = createTenantId("proj1");
-const STORAGE_DESTINATION = async () =>
-  ({ kind: "s3" as const, bucket: "test-bucket" });
+const STORAGE_DESTINATION = async () => ({
+  kind: "s3" as const,
+  bucket: "test-bucket",
+});
 
 // > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts).
 // Each sibling gets its own blob so a single one can be corrupted in isolation.
@@ -283,7 +285,9 @@ describe.skipIf(!hasTestcontainers)(
           // permits; every subsequent drop would be a resurrection.
           await vi.waitFor(
             async () => {
-              expect(await bodyUnreadableDropCount(name)).toBeGreaterThanOrEqual(1);
+              expect(
+                await bodyUnreadableDropCount(name),
+              ).toBeGreaterThanOrEqual(1);
             },
             { timeout: 15000, interval: 100 },
           );
@@ -419,7 +423,9 @@ describe.skipIf(!hasTestcontainers)(
           // recordDrop.
           await vi.waitFor(
             async () => {
-              expect(await bodyUnreadableDropCount(name)).toBeGreaterThanOrEqual(1);
+              expect(
+                await bodyUnreadableDropCount(name),
+              ).toBeGreaterThanOrEqual(1);
             },
             { timeout: 15000, interval: 100 },
           );

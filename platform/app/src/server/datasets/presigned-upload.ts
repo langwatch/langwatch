@@ -31,7 +31,7 @@ export const UPLOAD_TTL_SECONDS = 15 * 60;
  *
  * The reaper is *poll-triggered* (runs opportunistically when the next upload
  * starts — see `reapStalePendingUploads`), not a scheduler: this epic
- * deliberately adds no new cron/BullMQ-repeat (see the normalize-recovery
+ * deliberately adds no new cron or repeatable job (see the normalize-recovery
  * decision). The durable backstop for objects whose row never gets reaped (an
  * inactive project) is an S3 bucket lifecycle rule on the `staging/` prefix
  * (IaC) — the same place the upload-bucket CORS rule lives.

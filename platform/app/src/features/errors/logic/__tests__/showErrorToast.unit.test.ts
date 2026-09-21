@@ -11,7 +11,7 @@ interface ToastArgs {
   description?: string;
   // Non-optional: `showErrorToast` always sets `meta`, so the assertions read
   // `toast.meta.traceId` directly.
-  meta: { docsUrl?: string; traceId?: string; closable?: boolean };
+  meta: { docsUrl?: string; traceId?: string };
 }
 const create = vi.fn<(args: ToastArgs) => void>();
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create } }));
@@ -270,13 +270,10 @@ describe("showErrorToast", () => {
 
   describe("on every error toast", () => {
     /**
-     * Both are deliberate and neither was asserted: the shared 5s default is
-     * not long enough to read the copy and click through to the docs or the
-     * error id, and dropping `closable` leaves an error toast with no close
-     * button, because the Toaster only renders `Toast.CloseTrigger` when
-     * `meta.closable` is set.
+     * The duration is deliberate: the shared 5s default is not long enough to
+     * read the copy and click through to the docs or the error id.
      */
-    it("stays long enough to read and dismissable by hand", () => {
+    it("stays long enough to read", () => {
       showErrorToast({
         error: handledError(null),
         fallbackTitle: "Couldn't save",
@@ -286,7 +283,6 @@ describe("showErrorToast", () => {
         duration?: number;
       };
       expect(toast.duration).toBe(12000);
-      expect(toast.meta.closable).toBe(true);
     });
   });
 });

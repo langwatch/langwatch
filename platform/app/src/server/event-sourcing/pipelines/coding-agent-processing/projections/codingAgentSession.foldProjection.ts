@@ -7,6 +7,10 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
+  codingAgentCostComputedUsd,
+  codingAgentCostReportedUsd,
+} from "../metrics";
+import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type MetricFactsContributedEvent,
@@ -21,10 +25,15 @@ import {
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-import type {
-  CodingAgentSessionData,
-  MetricSeriesFact,
+import {
+  type CodingAgentSessionData,
+  contextUsageKey,
+  type MetricSeriesFact,
+  type SessionContextUsage,
+  type SessionTitleSource,
+  sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
+import { stampedContextOf } from "../services/session-context-memo";
 
 /**
  * The coding-agent session fold (ADR-056).
@@ -57,6 +66,43 @@ const codingAgentSessionEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
  *
+ *  2026-08-23: the session's `CostUsd` became the computed figure — the
+ *  call's own tokens priced against the model registry, the same formula and
+ *  the same cache-write lifetime the trace pipeline applies to the identical
+ *  span — and what the agent reports about its own bill moved to the new
+ *  `AgentReportedCostUsd` (migration 00085). Rows stamped earlier carry the
+ *  agent-reported number AS CostUsd and decode the new column as zero, so the
+ *  bump refolds each session once: the replayed span contributions rebuild
+ *  the computed cost, and the replayed api_request contributions land on the
+ *  reported column where they belong.
+ *
+ *  2026-08-10: `GitBranches` (migration 00077) joined the projected row shape,
+ *  the bounded first-seen set of every branch a session reported. A row stamped
+ *  2026-08-02 decodes it as an empty array, which is exactly what a session
+ *  that reported no branch at all decodes to, so the fold would carry on from
+ *  empty and remember only the branches reported after the deploy. Unlike the
+ *  git-context columns below, that stamp IS in the wild, so the bump is what
+ *  refolds each session once and rebuilds the whole set from its stored
+ *  contributions. The refold wave is the price of the backfill: the alternative
+ *  is a population that answers "one branch" forever for every session that had
+ *  already moved.
+ *
+ *  2026-08-02: the context-economics columns of migration 00074 joined the
+ *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
+ *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
+ *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows
+ *  stamped earlier decode without them, so the bump refolds each session once
+ *  to backfill the counters from its stored contributions.
+ *
+ *  The same stamp also covers the git-context columns of migration 00075
+ *  (`RepositoryHost` / `RepositoryOwner` / `RepositoryName`, `GitBranch`,
+ *  `GitWorktree`, `Title`), deliberately rather than by omission: it has not
+ *  been released, so no row in the wild carries it without them, and every
+ *  one of the six is a String whose `DEFAULT ''` decodes as null, the honest
+ *  "nothing reported this", which is also the answer for every agent with no
+ *  companion emitter. A second stamp would buy a refold wave over the whole
+ *  population to rediscover exactly that.
+ *
  *  2026-07-28 — the logs-only double-count gate became symmetric: a logs-only
  *  agent's model calls and tool runs no longer fold from BOTH its log events
  *  and the equivalent spans. Rows stamped `2026-07-27` were folded by the
@@ -77,7 +123,25 @@ const codingAgentSessionEvents = [
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
  *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
-export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
+
+/** The cost-drift counters' label set, off one contribution's facts. */
+function costDriftLabels({
+  agent,
+  facts,
+}: {
+  agent?: string;
+  facts: Record<string, unknown>;
+}): { agent: string; model: string } {
+  const model =
+    facts.model ??
+    facts["gen_ai.request.model"] ??
+    facts["gen_ai.response.model"];
+  return {
+    agent: agent ?? "unknown",
+    model: typeof model === "string" && model.length > 0 ? model : "unknown",
+  };
+}
 
 /**
  * The stamp rows carried while migrations 00053 and 00054 shipped.
@@ -89,10 +153,15 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
  * decodable — see `CodingAgentSessionStore.getWithApplied` for the second half
  * of the discriminator.
  *
- * Still accepted after the 2026-07-28 bump, deliberately: these rows predate
+ * Still accepted after the 2026-07-28, 2026-08-02 and 2026-08-10 bumps,
+ * deliberately: these rows predate
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
- * discriminator already covers the shape.
+ * discriminator already covers the shape. (The same trade holds for the 00074
+ * context-economics columns: a pre-stamp row decodes them as zeros, which is
+ * honest for sessions that old, and a replay can backfill them if they ever
+ * matter. And for the 00077 branch set: a pre-stamp row decodes it empty, and
+ * the read side falls back to the single branch such a row does carry.)
  *
  * Rejecting them would buy nothing anyway. They also predate Cowork detection,
  * so their contributions were stored labelled `claude_code` and a refold
@@ -285,7 +354,20 @@ export class CodingAgentSessionFoldProjection
       // The contribution's own label, not the folded (first-writer-wins)
       // state's — same reasoning as the log handler below.
       agent: data.agent,
+      // The stamp the contribute command put on the event, so the call's
+      // tokens are charged to the context declared before it.
+      context: stampedContextOf(data),
     });
+
+    // The computed half of the cost-drift canary: what this span's tokens
+    // priced at. Its reported counterpart rides the log handler below.
+    const computedDelta = next.costUsd - state.costUsd;
+    if (computedDelta > 0) {
+      codingAgentCostComputedUsd.inc(
+        costDriftLabels({ agent: data.agent, facts: data.facts }),
+        computedDelta,
+      );
+    }
 
     const withIdentity = this.withContributionIdentity(
       { ...state, ...next },
@@ -306,7 +388,21 @@ export class CodingAgentSessionFoldProjection
       // state's — the logs-only gate must reflect what THIS record is.
       agent: data.agent,
       occurredAtMs: data.timeUnixMs,
+      context: stampedContextOf(data),
     });
+
+    // The reported half of the cost-drift canary: what the agent says this
+    // call billed. Computed-vs-reported per model is the alarm for a stale
+    // price, ours or theirs.
+    const reportedDelta =
+      next.agentReportedCostUsd - state.agentReportedCostUsd;
+    if (reportedDelta > 0) {
+      codingAgentCostReportedUsd.inc(
+        costDriftLabels({ agent: data.agent, facts: data.facts }),
+        reportedDelta,
+      );
+    }
+
     return this.withContributionIdentity(
       { ...state, ...next },
       { ...data, occurredAt: data.timeUnixMs },
@@ -370,6 +466,28 @@ export interface CodingAgentSessionRow {
   userId: string;
   terminalType: string;
   entrypoint: string;
+  parentSessionId: string;
+  isFork: boolean;
+  /**
+   * A thread the agent ran for itself (00096): codex's thread title
+   * generator, its recap. Kept and priced, never listed as a session.
+   */
+  auxiliary: boolean;
+  /** Git identity from the companion event, and the generated title (00075). */
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  gitBranch: string;
+  /** Every branch the session reported, bounded and first-seen (00077). */
+  gitBranches: string[];
+  gitWorktree: string;
+  title: string;
+  /**
+   * Which source set `Title` (00083): "prompt", "generated", "name", or ""
+   * on a row from before the column. Read back so a later fold knows whether
+   * a regenerated title may replace it — a name may not be clobbered.
+   */
+  titleSource: string;
 
   modelCalls: number;
   toolCalls: number;
@@ -395,6 +513,14 @@ export interface CodingAgentSessionRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  agentReportedCostUsd: number;
+  /**
+   * What the session spent under each declared working context (00097),
+   * first seen first. The counters above are the amount; this says where it
+   * went. Empty on a row folded before the column, whose whole usage then
+   * reads as spent before any declaration.
+   */
+  usageByContext: SessionContextUsage[];
 
   modelCallMs: number;
   toolMs: number;
@@ -409,6 +535,7 @@ export interface CodingAgentSessionRow {
   compactions: number;
   compactionTokensBefore: number;
   compactionTokensAfter: number;
+  compactionTriggers: Record<string, number>;
   peakContextTokens: number;
   cacheRebuildCount: number;
   largestCacheRebuildTokens: number;
@@ -417,6 +544,7 @@ export interface CodingAgentSessionRow {
   errorTypes: Record<string, number>;
   apiErrors: number;
   rateLimited: number;
+  rateLimitEvents: number;
   retriesExhausted: number;
   retryMs: number;
   attempts: number;
@@ -493,6 +621,10 @@ export function projectCodingAgentSessionToRow({
     userId: state.userId ?? "",
     terminalType: state.terminalType ?? "",
     entrypoint: state.entrypoint ?? "",
+    parentSessionId: state.parentSessionId ?? "",
+    isFork: state.isFork,
+    auxiliary: state.auxiliary,
+    ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,
     toolCalls: state.toolCalls,
@@ -517,6 +649,8 @@ export function projectCodingAgentSessionToRow({
     cacheReadTokens: state.cacheReadTokens,
     cacheCreationTokens: state.cacheCreationTokens,
     costUsd: state.costUsd,
+    agentReportedCostUsd: state.agentReportedCostUsd,
+    usageByContext: Object.values(state.usageByContext),
 
     modelCallMs: state.modelCallMs,
     toolMs: state.toolMs,
@@ -531,6 +665,7 @@ export function projectCodingAgentSessionToRow({
     compactions: state.compactions,
     compactionTokensBefore: state.compactionTokensBefore,
     compactionTokensAfter: state.compactionTokensAfter,
+    compactionTriggers: state.compactionTriggers,
     peakContextTokens: state.peakContextTokens,
     cacheRebuildCount: state.cacheRebuildCount,
     largestCacheRebuildTokens: state.largestCacheRebuildTokens,
@@ -539,6 +674,7 @@ export function projectCodingAgentSessionToRow({
     errorTypes: state.errorTypes,
     apiErrors: state.apiErrors,
     rateLimited: state.rateLimited,
+    rateLimitEvents: state.rateLimitEvents,
     retriesExhausted: state.retriesExhausted,
     retryMs: state.retryMs,
     attempts: state.attempts,
@@ -584,6 +720,42 @@ export function projectCodingAgentSessionToRow({
     lastEventOccurredAt: state.LastEventOccurredAt,
   };
 }
+
+/**
+ * The git identity and title columns (migrations 00075 and 00077). The empty
+ * string is the honest unset for the six scalars: an agent with no companion
+ * emitter reports none of them, and `nullIfEmpty` maps them straight back on
+ * read. `gitBranches` is an empty array for the same reason.
+ */
+function gitContextColumns(state: CodingAgentSessionState): {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  gitBranch: string;
+  gitBranches: string[];
+  gitWorktree: string;
+  title: string;
+  titleSource: string;
+} {
+  return {
+    repositoryHost: state.repositoryHost ?? "",
+    repositoryOwner: state.repositoryOwner ?? "",
+    repositoryName: state.repositoryName ?? "",
+    gitBranch: state.gitBranch ?? "",
+    gitBranches: state.gitBranches,
+    gitWorktree: state.gitWorktree ?? "",
+    title: state.title ?? "",
+    titleSource: state.titleSource ?? "",
+  };
+}
+
+/**
+ * The title-source column decodes into its union; anything else — the empty
+ * default on a pre-00083 row included — reads as unset, which the fold ranks
+ * as a generated title (see `withTitle`).
+ */
+const titleSourceFromRow = (value: string): SessionTitleSource | null =>
+  sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null =>
@@ -637,6 +809,17 @@ export function codingAgentSessionStateFromRow(
     entrypoint: nullIfEmpty(row.entrypoint),
     finalRequestId: nullIfEmpty(row.finalRequestId),
     userId: nullIfEmpty(row.userId),
+    parentSessionId: nullIfEmpty(row.parentSessionId),
+    isFork: row.isFork,
+    auxiliary: row.auxiliary,
+    repositoryHost: nullIfEmpty(row.repositoryHost),
+    repositoryOwner: nullIfEmpty(row.repositoryOwner),
+    repositoryName: nullIfEmpty(row.repositoryName),
+    gitBranch: nullIfEmpty(row.gitBranch),
+    gitBranches: row.gitBranches,
+    gitWorktree: nullIfEmpty(row.gitWorktree),
+    title: nullIfEmpty(row.title),
+    titleSource: titleSourceFromRow(row.titleSource),
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,
@@ -667,6 +850,10 @@ export function codingAgentSessionStateFromRow(
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     costUsd: row.costUsd,
+    agentReportedCostUsd: row.agentReportedCostUsd,
+    usageByContext: Object.fromEntries(
+      row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
+    ),
 
     modelCallMs: row.modelCallMs,
     toolMs: row.toolMs,
@@ -681,6 +868,7 @@ export function codingAgentSessionStateFromRow(
     compactions: row.compactions,
     compactionTokensBefore: row.compactionTokensBefore,
     compactionTokensAfter: row.compactionTokensAfter,
+    compactionTriggers: row.compactionTriggers,
     peakContextTokens: row.peakContextTokens,
     cacheRebuildCount: row.cacheRebuildCount,
     largestCacheRebuildTokens: row.largestCacheRebuildTokens,
@@ -690,6 +878,7 @@ export function codingAgentSessionStateFromRow(
     errorTypes: row.errorTypes,
     apiErrors: row.apiErrors,
     rateLimited: row.rateLimited,
+    rateLimitEvents: row.rateLimitEvents,
     retriesExhausted: row.retriesExhausted,
     retryMs: row.retryMs,
     attempts: row.attempts,

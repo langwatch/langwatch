@@ -1,4 +1,4 @@
-import type { AccessPolicy } from "./access-policy";
+import type { AccessPolicy, CredentialClass } from "./access-policy";
 
 /**
  * Process-wide registry of every route declared through the secured app
@@ -13,6 +13,14 @@ export interface RegisteredRoute {
   readonly path: string;
   readonly policy: AccessPolicy;
   readonly family: string;
+  /**
+   * Which credential an API consumer sends here. Derived by the builder from
+   * the app and the policy, so a route cannot be published claiming a
+   * credential class nothing enforces. Read by the OpenAPI generator to stamp
+   * each operation's `security`, which used to inherit one document-wide
+   * default that was wrong for every organization-scoped route.
+   */
+  readonly credentialClass: CredentialClass;
 }
 
 const registry = new Map<string, RegisteredRoute>();

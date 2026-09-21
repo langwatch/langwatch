@@ -19,6 +19,7 @@ export const colorSystem = {
     400: { value: "#9CA3AF" },
     300: { value: "#cbd5e1" },
     200: { value: "#e2e8f0" },
+    150: { value: "#e7ecf2" },
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },

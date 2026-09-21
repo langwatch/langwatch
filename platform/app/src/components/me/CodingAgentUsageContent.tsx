@@ -4,6 +4,8 @@ import numeral from "numeral";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { api } from "~/utils/api";
 
+import { formatDurationSeconds } from "./duration";
+
 /**
  * The personal coding-agent usage figures (ADR-056, personal-usage.feature):
  * cost, tokens, active time and session count over the trailing window, with
@@ -65,7 +67,7 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
       ? `${numeral(totals.commits).format("0,0")} commit${totals.commits === 1 ? "" : "s"}`
       : null,
     totals.pullRequests > 0
-      ? `${numeral(totals.pullRequests).format("0,0")} PR${totals.pullRequests === 1 ? "" : "s"}`
+      ? `${numeral(totals.pullRequests).format("0,0")} pull request${totals.pullRequests === 1 ? "" : "s"}`
       : null,
   ].filter((part): part is string => part !== null);
 
@@ -77,10 +79,13 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
           value={numeral(totals.sessionCount).format("0,0")}
         />
         <Stat label="Cost" value={formatBudgetUsd(totals.costUsd)} />
-        <Stat label="Tokens" value={formatTokens(totals.totalTokens)} />
+        <Stat
+          label="Tokens"
+          value={numeral(totals.totalTokens).format("0,0")}
+        />
         <Stat
           label="Active time"
-          value={formatDuration(totals.activeTimeSec)}
+          value={formatDurationSeconds(totals.activeTimeSec)}
         />
       </SimpleGrid>
       {produced.length > 0 && (
@@ -114,21 +119,4 @@ function Stat({ label, value }: { label: string; value: string }) {
       </Text>
     </Box>
   );
-}
-
-/** Compact token count: 999 → "999", 12_345 → "12.3k", 4_500_000 → "4.5m". */
-function formatTokens(tokens: number): string {
-  if (tokens < 1_000) return numeral(tokens).format("0,0");
-  return numeral(tokens).format("0.[0]a");
-}
-
-/** Whole-second duration as "45s" / "12m" / "3h 20m". */
-function formatDuration(totalSeconds: number): string {
-  const seconds = Math.round(totalSeconds);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return remMinutes > 0 ? `${hours}h ${remMinutes}m` : `${hours}h`;
 }

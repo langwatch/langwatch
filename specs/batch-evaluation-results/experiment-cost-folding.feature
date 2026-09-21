@@ -4,8 +4,8 @@ Feature: Experiment trace cost folding
   I want trace costs to be automatically folded into experiment run results
   So that I can see LLM costs per row and per run without manual tracking
 
-  # Reactor + projection scenarios are bound below to:
-  #   * experimentMetricsSync.reactor.unit.test.ts — dispatch + skip
+  # Subscriber + projection scenarios are bound below to:
+  #   * experimentMetricsSync.subscriber.unit.test.ts — dispatch + skip
   #     paths for evaluation.run_id presence and totalCost values.
   #   * experimentRunState.projection.handler.test.ts — TraceMetrics
   #     accumulation + per-trace breakdown.
@@ -39,21 +39,21 @@ Feature: Experiment trace cost folding
     Given a trace has evaluation.run_id = "run-abc" in its attributes
     And the trace has a total cost of $0.003
     When the trace stabilises after 60 seconds of no new spans
-    Then the experimentMetricsSync reactor dispatches computeExperimentRunMetrics
+    Then the experimentMetricsSync subscriber dispatches computeExperimentRunMetrics
     And the command payload includes traceId and totalCost = 0.003
 
   @unimplemented
-  Scenario: Reactor does not fire for traces without evaluation.run_id
+  Scenario: Subscriber does not fire for traces without evaluation.run_id
     Given a trace has no evaluation.run_id attribute
     When the trace stabilises
-    Then the experimentMetricsSync reactor does not dispatch any command
+    Then the experimentMetricsSync subscriber does not dispatch any command
 
   @unimplemented
-  Scenario: Reactor does not fire when trace has no cost data
+  Scenario: Subscriber does not fire when trace has no cost data
     Given a trace has evaluation.run_id = "run-abc"
     And the trace has no cost data
     When the trace stabilises
-    Then the experimentMetricsSync reactor does not dispatch any command
+    Then the experimentMetricsSync subscriber does not dispatch any command
 
   # ============================================================================
   # Fold Projection: Aggregate Cost Accumulation

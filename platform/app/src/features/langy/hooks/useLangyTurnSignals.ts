@@ -18,6 +18,8 @@ export interface LangyTurnMetric {
 export interface LangyTurnSignals {
   /** From `status_reported` — e.g. "Analysing 1,204 traces". */
   status: string | null;
+  /** `status` is the manager's readiness placeholder (see the store field). */
+  statusIsReadiness: boolean;
   /** From `progress_reported` — 0..1 or 0..100. */
   progress: number | null;
   /** Measured batch timing used to interpolate between real progress samples. */
@@ -62,11 +64,13 @@ export function useLangyTurnSignals(
   _conversationId: string | null,
 ): LangyTurnSignals {
   const status = useLangyStore((s) => s.turnStatus);
+  const statusIsReadiness = useLangyStore((s) => s.turnStatusIsReadiness);
   const progress = useLangyStore((s) => s.turnProgress);
   const progressSample = useLangyStore((s) => s.turnProgressSample);
   const reasoning = useLangyStore((s) => s.turnReasoning);
   return {
     status,
+    statusIsReadiness,
     progress,
     progressSample,
     metrics: null,

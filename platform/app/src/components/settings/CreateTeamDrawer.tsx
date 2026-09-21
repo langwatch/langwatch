@@ -1,7 +1,7 @@
-import { TeamUserRole } from "@prisma/client";
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -19,7 +19,7 @@ export function CreateTeamDrawer({
   const { organization } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
   const { closeDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const form = useForm<TeamFormData>({
     defaultValues: {
@@ -60,7 +60,6 @@ export function CreateTeamDrawer({
               title: "Team created successfully",
               type: "success",
               duration: 5000,
-              meta: { closable: true },
             });
             closeDrawer();
           },
@@ -69,7 +68,6 @@ export function CreateTeamDrawer({
               title: "Failed to create team",
               type: "error",
               duration: 5000,
-              meta: { closable: true },
             });
           },
         },
@@ -97,7 +95,7 @@ export function CreateTeamDrawer({
               organizationId={organization.id}
               form={form}
               onSubmit={onSubmit}
-              isLoading={createTeam.isLoading}
+              isLoading={createTeam.isPending}
             />
           )}
         </Drawer.Body>

@@ -115,7 +115,7 @@ const ExecutionMetadata = ({
           <Button
             size="sm"
             onClick={() => {
-              openDrawer("traceDetails", {
+              openDrawer("traceV2Details", {
                 traceId: executionState.trace_id ?? "",
               });
             }}

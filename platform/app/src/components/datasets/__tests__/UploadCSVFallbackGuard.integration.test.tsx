@@ -54,7 +54,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       dataset: {
         findNextName: { fetch: vi.fn().mockResolvedValue("New Dataset") },
       },

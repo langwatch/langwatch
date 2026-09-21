@@ -27,6 +27,6 @@ Feature: Presence toggle placement in the chrome
   @unit
   Scenario: Avatar menu omits the presence toggle off the traces page
     Given the user is signed in
-    And the user is on a non-traces page (e.g. /messages, /analytics, /settings)
+    And the user is on a non-traces page (e.g. /analytics, /datasets, /settings)
     When the user opens the avatar dropdown in the top right
     Then no "Sharing presence" row is rendered inside the dropdown

@@ -93,6 +93,24 @@ describe("SimulationClickHouseRepository", () => {
           .calls[0]?.[0] as { query: string } | undefined;
         expect(firstCallArg?.query).toContain("IF(ScenarioSetId = '',");
       });
+
+      /** @scenario "The legacy voice-calls set is excluded from run listings" */
+      it("excludes the agent-test suffix and the voice-calls set", async () => {
+        const mockClient = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(mockClient);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        await repo.getDistinctExternalSetIds({
+          projectIds: ["project-1"],
+        });
+
+        const firstCallArg = (mockClient.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]?.[0] as { query: string } | undefined;
+        expect(firstCallArg?.query).toContain(
+          "endsWith(ScenarioSetId, '__agent-test')",
+        );
+        expect(firstCallArg?.query).toContain("ScenarioSetId != 'voice-calls'");
+      });
     });
 
     describe("when called with empty projectIds", () => {
@@ -138,6 +156,25 @@ describe("SimulationClickHouseRepository", () => {
         });
 
         expect(result).toEqual(new Set([DEFAULT_SET_ID]));
+      });
+    });
+  });
+
+  describe("getExternalSetSummaries()", () => {
+    describe("when called for a project", () => {
+      /** @scenario "The legacy voice-calls set is excluded from run listings" */
+      it("excludes the agent-test suffix and the voice-calls set", async () => {
+        const { client, getCapturedQueries } = makeMockClientWithQueryCapture({
+          rowsForQuery: () => [],
+        });
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        await repo.getExternalSetSummaries({ projectId: "project-1" });
+
+        const query = getCapturedQueries()[0]?.query;
+        expect(query).toContain("endsWith(ScenarioSetId, '__agent-test')");
+        expect(query).toContain("ScenarioSetId != 'voice-calls'");
       });
     });
   });
@@ -316,8 +353,12 @@ describe("SimulationClickHouseRepository", () => {
     }
 
     describe("when the page carries a StartedAt range", () => {
-      it("bounds step 2 with the byte-identical window and records a hit", async () => {
-        const before = await simulationOutcomeCount("hit");
+      it("bounds step 2 with the byte-identical window and meters it as windowed", async () => {
+        // The step-2 fake returns no preview rows, and this read declares its
+        // window authoritative (`fallback: "none"`) — so an empty result is
+        // metered as `windowed_empty`, not `hit`. Either way it proves the
+        // point this test exists for: the read ran windowed, not unwindowed.
+        const before = await simulationOutcomeCount("windowed_empty");
         const { repo, step2Query } = makeRepoCapturing("1000", "9000");
 
         await repo.getBatchHistoryForScenarioSet({
@@ -334,7 +375,7 @@ describe("SimulationClickHouseRepository", () => {
         );
         expect(step2?.params.minStartedAtMs).toBe("1000");
         expect(step2?.params.maxStartedAtMs).toBe("9000");
-        expect(await simulationOutcomeCount("hit")).toBe(before + 1);
+        expect(await simulationOutcomeCount("windowed_empty")).toBe(before + 1);
       });
     });
 

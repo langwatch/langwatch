@@ -36,6 +36,8 @@ def _api_response(version: int, version_id: str = "version_123"):
         "inputs": [],
         "outputs": [],
         "model": "openai/gpt-4",
+        "tags": [],
+        "parameters": {},
     }
     return mock_response
 
@@ -307,6 +309,8 @@ class TestCreateWithTags:
                     "inputs": [],
                     "outputs": [],
                     "model": "openai/gpt-4",
+                    "tags": [],
+                    "parameters": {},
                 }
 
                 with patch("httpx.Client.request") as mock_request:
@@ -356,6 +360,8 @@ class TestUpdateWithTags:
                     "inputs": [],
                     "outputs": [],
                     "model": "openai/gpt-4",
+                    "tags": [],
+                    "parameters": {},
                 }
 
                 with patch("httpx.Client.request") as mock_request:
@@ -407,6 +413,8 @@ class TestCreateWithMultipleTags:
                     "inputs": [],
                     "outputs": [],
                     "model": "openai/gpt-4",
+                    "tags": [],
+                    "parameters": {},
                 }
 
                 with patch("httpx.Client.request") as mock_request:
@@ -603,6 +611,8 @@ class TestUpdateWithMultipleTags:
                     "inputs": [],
                     "outputs": [],
                     "model": "openai/gpt-4",
+                    "tags": [],
+                    "parameters": {},
                 }
 
                 with patch("httpx.Client.request") as mock_request:

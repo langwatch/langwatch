@@ -1,4 +1,5 @@
 import {
+  currentTurnAssistant,
   hasTokens,
   runningTool,
   type ThinkingMessage,
@@ -180,7 +181,7 @@ export function deriveWaveActivity({
 }): LangyWaveActivity {
   if (isSettling) return "settling";
   if (!turnInFlight) return "idle";
-  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  const last = currentTurnAssistant(messages);
   if (runningTool(last)) return "tool";
   if (hasTokens(last)) return "streaming";
   if (hasLiveReasoning) return "thinking";

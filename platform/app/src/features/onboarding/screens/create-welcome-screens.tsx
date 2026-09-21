@@ -12,6 +12,7 @@ import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { Link } from "~/components/ui/link";
+import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
@@ -73,12 +74,24 @@ const OrganizationScreen: React.FC = () => {
           <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
             <Link
-              href="https://langwatch.ai/legal/terms-conditions"
+              href={LEGAL_LINKS.terms.href}
               isExternal
               fontWeight="medium"
               variant="underline"
             >
-              {"Terms of Service"}
+              {LEGAL_LINKS.terms.label}
+              <Icon size="xs">
+                <ExternalLink />
+              </Icon>
+            </Link>
+            {" and "}
+            <Link
+              href={LEGAL_LINKS.privacy.href}
+              isExternal
+              fontWeight="medium"
+              variant="underline"
+            >
+              {LEGAL_LINKS.privacy.label}
               <Icon size="xs">
                 <ExternalLink />
               </Icon>
@@ -169,6 +182,9 @@ const RoleScreen: React.FC = () => {
   );
 };
 
+/** The takeover phases are drawn by GuidedTakeover, outside the card. */
+const TakeoverScreen: React.FC = () => null;
+
 interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
@@ -213,6 +229,29 @@ export const useCreateWelcomeScreens = ({
         heading: "Let's tailor your experience",
         subHeading: "What best describes you?",
         component: RoleScreen,
+      },
+      // The guided takeover renders itself full-bleed; these entries only
+      // give the flow its indices, headings included for the page title.
+      [OnboardingScreenIndex.HELLO]: {
+        id: "hello",
+        required: true,
+        heading: "Hello",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.VALUE]: {
+        id: "value",
+        required: true,
+        heading: "What to set up",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.PROVIDER]: {
+        id: "provider",
+        required: true,
+        heading: "Connect a provider",
+        component: TakeoverScreen,
+        widthVariant: "full",
       },
     }),
     [],

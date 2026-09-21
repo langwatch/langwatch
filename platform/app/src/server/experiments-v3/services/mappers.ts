@@ -72,6 +72,11 @@ export interface ClickHouseExperimentRunItemRow {
   EvaluationCost: number | null;
   EvaluationInputs: string | null;
   EvaluationDurationMs: number | null;
+  /**
+   * 1 when the cell was copied into the run from the board, 0 when the run
+   * produced it. Rows written before the column existed read back as 0.
+   */
+  CarriedOver: number;
   CreatedAt: string;
 }
 

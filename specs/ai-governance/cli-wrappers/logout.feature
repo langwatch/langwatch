@@ -3,8 +3,10 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
   places so a plain `<tool>` keeps capturing: claude's env block in
   `~/.claude/settings.json`, codex's `[otel]` block in
   `~/.codex/config.toml`, and scoped shell functions in the profile rc
-  for gemini / opencode. `langwatch login --device` separately writes
-  the device session to `~/.langwatch/config.json`.
+  for gemini / opencode. Consenting to capture for claude also installs
+  the LangWatch Claude Code plugin, which registers a marketplace and an
+  install record under `~/.claude/plugins`. `langwatch login --device`
+  separately writes the device session to `~/.langwatch/config.json`.
 
   Logging out must undo BOTH halves. Revoking the token while leaving
   the exporters wired is worse than doing nothing: every subsequent
@@ -31,6 +33,15 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       When the user runs `langwatch logout`
       Then the device refresh token is server-revoked
       And ~/.langwatch/config.json no longer carries the session
+
+    @integration
+    Scenario: Logout retires the ingest keys this session minted
+      Given the user signed in with `langwatch login --device`
+      And this machine minted an ingest key for claude
+      When the user runs `langwatch logout`
+      Then the server revokes the session's login key with cause "user"
+      And it revokes that ingest key with cause "session"
+      And an ingest key minted by another machine under the same login keeps working
 
     Scenario: logout is idempotent when not logged in
       Given there is no device session on disk
@@ -73,6 +84,20 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       # projects are re-synced or removed automatically the next time a
       # wrapped claude session starts there.
 
+    Scenario: the LangWatch Claude Code plugin and its marketplace are removed
+      Given the LangWatch plugin was installed for claude
+      When the user runs `langwatch logout`
+      Then the plugin is uninstalled at user scope
+      And the LangWatch marketplace registration is removed
+      And plugins from other marketplaces are left installed
+
+    Scenario: a plugin that will not uninstall is disabled instead
+      Given the LangWatch plugin is installed but the uninstall subcommand fails
+      When the user runs `langwatch logout`
+      Then the plugin is switched off in `~/.claude/settings.json`
+      # Leaving it enabled with a revoked token means every session keeps
+      # firing hooks at a collector that will reject them.
+
     Scenario: the codex [otel] and gateway marker blocks are removed
       Given ~/.codex/config.toml carries the langwatch `[otel]` marker
         block and a user-authored `model = "gpt-5"` line
@@ -97,6 +122,7 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
         | tool     |
         | gemini   |
         | opencode |
+        | copilot  |
 
     Scenario: the global gateway shell-rc block is removed
       Given ~/.zshrc carries the `# >>> langwatch begin >>>` gateway block
@@ -114,6 +140,12 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       Given ~/.zshrc has no langwatch marker blocks
       When the user runs `langwatch logout`
       Then the file is left byte-for-byte unchanged
+
+    Scenario: a marketplace LangWatch did not register is left registered
+      Given a claude marketplace named `langwatch` that points at somebody
+        else's repository
+      When the user runs `langwatch logout`
+      Then that marketplace is neither listed nor removed
 
   Rule: the user sees what will be removed and can confirm
 
@@ -139,6 +171,7 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       When the user runs `langwatch logout --keep-credentials`
       Then the telemetry wiring is removed
       And the device session on disk is left intact
+      And the session's ingest keys stay live, because the session itself is untouched
 
   Rule: logout is a single command, symmetric to login
 

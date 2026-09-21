@@ -76,7 +76,7 @@ describe("substituteLiquidForJsonValidation", () => {
     it("folds the entire block into one whitespace-only tag span so embedded {{ ... }} does not produce stray top-level strings", () => {
       const source = [
         "{%- capture _url -%}",
-        "{{ project.url }}/messages?startDate={{ digest.windowStart | url_encode }}",
+        "{{ project.url }}/traces?startDate={{ digest.windowStart | url_encode }}",
         "{%- endcapture -%}",
         '{"text": "{{ _url }}"}',
       ].join("\n");

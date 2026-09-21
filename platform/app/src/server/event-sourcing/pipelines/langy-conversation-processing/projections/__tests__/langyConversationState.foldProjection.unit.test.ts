@@ -1,6 +1,7 @@
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
   type LangyConversationStateData,
@@ -124,6 +125,8 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when the first message is sent", () => {
+      /** @scenario "Sending the first message creates the conversation from its events" */
+      /** @scenario "A message and its activity bump are one command, not two writes" */
       it("sets the owner, title, active status, and a message count of 1", () => {
         const state = fold.apply(
           fold.init(),
@@ -174,12 +177,14 @@ describe("LangyConversationStateFoldProjection", () => {
       ),
     );
 
+    /** @scenario "Starting an agent response records the turn in operational state" */
     it("marks the conversation running and records the current turn", () => {
       expect(started.Status).toBe(LANGY_CONVERSATION_STATUS.RUNNING);
       expect(started.CurrentTurnId).toBe("turn-1");
     });
 
     describe("when the turn is finalized as completed", () => {
+      /** @scenario "The finalized response carries the whole answer as the source of truth" */
       it("appends the assistant message, returns to idle, and clears the turn", () => {
         const state = fold.apply(
           started,
@@ -236,6 +241,7 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when a failure event arrives for the turn in flight", () => {
+      /** @scenario "A stalled response with no answer to carry fails distinctly" */
       it("fails the conversation and records the error", () => {
         const state = fold.apply(
           started,
@@ -309,6 +315,7 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when the turn is finalized as failed", () => {
+      /** @scenario "A failed response is recorded without an assistant message loss" */
       it("records the failure status and error", () => {
         const state = fold.apply(
           started,
@@ -339,6 +346,7 @@ describe("LangyConversationStateFoldProjection", () => {
       event("ARCHIVED", LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED, {}, 3000),
     );
 
+    /** @scenario "Deleting a conversation archives it rather than hard-deleting" */
     it("flips status to archived and stamps ArchivedAt", () => {
       expect(archived.Status).toBe(LANGY_CONVERSATION_STATUS.ARCHIVED);
       expect(archived.ArchivedAt).toBe(3000);
@@ -356,6 +364,7 @@ describe("LangyConversationStateFoldProjection", () => {
   });
 
   describe("given a conversation the owner renames and shares", () => {
+    /** @scenario "Renaming or sharing updates metadata via one event" */
     it("applies the metadata update without touching other fields", () => {
       const base = fold.apply(fold.init(), messageSent({ title: "old" }, 1000));
       const state = fold.apply(
@@ -571,6 +580,37 @@ describe("LangyConversationStateFoldProjection", () => {
       const init = fold.init();
       expect(init.PendingHandoffToken).toBeNull();
       expect(init.PendingHandoffTurnId).toBeNull();
+    });
+  });
+
+  describe("given every event the conversation pipeline processes", () => {
+    // The row this projection writes carries the conversation's cursor, and
+    // the freshness signal is published only once that cursor has reached the
+    // event that raised it. An event this projection did not read was an event
+    // the cursor could never reach, so the signal for it was retried until it
+    // was dropped: a permission card raised or answered while a command ran
+    // reached no tab that was not streaming the turn itself.
+    for (const type of LANGY_CONVERSATION_PROCESSING_EVENT_TYPES) {
+      /** @scenario "Every event of the conversation moves its projection forward" */
+      it(`reads ${type} and moves its cursor`, () => {
+        const before = fold.init();
+        const after = fold.apply(before, {
+          ...event("MESSAGE_RECORDED", "1", {}, 5000),
+          type,
+        });
+        expect(after.LastEventOccurredAt).toBe(5000);
+      });
+    }
+
+    it("folds nothing of a card into the conversation row", () => {
+      const before = fold.init();
+      const after = fold.apply(before, {
+        ...event("MESSAGE_RECORDED", "1", {}, 5000),
+        type: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+      });
+      expect(after.MessageCount).toBe(before.MessageCount);
+      expect(after.Status).toBe(before.Status);
+      expect(after.LastActivityAt).toBe(before.LastActivityAt);
     });
   });
 });

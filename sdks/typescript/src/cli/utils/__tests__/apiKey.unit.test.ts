@@ -8,6 +8,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import type * as ProjectScopeNs from "../projectScope";
+import type * as SessionApiNs from "../governance/session-api";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -31,21 +33,44 @@ vi.mock("../governance/config", () => ({
 // Keep SessionApiError real (the resolver branches on `err.status`), mock only
 // the network call.
 vi.mock("../governance/session-api", async () => {
-  const actual =
-    await vi.importActual<typeof import("../governance/session-api")>(
-      "../governance/session-api",
-    );
+  const actual = await vi.importActual<typeof SessionApiNs>(
+    "../governance/session-api",
+  );
   return { SessionApiError: actual.SessionApiError, fetchPersonalProject: vi.fn() };
+});
+
+// The selector itself has its own unit suite (projectScope.unit.test.ts).
+// Here only the wiring is under test: that `--project` reaches the resolver,
+// that the resolved id becomes the request's project, and that an
+// unresolvable value ends the command instead of silently falling back to
+// the personal project. `ProjectScopeError` stays real.
+vi.mock("../projectScope", async () => {
+  const actual = await vi.importActual<typeof ProjectScopeNs>("../projectScope");
+  return {
+    ProjectScopeError: actual.ProjectScopeError,
+    projectScopeErrorLines: actual.projectScopeErrorLines,
+    resolveProjectSelector: vi.fn(),
+  };
 });
 
 import { config } from "dotenv";
 import { loadConfig, saveConfig } from "../governance/config";
 import {
+  ProjectScopeError,
+  resolveProjectSelector,
+} from "../projectScope";
+import { scopedProjectId } from "../../../internal/credentialContext";
+import {
   fetchPersonalProject,
   SessionApiError,
 } from "../governance/session-api";
 import { maybePrintIdentityNotice } from "../identityNotice";
-import { resolveCredentials, SESSION_REVALIDATE_WINDOW_MS } from "../apiKey";
+import {
+  loginElsewhereMessage,
+  loginMadeElsewhere,
+  resolveCredentials,
+  SESSION_REVALIDATE_WINDOW_MS,
+} from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
 
 const mockedDotenvConfig = vi.mocked(config);
@@ -53,6 +78,7 @@ const mockedLoadConfig = vi.mocked(loadConfig);
 const mockedSaveConfig = vi.mocked(saveConfig);
 const mockedFetchPersonalProject = vi.mocked(fetchPersonalProject);
 const mockedNotice = vi.mocked(maybePrintIdentityNotice);
+const mockedResolveProjectSelector = vi.mocked(resolveProjectSelector);
 
 const loggedOutConfig = () => ({
   control_plane_url: "https://app.langwatch.ai",
@@ -109,6 +135,7 @@ describe("resolveCredentials()", () => {
     mockedFetchPersonalProject.mockReset();
     mockedFetchPersonalProject.mockResolvedValue(null as never);
     mockedNotice.mockClear();
+    mockedResolveProjectSelector.mockReset();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     exitSpy = vi
@@ -193,6 +220,103 @@ describe("resolveCredentials()", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("when the login minted a user-scoped CLI key", () => {
+    it("prefers the login key over the personal project's own key", async () => {
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({
+          ...freshPersonal(),
+          cli_api_key: "sk-lw-lookup01_secret01",
+        }) as never,
+      );
+
+      const resolved = await resolveCredentials();
+
+      expect(resolved.apiKey).toBe("sk-lw-lookup01_secret01");
+      // The key reaches further, but the request still names the project the
+      // command pointed at before this feature.
+      expect(resolved.projectId).toBe("proj_1");
+    });
+
+    it("keeps LANGWATCH_API_KEY ahead of the login key", async () => {
+      process.env.LANGWATCH_API_KEY = "sk-from-env";
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({
+          ...freshPersonal(),
+          cli_api_key: "sk-lw-lookup01_secret01",
+        }) as never,
+      );
+
+      const resolved = await resolveCredentials();
+
+      expect(resolved.source).toBe("env");
+      expect(resolved.apiKey).toBe("sk-from-env");
+    });
+
+    it("wipes the login key too when the session turns out to be revoked", async () => {
+      const cfg = loggedInConfig({
+        ...stalePersonal(),
+        cli_api_key: "sk-lw-lookup01_secret01",
+        cli_api_key_scope: { kind: "organization", project_ids: [] },
+      });
+      mockedLoadConfig.mockReturnValue(cfg as never);
+      mockedFetchPersonalProject.mockRejectedValue(
+        new SessionApiError(401, "unauthorized", "Session expired or revoked"),
+      );
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      // A login key left behind would keep authenticating after the device was
+      // revoked — the exact bypass the personal key's wipe exists to close.
+      const stored = cfg as {
+        cli_api_key?: unknown;
+        cli_api_key_scope?: unknown;
+      };
+      expect(stored.cli_api_key).toBeUndefined();
+      expect(stored.cli_api_key_scope).toBeUndefined();
+      expect(mockedSaveConfig).toHaveBeenCalled();
+    });
+
+    it("targets the project --project names, not the personal project", async () => {
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({
+          ...freshPersonal(),
+          cli_api_key: "sk-lw-lookup01_secret01",
+        }) as never,
+      );
+      mockedResolveProjectSelector.mockResolvedValue("proj_checkout");
+
+      const resolved = await resolveCredentials({ project: "checkout-agent" });
+
+      expect(mockedResolveProjectSelector).toHaveBeenCalledWith(
+        expect.objectContaining({ selector: "checkout-agent" }),
+      );
+      expect(resolved.projectId).toBe("proj_checkout");
+      expect(scopedProjectId()).toBe("proj_checkout");
+    });
+
+    it("ends the command when --project names nothing the key can see", async () => {
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({
+          ...freshPersonal(),
+          cli_api_key: "sk-lw-lookup01_secret01",
+        }) as never,
+      );
+      mockedResolveProjectSelector.mockRejectedValue(
+        new ProjectScopeError(
+          "project_not_accessible",
+          'no accessible project matches "ghost".',
+          "ghost",
+        ),
+      );
+
+      await expect(
+        resolveCredentials({ project: "ghost" }),
+      ).rejects.toThrow("process.exit called");
+      // No silent fallback: the personal project must not become the target.
+      expect(scopedProjectId()).not.toBe("proj_1");
     });
   });
 
@@ -420,6 +544,135 @@ describe("resolveCredentials()", () => {
           .join("\n");
         expect(readCliErrorDocument(stdout)?.kind).toBe("missing_api_key");
       });
+    });
+  });
+
+  describe("given a login made against another address than the command targets", () => {
+    const LOGIN_ADDRESS = "https://app.langwatch.ai";
+    const OTHER = "https://langwatch.other.test";
+    const stripAnsi = (text: string): string =>
+      // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+      text.replace(/\u001b\[[0-9;]*m/g, "");
+    const loginWithBothKeys = () =>
+      loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-login-key" });
+
+    /** @scenario the device session's key is never sent to another address than the one that issued it */
+    it("resolves no key of the session and ends naming both addresses", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      setOutputFormat(undefined);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      const stderr = stripAnsi(
+        errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
+      );
+      expect(stderr).toBe(
+        `Error: ${loginElsewhereMessage({ loginEndpoint: LOGIN_ADDRESS, endpoint: OTHER })}`,
+      );
+      expect(stderr).toContain(LOGIN_ADDRESS);
+      expect(stderr).toContain(OTHER);
+      expect(stderr).toContain("langwatch login --device");
+      expect(stderr).toContain("unset LANGWATCH_ENDPOINT");
+      expect(stderr).not.toContain("sk-lw-login-key");
+      expect(stderr).not.toContain("pkey_personal");
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+      expect(mockedSaveConfig).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    /** @scenario the device session's key is never sent to another address than the one that issued it */
+    it("reads the other address from the folder's .env just the same", async () => {
+      mockedDotenvConfig.mockReturnValue({
+        parsed: { LANGWATCH_ENDPOINT: OTHER },
+      } as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+      expect(scopedProjectId()).toBeUndefined();
+    });
+
+    /** @scenario machine callers get a structured login_endpoint_mismatch document */
+    it("prints one structured document on stdout for a machine caller", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      setOutputFormat("json");
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      const stdout = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
+      const domain = readCliErrorDocument(stdout);
+      expect(domain?.kind).toBe("login_endpoint_mismatch");
+      expect(domain?.isHandled).toBe(true);
+      expect(domain?.meta).toMatchObject({
+        loginEndpoint: LOGIN_ADDRESS,
+        endpoint: OTHER,
+      });
+      expect(stdout).not.toContain("sk-lw-login-key");
+    });
+
+    /** @scenario an API key given for the other address is used as given */
+    it("uses a key from LANGWATCH_API_KEY or the flag, paired with the other address", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      process.env.LANGWATCH_API_KEY = "sk-of-the-other-address";
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      const fromEnv = await resolveCredentials();
+      const fromFlag = await resolveCredentials({ apiKey: "sk-explicit" });
+
+      expect(fromEnv).toMatchObject({
+        apiKey: "sk-of-the-other-address",
+        source: "env",
+        endpoint: OTHER,
+      });
+      expect(fromFlag).toMatchObject({
+        apiKey: "sk-explicit",
+        source: "flag",
+        endpoint: OTHER,
+      });
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario two spellings of one address are one address */
+    it.each([
+      "https://APP.langwatch.ai/",
+      "https://app.langwatch.ai:443",
+      "https://app.langwatch.ai///",
+    ])("takes %s for the login's own address", async (spelling) => {
+      process.env.LANGWATCH_ENDPOINT = spelling;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      const resolved = await resolveCredentials();
+
+      expect(resolved.source).toBe("session");
+      expect(resolved.apiKey).toBe("sk-lw-login-key");
+    });
+
+    /** @scenario localhost and 127.0.0.1 are two addresses */
+    it("does not take 127.0.0.1 for localhost", async () => {
+      process.env.LANGWATCH_ENDPOINT = "http://127.0.0.1:5560";
+      mockedLoadConfig.mockReturnValue({
+        ...loginWithBothKeys(),
+        control_plane_url: "http://localhost:5560",
+      } as never);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      expect(loginMadeElsewhere()).toEqual({
+        loginEndpoint: "http://localhost:5560",
+        endpoint: "http://127.0.0.1:5560",
+      });
+    });
+
+    it("has nothing to say with no login on the machine", () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+
+      expect(loginMadeElsewhere()).toBeUndefined();
     });
   });
 

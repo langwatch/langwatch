@@ -1,33 +1,38 @@
 ---
 title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+description: 'The LangWatch REST API: authentication, the OpenAPI document, and where each surface lives.'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+Every page in this section is generated from LangWatch's OpenAPI 3.1 document, so what you read here is what the API accepts.
 
-## Welcome
+## The OpenAPI document
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+Fetch the whole thing, unauthenticated:
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+GET https://app.langwatch.ai/api/gateway/v1/openapi.json
+```
+
+One document covers every surface below, which is what you point a client generator, a Postman import, or an agent at. Self-hosted: same path on your own DNS.
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+Most endpoints take a project API key:
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
 ```
+X-Auth-Token: sk-lw-...
+```
+
+`Authorization: Bearer sk-lw-...` works too. Some families need an **organization** API key instead, because they carry signing secrets and organization-wide data: [webhook endpoints](/features/webhooks), [gateway spend](/ai-gateway/billing-events), and everything that provisions the organization itself, from the [organization profile](/api-reference/organization/overview) and its [members](/api-reference/members/overview) through [roles](/api-reference/roles/overview) and [role bindings](/api-reference/role-bindings/overview). Create either kind under **Settings > API Keys**.
+
+Two surfaces authenticate differently again. The [SCIM 2.0 endpoints](/api-reference/scim/overview) take a SCIM bearer token, because the caller is your identity provider. [Creating organizations on a self-hosted instance](/api-reference/organizations/overview) takes the instance administrator credential, because it runs before any organization exists.
+
+The AI Gateway's own inference endpoints (`/v1/chat/completions` and friends) authenticate with a [virtual key](/ai-gateway/virtual-keys) rather than an API key, and live on the gateway host.
+
+## Conventions
+
+- Request and response fields are `lower_snake_case`.
+- Money is an integer number of nano-USD (billionths of a dollar), with a decimal string rendered from it for display. The integer is the source of truth: sum integers, round once.
+- Timestamps are ISO 8601, except spend and event filters, which take epoch milliseconds.
+- List endpoints are cursor-paged: follow `next_cursor` until it comes back `null`. A full page does not mean there is more, and a short page does not mean there is not.
+- Errors carry a stable `error.code` to branch on. See [Errors](/ai-gateway/api/errors).

@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -249,7 +250,7 @@ function useDeliveriesDrawerData(
       limit: DELIVERIES_PAGE_SIZE,
       cursor,
     },
-    { enabled: endpoint !== null, keepPreviousData: true },
+    { enabled: endpoint !== null, placeholderData: keepPreviousData },
   );
   const page = deliveries.data;
   useEffect(() => {

@@ -48,12 +48,23 @@ func runClean(ctx context.Context, d deps, inv invocation) error {
 		return nil
 	}
 	threshold := pruneStaleThreshold(inv)
+	if d.isAgent {
+		rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
+		if err != nil {
+			return err
+		}
+		return printPruneReport(ctx, d, rows, threshold)
+	}
+	return runInteractiveClean(ctx, d, threshold)
+}
+
+// runInteractiveClean is the terminal cleanup flow — the picker plus the
+// always-safe orphan reaping — shared by `haven clean` and the hub's "c"
+// handoff.
+func runInteractiveClean(ctx context.Context, d deps, threshold time.Duration) error {
 	rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
 	if err != nil {
 		return err
-	}
-	if d.isAgent {
-		return printPruneReport(ctx, d, rows, threshold)
 	}
 	if err := prunetui.Run(ctx, d.pruneActions(rows, threshold)); err != nil {
 		return err
@@ -77,7 +88,7 @@ func reapOrphanPlays(ctx context.Context, d deps) {
 }
 
 // reapOrphanRuntimes is the always-safe tail of a clean: kill dev runtimes
-// (tsgo, node, pnpm, uv, python, opencode) that have been orphaned to pid 1 but
+// (tsgo, node, pnpm, uv, python) that have been orphaned to pid 1 but
 // still reference this worktree.
 func reapOrphanRuntimes(d deps) {
 	procsupervisor.ReapOrphans([]string{d.worktree})

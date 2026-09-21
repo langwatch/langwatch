@@ -1,4 +1,4 @@
-import type { PrismaClient, RetentionPolicy } from "@prisma/client";
+import type { PrismaClient, RetentionPolicy } from "~/generated/prisma/client";
 import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";

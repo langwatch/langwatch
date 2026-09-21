@@ -1,0 +1,224 @@
+/**
+ * @vitest-environment node
+ * @unit
+ *
+ * Registering or repointing a voice agent through the API must refuse the
+ * same way the UI does when `release_voice_agents_enabled` is off for the
+ * project — the flag is not a UI-only decoration that a direct tRPC call
+ * could bypass.
+ *
+ * @see specs/features/agents/voice-agents-v1.feature
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { AgentService } from "~/server/agents/agent.service";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
+import { createInnerTRPCContext } from "../../trpc";
+import { agentsRouter } from "../agents";
+
+// A static top-level import of appPermissionsMock here throws "Cannot access
+// before initialization": vi.mock is hoisted above every import in the file,
+// so referencing an imported binding from inside its factory hits the TDZ.
+// The dynamic import is load-bearing for that reason (proven by running this
+// suite with a static import — the exact pattern every other
+// appPermissionsMock consumer in the repo also uses).
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
+vi.mock("../../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../rbac")>();
+  return {
+    ...actual,
+    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+  };
+});
+
+const isEnabledMock = vi.fn();
+vi.mock("~/server/featureFlag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/featureFlag")>();
+  return {
+    ...actual,
+    featureFlagService: {
+      isEnabled: (...args: unknown[]) => isEnabledMock(...args),
+    },
+  };
+});
+
+vi.mock("~/server/organizations/resolveOrganizationId", () => ({
+  resolveOrganizationId: vi.fn(async () => "org_1"),
+}));
+
+// The FORBIDDEN path records an audit row through Prisma; without this mock
+// the write needs a live database and turns the refusal into a 500 on CI.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
+describe("agentsRouter voice-agent gate", () => {
+  let caller: ReturnType<typeof agentsRouter.createCaller>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const ctx = createInnerTRPCContext({
+      session: { user: { id: "test-user-id" }, expires: "1" },
+      req: undefined,
+      res: undefined,
+      permissionChecked: true,
+      publiclyShared: false,
+    });
+    ctx.prisma = {} as unknown as PrismaClient;
+    caller = agentsRouter.createCaller(ctx);
+  });
+
+  describe("given the project's release_voice_agents_enabled flag is off", () => {
+    beforeEach(() => {
+      isEnabledMock.mockResolvedValue(false);
+    });
+
+    /** @scenario "Creating a voice agent is refused while the flag is off" */
+    it("refuses to create a voice agent", async () => {
+      await expect(
+        caller.create({
+          projectId: "project_1",
+          name: "Support line",
+          type: "voice",
+          config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    /** @scenario "Updating an agent's type to voice is refused while the flag is off" */
+    it("refuses to update an agent's type to voice", async () => {
+      await expect(
+        caller.update({
+          id: "agent_1",
+          projectId: "project_1",
+          type: "voice",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    it("refuses to copy a voice agent into a project", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const copyAgentSpy = vi
+        .spyOn(AgentService.prototype, "copyAgent")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.copy({
+          agentId: "agent_1",
+          projectId: "project_target",
+          sourceProjectId: "project_source",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(copyAgentSpy).not.toHaveBeenCalled();
+    });
+
+    it("refuses a config-only update of a stored voice agent while the flag is off", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_1",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const updateSpy = vi
+        .spyOn(AgentService.prototype, "update")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.update({
+          id: "agent_1",
+          projectId: "project_1",
+          config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: VOICE_AGENTS_DISABLED_MESSAGE,
+      });
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it("refuses to sync a voice agent copy while the flag is off", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_copy",
+        projectId: "project_target",
+        copiedFromAgentId: "agent_source",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      vi.spyOn(AgentService.prototype, "getByIdOnly").mockResolvedValue({
+        id: "agent_source",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getByIdOnly>>);
+      const syncSpy = vi
+        .spyOn(AgentService.prototype, "syncFromSource")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.syncFromSource({
+          agentId: "agent_copy",
+          projectId: "project_target",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(syncSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the project's release_voice_agents_enabled flag is on", () => {
+    beforeEach(() => {
+      isEnabledMock.mockResolvedValue(true);
+    });
+
+    /** @scenario "Updating a non-voice field does not check the voice flag" */
+    it("does not check the voice flag for an update naming no type", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_1",
+        type: "http",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+
+      // The fake prisma has no repository behind it, so the update call
+      // itself fails past the gate; only that it never reached the flag
+      // check is under test here.
+      await caller
+        .update({ id: "agent_1", projectId: "project_1", name: "Renamed" })
+        .catch(() => {
+          // Expected: the fake prisma has nothing behind it.
+        });
+      expect(isEnabledMock).not.toHaveBeenCalled();
+    });
+
+    it("copies a voice agent when the target project has the flag on", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const copyAgentSpy = vi
+        .spyOn(AgentService.prototype, "copyAgent")
+        .mockResolvedValue({
+          id: "agent_copy",
+          projectId: "project_target",
+          name: "Support line",
+          copiedFromAgentId: "agent_1",
+        });
+
+      await caller.copy({
+        agentId: "agent_1",
+        projectId: "project_target",
+        sourceProjectId: "project_source",
+      });
+
+      expect(copyAgentSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+});

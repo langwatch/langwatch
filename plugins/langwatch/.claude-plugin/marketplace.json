@@ -1,0 +1,14 @@
+{
+  "name": "langwatch",
+  "owner": {
+    "name": "LangWatch",
+    "url": "https://langwatch.ai"
+  },
+  "plugins": [
+    {
+      "name": "langwatch",
+      "source": "./",
+      "description": "Records which repository and branch each coding-agent session worked in, and teaches the agent to read its own traces back from LangWatch."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { teamRouter } from "../team";
 
@@ -16,16 +16,18 @@ import { teamRouter } from "../team";
 // The org-permission middleware/guard is real authorization the page already
 // passes for an org admin; it's mocked to a pass-through so these tests isolate
 // the member-resolution read path.
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
     hasOrganizationPermission: vi.fn().mockResolvedValue(true),
   };
 });
@@ -68,6 +70,11 @@ function buildMockPrisma({
 
 function buildCaller(prisma: PrismaClient) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: CALLER_ID }, expires: "1" },
     req: undefined,
     res: undefined,

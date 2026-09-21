@@ -33,7 +33,6 @@ export function useMemberDisableAction({
               : "They have access again and are using a seat.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           onChanged();
         },
@@ -49,5 +48,5 @@ export function useMemberDisableAction({
     );
   };
 
-  return { setMemberDisabled, isSettingDisabled: mutation.isLoading };
+  return { setMemberDisabled, isSettingDisabled: mutation.isPending };
 }

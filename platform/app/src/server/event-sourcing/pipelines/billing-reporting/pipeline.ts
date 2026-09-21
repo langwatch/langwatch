@@ -11,8 +11,8 @@ export interface BillingReportingPipelineDeps {
 /**
  * Creates the billing-reporting pipeline definition.
  *
- * Command-only pipeline — no projections, no reactors.
- * The reactor that dispatches commands is registered in the EventSourcing
+ * Command-only pipeline — no projections, no subscribers.
+ * The subscriber that dispatches commands is registered in the EventSourcing
  * constructor alongside the global fold and map projections.
  */
 export function createBillingReportingPipeline(

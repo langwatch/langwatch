@@ -1,5 +1,5 @@
 // Package assets embeds the manager's static worker templates — the AGENTS.md
-// system prompt and the skills/ tree opencode discovers — INTO the binary, so a
+// system prompt and the skills/ tree the worker discovers — INTO the binary, so a
 // worker spawn depends on nothing outside the process. This replaces the old
 // entrypoint.sh dance that seeded /opt/langy-templates into the /workspace
 // emptyDir at pod startup (a runtime dependency that failed silently when the
@@ -46,10 +46,11 @@ const (
 	filePerm = 0o644
 )
 
-// AgentsTemplate returns the AGENTS.md system-prompt template verbatim. It keeps
-// the literal ${LANGWATCH_ENDPOINT} placeholder — the manager substitutes it
-// per-worker at spawn. Read from the binary, so it never depends on a mounted
-// /workspace.
+// AgentsTemplate returns the AGENTS.md system-prompt template verbatim. A spawn
+// writes these bytes to the worker home unchanged: nothing is substituted into
+// the prompt, because the prompt reaches the user through the reply and an
+// address only the worker can use must never enter it. Read from the binary, so
+// it never depends on a mounted /workspace.
 func AgentsTemplate() (string, error) {
 	raw, err := embedded.ReadFile(agentsFile)
 	if err != nil {
@@ -59,7 +60,7 @@ func AgentsTemplate() (string, error) {
 }
 
 // MaterializeSkills writes the embedded skills/ tree to destDir on disk so the
-// per-worker opencode subprocess can discover it (a subprocess cannot read the
+// per-worker subprocess can discover it (a subprocess cannot read the
 // embedded FS). Idempotent — it overwrites, so a restart re-lays the tree cleanly.
 // Call once at pool startup; each worker home then symlinks to destDir.
 func MaterializeSkills(destDir string) error {

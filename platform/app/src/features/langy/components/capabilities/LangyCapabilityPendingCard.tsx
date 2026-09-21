@@ -28,6 +28,7 @@ import {
 } from "../../logic/langyActivityOwnership";
 import type { CapabilityCommand } from "../../logic/langyCapabilityDigest";
 import type { LangyProgressSample } from "../../stores/langyStore";
+import { LangyInterruptedNote } from "../LangyInterruptedNote";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
 import { useProjectedProgress } from "../StreamingStatusLine";
 import type { CapabilitySurface } from "./capabilityCatalog";
@@ -46,6 +47,7 @@ export function LangyCapabilityPendingCard({
   command,
   progress,
   progressSample,
+  interrupted = false,
 }: {
   surface: CapabilitySurface;
   overline: string;
@@ -58,18 +60,19 @@ export function LangyCapabilityPendingCard({
   /** Measured batch progress belongs on this card, not in a duplicate row. */
   progress?: number | null;
   progressSample?: LangyProgressSample | null;
+  /**
+   * The turn ended before this call reported anything. The shell keeps the rows
+   * it did find and drops every moving part, so a stopped search stops saying
+   * it is searching.
+   */
+  interrupted?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const shimmer = reduceMotion
-    ? { ...langyThinkingShimmerStyles, animation: "none" }
-    : langyThinkingShimmerStyles;
 
   // Start-frame hydration: only the query exists yet. Idle (and rendering
   // nothing extra) unless this resource has a query hydrator.
   const preview = useCapabilityData({ command: command ?? null });
   const percent = useProjectedProgress({ progress, sample: progressSample });
-  const hasMeasuredProgress =
-    progressSample !== null && progressSample !== undefined;
 
   return (
     <LangyCapabilityCard
@@ -79,73 +82,21 @@ export function LangyCapabilityPendingCard({
       overline={overline}
       deepLink={false}
       title={
-        <VStack align="stretch" gap={1}>
-          <HStack gap={2} align="baseline">
-            <Box
-              textStyle="sm"
-              fontWeight="640"
-              lineHeight="1.3"
-              css={shimmer}
-              role="status"
-              aria-live="polite"
-            >
-              {headline}…
-            </Box>
-          </HStack>
-          {detail ? (
-            <Box
-              textStyle="2xs"
-              fontFamily="mono"
-              color="fg.subtle"
-              truncate
-              maxWidth="100%"
-            >
-              {detail}
-            </Box>
-          ) : null}
-        </VStack>
+        <PendingTitle
+          headline={headline}
+          detail={detail}
+          interrupted={interrupted}
+          reduceMotion={reduceMotion}
+        />
       }
     >
-      {hasMeasuredProgress ? (
-        <VStack align="stretch" gap={1.5} marginTop={0.5}>
-          <Box
-            height="6px"
-            borderRadius="full"
-            background="langy.barTrack"
-            overflow="hidden"
-          >
-            <Box
-              height="full"
-              width={`${percent}%`}
-              borderRadius="full"
-              background="langy.barFill"
-              transition={
-                reduceMotion
-                  ? "none"
-                  : "width 180ms cubic-bezier(0.32, 0.72, 0, 1)"
-              }
-            />
-          </Box>
-          <HStack justify="space-between" gap={2}>
-            <Text
-              textStyle="2xs"
-              color="fg.muted"
-              fontFamily="mono"
-              fontVariantNumeric="tabular-nums"
-            >
-              {formatLangyProgressCount(progressSample)}
-            </Text>
-            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-              {Math.round(percent)}%
-            </Text>
-          </HStack>
-        </VStack>
+      {interrupted ? (
+        <LangyInterruptedNote />
       ) : (
-        <Box
-          className="langy-pending-bar"
-          aria-hidden
-          role="presentation"
-          marginTop={0.5}
+        <PendingProgress
+          sample={progressSample ?? null}
+          percent={percent}
+          reduceMotion={reduceMotion}
         />
       )}
       {preview.rows.length > 0 ? (
@@ -171,5 +122,110 @@ export function LangyCapabilityPendingCard({
         </VStack>
       ) : null}
     </LangyCapabilityCard>
+  );
+}
+
+/** The headline and the command line, in the shell's title slot. */
+function PendingTitle({
+  headline,
+  detail,
+  interrupted,
+  reduceMotion,
+}: {
+  headline: string;
+  detail?: string;
+  interrupted: boolean;
+  reduceMotion: boolean;
+}) {
+  const shimmer =
+    reduceMotion || interrupted
+      ? { ...langyThinkingShimmerStyles, animation: "none" }
+      : langyThinkingShimmerStyles;
+
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack gap={2} align="baseline">
+        <Box
+          textStyle="sm"
+          fontWeight="640"
+          lineHeight="1.3"
+          color={interrupted ? "fg.muted" : undefined}
+          css={interrupted ? undefined : shimmer}
+          role="status"
+          aria-live="polite"
+        >
+          {interrupted ? headline : `${headline}…`}
+        </Box>
+      </HStack>
+      {detail ? (
+        <Box
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          truncate
+          maxWidth="100%"
+        >
+          {detail}
+        </Box>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * The bar under the headline: the measured one when the call reports counts,
+ * the indeterminate sweep otherwise.
+ */
+function PendingProgress({
+  sample,
+  percent,
+  reduceMotion,
+}: {
+  sample: LangyProgressSample | null | undefined;
+  percent: number;
+  reduceMotion: boolean;
+}) {
+  if (!sample) {
+    return (
+      <Box
+        className="langy-pending-bar"
+        aria-hidden
+        role="presentation"
+        marginTop={0.5}
+      />
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1.5} marginTop={0.5}>
+      <Box
+        height="6px"
+        borderRadius="full"
+        background="langy.barTrack"
+        overflow="hidden"
+      >
+        <Box
+          height="full"
+          width={`${percent}%`}
+          borderRadius="full"
+          background="langy.barFill"
+          transition={
+            reduceMotion ? "none" : "width 180ms cubic-bezier(0.32, 0.72, 0, 1)"
+          }
+        />
+      </Box>
+      <HStack justify="space-between" gap={2}>
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          fontFamily="mono"
+          fontVariantNumeric="tabular-nums"
+        >
+          {formatLangyProgressCount(sample)}
+        </Text>
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          {Math.round(percent)}%
+        </Text>
+      </HStack>
+    </VStack>
   );
 }

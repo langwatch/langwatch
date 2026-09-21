@@ -29,6 +29,14 @@ import { context } from "@opentelemetry/api";
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) {}
 
+  // Delegates to the wrapped OTel logger rather than always returning `true`:
+  // the underlying logger is what actually knows whether a processor is
+  // registered, so this is what keeps `enabled()` truthful for a caller that
+  // wraps a no-op provider (e.g. `getLangWatchLogger` before setup runs).
+  enabled(options?: Parameters<Logger["enabled"]>[0]): boolean {
+    return this.logger.enabled(options);
+  }
+
   emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void {
     // Handle output capture configuration
     if (!shouldCaptureOutput()) {

@@ -178,9 +178,76 @@ Feature: haven play, a throwaway PR sandbox
     And only sandboxes whose owner process is gone are offered for reaping
     And "haven clean" finishes the teardown
 
+  # --- Seeding the sandbox ---
+  # A sandbox's databases are born empty, so the PR opens on the onboarding
+  # "waiting for your first message" screen — the wrong starting point for
+  # reviewing anything that happens after onboarding. `--seed <preset>` takes
+  # exactly the presets `haven db seed` takes (see haven-seed-presets.feature);
+  # there is no second registry and no play-only preset. Without the flag the
+  # sandbox seeds the stable identity only, as it always has.
+  @unit
+  Scenario: A sandbox can be seeded with a data preset
+    When the developer runs "haven play 4913 --seed demo"
+    Then the sandbox's seed carries that preset
+    And the presets offered are the ones "haven db seed" takes
+
+  @unit
+  Scenario: An unknown preset is rejected before anything is created
+    When the developer runs "haven play 4913 --seed nosuch"
+    Then the command fails listing the presets it can pick from
+    And it fails before the PR is resolved, so nothing is checked out
+
+  # The sandbox is provisioned by a backgrounded launcher process, so a preset
+  # that only reached the parent would be silently dropped.
+  @unit
+  Scenario: The preset reaches the backgrounded launcher
+    Given a preset was asked for
+    When play backgrounds the sandbox launcher
+    Then the launcher is told which preset to seed
+
+  # A preset's data goes through the real collector and event-sourcing commands,
+  # which only exist once the sandbox is serving — and the sandbox's services are
+  # supervised until it is torn down, so the ingest cannot be a step before them.
+  @unit
+  Scenario: Preset data is ingested once the sandbox is serving
+    Given a preset whose data goes through the collector
+    When the sandbox's services start
+    Then the ingest waits for the sandbox's own app to answer before sending anything
+    And it targets the sandbox's app on loopback, never another stack's
+
+  @unit
+  Scenario: Presets with no ingest never wait for the app
+    Given a preset that only switches the base seed
+    Then the sandbox runs no ingest step and waits for nothing
+
+  # A sandbox whose app never answers is either being torn down or running a PR
+  # that does not boot. Its database still holds everything the base seed put
+  # there; only the data that needs the running sandbox is missing.
+  @unit
+  Scenario: A sandbox that never serves keeps its base seed and nothing more
+    Given a preset whose data goes through the collector
+    And the sandbox's app never answers
+    Then that data is never sent to a sandbox that is not there
+    And the identity the base seed wrote is still in place
+
+  # The sandbox is the point; its sample data is not. A seeder that failed (or a
+  # PR whose collector is the thing that is broken) must leave the PR running.
+  @unit
+  Scenario: A failed seed never takes the sandbox down
+    Given a preset ingest step fails
+    Then the sandbox keeps running and the failing step is named
+    And the retry command names this sandbox's own stack
+
   @e2e @unimplemented
   Scenario: A PR runs end to end in the sandbox
     Given a terminal
     When the developer runs "haven play 4913" and passes the trust gate
     Then the PR serves at its own play hostname with its own databases
     And quitting the view tears all of it down
+
+  @e2e @unimplemented
+  Scenario: A seeded sandbox lands end to end
+    Given a terminal
+    When the developer runs "haven play 4913 --seed demo"
+    Then the sandbox comes up past onboarding with its sample traces ingested
+    And quitting the view tears the seeded databases down with everything else

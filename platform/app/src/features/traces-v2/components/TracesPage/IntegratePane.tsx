@@ -2,29 +2,28 @@
  * IntegratePane — the default view for no-traces projects.
  *
  * Shown when `hasAnyTraces === false` and the user hasn't flipped on
- * "See sample data". A focused full-screen integration guide — same
- * step-by-step content the IntegrateDrawer hosts, rendered inline
- * here so the user lands directly on what they need to do (mint a
- * token, pick a path, copy the snippet). No table, no toolbar, no
- * sidebar, no sample-data noise — just the integration journey, with
- * a single quiet "See sample data" escape if they want to preview
- * the product first.
+ * "See sample data". The page mints an access token first, then offers
+ * the ways forward under it: hand the setup to an agent, read the SDK
+ * instructions, or look at sample data before writing any code. One
+ * thing to read at a time, in the order the reader does them.
+ *
+ * Spec: specs/traces-v2/integrate-pane.feature
  */
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Compass } from "lucide-react";
+import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { AnalyticsBoundary } from "react-contextual-analytics";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
 } from "~/features/onboarding/contexts/ActiveProjectContext";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  IntegrationContent,
-  SEGMENTS,
-  type Segment,
-} from "../../onboarding/components/IntegrateDrawer";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { ApiKeyIntegrationInfoCard } from "../../onboarding/components/ApiKeyIntegrationInfoCard";
+import { SdkSetup } from "../../onboarding/components/SdkSetup";
+import { selfHostedEndpoint } from "../../onboarding/logic/selfHostedEndpoint";
 import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
@@ -41,22 +40,12 @@ export const IntegratePane: React.FC = () => {
     (s) => s.setCurrentSpotlightId,
   );
   const { project, organization } = useOrganizationTeamProject();
+  const publicEnv = usePublicEnv();
   const [token, setToken] = useState<string | null>(null);
-  const [segment, setSegment] = useState<Segment>("skill");
-
-  // Imperative `inert` set on the chrome wrapper so focus skips the
-  // faded SearchBar / Toolbar entirely (the JSX `inert` prop is
-  // dropped silently by older React versions; the IDL property always
-  // sticks). Combined with pointer-events / aria-hidden / user-select
-  // below, the chrome is completely inert in every interaction model.
-  const chromeRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = chromeRef.current;
-    if (el) el.inert = true;
-  }, []);
-
-  const activeSegment =
-    SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
+  const [showSdk, setShowSdk] = useState(false);
+  // The same endpoint rule the env block above the actions follows, so
+  // the keys the agent gets and the keys on screen are the same keys.
+  const endpoint = selfHostedEndpoint(publicEnv.data?.BASE_HOST);
 
   if (!project || !organization) return null;
 
@@ -80,14 +69,125 @@ export const IntegratePane: React.FC = () => {
     writeSpotlightFragment(firstId);
   };
 
-  // Real SearchBar + Toolbar in a non-interactive treatment so the user
-  // reads this as the trace page (just empty). Pointer events off, focus
-  // skips via `inert` (set imperatively above for cross-React-version
-  // safety), aria-hidden for screen readers, user-select none so text
-  // can't even be highlighted. tabIndex={-1} as a defensive belt — if
-  // `inert` is ever stripped by a future Chakra update, the wrapper
-  // still refuses focus.
-  const chrome = (
+  return (
+    <IntegratePaneShell ariaLabel="Integrate your code" chrome={<PageChrome />}>
+      <ActiveProjectProvider value={activeProjectContext}>
+        {/* Namespaces the analytics events the lifted onboarding
+            sections emit (prompt / skill / config copies) here. */}
+        <AnalyticsBoundary name="traces_integrate">
+          <VStack align="stretch" gap={6}>
+            <VStack align="stretch" gap={1.5} minWidth={0}>
+              <Text
+                textStyle="2xl"
+                fontWeight="600"
+                color="fg"
+                letterSpacing="-0.015em"
+              >
+                Instrument your agents in seconds
+              </Text>
+              <Text textStyle="sm" color="fg.muted" lineHeight="tall">
+                Mint a token, then hand the setup to your coding agent or follow
+                the SDK instructions.
+              </Text>
+            </VStack>
+
+            <ApiKeyIntegrationInfoCard
+              organizationId={organization.id}
+              projectId={project.id}
+              token={token}
+              onTokenGenerated={setToken}
+            />
+
+            <SetupActions
+              token={token}
+              endpoint={endpoint}
+              showSdk={showSdk}
+              onToggleSdk={() => setShowSdk((shown) => !shown)}
+              onEnterSampleMode={enterSampleMode}
+            />
+
+            {showSdk && <SdkSetup />}
+          </VStack>
+        </AnalyticsBoundary>
+      </ActiveProjectProvider>
+    </IntegratePaneShell>
+  );
+};
+
+/**
+ * The ways forward, under the token because that is the order they
+ * happen in, and centred because none of the three is the one
+ * everybody takes. They wrap rather than shrink, so a phone gets three
+ * readable buttons on as many rows as it needs.
+ */
+function SetupActions({
+  token,
+  endpoint,
+  showSdk,
+  onToggleSdk,
+  onEnterSampleMode,
+}: {
+  token: string | null;
+  /** Set only on a self-hosted deployment, matching the env block above. */
+  endpoint: string | null;
+  showSdk: boolean;
+  onToggleSdk: () => void;
+  onEnterSampleMode: () => void;
+}) {
+  return (
+    <HStack gap={2} justify="center" wrap="wrap">
+      <SetupWithAgentButton
+        surface="traces"
+        apiKey={token ?? undefined}
+        endpoint={endpoint ?? undefined}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onToggleSdk}
+        aria-expanded={showSdk}
+      >
+        <Icon as={Code2} boxSize={4} />
+        See SDK instructions
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        colorPalette="orange"
+        onClick={onEnterSampleMode}
+        transition="all 0.15s ease"
+        _hover={{
+          bg: "orange.subtle",
+          borderColor: "orange.emphasized",
+          transform: "translateY(-1px)",
+        }}
+        _active={{ bg: "orange.muted", transform: "translateY(0)" }}
+      >
+        <Icon as={Compass} boxSize={4} />
+        See sample data
+      </Button>
+    </HStack>
+  );
+}
+
+/**
+ * The real SearchBar and Toolbar in a non-interactive treatment, so the
+ * page still reads as the trace explorer (just empty). Pointer events
+ * off, focus skips via `inert` (set imperatively, because the JSX prop
+ * is dropped silently by older React versions while the IDL property
+ * always sticks), aria-hidden for screen readers, user-select none so
+ * the text cannot even be highlighted. `tabIndex={-1}` is the belt: if
+ * `inert` is ever stripped by a Chakra update, the wrapper still
+ * refuses focus.
+ */
+function PageChrome() {
+  const chromeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = chromeRef.current;
+    if (el) el.inert = true;
+  }, []);
+
+  return (
     <Box
       ref={chromeRef}
       tabIndex={-1}
@@ -98,76 +198,16 @@ export const IntegratePane: React.FC = () => {
       flexShrink={0}
       position="relative"
       zIndex={1}
+      // The chrome is context, not content: it says "this is the trace
+      // page, just empty". A phone has no room to say that, and the
+      // toolbar collapses into overlapping icons trying.
+      display={{ base: "none", md: "block" }}
     >
       <SearchBar />
-      {/* `hideSampleDataAction` collapses the toolbar's "See sample
-          data" toggle to invisible — the hero outlined button next to
-          the page title is the canonical entry point in the empty-trace
-          state. Showing it in both places splits attention; the larger
-          hero one is what we want users to press here. */}
+      {/* `hideSampleDataAction` collapses the toolbar's own "See sample
+          data" toggle: the actions under the token block are the
+          canonical entry point in the empty-trace state. */}
       <Toolbar hideSampleDataAction />
     </Box>
   );
-
-  return (
-    <IntegratePaneShell ariaLabel="Integrate your code" chrome={chrome}>
-      <ActiveProjectProvider value={activeProjectContext}>
-        <VStack align="stretch" gap={8}>
-          {/* Hero with the secondary "See sample data" action lifted up
-              alongside the title so it stays above the fold. The old
-              "Not ready to wire up?" footer card has been removed —
-              having the same escape down there meant most users never
-              saw it before scrolling through the integration content. */}
-          <HStack justify="space-between" align="flex-start" gap={4}>
-            <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
-              <Text
-                textStyle="2xl"
-                fontWeight="600"
-                color="fg"
-                letterSpacing="-0.015em"
-              >
-                Instrument your agents in seconds
-              </Text>
-              <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                Mint a token, then pick how you want to send traces. Skills and
-                MCP take under a minute; the SDK takes a couple more.
-              </Text>
-            </VStack>
-            <HStack gap={2} flexShrink={0}>
-              <SetupWithAgentButton surface="traces" />
-              <Button
-                size="sm"
-                variant="outline"
-                colorPalette="orange"
-                onClick={enterSampleMode}
-                transition="all 0.15s ease"
-                _hover={{
-                  bg: "orange.subtle",
-                  borderColor: "orange.emphasized",
-                  transform: "translateY(-1px)",
-                }}
-                _active={{
-                  bg: "orange.muted",
-                  transform: "translateY(0)",
-                }}
-              >
-                <Icon as={Compass} boxSize={4} />
-                See sample data
-              </Button>
-            </HStack>
-          </HStack>
-
-          <IntegrationContent
-            organizationId={organization.id}
-            projectId={project.id}
-            token={token}
-            onTokenGenerated={setToken}
-            segment={segment}
-            onSegmentChange={setSegment}
-            activeSegmentDescription={activeSegment?.description ?? ""}
-          />
-        </VStack>
-      </ActiveProjectProvider>
-    </IntegratePaneShell>
-  );
-};
+}

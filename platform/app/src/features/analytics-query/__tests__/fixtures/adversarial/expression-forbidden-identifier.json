@@ -1,0 +1,13 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"transform": [
+		{
+			"calculate": "warn(data('other')[0].secret)",
+			"as": "leaked"
+		}
+	]
+}

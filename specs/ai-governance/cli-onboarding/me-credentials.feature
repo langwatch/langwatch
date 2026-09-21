@@ -40,7 +40,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   #
   # The cached key is a long-lived Project.apiKey, not a session-bound token,
   # so trusting it forever would let a stolen ~/.langwatch/config.json keep
-  # working after the device was revoked from /me/devices. The resolver trusts
+  # working after the device was revoked from the devices inventory. The resolver trusts
   # the cache only within a short window; past it, it re-confirms the session
   # is live before using the key, and drops the key when the session is gone.
   # ─────────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @revocation @integration
   Scenario: device-session revocation severs CLI access and wipes the cached key
     Given a device login whose cached key's validation is past the window
-    When the device is revoked from /me/devices (its Redis tokens are dropped)
+    When the device is revoked from the devices inventory (its Redis tokens are dropped)
     And the next data command resolves credentials
     Then the session-authenticated revalidation fails with 401
     And the command reports the not-logged-in error
@@ -92,6 +92,48 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Then the resolved API key is the explicit argument
     And the environment value is not used
 
+  # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
+  # folder's .env can set it. A cloned folder could otherwise point every
+  # command at an address of its author's choosing and receive the key of
+  # whoever ran a command there.
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: the device session's key is never sent to another address than the one that issued it
+    Given ~/.langwatch/config.json holds a device session made against one LangWatch address
+    And LANGWATCH_ENDPOINT, in the shell or in the folder's .env, names another address
+    And no API key is given by flag or in LANGWATCH_API_KEY
+    When any API-calling command resolves credentials
+    Then no key of the session is resolved, neither the login key nor the personal project's
+    And the session endpoint is not called
+    And the command ends naming both addresses
+    And it says to run `langwatch login --device` against the other address, or to unset LANGWATCH_ENDPOINT
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: machine callers get a structured login_endpoint_mismatch document
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    When a command resolves credentials with --format json
+    Then stdout carries one error document of kind "login_endpoint_mismatch"
+    And its meta names the login's address and the address the command targets
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: an API key given for the other address is used as given
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    And LANGWATCH_API_KEY, or an explicit api key argument, is set
+    When a command resolves credentials
+    Then the resolved API key is the given one, paired with the address LANGWATCH_ENDPOINT names
+    And no key of the session is read
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: two spellings of one address are one address
+    Given a device session made against "https://app.acme.test"
+    When LANGWATCH_ENDPOINT is "https://APP.acme.test/" or "https://app.acme.test:443"
+    Then the session's key is resolved as usual
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: localhost and 127.0.0.1 are two addresses
+    Given a device session made against "http://localhost:5560"
+    When LANGWATCH_ENDPOINT is "http://127.0.0.1:5560"
+    Then the command ends naming both addresses
+
   @bdd @cli-onboarding @credentials @unit
   Scenario: the caller's .env still contributes only LANGWATCH_* keys (daemon constraint)
     Given the caller's .env contains LANGWATCH_API_KEY and an unrelated secret like DATABASE_URL
@@ -106,9 +148,18 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @integration
   Scenario: device-login exchange delivers the personal project key and the CLI stores it
     Given a device code was approved for a user with a personal workspace
+    And the user currently has permission to manage the personal project
     When the CLI polls POST /api/auth/cli/exchange
     Then the device_session response includes personal_project with id, slug, name and api_key
     And the CLI persists personal_project into ~/.langwatch/config.json
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: device-login exchange stays valid when the personal project key is withheld
+    Given a device code was approved for a user with a personal workspace
+    And the user does not have permission to manage the personal project
+    When the CLI polls POST /api/auth/cli/exchange
+    Then the device_session response is still successful
+    And personal_project is omitted from the response
 
   @bdd @cli-onboarding @credentials @integration
   Scenario: a session created before this change lazily exchanges once and rewrites the session file
@@ -130,9 +181,20 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   Scenario: GET /api/auth/cli/personal-project returns the caller's personal project
     Given a valid device-session bearer token whose personal workspace already exists
     And the user is an active member of the token's organization
+    And the user has permission to manage the personal project
     When the CLI calls GET /api/auth/cli/personal-project
     Then the response carries the personal project's id, slug, name and api_key
     And it is the same project the login exchange delivered
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: GET /api/auth/cli/personal-project withholds the key without breaking the session
+    Given a valid device-session bearer token whose personal workspace already exists
+    And the user is an active member of the token's organization
+    But the user does not have permission to manage the personal project
+    When the CLI calls GET /api/auth/cli/personal-project
+    Then the response is successful and carries the personal project's identity
+    But the response carries no api_key
+    And the device session remains valid
 
   # ─────────────────────────────────────────────────────────────────────
   # Tenancy boundary: current membership is proven before minting a key
@@ -147,6 +209,23 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And no personal team, project, or role binding is created in the former tenant
     And the presented access token is revoked from Redis
     And a follow-up call with the same token is 401
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's pre-disable token cannot mint or return a personal key
+    Given a device-session token issued while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And no personal team, project, or role binding is created
+    And the presented access token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's session cannot be renewed
+    Given a device session started while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI presents the refresh token to POST /api/auth/cli/refresh
+    Then the response is 401 and no new token pair is issued
+    And the presented refresh token is revoked
 
   @bdd @cli-onboarding @credentials @tenancy @integration
   Scenario: a deactivated user's token cannot mint or return a personal key

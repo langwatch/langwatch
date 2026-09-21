@@ -14,6 +14,7 @@
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RedirectRefusedError as ActualRedirectRefusedError } from "~/utils/ssrfProtection";
 
 import { HttpPollingPullerAdapter } from "../httpPollingPullerAdapter";
 
@@ -49,7 +50,12 @@ interface FetchCall {
 }
 
 let capturedCalls: FetchCall[] = [];
-let responseQueue: Array<{ status: number; body: unknown }> = [];
+let responseQueue: Array<{
+  status: number;
+  body: unknown;
+  /** Extra response headers, for the answers whose meaning is in a header. */
+  headers?: Record<string, string>;
+}> = [];
 
 beforeEach(() => {
   capturedCalls = [];
@@ -57,13 +63,21 @@ beforeEach(() => {
   // Mock undici fetch via the ssrfSafeFetch path. Easiest is to mock
   // the module — adapter imports `~/utils/ssrfProtection`.
   vi.doMock("~/utils/ssrfProtection", () => ({
+    // The adapter checks `instanceof RedirectRefusedError`, so the mock has
+    // to carry the real class. Mocking the module replaces all of its
+    // exports, and an `instanceof` against an undefined import throws a
+    // TypeError that reads nothing like the missing export it actually is.
+    RedirectRefusedError: ActualRedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
       capturedCalls.push({ url, init });
       const next = responseQueue.shift();
       if (!next) throw new Error("test bug: no queued response");
+      if (next.status >= 300 && next.status < 400) {
+        throw new ActualRedirectRefusedError();
+      }
       return new Response(JSON.stringify(next.body), {
         status: next.status,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...next.headers },
       });
     },
   }));
@@ -112,6 +126,63 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
+  describe("given a request that carries the source's credential", () => {
+    /**
+     * The request headers carry the source's decrypted upstream secret, and
+     * `ssrfSafeFetch` follows up to ten redirects by default — re-sending
+     * those headers to each host it lands on. A configured endpoint that
+     * starts answering with a redirect would hand the credential to wherever
+     * it points, with nothing in a pull run reporting it.
+     *
+     * Asserted on the call rather than through a redirecting fixture on
+     * purpose: the inherited default is to follow, so the only thing that
+     * proves this adapter opted out is the option itself being passed.
+     */
+    /** @scenario "A redirect never carries the credentials onward" */
+    it("tells the fetch helper not to follow redirects", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 200,
+        body: { events: [], next_cursor: null },
+      });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(capturedCalls).toHaveLength(1);
+      expect(
+        (capturedCalls[0]!.init as { followRedirects?: boolean })
+          .followRedirects,
+      ).toBe(false);
+    });
+
+    /**
+     * A configured endpoint that redirects is a permanent property of that
+     * endpoint, so retrying it only delays the error the admin needs to read.
+     */
+    /** @scenario "A redirect never carries the credentials onward" */
+    it("fails immediately on a refused redirect instead of retrying it", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({ status: 302, body: {} });
+
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(result.errorCount).toBe(1);
+      expect(capturedCalls).toHaveLength(1);
+    });
+  });
+
   describe("runOnce — single page", () => {
     it("returns mapped events with cursor=null when API drains in one call", async () => {
       const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
@@ -157,7 +228,7 @@ describe("HttpPollingPullerAdapter", () => {
         actor: "alice@acme.test",
         action: "completion",
         target: "gpt-5-mini",
-        cost_usd: 0.0023,
+        cost_usd: "0.0023",
         tokens_input: 50,
         tokens_output: 12,
       });
@@ -313,6 +384,65 @@ describe("HttpPollingPullerAdapter", () => {
         adapter.validateConfig(VALID_CONFIG),
       );
       expect(result.cursor).toBeNull();
+    });
+  });
+
+  /**
+   * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+   *
+   * This adapter is one of the two scheduled sources that used to let a
+   * provider's wait fall on the floor: a 429 landed in the generic 4xx branch,
+   * which ends the run correctly and throws away the header saying when it is
+   * safe to come back.
+   */
+  describe("given a provider answering that too many requests were made", () => {
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("stops the run rather than asking a second time", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      await expect(
+        adapter.runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        ),
+      ).rejects.toThrow(/429/);
+
+      // One queued answer, one request. A second would have emptied the queue
+      // and failed with the harness's own "no queued response".
+      expect(capturedCalls).toHaveLength(1);
+    });
+
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("carries away the wait the provider named", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      const thrown = await adapter
+        .runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        )
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(Reflect.get(thrown as object, "retryAfterMs")).toBe(120_000);
     });
   });
 });

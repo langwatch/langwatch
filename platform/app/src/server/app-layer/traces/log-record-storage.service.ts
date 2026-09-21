@@ -1,18 +1,7 @@
-import { CanonicalLogRecordClickHouseRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.clickhouse.repository";
-import {
-  type CanonicalLogRecordRepository,
-  NullCanonicalLogRecordRepository,
-} from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
-import {
-  type ClickHouseClientResolver,
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { LogRecordStorageClickHouseRepository } from "./repositories/log-record-storage.clickhouse.repository";
+import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
 import {
   type LogRecordStorageRepository,
   mergeStoredLogRows,
-  NullLogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "./repositories/log-record-storage.repository";
 
@@ -74,35 +63,4 @@ export class LogRecordStorageService {
     // matching "canonical is the authoritative store".
     return mergeStoredLogRows([...legacy, ...canonical], limit);
   }
-}
-
-/**
- * The default LogRecordStorageService for callers that don't inject one — a
- * ClickHouse-backed store when CH is enabled, else a no-op. Lives in the app
- * layer so the legacy `TraceService` can delegate its lazy default here instead
- * of constructing repositories (and touching CH config) itself.
- */
-export function createDefaultLogRecordStorageService(): LogRecordStorageService {
-  const resolveClickHouseClient: ClickHouseClientResolver = async (
-    tenantId,
-  ) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client) {
-      throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-    }
-    return client;
-  };
-  return isClickHouseEnabled()
-    ? new LogRecordStorageService({
-        repository: new LogRecordStorageClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-        canonical: new CanonicalLogRecordClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-      })
-    : new LogRecordStorageService({
-        repository: new NullLogRecordStorageRepository(),
-        canonical: new NullCanonicalLogRecordRepository(),
-      });
 }

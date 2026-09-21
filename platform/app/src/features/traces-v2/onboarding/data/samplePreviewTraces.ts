@@ -5,11 +5,8 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { RouterOutputs } from "~/utils/api";
-import type {
-  TraceEvalResult,
-  TraceListEvent,
-  TraceListItem,
-} from "../../types/trace";
+import type { TraceEvalResult, TraceListItem } from "../../types/trace";
+import { NO_TRACE_EVENTS } from "../../types/trace";
 
 /**
  * Conversation turn exactly as the `tracesV2.conversationContext` procedure
@@ -66,7 +63,6 @@ export function isPreviewTraceId(traceId: string): boolean {
 const NOW = () => Date.now();
 const minutesAgo = (n: number) => NOW() - n * 60_000;
 
-const noEvents: TraceListEvent[] = [];
 const noEvals: TraceEvalResult[] = [];
 
 interface MakeTraceArgs {
@@ -124,7 +120,7 @@ function makeTrace(args: MakeTraceArgs): TraceListItem {
     traceName: args.name,
     rootSpanType: args.rootSpanType,
     evaluations: args.evaluations ?? noEvals,
-    events: noEvents,
+    events: NO_TRACE_EVENTS,
   };
 }
 
@@ -1456,6 +1452,8 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
         input: "How's the checkout funnel looking today?",
         output:
           "Conversion is sitting at 33.7% over the last 24h, materially below the 41.2% baseline. The drop concentrates in this morning's window. Want me to dig in?",
+        totalTokens: 1_840,
+        totalCost: 0.0067,
         ...NOT_REDACTED,
       },
       {
@@ -1466,6 +1464,8 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
         status: richArrival.status,
         input: richArrival.input,
         output: richArrival.output,
+        totalTokens: richArrival.totalTokens,
+        totalCost: richArrival.totalCost,
         ...NOT_REDACTED,
       },
       {
@@ -1478,6 +1478,8 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
           "Re-enable the email-jobs runner now and ping me when it's caught up.",
         output:
           "Done — email-jobs is unpaused as of 09:42 UTC. Backlog is ~4,800 abandonment emails; estimated catch-up in 12 minutes. I'll ping you the moment the queue drains.",
+        totalTokens: 2_310,
+        totalCost: 0.0081,
         ...NOT_REDACTED,
       },
     ],
@@ -1729,6 +1731,8 @@ function buildPreviewConversation(
         status: trace.status,
         input: trace.input,
         output: trace.output,
+        totalTokens: trace.totalTokens,
+        totalCost: trace.totalCost,
         ...NOT_REDACTED,
       },
     ],

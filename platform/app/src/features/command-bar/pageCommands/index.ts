@@ -1,16 +1,14 @@
 import type { Command } from "../types";
-import { tracesPageCommands } from "./tracesPageCommands";
 
-// Registry of page-specific commands
-export const pageCommandRegistry: Record<string, Command[]> = {
-  "/[project]/messages": tracesPageCommands,
-  // Add more pages as needed
-};
+// Registry of page-specific commands. Empty since the legacy Traces page —
+// the only page that ever registered any — was removed; the extension point
+// stays for the next page that wants one.
+export const pageCommandRegistry: Record<string, Command[]> = {};
 
 export function getPageCommands(pathname: string): Command[] {
-  // Remove trailing slash before normalizing: /foo/messages/ → /foo/messages
+  // Remove trailing slash before normalizing: /foo/traces/ → /foo/traces
   const trimmed = pathname.replace(/\/$/, "");
-  // Match dynamic routes: /foo/messages → /[project]/messages
+  // Match dynamic routes: /foo/traces → /[project]/traces
   const normalized = trimmed.replace(/^\/[^/]+/, "/[project]");
   return pageCommandRegistry[normalized] ?? [];
 }

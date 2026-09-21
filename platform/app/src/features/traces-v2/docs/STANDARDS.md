@@ -396,7 +396,7 @@ export function useTraceList() {
     },
     {
       staleTime: STALE_TIMES.traceList,       // 30s
-      keepPreviousData: true,                  // smooth transitions on filter change
+      placeholderData: keepPreviousData,       // smooth transitions on filter change
     }
   );
 }
@@ -761,7 +761,7 @@ describe("useTraceList", () => {
 
 - Skeleton loading for initial load (Chakra's Skeleton component).
 - `isFetching` indicator for background refetches (subtle, not full skeleton).
-- `keepPreviousData: true` on list queries for smooth filter transitions.
+- `placeholderData: keepPreviousData` on list queries for smooth filter transitions.
 
 ### Keyboard navigation
 

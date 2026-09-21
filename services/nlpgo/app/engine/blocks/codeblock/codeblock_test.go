@@ -465,6 +465,74 @@ func TestCodeBlock_NoSecretsLeavesNamespaceUndefined(t *testing.T) {
 	assert.Contains(t, res.Error.Message, "secrets")
 }
 
+// TestCodeBlock_ParamsExposedAsNamespace pins the run-parameters contract:
+// a configured parameter rides on the request and the runner exposes it as
+// `params.NAME` attribute access, the same shape as secrets. Values keep
+// their configured type on the way through, so a boolean is usable as a
+// boolean and a number is usable in arithmetic rather than arriving as text.
+func TestCodeBlock_ParamsExposedAsNamespace(t *testing.T) {
+	requirePython(t)
+	code := "def execute():\n" +
+		"    return {\n" +
+		"        'tenant': params.TENANT,\n" +
+		"        'tenant_kind': type(params.TENANT).__name__,\n" +
+		"        'verbose_kind': type(params.VERBOSE).__name__,\n" +
+		"        'flipped': not params.VERBOSE,\n" +
+		"        'doubled': params.RETRIES * 2,\n" +
+		"    }\n"
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: code,
+		Params: map[string]any{
+			"TENANT":  "acme",
+			"RETRIES": 3,
+			"VERBOSE": true,
+		},
+		DeclaredOutputs: []string{"tenant", "tenant_kind", "verbose_kind", "flipped", "doubled"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "acme", res.Outputs["tenant"])
+	assert.Equal(t, "str", res.Outputs["tenant_kind"])
+	// The load-bearing assertion for typed params: a boolean reaches Python
+	// as a bool, so `not params.VERBOSE` is False. Were it stringified the
+	// way secrets are, the type would be "str" and the negation True.
+	assert.Equal(t, "bool", res.Outputs["verbose_kind"])
+	assert.Equal(t, false, res.Outputs["flipped"])
+	assert.InDelta(t, 6.0, res.Outputs["doubled"], 1e-9)
+}
+
+// TestCodeBlock_UndefinedParamRaisesAttributeError pins that a reference to
+// a parameter that isn't configured fails as AttributeError (the namespace
+// exists but the attr doesn't), not a silent empty value.
+func TestCodeBlock_UndefinedParamRaisesAttributeError(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': params.ABSENT}\n",
+		Params:          map[string]any{"PRESENT": "yes"},
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "AttributeError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "ABSENT")
+}
+
+// TestCodeBlock_NoParamsLeavesNamespaceUndefined pins the same failure shape
+// secrets has: with no parameters configured, `params` is undefined
+// (NameError) rather than an empty namespace, so reading one that was never
+// set fails loudly instead of resolving to nothing.
+func TestCodeBlock_NoParamsLeavesNamespaceUndefined(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': params.ANYTHING}\n",
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "NameError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "params")
+}
+
 func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 	requirePython(t)
 	exec := newExec(t)

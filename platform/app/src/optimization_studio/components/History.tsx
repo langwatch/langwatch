@@ -9,10 +9,10 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { UserAvatar } from "~/components/UserAvatar";
+import type { Project } from "~/generated/prisma/client";
 
 import { HistoryIcon } from "../../components/icons/History";
 import { Popover } from "../../components/ui/popover";
@@ -109,7 +109,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             title: `Saved version ${version}`,
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           setWorkflow({
             version,
@@ -122,7 +121,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
         },
       },
@@ -199,7 +197,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   alignSelf="end"
                   colorPalette="orange"
                   size="sm"
-                  loading={commitVersion.isLoading}
+                  loading={commitVersion.isPending}
                   disabled={!canSaveNewVersion}
                 >
                   Save new version
@@ -269,7 +267,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     <Button
                       variant="ghost"
                       onClick={() => void onRestoreSuccess(version.id)}
-                      loading={restoreVersion.isLoading}
+                      loading={restoreVersion.isPending}
                     >
                       <HistoryIcon size={24} />
                     </Button>

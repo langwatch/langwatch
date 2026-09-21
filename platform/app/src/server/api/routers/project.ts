@@ -1,35 +1,26 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { generate } from "@langwatch/ksuid";
-import {
-  Prisma,
-  type PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
+  governanceProjectRouteViolation,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import {
-  checkOrganizationPermission,
-  checkProjectPermission,
-  checkTeamPermission,
-  hasProjectPermission,
-  skipPermissionCheckProjectCreation,
-} from "../rbac";
+import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
@@ -78,6 +69,19 @@ function assertMoveStaysOutOfPersonalWorkspaces({
   }
 }
 
+/**
+ * The hidden governance project is not a workspace, and these mutations write
+ * Prisma directly rather than going through `ProjectService`, so they enforce
+ * the guard themselves. The rule itself is defined once in the projects app
+ * layer; see the helper there for why the id being reachable at all matters.
+ */
+function assertNotGovernanceProject(kind: string | null | undefined): void {
+  const violation = governanceProjectRouteViolation(kind);
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -90,27 +94,36 @@ export const projectRouter = createTRPCRouter({
         framework: z.string(),
       }),
     )
-    .use(skipPermissionCheckProjectCreation)
-    .use(({ ctx, input, next }) => {
-      if (input.teamId) {
-        return checkTeamPermission("project:create")({
-          ctx,
-          input: { ...input, teamId: input.teamId },
-          next,
-        });
-      } else if (input.newTeamName) {
-        return checkOrganizationPermission("organization:manage")({
-          ctx,
-          input,
-          next,
-        });
-      } else {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Either teamId or newTeamName must be provided",
-        });
-      }
-    })
+    .use(
+      declareAuthzMiddleware(
+        {
+          kind: "custom",
+          reason:
+            "creating into an existing team asks that team; creating a team alongside asks the organization",
+          permissions: ["project:create", "organization:manage"],
+        },
+        ({ ctx, input, next }) => {
+          if (input.teamId) {
+            return checkTeamPermission("project:create")({
+              ctx,
+              input: { ...input, teamId: input.teamId },
+              next,
+            });
+          } else if (input.newTeamName) {
+            return checkOrganizationPermission("organization:manage")({
+              ctx,
+              input,
+              next,
+            });
+          } else {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Either teamId or newTeamName must be provided",
+            });
+          }
+        },
+      ),
+    )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -122,10 +135,7 @@ export const projectRouter = createTRPCRouter({
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;
-      const slug =
-        slugify(input.name, { lower: true, strict: true }) +
-        "-" +
-        projectNanoId.substring(0, 6);
+      const slug = mintProjectSlug({ name: input.name, projectNanoId });
 
       const existingProject = await prisma.project.findFirst({
         where: {
@@ -144,30 +154,13 @@ export const projectRouter = createTRPCRouter({
 
       let teamId = input.teamId;
       if (!teamId) {
-        const teamName = input.newTeamName ?? input.name;
-        const teamNanoId = nanoid();
-        const newTeamId = `team_${teamNanoId}`;
-        const teamSlug =
-          slugify(teamName, { lower: true, strict: true }) +
-          "-" +
-          newTeamId.substring(0, 6);
-        const team = await prisma.team.create({
-          data: {
-            id: newTeamId,
-            name: teamName,
-            slug: teamSlug,
-            organizationId: input.organizationId,
-          },
-        });
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: input.organizationId,
-            userId: userId,
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-          },
+        // The team and the ADMIN binding that comes with it belong to the team
+        // service: the binding is a grants-ledger fact, and a route is not
+        // where the ledger is driven from.
+        const team = await new TeamService({ prisma }).createWithFoundingAdmin({
+          organizationId: input.organizationId,
+          name: input.newTeamName ?? input.name,
+          adminUserId: userId,
         });
 
         teamId = team.id;
@@ -213,13 +206,14 @@ export const projectRouter = createTRPCRouter({
       return { success: true, projectSlug: project.slug };
     }),
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants. Rotation stays at
-   * `project:manage`.
+   * The base key grants full access to one project. Revealing it is therefore
+   * an administrator action, just like rotating it.
    */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:update"))
+    .permission("project:manage", {
+      nondisclosure: "not-found-outside-organization",
+    })
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -239,7 +233,7 @@ export const projectRouter = createTRPCRouter({
     }),
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => {
       const project = await getApp().projects.getById(input.projectId);
 
@@ -247,9 +241,15 @@ export const projectRouter = createTRPCRouter({
     }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:manage"))
+    .permission("project:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      const target = await prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { kind: true },
+      });
+      assertNotGovernanceProject(target?.kind);
 
       // Generate new API key
       const newApiKey = generateApiKey();
@@ -320,7 +320,7 @@ export const projectRouter = createTRPCRouter({
           );
         }),
     )
-    .use(checkProjectPermission("project:update"))
+    .permission("project:update")
     .use(checkCapturedDataVisibilityPermission)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -336,6 +336,8 @@ export const projectRouter = createTRPCRouter({
           message: "Project not found",
         });
       }
+
+      assertNotGovernanceProject(project.kind);
 
       if (input.teamId) {
         const destinationTeam = await prisma.team.findFirst({
@@ -405,7 +407,7 @@ export const projectRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -427,7 +429,7 @@ export const projectRouter = createTRPCRouter({
     }),
   archiveById: protectedProcedure
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
-    .use(checkProjectPermission("project:delete"))
+    .permission("project:delete")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       if (input.projectToArchiveId === input.projectId) {
@@ -436,7 +438,7 @@ export const projectRouter = createTRPCRouter({
           message: "You cannot archive the current project",
         });
       }
-      const canDeleteTarget = await hasProjectPermission(
+      const canDeleteTarget = await probeProjectPermission(
         ctx,
         input.projectToArchiveId,
         "project:delete",
@@ -447,8 +449,9 @@ export const projectRouter = createTRPCRouter({
 
       const target = await prisma.project.findUnique({
         where: { id: input.projectToArchiveId },
-        select: { isPersonal: true },
+        select: { isPersonal: true, kind: true },
       });
+      assertNotGovernanceProject(target?.kind);
       const archiveViolation = personalWorkspaceArchiveViolation(
         target?.isPersonal ?? false,
       );
@@ -465,7 +468,7 @@ export const projectRouter = createTRPCRouter({
 
   triggerTopicClustering: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:update"))
+    .permission("project:update")
     .mutation(async ({ ctx, input }) => {
       try {
         const app = getApp();
@@ -519,7 +522,7 @@ async function checkCapturedDataVisibilityPermission({
 }) {
   if (
     input.traceSharingEnabled !== void 0 &&
-    !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
+    !(await probeProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",

@@ -1,7 +1,10 @@
 import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
+import { geminiAgentPlatformPair } from "../../modelProviders/geminiDoor";
+import { expandLatestAlias } from "../../modelProviders/latestAliases";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -309,7 +312,7 @@ async function resolveServingRow({
 }
 
 export const prepareLitellmParams = async ({
-  model,
+  model: requestedModel,
   modelProvider: givenModelProvider,
   projectId,
 }: {
@@ -317,6 +320,13 @@ export const prepareLitellmParams = async ({
   modelProvider: MaybeStoredModelProvider;
   projectId: string;
 }) => {
+  // A stored `<provider>/latest` or `<provider>/latest-mini` alias resolves to
+  // the concrete model here, at the last stop before the wire. The pickers
+  // resolve it on their own, but the prompts API, the CLI and agent-written
+  // configs store the alias verbatim, and no provider knows the word
+  // "latest". Runs before the serving-row selection so the row is picked for
+  // the concrete model. A concrete id passes through unchanged.
+  const model = expandLatestAlias(requestedModel);
   // Execution backstop for the terms-restricted provider: every general
   // inference path (workflows, evaluations, playground, optimization
   // studio) funnels through here on its way to litellm/nlpgo, and codex
@@ -326,7 +336,7 @@ export const prepareLitellmParams = async ({
   // guard is what makes the restriction hold against a handcrafted request.
   if (isCodexModel(model) || givenModelProvider.provider === "openai_codex") {
     throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
     );
   }
 
@@ -356,7 +366,7 @@ export const prepareLitellmParams = async ({
   // it too.
   if (modelProvider.provider === "openai_codex") {
     throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
     );
   }
 
@@ -394,6 +404,19 @@ export const prepareLitellmParams = async ({
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
     params.vertex_location =
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
+  }
+
+  // Gemini's second door: a credential carrying a project and location is
+  // an Agent Platform key, and the two fields ride with it so nlpgo and the
+  // Go gateway route to aiplatform.googleapis.com instead of the Gemini
+  // API. Emitted together or not at all — one without the other names no
+  // door. See specs/model-providers/google-agent-platform.feature.
+  if (modelProvider.provider === "gemini") {
+    const pair = geminiAgentPlatformPair(modelProvider.customKeys);
+    if (pair) {
+      params.project_id = pair.project;
+      params.region = pair.location;
+    }
   }
 
   if (modelProvider.provider === "bedrock") {

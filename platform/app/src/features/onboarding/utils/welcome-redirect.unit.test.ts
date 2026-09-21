@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { resolveWelcomeRedirect } from "./welcome-redirect";
 
 /**
- * ADR-038 v6: the welcome screen's redirect decision. An intent-set org is
- * onboarded, period — re-showing the create-org form would mint a duplicate
- * organization. Personal workspaces never count as projects.
+ * ADR-038 v6: the welcome screen's redirect decision. Belonging to an
+ * organization means onboarded, period — re-showing the create-org form would
+ * mint a duplicate organization. Personal workspaces never count as projects.
  *
  * Spec: specs/features/onboarding/intent-fork.feature
  */
@@ -91,10 +91,40 @@ describe("resolveWelcomeRedirect", () => {
   });
 
   describe("when a legacy org has no project at all", () => {
-    it("onboards, exactly as before the fork", () => {
+    // The invited-member trap. `primaryIntent` is null for every organization
+    // created before ADR-038, so reading onboardedness off it sent a member who
+    // had just accepted an invitation to "let's kick off by creating your
+    // organization", with nothing on that screen to do but create a second
+    // organization nobody wanted.
+    /** @scenario An invited member of an organization with no shared project goes home */
+    it("sends the member home rather than offering to create another organization", () => {
       expect(
         resolveWelcomeRedirect({
           organizations: [org(null, [{ isPersonal: false, projects: [] }])],
+          currentProjectSlug: null,
+        }),
+      ).toEqual({ kind: "home" });
+    });
+
+    /** @scenario A member whose only team is their own workspace goes home */
+    it("sends them home when their only team is their own workspace", () => {
+      expect(
+        resolveWelcomeRedirect({
+          organizations: [
+            org(null, [
+              { isPersonal: true, projects: [{ slug: "personal-abc" }] },
+            ]),
+          ],
+          currentProjectSlug: null,
+        }),
+      ).toEqual({ kind: "home" });
+    });
+
+    /** @scenario Someone who belongs to no organization is still onboarded */
+    it("still onboards a member of nothing at all", () => {
+      expect(
+        resolveWelcomeRedirect({
+          organizations: undefined,
           currentProjectSlug: null,
         }),
       ).toEqual({ kind: "onboard" });

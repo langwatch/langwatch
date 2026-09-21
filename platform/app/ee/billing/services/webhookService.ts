@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import { Currency, type PrismaClient } from "@prisma/client";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
+import { Currency, type PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "../../../src/server/app-layer/app";
 import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
@@ -14,9 +14,11 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { bestEffort } from "../bestEffort";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
+import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -393,10 +395,15 @@ export class EEWebhookService implements WebhookService {
     }
 
     if (organizationId) {
-      this.emitCheckoutAnalytics({
-        checkoutSession,
-        subscriptionId,
-        organizationId,
+      await bestEffort({
+        label: "checkout analytics",
+        context: { eventId: event.id, organizationId },
+        run: () =>
+          this.emitCheckoutAnalytics({
+            checkoutSession,
+            subscriptionId,
+            organizationId,
+          }),
       });
     }
   }
@@ -534,7 +541,56 @@ export class EEWebhookService implements WebhookService {
       );
     }
 
+    await this.trySetAnnualEventsBillingThreshold(subscriptionId);
+
     return { earlyReturn: false };
+  }
+
+  /**
+   * Annual subscriptions accrue metered events for a full year; the billing
+   * threshold makes Stripe collect that overage in slices as it accrues
+   * instead of one oversized renewal invoice. Checkout cannot set the field,
+   * so it is applied right after the subscription exists. Best-effort: a
+   * failure leaves the subscription behaving as before (single renewal
+   * invoice) and must never fail checkout completion.
+   *
+   * Because we answer Stripe 200 regardless — a non-2xx would make Stripe
+   * redeliver the whole checkout webhook, which must not happen — Stripe's own
+   * retry never covers this failure. A log line alone would leave the
+   * subscription quietly exposed to the single-large-invoice risk this exists
+   * to remove, so the failure also raises a Slack alert for manual follow-up.
+   * The alert is itself best-effort and separately guarded: a broken Slack
+   * webhook must never be what fails a checkout that otherwise succeeded.
+   */
+  private async trySetAnnualEventsBillingThreshold(
+    subscriptionId: string,
+  ): Promise<void> {
+    try {
+      const thresholdResult = await applyAnnualEventsBillingThreshold({
+        stripe: this.stripe,
+        stripeSubscriptionId: subscriptionId,
+      });
+      logger.info(
+        { subscriptionId, thresholdResult },
+        "[stripeWebhook] Annual events billing threshold evaluated",
+      );
+    } catch (err) {
+      logger.error(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to set annual events billing threshold — re-run the backfill script or apply manually",
+      );
+      try {
+        await getApp().notifications.sendSlackBillingThresholdFailureAlert({
+          stripeSubscriptionId: subscriptionId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      } catch (alertErr) {
+        logger.error(
+          { subscriptionId, err: alertErr },
+          "[stripeWebhook] Failed to alert on billing-threshold failure",
+        );
+      }
+    }
   }
 
   async handleInvoicePaymentSucceeded({
@@ -600,25 +656,23 @@ export class EEWebhookService implements WebhookService {
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
-    // Send "Subscription cancelled" Slack notification
-    try {
-      const org = await this.organizationRepository.findNameById(
-        existingSubscription.organizationId,
-      );
-      await getApp().notifications.sendSlackSubscriptionEvent({
-        type: "cancelled",
-        organizationId: existingSubscription.organizationId,
-        organizationName: org?.name ?? "Unknown",
-        plan: existingSubscription.plan,
-        subscriptionId: existingSubscription.id,
-        cancellationDate: new Date(),
-      });
-    } catch (err) {
-      logger.error(
-        { stripeSubscriptionId, err },
-        "[stripeWebhook] Failed to send cancellation notification",
-      );
-    }
+    await bestEffort({
+      label: "cancellation notification",
+      context: { stripeSubscriptionId },
+      run: async () => {
+        const org = await this.organizationRepository.findNameById(
+          existingSubscription.organizationId,
+        );
+        await getApp().notifications.sendSlackSubscriptionEvent({
+          type: "cancelled",
+          organizationId: existingSubscription.organizationId,
+          organizationName: org?.name ?? "Unknown",
+          plan: existingSubscription.plan,
+          subscriptionId: existingSubscription.id,
+          cancellationDate: new Date(),
+        });
+      },
+    });
 
     const remainingActive =
       await this.subscriptionRepository.findLastNonCancelled(
@@ -730,15 +784,20 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (shouldNotify) {
-        await getApp().notifications.sendSlackSubscriptionEvent({
-          type: "confirmed",
-          organizationId: updatedSubscription.organizationId,
-          organizationName: updatedSubscription.organization.name,
-          plan: updatedSubscription.plan,
-          subscriptionId: updatedSubscription.id,
-          startDate: updatedSubscription.startDate,
-          maxMembers: updatedSubscription.maxMembers,
-          maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+        await bestEffort({
+          label: "subscription confirmed notification",
+          context: { subscriptionId: updatedSubscription.id },
+          run: () =>
+            getApp().notifications.sendSlackSubscriptionEvent({
+              type: "confirmed",
+              organizationId: updatedSubscription.organizationId,
+              organizationName: updatedSubscription.organization.name,
+              plan: updatedSubscription.plan,
+              subscriptionId: updatedSubscription.id,
+              startDate: updatedSubscription.startDate,
+              maxMembers: updatedSubscription.maxMembers,
+              maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+            }),
         });
       }
     }
@@ -843,15 +902,20 @@ export class EEWebhookService implements WebhookService {
         await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
       }
 
-      await getApp().notifications.sendSlackSubscriptionEvent({
-        type: "confirmed",
-        organizationId: updatedSubscription.organizationId,
-        organizationName: updatedSubscription.organization.name,
-        plan: updatedSubscription.plan,
-        subscriptionId: updatedSubscription.id,
-        startDate: updatedSubscription.startDate,
-        maxMembers: updatedSubscription.maxMembers,
-        maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+      await bestEffort({
+        label: "subscription confirmed notification",
+        context: { subscriptionId: updatedSubscription.id },
+        run: () =>
+          getApp().notifications.sendSlackSubscriptionEvent({
+            type: "confirmed",
+            organizationId: updatedSubscription.organizationId,
+            organizationName: updatedSubscription.organization.name,
+            plan: updatedSubscription.plan,
+            subscriptionId: updatedSubscription.id,
+            startDate: updatedSubscription.startDate,
+            maxMembers: updatedSubscription.maxMembers,
+            maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+          }),
       });
 
       fireSubscriptionSyncNurturing({

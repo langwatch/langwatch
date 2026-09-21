@@ -141,6 +141,31 @@ describe("BatchTargetCell", () => {
           screen.getByTestId("expanded-cell-backdrop"),
         ).toBeInTheDocument();
       });
+
+      // The backdrop covers the viewport and swallows every pointer event, so
+      // an overlay that ignores Escape leaves the toolbar above the table dead
+      // until the reader happens to click the backdrop.
+      /** @scenario Expand full error message on click */
+      it("closes the expanded error on Escape, taking the backdrop with it", async () => {
+        const user = userEvent.setup();
+        const targetOutput = createTargetOutput({
+          output: null,
+          error: longError,
+        });
+
+        render(<BatchTargetCell targetOutput={targetOutput} />, {
+          wrapper: Wrapper,
+        });
+
+        await user.click(screen.getByTestId("error-output-target-1"));
+        expect(
+          screen.getByTestId("expanded-cell-backdrop"),
+        ).toBeInTheDocument();
+
+        await user.keyboard("{Escape}");
+
+        expect(screen.queryByTestId("expanded-cell-backdrop")).toBeNull();
+      });
     });
 
     /** @scenario Expand long target output */

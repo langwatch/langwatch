@@ -17,7 +17,8 @@ def test_login_already_logged_in_no_relogin(capsys):
     with patch("langwatch.login.get_api_key", return_value="fake_api_key"), \
          patch("langwatch.login.langwatch.setup") as mock_setup, \
          patch("langwatch.login.getpass") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         login(relogin=False)
 
@@ -32,7 +33,8 @@ def test_login_successful(capsys):
          patch("langwatch.login.langwatch.setup") as mock_setup, \
          patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="new_valid_key") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -58,7 +60,8 @@ def test_login_successful_with_relogin(capsys):
          patch("langwatch.login.langwatch.setup") as mock_setup, \
          patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="new_valid_key_relogin") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -84,7 +87,8 @@ def test_login_empty_api_key_entered(capsys):
     with patch("langwatch.login.get_api_key", return_value=""), \
          patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         with pytest.raises(ValueError) as excinfo:
             login()
@@ -102,7 +106,8 @@ def test_login_invalid_api_key(capsys):
          patch("langwatch.login.langwatch.setup") as mock_setup, \
          patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="invalid_key") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         mock_response = MagicMock()
         mock_response.status_code = 401
@@ -129,7 +134,8 @@ def test_login_api_call_fails_non_401(capsys):
          patch("langwatch.login.langwatch.setup") as mock_setup, \
          patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="some_key") as mock_getpass, \
-         patch("langwatch.login.httpx.post") as mock_post:
+         patch("langwatch.login.create_client") as mock_create_client:
+        mock_post = mock_create_client.return_value.__enter__.return_value.post
 
         mock_response = MagicMock()
         mock_response.status_code = 500

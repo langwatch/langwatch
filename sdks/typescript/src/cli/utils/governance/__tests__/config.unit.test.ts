@@ -4,6 +4,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   configPath,
+  defaultConfigPath,
+  displayConfigPath,
+  isIsolatedConfig,
   loadConfig,
   saveConfig,
   clearConfig,
@@ -93,7 +96,18 @@ describe("governance config persistence", () => {
         secret: "vk-lw-01HZX9N4TESTULIDTESTULID00",
         prefix: "vk-lw-01HZX9N",
       },
-      last_request_increase_url: "http://app.example/me/budget/request?signed=abc",
+      tool_mode: { claude: "ingestion" as const },
+      default_personal_ingest_keys: {
+        codex: { secret: "ik-lw-cache00000000000_secret" },
+      },
+      tool_project_keys: {
+        codex: {
+          secret: "ik-lw-pin0000000000000_secret",
+          project_id: "proj_1",
+          project_slug: "acme-app",
+          endpoint: "https://lw.acme.dev",
+        },
+      },
     };
     saveConfig(original);
 
@@ -103,6 +117,32 @@ describe("governance config persistence", () => {
     const loaded = loadConfig();
     expect(loaded).toEqual(expect.objectContaining(original));
     expect(isLoggedIn(loaded)).toBe(true);
+  });
+
+  describe("when a hand-edited project pin carries no secret", () => {
+    it("drops that entry and keeps the pins that do", () => {
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "http://gw.example",
+          control_plane_url: "http://app.example",
+          access_token: "at_x",
+          tool_project_keys: {
+            codex: { project_slug: "acme-app" },
+            claude: { secret: "ik-lw-pin0000000000000_secret" },
+          },
+        }),
+      );
+
+      const loaded = loadConfig();
+
+      // Kept, the codex entry would hand `Bearer undefined` to every reader
+      // that trusts the declared type.
+      expect(loaded.tool_project_keys?.codex).toBeUndefined();
+      expect(loaded.tool_project_keys?.claude?.secret).toBe(
+        "ik-lw-pin0000000000000_secret",
+      );
+    });
   });
 
   describe("when a stored personal VK secret is in a legacy format", () => {
@@ -162,8 +202,108 @@ describe("governance config persistence", () => {
     });
   });
 
+  describe("when loading a user-scoped login key", () => {
+    const write = (extra: Record<string, unknown>): void => {
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "https://gateway.langwatch.ai",
+          control_plane_url: "https://app.langwatch.ai",
+          ...extra,
+        }),
+      );
+    };
+
+    it("survives a save and load round trip", () => {
+      saveConfig({
+        gateway_url: "g",
+        control_plane_url: "c",
+        cli_api_key: "sk-lw-lookup01_secret01",
+        cli_api_key_scope: { kind: "projects", project_ids: ["proj_a"] },
+      });
+
+      const cfg = loadConfig();
+
+      expect(cfg.cli_api_key).toBe("sk-lw-lookup01_secret01");
+      expect(cfg.cli_api_key_scope).toEqual({
+        kind: "projects",
+        project_ids: ["proj_a"],
+      });
+    });
+
+    it("drops a blank key, and the scope that described it", () => {
+      write({
+        cli_api_key: "   ",
+        cli_api_key_scope: { kind: "organization", project_ids: [] },
+      });
+
+      const cfg = loadConfig();
+
+      expect(cfg.cli_api_key).toBeUndefined();
+      expect(cfg.cli_api_key_scope).toBeUndefined();
+    });
+
+    it("drops a scope in a shape whoami cannot read, keeping the key", () => {
+      write({
+        cli_api_key: "sk-lw-lookup01_secret01",
+        cli_api_key_scope: { kind: "everything" },
+      });
+
+      const cfg = loadConfig();
+
+      expect(cfg.cli_api_key).toBe("sk-lw-lookup01_secret01");
+      expect(cfg.cli_api_key_scope).toBeUndefined();
+    });
+
+    it("drops an organization scope that also carries project ids", () => {
+      write({
+        cli_api_key: "sk-lw-lookup01_secret01",
+        cli_api_key_scope: {
+          kind: "organization",
+          project_ids: ["proj_a", "proj_b"],
+        },
+      });
+
+      const cfg = loadConfig();
+
+      expect(cfg.cli_api_key).toBe("sk-lw-lookup01_secret01");
+      expect(cfg.cli_api_key_scope).toBeUndefined();
+    });
+  });
+
   it("env var override changes the path", () => {
     expect(configPath()).toBe(p);
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG names a file other than the home's default", () => {
+    it("is a config of its own", () => {
+      expect(isIsolatedConfig()).toBe(true);
+    });
+
+    /** @scenario "The login names the config file it writes" */
+    it("is shown by its own path, not as the home's default", () => {
+      expect(displayConfigPath()).toBe(p);
+    });
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG names the home's default file", () => {
+    it("is the machine's own config, shown under ~", () => {
+      process.env.LANGWATCH_CLI_CONFIG = defaultConfigPath();
+
+      expect(isIsolatedConfig()).toBe(false);
+      expect(displayConfigPath()).toBe(
+        path.join("~", ".langwatch", "config.json"),
+      );
+    });
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG is unset or blank", () => {
+    it.each([undefined, "", "  "])("is not a config of its own (%j)", (value) => {
+      if (value === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = value;
+
+      expect(isIsolatedConfig()).toBe(false);
+    });
   });
 
   it("clear removes the file (idempotent on missing)", () => {

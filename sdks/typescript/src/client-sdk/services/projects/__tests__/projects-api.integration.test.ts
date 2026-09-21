@@ -153,6 +153,50 @@ describe("ProjectsApiService", () => {
     });
   });
 
+  describe("getApiKey()", () => {
+    describe("when the credential may update the project", () => {
+      beforeEach(() => {
+        server.use(
+          http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123/api-key`, () => {
+            return HttpResponse.json({ apiKey: "sk-lw-project-key" });
+          }),
+        );
+      });
+
+      it("returns the project's key", async () => {
+        await expect(service.getApiKey("proj_abc123")).resolves.toBe(
+          "sk-lw-project-key",
+        );
+      });
+    });
+
+    describe("when the credential lacks the permission", () => {
+      beforeEach(() => {
+        server.use(
+          http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123/api-key`, () => {
+            return HttpResponse.json(
+              { error: "Forbidden", message: "Forbidden" },
+              { status: 403 },
+            );
+          }),
+        );
+      });
+
+      it("throws with the 403 status on it", async () => {
+        let thrown: unknown;
+        try {
+          await service.getApiKey("proj_abc123");
+        } catch (error) {
+          thrown = error;
+        }
+        const status =
+          (thrown as { status?: number; httpStatus?: number }).status ??
+          (thrown as { httpStatus?: number }).httpStatus;
+        expect(status).toBe(403);
+      });
+    });
+  });
+
   describe("create()", () => {
     describe("when valid input is provided", () => {
       beforeEach(() => {
@@ -171,6 +215,7 @@ describe("ProjectsApiService", () => {
         );
       });
 
+      /** @scenario Creating a project from the SDK returns the service API key minted with it */
       it("creates project and returns service API key", async () => {
         const result = await service.create({
           name: "New Project",

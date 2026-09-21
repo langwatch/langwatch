@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type DrawerViewMode, useDrawerStore } from "../stores/drawerStore";
+import { guardTraceEditExit } from "../utils/traceEditMode";
 
 /**
  * Trace-to-trace navigation inside the v2 drawer with a back stack.
@@ -58,54 +59,66 @@ export function useTraceDrawerNavigation() {
       ) {
         return;
       }
-      pushTraceHistory({
-        traceId: fromTraceId,
-        viewMode: fromViewMode,
-        occurredAtMs: fromTimestamp,
-      });
-      if (toViewMode) {
-        if (persistViewMode) setViewMode(toViewMode);
-        else useDrawerStore.getState().setViewModeTransient(toViewMode);
-      }
-      // Push into the store immediately so drawer hooks render with the
-      // right traceId/occurredAtMs before the URL change settles.
-      useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
-      openDrawer("traceV2Details", {
-        traceId: toTraceId,
-        ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+      // Moving to another trace leaves the correction behind, so an unsaved
+      // one asks first and the navigation waits on the answer.
+      guardTraceEditExit(() => {
+        pushTraceHistory({
+          traceId: fromTraceId,
+          viewMode: fromViewMode,
+          occurredAtMs: fromTimestamp,
+        });
+        if (toViewMode) {
+          if (persistViewMode) setViewMode(toViewMode);
+          else useDrawerStore.getState().setViewModeTransient(toViewMode);
+        }
+        // Push into the store immediately so drawer hooks render with the
+        // right traceId/occurredAtMs before the URL change settles.
+        useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
+        openDrawer("traceV2Details", {
+          traceId: toTraceId,
+          ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+        });
       });
     },
     [openDrawer, pushTraceHistory, setViewMode],
   );
 
+  // Going back is going to another trace, so it asks about an unsaved
+  // correction the same way going forward does. The history is popped inside
+  // the guarded action: parking the exit and popping anyway would lose the
+  // entry when the reviewer chooses to keep editing.
   const goBack = useCallback(() => {
-    const previous = popTraceHistory();
-    if (!previous) return;
-    setViewMode(previous.viewMode);
-    useDrawerStore
-      .getState()
-      .openTrace(previous.traceId, previous.occurredAtMs ?? null);
-    openDrawer("traceV2Details", {
-      traceId: previous.traceId,
-      ...(previous.occurredAtMs !== undefined
-        ? { t: String(previous.occurredAtMs) }
-        : {}),
+    guardTraceEditExit(() => {
+      const previous = popTraceHistory();
+      if (!previous) return;
+      setViewMode(previous.viewMode);
+      useDrawerStore
+        .getState()
+        .openTrace(previous.traceId, previous.occurredAtMs ?? null);
+      openDrawer("traceV2Details", {
+        traceId: previous.traceId,
+        ...(previous.occurredAtMs !== undefined
+          ? { t: String(previous.occurredAtMs) }
+          : {}),
+      });
     });
   }, [openDrawer, popTraceHistory, setViewMode]);
 
   const goBackTo = useCallback(
     (index: number) => {
-      const target = popTraceHistoryTo(index);
-      if (!target) return;
-      setViewMode(target.viewMode);
-      useDrawerStore
-        .getState()
-        .openTrace(target.traceId, target.occurredAtMs ?? null);
-      openDrawer("traceV2Details", {
-        traceId: target.traceId,
-        ...(target.occurredAtMs !== undefined
-          ? { t: String(target.occurredAtMs) }
-          : {}),
+      guardTraceEditExit(() => {
+        const target = popTraceHistoryTo(index);
+        if (!target) return;
+        setViewMode(target.viewMode);
+        useDrawerStore
+          .getState()
+          .openTrace(target.traceId, target.occurredAtMs ?? null);
+        openDrawer("traceV2Details", {
+          traceId: target.traceId,
+          ...(target.occurredAtMs !== undefined
+            ? { t: String(target.occurredAtMs) }
+            : {}),
+        });
       });
     },
     [openDrawer, popTraceHistoryTo, setViewMode],

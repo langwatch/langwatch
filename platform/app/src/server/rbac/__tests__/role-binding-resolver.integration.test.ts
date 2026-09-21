@@ -10,6 +10,9 @@
  * - No fallback to TeamUser when no RoleBindings exist
  * - RoleBinding is authoritative: TeamUser is ignored even when both exist
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   type Project,
@@ -17,9 +20,7 @@ import {
   type Team,
   TeamUserRole,
   type User,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import {
   checkRoleBindingPermission,

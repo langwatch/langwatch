@@ -21,7 +21,12 @@
  * projects whose parent org is off-list.
  */
 
-import type { Organization, PrismaClient, Project, Team } from "@prisma/client";
+import type {
+  Organization,
+  PrismaClient,
+  Project,
+  Team,
+} from "../../../../src/generated/prisma/client";
 
 const ENV_VAR = "DEMO_ORG_IDS";
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;

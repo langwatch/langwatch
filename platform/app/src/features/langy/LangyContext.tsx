@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { ProposalHandlers } from "./components/MessageContent";
 import type { LangyContextChip } from "./stores/langyStore";
+import type { LangyUiActionHandlers } from "./uiActions/types";
 
 /**
  * Per-page registration surface for Langy (proposal handlers + precise page
@@ -40,12 +41,22 @@ interface LangyContextValue {
   pageContext: LangyContextChip[];
   registerPageContext: (items: LangyContextChip[]) => void;
   clearPageContext: () => void;
+  /**
+   * The UI actions the CURRENT page can execute for the agent, kind → handler
+   * (specs/langy/langy-ui-actions.feature). A ref for the same reason
+   * `proposalHandlersRef` is one: pages re-derive the table on most renders,
+   * and the panel only reads it when a `ui` stream entry arrives.
+   */
+  actionHandlersRef: RefObject<LangyUiActionHandlers>;
+  registerActions: (handlers: LangyUiActionHandlers) => void;
+  clearActions: () => void;
 }
 
 const LangyContext = createContext<LangyContextValue | null>(null);
 
 export function LangyProvider({ children }: { children: ReactNode }) {
   const proposalHandlersRef = useRef<ProposalHandlers>({});
+  const actionHandlersRef = useRef<LangyUiActionHandlers>({});
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
   const [pageContext, setPageContext] = useState<LangyContextChip[]>([]);
 
@@ -60,6 +71,14 @@ export function LangyProvider({ children }: { children: ReactNode }) {
   const clearHandlers = useCallback(() => {
     proposalHandlersRef.current = {};
     setExperimentSlug(undefined);
+  }, []);
+
+  const registerActions = useCallback((handlers: LangyUiActionHandlers) => {
+    actionHandlersRef.current = handlers;
+  }, []);
+
+  const clearActions = useCallback(() => {
+    actionHandlersRef.current = {};
   }, []);
 
   const registerPageContext = useCallback((items: LangyContextChip[]) => {
@@ -79,6 +98,9 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       pageContext,
       registerPageContext,
       clearPageContext,
+      actionHandlersRef,
+      registerActions,
+      clearActions,
     }),
     [
       experimentSlug,
@@ -87,6 +109,8 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       pageContext,
       registerPageContext,
       clearPageContext,
+      registerActions,
+      clearActions,
     ],
   );
 
@@ -118,6 +142,20 @@ export function useRegisterLangyHandlers(
     registerHandlers(handlers, { experimentSlug: slug });
     return () => clearHandlers();
   }, [handlers, slug, registerHandlers, clearHandlers]);
+}
+
+/**
+ * Optional hook for pages that expose live UI actions to the agent
+ * (specs/langy/langy-ui-actions.feature). Registers on mount, clears on
+ * unmount, so navigating away leaves the agent's dispatches unclaimed — which
+ * is exactly the signal the server's fallback path keys on.
+ */
+export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
+  const { registerActions, clearActions } = useLangy();
+  useEffect(() => {
+    registerActions(handlers);
+    return () => clearActions();
+  }, [handlers, registerActions, clearActions]);
 }
 
 /**

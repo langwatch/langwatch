@@ -26,13 +26,14 @@ export const METRIC_MAP_COALESCE_MAX_BATCH = 256;
  * write path. Matches {@link METRIC_MAP_COALESCE_MAX_BATCH} so both stages of
  * this pipeline fold at the same width.
  *
- * The count is the only bound you can rely on here. The drain's byte budget
- * sums the *stored* size of each staged job, so it does not see a body the
- * envelope offloaded to the blob store — a batch of points near
- * {@link MAX_CANONICAL_METRIC_PAYLOAD_BYTES} is bounded by this count, not by
- * bytes, whenever envelope writes are on. Pre-existing and shared with the map
- * stage above; making the budget payload-aware is a groupQueue change that has
- * to cover both.
+ * The byte budget is the co-bound, and it survives offload: the envelope
+ * records the pre-compression, pre-offload payload size in its `s` header on
+ * every write, and both the drain's budget reader and its Lua twin spend
+ * against that rather than the stored length. A batch of points near
+ * {@link MAX_CANONICAL_METRIC_PAYLOAD_BYTES} is therefore stopped by bytes long
+ * before this count; the count bounds a burst of small points. (This previously
+ * read "the count is the only bound you can rely on", which was true before the
+ * `s` header existed and is not now.)
  */
 export const METRIC_COMMAND_COALESCE_MAX_BATCH = 256;
 export const MAX_CANONICAL_METRIC_PAYLOAD_BYTES = 256 * 1024;

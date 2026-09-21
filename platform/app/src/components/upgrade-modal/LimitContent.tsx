@@ -8,6 +8,16 @@ import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { trackEvent } from "../../utils/tracking";
 import { Dialog } from "../ui/dialog";
 
+/**
+ * Seat allowances are the two limits an admin runs into while doing the
+ * opposite of upgrading: working down the member list to fit the plan they
+ * already have. Upgrading is still an answer, so the button stays, but on its
+ * own it is the one answer they came here to avoid, and disabling a membership
+ * is the reversible move that actually returns a seat.
+ * See specs/licensing/seat-reconciliation.feature.
+ */
+const SEAT_LIMIT_TYPES = new Set(["members", "membersLite"]);
+
 function LimitContentBody({
   variant,
 }: {
@@ -30,6 +40,12 @@ function LimitContentBody({
           <Text>
             You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
             on your current plan.
+          </Text>
+        )}
+        {SEAT_LIMIT_TYPES.has(variant.limitType) && (
+          <Text color="gray.500">
+            To free a seat instead, disable a membership from the members page.
+            That is reversible, and it keeps their role and everything they did.
           </Text>
         )}
       </VStack>

@@ -3,8 +3,8 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-tr
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { createTracingProxy } from "../../create-tracing-proxy";
 import { getLangWatchTracer } from "../../../../observability-sdk";
-import { NoOpLogger } from "../../../../logger";
-import { setupObservability } from "../../../../observability-sdk/setup/node";
+import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
+import type { setupObservability } from "../../../../observability-sdk/setup/node";
 
 /**
  * Integration tests for createTracingProxy with real OpenTelemetry setup.
@@ -35,14 +35,9 @@ describe("createTracingProxy Integration Tests", () => {
     // from being attached — without it, test spans get buffered into the batch exporter and
     // never reach the InMemorySpanExporter, causing widespread "expected 1 span, got 0" flakes
     // (see langwatch/langwatch#3097).
-    observabilityHandle = setupObservability({
+    observabilityHandle = createIntegrationObservability({
       serviceName: "tracing-proxy-integration-test",
-      langwatch: "disabled",
       spanProcessors: [spanProcessor],
-      debug: { logger: new NoOpLogger() },
-      advanced: {
-        throwOnSetupError: true,
-      },
       attributes: {
         "test.suite": "tracing-proxy-integration",
         "test.environment": "vitest"

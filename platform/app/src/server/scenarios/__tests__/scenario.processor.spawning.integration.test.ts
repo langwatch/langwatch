@@ -42,6 +42,7 @@ describe.skipIf(process.env.CI)("Scenario Processor - Worker Spawning", () => {
     expect(exitCode).toBeDefined();
   }, 60000);
 
+  /** @scenario 'Child process receives job data via stdin' */
   it("receives serialized scenario data and returns result object", async () => {
     const jobData = createTestJobData();
     const env = {

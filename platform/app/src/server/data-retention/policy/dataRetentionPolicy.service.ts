@@ -1,4 +1,4 @@
-import type { RetentionPolicy } from "@prisma/client";
+import type { RetentionPolicy } from "~/generated/prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { type RetentionRow, resolveRetention } from "../resolveRetentionDays";
 import {

@@ -47,6 +47,18 @@ Feature: Workflow and evaluation failures are logged with fault attribution
     # WHO rejected the call to know where to act.
 
   @unit
+  Scenario: A relayed rejection names the upstream and its reason, never its response
+    Given a relay wraps an upstream rejection in its own generic message
+    When the failure surfaces to the user
+    Then the message names the upstream and the reason the upstream gave
+    And nothing else from the upstream's response is shown
+    # The relay files the upstream's WHOLE response under one field, so it
+    # can be an error page or a body echoing the request back. The surfaced
+    # message travels in a stream frame and a trace attribute, where a
+    # length limit bounds the size and hides nothing, so only the upstream's
+    # own reason is read out of it.
+
+  @unit
   Scenario: An engine bug is logged as a platform fault
     Given a node fails because of an engine-side problem
     When the node failure is recorded

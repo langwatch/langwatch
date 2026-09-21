@@ -11,6 +11,10 @@ import type {
   LangyConversationMetadataUpdatedEventData,
   LangyConversationStartedEventData,
   LangyConversationTitleGeneratedEventData,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
   LangyMessageImportedEventData,
   LangyMessagePart,
   LangyMessageRecordedEventData,
@@ -19,13 +23,20 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
 } from "@langwatch/langy";
 import {
   cursorHasReachedEvent,
+  foldLangyConversationTurn,
+  initLangyConversationTurnState,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnFoldState,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyTurnWait,
   langyConversationTurnEventSchema,
   langyJsonValueSchema,
 } from "@langwatch/langy";
@@ -42,8 +53,13 @@ import {
 } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
+import {
+  type LatestControlRequest,
+  latestControlRequest,
+} from "~/server/langy-local-control/request-state";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
+  LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
@@ -61,8 +77,73 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "./repositories/langy-message.repository";
+import type {
+  LangyTurnOrderReader,
+  LangyTurnSegment,
+} from "./streaming/langyTurnOrder";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
+
+/**
+ * Whether the developer's folder is attached, as of the last connect or
+ * disconnect in the log. Absent either, it was never attached.
+ */
+function lastWorkspaceConnection(
+  events: readonly LangyConversationProcessingEvent[],
+): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const type = events[i]?.type;
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED) {
+      return true;
+    }
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * One document per turn, folded from that turn's card events only: the waits
+ * ride on the tool calls, and no other part of the vocabulary is needed to
+ * read them back.
+ */
+function foldWaitTurns(
+  events: readonly LangyConversationProcessingEvent[],
+): Map<string, LangyConversationTurnFoldState> {
+  const turns = new Map<string, LangyConversationTurnFoldState>();
+  for (const event of events) {
+    if (!isLangyWaitEventType(event.type)) continue;
+    const parsed = langyConversationTurnEventSchema.safeParse({
+      id: event.id,
+      createdAt: event.createdAt,
+      occurredAt: event.occurredAt,
+      type: event.type,
+      data: event.data,
+    });
+    if (!parsed.success) continue;
+    const turnId = parsed.data.data.turnId;
+    turns.set(
+      turnId,
+      foldLangyConversationTurn(
+        turns.get(turnId) ?? initLangyConversationTurnState(),
+        parsed.data,
+      ),
+    );
+  }
+  return turns;
+}
+
+/** Every card the folded turns carry, tagged with the turn that raised it. */
+function recordWaitsOf(
+  turns: ReadonlyMap<string, LangyConversationTurnFoldState>,
+): LangyLocalRecordWait[] {
+  return [...turns].flatMap(([turnId, turn]) =>
+    turn.ToolCalls.flatMap((call) =>
+      call.wait ? [{ turnId, toolCallId: call.toolCallId, ...call.wait }] : [],
+    ),
+  );
+}
 
 /**
  * Narrow read port over the canonical event log, for the tail read (ADR-059).
@@ -93,23 +174,25 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
  * How long a read will wait out the dispatch window — the gap between a
  * create command being ACCEPTED and its projection row landing.
  *
- * 1.5s was not enough. A turn that has to wake a cold worker takes far longer
- * than the projector's usual few hundred milliseconds, and the read landed a
- * beat before the row did — so the reader was told their conversation did not
- * exist, and then it did.
+ * The projector usually folds the row within a few hundred milliseconds, but
+ * under load it has taken over ten seconds, and every read in that gap told
+ * the reader their conversation did not exist, and then it did. The window is
+ * ten seconds; a read that beats an even slower fold still ends in not-found,
+ * and the worker's own reads wait longer on their side.
  */
-const DISPATCH_LAG_ATTEMPTS = 12;
+const DISPATCH_LAG_ATTEMPTS = 25;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with NO pending handoff before we conclude the id
+ * How many attempts may pass with NO turn receipt before we conclude the id
  * is simply unknown.
  *
- * It cannot be zero, which is the second half of the same bug: the handoff row
- * is written by the very dispatch we are waiting on, so a read that arrives
- * before IT lands found no evidence, took the fast path, and returned "not
- * found" without ever retrying. A couple of beats of grace is the difference
- * between "no create is in flight" and "the create is a few milliseconds
- * younger than this read".
+ * The receipt is the evidence that a create is in flight: it is written in the
+ * turn admission transaction at send time, before any event is folded. It is
+ * the ONLY such evidence. The projection row and the handoff fields on it are
+ * folded from events, so before the fold there is no row and no handoff, and
+ * a read that keyed on the handoff never waited at all. The grace cannot be
+ * zero either: the receipt lands in the same beat as the create, so a read a
+ * few milliseconds older than the send finds nothing and must look again.
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
@@ -147,6 +230,12 @@ export type ConversationDetail = ConversationListItem & {
    * answer and no explanation at all.
    */
   lastError: string | null;
+  /**
+   * The model the latest accepted turn ran on, or null before any turn
+   * recorded one. Reopening the conversation seeds the composer's picker
+   * from it, so a conversation keeps the model it was last used with.
+   */
+  lastModel: string | null;
   /**
    * The projection's event cursor (ADR-059): the snapshot position the client
    * seeds its local fold from before folding the durable tail.
@@ -188,10 +277,50 @@ export interface LangyConversationCommands {
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
   consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
   generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }
 
 function newConversationId(): string {
   return generate(KSUID_RESOURCES.LANGY_CONVERSATION).toString();
+}
+
+/**
+ * Shape gate for ADOPTED conversation ids (`ensureConversation` with
+ * `adoptUnknownId`). Caller-chosen ids become aggregate keys, so keep them to
+ * the same alphabet our own KSUID-prefixed ids use; long enough to make
+ * accidental cross-caller collisions implausible, short enough for every index
+ * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
+ */
+export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
+
+/**
+ * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
+ * becomes an aggregate key, so its shape is gated before anything durable is
+ * written under it. Archived is a refusal, not a resume: adopting would append
+ * fresh events to a closed aggregate.
+ */
+function adoptConversationId(
+  conversationId: string,
+  ownership: "archived" | "missing",
+): { id: string; isNew: boolean } {
+  if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
+    throw new LangyConversationIdUnadoptableError(
+      conversationId,
+      "invalid_shape",
+    );
+  }
+  if (ownership === "archived") {
+    throw new LangyConversationIdUnadoptableError(conversationId, "archived");
+  }
+  return { id: conversationId, isNew: true };
 }
 
 function newMessageId(): string {
@@ -229,6 +358,29 @@ function toListItem(
   };
 }
 
+/** One card the developer's machine put up, as the durable record holds it. */
+export type LangyLocalRecordWait = LangyTurnWait & {
+  /** The turn that raised it, so the panel keeps them in turn order. */
+  turnId: string;
+  /** The tool call it rides on. */
+  toolCallId: string;
+};
+
+/** Everything one conversation's local control left on the record. */
+export interface LangyLocalRecord {
+  waits: LangyLocalRecordWait[];
+  /** Whether the last thing the folder did was connect. */
+  workspaceConnected: boolean;
+}
+
+/** The two events that carry a card, as the fold reads them. */
+function isLangyWaitEventType(type: string): boolean {
+  return (
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED ||
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED
+  );
+}
+
 /**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
@@ -239,21 +391,23 @@ export class LangyConversationService {
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
     private readonly events: LangyConversationEventsReader | null = null,
+    private readonly turnOrder: LangyTurnOrderReader | null = null,
   ) {}
 
   /**
    * The visibility read, tolerant of the DISPATCH window.
    *
-   * A conversation whose create was just accepted has a pending handoff —
-   * written synchronously at dispatch — before its projection row lands, so
-   * "missing row + pending handoff" means NOT YET, never "never". In that
-   * window this retries briefly instead of reporting the very lie the
-   * `getById` doc below spends three paragraphs on: the panel used to render
-   * "conversation not found" moments before the same conversation's turn was
-   * accepted. A miss with NO handoff stays an immediate not-found — an
-   * unknown id must not grow a probe-friendly delay, and the retried read
-   * still enforces visibility, so the handoff's existence never widens
-   * access.
+   * A conversation whose create was just accepted has a turn receipt, written
+   * in the admission transaction at send time, before its projection row
+   * lands, so "missing row + receipt" means NOT YET, never "never". In that
+   * window this retries instead of reporting "conversation not found", the
+   * answer the panel would render moments before the same conversation's
+   * turn is accepted, and the answer the worker's first `code_access` read
+   * would end the turn on, without its card (see `getById` below). A miss
+   * with NO receipt stays a quick not-found: an
+   * unknown id must not grow a probe-friendly delay. The receipt is read for
+   * this user, and the retried read still enforces visibility, so the
+   * receipt's existence never widens access.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -272,13 +426,13 @@ export class LangyConversationService {
       });
       if (row) return row;
 
-      // Re-asked every beat, not once up front: the handoff row lands on the
-      // same dispatch we are waiting for, so "no handoff yet" early on means
-      // "too soon to tell", not "no such conversation".
-      const handoff = await this.repository
-        .findPendingHandoff({ projectId, conversationId: id })
-        .catch(() => null);
-      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+      // Re-asked every beat, not once up front: the receipt lands on the same
+      // send we are waiting for, so "no receipt yet" early on means "too soon
+      // to tell", not "no such conversation".
+      const admitted = await this.repository
+        .hasAdmittedTurn({ projectId, conversationId: id, userId })
+        .catch(() => false);
+      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
 
       if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
       await new Promise((resolve) =>
@@ -329,6 +483,7 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      lastModel: row.lastModel,
       eventCursor: row.eventCursor ?? null,
     };
   }
@@ -422,6 +577,76 @@ export class LangyConversationService {
   }
 
   /**
+   * The developer's own machine in one conversation, off the durable record
+   * (ADR-129): every card it raised, in the order they were raised, and
+   * whether the folder is connected right now.
+   *
+   * The live stream cannot answer either question. A tab that adopted a
+   * running turn never subscribes to it, so a card raised before that tab
+   * opened reached nobody; and the browser's local fold starts at the
+   * snapshot's cursor, so everything the turn did before that cursor — a
+   * pending permission ask included — is not in it. Reopening a finished
+   * conversation had the same hole in the other direction: none of the cards
+   * the developer answered were on screen any more.
+   *
+   * Authorized exactly like the other reads (owner-or-shared, reported as
+   * not-found so it cannot probe), and folded with the SAME reducer the
+   * browser and the server projection use.
+   */
+  async getLocalRecord({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+    if (!this.events) return { waits: [], workspaceConnected: false };
+
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+
+    return {
+      waits: recordWaitsOf(foldWaitTurns(all)),
+      workspaceConnected: lastWorkspaceConnection(all),
+    };
+  }
+
+  /**
+   * The latest request to share a folder this conversation recorded, and
+   * whether a folder connected through it (ADR-129). The open request lives in
+   * Redis only while a terminal can approve it; this is what is left to say
+   * why there is nothing to approve. The caller proves the conversation first.
+   */
+  async getLatestLocalControlRequest({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LatestControlRequest | null> {
+    if (!this.events) return null;
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+    return latestControlRequest(all);
+  }
+
+  /**
    * `getById`, but absence is an answer rather than an error.
    *
    * For the callers that genuinely want to tolerate "there is no fold yet" — the
@@ -510,33 +735,48 @@ export class LangyConversationService {
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `message_recorded`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
+   *
+   * With `adoptUnknownId`, an id that never existed is ADOPTED — returned as a
+   * new conversation under the caller's chosen id instead of a minted one. This
+   * is how a caller that binds continuity to an externally-chosen id (a
+   * scenario run's `{{ threadId }}`, fixed once per run) gets a stable
+   * conversation across turns: turn 1 adopts, turns 2+ find it `owned`.
+   * Adoption never falls back to minting — an id that cannot be adopted
+   * (bad shape, archived collision) fails the turn loudly, because a silently
+   * minted fresh id degrades a multi-turn run to single-turn with no signal.
    */
   async ensureConversation({
     projectId,
     userId,
     conversationId,
+    adoptUnknownId = false,
   }: {
     projectId: string;
     userId: string;
     conversationId?: string | null;
+    adoptUnknownId?: boolean;
   }): Promise<{ id: string; isNew: boolean }> {
-    if (conversationId) {
-      // Resolve straight from the repo (not the share-aware getById): visibility
-      // of a shared conversation does not grant continuation rights.
-      const ownership = await this.repository.findOwnership({
-        id: conversationId,
-        projectId,
-        userId,
-      });
-      if (ownership === "owned") {
-        return { id: conversationId, isNew: false };
-      }
-      if (ownership === "other") {
-        throw new LangyConversationNotOwnedError(conversationId);
-      }
-      // Archived / never existed: fall through and mint a fresh id — a stale id
-      // is legitimate client state, unlike one owned by another user.
+    if (!conversationId) {
+      return { id: newConversationId(), isNew: true };
     }
+    // Resolve straight from the repo (not the share-aware getById): visibility
+    // of a shared conversation does not grant continuation rights.
+    const ownership = await this.repository.findOwnership({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (ownership === "owned") {
+      return { id: conversationId, isNew: false };
+    }
+    if (ownership === "other") {
+      throw new LangyConversationNotOwnedError(conversationId);
+    }
+    if (adoptUnknownId) {
+      return adoptConversationId(conversationId, ownership);
+    }
+    // Archived / never existed: mint a fresh id — a stale id is legitimate
+    // client state, unlike one owned by another user.
     return { id: newConversationId(), isNew: true };
   }
 
@@ -656,6 +896,9 @@ export class LangyConversationService {
         // An import runs no turn — there is nothing in flight to stop.
         currentTurnId: null,
         lastError: null,
+        // No turn ran here yet, so the fork carries no model of its own and
+        // the composer falls back to the resolved default.
+        lastModel: null,
         // The fork's projection has not landed yet, so there is no snapshot
         // position to seed from — the client folds from the start.
         eventCursor: null,
@@ -730,6 +973,7 @@ export class LangyConversationService {
     conversationId,
     turnId = crypto.randomUUID(),
     questionParts,
+    model,
     conversationStart,
     userMessage,
     consumeHandoffTurnId,
@@ -739,6 +983,8 @@ export class LangyConversationService {
     turnId?: string;
     /** The user's question that opened the turn — folded into the turn document. */
     questionParts?: LangyMessagePart[];
+    /** The model this turn runs on — the fold keeps the latest as `LastModel`. */
+    model?: string;
     /** Optional first-event marker, committed atomically before acceptance. */
     conversationStart?: Omit<
       LangyConversationStartedEventData,
@@ -755,6 +1001,7 @@ export class LangyConversationService {
       conversationId,
       turnId,
       ...(questionParts !== undefined ? { questionParts } : {}),
+      ...(model !== undefined ? { model } : {}),
       ...(conversationStart ? { conversationStart } : {}),
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),
@@ -983,13 +1230,46 @@ export class LangyConversationService {
       });
       return;
     }
+    const order = await this.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: buildFinalAssistantParts({ text: text ?? "", toolCalls }),
+      parts: buildFinalAssistantParts({
+        text: text ?? "",
+        toolCalls,
+        ...(order.length > 0 ? { order } : {}),
+      }),
       outcome: "completed",
     });
+  }
+
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Read here rather than by the caller because two paths finalize a turn — the
+   * relay's terminal frame and the agent's own HTTP post — and whichever lands
+   * first is the one the record keeps. Reading in one place is what makes the
+   * two produce the same parts.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose read fails, records the shape it always did rather than failing a
+   * finalize that is otherwise complete.
+   */
+  private async readTurnOrder(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]> {
+    if (!this.turnOrder) return [];
+    try {
+      return await this.turnOrder.readTurnOrder(at);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        { ...at, error },
+        "could not read a turn's order; recording its calls before its reply",
+      );
+      return [];
+    }
   }
 
   /**
@@ -1187,7 +1467,14 @@ export class LangyConversationService {
     repository: LangyConversationRepository,
     messages?: LangyMessageRepository,
     events?: LangyConversationEventsReader | null,
+    turnOrder?: LangyTurnOrderReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages, events);
+    return new LangyConversationService(
+      repository,
+      commands,
+      messages,
+      events,
+      turnOrder,
+    );
   }
 }

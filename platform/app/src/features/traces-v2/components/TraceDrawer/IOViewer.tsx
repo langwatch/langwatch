@@ -1,51 +1,40 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
-import {
-  LuCheck,
-  LuChevronDown,
-  LuChevronRight,
-  LuCode,
-  LuCopy,
-  LuEye,
-  LuLanguages,
-  LuLightbulb,
-  LuList,
-  LuMessageSquare,
-  LuPencil,
-  LuPlay,
-} from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
-import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
-import { useTextTranslation } from "../../hooks/useTextTranslation";
-import { AnnotationPopover } from "./conversationView/AnnotationPopover";
-import { IOViewerBody } from "./IOViewerBody";
-import { safePrettyJson } from "./JsonHighlight";
-import { SegmentedToggle } from "./SegmentedToggle";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
-  type ChatLayout,
-  type ChatMessage,
-  type ConversationTurn,
   coerceToChatMessages,
   collectChatTextLeaves,
   extractInlineBlocks,
-  groupMessagesIntoTurns,
-  parseContentBlocks,
   tryParseJSON,
-  VIRTUALIZE_AT,
-} from "./transcript";
+} from "~/shared/traces/transcript/parsing";
+import { splitChatForPanel } from "~/shared/traces/transcript/splitChatForPanel";
+import type {
+  ChatMessage,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
+import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
+import { useTextTranslation } from "../../hooks/useTextTranslation";
+import { IOViewerBody } from "./IOViewerBody";
+import { IOViewerToolbar } from "./IOViewerToolbar";
+import { safePrettyJson } from "./JsonHighlight";
+import { groupMessagesIntoTurns, VIRTUALIZE_AT } from "./transcript";
+import { MessageCommentScope } from "./transcript/messageComments";
 import {
   type MarkdownSubmode,
   useIOViewerState,
   type ViewFormat,
 } from "./useIOViewerState";
 
-const TRUNCATE_AT = 100_000;
+/**
+ * How much of a captured value this viewer renders before offering an
+ * expander. Exported because the inline editor refuses anything past it: an
+ * editor seeded with a truncated value would silently save the truncation.
+ */
+export const IO_DISPLAY_TRUNCATE_AT = 100_000;
+const TRUNCATE_AT = IO_DISPLAY_TRUNCATE_AT;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
 const TRUNCATE_TAIL_MIN = 1_000;
@@ -97,18 +86,20 @@ interface IOViewerProps {
   label: string;
   content: string;
   /**
-   * "input" renders the full chat history (all messages, all roles, tool calls
-   * inline). "output" — when the content happens to be a chat-history array —
-   * narrows to just the *final assistant message* of that array, since the
-   * trace's actual output for this turn is the model's last reply, not the
-   * whole transcript. For non-chat content this is a no-op.
+   * Which side of the call this panel reads, which decides how a chat-shaped
+   * payload is split (`splitChatForPanel`): "input" drops the trailing run of
+   * assistant messages, since that run is this turn's reply; "output" keeps
+   * everything after the last text-bearing user message, tool calls, tool
+   * results and intermediate assistant messages included, because those are
+   * part of the response rather than the history. For non-chat content this is
+   * a no-op.
    */
   mode?: "input" | "output";
   /**
-   * When provided, the panel header shows Annotate + Suggest-correction
-   * actions wired to the annotation comment store. These belong on the
-   * trace's input/output specifically (annotations target a trace, not a
-   * span), so per-span IOViewers leave this undefined.
+   * When provided, the panel header offers to comment on this field and, where
+   * a suggestion can correct it, to suggest what it should have said. The
+   * comment is recorded against the field this viewer is rendering: the span's
+   * when the viewer has a span, the trace's own otherwise.
    */
   traceId?: string;
   /**
@@ -120,161 +111,6 @@ interface IOViewerProps {
   spanId?: string;
   /** Span type — `llm` enables the Playground affordance. */
   spanType?: string;
-}
-
-const ActionButton = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: typeof LuPencil;
-    label: string;
-  } & React.ComponentProps<typeof Button>
->(function ActionButton({ icon, label, ...buttonProps }, ref) {
-  return (
-    <Button
-      ref={ref}
-      size="xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1.5}
-      paddingX={2}
-      height="22px"
-      onClick={(e) => e.stopPropagation()}
-      {...buttonProps}
-    >
-      <Icon as={icon} boxSize={3} />
-      {label}
-    </Button>
-  );
-});
-
-function PlaygroundButton({ spanId }: { spanId: string }) {
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
-  // No explicit action — the playground loader auto-detects: opens the
-  // existing managed prompt at the traced version when one is linked,
-  // creates a fresh tab when not. One button, smart default.
-  const href = buildUrl(spanId)?.toString() ?? "";
-  if (!href) return null;
-  return (
-    <Button
-      asChild
-      size="xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1.5}
-      paddingX={2}
-      height="22px"
-    >
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer noopener"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Icon as={LuPlay} boxSize={3} />
-        Open in Playground
-      </a>
-    </Button>
-  );
-}
-
-function AnnotateButton({ traceId }: { traceId: string }) {
-  const { hasPermission } = useOrganizationTeamProject();
-  const [open, setOpen] = useState(false);
-  const annotationsGate = usePersonalFeatureGate("annotations");
-  if (!hasPermission("annotations:manage")) return null;
-  return (
-    <>
-      <AnnotationPopover
-        traceId={traceId}
-        mode="annotate"
-        open={open}
-        onOpenChange={async (next) => {
-          if (next) {
-            const allowed = await annotationsGate.requestEnable();
-            if (!allowed) return;
-          }
-          setOpen(next);
-        }}
-        trigger={<ActionButton icon={LuPencil} label="Annotate" />}
-      />
-      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
-    </>
-  );
-}
-
-function SuggestCorrectionButton({
-  traceId,
-  output,
-}: {
-  traceId: string;
-  output: string;
-}) {
-  const { hasPermission } = useOrganizationTeamProject();
-  const [open, setOpen] = useState(false);
-  if (!hasPermission("annotations:manage")) return null;
-  return (
-    <AnnotationPopover
-      traceId={traceId}
-      output={output}
-      mode="suggest"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={<ActionButton icon={LuLightbulb} label="Suggest edit" />}
-    />
-  );
-}
-
-function TranslateButton({
-  isActive,
-  isLoading,
-  onToggle,
-}: {
-  isActive: boolean;
-  isLoading: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <ActionButton
-      icon={LuLanguages}
-      label={
-        isLoading ? "Translating…" : isActive ? "Show original" : "Translate"
-      }
-      aria-pressed={isActive}
-      color={isActive ? "blue.fg" : "fg.muted"}
-      disabled={isLoading}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-    />
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const { copied, copy } = useCopyToClipboard();
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    copy(text);
-  };
-
-  return (
-    <Button
-      size="xs"
-      variant="ghost"
-      onClick={handleCopy}
-      aria-label="Copy to clipboard"
-      padding={0}
-      minWidth="auto"
-      height="auto"
-    >
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
-    </Button>
-  );
 }
 
 export const IOViewer = memo(function IOViewer({
@@ -332,6 +168,15 @@ export const IOViewer = memo(function IOViewer({
     originalContent,
   ]);
 
+  // Which part of the trace a comment left on this panel is about: the span's
+  // field when the viewer is rendering a span, the trace's own field otherwise.
+  const fieldAnchor = useMemo<TraceAnchor | null>(
+    () =>
+      traceId
+        ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode }
+        : null,
+    [traceId, spanId, mode],
+  );
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
@@ -341,43 +186,12 @@ export const IOViewer = memo(function IOViewer({
   const isChat = allChatMessages !== null;
   const canJson = parsed !== null;
 
-  // Split the chat-shape payload between the two panels:
-  //   • Input panel = the full conversation history sent to the model on
-  //     this turn — user messages, system / developer prompts, and every
-  //     prior assistant operation (thinking, tool_use, tool_result echoes,
-  //     intermediate text). Tool_use IDs in input are distinct from those
-  //     in output (they belong to earlier LLM calls in the agent loop),
-  //     so this is real history, not duplicated output. Trailing
-  //     assistant messages still get trimmed because those are this
-  //     turn's response and live in the output panel.
-  //   • Output panel = everything from the last text-bearing user message
-  //     onwards, in full. That keeps the agent's reasoning, tool calls,
-  //     tool results, and intermediate assistant turns visible as the
-  //     response — which is what they actually are. Earlier behaviour
-  //     narrowed this to the final assistant message; that hid the
-  //     operation chain.
+  // Which part of the chat-shaped payload this panel shows: the rule itself
+  // lives in `splitChatForPanel`, which the server-side message extraction
+  // applies to the same payloads.
   const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
     if (!allChatMessages) return [];
-    const all = allChatMessages;
-    if (mode === "output") {
-      let lastUserIdx = -1;
-      for (let i = all.length - 1; i >= 0; i--) {
-        const msg = all[i]!;
-        if (msg.role !== "user") continue;
-        const blocks = parseContentBlocks(msg.content);
-        const hasText = blocks.some((b) => b.kind === "text");
-        if (hasText) {
-          lastUserIdx = i;
-          break;
-        }
-      }
-      return lastUserIdx >= 0 ? all.slice(lastUserIdx + 1) : all;
-    }
-    let end = all.length;
-    while (end > 0 && all[end - 1]!.role === "assistant") {
-      end--;
-    }
-    return all.slice(0, end);
+    return splitChatForPanel({ messages: allChatMessages, panel: mode });
   }, [allChatMessages, mode]);
 
   // Group raw messages into logical turns: user prose vs assistant operation
@@ -507,7 +321,8 @@ export const IOViewer = memo(function IOViewer({
         </Button>
         <HStack
           gap={2}
-          flex={1}
+          flex={collapsed ? 1 : undefined}
+          flexShrink={0}
           cursor="pointer"
           onClick={() => setCollapsed((c) => !c)}
         >
@@ -526,84 +341,26 @@ export const IOViewer = memo(function IOViewer({
             </Text>
           )}
         </HStack>
-        {!collapsed && (
-          <SegmentedToggle
-            value={format}
-            onChange={(f) => setFormat(f as ViewFormat)}
-            options={formatOptions.map((opt) => {
-              // Both layouts (thread / bubbles) are available for any
-              // chat-shaped content — input *or* output. Even with a
-              // single assistant reply, the operator may want the
-              // bubble visual; conversely, a multi-message output
-              // (rare but possible) benefits from the flat stack.
-              if (opt === "pretty" && isChat) {
-                return {
-                  value: "pretty",
-                  submodes: {
-                    value: chatLayout,
-                    onChange: (v) => setChatLayout(v as ChatLayout),
-                    options: [
-                      {
-                        value: "thread",
-                        label: "Thread",
-                        icon: LuList,
-                        tooltip: "Thread layout",
-                      },
-                      {
-                        value: "bubbles",
-                        label: "Bubbles",
-                        icon: LuMessageSquare,
-                        tooltip: "Bubble layout",
-                      },
-                    ],
-                  },
-                };
-              }
-              if (opt === "markdown") {
-                return {
-                  value: "markdown",
-                  submodes: {
-                    value: markdownSubmode,
-                    onChange: (v) =>
-                      setMarkdownSubmode(v as "rendered" | "source"),
-                    options: [
-                      {
-                        value: "rendered",
-                        label: "Rendered",
-                        icon: LuEye,
-                        tooltip: "Rendered markdown view",
-                      },
-                      {
-                        value: "source",
-                        label: "Source",
-                        icon: LuCode,
-                        tooltip: "Source markdown view",
-                      },
-                    ],
-                  },
-                };
-              }
-              return opt;
-            })}
-          />
-        )}
-        {!collapsed && (
-          <TranslateButton
-            isActive={translation.isActive}
-            isLoading={translation.isLoading}
-            onToggle={translation.toggle}
-          />
-        )}
-        {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
-        {!collapsed && traceId && mode === "output" && (
-          // Corrections must be stored against the REAL output — never the
-          // translated variant the viewer happens to be showing.
-          <SuggestCorrectionButton traceId={traceId} output={originalContent} />
-        )}
-        {!collapsed && spanType === "llm" && spanId && mode === "input" && (
-          <PlaygroundButton spanId={spanId} />
-        )}
-        <CopyButton text={content} />
+        <IOViewerToolbar
+          label={label}
+          collapsed={collapsed}
+          format={format}
+          onFormatChange={setFormat}
+          formatOptions={formatOptions}
+          isChat={isChat}
+          chatLayout={chatLayout}
+          onChatLayoutChange={setChatLayout}
+          markdownSubmode={markdownSubmode}
+          onMarkdownSubmodeChange={setMarkdownSubmode}
+          translation={translation}
+          traceId={traceId}
+          spanId={spanId}
+          spanType={spanType}
+          mode={mode}
+          fieldAnchor={fieldAnchor}
+          originalContent={originalContent}
+          copyText={content}
+        />
       </HStack>
 
       {!collapsed && (
@@ -628,22 +385,27 @@ export const IOViewer = memo(function IOViewer({
               transition="opacity 120ms ease-out"
             >
               <Box padding={innerPadding}>
-                <IOViewerBody
-                  format={format}
-                  isChat={isChat}
-                  canJson={canJson}
-                  prettyJsonContent={prettyJsonContent}
-                  markdownBody={markdownBody}
-                  markdownSubmode={markdownSubmode}
-                  conversationTurns={conversationTurns}
-                  chatLayout={chatLayout}
-                  inlineBlocks={inlineBlocks}
-                  hasInlineRichContent={hasInlineRichContent}
-                  displayContent={displayContent}
-                  isLong={isLong}
-                  expanded={expanded}
-                  mode={mode}
-                />
+                {/* A message inside the transcript is a part of the trace a
+                    comment can point at, and the transcript components are
+                    handed messages rather than the trace they came out of. */}
+                <MessageCommentScope traceId={traceId}>
+                  <IOViewerBody
+                    format={format}
+                    isChat={isChat}
+                    canJson={canJson}
+                    prettyJsonContent={prettyJsonContent}
+                    markdownBody={markdownBody}
+                    markdownSubmode={markdownSubmode}
+                    conversationTurns={conversationTurns}
+                    chatLayout={chatLayout}
+                    inlineBlocks={inlineBlocks}
+                    hasInlineRichContent={hasInlineRichContent}
+                    displayContent={displayContent}
+                    isLong={isLong}
+                    expanded={expanded}
+                    mode={mode}
+                  />
+                </MessageCommentScope>
               </Box>
             </Box>
             {/*

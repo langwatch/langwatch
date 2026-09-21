@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Command data for reporting usage for a billing month.
- * Dispatched by the billingMeterDispatch reactor after the
+ * Dispatched by the billingMeterDispatch subscriber after the
  * orgBillableEventsMeter map projection succeeds.
  *
  * Uses organizationId as tenantId — the framework only uses tenantId

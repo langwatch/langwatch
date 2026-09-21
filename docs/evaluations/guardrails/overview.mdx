@@ -5,7 +5,7 @@ description: Block or modify harmful LLM responses in real-time to enforce safet
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 Guardrails are evaluators that run in real-time and **act** on the results - blocking, modifying, or rejecting responses that violate your safety or policy rules. Unlike [monitors](/evaluations/online-evaluation/overview) which only measure and alert, guardrails actively prevent harmful content from reaching users.
@@ -47,6 +47,12 @@ Guardrails can run at two points:
 2. **Output guardrails** - Check LLM response before sending to user
 
 ## Getting Started
+
+Click **Set up Guardrail** on the [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) page to open the **New Guardrail** drawer. Pick a saved evaluator and copy the **Integration Code** for your language.
+
+<Frame>
+<img src="/images/evaluations/guardrail-drawer.png" alt="The New Guardrail drawer with an evaluator selected and the Python integration code" />
+</Frame>
 
 <CardGroup cols={2}>
   <Card
@@ -157,7 +163,7 @@ pii = evaluate("presidio/pii_detection", as_guardrail=True, output=response)
 
 ### 2. Provide helpful error messages
 
-Don't just block - guide users toward acceptable behavior:
+Tell the user why the request was blocked and how to rephrase it:
 
 ```python
 if not guardrail.passed:

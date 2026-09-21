@@ -22,6 +22,19 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 
+import { vi } from "vitest";
+
+// The dev `.env` sets IS_SAAS + BLOCK_LOCAL_HTTP_CALLS, and `ssrfProtection`
+// reads both ONCE at module load to build its validator. The fixture server
+// below is on loopback, so without this the suite fails with an SSRF rejection
+// on a developer machine while passing in CI, where the vars are unset —
+// which reads as a bug in the adapter and is really one in the fixture.
+// Hoisted because a `beforeAll` would run long after that module was evaluated.
+vi.hoisted(() => {
+  process.env.IS_SAAS = "false";
+  process.env.BLOCK_LOCAL_HTTP_CALLS = "false";
+});
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import http from "http";
 import { nanoid } from "nanoid";
@@ -31,6 +44,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { runIngestionPull } from "../pullerWorker";
 
@@ -68,11 +85,15 @@ const fixturePage1 = {
   ],
   next_cursor: "page-2",
 };
+// The newest instant the fixture serves. The run reports reading through to
+// the newest event it emitted rather than to the wall clock, so the fixture and
+// the expectation below read it from the same place.
+const lastEventAt = "2026-05-01T10:10:00.000Z";
 const fixturePage2 = {
   events: [
     {
       id: "evt-003",
-      created_at: "2026-05-01T10:10:00.000Z",
+      created_at: lastEventAt,
       user: { email: "alice@acme.test" },
       event_type: "completion",
       model: "claude-sonnet-4-6",
@@ -88,6 +109,10 @@ beforeAll(async () => {
     throw new Error("Test ClickHouse client not initialised");
   }
   ch = client;
+
+  // The path under test takes its ClickHouse repositories from the App rather
+  // than resolving a client, so the fixture has to provide one.
+  installClickHouseTestApp({ resolveClient: async () => ch });
 
   // Spin up a local fixture HTTP server. ssrfSafeFetch allows localhost
   // when IS_SAAS is unset (on-prem dev mode), which is the integration
@@ -155,6 +180,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 
   if (govProjectId) {
@@ -234,7 +260,15 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
 
     // The effect reports its outcome; the event-sourced completion command
     // and projection own durable cursor/status updates.
-    expect(outcome).toEqual({ nextCursor: null, eventCount: 3 });
+    expect(outcome).toEqual({
+      nextCursor: null,
+      eventCount: 3,
+      errorCount: 0,
+      // The feed drained, so nothing was left half-read.
+      completeness: "complete",
+      // No adapter statement, so the run reports the newest event it emitted.
+      readThroughAt: new Date(lastEventAt),
+    });
     const updated = await prisma.ingestionSource.findUnique({
       where: { id: ingestionSourceId },
     });

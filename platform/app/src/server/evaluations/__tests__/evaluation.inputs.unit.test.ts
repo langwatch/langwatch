@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const getClickHouseClientForProjectMock = vi.hoisted(() => vi.fn());
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: getClickHouseClientForProjectMock,
-}));
-
-import { EvaluationService } from "../evaluation.service";
+import {
+  serviceOver,
+  serviceOverUnavailable,
+} from "./support/evaluationServiceOver";
 
 describe("EvaluationService.getEvaluationInputs", () => {
   beforeEach(() => {
@@ -27,9 +23,8 @@ describe("EvaluationService.getEvaluationInputs", () => {
             ],
           }),
         );
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        const service = serviceOver({ query });
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -56,9 +51,8 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const query = vi.fn(async () => ({
           json: async () => [{ Inputs: null }],
         }));
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        const service = serviceOver({ query });
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -77,9 +71,8 @@ describe("EvaluationService.getEvaluationInputs", () => {
             "Query memory limit exceeded: would use 4.00 GiB, maximum: 3.50 GiB: (while reading column Inputs)",
           );
         });
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        const service = serviceOver({ query });
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -93,9 +86,10 @@ describe("EvaluationService.getEvaluationInputs", () => {
   describe("given ClickHouse is not enabled for the project", () => {
     describe("when its inputs are requested", () => {
       it("returns null without querying", async () => {
-        getClickHouseClientForProjectMock.mockResolvedValue(null);
+        const service = serviceOverUnavailable(
+          new Error("ClickHouse not available for tenant project_test"),
+        );
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",

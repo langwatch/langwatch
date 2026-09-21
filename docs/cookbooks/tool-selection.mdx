@@ -1,6 +1,6 @@
 ---
 title: Evaluating Tool Selection
-description: Understand how to evaluate tools and components in your RAG pipeline—covering retrievers, embedding models, chunking strategies, and vector stores.
+description: Understand how to evaluate tools and components in your RAG pipeline, covering retrievers, embedding models, chunking strategies, and vector stores.
 keywords:
   [
     RAG tools,
@@ -18,9 +18,9 @@ In this cookbook, we demonstrate how to evaluate tool calling capabilities in LL
 
 When building AI assistants, we often need them to use external tools - searching databases, calling APIs, or processing data. But how do we know if our model is selecting the right tools at the right time? Traditional evaluation methods don't capture this well.
 
-Imagine you're building a customer service bot. A user asks "What's my account balance?" Your assistant needs to decide: should it query the account database, ask for authentication, or simply respond with general information? Selecting the wrong tool leads to either frustrated users (if important tools are missed) or wasted resources (if unnecessary tools are called).
+Imagine you're building a customer service bot. A user asks "What's my account balance?" Your assistant needs to decide: should it query the account database, ask for authentication, or respond with general information? Selecting the wrong tool leads to either frustrated users (if important tools are missed) or wasted resources (if unnecessary tools are called).
 
-The key insight is that tool selection quality is distinct from text generation quality. You can have a model that writes beautiful responses but consistently fails to take appropriate actions. By measuring precision and recall of tool selection decisions, we can systematically improve how our models interact with the world around them.
+Tool selection quality is distinct from text generation quality. You can have a model that writes beautiful responses but consistently fails to take appropriate actions. By measuring precision and recall of tool selection decisions, we can systematically improve how our models interact with the world around them.
 
 ## Requirements
 

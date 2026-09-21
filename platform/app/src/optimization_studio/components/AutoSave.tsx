@@ -47,7 +47,7 @@ export function AutoSave() {
     useShallow((state) => state.getWorkflow()),
   );
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const saveIfChanged = useDebouncedCallback(
     () => {
@@ -109,7 +109,7 @@ export function AutoSave() {
 
   return (
     <Box paddingLeft={2}>
-      {autosave.isLoading ? (
+      {autosave.isPending ? (
         <HStack>
           <Spinner size="xs" />
           <Text fontSize="13px">Saving...</Text>

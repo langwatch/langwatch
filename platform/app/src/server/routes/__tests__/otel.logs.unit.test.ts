@@ -9,6 +9,8 @@ const mockGetActivePlan = vi.fn();
 const mockNotifyPlanLimitReached = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     planProvider: { getActivePlan: mockGetActivePlan },
@@ -173,11 +175,12 @@ describe("POST /api/otel/v1/logs", () => {
         planName: "free",
         count: 10,
         maxMessagesPerMonth: 10,
+        usageUnit: "traces",
       });
 
       const response = await postLogs();
 
-      expect(response.status).toBe(429);
+      expect(response.status).toBe(402);
       expect(mockHandleLogs).not.toHaveBeenCalled();
     });
   });

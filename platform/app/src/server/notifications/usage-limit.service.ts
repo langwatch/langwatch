@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { env } from "../../env.mjs";
 import { getApp } from "../app-layer/app";
 import type { UsageService } from "../app-layer/usage/usage.service";

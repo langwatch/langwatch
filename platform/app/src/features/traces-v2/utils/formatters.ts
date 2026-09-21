@@ -7,14 +7,6 @@ const MS_PER_WEEK = 7 * MS_PER_DAY;
 const MS_PER_MONTH = 30 * MS_PER_DAY;
 const MS_PER_YEAR = 365 * MS_PER_DAY;
 
-export function formatRelativeTime(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
-  if (diffMs < MS_PER_MINUTE) return "now";
-  if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
-  if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
-  return `${Math.floor(diffMs / MS_PER_DAY)}d`;
-}
-
 /**
  * Verbose natural-language relative time — "1 minute ago", "2 hours ago",
  * "3 weeks ago". Used by the SINCE column, which trades compactness for
@@ -150,11 +142,6 @@ export function formatAbsoluteTime(timestamp: number): string {
   )} UTC`;
 }
 
-export function formatDuration(ms: number): string {
-  if (ms < 1_000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1_000).toFixed(1)}s`;
-}
-
 export function formatCost(cost: number, estimated?: boolean): string {
   if (cost === 0) return "—";
   const prefix = estimated ? "~" : "";
@@ -162,8 +149,14 @@ export function formatCost(cost: number, estimated?: boolean): string {
   return `${prefix}$${cost.toFixed(2)}`;
 }
 
+/**
+ * Token counts in one decimal place, stepping up a tier at each thousand:
+ * `840`, `12.4K`, `1.1M`. Coding-agent sessions routinely run into millions of
+ * cached tokens, and `2400.0K` costs the reader a division to understand.
+ */
 export function formatTokens(tokens: number): string {
   if (tokens === 0) return "—";
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
   return `${tokens}`;
 }

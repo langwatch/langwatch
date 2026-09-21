@@ -3,9 +3,9 @@ import {
   TEST_FIRE_NOTICE,
 } from "@langwatch/automations/templating/banner";
 import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automations/templating/defaults";
-import { AlertType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
+import { AlertType } from "~/generated/prisma/client";
 import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
@@ -362,7 +362,7 @@ describe("testFireTrigger", () => {
       // The report example context populated — the trace context would have
       // left every report variable empty.
       expect(payload).toContain("trace_a1b2c3");
-      expect(payload).toContain("/acme/messages");
+      expect(payload).toContain("/acme/traces");
     });
 
     describe("when the report renders a dashboard", () => {

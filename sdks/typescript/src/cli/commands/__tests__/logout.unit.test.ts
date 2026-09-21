@@ -78,6 +78,37 @@ describe("logoutCommand", () => {
     });
   });
 
+  describe("when a tool is pinned to a team project", () => {
+    /** @scenario "Logout removes the wiring and the project pin together" */
+    it("takes the pin with the wiring, so no device keeps shipping to that project", async () => {
+      seedClaudeAndGemini();
+      const cfgPath = process.env.LANGWATCH_CLI_CONFIG!;
+      fs.writeFileSync(
+        cfgPath,
+        JSON.stringify(
+          {
+            access_token: "at",
+            refresh_token: "rt",
+            tool_project_keys: {
+              codex: { secret: "ik-lw-pinned", project_slug: "acme-app" },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      await logoutCommand({ yes: true });
+
+      expect(fs.existsSync(cfgPath)).toBe(false);
+      const claudePath = appSettingsTargetFor("claude")!.path;
+      const claude = JSON.parse(fs.readFileSync(claudePath, "utf8"));
+      expect("env" in claude).toBe(false);
+      const rc = fs.readFileSync(rcPath("zsh"), "utf8");
+      expect(rc).not.toContain("langwatch gemini begin");
+    });
+  });
+
   describe("when --keep-credentials is passed", () => {
     it("leaves a logged-in session file on disk", async () => {
       seedClaudeAndGemini();

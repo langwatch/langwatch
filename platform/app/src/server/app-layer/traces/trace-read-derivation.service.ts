@@ -34,7 +34,7 @@ interface DeriveParams {
    * Monotonic fold watermark — the fold's `spanCount`, which increments every
    * time a span is folded. The memo is keyed on it so a cached derivation is
    * reused only within one fold version (all of a coalesced batch's per-event
-   * reactors observe the same final state, so they share one read) and is
+   * subscribers observe the same final state, so they share one read) and is
    * dropped the moment newer spans land. Omit it to bypass the memo (a live
    * read with no watermark must always hit storage).
    */
@@ -65,11 +65,11 @@ interface MemoEntry<T> {
  * and its parity with the legacy incremental fold.
  *
  * The all-spans read these derivations issue is multi-MB for large traces. A
- * coalesced fold batch fires its reactors once per event but at one shared
+ * coalesced fold batch fires its subscribers once per event but at one shared
  * final fold state, so without coalescing the same read would run once per
  * span in the backlog — the read-amplification that re-saturated Redis/ClickHouse
  * during a backlog drain. The derivations are memoized per (tenant, trace, fold
- * version) so a batch reads stored spans once regardless of how many reactors or
+ * version) so a batch reads stored spans once regardless of how many subscribers or
  * events it dispatches, while a fold that has advanced (new spans) re-reads.
  */
 export class TraceReadDerivationService {

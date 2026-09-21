@@ -76,7 +76,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
      * (writes evaluation_runs), and langwatch_nlp exports OTel spans for the
      * cell (writes trace_summaries via the trace-processing pipeline). We
      * simulate the end-result of both pipelines by inserting into both
-     * tables directly, since the full BullMQ trace pipeline is not
+     * tables directly, since the full trace pipeline is not
      * available in this integration test environment.
      */
 

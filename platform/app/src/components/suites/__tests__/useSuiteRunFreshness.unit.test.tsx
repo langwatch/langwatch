@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: { getSuiteRunData: { invalidate: mocks.invalidate } },
     }),
     scenarios: { getSuiteRunFreshness: { useQuery: mocks.useQuery } },

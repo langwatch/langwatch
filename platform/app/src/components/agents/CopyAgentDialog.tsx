@@ -43,7 +43,7 @@ export const CopyAgentDialog = ({
           sourceProjectId,
         });
       }}
-      isLoading={copyAgent.isLoading}
+      isLoading={copyAgent.isPending}
       logError={logger.error.bind(logger)}
     />
   );

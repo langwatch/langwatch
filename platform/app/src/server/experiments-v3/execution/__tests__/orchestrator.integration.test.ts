@@ -1,4 +1,3 @@
-import type { Project } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
   DatasetColumn,
@@ -11,6 +10,7 @@ import {
   createInitialResults,
   createInitialUIState,
 } from "~/experiments-v3/types";
+import type { Project } from "~/generated/prisma/client";
 import { resetApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { getTestProject } from "~/utils/testUtils";
@@ -35,7 +35,7 @@ const hasNlpService =
 // "App not initialized" unless the composition is booted first — so the whole
 // suite needs a real app singleton, not just the NLP service. We boot it in
 // beforeAll (idempotent: reuses an app another file already initialized) and
-// tear it down in afterAll via resetApp so its Redis/BullMQ handles don't leak
+// tear it down in afterAll via resetApp so its Redis/queue handles don't leak
 // into the next file. This whole block is skipIf(!hasNlpService)-gated and CI
 // never sets OPENAI_API_KEY, so none of this runs in CI — it only makes the
 // suite runnable locally with both env vars set, following the same

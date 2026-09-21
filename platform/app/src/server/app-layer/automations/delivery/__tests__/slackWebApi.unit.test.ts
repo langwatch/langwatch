@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { sendHttpDestination } from "../httpDestination";
+import { sendHttpDestination } from "~/server/webhooks/httpDestination";
 import { listSlackChannels, postSlackChatMessage } from "../slackWebApi";
 
-vi.mock("../httpDestination", () => ({ sendHttpDestination: vi.fn() }));
+vi.mock("~/server/webhooks/httpDestination", () => ({
+  sendHttpDestination: vi.fn(),
+}));
 
 const mockedSend = vi.mocked(sendHttpDestination);
 

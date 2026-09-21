@@ -1,6 +1,7 @@
 import { type Env, Hono, type MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
+import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
@@ -22,9 +23,12 @@ import {
   canonicalErrorResponse,
 } from "~/app/api/shared/canonical-error";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
-import { prisma } from "~/server/db";
 
-import type { AccessPolicy } from "./access-policy";
+import {
+  type AccessPolicy,
+  type CredentialClass,
+  credentialClassFor,
+} from "./access-policy";
 import { registerRoutePolicy } from "./route-registry";
 
 /**
@@ -57,8 +61,12 @@ type HttpVerb = (typeof HTTP_VERBS)[number];
  * Derive the family label (tracer span name + registry grouping) from the
  * basePath so it can never typo or drift from the mount path: `/api/agents`
  * becomes `agents`, `/api/gateway/v1` becomes `gateway-v1`.
+ *
+ * Exported because the management-service factory registers route policies
+ * against the same registry: two derivations would let one family be labelled
+ * two ways and split its authorization audit in half.
  */
-function familyFromBasePath(basePath: string): string {
+export function familyFromBasePath(basePath: string): string {
   return (
     basePath
       .replace(/^\/+/, "")
@@ -113,19 +121,29 @@ export class SecuredApp<E extends Env> {
   private readonly family: string;
   private readonly strategy: AuthStrategy;
   private readonly errorEnvelope: ApiErrorEnvelope;
+  /**
+   * The credential class the family publishes, when its scope's default would
+   * name the wrong one. Only the instance-admin family needs it: a service app
+   * enforces a shared secret, but that secret is a credential an operator
+   * holds and the document declares a scheme for.
+   */
+  private readonly credentialClass?: CredentialClass;
 
   constructor(args: {
     basePath: string;
     strategy: AuthStrategy;
     errorEnvelope?: ApiErrorEnvelope;
+    credentialClass?: CredentialClass;
   }) {
     this.basePath = args.basePath;
     this.family = familyFromBasePath(args.basePath);
     this.strategy = args.strategy;
+    this.credentialClass = args.credentialClass;
     this.errorEnvelope = args.errorEnvelope ?? "legacy";
     this.hono = new Hono<E>().basePath(args.basePath);
     this.hono.use(tracerMiddleware({ name: this.family }));
     this.hono.use(loggerMiddleware());
+    this.hono.use(appContextMiddleware);
     // One shape per family, whichever layer refuses. A family can still
     // install its own onError to name its domain errors more precisely.
     this.hono.onError(
@@ -133,6 +151,25 @@ export class SecuredApp<E extends Env> {
         ? (error, c) => canonicalErrorResponse(error, c)
         : handleError,
     );
+  }
+
+  /**
+   * The credential class a route publishes.
+   *
+   * The app-level override renames only what the app's own secret classifies
+   * as, so a `publicEndpoint` on the same app still publishes as `none`: the
+   * SCIM discovery endpoints an identity provider reads before it holds a
+   * token are not reached by that token, and saying they were would put a
+   * security requirement on the one thing that has none.
+   */
+  private publishedCredentialClass(policy: AccessPolicy): CredentialClass {
+    const derived = credentialClassFor({
+      scope: this.strategy.scope,
+      policy,
+    });
+    return derived === "internal" && this.credentialClass
+      ? this.credentialClass
+      : derived;
   }
 
   /**
@@ -155,6 +192,7 @@ export class SecuredApp<E extends Env> {
           path: mergePath(this.basePath, path),
           policy,
           family: this.family,
+          credentialClass: this.publishedCredentialClass(policy),
         });
         // Prepend the enforcement chain, then the caller's handlers. The
         // verb method's STATIC type is Hono's own, so validator + context
@@ -231,7 +269,6 @@ const projectStrategy: AuthStrategy = {
         return [
           auth,
           requireApiKeyPermission({
-            prisma,
             permission: policy.permission,
             errorEnvelope,
           }),
@@ -326,6 +363,19 @@ export function createOrgApp<
 export function createServiceApp<E extends Env = Env>(args: {
   basePath: string;
   verifySecret?: MiddlewareHandler;
+  /**
+   * The error shape this family publishes. New families pass `canonical`;
+   * the default keeps the families that predate the envelope answering
+   * exactly what their consumers already parse.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
+  /**
+   * Overrides the credential class the family publishes. Set it only when the
+   * secret is one an API client holds and the document declares a scheme for
+   * it; leaving it unset keeps the honest default, `internal`, which the spec
+   * generator refuses to advertise.
+   */
+  credentialClass?: CredentialClass;
 }): SecuredApp<E> {
   const strategy: AuthStrategy = {
     scope: "service",
@@ -343,5 +393,10 @@ export function createServiceApp<E extends Env = Env>(args: {
       }
     },
   };
-  return new SecuredApp<E>({ basePath: args.basePath, strategy });
+  return new SecuredApp<E>({
+    basePath: args.basePath,
+    strategy,
+    ...(args.errorEnvelope ? { errorEnvelope: args.errorEnvelope } : {}),
+    ...(args.credentialClass ? { credentialClass: args.credentialClass } : {}),
+  });
 }

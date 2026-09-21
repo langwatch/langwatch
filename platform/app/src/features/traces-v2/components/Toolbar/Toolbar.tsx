@@ -63,7 +63,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   );
   // Sample data is an onboarding affordance — once the project has its
   // own real traces (`Project.firstMessage = true`, set by the
-  // projectMetadata reactor on first non-sample ingest), the toggle is
+  // projectMetadata subscriber on first non-sample ingest), the toggle is
   // noise. We gate visibility on `hasAnyTraces === false` rather than
   // `!== true` so the button stays put during the brief window where
   // `firstMessage` is still unknown (avoids a flicker on first load).

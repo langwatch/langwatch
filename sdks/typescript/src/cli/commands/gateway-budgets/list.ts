@@ -60,7 +60,11 @@ export const listGatewayBudgetsCommand = async (
   const spinner = createSpinner("Fetching gateway budgets...").start();
 
   try {
-    const { budgets, spend_available } = await service.list({ scopeTypes });
+    const budgets = await service.list({ scopeTypes });
+    // A budget whose spend could not be totalled serves a null `spent_usd`
+    // rather than a stale figure, so one null anywhere makes the whole
+    // listing's spend unreal.
+    const spend_available = budgets.every((b) => b.spent_usd !== null);
 
     spinner.succeed(`Found ${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`);
 

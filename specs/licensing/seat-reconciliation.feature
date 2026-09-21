@@ -59,6 +59,34 @@ Feature: Reconciling an organization down to its licensed seats
     And the work they did is still attributed to them
 
   @integration
+  Scenario: A disabled member cannot act through any permission path
+    Given a member of the organization has been disabled
+    When they try to act in that organization
+    Then the request is refused
+    And they are told their access was disabled, not that they are not a member
+
+  @unit
+  Scenario: A disabled member's API keys stop working
+    Given a member of the organization has been disabled
+    When a request arrives on an API key they own
+    Then the request is refused
+    But a service key that belongs to nobody keeps working
+
+  @unit
+  Scenario: A link that was public to anyone still opens for a disabled member
+    Given a member of the organization has been disabled
+    When they open a link that was shared with anyone
+    Then the link still opens
+    But a link shared only with the organization does not
+
+  @unit
+  Scenario: Disabling or re-enabling a membership takes effect on the next request
+    When an admin disables a membership
+    Then the member is refused on their very next request
+    When the admin re-enables it
+    Then the member is allowed again on their very next request
+
+  @integration
   Scenario: A disabled member can be re-enabled when a seat is free
     Given the organization is within its seat count
     And a member of the organization has been disabled
@@ -85,7 +113,38 @@ Feature: Reconciling an organization down to its licensed seats
     Then the request is refused so the organization keeps an admin who can sign in
 
   @integration
+  Scenario: Demoting the last admin is refused
+    Given the organization has one admin
+    When their role is changed to member
+    Then the request is refused so the organization keeps an admin who can sign in
+
+  @integration
   Scenario: An organization within its seats is not told anything
     Given the organization has as many members as its license covers
     When an admin opens the license page
     Then no seat warning is shown
+
+  # ============================================================================
+  # Choosing who keeps a seat, without guessing
+  # ============================================================================
+  #
+  # Reconciling means walking the member list and deciding person by person, and
+  # the two decisions available there are moving someone to a Lite Member seat
+  # and disabling them outright. Each has its own allowance and each is refused
+  # once that allowance runs out, so an admin who cannot see the allowances
+  # learns them one refusal at a time. The member list carries the same seat
+  # counts the license page does, and a refusal names the allowance that ran out
+  # rather than reporting that the action could not be completed.
+
+  @integration
+  Scenario: The member list shows how many seats of each kind are in use
+    When an admin opens the member list
+    Then the full member seats in use are shown against what the license covers
+    And the Lite Member seats in use are shown the same way
+
+  @integration
+  Scenario: Running out of Lite Member seats names that allowance
+    Given the organization has every Lite Member seat in use
+    When an admin moves another member to a Lite Member seat
+    Then the request is refused for exceeding the Lite Member seats
+    And the refusal offers disabling a membership as the reversible alternative

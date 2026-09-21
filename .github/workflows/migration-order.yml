@@ -24,6 +24,23 @@ name: migration-order
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # This workflow has no required status check, so filtering here is safe:
+    # a workflow GitHub filters out never reports, and a *required* check that
+    # never reports leaves a PR waiting forever. The always-run + green
+    # aggregator pattern the gated workflows use exists for exactly that
+    # reason, and none of them lose it.
+    #
+    # The two directories are the ones tools/migrationorder actually scans
+    # (tools/migrationorder/set.go). A PR that touches neither adds no
+    # migration, so there is no ordering to judge.
+    paths:
+      - "platform/app/prisma/migrations/**"
+      - "platform/app/src/server/clickhouse/migrations/**"
+      # The checker and its own gate: a change to either has to run against
+      # the real migration sets, not just its unit tests.
+      - "tools/migrationorder/**"
+      - "cmd/migrationorder/**"
+      - ".github/workflows/migration-order.yml"
 
 permissions:
   contents: read
@@ -42,11 +59,23 @@ jobs:
       # A merge commit already carries the base branch's migrations, which is the
       # very thing this check is comparing the branch against.
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+          # This job has timeout-minutes: 5 and was being killed by it DURING
+          # the clone: 9 of its last 34 runs ended cancelled, and the cancelled
+          # ones sat at 297-298s in this step while successful ones averaged
+          # 22.8s. It reads Go source and migration files, never the media, so
+          # excluding it takes the fetch from 180 MB to 42 MB and the timeout
+          # stops being reachable. See specs/ci/lean-checkout.feature.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Fetch base branch
         env:
@@ -54,7 +83,7 @@ jobs:
         run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum

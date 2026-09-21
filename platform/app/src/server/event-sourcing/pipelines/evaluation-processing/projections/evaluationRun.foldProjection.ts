@@ -18,6 +18,7 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "../schemas/events";
+import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
 
 export type { EvaluationRunData };
 
@@ -140,8 +141,10 @@ export class EvaluationRunFoldProjection
       ...state,
       evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      // Verdicts are gated on status === "processed" (#6833) — shared with
+      // the slim fold so the documented slim<->runs parity holds.
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       details: event.data.details ?? null,
       inputs: event.data.inputs ?? null,
@@ -165,8 +168,10 @@ export class EvaluationRunFoldProjection
       traceId: event.data.traceId ?? null,
       isGuardrail: event.data.isGuardrail ?? false,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      // Verdicts are gated on status === "processed" (#6833) — shared with
+      // the slim fold so the documented slim<->runs parity holds.
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       details: event.data.details ?? null,
       inputs: event.data.inputs ?? null,

@@ -192,12 +192,11 @@ def test_from_api_response_reads_parameters_from_real_deserialized_response():
     """
     @scenario Python prompt models expose runtime config
 
-    Regression: the request body models send `parameters`, but the response
-    models still carry it via the generator's `additional_properties` extras
-    bag (the recursive runtime-parameters schema can't be emitted by the
-    OpenAPI generator, so the field isn't promoted to first-class). A Mock
-    can't prove that path, so deserialize a real response with `from_dict`
-    and assert the parameters survive the wire round-trip.
+    Regression: `parameters` is a free-form JSON object, so the generated
+    response model wraps it in a type that keeps the whole value in an extras
+    bag instead of exposing a plain dict. A Mock can't prove that path, so
+    deserialize a real response with `from_dict` and assert the parameters
+    survive the wire round-trip.
     """
     response = GetApiPromptsByIdResponse200.from_dict(
         {
@@ -216,12 +215,13 @@ def test_from_api_response_reads_parameters_from_real_deserialized_response():
             "inputs": [],
             "outputs": [],
             "model": "openai/gpt-4",
+            "tags": [],
             "parameters": {"environment": "staging", "retries": 3},
         }
     )
 
-    # Until the field is promoted, it lands in the generator's extras bag.
-    assert response.additional_properties.get("parameters") == {
+    # The wrapper keeps the object in its extras bag rather than as a mapping.
+    assert response.parameters.to_dict() == {
         "environment": "staging",
         "retries": 3,
     }

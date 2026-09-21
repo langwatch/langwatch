@@ -5,8 +5,9 @@
  *
  * @see specs/webhooks/webhook-endpoints.feature
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { webhookEndpointsRouter } from "../webhookEndpoints";
 
@@ -43,23 +44,29 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkOrganizationPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
+    hasOrganizationPermission: vi.fn(
+      async (_ctx: unknown, _organizationId: string, permission: string) => {
         seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
-        }
-        ctx.permissionChecked = true;
-        return next();
+        return !denied.has(permission);
       },
+    ),
   };
 });
 
 const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ planProvider: { getActivePlan } }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      planProvider: { getActivePlan },
+    }),
+  };
+});
 
 const ENDPOINT_ROW = {
   id: "whep_1",
@@ -91,6 +98,11 @@ function buildMockPrisma() {
 
 function buildCaller(prisma: PrismaClient) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: "user_1" }, expires: "1" },
     req: undefined,
     res: undefined,
@@ -133,7 +145,7 @@ describe("webhookEndpointsRouter", () => {
         url: "https://example.com/hook",
         enabledEvents: ["gateway.request.completed"],
       }),
-    ).rejects.toThrow("denied");
+    ).rejects.toThrow("You do not have permission");
     expect((prisma as any).webhookEndpoint.create).not.toHaveBeenCalled();
   });
 

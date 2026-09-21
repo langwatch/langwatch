@@ -14,14 +14,23 @@ export interface TimelinePoint {
   index: number;
   cumulativeTokens: number;
   cumulativeCostUsd: number;
-  /** Milliseconds since the first entry. */
+  /** Milliseconds since the anchor, which is the first entry by default. */
   elapsedMs: number;
 }
 
-export function buildEntryTimeline(
-  entries: TranscriptEntry[],
-): TimelinePoint[] {
-  const startMs = entries[0]?.atMs;
+export function buildEntryTimeline({
+  entries,
+  startAtMs,
+}: {
+  entries: TranscriptEntry[];
+  /**
+   * Where elapsed time is measured from. The session's first turn when the
+   * view knows it, so the clock reads the same wherever the loaded window
+   * starts; the first loaded entry otherwise.
+   */
+  startAtMs?: number | null;
+}): TimelinePoint[] {
+  const startMs = startAtMs ?? entries[0]?.atMs;
   let cumulativeTokens = 0;
   let cumulativeCostUsd = 0;
   return entries.map((entry, index) => {
@@ -33,7 +42,7 @@ export function buildEntryTimeline(
       index,
       cumulativeTokens,
       cumulativeCostUsd,
-      elapsedMs: startMs != null ? entry.atMs - startMs : 0,
+      elapsedMs: startMs != null ? Math.max(0, entry.atMs - startMs) : 0,
     };
   });
 }

@@ -443,13 +443,15 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Evaluator verdict",
     group: "evaluation",
     table: "evaluation_runs",
-    // Surface a 4-way label so users can pick pass / fail / error / unknown
-    // without dealing with the 0/1/null underlying UInt8 storage. `error`
-    // takes precedence: an errored run's Passed column is meaningless, and
-    // the sidebar's "Errored" pill counts `Status = 'error'` — mapping those
-    // rows to 'unknown' made the pill filter by the wrong value.
+    // Surface a 5-way label so users can pick pass / fail / error / skipped /
+    // unknown without dealing with the 0/1/null underlying UInt8 storage.
+    // `error` and `skipped` take precedence: a run that crashed or never ran
+    // has a meaningless Passed column, and mapping either to 'unknown' buried
+    // it next to score-only runs where it could not be filtered for (#6835).
+    // The sidebar's "Errored" pill counts `Status = 'error'`, so the error
+    // arm must stay aligned with it.
     expression:
-      "multiIf(Status = 'error', 'error', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
+      "multiIf(Status = 'error', 'error', Status = 'skipped', 'skipped', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
   },
   {
     key: "evaluatorScore",

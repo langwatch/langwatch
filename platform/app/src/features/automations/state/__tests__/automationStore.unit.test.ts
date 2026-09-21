@@ -1,5 +1,5 @@
-import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { INITIAL_DRAFT } from "../../logic/draftReducer";
 import { MAX_TEST_HISTORY, useAutomationStore } from "../automationStore";
 

@@ -1,6 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { resolveProjectPermission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
 
@@ -14,6 +15,14 @@ import { projectRouter } from "../project";
  */
 
 // Mock nanoid to control API key generation
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
   customAlphabet: vi.fn(
@@ -21,30 +30,19 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-// Mock the permission check to always allow; use importOriginal so other rbac exports (e.g. checkPermissionOrPubliclyShared) are available to transitive imports
+// Mock the permission resolver to always allow; use importOriginal so other rbac exports stay available to transitive imports
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    resolveTeamPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
     skipPermissionCheck: ({ ctx, next }: any) => {
       ctx.permissionChecked = true;
       return next();
@@ -64,6 +62,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 describe("project.regenerateApiKey mutation logic", () => {
   let mockPrisma: {
     project: {
+      findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
   };
@@ -71,8 +70,16 @@ describe("project.regenerateApiKey mutation logic", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveProjectPermission).mockResolvedValue({
+      permitted: true,
+      organizationRole: "MEMBER",
+    });
     mockPrisma = {
       project: {
+        // The mutation reads the project's kind before re-keying it: the
+        // hidden governance project's key is what the receiver ingests under,
+        // and this route is not allowed to replace it (ADR-128 §11).
+        findUnique: vi.fn().mockResolvedValue({ kind: "application" }),
         update: vi.fn(),
       },
     };
@@ -85,6 +92,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       },
       req: undefined,
       res: undefined,
+      mfaGate: { offered: () => false },
       permissionChecked: true,
       publiclyShared: false,
     });
@@ -93,6 +101,144 @@ describe("project.regenerateApiKey mutation logic", () => {
     ctx.prisma = mockPrisma as unknown as PrismaClient;
 
     caller = projectRouter.createCaller(ctx);
+  });
+
+  describe("getProjectAPIKey security pipeline", () => {
+    const callerForKeyRead = ({
+      permitted,
+      organizationRole,
+      satisfied,
+    }: {
+      permitted: boolean;
+      organizationRole: "MEMBER" | null;
+      satisfied: boolean;
+    }) => {
+      let denialReason: "no-membership" | "no-binding" | undefined;
+      if (!permitted && organizationRole === null) {
+        denialReason = "no-membership";
+      } else if (!permitted) {
+        denialReason = "no-binding";
+      }
+      vi.mocked(resolveProjectPermission).mockResolvedValue({
+        permitted,
+        organizationRole,
+        denialReason,
+      });
+
+      const ownerOf = vi.fn(async () => ({
+        organizationId: "org-acme",
+        isPersonal: false,
+      }));
+      const standingForSession = vi.fn(async () => ({
+        organizationId: "org-acme",
+        organizationName: "Acme",
+        required: true,
+        satisfaction: satisfied
+          ? ({ satisfied: true, by: "account_enrollment" } as const)
+          : ({ satisfied: false, by: "none" } as const),
+        holdsPasskey: false,
+      }));
+      const ctx = createInnerTRPCContext({
+        session: {
+          user: { id: "test-user-id" },
+          sessionId: "session-1",
+          expires: "1",
+        },
+        mfaGate: {
+          offered: () => true,
+          scopes: { ownerOf },
+          organizationMfa: () => ({ standingForSession }),
+        },
+      });
+      ctx.prisma = mockPrisma as unknown as PrismaClient;
+
+      return {
+        caller: projectRouter.createCaller(ctx),
+        ownerOf,
+        standingForSession,
+      };
+    };
+
+    it("refuses an allowed member without the required second factor before reading the key", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        apiKey: "sk-lw-secret",
+      });
+      const { caller, standingForSession } = callerForKeyRead({
+        permitted: true,
+        organizationRole: "MEMBER",
+        satisfied: false,
+      });
+
+      await expect(
+        caller.getProjectAPIKey({ projectId: "project-own" }),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          code: "identity_mfa_enrollment_required",
+        }),
+      });
+
+      expect(standingForSession).toHaveBeenCalledWith({
+        userId: "test-user-id",
+        organizationId: "org-acme",
+        sessionId: "session-1",
+      });
+      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("returns the key after the canonical permission and MFA checks pass", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        apiKey: "sk-lw-secret",
+      });
+      const { caller } = callerForKeyRead({
+        permitted: true,
+        organizationRole: "MEMBER",
+        satisfied: true,
+      });
+
+      await expect(
+        caller.getProjectAPIKey({ projectId: "project-own" }),
+      ).resolves.toEqual({ apiKey: "sk-lw-secret" });
+      expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
+        where: { id: "project-own" },
+        select: { apiKey: true },
+      });
+    });
+
+    it("conceals a foreign project and never reads its key", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        apiKey: "sk-lw-foreign-secret",
+      });
+      const { caller, ownerOf, standingForSession } = callerForKeyRead({
+        permitted: false,
+        organizationRole: null,
+        satisfied: true,
+      });
+
+      await expect(
+        caller.getProjectAPIKey({ projectId: "project-foreign" }),
+      ).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+      expect(ownerOf).not.toHaveBeenCalled();
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("keeps a same-organization permission refusal forbidden", async () => {
+      const { caller, ownerOf, standingForSession } = callerForKeyRead({
+        permitted: false,
+        organizationRole: "MEMBER",
+        satisfied: true,
+      });
+
+      await expect(
+        caller.getProjectAPIKey({ projectId: "project-own" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(ownerOf).not.toHaveBeenCalled();
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   describe("when project exists", () => {
@@ -172,6 +318,19 @@ describe("project.regenerateApiKey mutation logic", () => {
         code: "NOT_FOUND",
         message: "Project not found",
       });
+    });
+  });
+
+  describe("when the project is the hidden governance record", () => {
+    it("refuses without touching the key the receiver ingests under", async () => {
+      mockPrisma.project.findUnique.mockResolvedValueOnce({
+        kind: "internal_governance",
+      });
+
+      await expect(
+        caller.regenerateApiKey({ projectId: "project_governance" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(mockPrisma.project.update).not.toHaveBeenCalled();
     });
   });
 

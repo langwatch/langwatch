@@ -20,13 +20,13 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import { unsupportedValue } from "./unsupportedValue";
 
 /**
  * Rule types with a wired detector / evaluator. Only these run on the
- * anomaly reactor today; others save in "preview" mode (admin can
+ * anomaly subscriber today; others save in "preview" mode (admin can
  * persist the row, but no detection fires until the corresponding
  * evaluator ships).
  */
@@ -42,7 +42,7 @@ export type SupportedRuleType = (typeof SUPPORTED_RULE_TYPES)[number];
  *
  * Adding a detector flow:
  *   1. Implement the evaluator service (mirror SpendSpikeAnomalyEvaluator)
- *   2. Wire it into the anomaly reactor's switchboard
+ *   2. Wire it into the anomaly subscriber's switchboard
  *   3. Add the type to SUPPORTED_RULE_TYPES above
  *   4. Add a Zod schema branch in `validateThresholdConfig`
  */

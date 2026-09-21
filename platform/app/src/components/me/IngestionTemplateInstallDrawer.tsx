@@ -32,8 +32,14 @@ export function buildEnvSnippet(
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
-    // Four claude-code OTel unlock knobs, all ON (rchaves
-    // "collect all humanly possible"):
+    // Every claude-code OTel unlock knob, all ON, so a session arrives
+    // whole rather than as counters:
+    //   ENHANCED_TELEMETRY_BETA  gates span tracing itself. Claude Code
+    //                      defaults it off, and without it the exporter
+    //                      emits no spans at all, so there is no tool
+    //                      call tree, no latencies and no subagent
+    //                      branches, and TOOL_CONTENT below goes dead
+    //                      with them. Experimental, hence the name.
     //   USER_PROMPTS       lifts user prompt text onto user_prompt
     //   TOOL_DETAILS       lifts tool metadata onto tool_decision/result
     //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
@@ -49,6 +55,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     //                      to keep the CH merge ceiling safe.
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
@@ -111,6 +118,17 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   return base;
 }
 
+/**
+ * What a rotation is about to cost, in the terms the person has to act on:
+ * how many keys stop working and which machines are holding them. A key with
+ * no machine behind its name still counts, so it is named rather than
+ * dropped from the list.
+ */
+export function rotationWarning(installedOn: (string | null)[]): string {
+  const machines = installedOn.map((label) => label ?? "unknown device");
+  return `Rotating revokes the ${machines.length} ${machines.length === 1 ? "key" : "keys"} for this source (${machines.join(", ")}). Paste the new token wherever you wired the old one.`;
+}
+
 export type IngestionTemplateMeta = {
   slug: string;
   displayName: string;
@@ -161,7 +179,7 @@ export function IngestionTemplateInstallDrawer({
   installResult,
   isInstalling,
   installError,
-  hasExistingKey,
+  installedOn,
   onInstall,
   onRotate,
   onMarkInstalled,
@@ -175,12 +193,14 @@ export function IngestionTemplateInstallDrawer({
   /** The install/rotate mutation's error, passed straight through. */
   installError: unknown;
   /**
-   * True when the user already has an ingestion key for this source. Drives
-   * the CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
-   * Without this signal the drawer would mint-only on every
-   * already-connected source.
+   * The machine behind every live key for this source, one entry per key,
+   * null where the key carries no label. Empty means the source is not
+   * connected yet, which is what drives the CTA copy: 'Use this template'
+   * (fresh) vs 'Rotate token' (replace). The count matters because a
+   * rotation kills every one of them, and the person needs to know how many
+   * places they are about to have to paste the new token.
    */
-  hasExistingKey: boolean;
+  installedOn: (string | null)[];
   /**
    * Called when the drawer mounts (or the user clicks 'Install') for the
    * given template. Parent owns the tRPC mutation
@@ -201,6 +221,7 @@ export function IngestionTemplateInstallDrawer({
   onMarkInstalled: () => void;
 }) {
   const [showSecret, setShowSecret] = useState(false);
+  const hasExistingKey = installedOn.length > 0;
 
   const copy = (value: string, label: string) => {
     void navigator.clipboard.writeText(value);
@@ -262,14 +283,11 @@ export function IngestionTemplateInstallDrawer({
                   <Alert.Root status="warning" variant="surface">
                     <Alert.Indicator />
                     <Alert.Content>
-                      <Text fontSize="sm">
-                        An ingestion key already exists for this source.
-                        Rotating will invalidate the existing token immediately.
-                      </Text>
+                      <Text fontSize="sm">{rotationWarning(installedOn)}</Text>
                     </Alert.Content>
                   </Alert.Root>
                   <Button onClick={onRotate} colorPalette="orange">
-                    Rotate token
+                    Rotate token (revokes {installedOn.length})
                   </Button>
                 </VStack>
               ) : (

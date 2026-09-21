@@ -59,7 +59,7 @@ export function extractTitleText(node: ReactNode): string {
  * the tab title is correct on first paint instead of flashing the parent
  * route's title (e.g. "LangWatch - Personal Workspace") before flipping
  * to the page-specific title on the next tick. Surfaced as Ariana QA
- * finding G12: cold-load title regression on /settings/governance/teams.
+ * finding G12: cold-load title regression on /governance/teams.
  */
 export default function Head({ children }: HeadProps) {
   useLayoutEffect(() => {

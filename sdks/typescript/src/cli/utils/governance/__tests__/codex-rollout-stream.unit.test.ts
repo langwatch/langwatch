@@ -33,6 +33,19 @@ const completedTurn = (traceId: string, turnId: string, user: string, reply: str
     .map(line)
     .join("\n");
 
+const sessionMeta = (sessionId: string) => ({
+  type: "session_meta",
+  payload: {
+    id: sessionId,
+    cwd: "/home/dev/acme-app",
+    git: {
+      branch: "feat/pricing",
+      repository_url: "https://github.com/acme/acme-app.git",
+      commit_hash: "f40dfb14fe962ff5c0e662de43424943ba44ae3e",
+    },
+  },
+});
+
 /** A fake OTLP endpoint that records the trace_ids in each POST. */
 function recordingFetch() {
   const posted: string[][] = [];
@@ -59,6 +72,7 @@ describe("createCodexIOStreamer", () => {
     createCodexIOStreamer({
       sinceMs: 0,
       endpoint: "http://collector.test/v1/traces",
+      logsEndpoint: null,
       token: "sk-lw-test",
       sessionsRoot: root,
       fetchImpl,
@@ -112,6 +126,52 @@ describe("createCodexIOStreamer", () => {
 
       expect(emitted).toBe(1);
       expect(posted).toEqual([["t-one"], ["t-two"]]);
+    });
+  });
+
+  describe("given a streaming session whose transcript records its repository", () => {
+    /** @scenario "A streaming session posts its repository once across ticks" */
+    it("posts the session context on the first tick and not again on the next", async () => {
+      const stateDir = await mkdtemp(join(tmpdir(), "codex-stream-state-"));
+      await writeFile(
+        rolloutFile(),
+        `${line(sessionMeta("s-one"))}\n${completedTurn("t-one", "t1", "hi", "there")}`,
+      );
+      const urls: string[] = [];
+      const fetchImpl = (async (url: string) => {
+        urls.push(String(url));
+        return { ok: true, status: 200 } as Response;
+      }) as unknown as typeof fetch;
+      const streamer = createCodexIOStreamer({
+        sinceMs: 0,
+        endpoint: "http://collector.test/v1/traces",
+        logsEndpoint: "http://collector.test/v1/logs",
+        token: "sk-lw-test",
+        sessionsRoot: root,
+        stateDir,
+        fetchImpl,
+      });
+
+      try {
+        await streamer.harvest(1);
+        await appendFile(
+          rolloutFile(),
+          `\n${completedTurn("t-two", "t2", "again", "ok")}`,
+        );
+        await streamer.harvest(2);
+
+        // The streamer re-offers every in-window session on every tick. The
+        // stored fingerprint is what keeps that from re-posting a context
+        // that has not changed.
+        expect(
+          urls.filter((u) => u === "http://collector.test/v1/logs"),
+        ).toHaveLength(1);
+        expect(
+          urls.filter((u) => u === "http://collector.test/v1/traces"),
+        ).toHaveLength(2);
+      } finally {
+        await rm(stateDir, { recursive: true, force: true });
+      }
     });
   });
 });

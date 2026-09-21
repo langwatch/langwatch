@@ -76,15 +76,47 @@ func SlugOrBase(slug, dir string) string {
 	return filepath.Base(dir)
 }
 
-// RedisDBForSlug maps a slug to a stable Redis DB (0-15) so BullMQ queues,
-// GroupQueue streams, and fold caches stay isolated across concurrent worktrees —
-// the job the old PORT-slot derivation did, now keyed on the slug.
+// RedisDBCount is how many databases a stock Redis serves (0-15).
+const RedisDBCount = 16
+
+// RedisDBForSlug maps a slug to a PREFERRED Redis DB (0-15). It is only a
+// starting point: with 16 databases and a plain hash, distinct slugs collide
+// often — three concurrent worktrees landing on the same index is ordinary,
+// not unlucky. Use AllocateRedisDB, which probes from here for a free one.
 func RedisDBForSlug(slug string) int {
 	var h uint32
 	for _, c := range slug {
 		h = h*31 + uint32(c)
 	}
-	return int(h % 16)
+	return int(h % RedisDBCount)
+}
+
+// AllocateRedisDB picks the Redis DB a stack should use, given the databases
+// other live stacks already hold.
+//
+// Sharing one is not a mild inconvenience: Redis is where the GroupQueue
+// lives, so two stacks on the same index share a job queue while writing to
+// SEPARATE ClickHouse databases. Whichever worker claims a job projects it
+// into its own database, and because every stack seeds the same fixed local
+// identity the tenant ids match perfectly — so the work lands in the wrong
+// stack and nothing looks wrong.
+//
+// Probing starts at the slug's preferred index so a stack keeps the same
+// database whenever it can, and the caller persists the result so it survives
+// restarts even if the neighbors change.
+//
+// With all 16 held it returns the preferred index and reports false: a
+// collision is then unavoidable, and the caller should say so rather than
+// pretend the stack is isolated.
+func AllocateRedisDB(slug string, taken map[int]bool) (db int, exclusive bool) {
+	preferred := RedisDBForSlug(slug)
+	for offset := range RedisDBCount {
+		candidate := (preferred + offset) % RedisDBCount
+		if !taken[candidate] {
+			return candidate, true
+		}
+	}
+	return preferred, false
 }
 
 // ErrInvalidSlug is returned when an explicit LANGWATCH_SLUG is malformed.

@@ -31,8 +31,12 @@ vi.mock("../codexGatewayModel", () => ({
   getCodexVercelAIModel: vi.fn().mockResolvedValue("codex-model-handle"),
 }));
 
-import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
+import {
+  getProjectModelProviders,
+  prepareLitellmParams,
+} from "~/server/api/routers/modelProviders.utils";
 import { prisma } from "~/server/db";
+import { expandLatestAlias } from "../latestAliases";
 import { getVercelAIModel } from "../utils";
 
 const mockPrismaFindUnique = prisma.project.findUnique as ReturnType<
@@ -76,6 +80,26 @@ describe("getVercelAIModel", () => {
           model: "azure/my-gpt4-deployment",
         }),
       ).rejects.toThrow('Model provider "azure" is configured but disabled.');
+    });
+  });
+
+  describe("when an explicit latest alias is requested", () => {
+    /** @scenario "An explicit alias handed to the model factory resolves before the provider lookup" */
+    it("prepares the LiteLLM params for the model the alias resolves to", async () => {
+      mockGetProjectModelProviders.mockResolvedValue({
+        openai: { provider: "openai", enabled: true, customKeys: null },
+      });
+
+      await getVercelAIModel({
+        projectId: "project-123",
+        model: "openai/latest",
+      });
+
+      const resolved = expandLatestAlias("openai/latest");
+      expect(resolved).not.toBe("openai/latest");
+      expect(prepareLitellmParams).toHaveBeenCalledWith(
+        expect.objectContaining({ model: resolved }),
+      );
     });
   });
 

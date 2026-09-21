@@ -1,4 +1,4 @@
-import type { Permission } from "~/server/api/rbac";
+import type { AuthzPermission } from "@langwatch/authz";
 
 /**
  * The access decision for a single HTTP route. Every route mounted through the
@@ -31,11 +31,11 @@ import type { Permission } from "~/server/api/rbac";
  *                        cron, gateway-internal, webhooks). Reason mandatory.
  */
 export type AccessPolicy =
-  | { readonly kind: "permission"; readonly permission: Permission }
-  | { readonly kind: "apiKeyPermission"; readonly permission: Permission }
+  | { readonly kind: "permission"; readonly permission: AuthzPermission }
+  | { readonly kind: "apiKeyPermission"; readonly permission: AuthzPermission }
   | {
       readonly kind: "projectPermission";
-      readonly permission: Permission;
+      readonly permission: AuthzPermission;
       /** Route param naming the project. Defaults to `id`. */
       readonly param: string;
     }
@@ -50,7 +50,7 @@ export type AccessPolicy =
        * gates on something that is not an RBAC permission. Mandatory — see
        * `handlerManagedAuth` for why the optional version was a defect.
        */
-      readonly permissions: readonly Permission[];
+      readonly permissions: readonly AuthzPermission[];
       /**
        * What kind of credential reaches this route:
        *
@@ -73,11 +73,111 @@ export type AccessPolicy =
 export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
+ * Which credential an API consumer presents to reach a route.
+ *
+ * Narrower than {@link HandlerCredential}, and the difference is the point:
+ * this answers "which key do I send", and the two API-key families are not
+ * interchangeable. An organization key reaches organization routes and, with
+ * `X-Project-Id`, project routes too; a project key can never reach an
+ * organization route: `resolveOrgOnly` never resolves one, so authentication
+ * fails before any permission is consulted and no grant on the key makes a
+ * difference. Getting that wrong costs an afternoon, so it is a property of
+ * the route rather than something to infer from the path.
+ *
+ * A route that also accepts a browser session still publishes its key class:
+ * the session is not something an integrator can send.
+ */
+export type CredentialClass =
+  | "project_api_key"
+  | "organization_api_key"
+  /**
+   * The instance administrator key a self-hosted operator configures. It is a
+   * shared secret by enforcement and an API credential by audience: it exists
+   * to create the first organization, before any organization key can, so it
+   * is the one secret the published document has a scheme for.
+   */
+  | "instance_admin_api_key"
+  /**
+   * The SCIM token an identity provider presents on the provisioning
+   * endpoints. Enforced by the family's own bearer check rather than the RBAC
+   * chain, and held by a directory connection rather than by us, so the
+   * document declares a scheme for it too.
+   */
+  | "scim_token"
+  | "session"
+  | "internal"
+  | "none";
+
+/**
+ * The credential class a route reaches by, from the app it is mounted on and
+ * the policy it declares.
+ *
+ * Derived rather than declared per route, because the app already decides it
+ * for every route but one kind: a handler-managed route can opt out of its
+ * app's family, and that is the only thing this has to read from the policy.
+ *
+ * The pair worth spelling out is a handler on a **service** app that says it
+ * accepts an API key, which is what the receiver surface is: the collector,
+ * the three OTLP signals, annotations, legacy traces and evaluations all sit
+ * on a service app and resolve `X-Auth-Token` themselves. There are only two
+ * key families, and the organization one exists only where an organization is
+ * resolved, so a handler resolving a key on an app that resolves neither is
+ * resolving a project key. Falling through to the service app's own answer,
+ * `internal`, would say those routes take a shared secret, which is exactly
+ * backwards for the most widely integrated endpoints we have.
+ */
+export function credentialClassFor({
+  scope,
+  policy,
+}: {
+  scope: AppScope;
+  policy: AccessPolicy;
+}): CredentialClass {
+  if (policy.kind === "public") return "none";
+  if (policy.kind === "internal") return "internal";
+  if (policy.kind === "handlerManaged") {
+    return handlerManagedCredentialClass({
+      scope,
+      credential: policy.credential,
+    });
+  }
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/** The app families a route can be mounted on. */
+type AppScope = "project" | "organization" | "service" | "session";
+
+/** What each app answers for a route that does not opt out of its family. */
+const CLASS_BY_APP_SCOPE = {
+  project: "project_api_key",
+  organization: "organization_api_key",
+  service: "internal",
+  session: "session",
+} as const satisfies Record<AppScope, CredentialClass>;
+
+/** @see credentialClassFor, which is where the reasoning lives. */
+function handlerManagedCredentialClass({
+  scope,
+  credential,
+}: {
+  scope: AppScope;
+  credential: HandlerCredential;
+}): CredentialClass {
+  if (credential === "internal") return "internal";
+  if (credential === "session") return "session";
+  // apiKey / both, on an app whose scope names no key family of its own.
+  if (scope === "service" || scope === "session") return "project_api_key";
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/**
  * Require a specific RBAC permission at the app's scope. The secured app
  * resolves it against the caller's role bindings (project scope) or org role
  * bindings (org scope), exactly like the tRPC `checkProjectPermission` path.
  */
-export function requires(permission: Permission): AccessPolicy {
+export function requires<P extends AuthzPermission>(
+  permission: P,
+): { readonly kind: "permission"; readonly permission: P } {
   return { kind: "permission", permission };
 }
 
@@ -89,7 +189,9 @@ export function requires(permission: Permission): AccessPolicy {
  * equivalent of `requires(...)`, kept distinct so the registry records that
  * the gate is the API-key ceiling rather than a strict role check.
  */
-export function apiKeyPermission(permission: Permission): AccessPolicy {
+export function apiKeyPermission<P extends AuthzPermission>(
+  permission: P,
+): { readonly kind: "apiKeyPermission"; readonly permission: P } {
   return { kind: "apiKeyPermission", permission };
 }
 
@@ -99,10 +201,14 @@ export function apiKeyPermission(permission: Permission): AccessPolicy {
  * resolve at organization scope there, so a single org-wide grant would reach
  * every project in the org.
  */
-export function requiresOnProject(
-  permission: Permission,
+export function requiresOnProject<P extends AuthzPermission>(
+  permission: P,
   options: { param?: string } = {},
-): AccessPolicy {
+): {
+  readonly kind: "projectPermission";
+  readonly permission: P;
+  readonly param: string;
+} {
   return {
     kind: "projectPermission",
     permission,
@@ -115,7 +221,7 @@ export function requiresOnProject(
  * is checked. Reserve for routes whose handler performs no privileged action
  * beyond what authentication already proves (e.g. "whoami").
  */
-export function anyAuthenticated(): AccessPolicy {
+export function anyAuthenticated(): { readonly kind: "anyAuthenticated" } {
   return { kind: "anyAuthenticated" };
 }
 
@@ -124,7 +230,10 @@ export function anyAuthenticated(): AccessPolicy {
  * it is the reviewable justification that this route is safe to expose without
  * credentials.
  */
-export function publicEndpoint(reason: string): AccessPolicy {
+export function publicEndpoint(reason: string): {
+  readonly kind: "public";
+  readonly reason: string;
+} {
   assertReason(reason, "publicEndpoint");
   return { kind: "public", reason };
 }
@@ -133,7 +242,10 @@ export function publicEndpoint(reason: string): AccessPolicy {
  * Service-to-service route authenticated by a shared secret or signature, not
  * an RBAC credential. `reason` is mandatory.
  */
-export function internalSecret(reason: string): AccessPolicy {
+export function internalSecret(reason: string): {
+  readonly kind: "internal";
+  readonly reason: string;
+} {
   assertReason(reason, "internalSecret");
   return { kind: "internal", reason };
 }
@@ -167,8 +279,8 @@ export function handlerManagedAuth({
    * was an absence, and absence is what let `POST /api/experiments/:slug/run`
    * sit on a grain no least-privilege key could hold.
    */
-  permissions: readonly Permission[];
-}): AccessPolicy {
+  permissions: readonly AuthzPermission[];
+}): Extract<AccessPolicy, { kind: "handlerManaged" }> {
   assertReason(reason, "handlerManagedAuth");
   return { kind: "handlerManaged", reason, permissions, credential };
 }
@@ -193,7 +305,9 @@ export function isApiKeyReachable(policy: AccessPolicy): boolean {
  * should ask "what does this route actually demand?", so a new policy kind
  * cannot quietly drop out of the answer.
  */
-export function policyPermissions(policy: AccessPolicy): readonly Permission[] {
+export function policyPermissions(
+  policy: AccessPolicy,
+): readonly AuthzPermission[] {
   switch (policy.kind) {
     case "permission":
     case "apiKeyPermission":

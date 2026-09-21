@@ -17,8 +17,19 @@ Feature: Scenario user-simulator and judge model selection
   # and each can be overridden per-scenario (and per run-plan, see
   # specs/suites/suite-model-selection.feature).
   #
+  # The agent under test has its own resolution, separate from the
+  # simulator/judge and from "scenarios.generator" (which stays a FAST-role
+  # authoring assist used only by scenario generation, not by a run): a
+  # prompt target with no model of its own resolves the DEFAULT-role
+  # "scenarios.agent_under_test" key. Workflow / code / http targets never
+  # resolve an adapter-role model at all — see
+  # specs/scenarios/simulation-run-model-resolution.feature for the full
+  # per-target-type matrix, including why this split is what lets a project
+  # whose FAST/coding default is a codex model still run simulations.
+  #
   # Resolution precedence for a single run:
-  #   scenario override -> scenarios.user_simulator / scenarios.judge default
+  #   simulator/judge:      scenario override -> scenarios.user_simulator / scenarios.judge default
+  #   agent under test:     prompt's own model -> scenarios.agent_under_test default (prompt targets only)
 
   Background:
     Given I am logged in

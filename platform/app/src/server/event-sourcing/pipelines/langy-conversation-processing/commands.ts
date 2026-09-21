@@ -12,12 +12,18 @@ import {
   langyConversationMetadataUpdatedEventDataSchema,
   langyConversationStartedEventDataSchema,
   langyConversationTitleGeneratedEventDataSchema,
+  langyLocalControlRequestedEventDataSchema,
+  langyLocalPolicyChangedEventDataSchema,
+  langyLocalWorkspaceConnectedEventDataSchema,
+  langyLocalWorkspaceDisconnectedEventDataSchema,
   langyMessageImportedEventDataSchema,
   langyMessageRecordedEventDataSchema,
   langyPlanUpdatedEventDataSchema,
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
+  langyUserWaitEndedEventDataSchema,
+  langyUserWaitStartedEventDataSchema,
 } from "@langwatch/langy";
 import { z } from "zod";
 import type { Command, CommandHandler } from "../../commands/command";
@@ -452,5 +458,122 @@ export const ConsumeTurnHandoffCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
+  }),
+});
+
+/**
+ * RequestLocalControl → local_control_requested (ADR-129). The code access
+ * card asked the developer for a folder. One event per request id, so the
+ * card that renders it can be redrawn without a second record.
+ */
+export const RequestLocalControlCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.REQUEST_LOCAL_CONTROL,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_CONTROL_REQUESTED,
+  aggregateType: "langy_conversation",
+  schema: langyLocalControlRequestedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:local-request:${d.requestId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+  }),
+});
+
+/**
+ * ConnectLocalWorkspace → local_workspace_connected. Keyed on the command line
+ * instance, so a socket that reconnects under the same instance records one
+ * connection rather than one per network blip.
+ */
+export const ConnectLocalWorkspaceCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CONNECT_LOCAL_WORKSPACE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_CONNECTED,
+  aggregateType: "langy_conversation",
+  schema: langyLocalWorkspaceConnectedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:local-connect:${d.instanceId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+  }),
+});
+
+/**
+ * DisconnectLocalWorkspace → local_workspace_disconnected. One terminal per
+ * instance: a Ctrl-C racing the presence sweep collapses to one event.
+ */
+export const DisconnectLocalWorkspaceCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.DISCONNECT_LOCAL_WORKSPACE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_DISCONNECTED,
+  aggregateType: "langy_conversation",
+  schema: langyLocalWorkspaceDisconnectedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:local-disconnect:${d.instanceId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+  }),
+});
+
+/**
+ * ChangeLocalPolicy → local_policy_changed. The developer's consent to run
+ * without permission cards, or their taking it back. Each choice is its own
+ * event, so the record reads as the sequence of decisions it was.
+ */
+export const ChangeLocalPolicyCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CHANGE_LOCAL_POLICY,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_POLICY_CHANGED,
+  aggregateType: "langy_conversation",
+  schema: langyLocalPolicyChangedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:local-policy:${d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+  }),
+});
+
+/**
+ * StartUserWait → user_wait_started (ADR-129). The durable half of a card the
+ * developer has to answer, so a reload mid-turn renders it again.
+ */
+export const StartUserWaitCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.START_USER_WAIT,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_STARTED,
+  aggregateType: "langy_conversation",
+  schema: langyUserWaitStartedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:wait-start:${d.waitId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+    "payload.wait.kind": d.kind,
+  }),
+});
+
+/**
+ * EndUserWait → user_wait_ended. A wait reaches exactly one terminal, so the
+ * answer, the expiry and the cancel share one idempotency slot and the first
+ * one recorded wins. That is what makes a late answer to an expired card a
+ * no-op rather than a contradiction in the log.
+ */
+export const EndUserWaitCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.END_USER_WAIT,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_ENDED,
+  aggregateType: "langy_conversation",
+  schema: langyUserWaitEndedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:wait-end:${d.waitId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+    "payload.wait.outcome": d.outcome,
   }),
 });

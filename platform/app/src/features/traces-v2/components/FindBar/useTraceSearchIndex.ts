@@ -7,7 +7,7 @@ function buildSearchableText(trace: TraceListItem): string {
   const evaluationText = trace.evaluations
     .map((e) => `${e.evaluatorName ?? ""} ${e.label ?? ""}`)
     .join(" ");
-  const eventText = trace.events.map((e) => e.name).join(" ");
+  const eventText = trace.events.groups.map((e) => e.name).join(" ");
 
   return [
     trace.traceId,

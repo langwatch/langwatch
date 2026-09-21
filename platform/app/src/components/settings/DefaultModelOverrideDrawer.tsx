@@ -26,12 +26,13 @@
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
+import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -53,6 +54,11 @@ type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 
 const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
+
+/** Stands in for "no row" in the hydration latch, which tracks which
+ *  target the drawer's state belongs to and cannot use a config id
+ *  for create mode. */
+const CREATE_TARGET = "__create__";
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
@@ -110,7 +116,7 @@ interface Props {
 }
 
 export function DefaultModelOverrideDrawer({ editingId }: Props) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const saveMutation = api.modelProvider.saveDefaultModelsConfig.useMutation();
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -133,14 +139,6 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     projects: [],
   };
   const features: FeatureProjection[] = dataQuery.data?.features ?? [];
-  const effective: Payload["effective"] =
-    dataQuery.data?.effective ??
-    ({
-      DEFAULT: null,
-      FAST: null,
-      LANGY: null,
-      EMBEDDINGS: null,
-    } as Payload["effective"]);
 
   // Treat the drawer as always-open while mounted - the registry only
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
@@ -174,28 +172,33 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   });
   const [busy, setBusy] = useState(false);
 
-  // Hydrate state when the drawer is reopened with a different target.
+  // Hydrate edit state once per target, and re-hydrate when the target
+  // changes. Both halves matter: keying on the `editing` object identity
+  // wiped in-progress edits whenever a background refetch replaced the
+  // query data, while a plain "hydrated once" latch goes the other way
+  // and keeps the previous target's values. The drawer is non-modal, so
+  // the pencil and "+ Add config" behind it can retarget it without ever
+  // unmounting, and stale values would then be saved onto another row.
+  const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
-    if (editing) {
-      setScopes(
-        editing.scopes.map((s) => ({
-          scopeType: s.type as ScopeType,
-          scopeId: s.id,
-        })),
-      );
-      setConfig({ ...(editing.config as Record<string, string>) });
-    } else {
+    if (!editingId) {
+      // Create mode has nothing to load, it starts empty.
+      if (hydratedForRef.current === CREATE_TARGET) return;
+      hydratedForRef.current = CREATE_TARGET;
       setScopes([]);
       setConfig({});
+      return;
     }
-    setExpanded({
-      DEFAULT: false,
-      FAST: false,
-      LANGY: false,
-      EMBEDDINGS: false,
-    });
-  }, [open, editing]);
+    if (!editing || hydratedForRef.current === editing.id) return;
+    hydratedForRef.current = editing.id;
+    setScopes(
+      editing.scopes.map((s) => ({
+        scopeType: s.type as ScopeType,
+        scopeId: s.id,
+      })),
+    );
+    setConfig({ ...(editing.config as Record<string, string>) });
+  }, [editingId, editing]);
 
   const inheritedQuery = api.modelProvider.getInheritedValuesForScopes.useQuery(
     {
@@ -204,11 +207,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         scopeType: s.scopeType,
         scopeId: s.scopeId,
       })),
-      excludeConfigId: editing?.id,
+      excludeConfigId: editingId,
     },
     {
-      // Need at least one picked scope to anchor the cascade walk
-      // and the editing target should be settled.
+      // Need at least one picked scope to anchor the cascade walk.
       enabled: !!project?.id && scopes.length > 0 && open,
     },
   );
@@ -331,46 +333,61 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     });
   }, []);
 
-  const canSave = scopes.length > 0 && !busy;
+  // Creating: at least one key must be pinned, an all-inherit new
+  // config is a no-op the backend refuses. Editing: an empty config is
+  // a valid save (it deletes the config, absence = pure inherit), but
+  // the target row must have loaded so the save carries its id;
+  // deriving the id from an unsettled query silently turned edits
+  // into creates.
+  const hasAnyKey = Object.keys(config).length > 0;
+  const canSave =
+    scopes.length > 0 && !busy && (editingId ? !!editing : hasAnyKey);
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
+    const copy = saveOutcomeCopy({ editingId, hasAnyKey });
     setBusy(true);
     try {
       await saveMutation.mutateAsync({
-        id: editing?.id,
+        id: editingId,
         config,
         scopes: scopes.map((s) => ({
           scopeType: s.scopeType,
           scopeId: s.scopeId,
         })),
       });
-      // Invalidate the local table query plus the resolved-default
-      // query so the prompts page, evaluation wizard, and other
-      // consumers of the cascaded default model pick up the change.
-      await Promise.all([
-        utils.modelProvider.getDefaultModelsForProject.invalidate(),
-        utils.modelProvider.getResolvedDefault.invalidate(),
-      ]);
+      // Refresh every default-model cache AND snap Langy's model pill to the
+      // new default when it was following the old one — an open panel used to
+      // keep offering the outgoing model until a full reload.
+      if (project?.id) {
+        await syncLangyAfterDefaultModelWrite({
+          utils,
+          projectId: project.id,
+        });
+      }
       toaster.create({
-        title: editing ? "Config updated" : "Config added",
+        title: copy.successTitle,
         type: "success",
         duration: 2500,
-        meta: { closable: true },
       });
       onSaved();
       onClose();
     } catch (err) {
-      showErrorToast({
-        error: err,
-        fallbackTitle: editing
-          ? "Couldn't save the default model"
-          : "Couldn't add the default model",
-      });
+      showErrorToast({ error: err, fallbackTitle: copy.failureTitle });
     } finally {
       setBusy(false);
     }
-  }, [canSave, saveMutation, editing, config, scopes, utils, onSaved, onClose]);
+  }, [
+    canSave,
+    saveMutation,
+    editingId,
+    hasAnyKey,
+    config,
+    scopes,
+    utils,
+    onSaved,
+    onClose,
+  ]);
 
   return (
     <Drawer.Root
@@ -397,6 +414,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               onChange={setScopes}
               available={available}
             />
+            <ReplacedConfigsNote
+              scopes={scopes}
+              configs={dataQuery.data?.configs ?? []}
+              editingId={editingId}
+            />
 
             <VStack align="stretch" gap={2}>
               {ROLES.map((role) => (
@@ -405,7 +427,6 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
                   role={role}
                   config={config}
                   features={featuresByRole[role]}
-                  effective={effective[role]}
                   inheritedForRole={inherited[role] ?? null}
                   inheritedForFeature={inherited}
                   expanded={expanded[role]}
@@ -452,7 +473,6 @@ function RoleRow({
   role,
   config,
   features,
-  effective,
   inheritedForRole,
   inheritedForFeature,
   expanded,
@@ -464,7 +484,6 @@ function RoleRow({
   role: ModelRoleKey;
   config: Record<string, string>;
   features: FeatureProjection[];
-  effective: Payload["effective"][ModelRoleKey];
   /** Server's cascade answer for this role at the picked scopes. Null
    *  when no picked scope OR no cascade hit AND no inferable provider. */
   inheritedForRole: InheritedEntry;
@@ -478,12 +497,7 @@ function RoleRow({
   displayNames: Record<string, string>;
 }) {
   const current = config[role] ?? "";
-  // Prefer the picked-scope cascade answer; fall back to the
-  // project's effective resolution when the picker is empty (so the
-  // user still sees a sensible placeholder while the chip set is
-  // being built).
-  const inheritedModel = inheritedForRole?.model ?? effective?.model;
-  const inheritOption = buildInheritOption(inheritedForRole, effective);
+  const inheritOption = buildInheritOption(inheritedForRole);
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
@@ -575,7 +589,6 @@ function RoleRow({
               roleLevelOverride={config[role] ?? ""}
               inheritedForFeature={inheritedForFeature[f.key] ?? null}
               inheritedForRole={inheritedForRole}
-              inheritedRoleModel={inheritedModel}
               modelOptions={modelOptions}
               onSetOverride={onSetOverride}
               displayNames={displayNames}
@@ -593,7 +606,6 @@ function FeatureRow({
   roleLevelOverride,
   inheritedForFeature,
   inheritedForRole,
-  inheritedRoleModel,
   modelOptions,
   onSetOverride,
   displayNames,
@@ -605,29 +617,18 @@ function FeatureRow({
   inheritedForFeature: InheritedEntry;
   /** Server cascade answer for the feature's role (fallback chain). */
   inheritedForRole: InheritedEntry;
-  /** Resolved model the role-level row would pick - wins over the
-   *  server-side feature inheritance because the in-progress config's
-   *  role-level pick is local and not yet persisted. */
-  inheritedRoleModel?: string;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
   displayNames: Record<string, string>;
 }) {
-  // The feature's "would inherit" placeholder follows the same cascade
-  // the resolver does: a role-level pick in THIS config (in-progress)
-  // wins over the server's per-feature cascade, which in turn beats the
-  // role cascade. Without that local check the placeholder would lag
-  // behind what the user just typed in the role row above.
-  //
-  // Surface "Inherit (from role-level in this config)" when the user
-  // already picked a role-level value here, otherwise walk the same
-  // cascade fallback chain the role row uses: server's per-feature
-  // answer → server's role-level answer → in-progress role pick from
-  // this config → finally the resolved-role model from the page's
-  // effective payload, so the placeholder is never blank when there's
-  // anything cascading down.
-  let inheritOption: { model: string; label: string } | undefined;
+  // The feature's inherit entry follows the same cascade the resolver
+  // does: a role-level pick in THIS config (in-progress) wins over the
+  // server's per-feature cascade, which in turn beats the role cascade.
+  // Without that local check the entry would lag behind what the user
+  // just typed in the role row above. When nothing carries a value the
+  // entry reads "Not configured", same as the role rows.
+  let inheritOption: InheritOptionShape;
   if (roleLevelOverride) {
     inheritOption = {
       model: roleLevelOverride,
@@ -635,11 +636,8 @@ function FeatureRow({
     };
   } else {
     inheritOption =
-      buildInheritOption(inheritedForFeature, null) ??
-      buildInheritOption(inheritedForRole, null) ??
-      (inheritedRoleModel
-        ? { model: inheritedRoleModel, label: "Inherit (role default)" }
-        : undefined);
+      inheritHitOption(inheritedForFeature) ??
+      buildInheritOption(inheritedForRole);
   }
   return (
     <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
@@ -670,59 +668,129 @@ function FeatureRow({
   );
 }
 
+export type InheritOptionShape = { model?: string; label: string };
+
+/**
+ * Toast copy for the save outcome. Saving an edit with every key on
+ * inherit deletes the config on the server (absence = pure inherit),
+ * so the toast has to say the config was removed instead of "updated".
+ */
+function saveOutcomeCopy({
+  editingId,
+  hasAnyKey,
+}: {
+  editingId?: string;
+  hasAnyKey: boolean;
+}): { successTitle: string; failureTitle: string } {
+  if (!editingId) {
+    return {
+      successTitle: "Config added",
+      failureTitle: "Couldn't add the default model",
+    };
+  }
+  return {
+    successTitle: hasAnyKey
+      ? "Config updated"
+      : "Config removed, every value inherits now",
+    failureTitle: "Couldn't save the default model",
+  };
+}
+
+/**
+ * The inherit entry for a real cascade hit at the picked scopes, or
+ * undefined when the server has none. The label names the WIDER scope
+ * the value flows down from ("Inherit (from organization)"), which is
+ * why the entry is built only from the server's answer for the picked
+ * scopes: the server anchors its walk at the most-specific picked
+ * scope and excludes the picked scopes themselves, so it can never
+ * answer with a narrower tier. The old fallback to the current
+ * project's own resolution is what produced "Inherit (from project)"
+ * inside an organization-scoped config.
+ *
+ * The `inferred` source is not a cascade hit, it is the server
+ * guessing what the user might want from their enabled providers.
+ * Showing it as a ghost value gave the contradictory read that
+ * something was set when nothing was.
+ */
+export function inheritHitOption(
+  entry: InheritedEntry,
+): InheritOptionShape | undefined {
+  if (!entry || entry.source === "inferred") return undefined;
+  return {
+    model: entry.model,
+    label: entry.scope ? `Inherit (from ${entry.scope})` : "Inherit",
+  };
+}
+
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
- * The label tells the user where the value comes from - "Inherit (from
- * organization)" or similar - and the model is rendered at reduced
- * opacity in the trigger + as the first dropdown entry.
- *
- * For the `inferred` source (server falls back to "we'd pick the
- * latest from your first provider") the label is a neutral "Inherit"
- * rather than "Suggested from X" - the picker already surfaces the
- * provider's `/latest` and `/latest-mini` aliases at the top of the
- * list, so the per-provider attribution would just add noise. The
- * inherit entry itself stays so the user can always toggle back from
- * an explicit override.
+ * With a cascade hit the entry carries the inherited model, rendered at
+ * reduced opacity in the trigger and as the first dropdown entry. With
+ * no hit (nothing set anywhere wider, or the widest scope is picked)
+ * the entry reads "Not configured" with no model attached: it still
+ * exists so an edit can always clear a pinned key back to inherit, it
+ * just never claims a value flows down from somewhere.
  */
-function buildInheritOption(
-  fromServer: InheritedEntry,
-  fromEffective: Payload["effective"][ModelRoleKey] | null,
-): { model: string; label: string } | undefined {
-  if (fromServer) {
-    // Skip the "inferred" source: an inferred value is the server
-    // guessing what the user MIGHT want based on which providers are
-    // enabled, not a real cascade hit. Showing it as a ghost
-    // placeholder under a "Not configured" badge gave the
-    // contradictory read that something was set when nothing was -
-    // the row stays empty until the user explicitly picks a model.
-    if (fromServer.source === "inferred") {
-      return undefined;
+export function buildInheritOption(entry: InheritedEntry): InheritOptionShape {
+  return inheritHitOption(entry) ?? { label: "Not configured" };
+}
+
+/**
+ * Note under the scope picker when a picked scope already belongs to
+ * another config. Saving claims those scopes (one config per scope), so
+ * the user learns the existing config gets replaced BEFORE hitting
+ * save, instead of discovering a silently rewired table after.
+ */
+function replacedScopeNames({
+  scopes,
+  configs,
+  editingId,
+}: {
+  scopes: ScopeTriadEntry[];
+  configs: Payload["configs"];
+  editingId?: string;
+}): string[] {
+  const picked = new Set(scopes.map((s) => `${s.scopeType}::${s.scopeId}`));
+  const names: string[] = [];
+  for (const c of configs) {
+    if (c.id === editingId) continue;
+    for (const s of c.scopes) {
+      if (picked.has(`${s.type}::${s.id}`)) names.push(s.name);
     }
-    // `feature_override` / `role_default` carry a concrete scope name
-    // (organization / team / project). The "system" / env-var fallback
-    // is surfaced via `fromEffective` below.
-    return {
-      model: fromServer.model,
-      label: fromServer.scope
-        ? `Inherit (from ${fromServer.scope})`
-        : "Inherit",
-    };
   }
-  if (fromEffective) {
-    // Same rationale as the `inferred` skip above: env-var fallback
-    // isn't a configured scope, just a host-level default. The drawer
-    // is for setting explicit policy, so empty stays empty.
-    if (fromEffective.source === "system") {
-      return undefined;
-    }
-    return {
-      model: fromEffective.model,
-      label: fromEffective.scope
-        ? `Inherit (from ${fromEffective.scope})`
-        : "Inherit",
-    };
-  }
-  return undefined;
+  return Array.from(new Set(names));
+}
+
+function ReplacedConfigsNote({
+  scopes,
+  configs,
+  editingId,
+}: {
+  scopes: ScopeTriadEntry[];
+  configs: Payload["configs"];
+  editingId?: string;
+}) {
+  const replacedNames = useMemo(
+    () => replacedScopeNames({ scopes, configs, editingId }),
+    [scopes, configs, editingId],
+  );
+  if (replacedNames.length === 0) return null;
+  const isSingle = replacedNames.length === 1;
+  return (
+    // The note appears only after a scope is picked, and it is the one
+    // warning that saving overwrites another config. `role="status"`
+    // makes the insertion announced, so it reaches a screen reader user
+    // before they save rather than not at all.
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      role="status"
+      data-testid="replaced-configs-note"
+    >
+      {replacedNames.join(", ")} already {isSingle ? "has" : "have"} default
+      models. Saving replaces {isSingle ? "that config" : "those configs"}.
+    </Text>
+  );
 }
 
 /**

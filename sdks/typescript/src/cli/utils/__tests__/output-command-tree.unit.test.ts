@@ -9,7 +9,14 @@
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";
-import { isOutputAware } from "../output";
+import {
+  assertFormatIsSupported,
+  isOutputAware,
+  resolveActionOutputOptions,
+} from "../output";
+import { installOutputHarness } from "./output-harness";
+
+const { warned } = installOutputHarness();
 
 describe("the real command tree", () => {
   // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
@@ -53,8 +60,17 @@ describe("the real command tree", () => {
       ["gateway-budgets", "archive"],
       ["virtual-keys", "rotate"],
       ["analytics", "query"],
+      ["query", "run"],
+      ["query", "schema"],
+      ["query", "reference"],
+      ["query", "examples"],
+      ["trace", "facets"],
+      ["trace", "fields"],
       ["trigger", "delete"],
       ["secret", "update"],
+      ["run-plan", "run"],
+      ["test-suite", "run"],
+      ["scenario", "run"],
     ];
 
     it.each(wired)("marks `%s %s` as speaking the output contract", async (group, name) => {
@@ -67,14 +83,9 @@ describe("the real command tree", () => {
   });
 
   describe("when a command still prints its own output", () => {
-    // The commands that legitimately still print their own output because a
-    // format-blind port cannot serve them: a raw byte stream, and the two
-    // human-interactive `--wait` polls whose completion has no structured payload.
-    const unmigrated = [
-      ["dataset", "download"],
-      ["suite", "run"],
-      ["scenario", "run"],
-    ];
+    // The command that legitimately still prints its own output because a
+    // format-blind port cannot serve it: a raw byte stream.
+    const unmigrated = [["dataset", "download"]];
 
     it.each(unmigrated)("leaves `%s %s` unmarked", async (group, name) => {
       const { buildProgram } = await import("../../program.js");
@@ -82,6 +93,46 @@ describe("the real command tree", () => {
 
       expect(command).toBeDefined();
       expect(isOutputAware(command!)).toBe(false);
+    });
+  });
+
+  describe("when a command deliberately emits nothing at all", () => {
+    /**
+     * The session context hook runs as a coding agent's own hook, where stdout
+     * is injected into the user's session context, so it prints nothing in any
+     * format. That honours every format, and the registration is what keeps the
+     * auto-detected agent mode (Claude Code sets CLAUDECODE in its children)
+     * from annotating every session start and stop with a note about a table
+     * that does not exist.
+     */
+    it("marks `ingest hook` as speaking the output contract", async () => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), ["ingest", "hook"]);
+
+      expect(command).toBeDefined();
+      expect(isOutputAware(command!)).toBe(true);
+    });
+  });
+
+  describe("when a tool wrapper runs inside a coding agent", () => {
+    /** @scenario "A wrapper run inside a coding agent prints no table note" */
+    it("prints no note about a table for any wrapper", async () => {
+      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import(
+        "../../program.js"
+      );
+      const root = buildProgram();
+      process.env.CLAUDECODE = "1";
+
+      for (const tool of TOOL_WRAPPER_COMMANDS) {
+        const wrapper = findCommand(root, [tool]);
+        expect(wrapper, tool).toBeDefined();
+        await assertFormatIsSupported(
+          wrapper!,
+          resolveActionOutputOptions(wrapper!),
+        );
+      }
+
+      expect(warned.join("")).not.toContain("not machine-readable");
     });
   });
 
@@ -103,6 +154,30 @@ describe("the real command tree", () => {
    * Adding a command now forces a decision: wire it to the port, or say here
    * why it cannot be.
    */
+  /**
+   * `-o json` is the current spelling, but `-f/--format json` is the one the
+   * skills put in front of the agent, and 186 commands accept it. The three
+   * commands that drive the open page did not, so an agent that followed its
+   * own instructions got `error: unknown option '--format'` and had to guess
+   * again. Commander rejects an undeclared option before the output
+   * preprocessor ever runs, so the flag has to be declared per command.
+   */
+  describe("when inspecting the commands an agent drives the open page with", () => {
+    const agentDriven = [
+      ["ui", "call"],
+      ["ui", "actions"],
+      ["workbench", "get-state"],
+    ];
+
+    it.each(agentDriven)("lets `%s %s` be asked for json the way the skills ask", async (group, name) => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), [group, name]);
+
+      expect(command).toBeDefined();
+      expect(command!.options.map((option) => option.long)).toContain("--format");
+    });
+  });
+
   describe("every leaf command", () => {
     /** Leaf path -> why the port cannot serve it. */
     const holdouts = new Map<string, string>([
@@ -110,26 +185,30 @@ describe("the real command tree", () => {
       ["dataset download", "streams raw bytes to a file or stdout"],
       ["trace export", "writes its own jsonl/csv/json, to a file when asked"],
 
-      // Human-interactive `--wait` polls: no structured completion payload.
-      ["suite run", "human-interactive --wait poll"],
-      ["scenario run", "human-interactive --wait poll"],
+      // A live session that runs until Ctrl-C: it produces status prose and
+      // exits via process.exit, never a result document.
+      ["agent tunnel", "live tunnel session until Ctrl-C, no result document"],
+      // Hidden compatibility name for `agent tunnel`, same wiring.
+      ["agent dev", "live tunnel session until Ctrl-C, no result document"],
 
-      // Launchers and passthroughs: they exec another tool and own its stdio.
-      ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "open"] as const
-      ).map((n) => [n, "launches another tool and owns its stdio"] as const),
+      // Opens the browser and owns no result document.
+      ["open", "launches another tool and owns its stdio"],
+      // Local machine setup: mints a key and installs an OS login agent;
+      // progress prose, no structured result document.
+      ["copilot-app connect", "interactive install flow: writes an OS login agent"],
       // Agent-only signal: prints the resource id for the relay to intercept;
       // it has no -o json data mode because it returns no platform result.
       ["navigate open", "signal command: prints the resource id, no data payload"],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
-      ["init-shell", "emits shell script for eval"],
 
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
-      ["whoami", "interactive credential flow"],
-      ["request-increase", "interactive support flow"],
+      // The output contract covers commands that return a platform document.
+      // This one reports what it wrote to the local machine, so there is no
+      // document for `--json` to carry.
+      ["instrument", "local setup flow: writes telemetry wiring files"],
       ["help", "renders help text"],
 
       // Own their key/value or `--json` output, predating the contract.
@@ -140,7 +219,7 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        ["ingest health", "ingest install", "ingest list", "ingest tail"] as const
+        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(

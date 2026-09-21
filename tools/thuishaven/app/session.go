@@ -63,7 +63,7 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 	r.Branch = st.Branch
 	r.Live = o.sys.ProcessAlive(st.LauncherPID)
 	if r.Live {
-		r.RSS = o.sys.GroupRSS(st.LauncherPID)
+		r.RSS = o.StackRSSByLauncher()[st.LauncherPID]
 	}
 
 	// Only the routed children this stack actually runs are bounceable — the

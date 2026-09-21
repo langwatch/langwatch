@@ -2,6 +2,7 @@ import type { ResolvedRetention } from "../../data-retention/retentionPolicy.sch
 import type { TenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
+import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 /**
@@ -42,7 +43,7 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
   store: AppendStore<Record>;
 
   /** Optional processing behavior configuration. */
-  options?: MapProjectionOptions;
+  options?: MapProjectionOptions<E>;
 
   /**
    * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
@@ -61,9 +62,43 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
 }
 
 /**
- * Options for configuring map projection processing behavior.
+ * The map-projection half of the enqueue-time seam (ADR-069 invariant 4).
+ *
+ * Deliberately the subscriber's own declaration, narrowed: `filter` carries the
+ * identical contract (pure, total, cheap, no retry behind it — read
+ * {@link EnqueueDispatchOptions} for the full rules), while `stage` is
+ * excluded because a map projection has no claim-check to swap in. Deriving the
+ * type from the subscriber's rather than re-declaring it is what keeps the two
+ * seams from drifting into two subtly different meanings of "filter".
+ *
+ * A map projection's `map()` already returns `null` for an event it has nothing
+ * to say about — but only after a job was minted, a payload deserialized and a
+ * worker slot spent. This is where that same answer costs nothing.
+ *
+ * **The filter must never reject what `map()` would map.** A superset is safe
+ * (the event is queued and `map()` declines it, exactly as today); a subset is
+ * silent data loss, because map fan-out is not replayed on the live path.
+ * Derive both from one declaration so they cannot disagree.
+ *
+ * Introducing a filter carries no deploy-order dependency, unlike `stage`: the
+ * job payload is unchanged, so jobs staged by a build without the filter drain
+ * correctly on a build with it — `map()` re-decides and writes nothing.
  */
-export interface MapProjectionOptions {
+export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
+  EnqueueDispatchOptions<E>,
+  "filter"
+>;
+
+/**
+ * Options for configuring map projection processing behavior.
+ *
+ * Generic in the projection's own event type so `enqueue.filter` is typed
+ * against the events this projection actually declares. Under strict function
+ * parameter checking a predicate over a narrower event is not assignable to
+ * one over `Event`, so without the parameter a projection could only ever
+ * supply a filter that widened its own type back out.
+ */
+export interface MapProjectionOptions<E extends Event = Event> {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
 
@@ -75,6 +110,13 @@ export interface MapProjectionOptions {
 
   /** Custom group key function for queue routing. Enables per-item parallelism instead of per-aggregate serialization. */
   groupKeyFn?: (event: any) => string;
+
+  /**
+   * Enqueue-time gate: an event this projection would map to `null` never
+   * mints a job. Evaluated at fan-out, after the event-type match and after the
+   * kill switch, so a killed projection still does no work at all.
+   */
+  enqueue?: MapEnqueueDispatchOptions<E>;
 
   /**
    * Maximum same-group events to persist through one `bulkAppend` call.

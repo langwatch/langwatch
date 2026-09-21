@@ -6,7 +6,7 @@
  * the `traceAnalyticsRollup` map projection over `event_log`
  * (dev/docs/runbooks/analytics-rollup-replay.md). This test pins that recovery
  * path end to end: events seeded into `event_log` are replayed through the
- * REAL replay executor (`replayMapProjection` — discovery, batch loading,
+ * REAL replay engine (`runFoldMapReplay` — discovery, streamed batch loading,
  * leaning, the projection's own map handler, and the ClickHouse append store),
  * and the reconstructed rollup rows are asserted against both literal expected
  * values and the projection's direct output for the same events.
@@ -31,8 +31,8 @@ import {
 import { createSpanReceivedEvent } from "../../pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
 import { TraceAnalyticsRollupMapProjection } from "../../pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
 import { TraceAnalyticsRollupAppendStore } from "../../pipelines/trace-processing/projections/traceAnalyticsRollup.store";
+import { runFoldMapReplay } from "../replayEngine";
 import { nullLog } from "../replayLog";
-import { replayMapProjection } from "../replayMapPath";
 import { cleanupAll } from "../replayMarkers";
 import type { RegisteredMapProjection } from "../types";
 
@@ -278,28 +278,27 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
         targetTable: "trace_analytics_rollup",
       };
 
-      const result = await replayMapProjection({
+      const result = await runFoldMapReplay({
         ctx: {
           redis,
           resolveClient: async () => client,
           accumulatorOpts: {},
         },
-        projection: registered,
-        projectionIndex: 0,
-        totalProjections: 1,
-        tenantIds: [tenantId],
-        since: new Date(0).toISOString(),
-        batchSize: 100,
-        aggregateBatchSize: 10,
-        dryRun: false,
-        log: nullLog,
+        config: {
+          projections: [],
+          mapProjections: [registered],
+          tenantIds: [tenantId],
+          since: new Date(0).toISOString(),
+          batchSize: 100,
+          aggregateBatchSize: 10,
+        },
+        callbacks: { log: nullLog },
       });
 
       expect(result.firstError).toBeUndefined();
       expect(result.batchErrors).toBe(0);
       expect(result.aggregatesReplayed).toBe(2);
       expect(result.totalEvents).toBe(3);
-      expect(result.touchedTenants).toEqual([tenantId]);
 
       const rows = await readRollupTotals(client, tenantId);
 

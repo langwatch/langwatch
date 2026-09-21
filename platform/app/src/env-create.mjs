@@ -53,6 +53,51 @@ export const rumSampleRatioSchema = z.preprocess(
  */
 export const storedObjectsBackendSchema = z.enum(["s3", "azure"]).optional();
 
+/**
+ * Azure Blob authentication mode (issue #6087). An explicit toggle — never
+ * inferred from which credential vars happen to be present, the same
+ * reasoning that made `storedObjectsBackendSchema` explicit rather than
+ * env-presence-inferred.
+ *
+ * `sharedKey` (default, unchanged from #4133) signs requests with
+ * AZURE_BLOB_ACCOUNT_KEY. The three token modes exchange an OAuth bearer
+ * token via @azure/identity instead of an HMAC signature:
+ *   - `workloadIdentity` — AKS federated service-account token, injected by
+ *     the azure-workload-identity admission webhook.
+ *   - `managedIdentity` — the instance metadata identity endpoint (Azure VM
+ *     / VMSS / App Service self-hosters).
+ *   - `azureCli` — the developer's `az login` session (local dev only).
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const azureBlobAuthModeSchema = z
+  .enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"])
+  .optional();
+
+/**
+ * The sign-in provider, under its supported name. `AUTH_PROVIDER` is the one
+ * to set; the NextAuth-era `NEXTAUTH_PROVIDER` still works but is deprecated
+ * — the modern name wins when both are set, and a deployment still on the
+ * old one is told once at boot, deliberately: the rename must never break a
+ * running install. The resolved value keeps flowing through the internal
+ * `NEXTAUTH_PROVIDER` field its readers already name; renaming those is a
+ * sweep of its own.
+ *
+ * Exported for unit testing.
+ */
+export const resolveConfiguredAuthProvider = () => {
+  const modern = process.env.AUTH_PROVIDER;
+  if (modern) return modern;
+  const legacy = process.env.NEXTAUTH_PROVIDER;
+  if (legacy) {
+    console.warn(
+      "NEXTAUTH_PROVIDER is deprecated - set AUTH_PROVIDER instead. The configured value still applies.",
+    );
+    return legacy;
+  }
+  return "email";
+};
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -73,6 +118,13 @@ const optionalIfBuildTime = (schema) => {
  * that puts 5560 back. Realigning here, after every `.env` file has loaded, is
  * what makes the alignment stick, and it leaves every other `.env`-pinned value
  * untouched.
+ *
+ * `LANGWATCH_ENDPOINT` follows the same rule. It is the address the app hands
+ * out as itself: the Langy worker's callback origin (frame relay, turn
+ * finalize, credential revoke, the MCP server), the scenario child processes,
+ * and every setup snippet the UI shows. Left at the committed 5560 on a
+ * checkout serving 5580, every Langy turn posts its result to a port that is
+ * not this stack and the conversation stalls on "Reconnecting to the agent".
  *
  * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
  * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
@@ -96,7 +148,7 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
   const target = `http://localhost:${port}`;
   const realigned = [];
 
-  for (const name of ["BASE_HOST", "NEXTAUTH_URL"]) {
+  for (const name of ["BASE_HOST", "NEXTAUTH_URL", "LANGWATCH_ENDPOINT"]) {
     const current = processEnv[name];
     if (!current || current === target) continue;
 
@@ -174,6 +226,14 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: z.string().optional(),
       AUTH0_MGMT_CLIENT_SECRET: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
+      // Pepper for the governance erasure digest (ADR-128 §9). Optional
+      // because erasure is opt-in; a deployment that never erases anybody
+      // never needs it, and one that does refuses to run without it rather
+      // than hashing with an empty secret and producing a list that protects
+      // nothing. NEVER ROTATE IT once anybody has been erased: every stored
+      // digest is a function of this value, and the identifiers needed to
+      // recompute them under a new one are exactly what was erased.
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET: z.string().min(32).optional(),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
       LW_GATEWAY_INTERNAL_SECRET:
@@ -219,6 +279,12 @@ export function createEnvConfig() {
           .optional(),
       ),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+      // Opt out of Google Cloud DLP entirely. When set, the google_dlp PII
+      // check is refused and the heavy @google-cloud/dlp SDK (generated protos
+      // via google-gax/grpc — one of the largest single deps in the server
+      // graph) is never imported. Off by default so DLP stays available for
+      // deployments that have configured GOOGLE_APPLICATION_CREDENTIALS.
+      LANGWATCH_DISABLE_GOOGLE_DLP: z.boolean().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
@@ -226,6 +292,38 @@ export function createEnvConfig() {
       LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
       LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
+
+      // Instant Evals: the classifier behind the LangWatchQL eval functions.
+      // The key is LangWatch's own, never a customer's. With none set the
+      // functions are published as unavailable and every judgement is skipped,
+      // which is what a self-hosted install with nothing configured gets.
+      JEV_API_KEY: z.string().optional(),
+      // HTTPS only: the classifier key travels in an Authorization header, so
+      // a plaintext origin would put it on the wire in the clear.
+      JEV_BASE_URL: z
+        .string()
+        .url()
+        .refine((value) => value.startsWith("https://"), {
+          message: "JEV_BASE_URL must use https",
+        })
+        .optional(),
+      JEV_MODEL: z.string().optional(),
+      INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
       // Self-hosted langevals on a plain HTTP service has no such cap,
@@ -261,6 +359,78 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
+      // ADR-117 §7: the one flag covering the identifier-first router (D03)
+      // and the screens that render its decisions (D13). Three-valued and
+      // shipped `off`, because the front door is the highest-risk flip in the
+      // D06: whether two-step verification exists at all. Reached SIGNED
+      // OUT — a challenge stands between a password and a session — so it is
+      // an env flag rather than a feature flag, which is read per project
+      // and needs somebody already signed in to have a project.
+      //
+      // Off is byte-for-byte the old behaviour: the plugin is not registered,
+      // so none of its routes are mounted and nothing about two-step
+      // verification is reachable. Turning it back off leaves everybody who
+      // set one up signed in and their enrollment rows intact — it stops
+      // being ASKED for, and nothing is deleted.
+      MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether this deployment offers passkeys. Same reasoning as the
+      // flag above for why it is an env value — registering a passkey is
+      // reached signed out, on the sign-in screen — and the opposite default,
+      // because passkeys shipped and are now the shortest and strongest way
+      // in. The setting is for the operator who must refuse them, not a
+      // staged rollout.
+      //
+      // One switch governs the whole surface: `off` omits the method from
+      // every method set AND leaves the plugin unregistered, so its ceremony
+      // routes are not mounted. A deployment where the button exists and the
+      // endpoint does not is the state that arrangement makes unreachable.
+      //
+      // Off is not a deletion. Passkeys already registered are left alone and
+      // nobody is signed out, so turning it back on finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
+      // Whether THIS deployment issues and verifies its own passwords while a
+      // federated provider is also configured (D09).
+      //
+      // The rule it relaxes came from NextAuth and held everywhere until now:
+      // a deployment mounted EITHER a social provider OR credentials, never
+      // both, so nobody could sidestep the configured identity provider. Five
+      // sites say it — the sign-up method set, `user.register`,
+      // `user.setPassword`, the credential-route refusal and whether
+      // better-auth mounts the routes at all — and each reads "on this
+      // deployment, passwords live at the identity provider".
+      //
+      // On LangWatch Cloud that sentence is already false. Auth0's own
+      // Universal Login offers a password box and a sign-up link, so the
+      // password door exists; it is simply hosted at the broker. Turning this
+      // on RELOCATES that door rather than opening a new one, and it is what
+      // stops every new password account being minted inside the tenant we
+      // are trying to leave.
+      //
+      // Shipped `off`, so merging the wiring changes no deployment. A
+      // deployment already in email mode needs nothing from this: it issues
+      // its own passwords by definition, and every site reads that first.
+      LOCAL_PASSWORDS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
+      // and shipped `off` for the same reason the router's own flag is: the
+      // front door is the highest-risk flip in the identity program.
+      // `off` composes today's `Organization.ssoDomain` strings and nothing
+      // else. `shadow` still lets the strings decide, and runs the
+      // `SsoConnection` projection lookup alongside so disagreements are
+      // logged with both answers. `enforce` is the flip, and only at `enforce`
+      // do the string writes stop. Rollback is this value.
+      SSOCONN_ROUTING: z
+        .enum(["off", "shadow", "enforce"])
+        .optional()
+        .default("off"),
+      // D08: whether a SCIM push writes membership through the grants
+      // service. Two-valued, because there is no useful middle: `off` keeps
+      // the previous write path — the hand-written OrganizationUser row with
+      // its unconditional MEMBER role — and `on` routes every membership
+      // consequence, including a deprovision and its empty proof, through
+      // GrantsService. Connection scoping and the directory-sync history are
+      // on either way; what this decides is who writes the membership.
+      // Rollback is this value.
+      SCIM_V2_GRANTS: z.enum(["off", "on"]).optional().default("off"),
       // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
       // Counts dispatches (one digest of N traces = 1), not traces or
       // recipients. Only ever bites immediate-cadence triggers; digest
@@ -275,14 +445,59 @@ export function createEnvConfig() {
         .int()
         .positive()
         .default(10000),
+      // Per-trigger daily ceiling on CONFIRMED persist dispatches — the dataset
+      // rows and annotation-queue items an automation actually creates. Only
+      // customer-attributable volume is counted: match records, unconfirmed
+      // matches, debounce fan-out and retries are our amplification and are
+      // never charged here.
+      //
+      // The tiers are set against what a human can consume rather than what a
+      // machine can produce: annotation throughput is a few hundred items a day,
+      // and 1,000 matches the existing per-project daily email cap. A single
+      // contract can raise its own ceiling past the tier through
+      // `PlanInfo.maxTriggerPersistDispatchesPerDay`.
+      TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(100),
+      TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(1000),
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
       USE_AWS_SES: z.string().optional(),
       AWS_REGION: z.string().optional(),
       EMAIL_DEFAULT_FROM: z.string().optional(),
+      // Email gateway selection. When unset, the provider is inferred from
+      // whichever credentials are present, so existing deployments are
+      // unaffected. See src/server/mailer/providers/index.ts.
+      EMAIL_PROVIDER: z.string().optional(),
+      AWS_SES_ENDPOINT: z.string().optional(),
+      SMTP_URL: z.string().optional(),
+      SMTP_HOST: z.string().optional(),
+      SMTP_PORT: z.string().optional(),
+      SMTP_USER: z.string().optional(),
+      SMTP_PASSWORD: z.string().optional(),
+      SMTP_SECURE: z.string().optional(),
+      RESEND_API_KEY: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Instance-wide bearer credential for the self-hosted organization
+      // provisioning API (/api/organizations). Absent (the default) the
+      // family answers 404; it is also absent-by-construction on SaaS, where
+      // the route gate ignores the variable entirely. 32 characters minimum,
+      // the same floor as the gateway secrets: one value provisions
+      // organizations across the whole instance.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(32).optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
@@ -297,9 +512,10 @@ export function createEnvConfig() {
       // blocked). Default: false.
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
+      TRUSTED_PROXY_ADDRESSES: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
-      // bypass the reactor depth check; emergency rollback only.
+      // bypass the subscriber depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
       // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
       // groups per tenant in the DISPATCH_LUA scheduler.
@@ -350,6 +566,31 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
       AZURE_BLOB_ENDPOINT: z.string().optional(),
       AZURE_BLOB_CONTAINER: z.string().optional(),
+      // See azureBlobAuthModeSchema above. Validated only when
+      // STORED_OBJECTS_BACKEND=azure — resolveAzureCredentials rejects it
+      // otherwise as dead config.
+      AZURE_BLOB_AUTH_MODE: azureBlobAuthModeSchema,
+      // Sovereign-cloud (e.g. Azure Government, Azure China) identity
+      // authority host for token exchange. Required alongside a
+      // token-based AZURE_BLOB_AUTH_MODE whenever AZURE_BLOB_ENDPOINT does
+      // not address the public *.blob.core.windows.net cloud — see
+      // resolveAzureCredentials in azure-credentials.ts.
+      AZURE_BLOB_AUTHORITY_HOST: z.string().optional(),
+      // Sovereign-cloud storage resource audience used to scope the token
+      // request (`{audience}/.default`). Defaults to the public-cloud
+      // "https://storage.azure.com" audience when unset.
+      AZURE_BLOB_TOKEN_AUDIENCE: z.string().optional(),
+      // The ADR-022 trace spool is bounded by a lifecycle rule the operator
+      // provisions on the container, NOT by anything the application does: it
+      // deletes eagerly after the event_log INSERT, and a crash between those
+      // two steps is what the rule reaps. That rule lives on Azure's
+      // MANAGEMENT plane (Microsoft.Storage/.../managementPolicies), and this
+      // deployment holds only a data-plane key, so the app cannot read it back
+      // to check. This flag is the operator asserting it exists. Default false
+      // means an Azure install that enables the spool without thinking about
+      // retention degrades to inline payloads rather than accumulating
+      // customer data nothing will ever reap.
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED: z.boolean().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -365,11 +606,16 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
-      // GitHub App used by Langy to open bot-authored PRs on repositories the
-      // App is installed on. Separate from the GITHUB_CLIENT_* identity-login
-      // app above. All optional: when the private key is unset the Langy GitHub
-      // feature is silently off, the connect card explains it is unavailable,
-      // and no installation token can be minted. Issue #4747.
+      // The GitHub App behind the organization's GitHub connection: Langy
+      // opens bot-authored pull requests through it, and pull-request linkage
+      // reads through it. Separate from the GITHUB_CLIENT_* identity-login app
+      // above. The names still say LANGY because they are set on every
+      // deployment; renaming them is an infra change of its own. All optional:
+      // when the private key is unset the integration is silently off, the
+      // settings card explains it is unavailable, and no installation token can
+      // be minted. Read through
+      // src/server/app-layer/github/githubAppConfig.ts, the only code site that
+      // names them.
       //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
       //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
       //                                app JWT used to mint installation tokens).
@@ -377,10 +623,15 @@ export function createEnvConfig() {
       //                                installation webhooks.
       //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
       //                                github.com/apps/<slug>/installations/new.
+      //
+      // GITHUB_LANGY_HOST is the GitHub host this instance connects to. Unset
+      // means github.com. Set it to a GitHub Enterprise Server hostname to bind
+      // the instance to that server.
       GITHUB_LANGY_APP_ID: z.string().optional(),
       GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
       GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
       GITHUB_LANGY_APP_SLUG: z.string().optional(),
+      GITHUB_LANGY_HOST: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -394,6 +645,17 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: z.string().optional(),
       OKTA_CLIENT_SECRET: z.string().optional(),
       OKTA_ISSUER: z.string().optional(),
+
+      // OneLogin
+      ONELOGIN_CLIENT_ID: z.string().optional(),
+      ONELOGIN_CLIENT_SECRET: z.string().optional(),
+      ONELOGIN_ISSUER: z.string().optional(),
+
+      // Any other OpenID Connect provider. Its endpoints are discovered from
+      // the issuer, so there is nothing to configure beyond these three.
+      OIDC_CLIENT_ID: z.string().optional(),
+      OIDC_CLIENT_SECRET: z.string().optional(),
+      OIDC_ISSUER: z.string().optional(),
 
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
@@ -414,6 +676,18 @@ export function createEnvConfig() {
       ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
+      // Connected agents (ADR-128). The relay payload cap, in mebibytes, for
+      // self-hosted deployments whose turns carry large attachments; and the
+      // app replica count, which decides whether connected agents can run
+      // without Redis (one replica only). Empty strings read as unset.
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().positive().optional(),
+      ),
+      LANGWATCH_APP_REPLICAS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().default(1),
+      ),
 
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
@@ -459,7 +733,7 @@ export function createEnvConfig() {
       NODE_ENV: process.env.NODE_ENV,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
-      NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
+      NEXTAUTH_PROVIDER: resolveConfiguredAuthProvider(),
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
@@ -468,6 +742,8 @@ export function createEnvConfig() {
       LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
       LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET:
+        process.env.GOVERNANCE_ERASURE_PSEUDONYM_SECRET,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,
@@ -479,13 +755,28 @@ export function createEnvConfig() {
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS:
         process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      LANGWATCH_DISABLE_GOOGLE_DLP:
+        process.env.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
       LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB:
+        process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
+      LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+      JEV_API_KEY: process.env.JEV_API_KEY,
+      JEV_BASE_URL: process.env.JEV_BASE_URL,
+      JEV_MODEL: process.env.JEV_MODEL,
+      INSTANT_EVAL_CLASSIFIER: process.env.INSTANT_EVAL_CLASSIFIER,
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND,
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_TENANT_TOKENS_PER_SECOND,
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET:
+        process.env.INSTANT_EVAL_QUERY_TOKEN_BUDGET,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
@@ -493,19 +784,43 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
+      MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
+      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
+      LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
+      SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
+      SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      TRIGGER_PERSIST_DAILY_CAP_FREE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      TRIGGER_PERSIST_DAILY_CAP_PAID:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
       USE_AWS_SES: process.env.USE_AWS_SES,
       AWS_REGION: process.env.AWS_REGION,
       EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
+      EMAIL_PROVIDER: process.env.EMAIL_PROVIDER,
+      AWS_SES_ENDPOINT: process.env.AWS_SES_ENDPOINT,
+      SMTP_URL: process.env.SMTP_URL,
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_PORT: process.env.SMTP_PORT,
+      SMTP_USER: process.env.SMTP_USER,
+      SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+      SMTP_SECURE: process.env.SMTP_SECURE,
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
       S3_KEY_SALT: process.env.S3_KEY_SALT,
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      // Blank means unset, so a templated .env line with no value cannot take
+      // the whole deployment down over an optional credential.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY:
+        process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",
@@ -514,6 +829,7 @@ export function createEnvConfig() {
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
       ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
+      TRUSTED_PROXY_ADDRESSES: process.env.TRUSTED_PROXY_ADDRESSES,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
@@ -535,6 +851,13 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
+      AZURE_BLOB_AUTH_MODE: process.env.AZURE_BLOB_AUTH_MODE,
+      AZURE_BLOB_AUTHORITY_HOST: process.env.AZURE_BLOB_AUTHORITY_HOST,
+      AZURE_BLOB_TOKEN_AUDIENCE: process.env.AZURE_BLOB_TOKEN_AUDIENCE,
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED:
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
+          "true",
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
@@ -560,6 +883,7 @@ export function createEnvConfig() {
       GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
       GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
       GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
+      GITHUB_LANGY_HOST: process.env.GITHUB_LANGY_HOST,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -567,6 +891,12 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
+      ONELOGIN_CLIENT_ID: process.env.ONELOGIN_CLIENT_ID,
+      ONELOGIN_CLIENT_SECRET: process.env.ONELOGIN_CLIENT_SECRET,
+      ONELOGIN_ISSUER: process.env.ONELOGIN_ISSUER,
+      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+      OIDC_ISSUER: process.env.OIDC_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,

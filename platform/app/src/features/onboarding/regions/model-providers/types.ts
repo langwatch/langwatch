@@ -9,7 +9,6 @@ export type ModelProviderKey =
   | "custom"
   | "deepseek"
   | "gemini"
-  | "google_agent_platform"
   | "grok_xai"
   | "groq"
   | "open_ai_azure"
@@ -21,7 +20,9 @@ export type ModelProviderSurface =
   | "evaluations"
   | "prompts"
   | "langy"
-  | "onboarding";
+  | "onboarding"
+  /** The guided onboarding's provider screen: one row of marks, one connect panel. */
+  | "guided";
 
 export interface FieldMetadata {
   label: string;
@@ -32,7 +33,6 @@ export interface ModelProviderSpec {
   /* The key that the backend uses to identify the model provider. This is different from the key used by the frontend. */
   backendModelProviderKey: ServerModelProviderKey;
   key: ModelProviderKey;
-  defaultModel?: string | null;
   defaultBaseUrl?: string;
   /**
    * The host the provider's APIs hang off, without a version segment.

@@ -19,7 +19,7 @@ export const PushToCopiesDialog = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const pushToCopies = api.workflow.pushToCopies.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
     new Set(),
   );
@@ -81,7 +81,7 @@ export const PushToCopiesDialog = ({
         await utils.workflow.getAll.invalidate();
         return result;
       }}
-      pushLoading={pushToCopies.isLoading}
+      pushLoading={pushToCopies.isPending}
       bodyIntro="Select which replicas to push the latest version to:"
       emptyMessage={
         <>

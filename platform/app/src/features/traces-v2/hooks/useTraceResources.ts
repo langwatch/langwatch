@@ -49,7 +49,7 @@ export function useTraceResources(
     {
       enabled,
       staleTime: 60_000,
-      cacheTime: 1_800_000,
+      gcTime: 1_800_000,
       refetchOnWindowFocus: false,
     },
   );

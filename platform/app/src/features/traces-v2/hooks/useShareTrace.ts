@@ -1,6 +1,6 @@
-import type { ShareLink } from "@prisma/client";
 import { useCallback } from "react";
 import { showErrorToast } from "~/features/errors";
+import type { ShareLink } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 
 export type ShareVisibilityOption = "PUBLIC" | "ORGANIZATION" | "PROJECT";
@@ -124,10 +124,10 @@ function useShareLinkMutations({
 
   return {
     createLink,
-    isCreating: createMutation.isLoading,
+    isCreating: createMutation.isPending,
     revokeLink,
     /** Which link is being revoked, so only that row shows a spinner. */
-    revokingId: revokeMutation.isLoading
+    revokingId: revokeMutation.isPending
       ? (revokeMutation.variables?.id ?? null)
       : null,
   };

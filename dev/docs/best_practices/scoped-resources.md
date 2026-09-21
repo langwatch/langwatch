@@ -168,7 +168,7 @@ Project-level endpoints are strong because the tenant is derived from the resour
 
 - Use the hardened `organizationProcedure`, which asserts `OrganizationUser` membership by default before any permission check. Do not hand-roll membership checks per router, and never disable RBAC with `skipPermissionCheck`.
 - For update and delete by resource id, derive the org from the row via `resolveOrganizationFromResource({ resourceType, resourceId })` and check permission against the derived org. Never trust a caller-supplied `organizationId`.
-- A non-`ORGANIZATION`-scoped `RoleBinding` may not carry organization-level permissions. The EXTERNAL membership floor is evaluated before custom-role permissions.
+- A non-`ORGANIZATION`-scoped `RoleBinding` may not carry organization-level permissions. The EXTERNAL (Lite Member) seat ceiling is enforced at write time for direct rows: they store Viewer or nothing, and a custom role requires a full seat. Custom rows that predate the rule are honored at runtime until the member's next seat change clears them. Group-derived and personal-workspace access stay runtime-capped by design (see ADR-021, "Lite Member seat as stored truth").
 - Gateway virtual-key authentication (lookup by hashed secret or id) is the one exemption: it authenticates a key principal, not a user session, and must not use `organizationProcedure`.
 
 ## When NOT to use this pattern

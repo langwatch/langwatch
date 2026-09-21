@@ -17,6 +17,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import {
   chakraComponents,
@@ -568,15 +569,27 @@ export const customGraphInputToFormData = (
   };
 };
 
+// A series is unusable if its metric no longer exists, or if it's missing a
+// key/subkey the metric requires. Shared by customGraphFormToCustomGraphInput
+// and customAPIinput, which both bail to `undefined` on the first bad series.
+const isSeriesMissingRequiredMetricFields = (
+  series: CustomGraphFormData["series"][number],
+): boolean => {
+  const metric = getMetric(series.metric);
+  if (!metric) {
+    return true;
+  }
+  if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
+    return true;
+  }
+  return !!metric.requiresSubkey && !series.subkey;
+};
+
 export const customGraphFormToCustomGraphInput = (
   formData: CustomGraphFormData,
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
-    const metric = getMetric(series.metric);
-    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
-      return undefined;
-    }
-    if (metric.requiresSubkey && !series.subkey) {
+    if (isSeriesMissingRequiredMetricFields(series)) {
       return undefined;
     }
   }
@@ -619,11 +632,7 @@ const customAPIinput = (
   filterParams: SharedFiltersInput,
 ): CustomAPICallData | undefined => {
   for (const series of formData.series) {
-    const metric = getMetric(series.metric);
-    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
-      return undefined;
-    }
-    if (metric.requiresSubkey && !series.subkey) {
+    if (isSeriesMissingRequiredMetricFields(series)) {
       return undefined;
     }
   }
@@ -697,7 +706,7 @@ function CustomGraphForm({
   const updateGraphById = api.graphs.updateById.useMutation();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   // Get dashboardId from URL query param
   const dashboardId = router.query.dashboard as string | undefined;
 
@@ -974,7 +983,7 @@ function CustomGraphForm({
           <Button
             colorPalette="orange"
             onClick={updateGraph}
-            loading={updateGraphById.isLoading}
+            loading={updateGraphById.isPending}
             marginX={2}
             minWidth="fit-content"
           >
@@ -983,7 +992,7 @@ function CustomGraphForm({
         ) : (
           <Button
             colorPalette="orange"
-            loading={addNewGraph.isLoading}
+            loading={addNewGraph.isPending}
             onClick={() => {
               addGraph();
             }}
@@ -1489,7 +1498,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
     {
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       enabled: queryOpts.enabled,
     },
   );

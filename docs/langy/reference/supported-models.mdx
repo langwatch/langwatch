@@ -42,10 +42,10 @@ A role decides which configured model runs for a given kind of work. Langy uses 
 
 In the Langy composer the picker shows a short shortlist by default, then a **More models** disclosure with the rest of the models your enabled providers expose.
 
-- The shortlist is **derived, not fixed**. It starts with the Langy default, then your current selection, then one representative each of the quick, balanced, and reasoning capability groups. It is not a hardcoded list of names.
+- The shortlist is **computed per project**. It starts with the Langy default, then your current selection, then one representative each of the quick, balanced, and reasoning capability groups.
 - The **More models** count is **data-driven per project**. It is however many other models your enabled providers make available, so it differs between projects.
 
-Named model families you will see when the matching provider is enabled include `gpt-5.6-terra` (the default), `gpt-5.6-sol`, `gpt-5.6-luna` (fast), and `claude-opus-4-8`.
+Named model families, available when the matching provider is enabled, include `gpt-5.6-terra` (the default), `gpt-5.6-sol`, `gpt-5.6-luna` (fast), and `claude-opus-4-8`.
 
 <Note>
 Codex models appear in the picker only for the Langy and Fast roles. OpenAI's terms scope the Codex subscription path to coding-assistant harnesses and light AI assists, so Codex is offered for Langy and Fast but not for the playground, evaluations, or workflows. See [Codex](/langy/codex).

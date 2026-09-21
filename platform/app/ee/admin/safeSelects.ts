@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 
 /**
  * Prisma `select` clauses used by the admin Hono routes for read operations

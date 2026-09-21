@@ -1,17 +1,31 @@
 import { z } from "zod";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
+import { runEvaluatorsSchema } from "~/server/scenarios/scenario-run-evaluators";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 import { EventSchema } from "../../../domain/types";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
 } from "./constants";
-import { simulationMessageSchema, simulationResultsSchema } from "./shared";
+import {
+  SIMULATION_VERDICT,
+  simulationMessageSchema,
+  simulationResultsSchema,
+} from "./shared";
 
 export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 
 /**
  * RunQueued event - emitted when a simulation run is scheduled but not yet started.
  */
+/** What an event-driven run executes against. */
+export const simulationRunTargetSchema = z.object({
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  referenceId: z.string(),
+});
+export type SimulationRunTarget = z.infer<typeof simulationRunTargetSchema>;
+
 export const simulationRunQueuedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -20,13 +34,24 @@ export const simulationRunQueuedEventDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
-  /** Target for execution. Added for event-driven execution (replaces BullMQ job data). */
-  target: z
-    .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
-      referenceId: z.string(),
-    })
-    .optional(),
+  /**
+   * The run's secret parameter values, encrypted, keyed by name.
+   *
+   * A sibling of `metadata`, not a member of it: the fold projection copies
+   * the metadata object into the runs store, so a worker on an older build
+   * would carry anything inside it into that store and a sibling is dropped
+   * instead. The names, in clear, ride `metadata.secretParameterNames`.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
+  /** Target the event-driven execution runs against. */
+  target: simulationRunTargetSchema.optional(),
+  /**
+   * The evaluators the run is graded with, resolved from its suite and its
+   * plan when it was queued. Absent on a run scheduled before this was
+   * recorded and on a run driven from code, which never queues here; those
+   * resolve their evaluators when they finish instead.
+   */
+  evaluators: runEvaluatorsSchema.optional(),
 });
 export type SimulationRunQueuedEventData = z.infer<
   typeof simulationRunQueuedEventDataSchema
@@ -96,6 +121,31 @@ export const simulationRunFinishedEventDataSchema = z.object({
   results: simulationResultsSchema.optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
+  // Identity + traceIds are event-carried state (ECST) so downstream
+  // subscribers never read fold state.
+  //
+  // Optional because the CALLER need not supply them — FinishRunCommand
+  // backfills from the run's prior events when they are absent. Not for
+  // backwards compatibility: this schema pins `version` to a literal, so an
+  // event written under an older version fails that check before reaching
+  // these fields at all.
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
+  /**
+   * The target the run was queued against, carried forward from its queued
+   * event so a subscriber can tell a run against a connected agent apart
+   * without reading the fold. Absent on a run driven from code.
+   */
+  target: simulationRunTargetSchema.optional(),
+  /**
+   * The evaluators the run is graded with, carried forward from its queued
+   * event so nothing downstream reads the suite or the plan again. Backfilled
+   * by FinishRunCommand, which resolves them live for a run whose events carry
+   * none.
+   */
+  evaluators: runEvaluatorsSchema.optional(),
 });
 export type SimulationRunFinishedEventData = z.infer<
   typeof simulationRunFinishedEventDataSchema
@@ -108,6 +158,42 @@ export const SimulationRunFinishedEventSchema = EventSchema.extend({
 });
 export type SimulationRunFinishedEvent = z.infer<
   typeof SimulationRunFinishedEventSchema
+>;
+
+/**
+ * RunEvaluated event - emitted once the evaluators attached to the run have
+ * produced their results, after the run finished.
+ *
+ * Carries the results and the verdict the run holds after the gate: a
+ * required evaluator that failed turns it to failure, otherwise the judge's
+ * verdict stands. The verdict and status the run held BEFORE ride along as
+ * event-carried state, so the suite run subscriber can move its counts
+ * without reading fold state, the way the finished event carries identity.
+ */
+export const simulationRunEvaluatedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  evaluations: z.array(scenarioEvaluationResultSchema),
+  /** The verdict the run holds now. Absent when the judge never graded it. */
+  verdict: z.enum(SIMULATION_VERDICT).optional(),
+  /** The status the run reads with now. */
+  status: z.string().optional(),
+  previousVerdict: z.enum(SIMULATION_VERDICT).optional(),
+  previousStatus: z.string().optional(),
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+});
+export type SimulationRunEvaluatedEventData = z.infer<
+  typeof simulationRunEvaluatedEventDataSchema
+>;
+
+export const SimulationRunEvaluatedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.EVALUATED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.EVALUATED),
+  data: simulationRunEvaluatedEventDataSchema,
+});
+export type SimulationRunEvaluatedEvent = z.infer<
+  typeof SimulationRunEvaluatedEventSchema
 >;
 
 /**
@@ -184,7 +270,8 @@ export type SimulationRunMetricsComputedEvent = z.infer<
 /**
  * CancelRequested event - emitted when a user requests cancellation of a run.
  * Sets CancellationRequestedAt in the fold projection without changing Status.
- * A reactor broadcasts this to all worker pods via Redis pub/sub.
+ * The simulationRunExecution process manager's cancel intent broadcasts this
+ * to all worker pods via Redis pub/sub.
  */
 export const simulationRunCancelRequestedEventDataSchema = z.object({
   scenarioRunId: z.string(),
@@ -200,6 +287,60 @@ export const SimulationRunCancelRequestedEventSchema = EventSchema.extend({
 });
 export type SimulationRunCancelRequestedEvent = z.infer<
   typeof SimulationRunCancelRequestedEventSchema
+>;
+
+/**
+ * AgentInstanceRecorded event - emitted once the run knows which connected
+ * agent instance answered it. The fold writes it into the run's metadata
+ * under `langwatch.agentInstance`, so the results page can show where the
+ * run was served. It arrives after the run finished: the child learns the
+ * instance during the run and the parent records it when the child exits.
+ */
+export const simulationRunAgentInstanceRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  agentInstance: z.object({
+    hostname: z.string(),
+    label: z.string().nullable(),
+  }),
+});
+export type SimulationRunAgentInstanceRecordedEventData = z.infer<
+  typeof simulationRunAgentInstanceRecordedEventDataSchema
+>;
+
+export const SimulationRunAgentInstanceRecordedEventSchema = EventSchema.extend(
+  {
+    type: z.literal(SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED),
+    version: z.literal(SIMULATION_EVENT_VERSIONS.AGENT_INSTANCE_RECORDED),
+    data: simulationRunAgentInstanceRecordedEventDataSchema,
+  },
+);
+export type SimulationRunAgentInstanceRecordedEvent = z.infer<
+  typeof SimulationRunAgentInstanceRecordedEventSchema
+>;
+
+/**
+ * CutAtLimitRecorded event — emitted after a simulated voice run ended
+ * because LangWatch cut it at the maximum call duration (AC28, #8021). The
+ * fold sets `metadata.langwatch.isCutAtLimit = true` so the run header shows
+ * "Cut at the call limit". It arrives after the run finished: the child learns
+ * of the cut from its call-limit timer and the parent records it on exit, the
+ * same post-exit path the served instance takes. The flag is implicit — the
+ * event's existence is the fact — so the payload carries only the run id.
+ */
+export const simulationRunCutAtLimitRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+});
+export type SimulationRunCutAtLimitRecordedEventData = z.infer<
+  typeof simulationRunCutAtLimitRecordedEventDataSchema
+>;
+
+export const SimulationRunCutAtLimitRecordedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.CUT_AT_LIMIT_RECORDED),
+  data: simulationRunCutAtLimitRecordedEventDataSchema,
+});
+export type SimulationRunCutAtLimitRecordedEvent = z.infer<
+  typeof SimulationRunCutAtLimitRecordedEventSchema
 >;
 
 /**
@@ -265,15 +406,21 @@ export type SimulationProcessingEvent =
   | SimulationTextMessageStartEvent
   | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
+  | SimulationRunEvaluatedEvent
   | SimulationRunMetricsComputedEvent
   | SimulationRunCancelRequestedEvent
+  | SimulationRunAgentInstanceRecordedEvent
+  | SimulationRunCutAtLimitRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
 export {
   isSimulationMessageSnapshotEvent,
+  isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
+  isSimulationRunCutAtLimitRecordedEvent,
   isSimulationRunDeletedEvent,
+  isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunMetricsComputedEvent,
   isSimulationRunQueuedEvent,

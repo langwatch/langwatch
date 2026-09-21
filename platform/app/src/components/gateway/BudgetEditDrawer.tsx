@@ -59,7 +59,7 @@ export function BudgetEditDrawer({
     }
   }, [budget]);
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const updateMutation = api.gatewayBudgets.update.useMutation({
     onSuccess: async () => {
       if (organization?.id) {

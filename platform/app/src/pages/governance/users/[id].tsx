@@ -1,0 +1,212 @@
+import {
+  Box,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import numeral from "numeral";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  formatRelativeTime,
+  formatUsd,
+} from "~/components/governance/PeopleTable";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
+import { Link } from "~/components/ui/link";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { getHexColorForString } from "~/utils/rotatingColors";
+
+function GovernanceUserDetailPage() {
+  const router = useRouter();
+  const actor =
+    typeof router.query.id === "string"
+      ? decodeURIComponent(router.query.id)
+      : null;
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
+
+  const usersQuery = api.activityMonitor.spendByUser.useQuery(
+    { organizationId: orgId, windowDays: 30, limit: 500 },
+    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+  );
+  const personalProjectQuery =
+    api.governance.resolveActorPersonalProject.useQuery(
+      { organizationId: orgId, actor: actor ?? "" },
+      { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
+    );
+  const personalProject = personalProjectQuery.data;
+
+  const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
+  const pageTitle = user
+    ? `${user.actor} · AI Governance · LangWatch`
+    : "User · AI Governance · LangWatch";
+
+  return (
+    <GovernanceLayout pageTitle={pageTitle}>
+      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
+        <VStack align="start" gap={1}>
+          <Text fontSize="xs" color="fg.muted">
+            <Link href="/governance" color="blue.600">
+              ← AI Governance
+            </Link>{" "}
+            ·{" "}
+            <Link href="/governance/people" color="blue.600">
+              People
+            </Link>
+          </Text>
+          <HStack gap={2}>
+            <Box
+              width="14px"
+              height="14px"
+              borderRadius="full"
+              // The filled state is a palette hue keyed off the name. The empty
+              // state was `fg.muted`, a text token, which painted the swatch at
+              // reading contrast — a near-black dot louder than the heading
+              // beside it. A swatch with no name behind it is a surface, so it
+              // takes a surface token.
+              backgroundColor={
+                actor ? getHexColorForString(actor) : "bg.emphasized"
+              }
+            />
+            <Heading size="md">
+              {user?.actor ?? actor ?? "User not found"}
+            </Heading>
+          </HStack>
+        </VStack>
+
+        {!canReadActivity ? (
+          <PermissionRequiredNotice
+            permission="activityMonitor:view"
+            detail="This member's spend and activity stay hidden until then."
+          />
+        ) : usersQuery.error ? (
+          <HandledErrorAlert
+            error={usersQuery.error}
+            fallbackTitle="Couldn't load this member's activity"
+          />
+        ) : usersQuery.isLoading ? (
+          <Spinner />
+        ) : !user ? (
+          <Box
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="md"
+            padding={5}
+          >
+            <Text fontSize="sm" color="fg.muted">
+              No spend data for this user in the last 30 days.
+            </Text>
+          </Box>
+        ) : (
+          <>
+            <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
+              <Stat
+                label="Spend, last 30 days"
+                value={formatUsd(user.spendUsd)}
+              />
+              <Stat
+                label="Requests"
+                value={numeral(user.requests).format("0,0")}
+              />
+              <Stat
+                label="Last active"
+                value={formatRelativeTime(user.lastActivityIso)}
+              />
+              <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
+            </SimpleGrid>
+
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              padding={4}
+            >
+              <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
+                Detail metrics
+              </Text>
+              <Text fontSize="xs" color="fg.muted" marginBottom={3}>
+                Per-day spend trend and per-model breakdown for this user are
+                not available yet.
+              </Text>
+              {personalProject && (
+                <>
+                  <Link
+                    href={`/${personalProject.projectSlug}/traces`}
+                    color="blue.600"
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    View {personalProject.displayName}'s personal workspace →
+                  </Link>
+                  <Text
+                    fontSize="xs"
+                    color="fg.subtle"
+                    marginTop={1}
+                    marginBottom={3}
+                  >
+                    Opens their trace explorer with a 'Viewing as admin' banner.
+                    Each access is recorded at /settings/audit-log.
+                  </Text>
+                </>
+              )}
+              <Link
+                href="/governance"
+                color="blue.600"
+                fontSize="sm"
+                fontWeight="medium"
+              >
+                See this user in the bird's-eye chart →
+              </Link>
+              <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+                The chart's {`'By User'`} toggle exercises the same data through
+                one orthogonal lens until the dedicated drilldown ships.
+              </Text>
+            </Box>
+          </>
+        )}
+      </VStack>
+    </GovernanceLayout>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={3}
+    >
+      <Text
+        fontSize="xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="wider"
+      >
+        {label}
+      </Text>
+      <Heading as="span" size="sm" marginTop={1}>
+        {value}
+      </Heading>
+    </Box>
+  );
+}
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("governance:view", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceUserDetailPage),
+);

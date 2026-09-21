@@ -1,5 +1,10 @@
 import { formatPiiMarker } from "@langwatch/redaction";
 import { findPhoneNumbersInText } from "libphonenumber-js";
+import { isBitcoinAddress } from "./bitcoinAddress";
+import {
+  isIdentifierShapedValue,
+  MAX_IDENTIFIER_LENGTH,
+} from "./identifierHoldout";
 
 /**
  * Native, lightweight redaction for the "essential" PII level: the pattern- and
@@ -14,6 +19,11 @@ import { findPhoneNumbersInText } from "libphonenumber-js";
  * a nearby context word, merge overlapping spans preferring the longer, then
  * rebuild the string in one pass replacing each survivor with its typed marker
  * (`[EMAIL_ADDRESS]`, `[PHONE_NUMBER]`, ...).
+ *
+ * Machine identifiers are held out of that: an attribute value that is
+ * exclusively one identifier-shaped token runs only the self-proving
+ * recognizers, and a phone number inside a longer token that carries letters is
+ * dropped wherever it appears.
  */
 
 const MAX_SCAN_LENGTH = 250_000;
@@ -44,11 +54,44 @@ export const ESSENTIAL_PII_ENTITIES = [
 interface Recognizer {
   entity: string;
   regex: RegExp;
+  /**
+   * A literal the regex cannot match without, checked with `String.includes`
+   * before the regex is run at all.
+   *
+   * These patterns are unanchored and scanned with `matchAll`, so on text that
+   * cannot match they still cost a pass per starting position — the email
+   * pattern alone measured 2.6% of the worker's wall time in production,
+   * because `[A-Za-z0-9._%+-]+` consumes a long alphanumeric run, fails to
+   * find `@`, and backs off a character at a time. `includes` is a native
+   * substring scan and settles the same question in one pass.
+   *
+   * Only set this where the literal appears in the pattern itself, so the
+   * claim is readable next to the regex rather than remembered. Getting it
+   * wrong silently stops redacting real personal data, which is why
+   * `essentialPii.prefilter.unit.test.ts` proves each one against its own
+   * pattern rather than trusting the annotation.
+   */
+  requiresSubstring?: string;
   /** Checksum/structure check on the raw match; a falsey result drops the candidate. */
   validate?: (raw: string) => boolean;
   /** Low-confidence patterns only fire when one of these words is within the window. */
   contextRequired?: boolean;
   contextWords?: string[];
+  /**
+   * The match carries its own proof: a checksum, or a marker no machine
+   * identifier holds by accident. Only these recognizers keep running on a
+   * value that is exclusively one identifier-shaped token
+   * (see {@link isIdentifierShapedValue}).
+   *
+   * The claim has to be TRUE, and a shape is not a proof. Both entries that
+   * claimed it on a shape alone were destroying machine identifiers at every
+   * privacy level: the bitcoin pattern matched one in sixty random hex trace
+   * ids, and the card pattern accepted any Luhn-passing digit run, which a
+   * millisecond timestamp is about one time in ten. Both now validate. Before
+   * setting this flag, ask what a random hex string has to clear to match, and
+   * if the answer is "nothing", write a validator or leave the flag off.
+   */
+  isSelfProving?: boolean;
 }
 
 function luhnValid(raw: string): boolean {
@@ -66,6 +109,67 @@ function luhnValid(raw: string): boolean {
     double = !double;
   }
   return sum % 10 === 0;
+}
+
+const UATP_LENGTH = 15;
+const MASTERCARD_SERIES_FIRST = 2221;
+const MASTERCARD_SERIES_LAST = 2720;
+const MASTERCARD_SERIES_LENGTH = 16;
+
+/**
+ * Whether a card scheme could have issued this number AT THIS LENGTH.
+ *
+ * The collision this exists to break is a Unix timestamp: thirteen digits for
+ * milliseconds, sixteen for microseconds, nineteen for nanoseconds, all of them
+ * currently starting `17`, and one in ten of them passing the Luhn check. The
+ * only scheme numbering from a leading 1 is UATP, which issues fifteen digits
+ * and nothing else — so length, not the leading digit, is what separates the
+ * two, and gating on length keeps UATP cards redacted.
+ *
+ * The 2-series is Mastercard's, and it is gated on BOTH the 2221-2720 window
+ * and a length of sixteen, which is the only length Mastercard issues there.
+ * The window alone would expire: from about June 2040 a millisecond timestamp
+ * is thirteen digits starting `22`, and the microsecond and nanosecond widths
+ * follow, so this exact defect would come back by the calendar with no code
+ * change. Pinning the length closes the thirteen- and nineteen-digit widths
+ * permanently.
+ *
+ * Everything else is accepted, on purpose. A range excluded here is a real card
+ * number stored in the clear and that is the worse failure by a wide margin, so
+ * the 0, 7, 8 and 9 spaces stay in scope: they carry UnionPay's 81 and 88
+ * series, Voyager's 8699, fleet cards in the 7 series, and private-label cards
+ * that follow no published range at all. This check narrows Luhn, it does not
+ * replace it — an arbitrary digit run outside the 1 and 2 ranges is no better
+ * protected than it was before, and the identifier hold-out is what covers
+ * those.
+ */
+function issuedCardRange(digits: string): boolean {
+  const first = digits.charCodeAt(0) - 48;
+  if (first === 1) return digits.length === UATP_LENGTH;
+  if (first === 2) {
+    if (digits.length !== MASTERCARD_SERIES_LENGTH) return false;
+    const series = Number(digits.slice(0, 4));
+    return (
+      series >= MASTERCARD_SERIES_FIRST && series <= MASTERCARD_SERIES_LAST
+    );
+  }
+  return true;
+}
+
+/**
+ * Whether a digit run is a plausible payment card: a valid length, an issuer
+ * range, and the Luhn check digit.
+ *
+ * Luhn ALONE is not proof. It is a single check digit, so one random digit run
+ * in ten passes it, and the recognizer's pattern accepts a bare run of 13 to 19
+ * digits with no separator and no nearby word to confirm it. Requiring the
+ * issuer range as well is what makes the CREDIT_CARD recognizer self-proving in
+ * the sense the flag claims.
+ */
+function creditCardValid(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 13 || digits.length > 19) return false;
+  return issuedCardRange(digits) && luhnValid(raw);
 }
 
 function ibanValid(raw: string): boolean {
@@ -117,6 +221,8 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "EMAIL_ADDRESS",
     regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    requiresSubstring: "@",
+    isSelfProving: true,
   },
   {
     entity: "IP_ADDRESS",
@@ -126,22 +232,48 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "IP_ADDRESS",
     regex: /\b(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}\b/g,
+    requiresSubstring: ":",
     validate: ipv6Plausible,
   },
   {
     entity: "CREDIT_CARD",
     regex: /\b\d(?:[ -]?\d){12,18}\b/g,
-    validate: luhnValid,
+    validate: creditCardValid,
+    isSelfProving: true,
   },
   {
     entity: "IBAN_CODE",
     regex: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g,
     validate: ibanValid,
+    isSelfProving: true,
   },
-  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g },
+  // An Ethereum address is the literal `0x` followed by exactly forty hex
+  // characters. The prefix is the proof here: a trace id, a span id and a digest
+  // are bare hex, so none of them carries it, and the `requiresSubstring` gate
+  // means the pattern is not even scanned for on text without it.
   {
     entity: "CRYPTO",
-    regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+    regex: /\b0x[a-fA-F0-9]{40}\b/g,
+    requiresSubstring: "0x",
+    isSelfProving: true,
+  },
+  // Bitcoin, legacy (`1…`/`3…`) and segwit (`bc1…`). The pattern alone is a
+  // SHAPE that roughly one in sixty random 32-character hex strings fits, which
+  // is to say one in sixty OTel trace ids; `isBitcoinAddress` verifies the
+  // base58check or bech32 checksum so a match is proof rather than a guess.
+  //
+  // Segwit is written twice, once per case, rather than carried by an `i` flag:
+  // the flag applies to the whole pattern, and it would turn the legacy class
+  // into one that accepts `0`, `O`, `I` and `l` — the four glyphs base58 leaves
+  // out precisely because they are confusable. Two explicit branches also say
+  // what BIP-173 says, which is that an address is all-lower or all-upper and
+  // never mixed.
+  {
+    entity: "CRYPTO",
+    regex:
+      /\b(?:bc1[a-z0-9]{25,62}|BC1[A-Z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+    validate: isBitcoinAddress,
+    isSelfProving: true,
   },
   // Hyphenated US SSN is distinctive enough to fire without context.
   { entity: "US_SSN", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
@@ -226,6 +358,7 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "BR_CPF",
     regex: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g,
     validate: cpfValid,
+    isSelfProving: true,
   },
 ];
 
@@ -234,6 +367,35 @@ interface Span {
   end: number;
   /** The PII entity that matched here, written as the redaction marker. */
   entity: string;
+}
+
+const HAS_WHITESPACE = /\s/;
+const HAS_LETTER = /[A-Za-z]/;
+
+/**
+ * The characters that carry on an identifier around a detected span. Narrower
+ * than the whole-value rule in {@link isIdentifierShapedValue}: a dot or a colon
+ * ends the token here, so sentence punctuation and `"phone":"+1..."` in minified
+ * JSON cannot pull a detected number into an identifier that surrounds it.
+ */
+const IDENTIFIER_TOKEN_CHAR = /[A-Za-z0-9_-]/;
+
+/**
+ * Whether a match sits inside a longer identifier: the identifier characters
+ * around it reach past the match and carry a letter, as the `20260812-09` in
+ * `hosted-eu-20260812-09` does. A match that itself holds whitespace
+ * (`+31 6 12345678`) covers more than one token, so it is never inside one.
+ */
+function insideIdentifierToken(text: string, span: Span): boolean {
+  if (HAS_WHITESPACE.test(text.slice(span.start, span.end))) return false;
+  const floor = Math.max(0, span.start - MAX_IDENTIFIER_LENGTH);
+  let start = span.start;
+  while (start > floor && IDENTIFIER_TOKEN_CHAR.test(text[start - 1]!)) start--;
+  const ceiling = Math.min(text.length, span.end + MAX_IDENTIFIER_LENGTH);
+  let end = span.end;
+  while (end < ceiling && IDENTIFIER_TOKEN_CHAR.test(text[end]!)) end++;
+  if (start === span.start && end === span.end) return false;
+  return HAS_LETTER.test(text.slice(start, end));
 }
 
 function hasContextWord(
@@ -382,8 +544,41 @@ function recognizedSpanFor({
 }
 
 /**
- * Regex/checksum recognizer pass: every `RECOGNIZERS` entry allowed by
- * `allowed`, reduced match-by-match via `recognizedSpanFor`. Split out of
+ * Whether one recognizer runs in this pass: the custom level can narrow the
+ * set through `allowed`, and on an identifier-shaped value only the recognizers
+ * that prove their own finding run. That value is one token a customer sends as
+ * a reference, so a shape, or a word inside that same token, is not evidence of
+ * personal data.
+ */
+function recognizerRuns({
+  recognizer,
+  allowed,
+  isIdentifierShaped,
+  text,
+}: {
+  recognizer: Recognizer;
+  allowed: ReadonlySet<string> | null;
+  isIdentifierShaped: boolean;
+  text: string;
+}): boolean {
+  if (allowed && !allowed.has(recognizer.entity)) return false;
+  // A pattern that cannot match without a literal is skipped on text that
+  // does not contain it. This only ever removes a scan that would have found
+  // nothing, so it cannot change which spans are redacted — provided the
+  // literal really is required, which is what `requiresSubstring` documents
+  // and its tests hold to.
+  if (
+    recognizer.requiresSubstring !== undefined &&
+    !text.includes(recognizer.requiresSubstring)
+  ) {
+    return false;
+  }
+  return !isIdentifierShaped || recognizer.isSelfProving === true;
+}
+
+/**
+ * Regex/checksum recognizer pass: every `RECOGNIZERS` entry `recognizerRuns`
+ * keeps, reduced match-by-match via `recognizedSpanFor`. Split out of
  * `collectCandidateSpans` so each pass stays independently under the
  * cognitive-complexity budget.
  */
@@ -391,14 +586,18 @@ function collectRecognizerSpans({
   text,
   allowed,
   excepted,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
   const spans: Span[] = [];
   for (const recognizer of RECOGNIZERS) {
-    if (allowed && !allowed.has(recognizer.entity)) continue;
+    if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped, text })) {
+      continue;
+    }
     for (const match of text.matchAll(recognizer.regex)) {
       const span = recognizedSpanFor({ recognizer, match, text, excepted });
       if (span) spans.push(span);
@@ -412,17 +611,49 @@ function collectRecognizerSpans({
  * the regex recognizers. Kept separate from `collectRecognizerSpans`: it is a
  * different library and match shape (`startsAt`/`endsAt`, not a regex match),
  * not a different set of rules.
+ *
+ * The detector has no checksum and no context word to prove a finding: any
+ * digit run that parses as a dialable number matches. Two rules hold it to
+ * digits a customer wrote as a number. It never runs on an identifier-shaped
+ * value, and a match inside a longer token that carries letters is dropped.
+ *
+ * It is also, by a wide margin, the most expensive thing this file does. The
+ * library treats every single digit as a candidate and then tries to parse it,
+ * so 200 KB of ordinary text costs 160 ms with a version number in it and
+ * 240 ms as JSON with numeric fields, both finding nothing. The whole secrets
+ * pass over the same text is under 4 ms. `ENOUGH_DIGITS_FOR_A_NUMBER` is what
+ * keeps that cost off text that cannot hold a number at all.
  */
+
+/**
+ * The shortest example number libphonenumber has for any country is 7 digits
+ * (Tristan da Cunha, +290 8999), so text whose longest digit window is shorter
+ * than that holds no number the detector could return. The floor here is 6,
+ * one below that minimum, so the gate stays on the safe side of the shortest
+ * number in the metadata rather than exactly on it.
+ *
+ * Digits count as one window while no more than four separators divide them,
+ * which is the library's own allowance between digit blocks. The class here is
+ * every non-alphanumeric character, a superset of the punctuation the library
+ * accepts, so the window can only come out longer than the library would read
+ * and the gate can only err towards running the detector.
+ */
+const ENOUGH_DIGITS_FOR_A_NUMBER = /\d(?:[^0-9A-Za-z]{0,4}\d){5}/;
+
 function collectPhoneSpans({
   text,
   allowed,
   excepted,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
+  if (isIdentifierShaped) return [];
   if (allowed && !allowed.has("PHONE_NUMBER")) return [];
+  if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text)) return [];
   const spans: Span[] = [];
   try {
     for (const phone of findPhoneNumbersInText(text, {
@@ -433,6 +664,7 @@ function collectPhoneSpans({
         end: phone.endsAt,
         entity: "PHONE_NUMBER",
       };
+      if (insideIdentifierToken(text, span)) continue;
       if (excepted(span)) continue;
       spans.push(span);
     }
@@ -454,11 +686,13 @@ function collectCandidateSpans({
   allowed,
   exceptPatterns,
   protectedRanges,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   exceptPatterns: readonly RegExp[] | undefined;
   protectedRanges: ProtectedRange[];
+  isIdentifierShaped: boolean;
 }): Span[] {
   const excepted = (span: Span): boolean => {
     const veto =
@@ -470,8 +704,8 @@ function collectCandidateSpans({
   };
 
   return [
-    ...collectRecognizerSpans({ text, allowed, excepted }),
-    ...collectPhoneSpans({ text, allowed, excepted }),
+    ...collectRecognizerSpans({ text, allowed, excepted, isIdentifierShaped }),
+    ...collectPhoneSpans({ text, allowed, excepted, isIdentifierShaped }),
   ];
 }
 
@@ -522,15 +756,31 @@ function maskSpans({
  * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
  * `compilePiiExceptPatterns`): a detected span whose entire matched text
  * matches one of them is left as it was.
+ *
+ * `isAttributeValue` says the text is one attribute value rather than free
+ * text. A value that is exclusively one identifier-shaped token then runs only
+ * the self-proving recognizers, because customers send identifiers on purpose
+ * and a shape alone does not make one personal data. Free text never takes the
+ * exemption: a document with no spaces in it is still a document.
+ *
+ * `shouldTreatAsIdentifier` takes that exemption on the caller's word, for the one
+ * case the shape rule cannot see: a decimal trace id carries no letter, so it
+ * reads as a digit run. It is the SAME exemption, not a stronger one — the
+ * self-proving recognizers still run, so a value under such a name that carries
+ * a card's checksum and a real issuer range is still redacted.
  */
 export function redactEssentialPiiInText({
   text,
   entities,
   exceptPatterns,
+  isAttributeValue = false,
+  shouldTreatAsIdentifier = false,
 }: {
   text: string;
   entities?: readonly string[];
   exceptPatterns?: readonly RegExp[];
+  isAttributeValue?: boolean;
+  shouldTreatAsIdentifier?: boolean;
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -546,6 +796,9 @@ export function redactEssentialPiiInText({
     allowed: entities ? new Set(entities) : null,
     exceptPatterns,
     protectedRanges,
+    isIdentifierShaped:
+      isAttributeValue &&
+      (shouldTreatAsIdentifier || isIdentifierShapedValue(text)),
   });
   if (spans.length === 0) return { text, redactedCount: 0 };
 

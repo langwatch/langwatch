@@ -23,6 +23,16 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
  * back to the bottom, we re-engage. `isPinned` + `canScroll` drive the
  * "jump to latest" affordance, which is the only way back to the live edge
  * without manual scrolling.
+ *
+ * ONLY THE READER RELEASES THE PIN: a scroll event says the scroller moved, and
+ * never says who moved it. The column rearranges itself constantly — a turn
+ * finalises and its live parts are replaced by recorded ones, a status line
+ * disappears, a card collapses — and a shrink the browser answers by clamping
+ * `scrollTop` looks, geometrically, exactly like a reader scrolling up. Reading
+ * it that way killed auto-follow for the rest of the conversation and left the
+ * reader with a "jump to latest" pill they never asked for. So an upward
+ * movement releases the pin only when input that could have caused it is behind
+ * it — see `trackReaderGestures`.
  */
 
 /**
@@ -35,6 +45,111 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
  * followed rather than being surprised by a dead stream.
  */
 const BOTTOM_THRESHOLD_PX = 40;
+
+/**
+ * How long an upward gesture keeps counting as the cause of what the scroller
+ * does next.
+ *
+ * Trackpad momentum keeps firing `wheel` long after the fingers leave, and a
+ * held key arrives as a burst, so this outlasts the gesture rather than trying
+ * to match it.
+ */
+const USER_GESTURE_WINDOW_MS = 700;
+
+/** The keys that move a scroller upward. */
+const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
+
+/**
+ * Answers one question about a scroller: could the reader be the cause of the
+ * upward movement being reported right now?
+ *
+ * Only input that can move the column UP counts. A wheel notch pushed down,
+ * `PageDown`, a finger dragging the page up: none of them can be behind an
+ * upward jump, so none of them may qualify one. Taking any input at all as the
+ * cause would hand the layout an alibi, and the alibi would be the commonest
+ * gesture there is — a reader at the live edge flicking further down, which
+ * moves nothing, and a finalisation clamp arriving in the same breath.
+ *
+ * A pointer drag is the one gesture that cannot report a direction, so it is
+ * qualified by where it can reach instead. A press that lands on the scroller
+ * ITSELF is its scrollbar, and the column follows that hand until it is let
+ * go; a press that lands on a child is a click or a text selection, which
+ * moves nothing. A selection does eventually scroll the column, but only once
+ * it is dragged past the top edge, and there the pointer says so itself.
+ *
+ * The drag is followed on the WINDOW, not on the scroller. A mouse takes no
+ * implicit pointer capture, so its moves are addressed to whatever sits under
+ * it, and both drags leave the column by design: the scrollbar drag ends
+ * wherever the hand stops, and the selection only scrolls once it is ABOVE the
+ * column. Listening on the scroller would go deaf at exactly the moment there
+ * is something to hear.
+ */
+function trackReaderGestures(el: HTMLElement) {
+  const controller = new AbortController();
+  let lastUpwardAt = 0;
+  let touchY: number | null = null;
+  let drag: {
+    isOnScrollbar: boolean;
+    topEdge: number;
+    pointerId: number;
+  } | null = null;
+
+  const onWheel = (event: WheelEvent) => {
+    if (event.deltaY < 0) lastUpwardAt = Date.now();
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (UPWARD_KEYS.has(event.key)) lastUpwardAt = Date.now();
+  };
+  const onTouchStart = (event: TouchEvent) => {
+    touchY = event.touches[0]?.clientY ?? null;
+  };
+  const onTouchMove = (event: TouchEvent) => {
+    const y = event.touches[0]?.clientY;
+    if (y === undefined) return;
+    // A finger travelling DOWN the glass drags the column up.
+    if (touchY !== null && y > touchY) lastUpwardAt = Date.now();
+    touchY = y;
+  };
+  // Touch reports its own direction above, so a resting finger is not a drag.
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === "touch") return;
+    drag = {
+      isOnScrollbar: event.target === el,
+      topEdge: el.getBoundingClientRect().top,
+      pointerId: event.pointerId,
+    };
+  };
+  // `drag` is tested on its own rather than through `drag?.pointerId`, which
+  // reads the same and is not: the types promise every pointer event carries a
+  // `pointerId`, a synthetic one need not, and two undefineds comparing equal
+  // walks straight into the null.
+  const onPointerMove = (event: PointerEvent) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (drag.isOnScrollbar || event.clientY < drag.topEdge) {
+      lastUpwardAt = Date.now();
+    }
+  };
+  const onPointerUp = (event: PointerEvent) => {
+    if (drag && event.pointerId === drag.pointerId) drag = null;
+  };
+
+  const opts = { passive: true, signal: controller.signal };
+  el.addEventListener("wheel", onWheel, opts);
+  el.addEventListener("keydown", onKeyDown, opts);
+  el.addEventListener("touchstart", onTouchStart, opts);
+  el.addEventListener("touchmove", onTouchMove, opts);
+  el.addEventListener("pointerdown", onPointerDown, opts);
+  // On the window: only the PRESS has to land on the column, and the rest of
+  // the drag is followed wherever it goes.
+  window.addEventListener("pointermove", onPointerMove, opts);
+  window.addEventListener("pointerup", onPointerUp, opts);
+  window.addEventListener("pointercancel", onPointerUp, opts);
+
+  return {
+    droveTheColumnUp: () => Date.now() - lastUpwardAt <= USER_GESTURE_WINDOW_MS,
+    dispose: () => controller.abort(),
+  };
+}
 
 export interface LangyStickToBottom {
   /** Attach to the scrolling element (`overflow-y: auto`). */
@@ -162,16 +277,24 @@ export function useLangyStickToBottom({
    * the very animation that was honouring it, and auto-follow would die after
    * the first token.
    *
-   * Direction is what actually separates the two cases. Our programmatic scroll
-   * only ever moves DOWN, toward the bottom; a user who wants out of the stream
-   * scrolls UP. So: moving up releases, reaching the bottom engages, and
-   * everything in between (including our own animation in flight) leaves the pin
-   * exactly as it was.
+   * Direction is what separates our own scrolling from the reader's. Our
+   * programmatic scroll only ever moves DOWN, toward the bottom; a user who
+   * wants out of the stream scrolls UP. So: moving up releases, reaching the
+   * bottom engages, and everything in between (including our own animation in
+   * flight) leaves the pin exactly as it was.
+   *
+   * Direction alone is not enough, because the column also moves up on its own.
+   * When content is removed the browser clamps `scrollTop` down to the new
+   * maximum, and if the column re-grows before the scroll event is dispatched,
+   * that event reads as a large upward jump far from the bottom. Upward INPUT
+   * is what tells the two apart: a movement no wheel, touch, key or pointer
+   * could have caused is the page rearranging itself, and the pin survives it.
    */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     let lastTop = el.scrollTop;
+    const gestures = trackReaderGestures(el);
 
     const onScroll = () => {
       const { atBottom, overflows } = measure(el);
@@ -180,12 +303,15 @@ export function useLangyStickToBottom({
 
       setCanScroll(overflows);
       if (atBottom) setPinned(true);
-      else if (movedUp) setPinned(false);
+      else if (movedUp && gestures.droveTheColumnUp()) setPinned(false);
     };
 
     onScroll();
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => {
+      gestures.dispose();
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [measure, setPinned]);
 
   // Content got taller (a token, a card, a status line, anything) — follow it,

@@ -2,15 +2,14 @@ import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
   Link,
-  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Building2,
   ExternalLink,
   FileClock,
   KeyRound,
@@ -18,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { SettingsSection } from "~/components/settings/SettingsSection";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
@@ -127,22 +127,33 @@ function CapabilityRow({
  *
  * Cloud renders nothing: there these are provisioned by LangWatch as part of
  * the plan, so the section would be noise on a page about sign-in methods. The
- * leading separator belongs to the section for that reason, so Cloud does not
- * get a divider with nothing under it.
+ * panel belongs to the section for that reason — a Cloud deployment gets no
+ * empty card where this would have been.
  */
 /**
- * The one state an operator cannot diagnose from the page alone: an identity
+ * The states an operator cannot diagnose from the page alone: an identity
  * provider is configured, everybody is signing in by email anyway, and the
- * reason is a license the deployment does not hold. The gate logs it at
- * startup, but nobody reads server logs to explain a login screen.
+ * reason is either a license the deployment does not hold or a provider that
+ * never started. The gate logs both at startup, but nobody reads server logs
+ * to explain a login screen, and email mode looks identical to a deployment
+ * that never wanted single sign-on.
+ *
+ * Each cause is fixed somewhere else, so each gets its own remedy rather than
+ * one message covering both.
  */
-function SsoConfiguredButUnlicensedNotice() {
+function SsoConfiguredButNotInUseNotice() {
   const ssoGate = api.license.getSsoGateStatus.useQuery(
     {},
     { refetchOnWindowFocus: false },
   );
 
-  if (!ssoGate.data?.configuredProvider || ssoGate.data.licensed) return null;
+  const gate = ssoGate.data;
+  if (!gate?.configuredProvider) return null;
+  if (gate.licensed && gate.mounted) return null;
+
+  // An unlicensed deployment has not tried to mount anything, so the license is
+  // the cause to report even when both look unsatisfied.
+  const unlicensed = !gate.licensed;
 
   return (
     <Box
@@ -152,7 +163,9 @@ function SsoConfiguredButUnlicensedNotice() {
       borderRadius="lg"
       padding={4}
       width="full"
-      data-testid="sso-unlicensed-notice"
+      data-testid={
+        unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"
+      }
       _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={3}>
@@ -161,13 +174,24 @@ function SsoConfiguredButUnlicensedNotice() {
         </Box>
         <VStack align="start" gap={1}>
           <Text fontWeight="medium">
-            Single sign-on is configured but not licensed on this deployment
+            {unlicensed
+              ? "Single sign-on is configured but not licensed on this deployment"
+              : "Single sign-on is configured but could not be started"}
           </Text>
           <Text color="fg.muted" fontSize="sm">
-            This deployment is set up for{" "}
-            <b>{ssoGate.data.configuredProvider}</b>, so everyone is signing in
-            by email until a license is activated. Activate one and restart the
-            server to switch single sign-on on.
+            This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
+            {unlicensed ? (
+              <>
+                so everyone is signing in by email until a license is activated.
+                Activate one and restart the server to switch single sign-on on.
+              </>
+            ) : (
+              <>
+                but it could not be started, so everyone is signing in by email.
+                Check that the provider name is one LangWatch supports and that
+                its client credentials are set, then restart the server.
+              </>
+            )}
           </Text>
         </VStack>
       </HStack>
@@ -183,26 +207,33 @@ export function EnterpriseCapabilitiesSection() {
   if (!isSelfHosted) return null;
 
   return (
-    <>
-      <Separator />
+    // The section chrome and the header are the page's now (`SettingsSection`),
+    // so this no longer draws a separator above itself or a heading of a
+    // different size from every other section's.
+    <SettingsSection
+      icon={<Building2 size={18} />}
+      title="Organization sign-in and governance"
+      description={
+        isEnterprise
+          ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
+          : "These run on the deployment you already have, unlocked by an Enterprise license."
+      }
+      testId="enterprise-capabilities-settings-section"
+    >
       <VStack
         align="start"
         gap={4}
         width="full"
         data-testid="enterprise-capabilities"
       >
-        <SsoConfiguredButUnlicensedNotice />
+        <SsoConfiguredButNotInUseNotice />
 
-        <VStack align="start" gap={1}>
-          <Heading as="h2" size="md">
-            Organization sign-in and governance
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            {isEnterprise
-              ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
-              : "These run on the deployment you already have, unlocked by an Enterprise license. Everything else in LangWatch, including unlimited members, teams, and projects, stays uncapped without one."}
+        {!isEnterprise ? (
+          <Text fontSize="sm" lineHeight="1.55" color="fg.muted">
+            Everything else in LangWatch, including unlimited members, teams,
+            and projects, stays uncapped without one.
           </Text>
-        </VStack>
+        ) : null}
 
         <VStack align="start" gap={3} width="full">
           {CAPABILITIES.map((capability) => (
@@ -216,7 +247,23 @@ export function EnterpriseCapabilitiesSection() {
 
         {!isEnterprise && (
           <HStack gap={3}>
-            <Button asChild size="sm" colorPalette="orange">
+            {/* Both colours are stated, not left to the palette: rendered
+                through `asChild` onto an anchor, the solid recipe's contrast
+                colour did not reach the text in light mode and the button
+                read as dark ink on orange. White on the palette's own solid
+                (orange.600, #dd6b20) is only 3.4:1, short of the 4.5:1 WCAG AA
+                asks of 14px text; orange.700 (#c05621) carries white at
+                4.6:1 and orange.800 on hover at 8.9:1, in both modes.
+                `tests/agentic-e2e/tests/front-door/license-contrast.test.ts`
+                measures the rendered ratio. */}
+            <Button
+              asChild
+              size="sm"
+              colorPalette="orange"
+              bg="orange.700"
+              color="white"
+              _hover={{ bg: "orange.800", color: "white" }}
+            >
               <a href="/settings/license">Activate a license</a>
             </Button>
             <Button asChild size="sm" variant="outline">
@@ -231,6 +278,6 @@ export function EnterpriseCapabilitiesSection() {
           </HStack>
         )}
       </VStack>
-    </>
+    </SettingsSection>
   );
 }

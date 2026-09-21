@@ -11,7 +11,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       tracesV2: { header: { prefetch: prefetchMock } },
     }),
   },

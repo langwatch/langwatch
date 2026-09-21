@@ -415,10 +415,10 @@ function EvaluationsContent() {
         filterParams.endDate = params.endDate;
       }
 
-      // Navigate to messages page with query parameters
+      // Navigate to the Trace Explorer with query parameters
       void router.push(
         {
-          pathname: `/${project.slug}/messages`,
+          pathname: `/${project.slug}/traces`,
           query: filterParams,
         },
         undefined,

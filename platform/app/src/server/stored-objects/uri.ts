@@ -1,5 +1,5 @@
 /**
- * Content-addressed URI helpers for stored objects.
+ * URI helpers for stored objects.
  *
  * Supported schemes:
  *   s3://         — objects stored in an S3-compatible bucket
@@ -7,8 +7,57 @@
  *   azure-blob:// — objects stored in an Azure Blob Storage container
  */
 
+import type { ProjectStorageDestination } from "./project-storage-destination";
+
 export const SUPPORTED_SCHEMES = ["s3", "file", "azure-blob"] as const;
 export type UriScheme = (typeof SUPPORTED_SCHEMES)[number];
+
+/**
+ * Mints the URI for `objectPath` at whichever backend `destination` names.
+ *
+ * `objectPath` is the COMPLETE path below the container/bucket/root — the
+ * caller owns its whole shape, including any tenant segment. That is
+ * deliberate: content-addressed callers want `{projectId}/{sha256}`, while the
+ * ADR-022 trace spool wants a stable top-level `trace-blobs/spool/…` prefix so
+ * a bucket lifecycle rule can match it (an S3 lifecycle prefix filter cannot
+ * wildcard a leading tenant segment). Pinning the layout here would have forced
+ * one of them to move.
+ *
+ * This is the single source of truth for the destination → URI mapping. It
+ * previously existed as three separate switch statements (content-addressed
+ * stored objects, the GroupQueue durable blob tier, and — missing entirely —
+ * the trace spool); a new backend had to be added to each, and the spool's
+ * absence from the list is exactly how it ended up hardcoded to S3
+ * (langwatch/langwatch-saas#800).
+ */
+export function mintUriForDestination({
+  destination,
+  objectPath,
+}: {
+  destination: ProjectStorageDestination;
+  objectPath: string;
+}): string {
+  switch (destination.kind) {
+    case "s3":
+      return `s3://${destination.bucket}/${objectPath}`;
+    case "file": {
+      // Normalised so a root configured without a leading slash still produces
+      // an absolute `file:///…` URI rather than a relative one.
+      const normalizedRoot = destination.root.startsWith("/")
+        ? destination.root
+        : `/${destination.root}`;
+      return `file://${normalizedRoot}/${objectPath}`;
+    }
+    case "azure":
+      return `azure-blob://${destination.accountName}/${destination.container}/${objectPath}`;
+    default: {
+      const unhandled: never = destination;
+      throw new Error(
+        `Unhandled storage destination kind: ${JSON.stringify(unhandled)}`,
+      );
+    }
+  }
+}
 
 /**
  * Mints an S3 content-addressed URI.
@@ -24,7 +73,10 @@ export function mintS3Uri({
   projectId: string;
   sha256: string;
 }): string {
-  return `s3://${bucket}/${projectId}/${sha256}`;
+  return mintUriForDestination({
+    destination: { kind: "s3", bucket },
+    objectPath: `${projectId}/${sha256}`,
+  });
 }
 
 /**
@@ -43,8 +95,10 @@ export function mintFileUri({
   projectId: string;
   sha256: string;
 }): string {
-  const normalizedRoot = root.startsWith("/") ? root : `/${root}`;
-  return `file://${normalizedRoot}/${projectId}/${sha256}`;
+  return mintUriForDestination({
+    destination: { kind: "file", root },
+    objectPath: `${projectId}/${sha256}`,
+  });
 }
 
 /**
@@ -68,7 +122,10 @@ export function mintAzureBlobUri({
   projectId: string;
   sha256: string;
 }): string {
-  return `azure-blob://${accountName}/${container}/${projectId}/${sha256}`;
+  return mintUriForDestination({
+    destination: { kind: "azure", accountName, container },
+    objectPath: `${projectId}/${sha256}`,
+  });
 }
 
 /**

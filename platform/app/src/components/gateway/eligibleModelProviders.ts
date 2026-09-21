@@ -1,4 +1,7 @@
-import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
+import { CODEX_DEFAULT_MODEL } from "~/server/modelProviders/codexRestrictions";
+import { recommendedChatModel } from "~/server/modelProviders/latestAliases";
+import { isDispatchableProvider } from "~/server/modelProviders/registry";
+import { SCOPE_BREADTH, scopeBreadthRank } from "~/utils/scopeBreadth";
 
 /**
  * A scope a VirtualKey is reachable from: the org/team/project triad the
@@ -62,12 +65,13 @@ export type ScopeHierarchy = {
  * bound to a self-hosted vLLM/LiteLLM provider names a model that endpoint
  * actually serves instead of the OpenAI-only `gpt-5-mini`.
  *
- * Precedence: registry default (openai/anthropic/... have one) -> the
- * provider's first registry chat model -> the provider's first custom model
- * (this is where self-hosted "custom" providers keep their model ids, since
- * the custom registry entry has no default). Bare provider label only as a
- * last resort so the gateway surfaces a readable 404 instead of an empty
- * model field.
+ * Precedence: the catalog's recommended model (the newest main-tier model
+ * of the providers whose ids the tier grammar reads; Codex has no catalog
+ * and serves its own default) -> the provider's first registry chat model
+ * -> the provider's first custom model (this is where self-hosted "custom"
+ * providers keep their model ids, since the catalog has none for them).
+ * Bare provider label only as a last resort so the gateway surfaces a
+ * readable 404 instead of an empty model field.
  */
 export function resolveProviderDefaultModel(
   providerKey: string,
@@ -75,15 +79,14 @@ export function resolveProviderDefaultModel(
   providerModels: string[],
   customModels?: Array<{ modelId: string }> | null,
 ): string {
-  const registry = modelProviderRegistry.find(
-    (entry) => entry.backendModelProviderKey === providerKey,
-  );
+  if (providerKey === "openai_codex") return CODEX_DEFAULT_MODEL;
+  const recommended = recommendedChatModel(providerKey);
+  if (recommended) return recommended;
   const fallbackModel = providerModels[0] ?? customModels?.[0]?.modelId;
-  const defaultModel = registry?.defaultModel ?? fallbackModel;
-  if (!defaultModel) {
+  if (!fallbackModel) {
     return providerLabel.toLowerCase();
   }
-  return `${providerKey}/${defaultModel}`;
+  return `${providerKey}/${fallbackModel}`;
 }
 
 /**
@@ -103,20 +106,28 @@ export function buildScopeHierarchy(
 
 /**
  * A provider is only offered to a key when the gateway would actually
- * dispatch to it: `enabled: true, disabledAt: null`, the same predicate
- * `scopeResolver.eligibleModelProvidersForVk` runs against Postgres.
- * Fails closed — a row that arrives without the flag is not advertised,
- * because listing a credential an admin has withdrawn overstates the
- * key's reach and is a governance problem, not a cosmetic one.
+ * dispatch to it: `enabled: true, disabledAt: null` AND registry-dispatchable
+ * (shared `isDispatchableProvider` — the predicate
+ * `scopeResolver.eligibleModelProvidersForVk` also applies), so the picker
+ * never advertises a provider the dispatch chain would drop.
+ * The enabled/disabledAt dimension fails closed — a row that arrives without
+ * the flag is not advertised, because listing a credential an admin has
+ * withdrawn overstates the key's reach and is a governance problem, not a
+ * cosmetic one. The registry dimension's failure direction is stated on
+ * `isDispatchableProvider` itself.
  */
 function isRoutable(provider: OrgModelProvider): boolean {
-  return provider.enabled === true && !provider.disabledAt;
+  return (
+    provider.enabled === true &&
+    !provider.disabledAt &&
+    isDispatchableProvider(provider.provider)
+  );
 }
 
 /**
- * Resolves the union eligible-ModelProvider set for a multi-scope VirtualKey
- * client-side, mirroring `scopeResolver.eligibleModelProvidersForVk` on the
- * server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
+ * Resolves the union scope-reachable ModelProvider set for a multi-scope
+ * VirtualKey client-side, mirroring `scopeResolver.scopeReachableModelProvidersForVk`
+ * on the server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
  *
  *   "A VK at scope S sees a ModelProvider P iff P's scope is an ancestor
  *    of S OR equal to S. ORG is the broadest, then TEAM, then PROJECT."
@@ -124,13 +135,41 @@ function isRoutable(provider: OrgModelProvider): boolean {
  * Each surviving MP carries the broadest of its OWN scopes that the key
  * reaches, which is what the scope chip in the picker UI names. Keyed by
  * row id, so a provider attached at several scopes resolves once.
+ *
+ * Scope only: a key's routing policy narrows what the gateway DISPATCHES to,
+ * never what its provider allowlist may name. A provider the scope reaches
+ * but the policy omits stays offered here and is savable; the policy blocks
+ * it at dispatch, not at save.
+ *
+ * Rows come back broadest scope first (ORGANIZATION, then TEAM, then
+ * PROJECT), and by name within a scope.
  */
-export function resolveEligible(
-  scopes: VirtualKeyScopeEntry[],
-  providers: OrgModelProvider[],
-  hierarchy: ScopeHierarchy,
-): EligibleModelProvider[] {
+export function resolveEligible({
+  scopes,
+  providers,
+  hierarchy,
+  providersAllowed,
+}: {
+  scopes: VirtualKeyScopeEntry[];
+  providers: OrgModelProvider[];
+  hierarchy: ScopeHierarchy;
+  /**
+   * The key's own provider allowlist, when it has one.
+   *
+   * Null or empty means the key may use every provider its scopes reach,
+   * current and future, so the unfiltered set is the answer. A list narrows
+   * it: those ids are ModelProvider row ids, the same key this function
+   * resolves by. Pickers pass nothing, because they have to offer providers
+   * the key does not hold yet; a read-only view of an existing key passes
+   * its list, or it overstates what the key can do.
+   */
+  providersAllowed?: string[] | null;
+}): EligibleModelProvider[] {
   if (scopes.length === 0 || providers.length === 0) return [];
+  const allowed =
+    providersAllowed && providersAllowed.length > 0
+      ? new Set(providersAllowed)
+      : null;
   const matchesScope = (
     mpScope: ModelProviderScopeEntry,
     vkScope: VirtualKeyScopeEntry,
@@ -155,17 +194,17 @@ export function resolveEligible(
 
   // Rank the tiers so a provider attached at several scopes is attributed to
   // the broadest one (ORG > TEAM > PROJECT) it reaches the key through.
-  const scopeBreadth = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
   const result = new Map<string, EligibleModelProvider>();
   for (const provider of providers) {
     if (!provider.id) continue;
+    if (allowed && !allowed.has(provider.id)) continue;
     if (!isRoutable(provider)) continue;
     let definedAt: ModelProviderScopeEntry | undefined;
     for (const mpScope of provider.scopes) {
       if (!scopes.some((vkScope) => matchesScope(mpScope, vkScope))) continue;
       if (
         !definedAt ||
-        scopeBreadth[mpScope.scopeType] < scopeBreadth[definedAt.scopeType]
+        SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]
       ) {
         definedAt = mpScope;
       }
@@ -188,8 +227,11 @@ export function resolveEligible(
       ),
     });
   }
-  return Array.from(result.values()).sort((a, b) =>
-    a.label.localeCompare(b.label),
+  return Array.from(result.values()).sort(
+    (a, b) =>
+      scopeBreadthRank(a.definedAt.scopeType) -
+        scopeBreadthRank(b.definedAt.scopeType) ||
+      a.label.localeCompare(b.label),
   );
 }
 
@@ -207,5 +249,5 @@ export function firstEligibleDefaultModel(args: {
 }): string | undefined {
   const { scopes, providers, availableProjects, organizationId } = args;
   const hierarchy = buildScopeHierarchy(availableProjects, organizationId);
-  return resolveEligible(scopes, providers, hierarchy)[0]?.defaultModel;
+  return resolveEligible({ scopes, providers, hierarchy })[0]?.defaultModel;
 }

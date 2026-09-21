@@ -127,7 +127,7 @@ export class GatewayVirtualKeySpendRepository {
         requests: Number(r.Requests) || 0,
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to read per-virtual-key spend from trace summaries",
       );
@@ -226,7 +226,7 @@ export class GatewayVirtualKeySpendRepository {
         blockedRequests: Number(r.blockedRequests) || 0,
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to aggregate gateway usage from trace summaries",
       );
@@ -244,9 +244,16 @@ export class GatewayVirtualKeySpendRepository {
     tenantIds: string[];
     window: SpendWindow;
     virtualKeyIds?: string[];
+    /**
+     * Narrow to one model, named the way `usageBuckets` names it: the first
+     * of the trace's models, or "unknown" when it recorded none. Applied
+     * after the dedup, on the winning version's array, because a filter on
+     * the raw rows would answer from whichever version happened to match.
+     */
+    model?: string;
     limit: number;
   }): Promise<GatewayTraceRow[]> {
-    const { tenantIds, window, virtualKeyIds, limit } = args;
+    const { tenantIds, window, virtualKeyIds, model, limit } = args;
     if (tenantIds.length === 0) return [];
     if (virtualKeyIds && virtualKeyIds.length === 0) return [];
 
@@ -256,6 +263,11 @@ export class GatewayVirtualKeySpendRepository {
       toMs: window.toDate.getTime(),
       limit: Math.max(1, Math.floor(limit)),
     };
+    let modelFilter = "";
+    if (model) {
+      params.model = model;
+      modelFilter = `WHERE if(length(TraceModels) = 0, 'unknown', arrayElement(TraceModels, 1)) = {model:String}`;
+    }
     const tenantPlaceholders = tenantIds
       .map((id, i) => {
         params[`tenant${i}`] = id;
@@ -306,6 +318,7 @@ export class GatewayVirtualKeySpendRepository {
               ${vkFilter}
             GROUP BY TenantId, TraceId
           )
+          ${modelFilter}
           ORDER BY occurredAtMs DESC
           LIMIT {limit:UInt32}
         `,
@@ -338,7 +351,7 @@ export class GatewayVirtualKeySpendRepository {
         blockedByGuardrail: Boolean(Number(r.blocked)),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to read gateway traces from trace summaries",
       );

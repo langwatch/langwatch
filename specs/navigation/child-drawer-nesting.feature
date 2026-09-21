@@ -64,14 +64,14 @@ Feature: Child drawers open as nested overlays instead of navigating
   # ---------------------------------------------------------------------------
   #
   # The two scenarios below describe the trace-details child drawer
-  # opened from inside the scenario run detail drawer. The component
-  # composition is exercised by `ScenarioRunDetailDrawer.integration
-  # .test.tsx` and the goBack() helper is covered in
-  # `TraceDetailsDrawer.integration.test.tsx` (test
-  # "calls goBack() to handle both nested and root drawer cases"),
-  # but no single test asserts the "Open Thread → child drawer
-  # mounts → close → parent visible" flow end-to-end. Cheap follow-
-  # up.
+  # opened from inside the scenario run detail drawer. That drawer
+  # renders `TraceDetails` inside a Drawer.Root of its own, which is
+  # why it outlived the removal of the legacy trace drawer: what was
+  # removed there was the drawer shell, not the detail view. The
+  # component composition is exercised by `ScenarioRunDetailDrawer
+  # .integration.test.tsx`, but no single test asserts the "Open
+  # Thread → child drawer mounts → close → parent visible" flow
+  # end-to-end. Cheap follow-up.
 
   @integration @unimplemented
   Scenario: Viewing a trace from scenario run detail opens as a child drawer

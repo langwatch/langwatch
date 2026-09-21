@@ -11,7 +11,7 @@ For the technical overview (how the staging Lua, the dispatcher, the tiered stor
 Reach for GroupQueue when **any** of these is true:
 
 - You need **per-aggregate FIFO**: event N for an aggregate must finish before event N+1 starts. This is the canonical fold-projection requirement.
-- You want **content-sharing across fan-out**: the same event dispatched to many reactors should not pay N× the Redis memory cost.
+- You want **content-sharing across fan-out**: the same event dispatched to many subscribers should not pay N× the Redis memory cost.
 - You expect **payloads up to ~50 MiB**: small payloads inline, big ones offload to S3 — no separate code path per size.
 - You want a **predictable retry path** that preserves FIFO within a group.
 
@@ -35,7 +35,7 @@ const pipeline = definePipeline<TraceEvent>()
   .withName("trace_processing")
   .withAggregateType("trace")
   .withFoldProjection("summary", traceSummaryFoldProjection)
-  .withReactor("summary", "syncToSearch", searchSyncReactor)
+  .withSubscriber("syncToSearch", { fold: "summary", handler: syncToSearch })
   .build();
 ```
 
@@ -50,10 +50,16 @@ See the parent [`event-sourcing/README.md`](../../README.md) for the full builde
 You only instantiate `GroupQueueProcessor` when building a new queue surface outside the event-sourcing framework — rare. The shape:
 
 ```typescript
+import { getApp } from "~/server/app-layer/app";
+import { roleRunsWorkers } from "~/server/app-layer/config";
 import { GroupQueueProcessor } from "~/server/event-sourcing/queues/groupQueue/groupQueue";
-import { connection } from "~/server/redis";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+
+// The App owns the process's connection (ADR-093). It is null when no Redis is
+// configured, and this processor requires one — so narrow before constructing.
+const redis = getApp().redis;
+if (!redis) throw new Error("this queue needs Redis");
 
 const queue = new GroupQueueProcessor<MyPayload>(
   {
@@ -62,9 +68,9 @@ const queue = new GroupQueueProcessor<MyPayload>(
     process: async (payload) => { /* handle one job */ },
     options: { globalConcurrency: 50 },
   },
-  connection,
+  redis,
   {
-    consumerEnabled: processRole === "worker",
+    consumerEnabled: roleRunsWorkers(processRole),
     objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
     resolveStorageDestination: resolveProjectStorageDestination,
   },
@@ -165,7 +171,7 @@ Payloads of different sizes land in different places, picked at encode time. You
 | **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate and lifecycle-sweep health |
 | **> 50 MiB** | Rejected at encode — `PayloadTooLargeError` | Hit by a product bug or a runaway loop — fix upstream rather than raise the cap |
 
-**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-reactor fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
+**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-subscriber fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
 
 ### Configuring writes
 

@@ -78,56 +78,56 @@ beforeEach(() => {
 describe("useViewSwitchingDim", () => {
   describe("given isFetching is true and a view key changes", () => {
     describe("when density changes while isFetching is true", () => {
-      it("sets isReplacingData to true even when isPreviousData is false", async () => {
+      it("sets isReplacingData to true even when isPlaceholderData is false", async () => {
         const { rerender } = renderHook(
           ({
             isFetching,
-            isPreviousData,
+            isPlaceholderData,
           }: {
             isFetching: boolean;
-            isPreviousData: boolean;
+            isPlaceholderData: boolean;
           }) =>
             useViewSwitchingDim({
               isFetching,
               isFetched: true,
-              isPreviousData,
+              isPlaceholderData,
             }),
-          { initialProps: { isFetching: false, isPreviousData: false } },
+          { initialProps: { isFetching: false, isPlaceholderData: false } },
         );
 
         // Simulate a density change happening while fetching begins
         mockDensity = "compact";
 
         await act(async () => {
-          rerender({ isFetching: true, isPreviousData: false });
+          rerender({ isFetching: true, isPlaceholderData: false });
         });
 
         expect(mockSetReplacingData).toHaveBeenCalledWith(true);
       });
     });
 
-    describe("when density changes and isFetching and isPreviousData are both false", () => {
+    describe("when density changes and isFetching and isPlaceholderData are both false", () => {
       it("does not dim because there is no fetch in flight", async () => {
         const { rerender } = renderHook(
           ({
             isFetching,
-            isPreviousData,
+            isPlaceholderData,
           }: {
             isFetching: boolean;
-            isPreviousData: boolean;
+            isPlaceholderData: boolean;
           }) =>
             useViewSwitchingDim({
               isFetching,
               isFetched: true,
-              isPreviousData,
+              isPlaceholderData,
             }),
-          { initialProps: { isFetching: false, isPreviousData: false } },
+          { initialProps: { isFetching: false, isPlaceholderData: false } },
         );
 
         mockDensity = "compact";
 
         await act(async () => {
-          rerender({ isFetching: false, isPreviousData: false });
+          rerender({ isFetching: false, isPlaceholderData: false });
         });
 
         // setReplacingData(false) called (viewSwitching=true but neither fetching nor previousData)
@@ -136,29 +136,29 @@ describe("useViewSwitchingDim", () => {
     });
   });
 
-  describe("given a query text change while isPreviousData is true", () => {
+  describe("given a query text change while isPlaceholderData is true", () => {
     describe("when the view switches and data is still from the prior key", () => {
       it("sets isReplacingData to true", async () => {
         const { rerender } = renderHook(
           ({
             isFetching,
-            isPreviousData,
+            isPlaceholderData,
           }: {
             isFetching: boolean;
-            isPreviousData: boolean;
+            isPlaceholderData: boolean;
           }) =>
             useViewSwitchingDim({
               isFetching,
               isFetched: true,
-              isPreviousData,
+              isPlaceholderData,
             }),
-          { initialProps: { isFetching: true, isPreviousData: true } },
+          { initialProps: { isFetching: true, isPlaceholderData: true } },
         );
 
         mockQueryText = "error";
 
         await act(async () => {
-          rerender({ isFetching: true, isPreviousData: true });
+          rerender({ isFetching: true, isPlaceholderData: true });
         });
 
         expect(mockSetReplacingData).toHaveBeenCalledWith(true);
@@ -173,17 +173,18 @@ describe("useViewSwitchingDim", () => {
           ({
             isFetching,
             isFetched,
-            isPreviousData,
+            isPlaceholderData,
           }: {
             isFetching: boolean;
             isFetched: boolean;
-            isPreviousData: boolean;
-          }) => useViewSwitchingDim({ isFetching, isFetched, isPreviousData }),
+            isPlaceholderData: boolean;
+          }) =>
+            useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }),
           {
             initialProps: {
               isFetching: true,
               isFetched: false,
-              isPreviousData: false,
+              isPlaceholderData: false,
             },
           },
         );
@@ -194,7 +195,7 @@ describe("useViewSwitchingDim", () => {
           rerender({
             isFetching: true,
             isFetched: false,
-            isPreviousData: false,
+            isPlaceholderData: false,
           });
         });
 
@@ -203,7 +204,7 @@ describe("useViewSwitchingDim", () => {
           rerender({
             isFetching: false,
             isFetched: true,
-            isPreviousData: false,
+            isPlaceholderData: false,
           });
         });
 

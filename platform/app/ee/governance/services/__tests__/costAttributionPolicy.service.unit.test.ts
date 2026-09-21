@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import {
   __resetCostAttributionCacheForTests,
@@ -74,6 +74,50 @@ describe("resolveSourceNonBillable", () => {
         sourceType: "opencode",
         prisma: fakePrisma([
           { config: { assistantKind: "claude_code", bundledPlan: false } },
+        ]),
+      });
+      expect(result).toBe(true);
+    });
+  });
+
+  /**
+   * Cowork and Claude Code are the one pair this join can plausibly confuse:
+   * same vendor, same runtime, same brand mark, and adjacent in the agent
+   * registry. Until `claude_cowork` was accepted as an assistant kind no tile
+   * could carry it, so the Cowork half of this join had no live left-hand side
+   * and nothing here could be asserted. These pin both directions, because the
+   * cheap way to "simplify" this is to fold Cowork into Claude Code, and that
+   * would move money without failing a test.
+   */
+  describe("when the organization runs both Cowork and Claude Code", () => {
+    it("bills Cowork when the Cowork tile is unticked", async () => {
+      const result = await resolveSourceNonBillable({
+        organizationId: "org_1",
+        sourceType: "claude_cowork",
+        prisma: fakePrisma([
+          { config: { assistantKind: "claude_cowork", bundledPlan: false } },
+        ]),
+      });
+      expect(result).toBe(false);
+    });
+
+    it("leaves Cowork bundled when only the Claude Code tile is unticked", async () => {
+      const result = await resolveSourceNonBillable({
+        organizationId: "org_1",
+        sourceType: "claude_cowork",
+        prisma: fakePrisma([
+          { config: { assistantKind: "claude_code", bundledPlan: false } },
+        ]),
+      });
+      expect(result).toBe(true);
+    });
+
+    it("leaves Claude Code bundled when only the Cowork tile is unticked", async () => {
+      const result = await resolveSourceNonBillable({
+        organizationId: "org_1",
+        sourceType: "claude_code",
+        prisma: fakePrisma([
+          { config: { assistantKind: "claude_cowork", bundledPlan: false } },
         ]),
       });
       expect(result).toBe(true);

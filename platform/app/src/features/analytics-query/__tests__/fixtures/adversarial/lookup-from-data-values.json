@@ -1,0 +1,24 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"transform": [
+		{
+			"lookup": "model",
+			"from": {
+				"data": {
+					"values": [
+						{
+							"model": "a",
+							"vendor": "b"
+						}
+					]
+				},
+				"key": "model",
+				"fields": ["vendor"]
+			}
+		}
+	]
+}

@@ -20,7 +20,11 @@ import { createLogger } from "@langwatch/observability";
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
+import { RedirectRefusedError, ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
   NormalizedPullEvent,
@@ -88,6 +92,69 @@ const httpPollingConfigSchema = z.object({
 
 export type HttpPollingConfig = z.infer<typeof httpPollingConfigSchema>;
 
+/**
+ * Ends the request when the provider has asked for fewer of them, carrying the
+ * wait it named.
+ *
+ * A 429 used to fall into the generic 4xx branch and throw a plain Error. That
+ * ended the run correctly and dropped the one number saying when it is safe to
+ * come back, so the next run walked into the window this one was refused in.
+ * Returns for every other answer, including the ones that do retry.
+ */
+async function refuseIfRateLimited({
+  response,
+  url,
+}: {
+  response: FetchResponse;
+  url: string;
+}): Promise<void> {
+  if (response.status !== 429) return;
+  // Housekeeping so undici can pool the connection. It must never become the
+  // error that leaves this branch: an unguarded reject would propagate instead
+  // of the DispatchError, and a plain Error carries no wait.
+  await response.body?.cancel().catch(() => void 0);
+  throw new DispatchError({
+    message: `HTTP 429 ${response.statusText} (${url})`,
+    retryable: true,
+    retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+  });
+}
+
+/**
+ * Lets a provider asking for silence out of the run, and lets every other
+ * failure fall through to be absorbed into an error count.
+ *
+ * The distinction is the whole point. An error count is a number on a screen;
+ * a wait is an instruction, and absorbing it strands it inside a run that then
+ * reports success, so the next run walks back into the window this one was
+ * refused in. Leaving by the error path is the only way it reaches the
+ * connection that has to honour it.
+ *
+ * Every `DispatchError`, not only one that named a wait. A 429 with no
+ * `Retry-After` — or one this build cannot read as a length of time — is still
+ * a provider asking for silence, and absorbing it relabels the run's recorded
+ * reason as an ordinary transport failure, which is what an administrator then
+ * reads on the source. The cadence is unchanged either way: the connection
+ * takes the longer of its own backoff and the named wait, and there is no
+ * named wait here. This is also what the two sibling pullers already do.
+ */
+function rethrowIfRateLimited({
+  error,
+  adapter,
+  url,
+}: {
+  error: unknown;
+  adapter: string;
+  url: string;
+}): void {
+  if (!(error instanceof DispatchError)) return;
+  logger.warn(
+    { adapter, url, retryAfterMs: error.retryAfterMs },
+    "HttpPollingPullerAdapter: provider asked for fewer requests; ending the run with its wait",
+  );
+  throw error;
+}
+
 export class HttpPollingPullerAdapter
   implements PullerAdapter<HttpPollingConfig>
 {
@@ -112,13 +179,23 @@ export class HttpPollingPullerAdapter
           { adapter: this.id, pageCount, cursor },
           "Deadline reached mid-pagination, returning cursor for next run",
         );
-        return { events: allEvents, cursor, errorCount: 0 };
+        // Pages are still waiting. Saying nothing here reads as "complete",
+        // which is how a source permanently stuck on a fraction of its data
+        // looked exactly like a healthy quiet one.
+        return {
+          events: allEvents,
+          cursor,
+          errorCount: 0,
+          completeness: "truncated",
+        };
       }
 
       let response: FetchResponse;
       try {
         response = await this.fetchPage({ config, cursor, options });
       } catch (error) {
+        // Rethrows a provider asking for silence and absorbs everything else.
+        rethrowIfRateLimited({ error, adapter: this.id, url: config.url });
         logger.error(
           {
             adapter: this.id,
@@ -157,7 +234,12 @@ export class HttpPollingPullerAdapter
       },
       "HttpPollingPullerAdapter: hit MAX_PAGES_PER_RUN safety cap",
     );
-    return { events: allEvents, cursor, errorCount: 0 };
+    return {
+      events: allEvents,
+      cursor,
+      errorCount: 0,
+      completeness: "truncated",
+    };
   }
 
   private async fetchPage({
@@ -196,7 +278,16 @@ export class HttpPollingPullerAdapter
           headers,
           body,
           signal,
+          // The headers above carry the source's decrypted upstream secret,
+          // and `ssrfSafeFetch` follows up to ten redirects by default —
+          // re-sending those headers to each new host. A configured endpoint
+          // that starts answering with a redirect would hand the credential
+          // to wherever it points, and nothing in a pull run would report it.
+          // Three other callers in this codebase already opt out for the same
+          // reason; this one was the exception.
+          followRedirects: false,
         });
+        await refuseIfRateLimited({ response, url });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
           lastError = new Error(
@@ -212,6 +303,12 @@ export class HttpPollingPullerAdapter
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        // A refused redirect is a permanent property of the configured
+        // endpoint, not a transient failure — retrying it just delays the
+        // error the admin needs to see.
+        if (error instanceof RedirectRefusedError) {
+          throw error;
+        }
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
         if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
@@ -353,6 +450,17 @@ export class HttpPollingPullerAdapter
       const n = typeof v === "number" ? v : Number(v);
       return Number.isFinite(n) ? n : 0;
     };
+    /** Preserves string inputs so sub-cent precision is not lost through
+     *  a float round-trip. Falls back to Number→String for numeric inputs. */
+    const asDecimalString = (v: unknown): string => {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (trimmed === "") return "0";
+        return trimmed;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) return String(v);
+      return "0";
+    };
     const asInt = (v: unknown): number => Math.trunc(asNumber(v));
 
     const extras: Record<string, unknown> = {};
@@ -368,7 +476,7 @@ export class HttpPollingPullerAdapter
       actor: asString(get(config.eventMapping.actor)),
       action: asString(get(config.eventMapping.action)),
       target: asString(get(config.eventMapping.target)),
-      cost_usd: asNumber(get(config.eventMapping.cost_usd)),
+      cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
       raw_payload: JSON.stringify(rawEvent),

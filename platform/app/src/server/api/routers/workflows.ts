@@ -1,14 +1,19 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import type {
+  Prisma,
+  PrismaClient,
+  WorkflowVersion,
+} from "~/generated/prisma/client";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
@@ -29,7 +34,6 @@ import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
@@ -43,7 +47,7 @@ export const workflowRouter = createTRPCRouter({
   // UI agree on one source of truth.
   engineMode: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(() => {
       return {
         engineMode: "go" as const,
@@ -60,7 +64,7 @@ export const workflowRouter = createTRPCRouter({
         publish: z.boolean().optional(), // Auto-publish the first version (useful for evaluator workflows)
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.create({
         data: {
@@ -123,10 +127,10 @@ export const workflowRouter = createTRPCRouter({
         copyDatasets: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least workflows:create permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "workflows:create",
@@ -195,7 +199,7 @@ export const workflowRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       const workflows = await ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
@@ -265,7 +269,7 @@ export const workflowRouter = createTRPCRouter({
         fn: async (projectId) => {
           const isVisible =
             projectId === input.projectId ||
-            (await hasProjectPermission(ctx, projectId, "workflows:view"));
+            (await probeProjectPermission(ctx, projectId, "workflows:view"));
           visibleProjects.set(projectId, isVisible);
         },
       });
@@ -296,7 +300,7 @@ export const workflowRouter = createTRPCRouter({
         workflowId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       // Find the workflow by ID and projectId (Prisma requires projectId in where clause)
       const workflow = await ctx.prisma.workflow.findFirst({
@@ -315,7 +319,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Verify the user has view permission on the workflow's project
-      const hasPermission = await hasProjectPermission(
+      const hasPermission = await probeProjectPermission(
         ctx,
         workflow.projectId,
         "workflows:view",
@@ -379,7 +383,7 @@ export const workflowRouter = createTRPCRouter({
       // Filter copies based on user's workflows:update permission
       const copiesWithPermissions = await Promise.all(
         copies.map(async (copy) => {
-          const hasPermission = await hasProjectPermission(
+          const hasPermission = await probeProjectPermission(
             ctx,
             copy.projectId,
             "workflows:update",
@@ -414,7 +418,7 @@ export const workflowRouter = createTRPCRouter({
 
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
         where: {
@@ -459,7 +463,7 @@ export const workflowRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
         where: {
@@ -558,7 +562,7 @@ export const workflowRouter = createTRPCRouter({
 
   restoreVersion: protectedProcedure
     .input(z.object({ projectId: z.string(), versionId: z.string() }))
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: { id: input.versionId, projectId: input.projectId },
@@ -606,7 +610,7 @@ export const workflowRouter = createTRPCRouter({
         setAsLatestVersion: z.boolean(),
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       const updatedVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -628,7 +632,7 @@ export const workflowRouter = createTRPCRouter({
         dsl: workflowJsonSchema,
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       const newVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -648,7 +652,7 @@ export const workflowRouter = createTRPCRouter({
         versionId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: {
@@ -676,7 +680,7 @@ export const workflowRouter = createTRPCRouter({
 
   unpublish: protectedProcedure
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -694,7 +698,7 @@ export const workflowRouter = createTRPCRouter({
         workflowId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       // Get the workflow and check if it has a source
       const workflow = await ctx.prisma.workflow.findUnique({
@@ -745,7 +749,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Check that the user has at least workflows:view permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         sourceWorkflow.projectId,
         "workflows:view",
@@ -798,7 +802,7 @@ export const workflowRouter = createTRPCRouter({
         copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
       // Get the workflow (source) and check if it has copies
       const workflow = await ctx.prisma.workflow.findUnique({
@@ -865,7 +869,7 @@ export const workflowRouter = createTRPCRouter({
       // Push to each copy
       for (const copy of copiesToPush) {
         // Check that the user has workflows:update permission on the copy's project
-        const hasCopyPermission = await hasProjectPermission(
+        const hasCopyPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "workflows:update",
@@ -946,7 +950,7 @@ export const workflowRouter = createTRPCRouter({
         workflowId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       // Find evaluators linked to this workflow
       const evaluators = await ctx.prisma.evaluator.findMany({
@@ -998,7 +1002,7 @@ export const workflowRouter = createTRPCRouter({
         unarchive: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:delete"))
+    .permission("workflows:delete")
     .mutation(async ({ ctx, input }) => {
       const now = input.unarchive ? null : new Date();
 
@@ -1066,7 +1070,7 @@ export const workflowRouter = createTRPCRouter({
         unarchive: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:delete"))
+    .permission("workflows:delete")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -1084,7 +1088,7 @@ export const workflowRouter = createTRPCRouter({
         newDsl: workflowJsonSchema,
       }),
     )
-    .use(checkProjectPermission("workflows:update"))
+    .permission("workflows:update")
     .mutation(async ({ input }) => {
       const prevDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),

@@ -36,13 +36,22 @@ function makeStubStore(overrides: Partial<ProcessStore> = {}): ProcessStore {
     commit: async () => {
       throw new Error("makeStubStore: commit not stubbed");
     },
+    appendIntents: async () => ({
+      insertedMessageKeys: [],
+      duplicateMessageKeys: [],
+    }),
     findMessagesByRef: async () => [],
     leaseDueMessages: async () => [],
-    markDispatched: async () => {},
-    markFailed: async () => {},
+    markDispatched: async () => ({ applied: true }),
+    markFailed: async () => ({ applied: true }),
+    recordFailedAttempt: async () => undefined,
+    releaseLease: async () => ({ applied: true }),
     findDueWakes: async () => [],
     requeueDeadMessages: async () => 0,
     deleteDispatchedBefore: async () => 0,
+    deleteDispatchedOutboxBatch: async () => 0,
+    deleteDeadOutboxBatch: async () => 0,
+    deleteConsumedInboxBatch: async () => 0,
     ...overrides,
   };
 }
@@ -105,6 +114,47 @@ describe("ProcessRuntime", () => {
         },
       });
       expect(process?.state).toEqual({ count: 1 });
+      expect(subscriber!.options?.groupKeyFn).toBeUndefined();
+      await runtime.stop();
+    });
+  });
+
+  describe("given a process manager declares keyBy", () => {
+    it("keys the instance by it and drains those events in one lane", async () => {
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<AutomationEvent>({
+        name: "tenantWatch",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state) => ({
+              state: { count: state.count + 1 },
+            }))
+            .keyBy((event) => `tenant:${event.tenantId}`),
+      });
+      const [subscriber] = runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["tenantWatch", definition]]),
+      }).subscribers;
+
+      await subscriber!.handle(physicalEvent("physical-1"), {
+        tenantId,
+        aggregateId: "trigger-1",
+      });
+
+      const process = await store.findByRef<{ count: number }>({
+        ref: {
+          processName: "tenantWatch",
+          projectId: tenantId,
+          processKey: `tenant:${tenantId}`,
+        },
+      });
+      expect(process?.state).toEqual({ count: 1 });
+      expect(
+        subscriber!.options?.groupKeyFn?.(physicalEvent("physical-1")),
+      ).toBe(`tenant:${tenantId}`);
       await runtime.stop();
     });
   });

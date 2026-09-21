@@ -72,7 +72,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        logger.error(
+        logger.warn(
           { url, timeoutMs: this.timeoutMs },
           "Evaluator request timed out",
         );
@@ -82,7 +82,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
         );
       }
       if (error instanceof Error && error.message.includes("fetch failed")) {
-        logger.error({ error, url }, "Evaluator cannot be reached");
+        logger.warn({ error, url }, "Evaluator cannot be reached");
         throw new EvaluatorExecutionError("Evaluator cannot be reached", {
           meta: { evaluatorType, url },
         });

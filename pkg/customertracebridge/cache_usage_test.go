@@ -101,3 +101,83 @@ func TestEmitter_NoCacheActivity_RecordsNoCacheTokens(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, int64(100), input, "input_tokens is the full prompt when there is no cache activity")
 }
+
+// Anthropic prices a cache write by how long the entry lives, and states the
+// split in its own response body. The span has to carry it or the control
+// plane prices every write short-lived and comes out under the bill.
+//
+// @scenario "A cache write bought for an hour is recorded as such on the span"
+func TestEmitter_HourLongCacheWrite_RecordsTheLifetime(t *testing.T) {
+	// The hour-long count is a PORTION of the writes, so the two differ here.
+	// Equal values would let an emitter that wrote the total into the hour-long
+	// attr pass, which is the mistake most worth catching: it would price
+	// short-lived writes at twice the input rate.
+	span := recordSpanForUsage(t, domain.Usage{
+		PromptTokens:          36299,
+		CompletionTokens:      210,
+		TotalTokens:           36509,
+		CacheReadTokens:       18443,
+		CacheCreationTokens:   17854,
+		CacheCreation1hTokens: 12000,
+	})
+
+	oneHour, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
+	require.True(t, ok, "span must carry gen_ai.usage.cache_creation_1h.input_tokens")
+	assert.Equal(t, int64(12000), oneHour)
+
+	writes, ok := findIntAttr(span, AttrGenAIUsageCacheCreate)
+	require.True(t, ok, "span must still carry the total write count")
+	assert.Equal(t, int64(17854), writes)
+}
+
+// @scenario "A cache write whose lifetime the provider did not state is left unqualified"
+func TestEmitter_UnstatedCacheWriteLifetime_RecordsNoHourLongAttr(t *testing.T) {
+	span := recordSpanForUsage(t, domain.Usage{
+		PromptTokens:        36299,
+		CompletionTokens:    210,
+		TotalTokens:         36509,
+		CacheReadTokens:     18443,
+		CacheCreationTokens: 17854,
+	})
+
+	_, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
+	assert.False(t, ok, "no hour-long attr when the provider did not state the split")
+}
+
+// The raw-forward lane takes its write total from Bifrost's normalized usage
+// struct and the hour-long split off the provider's bytes. On an
+// Anthropic-native response the struct reports no writes, so the producer
+// reconciles the pair before the usage reaches here. This pins what that
+// reconciliation buys: the written tokens leave the fresh input count exactly
+// once, instead of being billed as input AND again at the hour-long rate.
+//
+// @scenario "An hour-long cache write is not also counted as fresh input"
+func TestEmitter_HourLongWriteWithNoNormalizedTotal_LeavesFreshInputExcludingIt(t *testing.T) {
+	// What the raw-forward lane hands over: the normalized struct carried no
+	// cache-write count, the body said 17854 of the writes bought an hour.
+	usage := domain.Usage{
+		PromptTokens:          36299,
+		CompletionTokens:      210,
+		TotalTokens:           36509,
+		CacheReadTokens:       18443,
+		CacheCreationTokens:   0,
+		CacheCreation1hTokens: 17854,
+	}.ReconcileCacheWrites()
+
+	span := recordSpanForUsage(t, usage)
+
+	input, ok := findIntAttr(span, AttrGenAIUsageIn)
+	require.True(t, ok)
+	read, ok := findIntAttr(span, AttrGenAIUsageCacheRead)
+	require.True(t, ok)
+	writes, ok := findIntAttr(span, AttrGenAIUsageCacheCreate)
+	require.True(t, ok)
+	oneHour, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
+	require.True(t, ok)
+
+	assert.Equal(t, int64(2), input, "fresh input is the prompt minus what came from and went to the cache")
+	assert.Equal(t, int64(17854), writes, "the write total covers the hour-long writes")
+	assert.Equal(t, int64(17854), oneHour)
+	assert.Equal(t, int64(36299), input+read+writes,
+		"every prompt token is counted in exactly one bucket")
+}

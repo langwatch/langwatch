@@ -4,149 +4,170 @@ Feature: Traces tab pagination controls
   I want working pagination controls on the Traces tab
   So that I can browse through all my traces beyond the first page
 
-  # All scenarios describe pagination UI on the Traces tab. Need a
-  # JSDOM render of the pagination controls component or page-level
-  # integration test against the traces tab.
-
   # ─── Design Context ────────────────────────────────────────────────
   #
-  # The Traces tab supports two pagination modes:
-  #   1. Offset-based: default mode, uses pageOffset + pageSize URL params
-  #   2. Cursor-based: uses scrollId for deep pagination (10k+ results)
+  # The Traces tab pages by CURSOR only.
   #
-  # Pagination state is managed via URL query parameters (pageOffset,
-  # pageSize, scrollId) so that page state survives refresh and sharing.
+  # Offset paging was dropped when trace search moved to ClickHouse — deep
+  # OFFSET degrades badly, and keyset paging replaced it. The `pageOffset`
+  # parameter outlived the implementation: nothing read it, so a request
+  # carrying one was answered with the first page and HTTP 200, and an export
+  # that paged by offset repeated that page for as long as it ran (#6808).
   #
-  # The NavigationFooter component renders:
-  #   - "Items per page" dropdown (10, 25, 50, 100, 250)
-  #   - Page position indicator ("1-25 of 500 items")
-  #   - Previous/Next page buttons
+  # It is now rejected at the boundary rather than ignored, and the Traces tab
+  # never sends one. `scrollId` is the whole mechanism:
   #
-  # The useNavigationFooter hook reads URL params and provides
-  # nextPage, prevPage, and changePageSize functions that update
-  # the URL via shallow router.push.
+  #   - the response carries a `scrollId` when a full page came back
+  #   - the absence of one is how "there is nothing after this" is said
+  #   - going back replays cursors the session already walked; from the first
+  #     of those, the cursor is dropped and the list returns to page one
   #
-  # Bug: pagination controls (items per page and next page) are
-  # non-functional — changing page size or clicking next does not
-  # update the trace list. This affects both list and table views.
+  # Pagination state lives in the URL (`pageSize`, `scrollId`) so a page
+  # survives refresh and can be shared. A `pageOffset` left in an older
+  # bookmarked URL is ignored rather than obeyed, so an old link opens on the
+  # first page instead of erroring.
+  #
+  # Lists that genuinely page by offset — the experiments list, the audit log —
+  # share the footer component but declare offset mode explicitly. The mode is
+  # a caller's declaration, never inferred from what happens to be in the URL.
   # ─────────────────────────────────────────────────────────────────
 
   Background:
     Given I am on the Traces tab for my project
-    And the project has at least 50 traces
+    And the project has more traces than fit on one page
+
+  # ─── Cursor Navigation ──────────────────────────────────────────
+
+  @integration @unimplemented
+  Scenario: The first page requests no cursor
+    When the Traces tab loads for the first time
+    Then the trace search request carries no scrollId
+    And it carries no pageOffset
+
+  @integration @unimplemented
+  Scenario: Navigating forward follows the cursor from the response
+    Given the trace list is showing its first page
+    When I click the "next page" button
+    Then the scrollId from the previous response is put in the URL
+    And no pageOffset appears in the URL
+
+  @e2e @unimplemented
+  Scenario: Navigating forward shows different traces
+    Given the trace list is showing its first page
+    When I click the "next page" button
+    Then the trace list shows a different set of traces
+    And none of them appeared on the previous page
+
+  @integration @unimplemented
+  Scenario: The next button is disabled when the response carries no cursor
+    Given the trace list is showing the last page of results
+    Then the "next page" button is disabled
+
+  @integration @unimplemented
+  Scenario: Going back returns to the previously walked page
+    Given I have navigated forward twice
+    When I click the "previous page" button
+    Then the list returns to the page I came from
+    And the page counter goes down by one
+
+  @integration @unimplemented
+  Scenario: Going back from the second page returns to the first
+    Given I have navigated forward once
+    When I click the "previous page" button
+    Then the scrollId is removed from the URL
+    And the trace list shows the first page again
+
+  @integration @unimplemented
+  Scenario: The previous button is disabled on the first page
+    Given the trace list is showing its first page
+    Then the "previous page" button is disabled
+
+  # A cursor link can be opened cold — shared, bookmarked, refreshed — and the
+  # walked-cursor stack only exists in the session that walked it. That session
+  # is the only thing that knows which page this is, so the reader is told it
+  # is not the first rather than told a page number nobody computed.
+  @integration @unimplemented
+  Scenario: Opening a cursor link cold still allows going back
+    Given a URL for the Traces tab containing a scrollId I have not walked to
+    When I open that URL
+    Then the "previous page" button is enabled
+    And the position indicator does not claim to be page one
+    And clicking "previous page" returns the list to the first page
+
+  # ─── A Rejected Offset ──────────────────────────────────────────
+
+  @integration @unimplemented
+  Scenario: An old bookmarked link carrying an offset opens on the first page
+    Given a URL for the Traces tab containing a pageOffset of 25
+    When I open that URL
+    Then the trace list shows the first page
+    And the request sent to trace search carries no pageOffset
+    And no error is shown
 
   # ─── Items Per Page ─────────────────────────────────────────────
 
   @e2e @unimplemented
-  Scenario: Changing items per page reloads the trace list with new size
+  Scenario: Changing items per page reloads the trace list with the new size
     Given the default page size of 25 is active
     When I change the "Items per page" dropdown to 10
-    Then the trace list displays exactly 10 traces
-    And the displayed traces are a subset of the original 25
+    Then the trace list displays at most 10 traces
 
   @integration @unimplemented
-  Scenario: Changing items per page updates URL parameters
-    Given the current URL has no pageSize parameter
+  Scenario: Changing items per page starts the scroll over
+    Given I have navigated forward at least once
     When I change the "Items per page" dropdown to 50
-    Then the URL query parameter "pageSize" is set to "50"
-    And the "pageOffset" query parameter is absent
+    Then the scrollId is removed from the URL
+    And the trace list shows the first page at the new size
+
+  # The same reset has to happen for the offset-paged lists that share this
+  # footer, and it regressed there while trace pagination was being fixed. It
+  # is not written as a scenario here: this feature's Background puts the
+  # reader on the Traces tab, which has no offset mode, so a scenario about an
+  # offset list would contradict the Background it inherits. It is bound by
+  # useNavigationFooter.offset-reset.integration.test.ts, which runs.
 
   @integration @unimplemented
-  Scenario: Changing items per page resets to first page
-    Given I am on page 2 with pageOffset 25
-    When I change the "Items per page" dropdown to 10
-    Then the pageOffset is reset to 0
-    And the trace list reloads from the beginning
-
-  @integration @unimplemented
-  Scenario: Page size persists across page reload
+  Scenario: Page size persists across a page reload
     Given I have changed the page size to 50
     When I reload the page
     Then the "Items per page" dropdown shows 50
-    And the trace list displays at most 50 traces
 
-  # ─── Next Page Navigation ───────────────────────────────────────
-
-  @e2e @unimplemented
-  Scenario: Navigating to the next page shows different traces
-    Given the trace list shows the first 25 traces
-    When I click the "next page" button
-    Then the trace list shows a different set of traces
-    And the page position indicator shows "26-50"
+  # ─── Position Indicator ─────────────────────────────────────────
 
   @integration @unimplemented
-  Scenario: Next page button updates URL offset
-    Given the current pageOffset is 0 and pageSize is 25
-    When I click the "next page" button
-    Then the URL query parameter "pageOffset" is set to "25"
+  Scenario: The first page states an exact range
+    Given the page size is 25 and there are 100 matching traces
+    And the trace list is showing its first page
+    Then the position indicator reads "1-25 of 100 items"
 
   @integration @unimplemented
-  Scenario: Next page button is disabled on the last page
-    Given the page size is 25
-    And the total number of traces is less than the current offset plus page size
-    Then the "next page" button is disabled
+  Scenario: Later pages state an approximate position
+    Given I have navigated forward once
+    Then the position indicator names the page number
+    And it describes the total number of pages as approximate
 
-  # ─── Previous Page Navigation ───────────────────────────────────
+  # ─── Filter And Query Interaction ───────────────────────────────
 
+  # Integration, not unit: observing this means rendering the hook against a
+  # mocked router, which is a boundary. The existing test for this hook is
+  # already useNavigationFooter.cursor.integration.test.ts.
   @integration @unimplemented
-  Scenario: Previous page button is disabled on the first page
-    Given the pageOffset is 0
-    Then the "previous page" button is disabled
-
-  @integration @unimplemented
-  Scenario: Navigating back to the previous page
-    Given I am on page 2 with pageOffset 25
-    When I click the "previous page" button
-    Then the "pageOffset" query parameter is absent
-    And the trace list reloads showing the first page
-
-  # ─── Page Position Indicator ────────────────────────────────────
-
-  @integration @unimplemented
-  Scenario: Page position indicator shows correct range
-    Given the pageOffset is 0 and pageSize is 25 and totalHits is 100
-    Then the page position indicator shows "1-25 of 100 items"
-
-  @integration @unimplemented
-  Scenario: Page position indicator adjusts on the last page
-    Given the pageOffset is 75 and pageSize is 25 and totalHits is 90
-    Then the page position indicator shows "76-90 of 90 items"
-
-  # ─── Cursor-Based Pagination (Deep Pagination) ─────────────────
-
-  @integration @unimplemented
-  Scenario: Cursor pagination displays page estimate
-    Given cursor-based pagination is active via a scrollId in the URL
-    Then the page position indicator shows "Page N of ~M (X total items)"
-    And the previous page button label says "Go to first page"
-
-  @integration @unimplemented
-  Scenario: Previous page in cursor mode resets to first page
-    Given cursor-based pagination is active via a scrollId in the URL
-    When I click the "previous page" button
-    Then the scrollId is removed from the URL
-    And the pageOffset is reset to 0
-    And offset-based pagination resumes
-
-  # ─── Query/Filter Interaction ───────────────────────────────────
-
-  @unit @unimplemented
-  Scenario: Changing search query resets pagination to defaults
-    Given the pageOffset is 50 and pageSize is 100
+  Scenario: Changing the search query starts the scroll over
+    Given I have navigated forward at least once
     When the search query changes
-    Then the pageOffset is reset to 0
-    And the pageSize is reset to the default of 25
-
-  @unit @unimplemented
-  Scenario: Page size dropdown reflects current URL parameter
-    Given the URL has pageSize set to 100
-    When the NavigationFooter renders
-    Then the dropdown value is "100"
-
-  # ─── Filter Interaction ────────────────────────────────────────
+    Then the scrollId is removed from the URL
+    And the page size returns to the default of 25
 
   @integration @unimplemented
-  Scenario: Applying a filter resets pagination to first page
-    Given I am on page 2 with pageOffset 25
+  Scenario: Applying a filter starts the scroll over
+    Given I have navigated forward at least once
     When I apply a filter from the sidebar
-    Then the pageOffset is reset to 0
+    Then the scrollId is removed from the URL
+    And the trace list shows the first page of the filtered results
+
+  @integration @unimplemented
+  Scenario: Clearing filters starts the scroll over
+    Given I have navigated forward at least once
+    When I clear all filters
+    Then the scrollId is removed from the URL
+    And the trace list shows the first page of the unfiltered results

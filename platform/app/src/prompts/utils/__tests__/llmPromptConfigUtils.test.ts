@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
-import { PromptScope } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import { PromptScope } from "~/generated/prisma/client";
 import { formSchema } from "~/prompts/schemas/form-schema";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { buildDefaultFormValues } from "../buildDefaultFormValues";
@@ -307,6 +308,72 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     createdAt: new Date(),
     tags: [],
     parameters: {},
+  });
+
+  /**
+   * The form derives the demonstration columns from the inputs and outputs and
+   * writes them into itself on load, so a baseline built from the stored prompt
+   * has to carry the same columns or an untouched prompt reads as modified.
+   *
+   * @see specs/prompts/prompt-editor-dirty-state.feature
+   */
+  describe("when the prompt has inputs and outputs", () => {
+    /** @scenario "A stored prompt carries the demonstration columns its fields imply" */
+    it("derives the demonstration columns the form settles on", () => {
+      const prompt = createMockPrompt("gato");
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(
+        result.version.configData.demonstrations?.inline?.columnTypes,
+      ).toEqual([
+        { id: "input", name: "input", type: "string" },
+        { id: "output", name: "output", type: "string" },
+      ]);
+    });
+
+    /** @scenario "A stored prompt carries the demonstration columns its fields imply" */
+    it("keeps the stored demonstration records", () => {
+      const prompt = {
+        ...createMockPrompt("gato"),
+        demonstrations: {
+          inline: {
+            columnTypes: [],
+            records: { input: ["a question"] },
+          },
+        },
+      } as VersionedPrompt;
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.demonstrations?.inline?.records).toEqual(
+        {
+          input: ["a question"],
+        },
+      );
+    });
+  });
+
+  describe("when the stored demonstrations already carry the derived columns", () => {
+    /** @scenario "Stored demonstrations that already match are left alone" */
+    it("leaves them as they were stored", () => {
+      const demonstrations = {
+        inline: {
+          columnTypes: [
+            { id: "input", name: "input", type: "string" as const },
+            { id: "output", name: "output", type: "string" as const },
+          ],
+          records: { input: ["a question"] },
+        },
+      };
+      const prompt = {
+        ...createMockPrompt("gato"),
+        demonstrations,
+      } as VersionedPrompt;
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.demonstrations).toEqual(demonstrations);
+    });
   });
 
   describe("when prompt handle has no prefix", () => {

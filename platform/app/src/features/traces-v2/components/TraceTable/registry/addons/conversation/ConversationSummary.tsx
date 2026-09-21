@@ -13,19 +13,48 @@ interface SummaryProps {
 }
 
 function endTimestamp(group: ConversationGroup): number {
-  const lastTrace = group.traces[group.traces.length - 1]!;
-  return group.latestTimestamp + lastTrace.durationMs;
+  // Server-grouped session rows carry no turn rows until expansion loads
+  // them, so the last turn's duration is a best-effort refinement only.
+  const lastTrace = group.traces[group.traces.length - 1];
+  return group.latestTimestamp + (lastTrace?.durationMs ?? 0);
 }
 
-function pluralise(count: number, singular: string, plural: string): string {
+function pluralise({
+  count,
+  singular,
+  plural,
+}: {
+  count: number;
+  singular: string;
+  plural: string;
+}): string {
   return count === 1 ? singular : plural;
+}
+
+/**
+ * The trace-count line. `traceCount` is the server rollup over the whole
+ * session, while the expanded turn list is a capped preview, so once fewer
+ * turns are loaded than the session holds the label says which of the two it
+ * is showing rather than letting the list read as complete.
+ */
+export function traceCountLabel(group: ConversationGroup): string {
+  const noun = pluralise({
+    count: group.traceCount,
+    singular: "trace",
+    plural: "traces",
+  });
+  const loaded = group.traces.length;
+  if (loaded > 0 && loaded < group.traceCount) {
+    return `${loaded} of ${group.traceCount} ${noun}`;
+  }
+  return `${group.traceCount} ${noun}`;
 }
 
 export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} flexWrap="wrap" textStyle="xs" color="fg.subtle">
-      <Text>{group.traces.length} turns</Text>
+      <Text>{traceCountLabel(group)}</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
@@ -45,7 +74,7 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
       {group.totalTokens > 0 && (
         <>
           <Separator />
-          <Text>{formatTokens(group.totalTokens)} tok</Text>
+          <Text>{formatTokens(group.totalTokens)} tokens</Text>
         </>
       )}
       {group.errorCount > 0 && (
@@ -57,7 +86,11 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
             </Icon>
             <Text color="red.fg">
               {group.errorCount}{" "}
-              {pluralise(group.errorCount, "error", "errors")}
+              {pluralise({
+                count: group.errorCount,
+                singular: "error",
+                plural: "errors",
+              })}
             </Text>
           </HStack>
         </>
@@ -72,7 +105,7 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} textStyle="xs" color="fg.subtle">
-      <Text>{group.traces.length} turns</Text>
+      <Text>{traceCountLabel(group)}</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
@@ -103,7 +136,7 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
       {group.totalTokens > 0 && (
         <>
           <Separator />
-          <Text>{formatTokens(group.totalTokens)} tok</Text>
+          <Text>{formatTokens(group.totalTokens)} tokens</Text>
         </>
       )}
       {group.errorCount > 0 && (
@@ -115,7 +148,11 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
             </Icon>
             <Text color="red.fg">
               {group.errorCount}{" "}
-              {pluralise(group.errorCount, "error", "errors")}
+              {pluralise({
+                count: group.errorCount,
+                singular: "error",
+                plural: "errors",
+              })}
             </Text>
           </HStack>
         </>
@@ -129,7 +166,11 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
             </Icon>
             <Text>
               {group.totalEvents}{" "}
-              {pluralise(group.totalEvents, "event", "events")}
+              {pluralise({
+                count: group.totalEvents,
+                singular: "event",
+                plural: "events",
+              })}
             </Text>
           </HStack>
         </>

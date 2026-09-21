@@ -1,12 +1,27 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
+import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
+import type { PulledUsageRetractedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import type {
+  PulledUsageLedgerProcessDeps,
+  RetractCommandEnvelope,
+} from "@ee/governance/process-manager/pulledUsageLedger.process";
+import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import type { CostRollupComparatorDayComparer } from "@ee/governance/services/costRollupComparator.service";
+import { createAgentListingPort } from "@ee/governance/services/pullers/agentListingPort";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
-import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
+import { createPeopleListingPort } from "@ee/governance/services/pullers/peopleListingPort";
+import {
+  type DiscoveredPeopleMatcher,
+  type PulledUsageDispatcher,
+  runIngestionPull,
+} from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { mapCommands } from "~/server/event-sourcing/mapCommands";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 
@@ -14,13 +29,52 @@ const logger = createLogger("langwatch:enterprise:event-sourcing");
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
+  /**
+   * The pulled-usage ledger writer. Absent without ClickHouse — the pipeline
+   * still records every observation, only the ledger row is skipped.
+   *
+   * Missing its withdrawal dispatcher, and that is the type saying so. The
+   * command it sends belongs to the pipeline this dep is being passed INTO, so
+   * the composition root cannot hold it; `registerPulledUsagePipeline`
+   * completes the object once the pipeline it closes over exists.
+   */
+  pulledUsageLedger?: Omit<
+    PulledUsageLedgerProcessDeps,
+    "sendRetractPulledUsage"
+  >;
+  /**
+   * ADR-128's daily cost rollup store. Absent without ClickHouse — the
+   * pipeline still records every observation, only the summary is skipped.
+   */
+  governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+  /**
+   * ADR-128's drift check, which reads the rollup summary back. Absent without
+   * ClickHouse, on exactly the store's terms and for the same reason: with no
+   * summary there is nothing to hold a day's charges against, so the watch is
+   * not mounted at all rather than mounted to fail.
+   */
+  costRollupDayComparer?: CostRollupComparatorDayComparer;
+  /**
+   * ADR-128 §12's identity-match engine, composed by the root on the worker
+   * role only. A type, never an import: this module is statically reachable
+   * from request routers, and the scorer behind the engine is gated off every
+   * request path by the engine's import-graph guard. Absent on request-serving
+   * roles — discovery still records people, the review queue just waits for a
+   * process that composes the engine.
+   */
+  identityMatch?: DiscoveredPeopleMatcher;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
   eventSourcing: EventSourcing;
 };
 
-function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
+function registerIngestionPullPipeline(
+  deps: EnterprisePipelineRuntimeDeps & {
+    /** The pulled-usage write surface the pull effect emits cost through. */
+    pulledUsage: PulledUsageDispatcher;
+  },
+) {
   // Late-bind the outcome commands: they are this same pipeline's own write
   // surface and exist only after `.build()`; dispatch happens long after that.
   let outcomeCommands: IngestionPullOutcomeCommands | null = null;
@@ -30,7 +84,24 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
         deps.prisma,
       ),
       dispatch: {
-        runPort: { run: runIngestionPull },
+        runPort: {
+          run: async (params) => {
+            const outcome = await runIngestionPull({
+              ...params,
+              pulledUsage: deps.pulledUsage,
+              identityMatch: deps.identityMatch,
+            });
+            return {
+              ...outcome,
+              // The durable log carries instants as epoch milliseconds, so
+              // the conversion happens once, here at the seam, rather than
+              // giving the worker a second money-shaped date type to hold.
+              readThroughAt: outcome.readThroughAt?.getTime() ?? null,
+            };
+          },
+        },
+        agentListingPort: createAgentListingPort({ prisma: deps.prisma }),
+        peopleListingPort: createPeopleListingPort({ prisma: deps.prisma }),
         commands: () => {
           if (!outcomeCommands) {
             throw new Error(
@@ -43,11 +114,24 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
     }),
   );
   const ingestionPullCommands = mapCommands(pipeline.commands);
+  // Typed rather than cast. `IngestionPullOutcomeCommands` already names the
+  // envelope — `tenantId` and `occurredAt` — on every one of these, and the
+  // compiler confirms each is the payload its command takes, so an `as never`
+  // here buys nothing and costs the one check that matters: it is exactly what
+  // let a withdrawal missing both fields reach validation instead of the
+  // compiler on the sibling pipeline below (#8111). Do not reinstate it.
   outcomeCommands = {
     recordRunCompleted: (args) =>
-      ingestionPullCommands.recordRunCompleted(args as never),
-    recordRunFailed: (args) =>
-      ingestionPullCommands.recordRunFailed(args as never),
+      ingestionPullCommands.recordRunCompleted(args),
+    recordRunFailed: (args) => ingestionPullCommands.recordRunFailed(args),
+    recordAgentsListed: (args) =>
+      ingestionPullCommands.recordAgentsListed(args),
+    recordAgentsListingRefused: (args) =>
+      ingestionPullCommands.recordAgentsListingRefused(args),
+    recordPeopleListed: (args) =>
+      ingestionPullCommands.recordPeopleListed(args),
+    recordPeopleListingRefused: (args) =>
+      ingestionPullCommands.recordPeopleListingRefused(args),
   };
 
   if (deps.runsWorkers) {
@@ -75,6 +159,61 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 }
 
 /**
+ * The `pulled_usage` write surface (ADR-088).
+ *
+ * A sibling of the ingestion-pull pipeline rather than a part of it: that one
+ * is per-source and per-run, this one is per usage item, and a per-run stream
+ * cannot carry a per-item price. The puller effect dispatches
+ * `recordPulledUsage` in the same loop that writes the OCSF audit row.
+ *
+ * Its process manager also dispatches back INTO this pipeline, which is the
+ * knot the holder below unties: the withdrawal command exists only once the
+ * pipeline is registered, and registering it needs the process manager that
+ * sends it. The same shape `spendSettlement` uses, for the same reason.
+ */
+function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
+  let sendRetract:
+    | ((
+        data: PulledUsageRetractedEventData & RetractCommandEnvelope,
+      ) => Promise<void>)
+    | null = null;
+  const ledger = deps.pulledUsageLedger
+    ? {
+        ...deps.pulledUsageLedger,
+        sendRetractPulledUsage: async (
+          data: PulledUsageRetractedEventData & RetractCommandEnvelope,
+        ): Promise<void> => {
+          if (!sendRetract) {
+            // Unreachable in composition order, and thrown rather than
+            // swallowed because the outbox retries a throw. Dropping the
+            // withdrawal would leave two live versions of one charge, which
+            // is money reported twice.
+            throw new Error(
+              "pulled usage retraction dispatched before its pipeline was registered",
+            );
+          }
+          await sendRetract(data);
+        },
+      }
+    : undefined;
+  const pipeline = deps.eventSourcing.register(
+    createPulledUsageProcessingPipeline({
+      ledger,
+      costRollupStore: deps.governanceCostRollupStore,
+      costRollupComparator: deps.costRollupDayComparer,
+    }),
+  );
+  const commands = mapCommands(pipeline.commands);
+  // Typed rather than cast: the command payload is the event data plus the
+  // envelope, and an `as never` here is exactly what let a withdrawal missing
+  // `tenantId` and `occurredAt` reach validation instead of the compiler.
+  sendRetract = async (data) => {
+    await commands.retractPulledUsage(data);
+  };
+  return { commands };
+}
+
+/**
  * Registers the complete enterprise pipeline set with the shared
  * event-sourcing runtime. Domain definitions stay under /ee; their process
  * managers are declared on the pipelines (ADR-052 builder), so the shared
@@ -84,10 +223,24 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 export function registerEnterprisePipelineSet(
   deps: EnterprisePipelineRuntimeDeps,
 ) {
-  const ingestionPull = registerIngestionPullPipeline(deps);
+  // Pulled usage registers first because the pull effect emits through it.
+  // Its commands exist the moment its own pipeline is built, so this one
+  // needs no late-binding getter — only the ingestion-pull pipeline's own
+  // outcome commands do, and those are its own write surface.
+  const pulledUsage = registerPulledUsagePipeline(deps);
+  const ingestionPull = registerIngestionPullPipeline({
+    ...deps,
+    // No cast. The dispatcher's argument type IS the command's, so renaming a
+    // field on the event schema breaks this line at compile time instead of
+    // surfacing as an outbox parse failure in production.
+    pulledUsage: { recordPulledUsage: pulledUsage.commands.recordPulledUsage },
+  });
 
   return {
-    commands: { ingestionPull: ingestionPull.commands },
+    commands: {
+      ingestionPull: ingestionPull.commands,
+      pulledUsage: pulledUsage.commands,
+    },
   };
 }
 
@@ -103,6 +256,16 @@ export function createNoopEnterprisePipelineCommands(): EnterprisePipelineComman
       disable: noop,
       recordRunCompleted: noop,
       recordRunFailed: noop,
+      requestAgentsListing: noop,
+      recordAgentsListed: noop,
+      recordAgentsListingRefused: noop,
+      requestPeopleListing: noop,
+      recordPeopleListed: noop,
+      recordPeopleListingRefused: noop,
+    },
+    pulledUsage: {
+      recordPulledUsage: noop,
+      retractPulledUsage: noop,
     },
   } satisfies EnterprisePipelineCommands;
 }

@@ -44,7 +44,7 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  * checks that the composition root installs span-command sharding on the
  * recordSpan command — through both registration branches — while leaving the
  * trace-summary fold keyed per trace. `build()` only stores references, so no
- * store / reactor is ever invoked.
+ * store / subscriber is ever invoked.
  */
 
 const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";

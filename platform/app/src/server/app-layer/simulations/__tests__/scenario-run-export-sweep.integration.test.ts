@@ -2,8 +2,8 @@
  * The half of the export contract that only exists as SQL.
  *
  * Every scope the dialog offers — date range, scenario, set, project — is a
- * WHERE clause, and archived exclusion and STALLED derivation happen on the way
- * out of the row mapper. None of that can be observed against a stubbed
+ * WHERE clause, and archived exclusion happens on the way out of the row
+ * mapper. None of that can be observed against a stubbed
  * repository, so this runs against a real ClickHouse: a filter that silently
  * matches nothing looks identical to one that correctly matched nothing, and
  * only real rows tell the two apart.
@@ -14,13 +14,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
+import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 const tenantId = `test-export-sweep-${nanoid()}`;
@@ -334,20 +334,20 @@ describe("scenario run export sweep (integration)", () => {
 
   describe("given a run that stopped emitting events without finishing", () => {
     /**
-     * STALLED is derived at read time from the gap since the last event, not
-     * stored — so the export only agrees with the run history if it reads
-     * through the same mapper. If it ever read the raw Status column instead,
-     * this run would export as IN_PROGRESS while the screen said stalled.
+     * There is no read-time STALLED derivation anymore: an unfinished run
+     * reads as IN_PROGRESS no matter how quiet it has been, on screen and in
+     * the export alike. A genuinely stalled run reaches ERROR via the
+     * process-manager stall watchdog's terminal event.
      */
-    /** @scenario A run that stalled exports as stalled */
-    it("exports it as stalled, the same as the run history shows it", async () => {
-      const stalledRunId = `run-stalled-${nanoid()}`;
+    /** @scenario A run quiet past the stall threshold exports as in progress */
+    it("exports it as in progress, the same as the run history shows it", async () => {
+      const quietRunId = `run-quiet-${nanoid()}`;
       const lastEvent = new Date(now - STALL_THRESHOLD_MS - 60_000);
 
       await insertRows(ch, [
         makeInsertRow({
-          ScenarioRunId: stalledRunId,
-          ScenarioSetId: `set-stalled-${nanoid()}`,
+          ScenarioRunId: quietRunId,
+          ScenarioSetId: `set-quiet-${nanoid()}`,
           Status: "IN_PROGRESS",
           Verdict: null,
           MetCriteria: [],
@@ -361,10 +361,10 @@ describe("scenario run export sweep (integration)", () => {
       ]);
 
       const runs = await sweep({ projectId: tenantId, limit: 100 });
-      const stalled = runs.find((run) => run.scenarioRunId === stalledRunId);
+      const quiet = runs.find((run) => run.scenarioRunId === quietRunId);
 
-      expect(stalled).toBeDefined();
-      expect(stalled!.status).toBe(ScenarioRunStatus.STALLED);
+      expect(quiet).toBeDefined();
+      expect(quiet!.status).toBe(ScenarioRunStatus.IN_PROGRESS);
     });
   });
 });

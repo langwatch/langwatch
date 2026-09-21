@@ -5,7 +5,7 @@ import { api } from "~/utils/api";
  * agents list for the project so the UI stays in sync.
  */
 export function usePushAgentToCopies() {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   return api.agents.pushToCopies.useMutation({
     onSuccess: (_data, variables) => {
       void utils.agents.getAll.invalidate({ projectId: variables.projectId });

@@ -63,7 +63,6 @@ export function PushToCopiesDialog({
         title: `${entityLabel} pushed`,
         description: `"${sourceName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated ${entityLabel.toLowerCase()}(s).`,
         type: "success",
-        meta: { closable: true },
       });
 
       onSuccess?.();

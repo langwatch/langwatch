@@ -18,7 +18,7 @@
  */
 import { createHmac } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
+import type { AnomalyAlert, AnomalyRule } from "~/generated/prisma/client";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import {

@@ -71,6 +71,9 @@ interface FormData {
   maxMembersLite: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
+  /** Undefined while a plan template says nothing about it; sent as a definite
+   * answer, so what the operator sees ticked is what the license carries. */
+  webhookEndpointsEnabled?: boolean;
   usageUnit: "traces" | "events";
 }
 
@@ -92,6 +95,7 @@ const defaultFormData: FormData = {
   maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
+  webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
   usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
 
@@ -250,6 +254,7 @@ export const LicenseGeneratorForm = forwardRef<
         maxMembersLite: formData.maxMembersLite,
         maxMessagesPerMonth: formData.maxMessagesPerMonth,
         canPublish: formData.canPublish,
+        webhookEndpointsEnabled: !!formData.webhookEndpointsEnabled,
         usageUnit: formData.usageUnit,
       },
     });
@@ -290,14 +295,14 @@ export const LicenseGeneratorForm = forwardRef<
 
   useEffect(() => {
     onFormStateChange?.({
-      isGenerating: generateMutation.isLoading,
+      isGenerating: generateMutation.isPending,
       isFormValid,
     });
-  }, [generateMutation.isLoading, isFormValid, onFormStateChange]);
+  }, [generateMutation.isPending, isFormValid, onFormStateChange]);
 
   useImperativeHandle(ref, () => ({
     handleGenerate,
-    isGenerating: generateMutation.isLoading,
+    isGenerating: generateMutation.isPending,
     isFormValid,
     hasGeneratedLicense: !!generatedLicense,
   }));
@@ -358,7 +363,7 @@ export const LicenseGeneratorForm = forwardRef<
           onValueChange={(e) =>
             handlePrivateKeyMethodChange(e.value as PrivateKeyInputMethod)
           }
-          disabled={generateMutation.isLoading}
+          disabled={generateMutation.isPending}
         >
           <HStack gap={4} marginBottom={3}>
             <Radio value="file">Upload private key file</Radio>
@@ -399,7 +404,7 @@ export const LicenseGeneratorForm = forwardRef<
                     variant="ghost"
                     size="sm"
                     onClick={handleRemoveKeyFile}
-                    disabled={generateMutation.isLoading}
+                    disabled={generateMutation.isPending}
                     aria-label="Remove file"
                   >
                     <X size={16} />
@@ -445,7 +450,7 @@ export const LicenseGeneratorForm = forwardRef<
             fontFamily="mono"
             fontSize="xs"
             rows={6}
-            disabled={generateMutation.isLoading}
+            disabled={generateMutation.isPending}
           />
         )}
       </Field.Root>
@@ -567,6 +572,19 @@ export const LicenseGeneratorForm = forwardRef<
             <Checkbox.Control />
             <Checkbox.Label fontSize="xs" color="fg.muted">
               Enabled to publish Workflows publicly
+            </Checkbox.Label>
+          </Checkbox.Root>
+
+          <Checkbox.Root
+            checked={!!formData.webhookEndpointsEnabled}
+            onCheckedChange={(e) =>
+              handleInputChange("webhookEndpointsEnabled", !!e.checked)
+            }
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label fontSize="xs" color="fg.muted">
+              Enable webhook endpoints and gateway spend APIs
             </Checkbox.Label>
           </Checkbox.Root>
         </VStack>

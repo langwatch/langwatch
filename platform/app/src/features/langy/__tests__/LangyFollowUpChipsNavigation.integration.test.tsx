@@ -11,7 +11,7 @@
  * `MemoryRouter`, shaped like the app: the transcript lives in a LAYOUT route
  * (ProjectLangyLayout's role) and the pages swap in an <Outlet/> beneath it.
  *
- * The fixture is the live transport exactly as the panel receives it: opencode
+ * The fixture is the live transport exactly as the panel receives it: the worker
  * ran the CLI through `bash`, and the server's envelope retyped the call to
  * `langwatch.trace.search` while keeping the shell payload as its input. The
  * row it earns: a carried "Alert me on this" (the search rides to the
@@ -47,6 +47,11 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "p_demo", slug: "demo" },
   }),
 }));
+
+// tRPC v11's `useUtils()` throws at hook call when no provider is mounted
+// (v10's `useContext()` returned a lazy proxy, so this tree got away without
+// one). The hydrators only `.fetch` on user action, never in these renders.
+vi.mock("~/utils/api", () => ({ api: { useUtils: () => ({}) } }));
 
 import { LangyCapabilityRenderer } from "../components/capabilities/LangyCapabilityRenderer";
 

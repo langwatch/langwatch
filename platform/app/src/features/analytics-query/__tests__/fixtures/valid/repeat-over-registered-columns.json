@@ -1,0 +1,22 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"repeat": ["total", "latency"],
+	"spec": {
+		"data": {
+			"name": "query_result"
+		},
+		"mark": "bar",
+		"encoding": {
+			"x": {
+				"field": "model",
+				"type": "nominal"
+			},
+			"y": {
+				"field": {
+					"repeat": "repeat"
+				},
+				"type": "quantitative"
+			}
+		}
+	}
+}

@@ -179,10 +179,10 @@ describe("CLI E2E", () => {
       const initResult = cli.run("prompt init");
       expectCliResultSuccess(initResult);
 
-      const addResult = await cli.runInteractive(
-        `prompt add ${promptHandle}@latest`,
-        ["y"],
-      );
+      const addResult = await cli.runInteractive({
+        command: `prompt add ${promptHandle}@latest`,
+        inputs: ["y"],
+      });
       expectCliResultSuccess(addResult);
 
       // First sync to materialize the remote prompt

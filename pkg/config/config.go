@@ -5,7 +5,10 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"time"
 )
+
+var durationType = reflect.TypeOf(time.Duration(0))
 
 // Hydrate populates cfg (a pointer to a struct) from environment variables.
 // Fields are tagged with `env:"VAR_NAME"`. Nested structs chain prefixes with "_".
@@ -29,6 +32,21 @@ func hydrateStruct(v reflect.Value, t reflect.Type, prefix string) error {
 
 		if prefix != "" {
 			envTag = prefix + "_" + envTag
+		}
+
+		// Env-configurable time spans are an int64 count of seconds on a
+		// _SECONDS-suffixed variable across every service that shares this
+		// hydrator. time.Duration is a defined int64 (reflect.Kind() ==
+		// Int64), so a duration field would otherwise slip into the generic
+		// integer branch and accept a raw nanosecond count, giving one
+		// config surface two incompatible notations for the same idea.
+		// Refusing the declaration, rather than only a bad value, means the
+		// mistake surfaces on the first boot of the service that introduced
+		// it instead of on the first deployment that tries to configure it.
+		// Compared by exact type, not Kind, so plain int64 fields are
+		// unaffected.
+		if fieldType.Type == durationType {
+			return fmt.Errorf("config: field %s (env %s) is declared as time.Duration; env-configurable time spans must be an int64 count of seconds on a _SECONDS-suffixed variable", fieldType.Name, envTag)
 		}
 
 		switch field.Kind() {

@@ -24,6 +24,20 @@ export interface TraceV2DrawerShellProps {
    * Optional; the bare `traceId` query path still works on cache miss.
    */
   t?: string;
+  /**
+   * The project the trace belongs to, for openers whose page is not inside
+   * that project: the personal pages read the caller's own workspace while
+   * the chrome stays in the last project visited. Omitted everywhere the
+   * ambient project already is the trace's project.
+   *
+   * Declared here for the shape rather than read here. This shell takes its
+   * whole state from the drawer store, and an opener sets the project on that
+   * store through `openTrace(traceId, occurredAtMs, { projectId })`, which
+   * `useDrawerProjectId` then reads. The field exists on these props because
+   * the drawer registry types `openDrawer("traceV2Details", ...)` against
+   * them, so leaving it out would reject the openers that do pass it.
+   */
+  projectId?: string;
 }
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {

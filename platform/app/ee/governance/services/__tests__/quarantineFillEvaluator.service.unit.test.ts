@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * Unit coverage for QuarantineFillEvaluator — exercises the rate
- * arithmetic + threshold flag against a stubbed ClickHouse client
- * so we don't need to spin up CH for the basic contract.
+ * arithmetic + threshold flag against a stubbed trace-activity
+ * repository so we don't need to spin up CH for the basic contract.
  *
  * Integration coverage (live CH + populated trace_summaries) is a
  * follow-up; the rate math + threshold flag + per-source ordering
@@ -12,9 +12,9 @@
  * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceTraceActivityClickHouseRepository } from "../governanceTraceActivity.clickhouse.repository";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
@@ -30,12 +30,12 @@ vi.mock("../governanceProject.service", () => ({
   })),
 }));
 
-function stubChClient(rows: Array<{ sourceId: string; spanCount: number }>) {
+function stubTraceActivity(
+  rows: Array<{ sourceId: string; spanCount: number }>,
+) {
   return {
-    query: vi.fn(async () => ({
-      json: vi.fn(async () => rows),
-    })),
-  } as unknown as ClickHouseClient;
+    findSpanCountsBySource: vi.fn(async () => rows),
+  } as unknown as GovernanceTraceActivityClickHouseRepository;
 }
 
 describe("QuarantineFillEvaluator", () => {
@@ -50,10 +50,10 @@ describe("QuarantineFillEvaluator", () => {
   });
 
   it("returns zero rate + empty perSource on a quiescent org", async () => {
-    const ch = stubChClient([]);
+    const traceActivity = stubTraceActivity([]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({ organizationId: ORG_ID });
     expect(stats).toEqual({
@@ -68,13 +68,13 @@ describe("QuarantineFillEvaluator", () => {
 
   it("computes spans/min from a 60s window", async () => {
     // 50 spans in 60s → 50 spans/min, well under the 100 threshold.
-    const ch = stubChClient([
+    const traceActivity = stubTraceActivity([
       { sourceId: "is-a", spanCount: 30 },
       { sourceId: "is-b", spanCount: 20 },
     ]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({ organizationId: ORG_ID });
     expect(stats.spanCount).toBe(50);
@@ -88,10 +88,12 @@ describe("QuarantineFillEvaluator", () => {
 
   it("normalises spans/min for non-60s windows", async () => {
     // 200 spans in 30s → 400 spans/min — above threshold.
-    const ch = stubChClient([{ sourceId: "is-loop", spanCount: 200 }]);
+    const traceActivity = stubTraceActivity([
+      { sourceId: "is-loop", spanCount: 200 },
+    ]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({
       organizationId: ORG_ID,
@@ -104,10 +106,12 @@ describe("QuarantineFillEvaluator", () => {
 
   it("flags exceeded only when rate >= threshold", async () => {
     // Threshold == rate exactly should still flag (>=).
-    const ch = stubChClient([{ sourceId: "is-edge", spanCount: 100 }]);
+    const traceActivity = stubTraceActivity([
+      { sourceId: "is-edge", spanCount: 100 },
+    ]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({ organizationId: ORG_ID });
     expect(stats.rate).toBe(100);
@@ -115,10 +119,12 @@ describe("QuarantineFillEvaluator", () => {
   });
 
   it("respects a caller-supplied threshold override", async () => {
-    const ch = stubChClient([{ sourceId: "is-quiet", spanCount: 30 }]);
+    const traceActivity = stubTraceActivity([
+      { sourceId: "is-quiet", spanCount: 30 },
+    ]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({
       organizationId: ORG_ID,
@@ -129,15 +135,15 @@ describe("QuarantineFillEvaluator", () => {
   });
 
   it("drops rows with empty sourceId from perSource breakdown", async () => {
-    // CH JSON returns "" for missing map keys; we shouldn't surface
+    // The repository returns "" for missing map keys; we shouldn't surface
     // those as anonymous-source rows in the admin UI.
-    const ch = stubChClient([
+    const traceActivity = stubTraceActivity([
       { sourceId: "is-real", spanCount: 40 },
       { sourceId: "", spanCount: 10 },
     ]);
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({ organizationId: ORG_ID });
     expect(stats.perSource).toEqual([
@@ -147,15 +153,15 @@ describe("QuarantineFillEvaluator", () => {
     expect(stats.spanCount).toBe(40);
   });
 
-  it("fail-safes to zero stats on CH query error", async () => {
-    const ch = {
-      query: vi.fn(async () => {
+  it("fail-safes to zero stats on a query-time error", async () => {
+    const traceActivity = {
+      findSpanCountsBySource: vi.fn(async () => {
         throw new Error("clickhouse explode");
       }),
-    } as unknown as ClickHouseClient;
+    } as unknown as GovernanceTraceActivityClickHouseRepository;
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity,
     });
     const stats = await evaluator.evaluate({ organizationId: ORG_ID });
     // Failure mode: admin dashboard sees zero rate, NOT an unhandled
@@ -166,20 +172,15 @@ describe("QuarantineFillEvaluator", () => {
     expect(stats.perSource).toEqual([]);
   });
 
-  it("coerces stringified spanCount values from CH", async () => {
-    // ClickHouse JSONEachRow may return integers as strings depending
-    // on the column type. Number() coercion happens at the service
-    // boundary — the consumer sees a real number.
-    const ch = stubChClient([
-      // @ts-expect-error testing string-shaped count
-      { sourceId: "is-typed-str", spanCount: "75" },
-    ]);
+  it("throws when no ClickHouse repository is available", async () => {
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
-      clickHouseClient: ch,
+      traceActivity: undefined,
     });
-    const stats = await evaluator.evaluate({ organizationId: ORG_ID });
-    expect(stats.spanCount).toBe(75);
-    expect(stats.perSource[0]?.spanCount).toBe(75);
+    // Unlike a query-time failure, "no ClickHouse at all" is not fail-safed
+    // — there is no store to have read zero spans from.
+    await expect(
+      evaluator.evaluate({ organizationId: ORG_ID }),
+    ).rejects.toThrow("ClickHouse client is not available");
   });
 });

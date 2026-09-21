@@ -1,4 +1,4 @@
-import type { PrismaClient, PromptTag } from "@prisma/client";
+import type { PrismaClient, PromptTag } from "~/generated/prisma/client";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
 import {
   PROTECTED_TAGS,

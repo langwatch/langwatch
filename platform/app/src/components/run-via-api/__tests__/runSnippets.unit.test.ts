@@ -5,6 +5,10 @@
  * (workflow + experiment): the right trigger call, the right data-source
  * argument, and a "read the results back" block. Dataset-backed snippets must
  * omit fields the dataset already provides.
+ *
+ * Go has no SDK entry point, so its snippet drives the REST API directly: the
+ * assertions there cover the bearer auth, the bounded poll loop, and the
+ * escaping that keeps a hostile field identifier inside the generated literal.
  */
 import { describe, expect, it } from "vitest";
 
@@ -149,6 +153,136 @@ describe("buildRunSnippet", () => {
     });
   });
 
+  describe("when the shell snippet polls for the run to finish", () => {
+    const shell = () =>
+      buildRunSnippet({
+        ...baseInput,
+        dataSource: "attached",
+        lang: "shell",
+      });
+
+    it("bounds the poll loop instead of looping forever", () => {
+      expect(shell()).not.toContain("while true");
+      expect(shell()).toContain("MAX_ATTEMPTS");
+    });
+
+    it("gives up on a 404 rather than polling a run that cannot appear", () => {
+      const snippet = shell();
+      expect(snippet).toContain("%{http_code}");
+      expect(snippet).toContain('if [ "$CODE" = "404" ]');
+      expect(snippet).toContain("giving up");
+    });
+
+    it("gives up on any other non-200 status instead of parsing it as the run body", () => {
+      const snippet = shell();
+      expect(snippet).toContain('if [ "$CODE" != "200" ]');
+    });
+
+    it("breaks on every terminal status the API can report", () => {
+      expect(shell()).toContain(
+        'case "$STATUS" in completed|failed|stopped|interrupted) break;; esac',
+      );
+    });
+
+    it("does not advertise an events stream the API does not serve", () => {
+      expect(shell()).not.toContain("/events");
+    });
+  });
+
+  describe("given the Go language", () => {
+    const go = (overrides: Partial<BuildRunSnippetInput> = {}) =>
+      buildRunSnippet({
+        ...baseInput,
+        dataSource: "attached",
+        lang: "go",
+        ...overrides,
+      });
+
+    describe("when the attached-dataset source is selected", () => {
+      it("marshals the unprovided field into parameters and omits the dataset-backed one", () => {
+        const snippet = go();
+        expect(snippet).toContain('"parameters": map[string]any{');
+        expect(snippet).toContain("feature_flag");
+        expect(snippet).not.toContain('"question"');
+      });
+    });
+
+    describe("when the inline-data source is selected", () => {
+      it("marshals the example row into a data slice", () => {
+        const snippet = go({ dataSource: "inline" });
+        expect(snippet).toContain('"data": []map[string]any{{');
+        expect(snippet).toContain("feature_flag");
+      });
+    });
+
+    describe("when the dataset-id source is selected", () => {
+      it("marshals a dataset id with a placeholder to replace", () => {
+        const snippet = go({ dataSource: "dataset_id" });
+        expect(snippet).toContain('"dataset_id": "dataset_xxxxxxxxxxxx"');
+        expect(snippet).not.toContain('"parameters"');
+        expect(snippet).not.toContain('"data"');
+      });
+    });
+
+    it("authenticates with a bearer token, not the legacy auth header", () => {
+      const snippet = go();
+      expect(snippet).toContain(
+        '"Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY")',
+      );
+      expect(snippet).not.toContain("X-Auth-Token");
+    });
+
+    it("starts the run, polls it, then reads the per-row results back", () => {
+      const snippet = go();
+      expect(snippet).toMatch(
+        /startPath\s+= "\/api\/experiments\/my-experiment\/run"/,
+      );
+      expect(snippet).toContain('baseURL + "/api/experiments/runs/" + runID');
+      expect(snippet).toContain('"/api/experiments/runs/"+runID+"/results"');
+    });
+
+    it("bounds the poll loop instead of looping forever", () => {
+      const snippet = go();
+      expect(snippet).not.toContain("for {");
+      expect(snippet).toContain("attempt < maxAttempts");
+    });
+
+    it("gives up on a 404 rather than polling a run that cannot appear", () => {
+      const snippet = go();
+      expect(snippet).toContain("code == http.StatusNotFound");
+      expect(snippet).toContain("giving up");
+    });
+
+    it("gives up on any other non-200 status instead of parsing it as the run body", () => {
+      expect(go()).toContain("code != http.StatusOK");
+    });
+
+    it("stops on every terminal status the API can report", () => {
+      const snippet = go();
+      for (const status of ["completed", "failed", "stopped", "interrupted"]) {
+        expect(snippet).toContain(`"${status}":`);
+      }
+      expect(snippet).toContain("terminalStatuses[run.Status]");
+    });
+
+    it("reads the run id under both the experiment and workflow field names", () => {
+      const snippet = go();
+      expect(snippet).toContain('json:"runId"');
+      expect(snippet).toContain('json:"run_id"');
+    });
+
+    describe("when an entry field identifier contains Go string metacharacters", () => {
+      it("escapes them into the map key instead of ending the literal early", () => {
+        const snippet = go({
+          entryFields: [{ identifier: 'sneaky", "injected', type: "str" }],
+          datasetColumns: [],
+          dataSource: "inline",
+        });
+        expect(snippet).toContain(String.raw`"sneaky\", \"injected":`);
+      });
+    });
+  });
+
   describe("given the experiment kind", () => {
     it("calls the experiment SDK entry points", () => {
       const input = { ...baseInput, kind: "experiment" as const };
@@ -164,6 +298,9 @@ describe("buildRunSnippet", () => {
       ).toContain('langwatch.experiments.runWithResults("my-experiment"');
       expect(
         buildRunSnippet({ ...input, dataSource: "attached", lang: "shell" }),
+      ).toContain("/api/experiments/my-experiment/run");
+      expect(
+        buildRunSnippet({ ...input, dataSource: "attached", lang: "go" }),
       ).toContain("/api/experiments/my-experiment/run");
     });
   });
@@ -188,11 +325,14 @@ describe("buildRunSnippet", () => {
       expect(
         buildRunSnippet({ ...input, dataSource: "attached", lang: "shell" }),
       ).toContain("/api/workflows/workflow_abc123/evaluate");
+      expect(
+        buildRunSnippet({ ...input, dataSource: "attached", lang: "go" }),
+      ).toContain("/api/workflows/workflow_abc123/evaluate");
     });
   });
 
   describe("given every language and data source", () => {
-    const langs: RunSnippetLang[] = ["python", "typescript", "shell"];
+    const langs: RunSnippetLang[] = ["python", "typescript", "go", "shell"];
     const sources = ["attached", "inline", "dataset_id"] as const;
 
     it("produces a non-empty snippet for each combination", () => {
