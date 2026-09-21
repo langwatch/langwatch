@@ -36,6 +36,19 @@ Feature: The usage report a self-hosted install sends
     And a field the dictionary does not declare never reaches the report
 
   @unit
+  Scenario: The docs page lists every field the dictionary declares
+    When the docs page is rendered from the dictionary
+    Then every field appears with its window and the reason it is collected
+    And the page names the schema version it describes
+    And the list of what is never collected is on it
+
+  @unit
+  Scenario: The docs page fails the build when it is stale
+    Given a field was added to the dictionary and the page was not regenerated
+    When the committed page is compared with the dictionary
+    Then the build fails and names the command that regenerates the page
+
+  @unit
   Scenario: The docs page states what is never collected
     When the list of what is never collected is read
     Then it names trace content, prompts, dataset contents and evaluation inputs and outputs
