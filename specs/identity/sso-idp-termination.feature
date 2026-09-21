@@ -373,12 +373,33 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When one of its people submits their work email in mixed case with a plus tag
     Then the decision is a redirect to that provider
 
+  # WHAT THE LEGACY COLUMNS ACTUALLY SAY. An organization's pin is not the
+  # name of a door this deployment hung. It names the identity provider its
+  # people come FROM, which on a deployment that brokers sign-in is the
+  # provider sitting behind the broker rather than the broker itself. Reading
+  # it as a door left every brokered enterprise organization looking like one
+  # naming a provider nobody here mounted, so their administrators were told
+  # their single sign-on was unfinished and offered a password form.
+  #
+  # The broker is the door, the pin names who is behind it, and the address
+  # the person typed is what tells the broker which of them to open. Who is
+  # let back in is unchanged: an arrival from the wrong provider is still
+  # refused against the pin.
+  @unit
+  Scenario: An organization pinned to a provider behind the broker is sent to the broker
+    Given this deployment brokers sign-in through one provider
+    And an organization whose legacy columns pin its people to an identity provider behind that broker
+    When one of its people submits their work email
+    Then the decision is a redirect to the broker
+    And the decision carries the reason code "domain_routed"
+    And no password was ever asked for
+
   # The failure that must NOT be a redirect. Sending somebody to a provider
-  # this deployment never mounted is a door that cannot open, and the local
-  # set is what they can actually use.
+  # nothing here can carry is a door that cannot open, and the local set is
+  # what they can actually use.
   @unit
   Scenario: An organization naming a provider this deployment does not mount is not sent nowhere
-    Given this deployment mounts a provider from its environment
+    Given this deployment mounts a provider of its own, brokering for nobody
     And an organization whose legacy columns name a different provider
     When one of its people submits their work email
     Then the decision is the local method set

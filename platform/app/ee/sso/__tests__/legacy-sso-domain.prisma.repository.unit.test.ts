@@ -9,6 +9,14 @@ const AUTH0: SignInMethod = {
   connectionId: null,
 };
 
+/** A deployment mounting an identity provider of its own, brokering for
+ *  nobody — where a pin naming anything else names nothing here. */
+const OKTA: SignInMethod = {
+  id: "okta",
+  kind: "federated",
+  connectionId: null,
+};
+
 function build({
   organization = null,
   instanceMethod = AUTH0,
@@ -55,10 +63,10 @@ describe("the legacy ssoDomain routing lookup", () => {
       });
     });
 
-    it("reports it unconfigured when the deployment mounts a different provider", async () => {
+    it("reports it unconfigured when nothing mounted here carries the pin", async () => {
       const { repository } = build({
-        organization: { id: "org_acme", ssoProvider: "okta" },
-        instanceMethod: AUTH0,
+        organization: { id: "org_acme", ssoProvider: "azure-ad" },
+        instanceMethod: OKTA,
       });
 
       const connection = await repository.findConnectionForDomain({
@@ -66,6 +74,23 @@ describe("the legacy ssoDomain routing lookup", () => {
       });
 
       expect(connection?.configured).toBe(false);
+    });
+
+    it("hands out the broker for a pin naming the provider behind it", async () => {
+      const { repository } = build({
+        organization: { id: "org_acme", ssoProvider: "waad|acme-connection" },
+        instanceMethod: AUTH0,
+      });
+
+      const connection = await repository.findConnectionForDomain({
+        domain: "acme.com",
+      });
+
+      // The pin is not dialable as written — the id handed out has to be one
+      // the sign-in surface can actually call.
+      expect(connection?.configured).toBe(true);
+      expect(connection?.method.id).toBe("auth0");
+      expect(connection?.connectionId).toBe("org:org_acme");
     });
   });
 

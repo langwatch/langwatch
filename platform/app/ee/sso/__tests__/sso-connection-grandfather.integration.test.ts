@@ -67,7 +67,7 @@ const legacyRouting = new LegacySsoDomainRoutingRepository(
 );
 const connectionRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async ({ methodId }) => methodId === PROVIDER,
+  async ({ methodId }) => (methodId === PROVIDER ? methodId : null),
 );
 
 let appended = 0;
@@ -283,7 +283,7 @@ describe("the sso connection grandfather migration against Postgres", () => {
         legacyRouting,
         connectionRouting: new SsoConnectionDomainRoutingRepository(
           prisma,
-          async () => false,
+          async () => null,
         ),
         idpMetadataFor: ({ ssoProvider }) => ({
           issuer: null,

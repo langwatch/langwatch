@@ -84,21 +84,24 @@ export class SsoConnectionDomainRoutingRepository
   constructor(
     private readonly prisma: PrismaClient,
     /**
-     * Whether this connection can actually be dialed. Injected rather than
-     * read here so this class holds no policy — the same split the legacy
-     * repository makes.
+     * WHICH method this connection is actually dialed through, or null when
+     * none is. Injected rather than read here so this class holds no policy —
+     * the same split the legacy repository makes.
      *
      * It takes the CONNECTION as well as the method id because there are two
-     * ways to be configured since D09 and they are keyed differently: the
+     * ways to be dialable since D09 and they are keyed differently: the
      * deployment's own mounted provider is named by method id, and an
-     * organization's own registered provider is keyed by the connection.
+     * organization's own registered provider is keyed by the connection. It
+     * answers the id rather than a yes because a grandfathered connection's
+     * `providerId` is a PIN — see `legacy-sso-dial.ts` — and the method that
+     * carries it is not always the pin itself.
      */
-    private readonly isMethodConfigured: (args: {
+    private readonly resolveMethodDial: (args: {
       source: SsoConnectionSource;
       methodId: string;
       connectionId: string;
       organizationId: string;
-    }) => Promise<boolean>,
+    }) => Promise<string | null>,
   ) {}
 
   async findConnectionForDomain({
@@ -190,15 +193,23 @@ export class SsoConnectionDomainRoutingRepository
   ): Promise<RoutableConnection> {
     // WHICH REGISTRY HOLDS THE PROVIDER IS WHICH ID GETS DIALED. A
     // grandfathered connection is a reference to the provider this deployment
-    // mounts, and `idpMetadata.providerId` is that provider's name. A
-    // self-serve connection is registered with the engine under its CONNECTION
-    // id, so that is the id better-auth knows it by; dialing the customer's own
-    // label would dial a provider the engine has never registered.
+    // mounts, and `idpMetadata.providerId` is the PIN naming it — which may
+    // name an upstream behind a broker rather than the broker itself, so the
+    // dial resolver has the last word on the id. A self-serve connection is
+    // registered with the engine under its CONNECTION id, so that is the id
+    // better-auth knows it by; dialing the customer's own label would dial a
+    // provider the engine has never registered.
     const source = row.source as SsoConnectionSource;
     const methodId =
       source === "legacy-grandfathered" ? providerIdOf(row) : row.id;
+    const dial = await this.resolveMethodDial({
+      source,
+      methodId,
+      connectionId: row.id,
+      organizationId: row.organizationId,
+    });
     const method: SignInMethod = {
-      id: methodId,
+      id: dial ?? methodId,
       kind: "federated",
       connectionId: row.id,
     };
@@ -206,12 +217,7 @@ export class SsoConnectionDomainRoutingRepository
       connectionId: row.id,
       method,
       state: routingStateOf(row.state as Parameters<typeof routingStateOf>[0]),
-      configured: await this.isMethodConfigured({
-        source,
-        methodId,
-        connectionId: row.id,
-        organizationId: row.organizationId,
-      }),
+      configured: dial !== null,
       allowsJit:
         row.arrivalPolicy !== "refuse" &&
         (domain === undefined ||
