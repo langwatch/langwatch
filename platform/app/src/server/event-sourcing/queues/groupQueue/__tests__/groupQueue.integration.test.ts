@@ -284,14 +284,11 @@ describe.skipIf(!hasTestcontainers)(
       expect(await redis.zcard(`${name}:gq:group:wedged:jobs`)).toBe(1);
     });
 
-    /** @scenario "Work that never drains leaves its tenants held rather than refusing startup" */
     describe("when the preflight's own work has not drained by the deadline", () => {
+      /** @scenario "Work that never drains leaves its tenants held rather than refusing startup" */
       it("starts anyway rather than refusing, leaving the work queued", async () => {
-        const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
-        const definition = createQueueDefinition({
-          name,
-          process: async () => {},
-        });
+        const definition = createQueueDefinition({ process: async () => {} });
+        const name = definition.name;
         // No consumer will ever take this: the claim's owner is gone, exactly
         // as it is on a fleet whose every replica is still in this barrier.
         const preflight = new GroupQueueProcessor(definition, redis, {
@@ -311,12 +308,10 @@ describe.skipIf(!hasTestcontainers)(
         expect(await redis.zcard(`${name}:gq:group:stuck:jobs`)).toBe(1);
       });
 
+      /** @scenario "Work that never drains leaves its tenants held rather than refusing startup" */
       it("still refuses when some of that work has failed", async () => {
-        const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
-        const definition = createQueueDefinition({
-          name,
-          process: async () => {},
-        });
+        const definition = createQueueDefinition({ process: async () => {} });
+        const name = definition.name;
         const preflight = new GroupQueueProcessor(definition, redis, {
           consumerEnabled: false,
           dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
