@@ -54,7 +54,6 @@ export type BackfillDiff = {
   kind:
     | "identifier_missing"
     | "subject_collision"
-    | "subject_duplicate"
     | "state_mismatch"
     | "value_mismatch"
     | "surplus_row";
@@ -62,10 +61,9 @@ export type BackfillDiff = {
   provider: string;
   expectedState?: string;
   actualState?: string;
-  /** On `subject_collision` and `subject_duplicate`: the live identifier that
-   *  already holds the provider subject this one expected. Named because a
-   *  collision is remedied by a human merging two accounts, and neither id
-   *  alone says which two. */
+  /** On `subject_collision` only: the live identifier that already holds the
+   *  provider subject this one expected. Named because the remediation is a
+   *  human merging two accounts, and neither id alone says which two. */
   holdingIdentifierId?: string;
 };
 
@@ -89,16 +87,13 @@ export function identifierStateSatisfies(
  * `surplus_row` diff, because such a row keeps blocking its value for every
  * other user; DETACHED and DEAD_END surpluses are inert tombstones and fine.
  *
- * An absent identifier is reported as one of THREE things, because they ask
+ * An absent identifier is reported as one of TWO things, because they ask
  * different things of the reader. `identifier_missing` heals by itself — the
  * fold has not caught up, and the next pass proves it. `subject_collision`
  * never does: another live identifier holds the provider subject, the fold
  * parked this one against the live unique index, and no number of passes
  * moves a subject off the incumbent. Only a person merging the two accounts
- * clears it, so the report has to say which one it is. `subject_duplicate` is
- * the same parking with the holder among this user's OWN rows: two of their
- * identifiers name one subject, nobody else is involved, there is nothing to
- * merge, and the sign-in method already works through the holder.
+ * clears it, so the report has to say which one it is.
  */
 export function backfillParityDiffs({
   rows,
@@ -116,7 +111,7 @@ export function backfillParityDiffs({
     if (!row) {
       const holding = holderOfExpectedSubject({ expectation, subjectHolders });
       diffs.push({
-        kind: absentIdentifierKind({ holding, ownRows: byId }),
+        kind: holding === null ? "identifier_missing" : "subject_collision",
         identifierId: expectation.identifierId,
         provider: expectation.provider,
         expectedState: expectation.expectedState,
@@ -154,17 +149,6 @@ export function backfillParityDiffs({
     });
   }
   return diffs;
-}
-
-function absentIdentifierKind({
-  holding,
-  ownRows,
-}: {
-  holding: string | null;
-  ownRows: ReadonlyMap<string, BackfillIdentifierRow>;
-}): "identifier_missing" | "subject_collision" | "subject_duplicate" {
-  if (holding === null) return "identifier_missing";
-  return ownRows.has(holding) ? "subject_duplicate" : "subject_collision";
 }
 
 /**

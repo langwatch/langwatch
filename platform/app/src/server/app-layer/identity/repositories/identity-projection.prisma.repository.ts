@@ -245,9 +245,7 @@ export class PrismaIdentityProjectionRepository
    *     projection, and the missing identifier shows up as a parity diff —
    *     as `subject_collision` rather than `identifier_missing`, because the
    *     holder is named, and the two ask different things of the operator:
-   *     one heals itself, this one needs an account merge. Where the holder
-   *     is the user's OWN identifier it reads `subject_duplicate`: nothing to
-   *     merge, and the method works through the holder. The user is HELD
+   *     one heals itself, this one needs an account merge. The user is HELD
    *     with that report, which is the system saying "not right yet", and it
    *     is a far better outcome than a projection that stops folding for
    *     everybody.
@@ -313,10 +311,9 @@ export class PrismaIdentityProjectionRepository
   }
 
   /**
-   * The same collision one table over: another `Account` row — another
-   * user's, or this user's own under a different id — already owns this
-   * provider subject, so the bridge row this fact implies cannot be written
-   * at all.
+   * The same collision one table over: another user's `Account` row already
+   * owns this provider subject, so the bridge row this fact implies cannot
+   * be written at all.
    *
    * `Account` is unique on `(provider, providerAccountId)` across ALL users,
    * and the create branch of `upsertLiveAccount` keys on the row id, so a
