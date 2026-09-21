@@ -2644,6 +2644,11 @@ const presentations = {
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
   },
+  sso_connection_not_found: {
+    title: "That single sign-on connection is not here any more",
+    describe: () =>
+      "It may have been removed while this page was open. Refresh to see what your organization has now.",
+  },
   sso_connection_domain_taken: {
     // Says the domain is spoken for and stops there: which organization holds
     // it is not something a second claimant is entitled to learn from a
@@ -2666,6 +2671,33 @@ const presentations = {
     title: "Removing this connection would lock people out",
     describe: () =>
       "Some people can only sign in through it. Give them another verified sign-in method first, then remove it.",
+  },
+  sso_domain_claim_pending: {
+    // Reached by one claim only now: one on a domain somebody else already
+    // proved. Says the claim is being looked at and nothing about who is
+    // looking or who holds the domain — neither is the reader's to know.
+    title: "We're still reviewing this domain",
+    describe: () =>
+      "You can prove the domain as soon as the review is done. We'll let you know, and nothing else about your setup is waiting on it.",
+  },
+  sso_domain_lookup_failed: {
+    // Deliberately NOT the words above. We did not look and find nothing —
+    // we could not look, so "publish it and check again" would send an
+    // administrator to change a record that is already correct. The words
+    // say to try again and name no resolver, nameserver or timeout.
+    title: "We couldn't check your domain just now",
+    describe: () =>
+      "Looking your domain's records up didn't work this time. Nothing about your setup changed — try again in a few minutes, and tell us if it keeps happening.",
+  },
+  sso_domain_proof_expired: {
+    title: "That record has expired",
+    describe: () =>
+      "Ask for a fresh one and publish it — your approved domain is unaffected, and you don't start over.",
+  },
+  sso_domain_proof_not_found: {
+    title: "We couldn't find that record yet",
+    describe: () =>
+      "Publish the record shown here on your domain, then check again. Changes to DNS can take a while to reach us.",
   },
   sso_connection_operator_act_required: {
     // Read by two very different people: a LangWatch operator whose session
@@ -4435,6 +4467,30 @@ const presentations = {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
       }
       return "Try again, or pick a different model.";
+    },
+  },
+  lwql_app_function_key_cap: {
+    title: "That's too many records to read at once",
+    describe: (error) => {
+      // The cap is per key kind, so the copy names the kind the run broke
+      // rather than always saying "conversations": a trace or span cap
+      // rejection that talks about conversations sends the reader looking in
+      // the wrong place.
+      const kind = error.meta.keyKind;
+      const noun =
+        kind === "thread"
+          ? "conversations"
+          : kind === "span"
+            ? "model calls"
+            : kind === "trace"
+              ? "traces"
+              : "records";
+      const cap = error.meta.cap;
+      const capped =
+        typeof cap === "number"
+          ? `A single run can read ${cap.toLocaleString()} ${noun}.`
+          : `A single run can only read so many ${noun}.`;
+      return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
     },
   },
   agent_error: {
