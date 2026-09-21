@@ -140,6 +140,40 @@ describe("backfill parity", () => {
       ]);
     });
 
+    /** @scenario "A user whose own identifier already holds the subject is not sent for a merge" */
+    it("names a duplicate, not a collision, when the holder is the user's own row", () => {
+      const own = row({
+        id: "idf_google_own",
+        provider: "google",
+        accountId: "acc_google",
+      });
+      expect(
+        backfillParityDiffs({
+          rows: [row({}), own],
+          expected: [
+            EMAIL,
+            { ...GOOGLE, identifierId: "idf_google_own" },
+            GOOGLE,
+          ],
+          subjectHolders: [
+            {
+              identifierId: "idf_google_own",
+              providerId: "google",
+              providerAccountId: "google-sub-1",
+            },
+          ],
+        }),
+      ).toEqual([
+        {
+          kind: "subject_duplicate",
+          identifierId: "idf_google",
+          provider: "google",
+          expectedState: "VERIFIED",
+          holdingIdentifierId: "idf_google_own",
+        },
+      ]);
+    });
+
     it("stays an ordinary missing identifier when no row holds the subject", () => {
       // Nothing holds it, so the identifier is simply not projected yet and
       // the next pass heals it; only a held subject needs a human.

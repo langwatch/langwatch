@@ -432,9 +432,15 @@ accounts and the two users. The incumbent's row is never rewritten: demoting
 it would take a working sign-in method off somebody who has it to give it to
 somebody the database just refused. So the losing user simply has no
 `Account` row for that subject, and the fold carries on with the rest of
-their identifiers. (Within ONE user the constraint does not fire at all —
-one user's two identifiers naming one subject share a row — which is the
-case this paragraph used to describe as the general one.)
+their identifiers.
+
+The two claimants are usually NOT two people. The common shape is one user
+with two identifiers naming one subject — an adopted row and one the backfill
+derived for the same sign-in method — and the constraint fires there exactly
+as it does across users, because it knows nothing of users. The parking is the
+same and so is the incumbent rule; what differs is what it means. Nobody lost
+anything: the sign-in method works through the identifier that holds the
+subject, and there is no second account to merge.
 
 What that costs the losing user depends on where they are, and only one case
 is contained. A user still being backfilled is revisited every pass, and the
@@ -442,7 +448,10 @@ missing identifier shows up as a parity diff — `subject_collision`, naming
 the identifier that holds the subject, rather than the plain
 `identifier_missing` that means "the fold has not caught up yet". The
 distinction is the whole point: one heals on the next pass, the other never
-does, and only a person merging the two accounts clears it. They stay HELD
+does, and only a person merging the two accounts clears it. Where the holder
+is one of the user's own identifiers the diff is `subject_duplicate` instead,
+so that nobody is sent to merge an account with itself; it clears when the
+backfill stops expecting the second identifier. Either way they stay HELD
 with that report — the system saying "not right yet". A user who has already
 `finalized` is NOT revisited: `finalized` is terminal and the runner
 short-circuits on it, so a latched user linking a new enterprise account whose

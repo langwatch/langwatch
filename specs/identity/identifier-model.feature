@@ -487,6 +487,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And it reads as a clash needing an account merge, not as work still in flight
 
   @unit
+  Scenario: A user whose own identifier already holds the subject is not sent for a merge
+    Given "sam"'s backfill expects two identifiers for one provider subject
+    And one of them is live and the other is not carried because the first holds the subject
+    When the backfill proves "sam" against their sign-in methods
+    Then the report names "sam"'s own identifier as the one holding the subject
+    And it reads as a duplicate within one account, not as a clash between two
+
+  @unit
   Scenario: The gate costs nothing before anyone is enrolled
     Given no user has finalized the identifier backfill
     When any number of users are checked against the gate
