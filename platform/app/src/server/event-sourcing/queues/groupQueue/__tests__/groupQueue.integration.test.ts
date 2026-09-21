@@ -294,7 +294,7 @@ describe.skipIf(!hasTestcontainers)(
         const preflight = new GroupQueueProcessor(definition, redis, {
           consumerEnabled: false,
           dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
-          preflightDrainTimeoutMs: 250,
+          preflightDrainTimeoutMs: 0,
         });
         queues.push(preflight);
 
@@ -315,7 +315,7 @@ describe.skipIf(!hasTestcontainers)(
         const preflight = new GroupQueueProcessor(definition, redis, {
           consumerEnabled: false,
           dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
-          preflightDrainTimeoutMs: 250,
+          preflightDrainTimeoutMs: 0,
         });
         queues.push(preflight);
 
