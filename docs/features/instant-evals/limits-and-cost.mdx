@@ -1,0 +1,68 @@
+---
+title: Instant Evals limits, cost and billing
+sidebarTitle: Limits and cost
+keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend
+description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+---
+
+## Limits
+
+| What                           | Limit                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Rows per run                   | 1,000 unless you pass `--limit`; 10,000 through the API unless you pass `limit`; 10,000 at most on the free plan, 100,000 on a paid plan |
+| Questions per run              | 10                                                                                                                                       |
+| Levels on a score scale        | 10                                                                                                                                       |
+| Options on a category question | 255                                                                                                                                      |
+| Text per row                   | About 31,000 tokens, less what your questions take; the `traces` digest is cut to 8,000                                                  |
+| Rows `sample` reads            | 25                                                                                                                                       |
+| Verdicts per `results` page    | 1,000                                                                                                                                    |
+| Time `status --wait` waits     | 45 minutes, or the number of minutes you give it                                                                                         |
+
+Ask for more rows than your plan allows and the run is refused with `instant_eval_row_cap_exceeded`, with the cap and the plan in the refusal. When the rows in the window outnumber the limit, the run judges up to the limit and reports `isCapped`, so narrow the window or the filter when the answer has to cover every row.
+
+If a run makes no progress for fifteen minutes, LangWatch fails it rather than leaving it hanging, and you can still read the verdicts it wrote.
+
+## How long does a run take
+
+Judging 1,000 conversations takes about nine seconds, and 10,000 about a minute. The rows are read in pages and each page is judged in parallel while the next one is read, so the time grows with the rows and with the length of their text rather than with the number of questions.
+
+## What a run costs
+
+The rate is 0.0546 USD per million input tokens the judge reads, and output is free. You pay for each row's text plus your questions, in one judge request per row: more for a long conversation than for a short one, and about the same for ten questions as for one.
+
+For example, the first run on the [overview](/features/instant-evals/overview) judged 100 conversations, read 107,000 tokens and cost 0.0058 USD, so 10,000 conversations of the same size come to about 0.58 USD.
+
+## Reading the cost before you start
+
+```bash
+langwatch instant-eval estimate "the customer sounds annoyed" --target threads --last 30d --limit 10000
+```
+
+```
+  This run would judge:
+    Rows:     10,000
+    Requests: 10,000  Tokens: 11,870,000 (1,187 per row)
+    Price:    $0.65
+
+  Nothing was judged and nothing was charged.
+```
+
+The estimate counts the rows exactly, measures the text of fifty rows spread across the whole selection, and multiplies. When a few enormous rows sit among small ones, a sample of fifty can miss them, so check the `Tokens:` line of the finished run for what it actually read.
+
+`run --estimate` does the same and exits. A plain `run` over more than 1,000 rows prints the estimate before it starts.
+
+## The free budget
+
+Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
+
+A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget you set on the project, the team or the organization still applies, and stops a run when it is reached.
+
+## Where the spend shows up
+
+Every finished run and every judged query is one row on the same spend ledger the LangWatch AI Gateway writes, labelled Instant Evals on the [spend page](/ai-gateway/billing-events). A [gateway budget](/ai-gateway/budgets) on a project, a team or the organization counts Instant Evals against it the same way it counts gateway traffic, so one budget caps both.
+
+If you cancel a run, you pay for the rows it judged before it stopped, and a run that judged no rows is free.
+
+## What is stored
+
+LangWatch stores the trace, the question and the answer for each verdict, and none of the judged text; read the text again with `sample`. Verdicts are kept until you delete the project, so a question asked about last quarter still has its answer next year.

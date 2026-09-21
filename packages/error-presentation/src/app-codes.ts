@@ -243,6 +243,17 @@ export const APP_ERROR_CODES = [
   "ingestion_key_workspace_missing",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
+  "instant_eval_already_finished",
+  "instant_eval_classifier_unavailable",
+  "instant_eval_estimate_unavailable",
+  "instant_eval_free_budget_exhausted",
+  "instant_eval_not_enabled",
+  "instant_eval_not_found",
+  "instant_eval_query_budget_exceeded",
+  "instant_eval_query_invalid",
+  "instant_eval_query_missing_columns",
+  "instant_eval_questions_too_long",
+  "instant_eval_row_cap_exceeded",
   "insufficient_permissions",
   // Also a Go code, with copy already written under the shared/transport
   // heading — the REST boundary in `packages/api` puts it on the wire as the

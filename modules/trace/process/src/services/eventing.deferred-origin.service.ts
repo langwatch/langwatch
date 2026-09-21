@@ -2,6 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
+  isSpanReceivedEvent,
   STALE_TRACE_THRESHOLD_MS,
   type ResolveOriginCommandData,
   type TraceProcessingEvent,
@@ -28,6 +29,11 @@ export class TraceDeferredOriginEventingAdapter {
     event: TraceProcessingEvent;
     foldState: TraceSummaryData;
   }): boolean {
+    // Only a span arrival opens the gate: a clustering pass re-emits
+    // topic_assigned stamped with the current time for its whole backlog, so
+    // the staleness check below never catches it and months-old traces would
+    // have the deferred fallback scheduled (#8191).
+    if (!isSpanReceivedEvent(event)) return false;
     if (event.occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return false;
     return !foldState.attributes?.["langwatch.origin"];
   }

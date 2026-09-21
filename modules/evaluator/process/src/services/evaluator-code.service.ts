@@ -92,7 +92,10 @@ export class EvaluatorCodeService {
           }),
           inputs: [inputs],
           manual_execution_mode: false,
-          do_not_trace: false,
+          // Without a parent link the engine mints a fresh trace id, and the
+          // evaluator's spans become a separate evaluation-origin trace that
+          // flows back through the pipeline as customer traffic (#8192).
+          do_not_trace: input.parentTrace === undefined,
           run_evaluations: false,
           origin: "evaluation",
         },

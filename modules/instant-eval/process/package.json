@@ -20,8 +20,30 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*"
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

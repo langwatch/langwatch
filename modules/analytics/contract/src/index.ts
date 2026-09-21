@@ -47,5 +47,6 @@ export {
 } from "./dashboard-widget.schemas.ts";
 
 export * from "./dashboard-widget.errors.ts";
+export * from "./langwatch-ql-app-functions.ts";
 export * from "./langwatch-ql-violation.ts";
 export * from "./langwatch-ql-validation.errors.ts";

@@ -2716,6 +2716,81 @@ const presentations = {
     title: "Ingestion source not found",
     describe: () => "It may have been archived. Reload to see the current list.",
   },
+  instant_eval_already_finished: {
+    title: "That run is already over",
+    describe: () => "There is nothing left to cancel.",
+  },
+  instant_eval_classifier_unavailable: {
+    title: "The judgements couldn't be made right now",
+    describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
+  },
+  instant_eval_estimate_unavailable: {
+    title: "We couldn't work out the size of this run",
+    describe: () => "The estimate failed on our side. Try again, or start the run without one.",
+  },
+  instant_eval_free_budget_exhausted: {
+    title: "Your free Instant Evals budget is used up",
+    // Both numbers are on the error, and the reader is deciding whether to
+    // upgrade, so the sentence says what the free allowance was and where
+    // upgrading is done rather than leaving them to find the plan page.
+    describe: (error) => {
+      const budget = error.meta.budgetUsd;
+      const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+    },
+  },
+  instant_eval_not_enabled: {
+    title: "Instant Evals aren't available yet",
+    describe: () =>
+      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+  },
+  instant_eval_not_found: {
+    title: "That run doesn't exist",
+    describe: () => "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_query_budget_exceeded: {
+    title: "That's too much text to judge in one query",
+    describe: () =>
+      "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
+  },
+  instant_eval_query_invalid: {
+    title: "That query can't run as a job",
+    describe: (error) => {
+      const parameters = error.meta.parameters;
+      // The named parameters are the whole of the fix, so the copy repeats them
+      // rather than sending the reader back to the statement to guess which
+      // ones a job cannot fill.
+      return Array.isArray(parameters) && parameters.length > 0
+        ? `Remove ${parameters.join(", ")} from the query and run it again.`
+        : "Edit the query and run it again.";
+    },
+  },
+  instant_eval_query_missing_columns: {
+    title: "That query is missing what a run needs",
+    describe: (error) =>
+      error.meta.isEvalFunctionMissing === true
+        ? "Add an eval function to the query's SELECT list, such as eval(...) over the text you want judged."
+        : "Add TraceId to the query's SELECT list so each judgement can be tied back to its trace.",
+  },
+  instant_eval_questions_too_long: {
+    title: "Those questions leave no room for the text",
+    describe: () =>
+      "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
+  },
+  instant_eval_row_cap_exceeded: {
+    title: "That's more rows than one run may judge",
+    describe: (error) => {
+      const cap = error.meta.cap;
+      const maxCap = error.meta.maxCap;
+      if (typeof cap !== "number") return "Ask for fewer rows.";
+      // Two different asks: below the ceiling an upgrade lifts it, at the
+      // ceiling nothing does, and saying "upgrade" there would sell something
+      // that changes nothing.
+      return typeof maxCap === "number" && cap < maxCap
+        ? `This plan judges up to ${cap.toLocaleString()} rows in one run. Lower the limit, or upgrade to judge up to ${maxCap.toLocaleString()}.`
+        : `A run judges up to ${cap.toLocaleString()} rows. Split the selection across more than one run.`;
+    },
+  },
   impersonation_cannot_change_credentials: {
     // A deliberate denial, like the admin-to-admin impersonation one: how an
     // account signs in belongs to its owner, and support access must never
@@ -3991,7 +4066,7 @@ const presentations = {
   },
   guided_onboarding_path_unknown: {
     title: "This onboarding path is not one we know",
-    description: "Pick one of the paths the guided onboarding offers and try again.",
+    describe: () => "Pick one of the paths the guided onboarding offers and try again.",
   },
   github_not_connected: {
     title: "GitHub is not connected",

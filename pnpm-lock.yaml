@@ -7659,15 +7659,27 @@ importers:
 
   modules/instant-eval/contract:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -7681,12 +7693,78 @@ importers:
 
   modules/instant-eval/process:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../gateway/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.1
+      hono-openapi:
+        specifier: 'catalog:'
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -14023,6 +14101,9 @@ importers:
       '@langwatch/enterprise-scim-browser':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/browser
+      '@langwatch/enterprise-sso-browser':
+        specifier: workspace:*
+        version: link:../../enterprise/modules/sso/browser
       '@langwatch/evaluator-browser':
         specifier: workspace:*
         version: link:../../modules/evaluator/browser
