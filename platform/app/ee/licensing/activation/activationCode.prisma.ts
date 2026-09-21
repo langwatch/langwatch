@@ -119,7 +119,10 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
       UPDATE "ActivationCode"
          SET "redeemedAt" = ${at},
              "redeemedByInstanceId" = ${instanceId},
-             "redemptionCount" = "redemptionCount" + 1
+             "redemptionCount" = "redemptionCount" + 1,
+             -- Set here: the @updatedAt attribute is applied by the Prisma
+             -- client, which this statement goes around.
+             "updatedAt" = now()
        WHERE "id" = ${id}
          AND "reusable" = false
          AND "redeemedAt" IS NULL
@@ -149,7 +152,10 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
       UPDATE "ActivationCode"
          SET "redeemedAt" = ${at},
              "redeemedByInstanceId" = ${instanceId},
-             "redemptionCount" = "redemptionCount" + 1
+             "redemptionCount" = "redemptionCount" + 1,
+             -- Set here: the @updatedAt attribute is applied by the Prisma
+             -- client, which this statement goes around.
+             "updatedAt" = now()
        WHERE "id" = ${id}
          AND "reusable" = true
          AND "revokedAt" IS NULL
