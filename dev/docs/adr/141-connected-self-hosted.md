@@ -52,16 +52,29 @@ What the code had when this was written:
 3. Hard stop when the prepaid commit is spent. On-demand overage only when the
    contract enables it, with a maximum.
 4. Overage invoiced quarterly in arrears. No air-gapped rate change.
-5. Opt-in per hosted service in Settings, default off, stating what leaves.
+5. A hosted service the license names is on unless an organization admin
+   switches it off in Settings, which states what leaves. Off is recorded,
+   not on, so a bought service works before anyone finds the page.
+6. Seats are the count signed into the license, with no headroom above it. A
+   customer that needs more asks; the license is reissued with the new count
+   and the install picks it up on the next sync or on refresh. Seats added
+   mid-term are invoiced prorated to the end of the term, seats removed are
+   not credited.
+7. The prepaid usage budget expires with the term. Nothing rolls forward.
+   Overage past the commit is off unless sales enables it on the license, and
+   the maximum lives on that license alone.
+8. Invoices are chased by finance by hand. The hard stops are the license end
+   date and revocation of hosted services from the backoffice, which takes
+   effect within fifteen minutes.
 
 ## Decisions
 
 ### 1. A license registry on LangWatch Cloud
 
 `IssuedLicense` records every license: customer organization, plan, seats,
-term, status, entitled services, seat overage allowance, seat rate, commit,
-overage switch and maximum, instance binding, the managed key, who issued it and
-what it replaces. Status `expired` is derived from the term, never written.
+term, status, entitled services, seat rate, commit, overage switch and
+maximum, instance binding, the managed key, who issued it and what it
+replaces. Status `expired` is derived from the term, never written.
 
 Every issue path writes it through one service: the backoffice, the purchase
 webhook and `scripts/generate-license.ts`. The signing key is read from
@@ -240,67 +253,52 @@ it, the refusal names the maximum (400
 `connect_budget_above_contract_maximum`). A customer with no commit agreed has no
 budget to set (409 `connect_budget_not_set`).
 
-### 6. The sync lease is the grace rule
+### 6. Sync delivers the license; the license is the seat count
 
 `POST /v1/license/sync` sends the token, the instance id, the version and the
-two seat counts. It answers with a lease:
-`{licenseId, instanceId, services, seatOverageAllowance, issuedAt, warnAfter,
-validUntil}`, signed with the license key pair and verified with the public key
-the install already embeds. `warnAfter` is 14 days out and `validUntil` is 30.
+two seat counts. It answers `{services, license?}`: the hosted services the
+registry has the license entitled to, and the signed license that replaces the
+one presented, when an operator reissued it. There is no second signed
+artefact and no grace rule. The seats an install may fill are the seats in the
+license it holds, checked offline exactly as they were before Connect.
 
-When sync fails, the allowance is kept without comment for 14 days. From day 14
-to day 30 it is still kept, and admins see a warning that names the day it will
-be withdrawn. After day 30 the install is back on the hard licensed cap. A sync
-failure is shown in Settings, Connect from the first failure, so the cause can
-be fixed long before the warning.
+A customer that needs more seats asks. The operator raises them in the
+backoffice ("Change seats" on the license drawer), which signs a replacement
+for the same term and holds it encrypted for delivery. The install applies it
+on its next daily sync, or at once when an admin presses "Refresh license" on
+the License page, which runs the same sync by hand and reports the outcome:
+the new seat count, an unchanged license, or the refusal the host named. The
+refresh goes through the registry's rate limit like the daily sync (48 calls
+per license per 24 hours, answered `rate_limited` 429). A lapsed license is
+renewed the same way through `reissue`, with a new term.
 
-The default allowance is 20% of the licensed seats, rounded up. A license can
-override it on its registry row.
-
-The install applies the allowance where plan limits are resolved, so every
-caller of the seat guard sees it: licensed seats plus the allowance while a
-lease is valid, licensed seats alone once it is not. Existing members are never
-locked out, which keeps the rule in `specs/licensing/seat-reconciliation.feature`.
-
-A "last successful sync" timestamp in the install's own database was rejected.
-An admin of a self-hosted install can edit a row. A lease that expires needs no
-local clock to be trusted, and neither the allowance nor the two dates can be
-forged without changing code. 30 days survives an outage, a holiday and a
-firewall ticket, and is short enough that an install can not take the allowance
-and stop reporting for a quarter.
-
-Going over the licensed seats costs money later, so the install says so when it
-happens: on the invitation and on the members page.
+A "last successful sync" timestamp is kept on the install for the settings
+page only; nothing is enforced from it. A sync failure is shown in Settings,
+Connect from the first failure, so an outbound rule can be fixed before a seat
+change is waiting on it.
 
 The install's identity on sync is the one it presents to the gateway (section
-9): the organization id, or `LANGWATCH_CONNECT_INSTANCE_ID`. One identity for
-both hosts, because the registry binds a license to one instance and a sync
-that presented another id than the classify calls would be refused as the wrong
-instance. It carries no organization name. The statistics post keeps its
-payload, moves to the connect host when Connect is on, and stays off with
-`DISABLE_USAGE_STATS`. `app.langwatch.ai/api/track_usage` keeps working for
-older installs and for installs without Connect.
+9): a UUID minted into its own database, or `LANGWATCH_CONNECT_INSTANCE_ID`.
+One identity for both hosts, because the registry binds a license to one
+instance and a sync that presented another id than the classify calls would
+be refused as the wrong instance. It carries no organization name. The
+statistics post keeps its payload, moves to the connect host when Connect is
+on, and stays off with `DISABLE_USAGE_STATS`. `app.langwatch.ai/api/track_usage`
+keeps working for older installs and for installs without Connect.
 
-"Seat reconciliation" already names the in-app flow of disabling members down to
-the license. The quarterly billing job is called the seat true-up everywhere.
+What the registry keeps from a sync is the last report on the row
+(`lastSyncAt`, `lastSyncVersion`, `reportedMembers`, `reportedMembersLite`).
+The backoffice and the lead signals read it; a licensed install whose last sync
+is older than seven days raises the `license_sync_stale` signal once. A refused
+sync records nothing.
 
-What the registry keeps from a sync: the last report on the row (`lastSyncAt`,
-`lastSyncVersion`, `reportedMembers`, `reportedMembersLite`) and the peak of the
-license term quarter in `LicenseSeatReport`, keyed by `(licenseId,
-quarterStartsAt)` and only ever raised. The quarter runs in three-month steps
-from the license's own `issuedAt`, not from the calendar year, because that is
-the term the seats were bought for. Sync is rate limited per registry row at 48
-calls per 24 hours, answered `rate_limited` 429; a refused sync records nothing.
-
-A reissued license travels inside the sync answer (`license`) until the install
-presents the new token. The lease beside it still names the license being
-replaced, so the install does not keep that lease: it applies the new license
-through the same validation a pasted key gets, then syncs once more with the new
-token. That second sync is what earns a lease for the new `licenseId` and what
-tells the registry the replaced license is out of use: the replaced row is
-marked superseded, its managed key is retired, and the encrypted copy held for
-delivery is erased. A delivered license that does not verify is not applied and
-the failure is shown in Settings, Connect.
+A reissued license travels inside the sync answer (`license`) until the
+install presents the new token. The install applies it through the same
+validation a pasted key gets, then syncs once more with the new token. That
+second sync is what tells the registry the replaced license is out of use: the
+replaced row is marked superseded, its managed key is retired, and the
+encrypted copy held for delivery is erased. A delivered license that does not
+verify is not applied and the failure is shown in Settings, Connect.
 
 The install reports its version from `SERVICE_VERSION`, then `service.version`
 in `OTEL_RESOURCE_ATTRIBUTES`, then the package version, and `unknown` when none
@@ -339,10 +337,6 @@ Verified against the Stripe documentation and in Stripe test mode on 2026-09-19.
   banks in the United States. The transfer type is an onboarding input. Every
   other customer pays to LangWatch's own bank account, the invoice shows those
   instructions, and finance marks it paid out of band from the backoffice.
-- Stripe has no setting that skips a small invoice and rolls it forward. Billing
-  thresholds do the opposite. Roll-forward under 50 USD is an explicit command:
-  a credit note on the small invoice, then a pending invoice item on the
-  subscription for the same amount.
 - The repository pins `stripe@15.12.0` at API version `2024-04-10`, which has no
   credit grants. A global bump would change subscriptions, checkout and webhooks
   for every Cloud customer, so it is not part of this change. A small adapter
@@ -356,15 +350,20 @@ organization budget equal to the commit with window `MANUAL` and breach action
 `BLOCK`. Each step stores the id it created, so a run that failed halfway
 resumes.
 
-The seat true-up runs on a daily worker tick and dispatches a checkpointed
-command per license and term quarter, after the quarter has closed. Added seats
-are the quarter's highest reported count minus the seats already invoiced. The
-amount is `added seats * annual seat rate * days remaining / term days`, rounded
-to the cent, where the days remaining start the day after the quarter closes.
-Nothing is backdated. It is its own one-off invoice in the currency of the seat
-contract, because seat lines can not ride a USD usage subscription. Seats are
-not credited back mid-term. A license that never synced in a quarter is flagged
-and not invoiced on a guess.
+A seat change is invoiced when the operator makes it. Added seats are the new
+count minus the count on the license it replaces. The amount is `added seats *
+annual seat rate * days remaining / term days`, rounded to the cent per seat
+first and then multiplied, where the days remaining count from the day of the
+change. It is its own one-off invoice in the currency of the seat contract,
+because seat lines can not ride a USD usage subscription. Seats are not
+credited back mid-term.
+
+The gateway stops a connected customer at its budget on a 60 second refresh,
+so the spend ledger can run a few cents past the commit before it does; what
+is reported to the usage meter is clamped at the commit, or at the commit plus
+the overage maximum when overage is on, less what the term's earlier months
+already carried, so the credit grant always covers the quarterly invoice in
+full and an overshoot never appears as an amount due.
 
 `reportUsageForMonth` skips organizations that are not on `SEAT_EVENT` pricing.
 A connected customer organization is not, so it is admitted explicitly through
@@ -373,7 +372,10 @@ its `selfHostedCustomer` mark, or its hosted usage would never reach the meter.
 How it is built (`ee/billing/connected/`):
 
 - The commit is agreed on the license, in the registry (`commitUsdCents`), and
-  that is the one number the organization budget follows. Billing never sets a
+  that is the one number the organization budget follows. The overage maximum
+  (`overageMaxUsdCents`) lives on the license too; there is no default on the
+  registry, the backoffice form suggests a quarter of the commit when the
+  switch is turned on and the operator edits it. Billing never sets a
   cap of its own: onboarding and renewal refuse a commit that differs from the
   license terms (`connected_billing_commit_mismatch`), adding commit mid-term
   raises the license commit through the registry, and after each of these the
@@ -394,22 +396,20 @@ How it is built (`ee/billing/connected/`):
   pending renewal naming the old term's end and creates the renewal grant only
   once a finalized usage invoice covers that period; `invoice.finalized` and
   the daily tick both try to complete it.
-- A usage invoice under 50 USD is credited in full and its amount becomes a
-  pending item on the subscription with `rolled_forward_from` naming the
-  invoice; the stored invoice row remembers the item, so a second run moves
-  nothing.
-- The seat true-up (`seatTrueUp.service.ts`) runs daily on LangWatch Cloud and
-  decides each closed term quarter once, keyed `(licenseId, quarterStartsAt)`:
-  added seats are the quarter's peak from `LicenseSeatReport` minus the seats
-  on the account plus the seats of earlier quarters already invoiced or in
-  flight; the per-seat amount is the annual rate times the days remaining after
-  the quarter closes over the term days, rounded to the cent, then multiplied
-  (50 seats at 600 USD, 8 added with 183 of 365 days left: 8 x 300.82 =
-  2,406.56 USD; per seat first, so the unit amount and the quantity on the
-  invoice line multiply back to the total); an `intent` row is written before the provider call, which
-  carries an idempotency key, so a retry invoices once; a quarter without a
-  report is `flagged`, or `skipped` for a license with no allowance that never
-  synced; seats that went down are not credited back.
+- A seat change (`seatChange.service.ts`) is invoiced by the registry's
+  `changeSeats` through a port, after the replacement license is signed and
+  recorded: added seats are the new count minus the replaced license's count;
+  the per-seat amount is the annual rate times the days remaining from the day
+  of the change over the term days, rounded to the cent, then multiplied (50
+  seats at 600 USD, 8 added with 182 of 365 days left: 8 x 299.18 = 2,393.44
+  USD; per seat first, so the unit amount and the quantity on the invoice line
+  multiply back to the total). A `ConnectedSeatChange` row keyed on the
+  reissued license is written in state `intent` before the provider call,
+  which carries an idempotency key derived from that license, so a retry
+  invoices once; the daily billing tick completes any intent whose provider
+  call failed, and the backoffice shows it as pending until then. A customer
+  with no billing account gets no invoice from here and the operator is told
+  so. Seats that went down are not credited back.
 - A connected customer's meter event is dated at the end of the month it
   covers, because the quarterly invoice for that month is still open; a Cloud
   customer's stays at the time of reporting, because its monthly invoice may
@@ -562,7 +562,7 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | A revoked license with a cached gateway credential | Revoking revokes the managed key; the change feed evicts the cache entry on the next poll. The 15 minute JWT expiry is the backstop. | While the control plane is unreachable the gateway serves stale entries for up to its 6 hour hard grace. Exposure is capped by the budget. |
 | Hash enumeration | The token is the SHA-256 of a payload that contains a 2048-bit RSA signature. It can not be guessed. The shape check and the negative cache keep a flood of unknown tokens off Postgres. | Refusals never include customer name, seats or term. |
 | A read of the registry table | Rows hold `sha256(token)`, never the token, and a SHA-256 of a 256-bit value can not be reversed. A held reissued license is encrypted. | The encryption key lives outside the database. |
-| A self-hosted admin tampers with the client | They can forge nothing LangWatch signs: not a license, not a lease. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing is flagged in the backoffice, and the contract's audit clause covers the rest. |
+| A self-hosted admin tampers with the client | They can forge nothing LangWatch signs. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing raises a signal after seven days, and the contract's audit clause covers the rest. |
 | A customer changes its own cap | `PUT /v1/budget` is bounded by the contract maximum on the registry row. | The install only offers it to organization admins. |
 
 ## Operator names
@@ -575,9 +575,11 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | Entitlement | `LicenseData.connectServices`, signed into the license |
 | Instance identity | `InstanceIdentity` (one row: `instanceId`, `lastReportAt`, `lastReportError`) |
 | Install opt-out | `Organization.connectServicesDisabled` (empty by default, so an entitled service is on) |
+| Seat change | backoffice "Change seats", `licenseRegistry.changeSeats`, `ConnectedSeatChange` |
+| Refresh | License page "Refresh license", `license.refresh`, `syncLicenseNow` |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
 | Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |
-| Connect host | `POST /v1/license/sync`, `POST /v1/stats` |
+| Connect host | `POST /v1/license/sync` (answers `{services, license?}`), `POST /v1/stats` |
 | Contract budget | `GatewayBudget.externalId = connect-contract`, metadata `connect_cap_set_by` |
 | Error codes | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `connect_budget_exhausted`, `connect_disabled`, `connect_unreachable`, `hosted_service_unavailable` |
 

@@ -176,12 +176,13 @@ For an install that must prove the absence rather than derive it, set `app.conne
 | `connect_service_not_entitled` | The service is not part of your license. | Contact LangWatch to add it. |
 | `connect_budget_exhausted` | The cap has been reached and hosted calls stop. | An organization admin raises the cap in Settings, Connect, up to the contract maximum. |
 | `license_sync_failed` | The daily sync did not complete. | It runs again in a day, or press Refresh license. Your seats and services are unchanged meanwhile. |
+| `rate_limited` | The license synced as often as LangWatch allows in a day. | Wait and refresh later; the daily sync is unaffected. |
 | `hosted_service_unavailable` | LangWatch did not answer. | No text was judged and no charge was made. Try again in a moment. |
 | `activation_code_*` | The code was refused: unknown, expired, already used, or bound to another install. | The message names which. Ask LangWatch for a new code. |
 
 ## How hosted usage is billed
 
-You prepay a usage commit for the term. It is charged at list rates as a line on the annual invoice, next to the seats, and hosted usage draws it down.
+You prepay a usage commit for the term. It is charged at list rates as a line on the annual invoice, next to the seats, and hosted usage draws it down. What is left of the commit expires with the term.
 
 When the commit is spent, hosted calls stop. They keep running past it only when your contract enables overage, which carries a maximum you agreed, prefilled at a quarter of the commit and changeable by LangWatch. The cap you set in Settings, Connect can be anywhere between zero and that maximum.
 

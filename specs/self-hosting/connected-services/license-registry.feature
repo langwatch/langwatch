@@ -215,13 +215,31 @@ Feature: License registry
 
   @unit
   Scenario: Commercial terms are set on the registry row
-    When an operator sets a seat overage allowance of 5, a seat rate of 600 USD per year, a prepaid commit of 1000 USD and on-demand overage up to 500 USD
-    Then the row records the allowance, the seat rate, the commit, that overage is enabled and its maximum
+    When an operator sets a seat rate of 600 USD per year, a prepaid commit of 1000 USD and on-demand overage up to 500 USD
+    Then the row records the seat rate, the commit, that overage is enabled and its maximum
 
   @unit
-  Scenario: The seat overage allowance defaults to a fifth of the seats, rounded up
-    When an operator issues a license for 52 seats without setting an allowance
-    Then its seat overage allowance is 11
+  Scenario: Switching overage on suggests a quarter of the commit as the maximum
+    Given a license form with a prepaid commit of 1000 USD and overage off
+    When an operator switches on-demand overage on
+    Then the maximum reads 250 USD, which the operator can edit
+    And switching it off again sends no maximum
+    And the registry holds no default maximum of its own
+
+  @unit
+  Scenario: An operator changes the seats of a running license
+    Given an active license for 50 seats
+    When an operator changes it to 58 seats
+    Then a replacement is signed for 58 seats and the same term
+    And it is held for delivery to the install over sync
+    And billing is asked to invoice the 8 added seats
+
+  @unit
+  Scenario: Seats changed on a revoked license are refused
+    Given a revoked license
+    When an operator changes its seats
+    Then the change is refused as not active
+    And billing is asked for nothing
 
   @unit
   Scenario: An overage maximum without overage enabled is refused
