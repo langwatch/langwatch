@@ -7,11 +7,9 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
-
     "rootDir": ".",
 
-    "outDir": "dist",
-
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vitest.setup.ts"],
 
@@ -39,6 +37,9 @@
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"

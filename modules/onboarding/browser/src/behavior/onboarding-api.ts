@@ -4,6 +4,11 @@
  */
 
 import { createModuleApi } from "@langwatch/api/web";
+import type {
+  GuidedOnboardingState as GuidedState,
+  GuidedOnboardingStateWithInstance as GuidedStateWithInstance,
+  GuidedOnboardingStateWithVariant as GuidedStateWithVariant,
+} from "@langwatch/onboarding-contract";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import type { TimeInput } from "@langwatch/time";
 
@@ -34,6 +39,78 @@ export type OnboardingApiMap = {
       mutation: {
         input: { integrationMethod: string; projectId?: string };
         output: unknown;
+      };
+    };
+
+    /** The guided takeover/tour's durable state, plus the variant it was assigned. */
+    getGuidedState: {
+      query: {
+        input: { organizationId: string };
+        output: GuidedStateWithVariant;
+      };
+    };
+
+    /** Records the paths picked on the value screen, in pick order. */
+    recordPaths: {
+      mutation: {
+        input: { organizationId: string; paths: string[] };
+        output: GuidedState;
+      };
+    };
+
+    /** Records the provider the reader connected on the provider screen. */
+    recordProvider: {
+      mutation: {
+        input: { organizationId: string; provider: string; model: string };
+        output: GuidedState;
+      };
+    };
+
+    /** Records that the reader skipped connecting a provider. */
+    recordProviderSkipped: {
+      mutation: {
+        input: { organizationId: string };
+        output: GuidedState;
+      };
+    };
+
+    /** Records a virtual key the gateway tour minted, for the secret snippet card. */
+    recordVirtualKeyReveal: {
+      mutation: {
+        input: { organizationId: string; name: string; preview: string; revealId: string };
+        output: GuidedState;
+      };
+    };
+
+    /** Records the tour's outcome: completed, skipped, or replayed. */
+    recordTour: {
+      mutation: {
+        input: { organizationId: string; status: "completed" | "skipped" | "replayed" };
+        output: GuidedState;
+      };
+    };
+
+    /** Marks a path as the one Langy is guiding now. */
+    beginPath: {
+      mutation: {
+        input: { organizationId: string; path: string };
+        output: GuidedStateWithInstance;
+      };
+    };
+
+    /** Marks a path done. */
+    completePath: {
+      mutation: {
+        input: { organizationId: string; path: string };
+        output: GuidedState;
+      };
+    };
+
+    /** Attaches the Langy conversation the kickoff started to the organization. */
+    attachConversation: {
+      mutation: {
+        input: { organizationId: string; conversationId: string };
+        output: GuidedState;
       };
     };
   };
