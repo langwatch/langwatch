@@ -22,10 +22,20 @@
  *     global bucket is already refusing doesn't also mint a fresh per-caller
  *     Redis key on every request.
  *   - per-IP and per-instance limits on top, for fairness once under the cap
+ *
+ * An accepted report lands in two places: the registry of self-hosted installs
+ * (one row per install, plus the report itself as history), and PostHog. The
+ * registry is what a screen reads back; before it, the report reached PostHog
+ * and no database, so no question about our own distribution could be
+ * answered. Because the caller presents no credential, a report identifies an
+ * install and never a customer: the organization on an install's row comes
+ * from the license bound to that instance, never from the posted body.
  */
 
+import { createSelfHostedInstanceService } from "@ee/telemetry/instances/composition";
 import type { Context } from "hono";
 import { z } from "zod";
+import { prisma } from "~/server/db";
 import { getPostHogInstance } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
@@ -249,6 +259,12 @@ export async function handleTrackUsage(c: Context) {
     return c.json({ message: "Too many requests" }, 429);
   }
 
+  await storeReport({
+    instanceId: instance_id,
+    properties,
+    unknownFields,
+  });
+
   const posthog = getPostHogInstance();
   if (posthog) {
     try {
@@ -263,4 +279,38 @@ export async function handleTrackUsage(c: Context) {
   }
 
   return c.json({ message: "Event captured" });
+}
+
+/**
+ * The report's own row, and one row of history (ADR-139, section 10).
+ *
+ * A failure here is swallowed, exactly as the PostHog capture's is, and for
+ * the same reason: refusing a report takes the install with it. An install
+ * that gets a 500 back logs a failed report and tries again tomorrow, and a
+ * receiver that is briefly unable to write would turn a day of storage trouble
+ * into a gap in every install's history. The failure reaches error tracking
+ * instead.
+ *
+ * The organization an install belongs to is resolved inside the service, from
+ * the license bound to that instance. Nothing in `properties` reaches it.
+ */
+async function storeReport({
+  instanceId,
+  properties,
+  unknownFields,
+}: {
+  instanceId: string;
+  properties: Record<string, unknown>;
+  unknownFields: number;
+}): Promise<void> {
+  try {
+    await createSelfHostedInstanceService(prisma).recordReport({
+      instanceId,
+      properties,
+      unknownFields,
+      receivedAt: new Date(),
+    });
+  } catch (error) {
+    captureException(toError(error));
+  }
 }

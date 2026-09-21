@@ -40,6 +40,13 @@ vi.mock("~/server/posthog", () => ({
   getPostHogInstance: () => ({ capture }),
 }));
 
+// The registry of self-hosted installs, stood in for so this file can say what
+// the route hands it without reaching a database.
+const recordReport = vi.fn();
+vi.mock("@ee/telemetry/instances/composition", () => ({
+  createSelfHostedInstanceService: () => ({ recordReport }),
+}));
+
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { app } from "../misc";
 
@@ -102,6 +109,45 @@ describe("POST /api/track_usage", () => {
           unknown_fields: 0,
         },
       });
+    });
+  });
+
+  describe("when the report is accepted", () => {
+    /** @scenario "The first report from an install creates its row" */
+    it("hands the registry the validated report and the instance it came from", async () => {
+      const res = await request({
+        body: dailyUsageStatsBody({
+          totalTraces: 42,
+          injected_marker: "attacker-controlled",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(recordReport).toHaveBeenCalledTimes(1);
+      const stored = recordReport.mock.calls[0]?.[0] as {
+        instanceId: string;
+        properties: Record<string, unknown>;
+        unknownFields: number;
+      };
+      expect(stored.instanceId).toBe("acme__org_1");
+      expect(stored.properties.totalTraces).toBe(42);
+      expect(stored.properties.injected_marker).toBeUndefined();
+      expect(stored.unknownFields).toBe(1);
+    });
+  });
+
+  describe("when the database refuses the write", () => {
+    /** @scenario "Storage failing never refuses the report" */
+    it("answers the install as though the report had landed", async () => {
+      // Refusing here would take the install with it: a 500 on a day of
+      // storage trouble turns into a gap in every install's history, and the
+      // report is the only thing that tells us an install exists.
+      recordReport.mockRejectedValueOnce(new Error("connection refused"));
+
+      const res = await request({ body: dailyUsageStatsBody() });
+
+      expect(res.status).toBe(200);
+      expect(capture).toHaveBeenCalledTimes(1);
     });
   });
 

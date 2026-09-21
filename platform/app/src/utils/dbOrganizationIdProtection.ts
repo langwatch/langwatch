@@ -677,6 +677,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // backoffice. A guard demanding organizationId would refuse both. It holds
   // no customer content: ids, a token hash, seat counts, terms and amounts.
   "IssuedLicense",
+  // The registry of self-hosted installs (ADR-139, section 10). Org-bearing,
+  // and deliberately not org-CONSTRAINED: a report is addressed by the
+  // instance id the install minted, before any organization is known, and the
+  // organization on the row is filled in afterwards from the license bound to
+  // that instance. LangWatch operators also list it across customers in the
+  // backoffice. A guard demanding organizationId would refuse both. It holds
+  // no customer content: an instance id, a release, counts, dates and
+  // aggregated email domains.
+  "SelfHostedInstance",
   // The engine's provider table (D09), org-bearing and deliberately not
   // org-CONSTRAINED for the same reason `SsoConnection` is not: better-auth's
   // single sign-on plugin addresses a provider by its globally-unique

@@ -25,6 +25,7 @@ import {
   Network,
   RefreshCw,
   ScrollText,
+  Server,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -405,6 +406,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         icon: ShieldCheck,
       },
       { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
+      {
+        label: "Self-hosted installs",
+        href: "/ops/backoffice/self-hosted-instances",
+        icon: Server,
+      },
       {
         label: "Identity Lookup",
         href: "/ops/backoffice/identity-lookup",

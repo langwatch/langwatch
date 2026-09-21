@@ -6365,3 +6365,93 @@ model InstanceIdentity {
   /// its own rather than travelling with its category.
   hostnameOptOut        Boolean @default(false)
 }
+
+/// One self-hosted install, as its daily usage report describes it (ADR-139,
+/// section 10). The row is created by the first report that names an instance
+/// id and is updated by every report after that, so the backoffice reads one
+/// row per install rather than folding a history on every page load.
+///
+/// The report carries no credential, so it identifies an install and never a
+/// customer. `organizationId` and `issuedLicenseId` are resolved from the
+/// license bound to this instance, which the install proved by presenting its
+/// token to license sync. A field in the posted body never reaches them.
+model SelfHostedInstance {
+  id          String   @id @default(nanoid())
+  /// The UUID the install minted for itself. The join key for everything else.
+  instanceId  String   @unique
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime
+
+  /// What the install says about itself.
+  version             String?
+  installMethod       String?
+  chartVersion        String?
+  /// The host it answers on, when the operator left hostname reporting on.
+  hostname            String?
+  environment         String?
+  /// The day the install itself says it first came up, which predates the
+  /// first report on an install that switched reporting on later.
+  installedAt         DateTime?
+  reportSchemaVersion Int?
+
+  /// The customer, and the license that named them. Plain column refs rather
+  /// than relations, like `LicenseSeatReport.licenseId`: relationMode="prisma"
+  /// carries no foreign keys, and the receiver resolves both from the license
+  /// registry rather than from the report.
+  organizationId  String?
+  issuedLicenseId String?
+
+  /// Domains with counts, as `{"acme.test": 14}`. Never an address. Null on an
+  /// install that switched the optional category off.
+  userEmailDomains Json?
+  /// The same domains as the keys of `userEmailDomains`, flattened so an
+  /// operator can search for one. A JSON object's keys are the domains
+  /// themselves, and no query language addresses a key it does not already
+  /// know the name of.
+  userDomains      String[] @default([])
+
+  /// What the last report carried, so the list and the drawer read one row:
+  /// the onboarding ladder, the usage counts and the operational block, under
+  /// the same keys the dictionary declares.
+  latestReport Json?
+
+  /// What the last report said the operator had switched off, read from which
+  /// categories arrived rather than from a field the install could assert.
+  optionalMetricsReported Boolean @default(true)
+  hostnameReported        Boolean @default(true)
+
+  /// How many reports have landed, and how many fields the last one carried
+  /// that this release has no name for. A count above zero says the senders
+  /// are ahead of the receiver.
+  reportCount       Int @default(0)
+  lastUnknownFields Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lastSeenAt])
+  @@index([organizationId])
+  @@index([issuedLicenseId])
+}
+
+/// One usage report, exactly as it arrived. Kept so a number on an install's
+/// row can be traced back to the report that set it, and so a question asked
+/// later can be answered over the history rather than over the latest snapshot.
+model SelfHostedInstanceReport {
+  id         String   @id @default(nanoid())
+  /// The `SelfHostedInstance.instanceId` this report came from. A plain column
+  /// ref for the same reason the instance row's refs are.
+  instanceId String
+  receivedAt DateTime @default(now())
+
+  version             String?
+  reportSchemaVersion Int?
+  /// Fields this release had no name for. Counted, never stored by name.
+  unknownFields       Int     @default(0)
+
+  /// The validated report, with every unknown field already dropped.
+  payload Json
+
+  @@index([instanceId, receivedAt])
+  @@index([receivedAt])
+}

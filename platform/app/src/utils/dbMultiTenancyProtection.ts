@@ -108,6 +108,17 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
+  // The install's own identity (ADR-139, section 10): one row, at the fixed id
+  // "self", naming the deployment rather than anything inside it. It has no
+  // tenant to constrain on, because it is what the whole install is.
+  "InstanceIdentity",
+  // The history of usage reports received from self-hosted installs (ADR-139,
+  // section 10). Written by a public route that holds no tenant at all, and
+  // read by the backoffice for one instance id at a time. Its sibling
+  // `SelfHostedInstance` carries an organizationId and so is classified by the
+  // org guard; this one carries no id of ours. It holds no customer content:
+  // counts, dates, a release and aggregated email domains.
+  "SelfHostedInstanceReport",
 ] as const;
 
 /**

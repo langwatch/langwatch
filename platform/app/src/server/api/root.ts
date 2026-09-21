@@ -87,6 +87,7 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { secretsRouter } from "./routers/secrets";
+import { selfHostedInstancesRouter } from "./routers/selfHostedInstances";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
@@ -177,6 +178,7 @@ const coreRouters = {
   license: licenseRouter,
   licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  selfHostedInstances: selfHostedInstancesRouter,
   connect: connectRouter,
   connectedBilling: connectedBillingRouter,
   scimOversight: scimOversightRouter,

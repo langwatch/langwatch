@@ -253,6 +253,8 @@ export async function userEmailDomains(
   prisma: PrismaClient,
 ): Promise<Record<string, number>> {
   const rows = await prisma.$queryRaw<{ domain: string; count: number }[]>`
+    -- @tenancy: the usage report describes the whole install, so this counts
+    -- every user on it rather than one tenant's. No address leaves Postgres.
     SELECT split_part(lower(trim("email")), '@', 2) AS domain,
            count(*)::int AS count
       FROM "User"
