@@ -17,17 +17,18 @@ data migrate cleanly is switched over. No preparatory release or manual
 migration pass is required.
 
 A tenant whose historical data disagrees with the migrated result is **held**
-on its existing legacy sign-in path — nothing is changed or discarded — and
-the app still starts and serves it as before. A tenant whose migration throws
-is **parked** the same way, also without blocking startup. Both are retried
-automatically: the next restart re-drives them from the start of its own
-preflight, and an operator can also trigger a pass, or target one
-organization, without waiting for a restart — see
+on its existing legacy sign-in path: the migration leaves that tenant's data
+untouched, and the app still starts and serves it as before. A tenant whose
+migration throws is **parked** the same way, also without blocking startup.
+
+Both are retried automatically. The next restart re-drives them from the
+start of its own preflight, and an operator can also trigger a pass, or
+target one organization, without waiting for a restart. See
 [Check the migration results](#check-the-migration-results) below.
 
 Startup still refuses to serve traffic in three cases: the migration runner
 itself fails outright, the queue behind it fails to drain, or the fleet makes
-no progress for 25 passes (about two minutes — for example because Redis is
+no progress for 25 passes (about two minutes: for example because Redis is
 unreachable, or another process holds every claim). In all three the process
 exits non-zero and the next start retries from scratch.
 
