@@ -297,12 +297,13 @@ describe("given a full pass over both legs", () => {
 
       await runSystemMigrationPass();
 
-      const queries = stubs.secretHealQueryRaw.mock.calls.map(
-        ([strings, ...values]: [TemplateStringsArray, ...unknown[]]) => ({
-          sql: strings.join(" "),
-          values,
-        }),
-      );
+      const queries = stubs.secretHealQueryRaw.mock.calls.map((call) => {
+        const [strings, ...values] = call as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        return { sql: strings.join(" "), values };
+      });
       // The heal's own source asks about drifted credentials and nothing
       // else: narrowing it by migration state would empty it, because the
       // heal never finalizes anyone.
