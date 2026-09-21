@@ -7,8 +7,20 @@
  *
  * Spec: specs/identity/sso-connection-history.feature.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { SsoApi, ssoSetupTrpc } from "@langwatch/enterprise-sso-contract";
+import { defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import { SsoApi, ssoSetupTrpc, type SsoAdministrator } from "@langwatch/enterprise-sso-contract";
+
+/**
+ * Minted from the session, never taken from an input: the administrator this
+ * surface authenticated is who the connection's history names.
+ */
+function administratorOf(actor: TrpcHandlerActor): SsoAdministrator {
+  if (actor.type === "user" && actor.impersonatorId !== undefined) {
+    return { id: actor.id, impersonatorId: actor.impersonatorId };
+  }
+
+  return { id: actor.id };
+}
 
 export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .procedure("getHistory")
@@ -24,4 +36,24 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
       signal,
     }),
   )
+
+  .procedure("claimDomain")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupClaimDomain(input, administratorOf(actor)))
+
+  .procedure("proveDomain")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupProveDomain(input, administratorOf(actor)))
+
+  .procedure("removeDomain")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRemoveDomain(input, administratorOf(actor)))
+
+  .procedure("checkDomainRecord")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupCheckDomainRecord(input, administratorOf(actor)))
+
+  .procedure("checkDomainFile")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupCheckDomainFile(input, administratorOf(actor)))
   .build();

@@ -17,8 +17,10 @@ export const detectedCurrencySchema = z
 export type DetectedCurrency = z.infer<typeof detectedCurrencySchema>;
 
 function getUnitAmountCents(name: StripePriceName, prices: StripePriceMap): number {
+  // A price name can be unmapped in a mode, so the lookup is guarded rather
+  // than indexed blind: the callers here all name required prices.
   const priceId = prices[name];
-  const detail = stripePricesFile.prices[priceId];
+  const detail = priceId ? stripePricesFile.prices[priceId] : undefined;
   if (!detail?.unitAmount) throw new Error(`No unitAmount for ${name}`);
   return detail.unitAmount;
 }

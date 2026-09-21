@@ -12,6 +12,7 @@ import {
   createSsoTestApp,
   createSsoTestIdentity,
   RecordingSsoConnectionLedger,
+  RecordingSsoDomainCeremony,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoSetupTrpcTransport } from "../sso-setup.trpc.ts";
 
@@ -56,9 +57,14 @@ const ENTRY = {
 async function harness(options: { permits?: (permission: string) => boolean } = {}) {
   const connections = RecordingSsoConnectionLedger.create();
   const getHistory = vi.fn(async () => [ENTRY]);
+  const ceremony = RecordingSsoDomainCeremony.create();
+  const auditLog = { record: vi.fn(async () => {}), listEntityHistory: vi.fn() };
   const app = await createSsoTestApp({
     connections,
-    dependencies: { identity: createSsoTestIdentity(connections, { getHistory }) },
+    dependencies: {
+      auditLog,
+      identity: createSsoTestIdentity(connections, { getHistory }, ceremony),
+    },
   });
   const trpc = initTRPC.context<TestContext>().create();
   const router = createTrpcRuntime<TestContext>({
@@ -67,19 +73,30 @@ async function harness(options: { permits?: (permission: string) => boolean } = 
     members: runtimePorts(options.permits ?? (() => true)),
   }).mount(ssoSetupTrpcTransport, () => app);
 
-  return { getHistory, router, caller: router.createCaller({ actor: { id: "user_ana" } }) };
+  return {
+    auditLog,
+    ceremony,
+    getHistory,
+    router,
+    caller: router.createCaller({ actor: { id: "user_ana" } }),
+  };
 }
 
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 
 describe("the organization's own single sign-on surface", () => {
   describe("given the mounted router", () => {
-    it("exposes the history read and its signal, and nothing that writes", async () => {
+    it("exposes the history read, its signal, and the domain ceremony", async () => {
       const { router } = await harness();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "checkDomainFile",
+        "checkDomainRecord",
+        "claimDomain",
         "getHistory",
         "onHistoryActivity",
+        "proveDomain",
+        "removeDomain",
       ]);
     });
   });
@@ -120,6 +137,69 @@ describe("the organization's own single sign-on surface", () => {
 
       await expect(caller.getHistory(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(getHistory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator running the domain ceremony", () => {
+    /** @scenario "The ceremony names the administrator the surface authenticated" */
+    it("names the session administrator on the fact, never an id from the input", async () => {
+      const { caller, ceremony } = await harness();
+
+      await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).resolves.toEqual({
+        waitsForReview: false,
+        disputed: false,
+      });
+      expect(ceremony.claimDomain).toHaveBeenCalledWith({
+        ...TARGET,
+        domain: "acme.test",
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("answers the record to publish, with the value identity issued once", async () => {
+      const { caller } = await harness();
+
+      await expect(caller.proveDomain({ ...TARGET, domain: "acme.test" })).resolves.toMatchObject({
+        proved: false,
+        record: { domain: "acme.test", value: "langwatch-domain-proof=token" },
+      });
+    });
+
+    /** @scenario "The attempt is on the trail even when the ceremony refuses" */
+    it("records the attempt before the ceremony runs, so a refusal is still on the trail", async () => {
+      const { auditLog, caller, ceremony } = await harness();
+      ceremony.checkDomainRecord.mockRejectedValueOnce(new Error("nothing published yet"));
+
+      await expect(caller.checkDomainRecord({ ...TARGET, domain: "acme.test" })).rejects.toThrow(
+        "nothing published yet",
+      );
+
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.checkDomainRecord",
+        args: { ...TARGET, domain: "acme.test" },
+        targetKind: "ssoConnection",
+        targetId: "ssoc_1",
+      });
+    });
+  });
+
+  describe("given that same reader at the ceremony", () => {
+    /** @scenario "Running the ceremony takes managing single sign-on, not only seeing it" */
+    it("refuses every verb of it, and runs none of it", async () => {
+      const { caller, ceremony } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.removeDomain({ ...TARGET, domain: "acme.test" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(
+        caller.checkDomainFile({ ...TARGET, domain: "acme.test" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(ceremony.removeDomain).not.toHaveBeenCalled();
+      expect(ceremony.checkDomainFile).not.toHaveBeenCalled();
     });
   });
 });

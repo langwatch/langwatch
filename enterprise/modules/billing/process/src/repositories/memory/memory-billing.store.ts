@@ -59,9 +59,13 @@ export class MemoryBillingStore {
     return new MemoryBillingStore();
   }
 
-  /** The key a checkpoint is stored under; one row per organization month. */
-  static checkpointKey(input: { organizationId: string; billingMonth: string }): string {
-    return `${input.organizationId}:${input.billingMonth}`;
+  /** The key a checkpoint is stored under; one row per organization month meter. */
+  static checkpointKey(input: {
+    organizationId: string;
+    billingMonth: string;
+    meter: string;
+  }): string {
+    return `${input.organizationId}:${input.billingMonth}:${input.meter}`;
   }
 
   /** The profile facts a lifecycle signal reads, or null where the seat is gone. */

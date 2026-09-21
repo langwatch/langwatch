@@ -1,13 +1,23 @@
-export { SsoApi, type SsoOperator } from "./sso.api.ts";
+export { SsoApi, type SsoAdministrator, type SsoOperator } from "./sso.api.ts";
 export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
 export { ssoSetupTrpc } from "./sso-setup.trpc.ts";
 export {
   ssoConnectionHistoryEntrySchema,
+  ssoDomainClaimOutcomeSchema,
+  ssoDomainProofSchema,
+  ssoDomainProvedSchema,
   ssoHistoryActivitySchema,
+  ssoIssuedDnsRecordSchema,
   ssoSetupConnectionSchema,
+  ssoSetupDomainSchema,
   type SsoConnectionHistoryEntry,
+  type SsoDomainClaimOutcome,
+  type SsoDomainProof,
+  type SsoDomainProved,
   type SsoHistoryActivity,
+  type SsoIssuedDnsRecord,
   type SsoSetupConnectionInput,
+  type SsoSetupDomainInput,
 } from "./sso-setup.contract.ts";
 export {
   activateSsoConnectionInputSchema,

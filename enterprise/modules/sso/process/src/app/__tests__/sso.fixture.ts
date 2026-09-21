@@ -3,10 +3,12 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ssoSecrets, type SsoConfig } from "@langwatch/enterprise-sso-contract";
-import type {
-  IdentityApi,
-  SsoConnectionBackofficeApi,
-  SsoConnectionHistoryApi,
+import {
+  ssoDomainRecordLocation,
+  type IdentityApi,
+  type SsoConnectionBackofficeApi,
+  type SsoConnectionHistoryApi,
+  type SsoDomainCeremonyApi,
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
@@ -128,6 +130,34 @@ export class RecordingSsoConnectionLedger implements SsoConnectionLedger, Ledger
   readonly findHistory = vi.fn<Ledger["findHistory"]>(async () => null);
 }
 
+/** The ceremony an administrator runs, recorded. Answers the shape identity
+ *  answers: a claim nobody disputes, and a proof still waiting on a record. */
+export class RecordingSsoDomainCeremony implements SsoDomainCeremonyApi {
+  static create(): RecordingSsoDomainCeremony {
+    return new RecordingSsoDomainCeremony();
+  }
+
+  readonly claimDomain = vi.fn<SsoDomainCeremonyApi["claimDomain"]>(async () => ({
+    waitsForReview: false,
+    disputed: false,
+  }));
+  readonly proveDomain = vi.fn<SsoDomainCeremonyApi["proveDomain"]>(async ({ domain }) => ({
+    proved: false,
+    record: {
+      ...ssoDomainRecordLocation({ domain }),
+      value: "langwatch-domain-proof=token",
+      expiresAtMs: 1_764_000_600_000,
+    },
+  }));
+  readonly removeDomain = vi.fn<SsoDomainCeremonyApi["removeDomain"]>(async () => {});
+  readonly checkDomainRecord = vi.fn<SsoDomainCeremonyApi["checkDomainRecord"]>(async () => ({
+    proved: true,
+  }));
+  readonly checkDomainFile = vi.fn<SsoDomainCeremonyApi["checkDomainFile"]>(async () => ({
+    proved: true,
+  }));
+}
+
 /** The gate's log lines, kept so a test can read what an operator would. */
 export class RecordingSsoGateLogger implements SsoGateLogger {
   static create(): RecordingSsoGateLogger {
@@ -142,10 +172,12 @@ export class RecordingSsoGateLogger implements SsoGateLogger {
 export function createSsoTestIdentity(
   connections: SsoConnectionBackofficeApi,
   history?: SsoConnectionHistoryApi,
+  ceremony?: SsoDomainCeremonyApi,
 ): IdentityApi {
   return createApiFixture<IdentityApi>({
     ssoBackoffice: () => connections,
     ...(history ? { ssoConnectionHistory: () => history } : {}),
+    ...(ceremony ? { ssoDomainCeremony: () => ceremony } : {}),
   });
 }
 

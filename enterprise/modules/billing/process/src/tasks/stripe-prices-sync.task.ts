@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  OPTIONAL_STRIPE_PRICE_NAMES,
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
   stripePricesFileSchema,
@@ -307,8 +308,11 @@ export const validateMappings = (
   const expectedLiveMode = environment === "live";
 
   for (const key of STRIPE_PRICE_NAMES) {
-    const priceId = file.mapping[key][environment];
+    const priceId = file.mapping[key]?.[environment];
     if (!priceId) {
+      // An optional name is provisioned per mode by hand, so an unmapped one
+      // is the window before that, not a catalogue defect.
+      if (OPTIONAL_STRIPE_PRICE_NAMES.includes(key)) continue;
       errors.push(`mapping.${key}.${environment} is missing`);
       continue;
     }
@@ -342,10 +346,11 @@ export const mergeWithExisting = (params: {
 
   const mergedMapping = {} as StripePricesFile["mapping"];
   for (const key of STRIPE_PRICE_NAMES) {
+    const existingPrice = existing.mapping[key];
     mergedMapping[key] = {
-      test: existing.mapping[key].test,
-      live: existing.mapping[key].live,
-      [environment]: resolvedMapping[key],
+      test: existingPrice?.test ?? "",
+      live: existingPrice?.live ?? "",
+      [environment]: resolvedMapping[key] ?? existingPrice?.[environment] ?? "",
     };
   }
 
@@ -355,7 +360,7 @@ export const mergeWithExisting = (params: {
     mergedMeters[key] = {
       test: existingMeter?.test ?? "",
       live: existingMeter?.live ?? "",
-      [environment]: resolvedMeterMapping[key],
+      [environment]: resolvedMeterMapping[key] ?? existingMeter?.[environment] ?? "",
     };
   }
 

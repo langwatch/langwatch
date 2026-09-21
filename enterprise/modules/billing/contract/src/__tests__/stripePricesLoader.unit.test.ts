@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getStripeEnvironmentFromNodeEnv,
+  OPTIONAL_STRIPE_PRICE_NAMES,
   parseStripePricesFile,
   resolveStripePriceMap,
   STRIPE_PRICE_NAMES,
@@ -15,7 +16,13 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
       expect(parsed.schemaVersion).toBe(1);
-      expect(Object.keys(parsed.mapping)).toHaveLength(STRIPE_PRICE_NAMES.length);
+      // The optional names may be absent from the committed file until their
+      // Stripe mode is provisioned by hand, so the floor is the required set
+      // and the ceiling is every name.
+      expect(Object.keys(parsed.mapping).length).toBeGreaterThanOrEqual(
+        STRIPE_PRICE_NAMES.length - OPTIONAL_STRIPE_PRICE_NAMES.length,
+      );
+      expect(Object.keys(parsed.mapping).length).toBeLessThanOrEqual(STRIPE_PRICE_NAMES.length);
       expect(Object.keys(parsed.prices).length).toBeGreaterThan(0);
     });
 
@@ -40,7 +47,7 @@ describe("stripeCatalog", () => {
       const resolved = resolveStripePriceMap(parsed, "test");
 
       for (const key of STRIPE_PRICE_NAMES) {
-        expect(resolved[key]).toBe(parsed.mapping[key].test);
+        expect(resolved[key]).toBe(parsed.mapping[key]?.test);
       }
     });
 
@@ -50,7 +57,7 @@ describe("stripeCatalog", () => {
       const resolved = resolveStripePriceMap(parsed, "live");
 
       for (const key of STRIPE_PRICE_NAMES) {
-        expect(resolved[key]).toBe(parsed.mapping[key].live);
+        expect(resolved[key]).toBe(parsed.mapping[key]?.live);
       }
     });
 
@@ -81,6 +88,7 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(augmented);
       const resolved = resolveStripePriceMap(parsed, "test");
       for (const key of STRIPE_PRICE_NAMES) {
+        if (OPTIONAL_STRIPE_PRICE_NAMES.includes(key)) continue;
         expect(resolved[key]).toBeDefined();
       }
     });
@@ -89,7 +97,9 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
       for (const key of STRIPE_PRICE_NAMES) {
-        expect(parsed.mapping[key].test).not.toBe(parsed.mapping[key].live);
+        const mapping = parsed.mapping[key];
+        if (!mapping) continue;
+        expect(mapping.test).not.toBe(mapping.live);
       }
     });
   });

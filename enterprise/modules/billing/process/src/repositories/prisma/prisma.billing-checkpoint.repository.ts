@@ -24,12 +24,14 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
   async findCheckpoint(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
   }): Promise<BillingCheckpoint | null> {
     const row = await this.prisma.billingMeterCheckpoint.findUnique({
       where: {
-        organizationId_billingMonth: {
+        organizationId_billingMonth_meter: {
           organizationId: params.organizationId,
           billingMonth: params.billingMonth,
+          meter: params.meter,
         },
       },
     });
@@ -44,19 +46,22 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
   async writeIntent(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
   }): Promise<void> {
     await this.prisma.billingMeterCheckpoint.upsert({
       where: {
-        organizationId_billingMonth: {
+        organizationId_billingMonth_meter: {
           organizationId: params.organizationId,
           billingMonth: params.billingMonth,
+          meter: params.meter,
         },
       },
       create: {
         organizationId: params.organizationId,
         billingMonth: params.billingMonth,
+        meter: params.meter,
         lastReportedTotal: params.lastReportedTotal,
         pendingReportedTotal: params.pendingReportedTotal,
       },
@@ -69,18 +74,21 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
   async confirm(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
   }): Promise<void> {
     await this.prisma.billingMeterCheckpoint.upsert({
       where: {
-        organizationId_billingMonth: {
+        organizationId_billingMonth_meter: {
           organizationId: params.organizationId,
           billingMonth: params.billingMonth,
+          meter: params.meter,
         },
       },
       create: {
         organizationId: params.organizationId,
         billingMonth: params.billingMonth,
+        meter: params.meter,
         lastReportedTotal: params.lastReportedTotal,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -96,13 +104,15 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
   async clearPendingAndIncrementFailures(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     consecutiveFailures: number;
   }): Promise<void> {
     await this.prisma.billingMeterCheckpoint.update({
       where: {
-        organizationId_billingMonth: {
+        organizationId_billingMonth_meter: {
           organizationId: params.organizationId,
           billingMonth: params.billingMonth,
+          meter: params.meter,
         },
       },
       data: {
@@ -115,20 +125,23 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
   async incrementFailures(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
     consecutiveFailures: number;
   }): Promise<void> {
     await this.prisma.billingMeterCheckpoint.upsert({
       where: {
-        organizationId_billingMonth: {
+        organizationId_billingMonth_meter: {
           organizationId: params.organizationId,
           billingMonth: params.billingMonth,
+          meter: params.meter,
         },
       },
       create: {
         organizationId: params.organizationId,
         billingMonth: params.billingMonth,
+        meter: params.meter,
         lastReportedTotal: params.lastReportedTotal,
         pendingReportedTotal: params.pendingReportedTotal,
         consecutiveFailures: params.consecutiveFailures,

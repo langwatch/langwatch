@@ -1,5 +1,6 @@
 import {
   BillingPriceCatalogue,
+  OPTIONAL_STRIPE_PRICE_NAMES,
   PlanTypes,
   STRIPE_PRICE_NAMES,
 } from "@langwatch/enterprise-billing-contract";
@@ -97,7 +98,12 @@ describeIfStripeKey("Stripe billing integration", () => {
     it("confirms all mapped price IDs are active in Stripe", async () => {
       for (const priceName of STRIPE_PRICE_NAMES) {
         const priceId = prices[priceName];
-        expect(priceId).toBeDefined();
+        // An optional name is provisioned per Stripe mode by hand, so its
+        // absence here is the window before that, not a broken catalogue.
+        if (!priceId) {
+          expect(OPTIONAL_STRIPE_PRICE_NAMES).toContain(priceName);
+          continue;
+        }
 
         const stripePrice = await stripe.prices.retrieve(priceId);
 

@@ -8,6 +8,7 @@
  * and never whether the organization may be left with nobody to administer
  * it. specs/identity/scim-connection-sync.feature.
  */
+import type { ScimCreateUserRequest } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { CannotRemoveLastAdminError } from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
@@ -26,11 +27,11 @@ const ORGANIZATION = "org_acme";
 const ADMIN = "user_ana";
 const CONNECTION = "conn_okta_primary";
 
-const DEACTIVATING_PUSH = {
+const DEACTIVATING_PUSH: ScimCreateUserRequest = {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
   userName: "ana@acme.com",
   active: false,
-} as const;
+};
 
 const profile: UserProfile = {
   id: ADMIN,
@@ -91,7 +92,7 @@ function directory(): ScimRepository {
       userId: ADMIN,
       organizationId: ORGANIZATION,
       role: "ADMIN",
-      user: { id: ADMIN, name: profile.name, email: profile.email, deactivatedAt: null },
+      user: profile,
     })),
   });
 }

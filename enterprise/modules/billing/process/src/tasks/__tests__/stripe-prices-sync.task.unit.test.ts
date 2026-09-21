@@ -56,6 +56,7 @@ const createRequiredPriceRecords = (
   const record: Record<string, StripePriceDetail> = {};
   for (const key of STRIPE_PRICE_NAMES) {
     const id = mapping[key];
+    if (!id) continue;
     record[id] = {
       id,
       active: true,
@@ -79,7 +80,9 @@ const createPriceMapForEnvironment = (
 ): StripePriceMap => {
   const priceMap = {} as StripePriceMap;
   for (const key of STRIPE_PRICE_NAMES) {
-    priceMap[key] = mapping[key][environment];
+    const entry = mapping[key];
+    if (!entry) continue;
+    priceMap[key] = entry[environment];
   }
   return priceMap;
 };
@@ -353,8 +356,8 @@ describe("syncStripePrices", () => {
       });
 
       for (const key of STRIPE_PRICE_NAMES) {
-        expect(merged.mapping[key].test).toBe(resolvedMapping[key]);
-        expect(merged.mapping[key].live).toBe(existing.mapping[key].live);
+        expect(merged.mapping[key]?.test).toBe(resolvedMapping[key]);
+        expect(merged.mapping[key]?.live).toBe(existing.mapping[key]?.live);
       }
 
       const livePrices = Object.values(merged.prices).filter((price) => price.livemode);
@@ -383,8 +386,8 @@ describe("syncStripePrices", () => {
       });
 
       for (const key of STRIPE_METER_NAMES) {
-        expect(merged.meters[key].test).toBe(resolvedMeterMapping[key]);
-        expect(merged.meters[key].live).toBe(existing.meters[key].live);
+        expect(merged.meters[key]?.test).toBe(resolvedMeterMapping[key]);
+        expect(merged.meters[key]?.live).toBe(existing.meters[key]?.live);
       }
     });
 
@@ -412,8 +415,8 @@ describe("syncStripePrices", () => {
       });
 
       for (const key of STRIPE_METER_NAMES) {
-        expect(merged.meters[key].test).toBe(resolvedMeterMapping[key]);
-        expect(merged.meters[key].live).toBe("");
+        expect(merged.meters[key]?.test).toBe(resolvedMeterMapping[key]);
+        expect(merged.meters[key]?.live).toBe("");
       }
     });
   });

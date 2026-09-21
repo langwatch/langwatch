@@ -312,6 +312,27 @@ Feature: Proving a domain by publishing a record
     And she is told how long is left before she may claim again
     And the domains she already claimed are untouched
 
+  # ── The surface the administrator runs it from ─────────────────────────
+
+  @unit
+  Scenario: Running the ceremony takes managing single sign-on, not only seeing it
+    Given a reader who may see single sign-on but not manage it
+    When they claim, prove, re-check or remove a domain
+    Then every one of those is refused
+    And nothing about the connection is read or changed
+
+  @unit
+  Scenario: The ceremony names the administrator the surface authenticated
+    Given "ana" is signed in and manages single sign-on for "acme"
+    When she claims "acme.com" on the connection
+    Then the fact names her, and no identifier from the request decides who acted
+
+  @unit
+  Scenario: The attempt is on the trail even when the ceremony refuses
+    Given "ana" re-checks a record that is not published yet
+    When the check refuses
+    Then the attempt is already recorded against her and the connection
+
   # ── The record is read again, and again ────────────────────────────────
 
   @integration

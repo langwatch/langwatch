@@ -38,6 +38,9 @@ export const backofficeSsoConnectionSchema = z
     testLoginAccountId: z.string().nullable(),
     rejection: z.object({ domain: z.string(), note: z.string() }).strict().nullable(),
     pendingVerificationDomain: z.string().nullable(),
+    /** When the ceremony in flight stops proving anything; null when none is
+     *  in flight, or when it does not expire. */
+    pendingVerificationExpiresAtMs: z.number().nullable(),
     createdAtMs: z.number(),
     updatedAtMs: z.number(),
   })

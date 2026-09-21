@@ -27,11 +27,16 @@ import {
   type SsoConnectionByIdInput,
   type SsoConnectionHistoryEntry,
   type SsoConnectionReasonInput,
+  type SsoAdministrator,
   type SsoConnectionTarget,
+  type SsoDomainClaimOutcome,
+  type SsoDomainProof,
+  type SsoDomainProved,
   type SsoDomainTarget,
   type SsoHistoryActivity,
   type SsoOperator,
   type SsoSetupConnectionInput,
+  type SsoSetupDomainInput,
 } from "@langwatch/enterprise-sso-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -49,7 +54,9 @@ import type {
   SsoConnectionLedgerOperator,
   SsoConnectionHistoryReads,
   SsoConnectionLedger,
+  SsoDomainCeremonyLedger,
   SsoGateLogger,
+  SsoSelfServeActor,
 } from "./sso.members.ts";
 
 /** Whether the configured provider can actually be mounted by BetterAuth. */
@@ -171,6 +178,7 @@ export class SsoApp implements SsoApiContract {
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
+  readonly #ceremony: SsoDomainCeremonyLedger;
   readonly #history: SsoConnectionHistoryReads;
   readonly #historyActivity: SsoHistoryActivityService;
   readonly #operators: OpsApi;
@@ -180,12 +188,14 @@ export class SsoApp implements SsoApiContract {
   private constructor(
     gate: SsoGateService,
     connections: SsoConnectionLedger,
+    ceremony: SsoDomainCeremonyLedger,
     history: SsoConnectionHistoryReads,
     logger: SsoActivityLogger,
     dependencies: SsoSetup["dependencies"],
   ) {
     this.#gate = gate;
     this.#connections = connections;
+    this.#ceremony = ceremony;
     this.#history = history;
     this.#historyActivity = SsoHistoryActivityService.create({ history, logger });
     this.#operators = dependencies.operators;
@@ -210,6 +220,14 @@ export class SsoApp implements SsoApiContract {
       resumeConnection: (input) => backoffice().resumeConnection(input),
       requestTeardown: (input) => backoffice().requestTeardown(input),
     };
+    const ceremony = () => dependencies.identity.ssoDomainCeremony();
+    const domains: SsoDomainCeremonyLedger = {
+      claimDomain: (input, actor) => ceremony().claimDomain({ ...input, actor }),
+      proveDomain: (input, actor) => ceremony().proveDomain({ ...input, actor }),
+      removeDomain: (input, actor) => ceremony().removeDomain({ ...input, actor }),
+      checkDomainRecord: (input, actor) => ceremony().checkDomainRecord({ ...input, actor }),
+      checkDomainFile: (input, actor) => ceremony().checkDomainFile({ ...input, actor }),
+    };
     const configuration = await resolveConfiguration(config, members, secrets);
     return new SsoApp(
       SsoGateService.create({
@@ -219,6 +237,7 @@ export class SsoApp implements SsoApiContract {
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
       connections,
+      domains,
       { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
       members.logger,
       dependencies,
@@ -335,6 +354,66 @@ export class SsoApp implements SsoApiContract {
     await this.#audited(by, "requestTeardown", { ...input }, (operator) =>
       this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS }),
     );
+  }
+
+  setupClaimDomain(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainClaimOutcome> {
+    return this.#attempted(by, "claimDomain", input, (actor) =>
+      this.#ceremony.claimDomain(input, actor),
+    );
+  }
+
+  setupProveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProof> {
+    return this.#attempted(by, "proveDomain", input, (actor) =>
+      this.#ceremony.proveDomain(input, actor),
+    );
+  }
+
+  setupRemoveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<void> {
+    return this.#attempted(by, "removeDomain", input, (actor) =>
+      this.#ceremony.removeDomain(input, actor),
+    );
+  }
+
+  setupCheckDomainRecord(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainProved> {
+    return this.#attempted(by, "checkDomainRecord", input, (actor) =>
+      this.#ceremony.checkDomainRecord(input, actor),
+    );
+  }
+
+  setupCheckDomainFile(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProved> {
+    return this.#attempted(by, "checkDomainFile", input, (actor) =>
+      this.#ceremony.checkDomainFile(input, actor),
+    );
+  }
+
+  /**
+   * Record the attempt, then run it: somebody asking why a domain changed at
+   * 03:14 needs the try, not only the ones that worked. The fact names the
+   * session the surface authenticated; the row names the operator borrowing
+   * that access where there is one.
+   */
+  async #attempted<T>(
+    by: SsoAdministrator,
+    action: string,
+    input: SsoSetupDomainInput,
+    ceremony: (actor: SsoSelfServeActor) => Promise<T>,
+  ): Promise<T> {
+    await this.#auditLog.record({
+      userId: by.impersonatorId ?? by.id,
+      organizationId: input.organizationId,
+      action: `ssoSetup.${action}`,
+      args: { ...input },
+      targetKind: AUDIT_TARGET_KIND,
+      targetId: input.connectionId,
+    });
+
+    return ceremony({ userId: by.id });
   }
 
   /**

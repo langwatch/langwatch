@@ -112,9 +112,31 @@ export const resolveGrowthEventsPriceId = ({
 };
 
 /**
- * Creates Stripe checkout line items for a Growth plan subscription: a
- * seat line item (quantity = coreMembers) and a metered events line item
- * (no quantity — Stripe tracks usage via usage records).
+ * The Instant Evals price on a Growth subscription, when the mode has one.
+ * United States dollars only, and absent until the meter and price behind it
+ * are provisioned: a checkout that failed over a meter for a separate feature
+ * would block every Growth signup. @see specs/instant-evals/instant-eval-billing.feature
+ */
+export const resolveGrowthInstantEvalPriceId = ({
+  currency,
+  prices,
+}: {
+  currency: Currency;
+  prices: StripePriceMap;
+}): string | undefined => (currency === "USD" ? prices.GROWTH_INSTANT_EVAL_USD : undefined);
+
+/** Whether this deployment's Stripe mode has the Instant Evals price. */
+export const isGrowthInstantEvalPriceProvisioned = ({
+  prices,
+}: {
+  prices: StripePriceMap;
+}): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
+
+/**
+ * Creates Stripe checkout line items for a Growth plan subscription: a seat
+ * line item (quantity = coreMembers), a metered events line item, and where it
+ * is provisioned a metered Instant Evals one (neither metered item carries a
+ * quantity — Stripe tracks usage via usage records).
  */
 export const createCheckoutLineItems = ({
   coreMembers,
@@ -130,6 +152,8 @@ export const createCheckoutLineItems = ({
   if (coreMembers < 1) {
     throw new InvalidSeatCountError(coreMembers);
   }
+  const instantEvalPriceId = resolveGrowthInstantEvalPriceId({ currency, prices });
+
   return [
     {
       price: resolveGrowthSeatPriceId({ currency, interval, prices }),
@@ -138,5 +162,6 @@ export const createCheckoutLineItems = ({
     {
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
+    ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
   ];
 };

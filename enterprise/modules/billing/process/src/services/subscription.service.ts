@@ -456,7 +456,9 @@ export class BillingSubscriptionService {
     }
 
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
-    const rawCurrency = stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
+    const rawCurrency = basePriceId
+      ? stripePricesFile.prices[basePriceId]?.currency?.toLowerCase()
+      : undefined;
     const checkoutCurrency = rawCurrency === "usd" || rawCurrency === "eur" ? rawCurrency : "usd";
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",

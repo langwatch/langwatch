@@ -2,8 +2,12 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
   SsoConnectionHistoryEntry,
+  SsoDomainClaimOutcome,
+  SsoDomainProof,
+  SsoDomainProved,
   SsoHistoryActivity,
   SsoSetupConnectionInput,
+  SsoSetupDomainInput,
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
@@ -24,6 +28,16 @@ import type {
  * operator, so the impersonator is who the staff list is checked against.
  */
 export type SsoOperator = Readonly<{
+  id: string;
+  impersonatorId?: string | undefined;
+}>;
+
+/**
+ * The organization's own administrator. `id` is the session the surface
+ * authenticated, which the history names; `impersonatorId` is the operator
+ * borrowing that access, who the audit row is filed against.
+ */
+export type SsoAdministrator = Readonly<{
   id: string;
   impersonatorId?: string | undefined;
 }>;
@@ -70,6 +84,24 @@ export interface SsoApi {
   watchConnectionHistory(
     input: SsoSetupConnectionInput & { signal?: AbortSignal },
   ): AsyncGenerator<SsoHistoryActivity>;
+
+  /**
+   * The domain ceremony the organization runs itself (ADR-123), where
+   * `claimDomain` above is the operator's. Both end at the same aggregate;
+   * what differs is who may call and what the history names.
+   */
+  setupClaimDomain(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainClaimOutcome>;
+  /** The record to publish, or nothing left to do. Answered once. */
+  setupProveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProof>;
+  setupRemoveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<void>;
+  setupCheckDomainRecord(
+    input: SsoSetupDomainInput,
+    by: SsoAdministrator,
+  ): Promise<SsoDomainProved>;
+  setupCheckDomainFile(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProved>;
 }
 
 export const SsoApi = moduleApi<SsoApi>()("sso");

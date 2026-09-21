@@ -29,6 +29,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   async findCheckpoint(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
   }): Promise<BillingCheckpoint | null> {
     return this.store.checkpoints.get(MemoryBillingStore.checkpointKey(params)) ?? null;
   }
@@ -36,6 +37,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   async writeIntent(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
   }): Promise<void> {
@@ -50,6 +52,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   async confirm(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
   }): Promise<void> {
     this.write(params, {
@@ -62,6 +65,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   async clearPendingAndIncrementFailures(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     consecutiveFailures: number;
   }): Promise<void> {
     const current = await this.findCheckpoint(params);
@@ -75,6 +79,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   async incrementFailures(params: {
     organizationId: string;
     billingMonth: string;
+    meter: string;
     lastReportedTotal: number;
     pendingReportedTotal: number;
     consecutiveFailures: number;
@@ -87,7 +92,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
   }
 
   private write(
-    key: { organizationId: string; billingMonth: string },
+    key: { organizationId: string; billingMonth: string; meter: string },
     checkpoint: BillingCheckpoint,
   ): void {
     this.store.checkpoints.set(MemoryBillingStore.checkpointKey(key), checkpoint);
