@@ -60927,7 +60927,7 @@ keywords: connect, hosted services, self-hosted, license sync, seats, instant ev
 
 Connect opens one outbound connection from a licensed self-hosted install to LangWatch, for two hosted services: the Instant Evals judge and managed models. Everything else keeps running on your own infrastructure.
 
-Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches nothing, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
+Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches no hosted service at all, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
 
 A service your license names is on. An organization admin switches off the ones they do not want in **Settings → Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
 
@@ -61054,7 +61054,7 @@ Your own providers are untouched: a model spelled without the prefix goes to you
 
 ## Air-gapped installs
 
-An install whose license names no hosted service opens no connection to LangWatch: no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes none of that, and the license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches nothing.
+An install whose license names no hosted service opens no connection to LangWatch: no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes none of that, and the license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
 For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call and the usage report as well, whatever the license says.
 
