@@ -61,11 +61,17 @@ export const DashboardPageBody = ({
 }: DashboardPageBodyProps) => {
   const router = useRouter();
   const { data: session } = useRequiredSession({ required: !publicPage });
-  const { organization, team, project, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    organization,
+    team,
+    project,
+    organizationRole,
+    hasPermission,
+    isLoading: isOrganizationContextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
@@ -300,7 +306,14 @@ export const DashboardPageBody = ({
         {publicPage ? null : <StartupNotice />}
 
         <JoinYourTeamTakeover
-          currentOrganizationId={organization?.id}
+          // Three meanings, kept apart: `undefined` while the organization
+          // read is still out (the takeover decides nothing), `null` once it
+          // has answered with no organization, and the id otherwise.
+          currentOrganizationId={
+            isOrganizationContextLoading
+              ? undefined
+              : (organization?.id ?? null)
+          }
           fallback={publicPage ? null : <SecureAccountNudge />}
         />
 
@@ -379,7 +392,11 @@ export const DashboardPageBody = ({
           offerPasskey={mfaGate.outcome.offerPasskey}
           onEnrolled={mfaGate.refresh}
         />
-      ) : userIsPartOfTeam ? (
+      ) : userIsPartOfTeam || isOrganizationContextLoading ? (
+        // A refusal is only ever drawn from an answered read: membership
+        // comes from `team` and `organizationRole`, which do not exist until
+        // the organization read lands. This gate has no loading screen of
+        // its own, so the body renders meanwhile.
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%

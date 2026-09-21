@@ -143,6 +143,14 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_not_found and status 404
     And nothing about the other organization is revealed
 
+  @integration
+  Scenario: A pending request for another organization does not take over a dashboard that is still loading
+    Given "sam" has a pending request to join "ana"
+    And "sam" opens "acme", whose own organization read has not answered yet
+    When the dashboard renders
+    Then the waiting screen for "ana" is not shown
+    And the waiting screen appears once "acme" resolves and the request is still for another organization
+
   # ── Anti-abuse ─────────────────────────────────────────────────────────
 
   # A request costs an admin attention, so the cheapest attack is volume. Two

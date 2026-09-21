@@ -11,8 +11,15 @@ import { signOut, useSession } from "~/utils/auth-client";
 
 /**
  * Presents the join decision and any pending request for the active account.
- * A dashboard supplies its organization to keep pending requests scoped;
- * onboarding omits it so a request still blocks workspace creation.
+ *
+ * `currentOrganizationId` carries three distinct meanings, not two: a string
+ * scopes a pending request to that organization; explicit `null` means the
+ * caller has no organization context at all (onboarding, where a request
+ * still blocks workspace creation); `undefined` means the caller HAS a
+ * context but it has not resolved yet (a dashboard's own organization read,
+ * still in flight). That third state must never be read as "no context" —
+ * doing so is what let a pending request for a DIFFERENT organization take
+ * over a dashboard while its own organization was still loading.
  */
 export function JoinYourTeamTakeover({
   dismissLabel = "Not now — keep working on my own",
@@ -29,7 +36,12 @@ export function JoinYourTeamTakeover({
   onDismissed?: () => void;
   /** A lower-priority prompt, shown only after the join decision resolves. */
   fallback?: React.ReactNode;
-  /** The organization currently being viewed, when there is one. */
+  /**
+   * The organization currently being viewed — `string` to scope to it,
+   * explicit `null` for "no organization context at all" (onboarding), or
+   * `undefined` for "there is a context, but it has not resolved yet".
+   * Every caller must pick one deliberately; there is no safe default.
+   */
   currentOrganizationId?: string | null;
 } = {}) {
   // The shell renders on public pages too (a shared trace), where there is no
@@ -51,6 +63,15 @@ export function JoinYourTeamTakeover({
   if (offer.isPending || mine.isPending) return null;
 
   const decision = offer.data;
+
+  // The dashboard's OWN organization read is still in flight — a distinct
+  // state from "no organization context" (onboarding passes explicit
+  // `null` for that). Deciding "no context" here is exactly what let a
+  // pending request for some OTHER organization take over a dashboard
+  // whose own organization had not resolved yet: the read is half
+  // answered, so nothing here decides.
+  if (currentOrganizationId === undefined) return fallback;
+
   const waiting = findWaitingRequest(mine.data, currentOrganizationId);
 
   if (waiting) {
@@ -64,9 +85,10 @@ export function JoinYourTeamTakeover({
 
   // A dashboard already has an organization context. Do not replace it with
   // a domain offer for another organization; onboarding has no such context
-  // and keeps the offer visible.
+  // and keeps the offer visible. `undefined` cannot reach here (returned
+  // above), so this is `null` (no context) versus a real organization id.
   if (
-    currentOrganizationId != null &&
+    currentOrganizationId !== null &&
     decision?.outcome === "ask" &&
     !decision.organizations.some(
       (organization) => organization.organizationId === currentOrganizationId,
@@ -248,14 +270,20 @@ function organizationNameFor({
   );
 }
 
+/**
+ * `currentOrganizationId` is never `undefined` here — the caller above
+ * already returned `fallback` for that state. Only `null` (no organization
+ * context at all, onboarding) matches any pending request; a string matches
+ * only that organization's.
+ */
 function findWaitingRequest(
   requests: Array<{ organizationId: string }> | undefined,
-  currentOrganizationId: string | null | undefined,
+  currentOrganizationId: string | null,
 ) {
   return (
     requests?.find(
       (request) =>
-        currentOrganizationId == null ||
+        currentOrganizationId === null ||
         request.organizationId === currentOrganizationId,
     ) ?? null
   );
