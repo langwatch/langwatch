@@ -18,7 +18,7 @@ const schema = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
 const migration = readFileSync(
   join(
     root,
-    "prisma/migrations/20260916120000_org_sign_in_security/migration.sql",
+    "prisma/migrations/20260918171002_org_sign_in_security/migration.sql",
   ),
   "utf8",
 );

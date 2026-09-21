@@ -43,9 +43,9 @@ handover; commit history retains the original investigations.
 
 ## Rollout and acceptance
 
-- Deployment includes PostgreSQL migrations `20260913120002_identity_sso` and
-  `20260916120000_org_sign_in_security`, plus
-  `20260917063000_scim_directory_user_ownership`, after PR1's migrations.
+- Deployment includes PostgreSQL migrations `20260918171001_identity_sso` and
+  `20260918171002_org_sign_in_security`, plus
+  `20260918171003_scim_directory_user_ownership`, after PR1's migrations.
   The ownership migration backfills existing external-ID mappings; users without
   one are adopted on their next successful SCIM write. No ClickHouse schema change.
 - Password-MFA attempts begun before this cleanup deploys lack the server-side
