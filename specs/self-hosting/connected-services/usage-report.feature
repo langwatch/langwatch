@@ -100,6 +100,64 @@ Feature: The usage report a self-hosted install sends
     Then each windowed figure appears three times: lifetime, over seven days and over twenty-eight days
     And an install that ingested heavily two years ago and nothing since reads differently from one ingesting today
 
+  # ============================================================================
+  # What they do, by family
+  # ============================================================================
+
+  @integration
+  Scenario: Spans are counted from what the install stores, lifetime and over two windows
+    Given spans stored three, twenty and forty days ago, and another install's spans
+    When spans are counted
+    Then the lifetime figure counts every span of this install
+    And the seven day figure counts only the span from three days ago
+    And the twenty-eight day figure leaves out the span from forty days ago
+    And no span of the other install is counted
+
+  @integration
+  Scenario: Gateway requests and spend come from the spend ledger
+    Given a gateway request admitted at one price and settled at another
+    And a request from forty days ago
+    When gateway requests and spend are read
+    Then the settled request counts once, at its settled cost in USD
+    And the lifetime figures cover both requests while the windows cover the recent one
+    And the first gateway request is dated from the oldest row
+
+  @integration
+  Scenario: Instant Eval runs and judgments are counted
+    Given an Instant Eval run three days ago with two judgments, one twenty days ago, and one forty days ago
+    When runs and judgments are counted
+    Then each is counted lifetime and over both windows
+    And the first run is dated from the oldest row
+
+  @integration
+  Scenario: Langy turns and the people sending them are counted
+    Given one person with a conversation active this week and one long idle
+    And another person whose conversation opened twenty days ago
+    When the stored counts are taken
+    Then turns are counted by the day the fold stamped them
+    And people are counted once each, by the last activity of their conversations
+    And the first Langy turn is dated from the oldest turn
+
+  @integration
+  Scenario: Coding agent sessions are counted once each
+    Given a coding agent session folded twice and a session from forty days ago
+    When sessions are counted
+    Then the re-folded session counts once
+    And the windows leave out the old session
+
+  @integration
+  Scenario: Pull requests are counted by the day they were opened
+    Given pull requests opened three, twenty and forty days ago, all noticed by the install today
+    When the stored counts are taken
+    Then the windows are cut on the day each pull request was opened
+    And another organization's pull requests are not counted
+
+  @integration
+  Scenario: The ladder gains the first gateway request, Instant Eval run and coding agent session
+    When the ladder is read for an install that reached a rung
+    Then the rung carries the day of the oldest row
+    And a rung the install never reached is null rather than the start of time
+
   @unimplemented @unit
   Scenario: The onboarding ladder records the day each rung was first reached
     When the report is taken

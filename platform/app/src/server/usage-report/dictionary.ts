@@ -67,7 +67,7 @@ export interface UsageField {
  * that produced it rather than against the list running today. Raised whenever
  * a field is added, removed or changes meaning.
  */
-export const USAGE_REPORT_SCHEMA_VERSION = 2;
+export const USAGE_REPORT_SCHEMA_VERSION = 3;
 
 /** Every field, in the order the docs page lists them. */
 export const USAGE_FIELDS: readonly UsageField[] = [
@@ -148,7 +148,7 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     key: "projects",
     category: "operational",
     window: "point_in_time",
-    why: "How many projects the install carries, which is the unit most limits and most screens are scoped to.",
+    why: "How many projects the install carries, which is the unit limits and screens are scoped to.",
     source: "Project",
   },
   {
@@ -216,14 +216,14 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     key: "first_dataset_at",
     category: "optional",
     window: "point_in_time",
-    why: "When the install got its first dataset, which is the rung most installs stall on.",
+    why: "When the install got its first dataset, which is the rung installs stall on more than any other.",
     source: "min(Dataset.createdAt)",
   },
   {
     key: "first_evaluation_at",
     category: "optional",
     window: "point_in_time",
-    why: "When the install first ran an evaluation, which is what most people came for.",
+    why: "When the install first ran an evaluation, which is what people come for.",
     source: "min(BatchEvaluation.createdAt)",
   },
   {
@@ -251,7 +251,7 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     key: "first_model_provider_at",
     category: "optional",
     window: "point_in_time",
-    why: "When a model provider was first configured, without which most of the product does nothing.",
+    why: "When a model provider was first configured, which every evaluation, studio run and Langy turn needs before it can call a model.",
     source: "min(ModelProvider.createdAt)",
   },
   {
@@ -274,6 +274,34 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     window: "point_in_time",
     why: "When the install first ran an experiment.",
     source: "min(Experiment.createdAt)",
+  },
+  {
+    key: "first_gateway_request_at",
+    category: "optional",
+    window: "point_in_time",
+    why: "When the first model call went through the AI gateway, which is when model traffic started being routed rather than only observed.",
+    source: "min(gateway_spend.OccurredAt)",
+  },
+  {
+    key: "first_instant_eval_run_at",
+    category: "optional",
+    window: "point_in_time",
+    why: "When the install first ran an Instant Eval over its own traces.",
+    source: "min(instant_eval_runs.CreatedAt)",
+  },
+  {
+    key: "first_langy_turn_at",
+    category: "optional",
+    window: "point_in_time",
+    why: "When somebody first asked Langy a question.",
+    source: "min(LangyConversationTurnProjection.createdAt)",
+  },
+  {
+    key: "first_coding_agent_session_at",
+    category: "optional",
+    window: "point_in_time",
+    why: "When the first coding agent session was recorded, which is when the install started watching agents rather than only applications.",
+    source: "min(coding_agent_sessions.StartedAt)",
   },
 
   // --- optional: what they do, lifetime and windowed ----------------------
@@ -336,6 +364,53 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     why: "How many alerts are configured.",
     source: "Trigger",
   }),
+  ...lifetimeAndWindows({
+    key: "spans",
+    why: "How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice.",
+    source: "stored_spans, rows counted per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "gateway_requests",
+    why: "How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months.",
+    source: "gateway_spend, rows counted per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "gateway_spend_usd",
+    why: "What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months.",
+    source: "gateway_spend, CostNanoUSD summed per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "instant_eval_runs",
+    why: "How many Instant Evals the install has run over its own traces.",
+    source: "instant_eval_runs, counted per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "instant_eval_judgments",
+    why: "How many judgments those runs produced, which is how much of the install's traffic has been judged.",
+    source: "instant_eval_judgments, counted per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "langy_turns",
+    why: "How many questions Langy has answered, which says whether the assistant is used or only present.",
+    source: "LangyConversationTurnProjection",
+  }),
+  ...lifetimeAndWindows({
+    key: "langy_active_users",
+    why: "How many different people talked to Langy, counted by user so one person with twenty conversations is one person.",
+    source: "LangyConversationProjection.userId, distinct, by last activity",
+    lifetimeKey: "langy_users",
+  }),
+  ...lifetimeAndWindows({
+    key: "coding_agent_sessions",
+    why: "How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once.",
+    source:
+      "coding_agent_sessions, distinct SessionId per organization and added up",
+  }),
+  ...lifetimeAndWindows({
+    key: "pull_requests",
+    why: "How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped.",
+    source: "GithubPullRequest, by the day the pull request was opened",
+  }),
   {
     key: "annotationQueues",
     category: "optional",
@@ -375,7 +450,7 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     key: "active_projects_28d",
     category: "optional",
     window: "28d",
-    why: "How many projects saw activity over four weeks, which separates a live project from a folder nobody opened.",
+    why: "How many projects saw activity over four weeks, which separates a live project from a folder no one opened.",
     source: "Project.updatedAt",
   },
 

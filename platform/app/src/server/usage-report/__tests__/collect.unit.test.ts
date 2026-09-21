@@ -34,6 +34,7 @@ function emptyModel() {
     count: vi.fn(async () => 0),
     findFirst: vi.fn(async () => null),
     findMany: vi.fn(async () => []),
+    groupBy: vi.fn(async () => []),
   };
 }
 
@@ -47,6 +48,9 @@ const MODELS = [
   "dataset",
   "datasetRecord",
   "experiment",
+  "githubPullRequest",
+  "langyConversationProjection",
+  "langyConversationTurnProjection",
   "llmPromptConfig",
   "modelProvider",
   "monitor",
@@ -90,9 +94,28 @@ function prismaOver({
   return client as unknown as PrismaClient;
 }
 
+/**
+ * A ClickHouse that answers the same figure for every stretch of time, and
+ * reached each rung on a day that depends on the organization asked, so the
+ * report's "earliest across organizations" has something to choose between.
+ */
 const repository: InstanceUsageStatsRepository = {
   findTraceCount: vi.fn(async () => 120),
   findScenarioRunCount: vi.fn(async () => 7),
+  findSpanCount: vi.fn(async () => 900),
+  findGatewaySpend: vi.fn(async () => ({ requests: 30, spendUsd: 1.25 })),
+  findInstantEvalRunCount: vi.fn(async () => 4),
+  findInstantEvalJudgmentCount: vi.fn(async () => 400),
+  findCodingAgentSessionCount: vi.fn(async () => 11),
+  findFirstGatewayRequestAt: vi.fn(async ({ organizationId }) =>
+    organizationId === "org-2"
+      ? new Date("2026-02-01T00:00:00.000Z")
+      : new Date("2026-03-01T00:00:00.000Z"),
+  ),
+  findFirstInstantEvalRunAt: vi.fn(async () => null),
+  findFirstCodingAgentSessionAt: vi.fn(async ({ organizationId }) =>
+    organizationId === "org-1" ? new Date("2026-04-01T00:00:00.000Z") : null,
+  ),
 };
 
 function report(overrides: Parameters<typeof collectUsageReport>[0]) {
@@ -182,6 +205,46 @@ describe("given an install with the report switched fully on", () => {
       expect(payload.totalTraces).toBe(240);
       expect(payload.totalScenarioEvents).toBe(14);
     });
+
+    it("adds up spans, gateway traffic, Instant Evals and agent sessions over every organization", async () => {
+      const payload = await report({
+        prisma: prismaOver(),
+        organizationIds: ["org-1", "org-2"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: null,
+        repository,
+      });
+
+      expect(payload).toMatchObject({
+        spans: 1800,
+        spans_7d: 1800,
+        spans_28d: 1800,
+        gateway_requests: 60,
+        gateway_requests_28d: 60,
+        gateway_spend_usd: 2.5,
+        gateway_spend_usd_7d: 2.5,
+        instant_eval_runs: 8,
+        instant_eval_judgments_7d: 800,
+        coding_agent_sessions_28d: 22,
+      });
+    });
+
+    it("dates each ClickHouse rung from the earliest organization, and null where none reached it", async () => {
+      const payload = await report({
+        prisma: prismaOver(),
+        organizationIds: ["org-1", "org-2"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: null,
+        repository,
+      });
+
+      expect(payload.first_gateway_request_at).toBe("2026-02-01T00:00:00.000Z");
+      expect(payload.first_coding_agent_session_at).toBe(
+        "2026-04-01T00:00:00.000Z",
+      );
+      expect(payload.first_instant_eval_run_at).toBeNull();
+      expect(payload.first_langy_turn_at).toBeNull();
+    });
   });
 });
 
@@ -246,9 +309,46 @@ describe("given a figure that is counted over time", () => {
         "datasets",
         "datasets_7d",
         "datasets_28d",
+        "totalTraces",
+        "traces_7d",
+        "traces_28d",
+        "langy_users",
+        "langy_active_users_7d",
+        "langy_active_users_28d",
+        "pull_requests",
+        "pull_requests_7d",
+        "pull_requests_28d",
       ]) {
         expect(payload, `${key} is missing`).toHaveProperty(key);
       }
+    });
+  });
+});
+
+describe("given an install with an organization and no project yet", () => {
+  describe("when the report is taken", () => {
+    it("still reports, without the figures a project would scope", async () => {
+      const client = prismaOver({
+        emails: ["ada@acme.test"],
+        projectIds: [],
+      });
+
+      const payload = await report({
+        prisma: client,
+        organizationIds: ["org-1"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: null,
+        repository,
+      });
+
+      expect(payload.projects).toBe(0);
+      expect(payload.user_email_domains).toEqual({ "acme.test": 1 });
+      expect(payload.annotations).toBeUndefined();
+      expect(payload.first_project_at).toBeUndefined();
+      // No project-scoped model was asked with an empty list, which is what
+      // the tenancy guard would have refused.
+      const models = client as unknown as Record<string, { count: unknown }>;
+      expect(models.annotation?.count).not.toHaveBeenCalled();
     });
   });
 });

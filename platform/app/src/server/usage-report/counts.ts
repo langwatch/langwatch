@@ -36,25 +36,26 @@ interface CountableModel {
 export async function countedInWindows({
   key,
   model,
-  projectIds,
+  scope,
   now,
   lifetimeKey,
-  extraWhere,
+  dateField = "createdAt",
 }: {
   key: string;
   model: CountableModel;
-  projectIds: string[];
+  /** The rows that belong to this install: a project or organization scope. */
+  scope: Record<string, unknown>;
   now: Date;
   lifetimeKey?: string;
-  extraWhere?: Record<string, unknown>;
+  /** The column a window is cut on, where it is not the row's own creation. */
+  dateField?: string;
 }): Promise<Record<string, number>> {
-  const scope = { projectId: { in: projectIds }, ...(extraWhere ?? {}) };
   const { sevenDays, twentyEight } = windowStarts(now);
 
   const [lifetime, sevenDayCount, twentyEightCount] = await Promise.all([
     model.count({ where: scope }),
-    model.count({ where: { ...scope, createdAt: { gte: sevenDays } } }),
-    model.count({ where: { ...scope, createdAt: { gte: twentyEight } } }),
+    model.count({ where: { ...scope, [dateField]: { gte: sevenDays } } }),
+    model.count({ where: { ...scope, [dateField]: { gte: twentyEight } } }),
   ]);
 
   return {
@@ -89,12 +90,15 @@ async function firstAt({
 async function windowedCounts({
   prisma,
   projectIds,
+  organizationIds,
   now,
 }: {
   prisma: PrismaClient;
   projectIds: string[];
+  organizationIds: string[];
   now: Date;
 }): Promise<Record<string, number>> {
+  const scope = { projectId: { in: projectIds } };
   const of = (
     key: string,
     model: CountableModel,
@@ -103,7 +107,7 @@ async function windowedCounts({
     countedInWindows({
       key,
       model,
-      projectIds,
+      scope,
       now,
       ...(lifetimeKey ? { lifetimeKey } : {}),
     });
@@ -118,8 +122,87 @@ async function windowedCounts({
     of("monitors", prisma.monitor),
     of("workflows", prisma.workflow),
     of("triggers", prisma.trigger),
+    // Pull requests hang off the organization, and are windowed by the day
+    // the pull request was opened rather than the day this install noticed
+    // it: a backfill of last year's pull requests is not last week's work.
+    countedInWindows({
+      key: "pull_requests",
+      model: prisma.githubPullRequest,
+      scope: { organizationId: { in: organizationIds } },
+      now,
+      dateField: "prCreatedAt",
+    }),
+    langyCounts({ prisma, projectIds, now }),
   ]);
   return Object.assign({}, ...counted);
+}
+
+/**
+ * Langy, from its Postgres projections. Turns are rows of the turn
+ * projection; people are distinct owners of conversations, counted in
+ * Postgres by grouping, so twenty conversations of one person are one person.
+ *
+ * The projections stamp their times as epoch milliseconds, which is why the
+ * windows are numbers here and dates everywhere else.
+ */
+async function langyCounts({
+  prisma,
+  projectIds,
+  now,
+}: {
+  prisma: PrismaClient;
+  projectIds: string[];
+  now: Date;
+}): Promise<Record<string, number>> {
+  const scope = { projectId: { in: projectIds } };
+  const { sevenDays, twentyEight } = windowStarts(now);
+
+  const turnsSince = (since?: Date) =>
+    prisma.langyConversationTurnProjection.count({
+      where: {
+        ...scope,
+        ...(since ? { CreatedAt: { gte: since.getTime() } } : {}),
+      },
+    });
+
+  // A conversation is active when its last activity falls in the window; a
+  // conversation opened in the window and never stamped is active too.
+  const usersSince = (since?: Date) =>
+    prisma.langyConversationProjection
+      .groupBy({
+        by: ["UserId"],
+        where: {
+          ...scope,
+          ...(since
+            ? {
+                OR: [
+                  { LastActivityAt: { gte: since.getTime() } },
+                  { CreatedAt: { gte: since.getTime() } },
+                ],
+              }
+            : {}),
+        },
+      })
+      .then((rows) => rows.length);
+
+  const [turns, turns7d, turns28d, users, users7d, users28d] =
+    await Promise.all([
+      turnsSince(),
+      turnsSince(sevenDays),
+      turnsSince(twentyEight),
+      usersSince(),
+      usersSince(sevenDays),
+      usersSince(twentyEight),
+    ]);
+
+  return {
+    langy_turns: turns,
+    langy_turns_7d: turns7d,
+    langy_turns_28d: turns28d,
+    langy_users: users,
+    langy_active_users_7d: users7d,
+    langy_active_users_28d: users28d,
+  };
 }
 
 /** The figures that are only ever a lifetime total. */
@@ -160,17 +243,50 @@ async function lifetimeCounts({
 export async function storedCounts({
   prisma,
   projectIds,
+  organizationIds,
   now,
 }: {
   prisma: PrismaClient;
   projectIds: string[];
+  organizationIds: string[];
   now: Date;
 }): Promise<Record<string, number>> {
   const [windowed, lifetime] = await Promise.all([
-    windowedCounts({ prisma, projectIds, now }),
+    windowedCounts({ prisma, projectIds, organizationIds, now }),
     lifetimeCounts({ prisma, projectIds }),
   ]);
   return { ...lifetime, ...windowed };
+}
+
+/**
+ * The first model provider, asked one organization at a time.
+ *
+ * A provider lives on the organization, and the tenancy guard on that model
+ * admits one organization id per read rather than a list, so the install's
+ * organizations are read in turn and the earliest wins.
+ */
+async function firstModelProviderAt({
+  prisma,
+  organizationIds,
+}: {
+  prisma: PrismaClient;
+  organizationIds: string[];
+}): Promise<string | null> {
+  const rows = await Promise.all(
+    organizationIds.map((organizationId) =>
+      prisma.modelProvider.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ),
+  );
+  const reached = rows
+    .filter((row): row is { createdAt: Date } => row !== null)
+    .map((row) => row.createdAt.getTime());
+  return reached.length === 0
+    ? null
+    : new Date(Math.min(...reached)).toISOString();
 }
 
 /** The day each rung of getting started was first reached, or null. */
@@ -195,6 +311,7 @@ export async function onboardingLadder({
     firstTrigger,
     firstExperiment,
     secondMember,
+    firstLangyTurn,
   ] = await Promise.all([
     prisma.project
       .findFirst({
@@ -208,14 +325,7 @@ export async function onboardingLadder({
     firstAt({ model: prisma.monitor, projectIds }),
     firstAt({ model: prisma.llmPromptConfig, projectIds }),
     firstAt({ model: prisma.workflow, projectIds }),
-    // Scoped to the organization, because that is where a provider lives.
-    prisma.modelProvider
-      .findFirst({
-        where: { organizationId: { in: organizationIds } },
-        orderBy: { createdAt: "asc" },
-        select: { createdAt: true },
-      })
-      .then((row) => row?.createdAt.toISOString() ?? null),
+    firstModelProviderAt({ prisma, organizationIds }),
     firstAt({ model: prisma.annotation, projectIds }),
     firstAt({ model: prisma.trigger, projectIds }),
     firstAt({ model: prisma.experiment, projectIds }),
@@ -223,11 +333,20 @@ export async function onboardingLadder({
     // and an install becomes a team on the second.
     prisma.organizationUser
       .findMany({
+        where: { organizationId: { in: organizationIds } },
         orderBy: { createdAt: "asc" },
         take: 2,
         select: { createdAt: true },
       })
       .then((rows) => rows[1]?.createdAt.toISOString() ?? null),
+    // The turn projection stamps epoch milliseconds, not a date.
+    prisma.langyConversationTurnProjection
+      .findFirst({
+        where: { projectId: { in: projectIds } },
+        orderBy: { CreatedAt: "asc" },
+        select: { CreatedAt: true },
+      })
+      .then((row) => (row ? new Date(row.CreatedAt).toISOString() : null)),
   ]);
 
   return {
@@ -242,6 +361,7 @@ export async function onboardingLadder({
     first_annotation_at: firstAnnotation,
     first_trigger_at: firstTrigger,
     first_experiment_at: firstExperiment,
+    first_langy_turn_at: firstLangyTurn,
   };
 }
 

@@ -64,6 +64,55 @@ describe("given the dictionary", () => {
       const ownSwitch = USAGE_FIELDS.filter((field) => field.ownSwitch);
       expect(ownSwitch.map((field) => field.key)).toEqual(["hostname"]);
     });
+
+    it("declares exactly the fields the schema version stands for", () => {
+      // A field added or removed is a schema version bump, and this is the
+      // number that makes somebody notice they owe one.
+      expect(USAGE_FIELDS).toHaveLength(102);
+      expect(USAGE_REPORT_SCHEMA_VERSION).toBe(3);
+    });
+  });
+
+  describe("when a figure is counted over time", () => {
+    /** @scenario "Counts are reported lifetime and over two windows" */
+    it("declares each of the newer families lifetime, over seven days and over twenty-eight", () => {
+      const families: Array<[string, string]> = [
+        ["spans", "spans"],
+        ["gateway_requests", "gateway_requests"],
+        ["gateway_spend_usd", "gateway_spend_usd"],
+        ["instant_eval_runs", "instant_eval_runs"],
+        ["instant_eval_judgments", "instant_eval_judgments"],
+        ["langy_turns", "langy_turns"],
+        ["langy_active_users", "langy_users"],
+        ["coding_agent_sessions", "coding_agent_sessions"],
+        ["pull_requests", "pull_requests"],
+      ];
+
+      for (const [key, lifetimeKey] of families) {
+        expect(usageField(lifetimeKey)?.window, lifetimeKey).toBe("lifetime");
+        expect(usageField(`${key}_7d`)?.window, `${key}_7d`).toBe("7d");
+        expect(usageField(`${key}_28d`)?.window, `${key}_28d`).toBe("28d");
+        for (const field of [lifetimeKey, `${key}_7d`, `${key}_28d`]) {
+          expect(usageField(field)?.category).toBe("optional");
+        }
+      }
+    });
+  });
+
+  describe("when the ladder is read", () => {
+    it("has a rung for the first gateway request, Instant Eval run, Langy turn and coding agent session", () => {
+      for (const rung of [
+        "first_gateway_request_at",
+        "first_instant_eval_run_at",
+        "first_langy_turn_at",
+        "first_coding_agent_session_at",
+      ]) {
+        expect(usageField(rung), rung).toMatchObject({
+          category: "optional",
+          window: "point_in_time",
+        });
+      }
+    });
   });
 });
 
