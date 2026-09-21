@@ -222,7 +222,8 @@ describe("SCIM characterization: token lifecycle", () => {
 });
 
 describe("SCIM characterization: provisioning invariants", () => {
-  it("caps neither repository semantics nor response shape: list response preserves requested page values", async () => {
+  /** @scenario "A page reports how many resources it actually carries" */
+  it("reports the page it holds rather than the page that was asked for", async () => {
     const repo = repository({
       listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
     });
@@ -232,7 +233,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: 0,
       startIndex: 1,
-      itemsPerPage: 100,
+      itemsPerPage: 0,
       Resources: [],
     });
   });

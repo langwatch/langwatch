@@ -37,6 +37,7 @@ export abstract class ScimService {
   abstract getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
   abstract listUsers(input: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
@@ -61,6 +62,7 @@ export abstract class ScimService {
 
   abstract listGroups(input: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
@@ -69,6 +71,7 @@ export abstract class ScimService {
   abstract getGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup>;
   abstract createGroup(input: {
@@ -79,12 +82,18 @@ export abstract class ScimService {
   abstract replaceGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup>;
   abstract updateGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup>;
-  abstract deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void>;
+  abstract deleteGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    connectionId?: string | null;
+  }): Promise<void>;
 }

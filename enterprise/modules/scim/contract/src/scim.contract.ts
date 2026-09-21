@@ -103,10 +103,20 @@ const scimEnterpriseUserSchema = z
   })
   .passthrough();
 
+/**
+ * The identity provider's own id for a resource, as it actually arrives.
+ * Absent and blank mean the same thing; `.min(1)` refused the whole push over
+ * a field RFC 7644 makes optional. A blank id must still never reach a store.
+ */
+const scimExternalId = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 export const scimCreateUserRequestSchema = z
   .object({
     schemas: z.array(z.string()),
-    externalId: z.string().min(1).optional(),
+    externalId: scimExternalId,
     userName: z.string().email(),
     name: z
       .object({
@@ -161,7 +171,7 @@ export const scimGroupMemberSchema = z.object({
 
 export const scimCreateGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
-  externalId: z.string().min(1).optional(),
+  externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
@@ -170,7 +180,7 @@ export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema
 
 export const scimReplaceGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
-  externalId: z.string().min(1).optional(),
+  externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });

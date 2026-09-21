@@ -121,7 +121,9 @@ const listQuery = z.object({
   filter: z
     .string()
     .optional()
-    .describe('A SCIM filter. Only `attribute eq "..."` is applied; anything else is ignored.'),
+    .describe(
+      'A SCIM filter. Only `attribute eq "..."` is understood; any other expression is refused.',
+    ),
   startIndex: z
     .string()
     .optional()
@@ -447,7 +449,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withDocs({
     summary: "List provisioned users",
     description:
-      'The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq "someone@example.com"`, matched against the member\'s email without regard to case.',
+      'The members of the organization the token belongs to, as SCIM users. Two filter expressions are understood: `userName eq "someone@example.com"`, matched against the member\'s email without regard to case, and `externalId eq "..."`, matched against the identifier the presented token\'s own directory connection pushed. Any other filter is refused.',
     tags: SCIM_TAGS,
     responses: scimAnswer(
       200,
@@ -456,10 +458,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     ),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
   })
-  .handle(async ({ app, input, scope }) =>
+  .handle(async ({ app, input, scope }, { connectionId }) =>
     scimJson(
       await app.listUsers({
         organizationId: scope.id,
+        connectionId,
         filter: input.filter,
         startIndex: positiveInteger(input.startIndex, 1),
         count: pageSize(input.count),
@@ -487,7 +490,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request }) => {
+  .handle(async ({ app, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON in request body");
@@ -496,7 +499,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
     if (!parsed.success) return scimError(400, parsed.error.message);
 
-    return scimJson(await app.createUser({ organizationId: scope.id, request: parsed.data }), 201);
+    return scimJson(
+      await app.createUser({ organizationId: scope.id, connectionId, request: parsed.data }),
+      201,
+    );
   })
 
   .get("/Users/:id", "scimGetUser")
@@ -529,7 +535,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }) => {
+  .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON in request body");
@@ -539,7 +545,12 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     if (!parsed.success) return scimError(400, parsed.error.message);
 
     return scimJson(
-      await app.replaceUser({ id: input.id, organizationId: scope.id, request: parsed.data }),
+      await app.replaceUser({
+        id: input.id,
+        organizationId: scope.id,
+        connectionId,
+        request: parsed.data,
+      }),
     );
   })
 
@@ -556,7 +567,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }) => {
+  .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON in request body");
@@ -569,6 +580,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       await app.updateUser({
         id: input.id,
         organizationId: scope.id,
+        connectionId,
         patchRequest: parsed.data,
       }),
     );
@@ -587,8 +599,8 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: DEPROVISIONED,
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) => {
-    await app.deleteUser({ id: input.id, organizationId: scope.id });
+  .handle(async ({ app, input, scope }, { connectionId }) => {
+    await app.deleteUser({ id: input.id, organizationId: scope.id, connectionId });
 
     return deprovisioned();
   })
@@ -612,10 +624,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     ),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
   })
-  .handle(async ({ app, input, scope }) =>
+  .handle(async ({ app, input, scope }, { connectionId }) =>
     scimJson(
       await app.listGroups({
         organizationId: scope.id,
+        connectionId,
         filter: input.filter,
         startIndex: positiveInteger(input.startIndex, 1),
         count: pageSize(input.count),
@@ -645,7 +658,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request }) => {
+  .handle(async ({ app, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON");
@@ -654,7 +667,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
     if (!parsed.success) return scimError(400, parsed.error.message);
 
-    return scimJson(await app.createGroup({ organizationId: scope.id, request: parsed.data }), 201);
+    return scimJson(
+      await app.createGroup({ organizationId: scope.id, connectionId, request: parsed.data }),
+      201,
+    );
   })
 
   .get("/Groups/:id", "scimGetGroup")
@@ -671,11 +687,12 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The group.", scimGroupSchema),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) =>
+  .handle(async ({ app, input, scope }, { connectionId }) =>
     scimJson(
       await app.getGroup({
         externalScimId: input.id,
         organizationId: scope.id,
+        connectionId,
         excludeMembers: excludesMembers(input.excludedAttributes),
       }),
     ),
@@ -694,7 +711,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }) => {
+  .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON");
@@ -707,6 +724,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       await app.replaceGroup({
         externalScimId: input.id,
         organizationId: scope.id,
+        connectionId,
         request: parsed.data,
       }),
     );
@@ -725,7 +743,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }) => {
+  .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null) return scimError(400, "Invalid JSON");
@@ -738,6 +756,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       await app.updateGroup({
         externalScimId: input.id,
         organizationId: scope.id,
+        connectionId,
         patchRequest: parsed.data,
       }),
     );
@@ -756,8 +775,8 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: DEPROVISIONED,
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) => {
-    await app.deleteGroup({ externalScimId: input.id, organizationId: scope.id });
+  .handle(async ({ app, input, scope }, { connectionId }) => {
+    await app.deleteGroup({ externalScimId: input.id, organizationId: scope.id, connectionId });
 
     return deprovisioned();
   })

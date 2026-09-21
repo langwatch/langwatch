@@ -94,28 +94,40 @@ export interface ScimApi {
 
   listUsers(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     filter?: string | undefined;
     startIndex?: number | undefined;
     count?: number | undefined;
   }): Promise<ScimListResponse<ScimUser>>;
-  createUser(input: { organizationId: string; request: ScimCreateUserRequest }): Promise<ScimUser>;
+  createUser(input: {
+    organizationId: string;
+    connectionId?: string | null | undefined;
+    request: ScimCreateUserRequest;
+  }): Promise<ScimUser>;
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
   replaceUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null | undefined;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser>;
   updateUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null | undefined;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimUser>;
-  deleteUser(input: { organizationId: string; id: string }): Promise<void>;
+  deleteUser(input: {
+    organizationId: string;
+    id: string;
+    connectionId?: string | null | undefined;
+  }): Promise<void>;
 
   // ── SCIM 2.0 groups ──────────────────────────────────────────────────────
 
   listGroups(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     filter?: string | undefined;
     startIndex?: number | undefined;
     count?: number | undefined;
@@ -123,24 +135,32 @@ export interface ScimApi {
   }): Promise<ScimListResponse<ScimGroup>>;
   createGroup(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     request: ScimCreateGroupRequest;
   }): Promise<ScimGroup>;
   getGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     excludeMembers?: boolean | undefined;
   }): Promise<ScimGroup>;
   replaceGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup>;
   updateGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup>;
-  deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void>;
+  deleteGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    connectionId?: string | null | undefined;
+  }): Promise<void>;
 
   // ── The directory's log stream ───────────────────────────────────────────
 

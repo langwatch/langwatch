@@ -29,6 +29,9 @@ export interface ScimGroupRecord {
   slug: string;
   scimSource: string | null;
   externalId: string | null;
+  /** The directory connection that pushed this group, or null for a group
+   *  created by hand and for the ones that predate connection scoping. */
+  connectionId: string | null;
   createdAt: Instant;
   updatedAt: Instant;
 }
@@ -92,6 +95,9 @@ export abstract class ScimRepository extends ScimGrantRepository {
   abstract listMemberships: (input: {
     organizationId: string;
     email?: string;
+    /** When present the page narrows to these members and no others; an empty
+     *  array is an empty page rather than "everybody". */
+    userIds?: readonly string[];
     startIndex: number;
     count: number;
   }) => Promise<{ rows: ScimMembershipRecord[]; total: number }>;
@@ -107,18 +113,29 @@ export abstract class ScimRepository extends ScimGrantRepository {
   }): Promise<ScimGroupRecord | null>;
   abstract listGroups(input: {
     organizationId: string;
+    /** Which connection's groups are in reach. A legacy token (null) keeps
+     *  organization-wide reach; a scoped token sees its own groups and the
+     *  ones that predate connection scoping. */
+    connectionId?: string | null;
     displayName?: string;
+    externalId?: string;
     startIndex: number;
     count: number;
   }): Promise<{
     rows: (ScimGroupRecord & { members: ScimGroupMembershipRecord[] })[];
     total: number;
   }>;
+  abstract findGroupByExternalId(input: {
+    organizationId: string;
+    connectionId: string | null;
+    externalId: string;
+  }): Promise<ScimGroupRecord | null>;
   abstract createGroup(input: {
     organizationId: string;
     name: string;
     slug: string;
     externalId: string | null;
+    connectionId: string | null;
   }): Promise<ScimGroupRecord>;
   abstract renameGroup(input: { id: string; name: string }): Promise<void>;
   abstract deleteGroup(input: { id: string }): Promise<void>;

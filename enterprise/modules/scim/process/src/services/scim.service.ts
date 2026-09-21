@@ -89,7 +89,7 @@ export class ScimService extends ScimServiceContract {
       provenOffboarding,
     });
     this.entitlements = entitlements;
-    this.groups = ScimDirectoryService.create({ prisma, grants });
+    this.groups = ScimDirectoryService.create({ prisma, grants, identities: this.identities });
   }
 
   static create(options: {
@@ -215,6 +215,7 @@ export class ScimService extends ScimServiceContract {
    */
   listGroups(input: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
@@ -226,6 +227,7 @@ export class ScimService extends ScimServiceContract {
   getGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup> {
     return this.groups.getGroup(input);
@@ -252,6 +254,7 @@ export class ScimService extends ScimServiceContract {
   replaceGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup> {
     return this.groups.replaceGroup(input);
@@ -260,12 +263,17 @@ export class ScimService extends ScimServiceContract {
   updateGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup> {
     return this.groups.updateGroup(input);
   }
 
-  deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void> {
+  deleteGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    connectionId?: string | null;
+  }): Promise<void> {
     return this.groups.deleteGroup(input);
   }
 
@@ -313,6 +321,7 @@ export class ScimService extends ScimServiceContract {
 
   async listUsers(input: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;

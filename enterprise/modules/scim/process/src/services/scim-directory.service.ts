@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimProtocolError,
+  ScimWriteOutsideConnectionError,
+} from "@langwatch/enterprise-scim-contract";
 import type {
   ScimCreateGroupRequest,
   ScimGroup,
@@ -13,6 +16,7 @@ import type {
 import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
 import { parseScimFilter } from "../rules/scim-filter.rules.ts";
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
+import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimGroupMembershipService,
@@ -39,78 +43,101 @@ export type ScimDirectoryRepository = Pick<
   | "listRoleBindings"
   | "renameGroup"
   | "findGroup"
+  | "findGroupByExternalId"
 > &
   ScimGroupMembershipRepository;
+
+/** The one thing the directory asks of the identity mapping: may this
+ *  connection write to this person at all. */
+export type ScimGroupMemberAuthority = Pick<ScimDirectoryIdentityService, "assertWritable">;
 
 export class ScimDirectoryService {
   private readonly prisma: ScimDirectoryRepository;
   private readonly grants: ScimGrantsService;
   private readonly membership: ScimGroupMembershipService;
+  private readonly identities: ScimGroupMemberAuthority;
 
   private constructor({
     prisma,
     grants,
+    identities,
   }: {
     prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
+    identities: ScimGroupMemberAuthority;
   }) {
     this.prisma = prisma;
     this.grants = grants;
+    this.identities = identities;
     this.membership = ScimGroupMembershipService.create(prisma);
   }
 
   static create(options: {
     prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
+    identities: ScimGroupMemberAuthority;
   }): ScimDirectoryService {
     return new ScimDirectoryService(options);
   }
 
   async listGroups({
     organizationId,
+    connectionId = null,
     filter,
     startIndex = 1,
     count = 100,
     excludeMembers = false,
   }: {
     organizationId: string;
+    /** Whose groups are in reach, and whose `externalId` namespace the filter
+     *  reads against. A legacy token (null) keeps organization-wide reach. */
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
     excludeMembers?: boolean;
   }): Promise<ScimListResponse<ScimGroup>> {
     assertScimOrganizationId(organizationId);
-    const parsed = parseScimFilter({ filter, supported: ["displayName"] });
+    const parsed = parseScimFilter({ filter, supported: ["displayName", "externalId"] });
     if (!parsed.ok) {
       return this.scimError({ status: "400", scimType: "invalidFilter", detail: parsed.detail });
     }
 
+    const term = parsed.term;
     const { rows: groups, total: totalCount } = await this.prisma.listGroups({
       organizationId,
-      displayName: parsed.term?.value,
+      connectionId,
+      ...(term?.attribute === "displayName" ? { displayName: term.value } : {}),
+      // A value this organization has never pushed narrows to nobody rather
+      // than widening back to every group — the people listing's own rule.
+      ...(term?.attribute === "externalId" ? { externalId: term.value } : {}),
       startIndex,
       count,
     });
+    const resources = groups.map((g) => this.toScimGroup(g, g.members, excludeMembers));
 
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
       startIndex,
-      itemsPerPage: count,
-      Resources: groups.map((g) => this.toScimGroup(g, g.members, excludeMembers)),
+      // What this page holds, not what was asked for (RFC 7644 §3.4.2.4).
+      itemsPerPage: resources.length,
+      Resources: resources,
     };
   }
 
   async getGroup({
     externalScimId,
     organizationId,
+    connectionId = null,
     excludeMembers = false,
   }: {
     externalScimId: string;
     organizationId: string;
+    connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup> {
-    const group = await this.findGroup({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId, connectionId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -123,23 +150,29 @@ export class ScimDirectoryService {
   async createGroup({
     request,
     organizationId,
+    connectionId = null,
   }: {
     request: ScimCreateGroupRequest;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<ScimGroup> {
-    const existing = await this.prisma.listGroups({
+    const existing = await this.findExistingGroup({
       organizationId,
+      connectionId,
+      externalId: request.externalId ?? null,
       displayName: request.displayName,
-      startIndex: 1,
-      count: 1,
     });
-    if (existing.total > 0) {
+    if (existing) {
       return this.scimError({
         status: "409",
         detail: "A group with this name already exists",
       });
     }
 
+    await this.authorizeMembers({
+      connectionId,
+      memberIds: (request.members ?? []).map((member) => member.value),
+    });
     const slug = await this.membership.uniqueSlug({
       organizationId,
       name: request.displayName,
@@ -148,7 +181,8 @@ export class ScimDirectoryService {
       organizationId,
       name: request.displayName,
       slug,
-      externalId: (request as { externalId?: string }).externalId ?? null,
+      externalId: request.externalId ?? null,
+      connectionId,
     });
 
     if (request.members?.length) {
@@ -167,17 +201,23 @@ export class ScimDirectoryService {
   async replaceGroup({
     externalScimId,
     organizationId,
+    connectionId = null,
     request,
   }: {
     externalScimId: string;
     organizationId: string;
+    connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup> {
-    const group = await this.findGroup({ externalScimId, organizationId });
+    const group = await this.findWritableGroup({ externalScimId, organizationId, connectionId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
 
+    await this.authorizeMembers({
+      connectionId,
+      memberIds: (request.members ?? []).map((member) => member.value),
+    });
     if (request.displayName !== group.name) {
       await this.prisma.renameGroup({ id: group.id, name: request.displayName });
     }
@@ -188,7 +228,7 @@ export class ScimDirectoryService {
       memberIds: (request.members ?? []).map((member) => member.value),
     });
 
-    const updatedGroup = (await this.findGroup({ externalScimId, organizationId }))!;
+    const updatedGroup = (await this.findGroup({ externalScimId, organizationId, connectionId }))!;
     const members = await this.prisma.listGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
@@ -197,13 +237,15 @@ export class ScimDirectoryService {
   async updateGroup({
     externalScimId,
     organizationId,
+    connectionId = null,
     patchRequest,
   }: {
     externalScimId: string;
     organizationId: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup> {
-    const group = await this.findGroup({ externalScimId, organizationId });
+    const group = await this.findWritableGroup({ externalScimId, organizationId, connectionId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -212,7 +254,7 @@ export class ScimDirectoryService {
       await this.membership.applyPatch({ group, operation, organizationId });
     }
 
-    const updatedGroup = (await this.findGroup({ externalScimId, organizationId }))!;
+    const updatedGroup = (await this.findGroup({ externalScimId, organizationId, connectionId }))!;
     const members = await this.prisma.listGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
@@ -221,11 +263,13 @@ export class ScimDirectoryService {
   async deleteGroup({
     externalScimId,
     organizationId,
+    connectionId = null,
   }: {
     externalScimId: string;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<void> {
-    const group = await this.findGroup({ externalScimId, organizationId });
+    const group = await this.findWritableGroup({ externalScimId, organizationId, connectionId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -249,14 +293,106 @@ export class ScimDirectoryService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  /**
+   * A read hides a sibling connection's group. A legacy token (null) keeps
+   * organization-wide reach, and a group that predates connection scoping
+   * stays visible to every token in the organization.
+   */
   private async findGroup({
     externalScimId,
     organizationId,
+    connectionId,
   }: {
     externalScimId: string;
     organizationId: string;
+    connectionId: string | null;
   }): Promise<ScimGroupRecord | null> {
-    return this.prisma.findGroup({ id: externalScimId, organizationId });
+    const group = await this.prisma.findGroup({ id: externalScimId, organizationId });
+
+    return group && this.withinReach({ group, connectionId }) ? group : null;
+  }
+
+  /**
+   * A write acknowledges that the submitted id exists and refuses the token's
+   * authority, rather than answering a misleading retryable not-found.
+   */
+  private async findWritableGroup({
+    externalScimId,
+    organizationId,
+    connectionId,
+  }: {
+    externalScimId: string;
+    organizationId: string;
+    connectionId: string | null;
+  }): Promise<ScimGroupRecord | null> {
+    const group = await this.prisma.findGroup({ id: externalScimId, organizationId });
+    if (!group) return null;
+    if (this.withinReach({ group, connectionId })) return group;
+
+    throw new ScimWriteOutsideConnectionError();
+  }
+
+  private withinReach({
+    group,
+    connectionId,
+  }: {
+    group: ScimGroupRecord;
+    connectionId: string | null;
+  }): boolean {
+    return (
+      connectionId === null || group.connectionId === null || group.connectionId === connectionId
+    );
+  }
+
+  /**
+   * The group a push is about, before one exists: the directory's own
+   * identifier first and the display name second, so a group renamed in the
+   * directory stays one group rather than arriving as a second.
+   */
+  private async findExistingGroup({
+    organizationId,
+    connectionId,
+    externalId,
+    displayName,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    externalId: string | null;
+    displayName: string;
+  }): Promise<ScimGroupRecord | null> {
+    if (externalId) {
+      const byIdentifier = await this.prisma.findGroupByExternalId({
+        organizationId,
+        connectionId,
+        externalId,
+      });
+      if (byIdentifier) return byIdentifier;
+    }
+
+    const byName = await this.prisma.listGroups({
+      organizationId,
+      connectionId,
+      displayName,
+      startIndex: 1,
+      count: 1,
+    });
+
+    return byName.rows[0] ?? null;
+  }
+
+  /** A scoped connection may only name people its own directory asserted. */
+  private async authorizeMembers({
+    connectionId,
+    memberIds,
+  }: {
+    connectionId: string | null;
+    memberIds: string[];
+  }): Promise<void> {
+    if (connectionId === null) return;
+
+    for (const userId of new Set(memberIds)) {
+      await this.identities.assertWritable({ connectionId, userId });
+    }
   }
 
   private toScimGroup(
@@ -270,6 +406,9 @@ export class ScimDirectoryService {
     return {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
       id: group.id,
+      // Echoed when we hold one: a directory that sent an externalId and never
+      // got it back cannot tell that we kept it.
+      ...(group.externalId ? { externalId: group.externalId } : {}),
       displayName: group.name,
       ...(excludeMembers
         ? {}

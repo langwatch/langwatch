@@ -25,6 +25,7 @@ function scimGroupRecordOf(row: {
   slug: string;
   scimSource: string | null;
   externalId: string | null;
+  scimConnectionId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): ScimGroupRecord {
@@ -35,6 +36,7 @@ function scimGroupRecordOf(row: {
     slug: row.slug,
     scimSource: row.scimSource,
     externalId: row.externalId,
+    connectionId: row.scimConnectionId,
     createdAt: fromDate(row.createdAt),
     updatedAt: fromDate(row.updatedAt),
   };
@@ -124,6 +126,7 @@ export class PrismaScimRepository extends ScimRepository {
   listMemberships = async (input: {
     organizationId: string;
     email?: string;
+    userIds?: readonly string[];
     startIndex: number;
     count: number;
   }): Promise<{ rows: ScimMembershipRecord[]; total: number }> => {
@@ -132,6 +135,7 @@ export class PrismaScimRepository extends ScimRepository {
       ...(input.email
         ? { user: { email: { equals: input.email, mode: Prisma.QueryMode.insensitive } } }
         : {}),
+      ...(input.userIds ? { userId: { in: [...input.userIds] } } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.organizationUser.findMany({
@@ -139,6 +143,10 @@ export class PrismaScimRepository extends ScimRepository {
         include: { user: true },
         skip: input.startIndex - 1,
         take: input.count,
+        // A page is skip/take over a result set and Postgres promises no order
+        // without being asked: an unordered scan hands the same person to two
+        // pages and never hands over somebody else at all.
+        orderBy: { userId: "asc" },
       }),
       this.prisma.organizationUser.count({ where }),
     ]);
@@ -167,7 +175,9 @@ export class PrismaScimRepository extends ScimRepository {
   }
   async listGroups(input: {
     organizationId: string;
+    connectionId?: string | null;
     displayName?: string;
+    externalId?: string;
     startIndex: number;
     count: number;
   }): Promise<{
@@ -177,9 +187,15 @@ export class PrismaScimRepository extends ScimRepository {
     const where = {
       organizationId: input.organizationId,
       scimSource: { not: null },
+      // Legacy tokens keep organization-wide reach; a scoped token also sees
+      // the groups that predate connection scoping.
+      ...(input.connectionId
+        ? { OR: [{ scimConnectionId: input.connectionId }, { scimConnectionId: null }] }
+        : {}),
       ...(input.displayName
         ? { name: { equals: input.displayName, mode: Prisma.QueryMode.insensitive } }
         : {}),
+      ...(input.externalId === undefined ? {} : { externalId: input.externalId }),
     };
     const [rows, total] = await Promise.all([
       this.prisma.group.findMany({
@@ -191,7 +207,9 @@ export class PrismaScimRepository extends ScimRepository {
         },
         skip: input.startIndex - 1,
         take: input.count,
-        orderBy: { createdAt: "asc" },
+        // `createdAt` alone leaves groups made in the same instant in an order
+        // the store picks, and two pages cut from two such orders overlap.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       }),
       this.prisma.group.count({ where }),
     ]);
@@ -200,14 +218,34 @@ export class PrismaScimRepository extends ScimRepository {
       total,
     };
   }
+  async findGroupByExternalId(input: {
+    organizationId: string;
+    connectionId: string | null;
+    externalId: string;
+  }): Promise<ScimGroupRecord | null> {
+    const row = await this.prisma.group.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        scimConnectionId: input.connectionId,
+        externalId: input.externalId,
+      },
+    });
+
+    return row ? scimGroupRecordOf(row) : null;
+  }
   async createGroup(input: {
     organizationId: string;
     name: string;
     slug: string;
     externalId: string | null;
+    connectionId: string | null;
   }): Promise<ScimGroupRecord> {
+    const { connectionId, ...group } = input;
+
     return scimGroupRecordOf(
-      await this.prisma.group.create({ data: { ...input, scimSource: "scim" } }),
+      await this.prisma.group.create({
+        data: { ...group, scimSource: "scim", scimConnectionId: connectionId },
+      }),
     );
   }
   async renameGroup(input: { id: string; name: string }): Promise<void> {

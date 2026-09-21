@@ -103,3 +103,154 @@ Feature: Enterprise SCIM package boundary
       Given a member stored as one display name
       When the directory patches name.familyName with a scalar value
       Then the stored name is updated rather than silently accepted
+
+  Rule: A blank external identifier means the directory has none
+
+    RFC 7644 makes externalId optional, and a provisioning client with none
+    sends the key empty as readily as it omits it. Refusing on a minimum
+    length turned that into a 400 for the whole person, so blank is read as
+    absent — while a blank identifier still never reaches a store.
+
+    @unit
+    Scenario: A blank external identifier is read as none rather than refused
+      Given a directory pushing a person with no external identifier
+      When the push carries externalId as an empty string
+      Then the push is accepted and the identifier is read as absent
+
+  Rule: A directory is read back one whole page at a time
+
+    A page is a slice of a result set, and a slice of an unsettled order hands
+    the same person to two pages while never handing over somebody else. The
+    page also says what it holds rather than what was asked for, so a provider
+    that advances by the count it was told lands on the end exactly.
+
+    @unit
+    Scenario: Paging through a large directory lists everybody exactly once
+      Given a directory larger than one page
+      When a provider walks every page
+      Then each member appears exactly once
+
+    @unit
+    Scenario: The total is the whole directory, never the page
+      Given a directory larger than one page
+      When a provider reads any page
+      Then the reported total is the whole directory
+
+    @unit
+    Scenario: A start past the end of the directory is an empty page, not a failure
+      Given a directory larger than one page
+      When a provider starts past the last member
+      Then the page is empty and still reports the whole total
+
+    @unit
+    Scenario: A page reports how many resources it actually carries
+      Given a directory whose size is not a multiple of the page
+      When a provider reads the last page
+      Then the page reports its real size rather than the size requested
+
+    @unit
+    Scenario: A provider that advances by what it was told lands on the end exactly
+      Given a directory whose size is not a multiple of the page
+      When a provider advances by the count each page reported
+      Then it reaches the last member and stops
+
+  Rule: An external identifier resolves only within the connection that asserted it
+
+    The identity provider's own identifier is unique to its own directory, so
+    a lookup by it is answered from the mapping the presented token's
+    connection owns. An identifier that connection has never seen narrows to
+    nobody rather than widening back to the whole organization.
+
+    @unit
+    Scenario: Looking somebody up by the directory's own identifier works
+      Given a token belonging to a directory connection
+      When the provider filters users by externalId
+      Then the listing answers with the person that connection means
+
+    @unit
+    Scenario: One connection cannot find another connection's person by identifier
+      Given two directory connections in one organization
+      When one filters by the other's externalId
+      Then the listing answers with nobody
+
+    @unit
+    Scenario: An identifier the directory has never seen answers with nobody
+      Given a token belonging to a directory connection
+      When the provider filters by an externalId the connection never pushed
+      Then the listing answers with nobody rather than everybody
+
+  Rule: A group belongs to the connection that pushed it
+
+    Two directories can be connected to one organization, and each carries its
+    own "engineering". A read hides the other's group; a write acknowledges
+    that the id exists and refuses the token's authority, so a provider is not
+    handed a retryable not-found for a resource it may never change. A token
+    that belongs to no connection keeps organization-wide reach, and so does a
+    group created before connections were scoped.
+
+    @unit
+    Scenario: A group records the connection that pushed it
+      Given a token belonging to a directory connection
+      When the directory pushes a new group
+      Then the group is stored against that connection
+
+    @unit
+    Scenario: A group renamed in the directory stays one group
+      Given a group pushed with the directory's own identifier
+      When the directory pushes it again under a new display name
+      Then it is recognised as the same group rather than created twice
+
+    @unit
+    Scenario: Two connections each carry their own group of the same name
+      Given a group named Engineering pushed by one connection
+      When another connection pushes its own Engineering
+      Then the second group is created against the second connection
+
+    @unit
+    Scenario: A read hides a sibling connection's group
+      Given a group pushed by another connection
+      When a token reads it
+      Then the read answers not found
+
+    @unit
+    Scenario: A group that predates connection scoping stays visible
+      Given a group with no connection recorded
+      When a scoped token reads it
+      Then the group is returned
+
+    @unit
+    Scenario: A legacy token keeps organization-wide reach
+      Given a token belonging to no connection
+      When it reads a group another connection pushed
+      Then the group is returned
+
+    @unit
+    Scenario: A write to a sibling connection's group is refused by authority
+      Given a group pushed by another connection
+      When a token deletes or patches it
+      Then the write is refused with scim_write_outside_connection
+
+    @unit
+    Scenario: A connection may only name people its own directory asserted
+      Given a scoped token pushing a group with members
+      When the push names a person
+      Then the identity mapping is asked whether this connection may write them
+
+  Rule: A summary of several directories reports the least healthy one
+
+    An administrator reading a closed tab has the colour and the count and
+    nothing else. A badge that reads green while one of two connections has
+    stopped is the failure both summaries exist to catch, so the worst
+    condition among the sources wins.
+
+    @unit
+    Scenario: One source that stopped is never summarised as working
+      Given one directory syncing and another that has stopped
+      When the overview summarises them
+      Then the summary does not say everything is working
+
+    @unit
+    Scenario: A group echoes the identifier its directory sent
+      Given a directory pushing a group with its own identifier
+      When the group is created
+      Then the answer carries that identifier back

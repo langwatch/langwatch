@@ -235,6 +235,7 @@ export class ScimApp implements ScimApiContract {
 
   listUsers(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     filter?: string | undefined;
     startIndex?: number | undefined;
     count?: number | undefined;
@@ -242,7 +243,11 @@ export class ScimApp implements ScimApiContract {
     return this.#scim.listUsers(input);
   }
 
-  createUser(input: { organizationId: string; request: ScimCreateUserRequest }): Promise<ScimUser> {
+  createUser(input: {
+    organizationId: string;
+    connectionId?: string | null | undefined;
+    request: ScimCreateUserRequest;
+  }): Promise<ScimUser> {
     return this.#scim.createUser(input);
   }
 
@@ -253,6 +258,7 @@ export class ScimApp implements ScimApiContract {
   replaceUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null | undefined;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser> {
     return this.#scim.replaceUser(input);
@@ -261,12 +267,17 @@ export class ScimApp implements ScimApiContract {
   updateUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null | undefined;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimUser> {
     return this.#scim.updateUser(input);
   }
 
-  deleteUser(input: { organizationId: string; id: string }): Promise<void> {
+  deleteUser(input: {
+    organizationId: string;
+    id: string;
+    connectionId?: string | null | undefined;
+  }): Promise<void> {
     return this.#scim.deleteUser(input);
   }
 
@@ -274,6 +285,7 @@ export class ScimApp implements ScimApiContract {
 
   listGroups(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     filter?: string | undefined;
     startIndex?: number | undefined;
     count?: number | undefined;
@@ -284,6 +296,7 @@ export class ScimApp implements ScimApiContract {
 
   createGroup(input: {
     organizationId: string;
+    connectionId?: string | null | undefined;
     request: ScimCreateGroupRequest;
   }): Promise<ScimGroup> {
     return this.#scim.createGroup(input);
@@ -292,6 +305,7 @@ export class ScimApp implements ScimApiContract {
   getGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     excludeMembers?: boolean | undefined;
   }): Promise<ScimGroup> {
     return this.#scim.getGroup(input);
@@ -300,6 +314,7 @@ export class ScimApp implements ScimApiContract {
   replaceGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup> {
     return this.#scim.replaceGroup(input);
@@ -308,12 +323,17 @@ export class ScimApp implements ScimApiContract {
   updateGroup(input: {
     organizationId: string;
     externalScimId: string;
+    connectionId?: string | null | undefined;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup> {
     return this.#scim.updateGroup(input);
   }
 
-  deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void> {
+  deleteGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    connectionId?: string | null | undefined;
+  }): Promise<void> {
     return this.#scim.deleteGroup(input);
   }
 
