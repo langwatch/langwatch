@@ -71,6 +71,8 @@ Feature: Remote-trace judging for http targets
     Given the pre-compiled child process bundle with the scenario SDK inlined
     When the bundle is inspected for the capability the platform configures
     Then the judge's remote-trace tooling is present in the bundle
+    And the bundle reads the quiet period the platform sends it
+    And the bundle reports inconclusive criteria apart from the unmet ones
 
   @unit
   Scenario: The prefetcher computes the wait budget only for http targets
