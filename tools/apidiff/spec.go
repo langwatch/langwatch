@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -67,6 +68,18 @@ func CanonicalAliasPath(path string) string {
 		return path
 	}
 	return "/api/" + rest
+}
+
+// pathParameter matches one templated path parameter, whatever it is named.
+var pathParameter = regexp.MustCompile(`\{[^/{}]*\}`)
+
+// PairingPath erases path-parameter NAMES so two sides that spell the same
+// route differently still pair: base "/api/projects/{id}" and candidate
+// "/api/projects/{projectId}" are one operation, and pairing on the literal
+// template reported the pair as a removal and an addition instead. Only the
+// names go — arity and every literal segment still decide identity.
+func PairingPath(path string) string {
+	return pathParameter.ReplaceAllString(path, "{}")
 }
 
 // VersionMountPath reports whether a path is one of the URL version mounts a
@@ -576,10 +589,11 @@ func UnionOperations(a, b []Operation) []Operation {
 		// A URL version mount never enters the union: not probed, not skipped,
 		// not a ledger row. Reporting one would report the fallback rather than
 		// the surface a client is built against.
-		if VersionMountPath(id.path) {
+		operation := *merger.merged[id]
+		if VersionMountPath(operation.Path) {
 			continue
 		}
-		result = append(result, *merger.merged[id])
+		result = append(result, operation)
 	}
 	sortOperations(result)
 	return result
@@ -607,7 +621,7 @@ func (merger *operationMerger) ingest(operations []Operation, isA bool) {
 		op := operations[index]
 		incoming := ingested{op: op, form: op.Path, isA: isA}
 		op.Path = CanonicalAliasPath(incoming.form)
-		id := operationKey{op.Method, op.Path}
+		id := operationKey{op.Method, PairingPath(op.Path)}
 		if existing, ok := merger.merged[id]; ok {
 			merger.mergeInto(existing, incoming)
 			continue
@@ -626,6 +640,9 @@ func (merger *operationMerger) ingest(operations []Operation, isA bool) {
 func (merger *operationMerger) mergeInto(existing *Operation, incoming ingested) {
 	if incoming.isA {
 		existing.InA = true
+		// The candidate's spelling of the parameter names is what the report
+		// shows, for the same reason its definition wins below.
+		existing.Path = CanonicalAliasPath(incoming.form)
 		existing.PathA = preferredForm(existing.PathA, incoming.form)
 		existing.BodySchemaA = incoming.op.BodySchema
 		existing.Params = incoming.op.Params

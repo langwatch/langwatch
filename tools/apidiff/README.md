@@ -146,6 +146,13 @@ deterministic summary, or the machine report with `-json` (optionally to
   side documenting neither is probed at the canonical bare form anyway, so an
   undocumented-but-mounted route still shows up. The transcript records both
   probed paths.
+- **Pairing ignores path-parameter NAMES.** Base `/api/projects/{id}` and
+  candidate `/api/projects/{projectId}` are one operation: pairing on the
+  literal template reported the pair as a removal AND an addition, silently,
+  for any renamed parameter (5 such pairs on run 24 of 2026-09-21). Only the
+  names are erased (`PairingPath`, `spec.go`) — arity and every literal
+  segment still decide identity — and each side is still probed at the
+  spelling its own document declares, with the candidate's spelling reported.
 - **URL version mounts are skipped, never reported.** Versioning is negotiated
   through the `X-API-Version` header; `/api/<family>/latest/...` and
   `/api/<family>/<YYYY-MM-DD>/...` are a supported convenience fallback the

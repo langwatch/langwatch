@@ -210,3 +210,14 @@ Feature: apidiff boots its instances through haven
     Given a family mounted at /api/scim/v2
     When the operation union is built
     Then that family is compared like any other
+
+  # Pairing on the literal path template made a renamed path parameter read as
+  # a removal and an addition at once. Measured on run 24 of 2026-09-21: base
+  # spells /api/projects/{id}, the candidate /api/projects/{projectId}, and 5
+  # such pairs were reported as drift that did not exist.
+  @unit
+  Scenario: Two sides spelling one route's parameter differently are one operation
+    Given the base and the candidate name the same path parameter differently
+    When the operation union is built
+    Then the two are paired as one operation
+    And each side is probed at the spelling its own document declares

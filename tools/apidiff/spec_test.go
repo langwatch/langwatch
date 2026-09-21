@@ -354,3 +354,45 @@ func TestUnionOperationsDropsAliasedVersionMounts(t *testing.T) {
 		t.Fatalf("union = %v, want empty", union)
 	}
 }
+
+/** @scenario "Two sides spelling one route's parameter differently are one operation" */
+func TestUnionOperationsPairsAcrossParameterNames(t *testing.T) {
+	t.Parallel()
+	a := []Operation{{Method: "GET", Path: "/api/projects/{projectId}", Params: []Param{{Name: "projectId", In: "path", Required: true}}}}
+	b := []Operation{{Method: "GET", Path: "/api/projects/{id}"}}
+
+	union := UnionOperations(a, b)
+
+	if len(union) != 1 {
+		t.Fatalf("union = %d operations, want 1 (paired)", len(union))
+	}
+	got := union[0]
+	if !got.InA || !got.InB {
+		t.Errorf("presence = A:%v B:%v, want present on both", got.InA, got.InB)
+	}
+	// Each side is probed at its OWN spelling, and the candidate's is reported.
+	if got.PathA != "/api/projects/{projectId}" || got.PathB != "/api/projects/{id}" {
+		t.Errorf("side paths = A:%q B:%q", got.PathA, got.PathB)
+	}
+	if got.Path != "/api/projects/{projectId}" {
+		t.Errorf("reported path = %q, want the candidate's spelling", got.Path)
+	}
+}
+
+func TestPairingPathKeepsArityAndLiterals(t *testing.T) {
+	t.Parallel()
+	same := PairingPath("/api/projects/{id}/charts/{chartId}")
+	if other := PairingPath("/api/projects/{projectId}/charts/{cid}"); other != same {
+		t.Errorf("%q != %q, want parameter names erased", other, same)
+	}
+	// Arity and literals still decide identity.
+	for _, different := range []string{
+		"/api/projects/{id}/charts",
+		"/api/projects/{id}/widgets/{chartId}",
+		"/api/projects/{id}/charts/{a}/{b}",
+	} {
+		if PairingPath(different) == same {
+			t.Errorf("%q collapsed onto %q", different, same)
+		}
+	}
+}
