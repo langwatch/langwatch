@@ -87,7 +87,12 @@ export interface IdentityBackofficeSsoConnection {
   claimedDomains: string[];
   approvedDomains: string[];
   verifiedDomains: string[];
-  domainVerifications: SsoDomainVerification[];
+  /** What proved each domain. Not its ADR-123 condition: the back-office
+   *  surface does not carry one yet. */
+  domainVerifications: Pick<
+    SsoDomainVerification,
+    "domain" | "method" | "actorId" | "verifiedAtMs"
+  >[];
   providerId: string;
   issuer: string | null;
   allowsJit: boolean;

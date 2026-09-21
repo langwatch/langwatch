@@ -1,4 +1,9 @@
 import {
+  type GuidedOnboardingRecord,
+  parseGuidedOnboardingState,
+  parseOnboardingVariant,
+} from "@langwatch/onboarding-contract";
+import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -25,6 +30,62 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
 
   static create(database: PrismaClient): PrismaOrganizationRepository {
     return new PrismaOrganizationRepository(database);
+  }
+
+  async getGuidedOnboarding({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GuidedOnboardingRecord> {
+    const signupData = await this.readSignupData(organizationId);
+
+    return {
+      state: parseGuidedOnboardingState(signupData),
+      variant: parseOnboardingVariant(signupData),
+    };
+  }
+
+  /**
+   * The two keys upstream writes and nothing else: every other sign-up answer
+   * on the row is carried through untouched, so a welcome flow saving its
+   * progress never erases what the sign-up form collected.
+   */
+  async saveGuidedOnboarding({
+    organizationId,
+    record,
+  }: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord> {
+    const signupData = await this.readSignupData(organizationId);
+    const held =
+      signupData && typeof signupData === "object" && !Array.isArray(signupData)
+        ? (signupData as Record<string, unknown>)
+        : {};
+
+    await this.database.organization.update({
+      where: { id: organizationId },
+      data: {
+        signupData: {
+          ...held,
+          guidedOnboarding: record.state,
+          onboardingVariant: record.variant,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return record;
+  }
+
+  /** The column, with the refusal an unknown organization earns. */
+  private async readSignupData(organizationId: string): Promise<unknown> {
+    const organization = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { signupData: true },
+    });
+    if (!organization) throw new OrganizationNotFoundError();
+
+    return organization.signupData;
   }
 
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {

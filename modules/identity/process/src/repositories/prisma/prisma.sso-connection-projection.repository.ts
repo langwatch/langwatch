@@ -19,6 +19,18 @@ import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state
 /** The one model the connection head reads and writes, and no other. */
 export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection">;
 
+/** The proof condition a decoded row carries. A row written before ADR-123
+ *  has none and reads as VERIFIED: nothing had doubted it, and fabricating a
+ *  clock would start one nobody set. */
+function provedCondition(entry: SsoDomainVerification): SsoDomainVerification {
+  return {
+    ...entry,
+    proofState: entry.proofState ?? "VERIFIED",
+    firstAbsentAtMs: entry.firstAbsentAtMs ?? null,
+    graceEndsAtMs: entry.graceEndsAtMs ?? null,
+  };
+}
+
 /**
  * `SsoConnection` head and its cursor, written under the queue's per-connection lock.
  * The connection pipeline's projection store (D04, ADR-117 §5): the Postgres
@@ -117,7 +129,7 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       approvedDomains: row.approvedDomains,
       verifiedDomains: row.verifiedDomains,
       domainVerifications: Array.isArray(row.domainVerifications)
-        ? (row.domainVerifications as unknown as SsoDomainVerification[])
+        ? (row.domainVerifications as unknown as SsoDomainVerification[]).map(provedCondition)
         : [],
       pendingVerification: row.pendingVerification
         ? (row.pendingVerification as unknown as {

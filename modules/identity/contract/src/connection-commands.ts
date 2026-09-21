@@ -32,6 +32,15 @@ export const COMPLETE_TEARDOWN_COMMAND_TYPE = "lw.identity.complete_teardown" as
  * moves an existing one, so it cannot be a way around a guard (ADR-117 §5).
  */
 export const GRANDFATHER_CONNECTION_COMMAND_TYPE = "lw.identity.grandfather_connection" as const;
+/**
+ * What a re-read of a published proof found (ADR-123). Two commands rather
+ * than one carrying a boolean: "the record is there" and "the record is
+ * gone" lead to different facts, and only the second one carries a clock.
+ */
+export const RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE =
+  "lw.identity.record_domain_proof_present" as const;
+export const RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE =
+  "lw.identity.record_domain_proof_absent" as const;
 
 export const SSO_CONNECTION_COMMAND_TYPES = [
   REGISTER_CONNECTION_COMMAND_TYPE,
@@ -48,6 +57,8 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   REQUEST_TEARDOWN_COMMAND_TYPE,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType = (typeof SSO_CONNECTION_COMMAND_TYPES)[number];
 
@@ -134,6 +145,21 @@ export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSche
 export const verifyDomainCommandDataSchema = commandDataSchema(domainShape);
 export type VerifyDomainCommandData = z.infer<typeof verifyDomainCommandDataSchema>;
 
+export const recordDomainProofPresentCommandDataSchema = commandDataSchema(domainShape);
+export type RecordDomainProofPresentCommandData = z.infer<
+  typeof recordDomainProofPresentCommandDataSchema
+>;
+
+/** `graceMs` is passed in rather than read here, so the window a customer is
+ *  told about is one composed constant and not a second copy of it. */
+export const recordDomainProofAbsentCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  graceMs: z.number().int().positive(),
+});
+export type RecordDomainProofAbsentCommandData = z.infer<
+  typeof recordDomainProofAbsentCommandDataSchema
+>;
+
 export const activateConnectionCommandDataSchema = commandDataSchema({
   /** The account whose test login the activation rests on; null only for a
    *  grandfathered connection (its production history is the test login). */
@@ -201,6 +227,14 @@ export type SsoConnectionCommand =
     }
   | { type: typeof ATTEST_DOMAIN_COMMAND_TYPE; data: AttestDomainCommandData }
   | { type: typeof VERIFY_DOMAIN_COMMAND_TYPE; data: VerifyDomainCommandData }
+  | {
+      type: typeof RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE;
+      data: RecordDomainProofPresentCommandData;
+    }
+  | {
+      type: typeof RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE;
+      data: RecordDomainProofAbsentCommandData;
+    }
   | {
       type: typeof ACTIVATE_CONNECTION_COMMAND_TYPE;
       data: ActivateConnectionCommandData;

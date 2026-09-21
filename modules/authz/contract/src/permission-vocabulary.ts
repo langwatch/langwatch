@@ -109,6 +109,10 @@ export const Resources = {
   // Organization cost screen (ADR-128): provider-billed, gateway-metered,
   // and seat lanes. Read-only; separate from governance:* (ADR-128).
   GOVERNANCE_COST: "governanceCost",
+  // Single sign-on and the directory that provisions against it (D05,
+  // ADR-122). Organization-tier only: a connection decides how EVERYONE in
+  // the organization signs in.
+  SSO: "sso",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

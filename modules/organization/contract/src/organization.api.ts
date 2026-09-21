@@ -1,5 +1,6 @@
 import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -178,6 +179,17 @@ export interface OrganizationApi {
     input: Readonly<{ isDemo: boolean; demoProjectUserId: string; demoProjectId: string }>,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]>;
+  /**
+   * The guided-onboarding record the organization carries, in the column the
+   * organization owns. An organization nobody has onboarded reads as the
+   * empty state with no variant; an unknown one refuses by name.
+   */
+  readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord>;
+  /** Replaces the record, leaving every other sign-up answer where it is. */
+  writeGuidedOnboardingState(input: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord>;
   updateSettings(input: UpdateOrganizationSettingsInput): Promise<UpdateOrganizationSettingsResult>;
   getSettings(input: {
     organizationId: string;

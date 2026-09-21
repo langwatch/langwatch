@@ -8,6 +8,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 /**
  * The organization feature's application: what its four tRPC doors (`organization.*`, `team.*`,
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
@@ -550,6 +551,17 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
    * existing share link now has to be revoked (ADR-057) — only the write saw the stored value
    * beforehand, so the answer is carried through rather than dropped here.
    */
+  readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
+    return this.#dependencies.organizations.readGuidedOnboardingState(input);
+  }
+
+  writeGuidedOnboardingState(input: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord> {
+    return this.#dependencies.organizations.writeGuidedOnboardingState(input);
+  }
+
   async updateSettings(
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {

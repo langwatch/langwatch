@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,
@@ -188,6 +189,18 @@ export class OrganizationService extends OrganizationServiceContract {
     }
 
     return { ...stored, ...this.decryptSettings(stored) };
+  }
+
+  /** The guided-onboarding record, where the organization keeps it. */
+  readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
+    return this.repository.getGuidedOnboarding(input);
+  }
+
+  writeGuidedOnboardingState(input: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord> {
+    return this.repository.saveGuidedOnboarding(input);
   }
 
   async updateSettings(

@@ -9,6 +9,9 @@ import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
@@ -80,6 +83,12 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
     }`,
   [DOMAIN_VERIFIED_EVENT_TYPE]: ({ domain, method }) =>
     `${domain ?? "A domain"} was verified using ${selfProvedMethodWords(method)}`,
+  [DOMAIN_PROOF_WAVERED_EVENT_TYPE]: ({ domain }) =>
+    `The published record${forDomain(domain)} could not be found`,
+  [DOMAIN_PROOF_LAPSED_EVENT_TYPE]: ({ domain }) =>
+    `${domain ?? "The domain"} stopped counting toward automatic joining because its published record stayed missing`,
+  [DOMAIN_PROOF_RECOVERED_EVENT_TYPE]: ({ domain }) =>
+    `The published record${forDomain(domain)} was found again`,
   [CONNECTION_ACTIVATED_EVENT_TYPE]: () => "The connection was turned on",
   [CONNECTION_SUSPENDED_EVENT_TYPE]: ({ note }) => `The connection was suspended${withNote(note)}`,
   [CONNECTION_RESUMED_EVENT_TYPE]: () => "The connection was resumed",

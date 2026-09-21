@@ -21,9 +21,16 @@ import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   type GrandfatherConnectionCommandData,
   normalizeDomain,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -35,6 +42,8 @@ import {
   type ResumeConnectionCommandData,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionFactInput,
+  type SsoConnectionState,
+  type SsoDomainVerification,
   SsoConnectionActivationBlockedError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionTeardownStrandsUsersError,
@@ -311,6 +320,116 @@ export class SsoConnectionGuardsService {
         },
       },
     ];
+  }
+
+  /**
+   * A re-check found the record gone (ADR-123). The first absence starts the
+   * clock; a later one lapses only once the deadline the customer was TOLD
+   * has passed, and an already-lapsed domain states nothing.
+   */
+  async recordDomainProofAbsent(
+    data: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.checks.require(data, RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE);
+    const domain = normalizeDomain(data.domain);
+    const proof = this.requirePublishedProof({ state, domain });
+    if (proof.proofState === "LAPSED") {
+      return [];
+    }
+
+    if (proof.proofState === "VERIFIED") {
+      return [
+        {
+          type: DOMAIN_PROOF_WAVERED_EVENT_TYPE,
+          data: {
+            connectionId: data.connectionId,
+            domain,
+            firstAbsentAtMs: data.occurredAtMs,
+            graceEndsAtMs: data.occurredAtMs + data.graceMs,
+            actor: data.actor,
+            source: data.source,
+          },
+        },
+      ];
+    }
+
+    const firstAbsentAtMs = proof.firstAbsentAtMs ?? data.occurredAtMs;
+    const deadline = proof.graceEndsAtMs ?? firstAbsentAtMs + data.graceMs;
+    if (data.occurredAtMs < deadline) {
+      return [];
+    }
+
+    return [
+      {
+        type: DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          firstAbsentAtMs,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * A re-check found the record published (ADR-123). Recovery is
+   * unconditional and costs nothing beyond publishing it; a domain nothing
+   * was doubting states nothing, which every healthy domain does.
+   */
+  async recordDomainProofPresent(
+    data: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.checks.require(data, RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE);
+    const domain = normalizeDomain(data.domain);
+    const proof = this.requirePublishedProof({ state, domain });
+    if (proof.proofState === "VERIFIED") {
+      return [];
+    }
+
+    return [
+      {
+        type: DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          absentForMs: Math.max(
+            0,
+            data.occurredAtMs - (proof.firstAbsentAtMs ?? data.occurredAtMs),
+          ),
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * The proof a published answer is entitled to speak about. Everything else
+   * is refused rather than ignored, so a caller sweeping the wrong set of
+   * domains is told rather than quietly lapsing evidence never in DNS.
+   */
+  private requirePublishedProof({
+    state,
+    domain,
+  }: {
+    state: SsoConnectionState;
+    domain: string;
+  }): SsoDomainVerification {
+    const proof = state.domainVerifications.find((entry) => entry.domain === domain);
+    if (!proof) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${state.connectionId}: ${domain} has no proof to re-check`,
+      );
+    }
+    if (proof.method !== "dns-txt" && proof.method !== "https-file") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${state.connectionId}: ${domain} was proved by ${proof.method}, which no published proof can speak for`,
+      );
+    }
+
+    return proof;
   }
 
   /**

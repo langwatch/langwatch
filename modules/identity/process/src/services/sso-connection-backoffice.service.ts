@@ -31,7 +31,12 @@ export interface BackofficeSsoConnection {
   claimedDomains: string[];
   approvedDomains: string[];
   verifiedDomains: string[];
-  domainVerifications: SsoDomainVerification[];
+  /** What proved each domain — not yet its ADR-123 condition, which the
+   *  back-office schema does not carry. */
+  domainVerifications: Pick<
+    SsoDomainVerification,
+    "domain" | "method" | "actorId" | "verifiedAtMs"
+  >[];
   providerId: string;
   issuer: string | null;
   allowsJit: boolean;
@@ -276,7 +281,14 @@ export class SsoConnectionBackofficeService {
       claimedDomains: state.claimedDomains,
       approvedDomains: state.approvedDomains,
       verifiedDomains: state.verifiedDomains,
-      domainVerifications: state.domainVerifications,
+      domainVerifications: state.domainVerifications.map(
+        ({ domain, method, actorId, verifiedAtMs }) => ({
+          domain,
+          method,
+          actorId,
+          verifiedAtMs,
+        }),
+      ),
       providerId: state.idpMetadata.providerId,
       issuer: state.idpMetadata.issuer,
       allowsJit: state.allowsJit,

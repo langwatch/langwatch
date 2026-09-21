@@ -175,6 +175,9 @@ describe("ops-assisted onboarding", () => {
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
       // And it never reads as a domain the customer proved: the method is a

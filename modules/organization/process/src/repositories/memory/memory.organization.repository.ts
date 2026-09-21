@@ -1,4 +1,9 @@
 import {
+  type GuidedOnboardingRecord,
+  parseGuidedOnboardingState,
+  parseOnboardingVariant,
+} from "@langwatch/onboarding-contract";
+import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -14,7 +19,11 @@ import {
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
 } from "../organization.repository.ts";
-import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
+import type {
+  MemoryOrganizationDatabase,
+  MemoryOrganizationRow,
+  MemoryTeamRow,
+} from "./memory.organization.database.ts";
 
 /** In-memory `OrganizationRepository`, for tests and a memory-backed boot. */
 export class MemoryOrganizationRepository extends OrganizationRepository {
@@ -29,6 +38,43 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     const organization = this.memory.organizations.get(organizationId);
     return organization ? { ...organization } : null;
+  }
+
+  async getGuidedOnboarding({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GuidedOnboardingRecord> {
+    const signupData = this.requireOrganization(organizationId).signupData;
+
+    return {
+      state: parseGuidedOnboardingState(signupData),
+      variant: parseOnboardingVariant(signupData),
+    };
+  }
+
+  async saveGuidedOnboarding({
+    organizationId,
+    record,
+  }: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord> {
+    const organization = this.requireOrganization(organizationId);
+    organization.signupData = {
+      ...(organization.signupData ?? {}),
+      guidedOnboarding: record.state,
+      onboardingVariant: record.variant,
+    };
+
+    return record;
+  }
+
+  private requireOrganization(organizationId: string): MemoryOrganizationRow {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+
+    return organization;
   }
 
   async updateSettings(input: {

@@ -19,6 +19,9 @@ export interface MemoryOrganizationRow {
   s3SecretAccessKey: string | null;
   s3Bucket: string | null;
   stripeCustomerId: string | null;
+  /** Every sign-up answer the organization carries, guided onboarding among
+   *  them. Shapeless here for the reason it is shapeless in Postgres. */
+  signupData?: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
 }

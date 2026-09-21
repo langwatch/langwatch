@@ -129,6 +129,9 @@ describe("operator attestation", () => {
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
     });
@@ -239,6 +242,9 @@ describe("operator attestation", () => {
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
 
@@ -301,6 +307,9 @@ describe("operator attestation", () => {
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
     });
@@ -353,6 +362,9 @@ describe("operator attestation", () => {
             method: "dns-txt",
             actorId: "user_first",
             verifiedAtMs: T0,
+            proofState: "VERIFIED",
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
           },
         ],
       });
@@ -489,6 +501,9 @@ describe("operator attestation", () => {
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
       expect(published?.domainVerifications).toEqual([
@@ -497,6 +512,9 @@ describe("operator attestation", () => {
           method: "dns-txt",
           actorId: ANA.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
       expect(byLicence?.domainVerifications).toEqual([
@@ -505,6 +523,9 @@ describe("operator attestation", () => {
           method: "license-token",
           actorId: ANA.id,
           verifiedAtMs: T0,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         },
       ]);
 

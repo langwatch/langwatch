@@ -175,6 +175,15 @@ export const AUTHZ_RESOURCES = {
     actions: ["view"],
     scopes: ["organization"],
   },
+  // D05, ADR-122. Seeing a connection and changing one are two jobs: a
+  // security reviewer reads which domains route and who proved them, an IT
+  // administrator sets it up. Org-tier only, and the directory that
+  // provisions people is gated by these same two — federating sign-in and
+  // letting a directory write your membership are one administrator's job.
+  sso: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {

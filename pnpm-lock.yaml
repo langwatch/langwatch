@@ -8084,6 +8084,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -9158,9 +9161,18 @@ importers:
 
   modules/onboarding/process:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability

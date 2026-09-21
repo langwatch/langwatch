@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   AuthzGrantsService,
   type AuthzApi,
@@ -8,6 +9,7 @@ import {
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
 } from "@langwatch/authz-contract";
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
@@ -20,7 +22,6 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -38,7 +39,24 @@ import { TeamRepository } from "../../repositories/team.repository.ts";
 import { OrganizationService } from "../organization.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  guidedOnboarding: GuidedOnboardingRecord = { state: { paths: [], donePaths: [] }, variant: null };
   storedSettings: StoredOrganizationSettings | null = null;
+
+  async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
+    return this.guidedOnboarding;
+  }
+
+  async saveGuidedOnboarding({
+    record,
+  }: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord> {
+    this.guidedOnboarding = record;
+
+    return record;
+  }
+
   settingsUpdate: Record<string, unknown> | null = null;
   constructor(
     private readonly teamId: string | null,

@@ -21,11 +21,17 @@ import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   domainAttestedPayloadSchema,
   domainClaimApprovedPayloadSchema,
   domainClaimedPayloadSchema,
   domainClaimRejectedPayloadSchema,
+  domainProofLapsedPayloadSchema,
+  domainProofRecoveredPayloadSchema,
+  domainProofWaveredPayloadSchema,
   domainVerifiedPayloadSchema,
   emptySsoConnection,
   reduceSsoConnection,
@@ -90,6 +96,24 @@ export const domainVerifiedEventSchema = EventSchema.extend({
 });
 export type DomainVerifiedEvent = z.infer<typeof domainVerifiedEventSchema>;
 
+export const domainProofWaveredEventSchema = EventSchema.extend({
+  type: z.literal(DOMAIN_PROOF_WAVERED_EVENT_TYPE),
+  data: domainProofWaveredPayloadSchema,
+});
+export type DomainProofWaveredEvent = z.infer<typeof domainProofWaveredEventSchema>;
+
+export const domainProofLapsedEventSchema = EventSchema.extend({
+  type: z.literal(DOMAIN_PROOF_LAPSED_EVENT_TYPE),
+  data: domainProofLapsedPayloadSchema,
+});
+export type DomainProofLapsedEvent = z.infer<typeof domainProofLapsedEventSchema>;
+
+export const domainProofRecoveredEventSchema = EventSchema.extend({
+  type: z.literal(DOMAIN_PROOF_RECOVERED_EVENT_TYPE),
+  data: domainProofRecoveredPayloadSchema,
+});
+export type DomainProofRecoveredEvent = z.infer<typeof domainProofRecoveredEventSchema>;
+
 export const connectionActivatedEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
   data: connectionActivatedPayloadSchema,
@@ -129,6 +153,9 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   verificationRequestedEventSchema,
   domainAttestedEventSchema,
   domainVerifiedEventSchema,
+  domainProofWaveredEventSchema,
+  domainProofLapsedEventSchema,
+  domainProofRecoveredEventSchema,
   connectionActivatedEventSchema,
   connectionSuspendedEventSchema,
   connectionResumedEventSchema,
@@ -150,6 +177,9 @@ const ssoConnectionEvents = [
   verificationRequestedEventSchema,
   domainAttestedEventSchema,
   domainVerifiedEventSchema,
+  domainProofWaveredEventSchema,
+  domainProofLapsedEventSchema,
+  domainProofRecoveredEventSchema,
   connectionActivatedEventSchema,
   connectionSuspendedEventSchema,
   connectionResumedEventSchema,
@@ -267,6 +297,27 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityDomainVerified(
     event: DomainVerifiedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofWavered(
+    event: DomainProofWaveredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofLapsed(
+    event: DomainProofLapsedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofRecovered(
+    event: DomainProofRecoveredEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

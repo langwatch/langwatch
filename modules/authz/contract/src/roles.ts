@@ -166,6 +166,12 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   // screen before delegating it. authz/web derives built-in bags from this
   // one via `builtinRolePermissions`, so there is no mirror bag to keep in step.
   "governanceCost:view",
+  // The organization administrator IS the IT administrator on self-hosted:
+  // nobody else holds single sign-on and directory sync, and a fresh install
+  // has no custom-role authoring surface to mint one. The licence gates
+  // whether the capability exists; this only says who may use it (D05).
+  "sso:view",
+  "sso:manage",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];

@@ -1,3 +1,5 @@
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
+
 import type {
   AddOrganizationGroupBindingInput,
   ApplyOrganizationGroupEditsInput,
@@ -56,6 +58,15 @@ import type {
 } from "./team.ts";
 
 export abstract class OrganizationService {
+  /** The guided-onboarding record, in the sign-up column the organization
+   *  owns. An organization nobody has onboarded reads as the empty state. */
+  abstract readGuidedOnboardingState(input: {
+    organizationId: string;
+  }): Promise<GuidedOnboardingRecord>;
+  abstract writeGuidedOnboardingState(input: {
+    organizationId: string;
+    record: GuidedOnboardingRecord;
+  }): Promise<GuidedOnboardingRecord>;
   abstract getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings>;
   abstract updateSettings(
     input: UpdateOrganizationSettingsInput,

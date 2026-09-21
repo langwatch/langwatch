@@ -35,10 +35,12 @@ export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
 export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
 
 /**
- * Verification methods: DNS TXT, license token, operator-attested (D05), legacy (grandfather).
+ * Verification methods: DNS TXT, the file the domain serves, license token,
+ * operator-attested (D05), legacy (grandfather).
  */
 export const SSO_VERIFICATION_METHODS = [
   "dns-txt",
+  "https-file",
   "license-token",
   "operator-attested",
   "legacy-configuration",
@@ -49,6 +51,24 @@ export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
 export const SSO_VERIFICATION_CEREMONY_METHODS = ["dns-txt", "license-token"] as const;
 export const ssoVerificationCeremonyMethodSchema = z.enum(SSO_VERIFICATION_CEREMONY_METHODS);
 export type SsoVerificationCeremonyMethod = z.infer<typeof ssoVerificationCeremonyMethodSchema>;
+
+/**
+ * The two channels one published-proof ceremony can be satisfied through:
+ * the same pending ceremony and the same hash, so which one proved it is
+ * what the verified fact records, and a re-read looks where it lives.
+ */
+export const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
+export const ssoPublishedProofChannelSchema = z.enum(SSO_PUBLISHED_PROOF_CHANNELS);
+export type SsoPublishedProofChannel = z.infer<typeof ssoPublishedProofChannelSchema>;
+
+/**
+ * Whether the evidence behind a proved domain is still there (ADR-123).
+ * `WAVERING` found the record gone and started a clock; `LAPSED` is that
+ * grace spent, which stops it vouching for anybody NEW.
+ */
+export const SSO_DOMAIN_PROOF_STATES = ["VERIFIED", "WAVERING", "LAPSED"] as const;
+export const ssoDomainProofStateSchema = z.enum(SSO_DOMAIN_PROOF_STATES);
+export type SsoDomainProofState = z.infer<typeof ssoDomainProofStateSchema>;
 
 /**
  * Where a connection came from. `legacy-grandfathered` is stamped on every
@@ -84,6 +104,9 @@ export const CONNECTION_DISCARDED_EVENT_TYPE = "lw.identity.connection_discarded
 export const VERIFICATION_REQUESTED_EVENT_TYPE = "lw.identity.verification_requested" as const;
 export const DOMAIN_ATTESTED_EVENT_TYPE = "lw.identity.domain_attested" as const;
 export const DOMAIN_VERIFIED_EVENT_TYPE = "lw.identity.domain_verified" as const;
+export const DOMAIN_PROOF_WAVERED_EVENT_TYPE = "lw.identity.domain_proof_wavered" as const;
+export const DOMAIN_PROOF_LAPSED_EVENT_TYPE = "lw.identity.domain_proof_lapsed" as const;
+export const DOMAIN_PROOF_RECOVERED_EVENT_TYPE = "lw.identity.domain_proof_recovered" as const;
 export const CONNECTION_ACTIVATED_EVENT_TYPE = "lw.identity.connection_activated" as const;
 export const CONNECTION_SUSPENDED_EVENT_TYPE = "lw.identity.connection_suspended" as const;
 export const CONNECTION_RESUMED_EVENT_TYPE = "lw.identity.connection_resumed" as const;
@@ -99,6 +122,9 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   VERIFICATION_REQUESTED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -188,6 +214,49 @@ export const domainVerifiedPayloadSchema = z.object({
   ...sourced,
 });
 
+/**
+ * A re-check found the record gone (ADR-123). Stated once, when the evidence
+ * first goes missing. `graceEndsAtMs` rides on the fact: the deadline a
+ * customer was TOLD is the one they get, whatever the window becomes.
+ */
+export const domainProofWaveredPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** When the record was first found missing. The clock starts here. */
+  firstAbsentAtMs: z.number().int().nonnegative(),
+  /** When continued absence becomes a lapse. */
+  graceEndsAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * The grace ran out with the record still missing (ADR-123). The domain stops
+ * vouching for NEW people; it suspends nothing and un-proves nothing, because
+ * routing is untouched.
+ */
+export const domainProofLapsedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** Carried forward so the fact says how long it was gone before we acted. */
+  firstAbsentAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * The record is published again (ADR-123). Recovery costs the customer
+ * nothing but publishing it: the domain was never un-proved, only doubted.
+ */
+export const domainProofRecoveredPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** How long the evidence was missing, end to end. */
+  absentForMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 export const connectionActivatedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   /** The account whose successful test login the activation rests on; null
@@ -267,6 +336,18 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: domainVerifiedPayloadSchema,
   }),
   z.object({
+    type: z.literal(DOMAIN_PROOF_WAVERED_EVENT_TYPE),
+    data: domainProofWaveredPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(DOMAIN_PROOF_LAPSED_EVENT_TYPE),
+    data: domainProofLapsedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(DOMAIN_PROOF_RECOVERED_EVENT_TYPE),
+    data: domainProofRecoveredPayloadSchema,
+  }),
+  z.object({
     type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
     data: connectionActivatedPayloadSchema,
   }),
@@ -306,6 +387,14 @@ export interface SsoDomainVerification {
    *  Null for a system actor, which is what the grandfather migration is. */
   actorId: string | null;
   verifiedAtMs: number;
+  /** Whether that evidence is still there (ADR-123). A statement about the
+   *  evidence, never about the method or the prover: an attested domain that
+   *  wavers is still an attested domain. */
+  proofState: SsoDomainProofState;
+  /** When a re-check first found the record gone, and when that becomes a
+   *  lapse. Both null while the proof is VERIFIED. */
+  firstAbsentAtMs: number | null;
+  graceEndsAtMs: number | null;
 }
 
 /**
@@ -394,6 +483,31 @@ const withVerification = (
 ];
 
 /**
+ * Change what one domain's proof SAYS about itself, leaving what proved it
+ * alone (ADR-123). A statement about a domain with no proof changes nothing;
+ * the guards refuse that before any fact exists.
+ */
+const withProofCondition = (
+  held: SsoDomainVerification[],
+  condition: {
+    domain: string;
+    proofState: SsoDomainProofState;
+    firstAbsentAtMs: number | null;
+    graceEndsAtMs: number | null;
+  },
+): SsoDomainVerification[] =>
+  held.map((entry) =>
+    entry.domain === condition.domain
+      ? {
+          ...entry,
+          proofState: condition.proofState,
+          firstAbsentAtMs: condition.firstAbsentAtMs,
+          graceEndsAtMs: condition.graceEndsAtMs,
+        }
+      : entry,
+  );
+
+/**
  * The reducer. Pure and total: the same function runs in the framework's
  * fold, the replay proof, and a browser tab. Guards refuse a forbidden fact
  * before it exists, so this file states transitions, never re-checks them.
@@ -467,6 +581,9 @@ export function reduceSsoConnection({
           method: "operator-attested",
           actorId: fact.data.actor.id,
           verifiedAtMs: fact.occurredAt,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         }),
         pendingVerification: null,
       };
@@ -481,8 +598,44 @@ export function reduceSsoConnection({
           method: fact.data.method,
           actorId: fact.data.actor.id,
           verifiedAtMs: fact.occurredAt,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
         }),
         pendingVerification: null,
+      };
+    // A doubted, lapsed or recovered proof moves no lifecycle and un-proves
+    // nothing: `verifiedDomains` is untouched, because routing is untouched.
+    case DOMAIN_PROOF_WAVERED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "WAVERING",
+          firstAbsentAtMs: fact.data.firstAbsentAtMs,
+          graceEndsAtMs: fact.data.graceEndsAtMs,
+        }),
+      };
+    case DOMAIN_PROOF_LAPSED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "LAPSED",
+          firstAbsentAtMs: fact.data.firstAbsentAtMs,
+          // The clock has run; keeping a deadline would say one still is.
+          graceEndsAtMs: null,
+        }),
+      };
+    case DOMAIN_PROOF_RECOVERED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
+        }),
       };
     case CONNECTION_ACTIVATED_EVENT_TYPE:
       return {

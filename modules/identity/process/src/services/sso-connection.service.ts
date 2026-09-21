@@ -20,6 +20,12 @@ import {
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  type RecordDomainProofPresentCommandData,
+  recordDomainProofPresentCommandDataSchema,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
@@ -144,6 +150,29 @@ export class SsoConnectionService {
     return this.commit(
       { type: VERIFY_DOMAIN_COMMAND_TYPE, data },
       await this.guards.verifyDomain(data),
+    );
+  }
+
+  /** What a re-read of a published proof found (ADR-123). */
+  async recordDomainProofAbsent(
+    input: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofAbsentCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofAbsent(data),
+    );
+  }
+
+  async recordDomainProofPresent(
+    input: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofPresentCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofPresent(data),
     );
   }
 
