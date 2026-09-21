@@ -31,7 +31,15 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { MigrationProgress } from "../migration-progress";
+import {
+  migrationBlockers,
+  finalizationBlockers,
+} from "@ee/sso/sso-migration.rules";
+import {
+  MigrationProgress,
+  UPDATE_CHECK_CODES,
+  UPDATE_FINISH_CONDITIONS,
+} from "../migration-progress";
 
 function migrationWith(
   changes: Partial<SelfServeMigrationView> = {},
@@ -118,7 +126,7 @@ describe("given a replacement with a successful test sign-in", () => {
       const view = render(migrationScreen({ connectionState: "VERIFIED" }));
 
       const switchButton = screen.getByRole("button", {
-        name: "Switch to new SSO",
+        name: "Switch sign-in over",
       });
       expect(switchButton.hasAttribute("disabled")).toBe(true);
       fireEvent.click(switchButton);
@@ -126,7 +134,7 @@ describe("given a replacement with a successful test sign-in", () => {
 
       view.rerender(migrationScreen());
       fireEvent.click(
-        screen.getByRole("button", { name: "Switch to new SSO" }),
+        screen.getByRole("button", { name: "Switch sign-in over" }),
       );
       expect(routeMock).toHaveBeenCalledWith(
         {
@@ -149,12 +157,12 @@ describe("given a replacement with a successful test sign-in", () => {
       });
       const view = render(migrationScreen({ migration }));
 
-      expect(screen.queryByRole("button", { name: /Roll back/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Switch back/ })).toBeNull();
       expect(
-        screen.queryByRole("button", { name: "Switch to new SSO" }),
+        screen.queryByRole("button", { name: "Switch sign-in over" }),
       ).toBeNull();
       fireEvent.click(
-        screen.getByRole("button", { name: "Retry finalization" }),
+        screen.getByRole("button", { name: "Try finishing again" }),
       );
       expect(finalizeMock).toHaveBeenCalledWith(
         { organizationId: "org_acme", connectionId: "ssoc_direct" },
@@ -166,7 +174,7 @@ describe("given a replacement with a successful test sign-in", () => {
       );
       expect(
         screen.queryByRole("button", {
-          name: /finalization|Finalize|Roll back|Switch to/,
+          name: /finishing|Finish|Switch back|Switch sign-in/,
         }),
       ).toBeNull();
     });
@@ -186,9 +194,9 @@ describe("given a replacement with a successful test sign-in", () => {
         }),
       );
 
-      const rollback = screen.getByRole("button", { name: /Roll back/ });
+      const rollback = screen.getByRole("button", { name: /Switch back/ });
       const finalize = screen.getByRole("button", {
-        name: "Finalize migration",
+        name: "Finish the update",
       });
       expect(rollback.hasAttribute("disabled")).toBe(true);
       expect(finalize.hasAttribute("disabled")).toBe(true);
@@ -206,7 +214,7 @@ describe("given a replacement with a successful test sign-in", () => {
 
       expect(screen.getByText("Member 0")).toBeDefined();
       expect(
-        screen.queryByRole("button", { name: /Finalize|Roll back|Switch to/ }),
+        screen.queryByRole("button", { name: /Finish|Switch back|Switch sign-in/ }),
       ).toBeNull();
     });
   });
@@ -315,6 +323,163 @@ describe("given more than one page of members still using the legacy provider", 
       expect(refetchMock).toHaveBeenCalledOnce();
       fireEvent.click(screen.getByRole("button", { name: "Previous members" }));
       expect(screen.getByText("Member 0")).toBeDefined();
+    });
+  });
+});
+
+/**
+ * WHERE IT STANDS, AND WHAT IS LEFT.
+ *
+ * The panel used to open with three rows of counts under a card titled after
+ * a word no administrator has heard. What somebody arriving here actually
+ * asks is who is signing their company in right now, and what they have to do
+ * next — in that order.
+ */
+describe("given an update under way", () => {
+  describe("when the new connection is registered and nothing has moved", () => {
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("says who is signing people in and that nothing has changed for them", () => {
+      render(migrationScreen({ migration: migrationWith({ phase: "SETUP" }) }));
+
+      expect(screen.getByTestId("sso-update-status").textContent).toBe(
+        "Everyone still signs in through Auth0. Set the new connection up and test it, and nothing changes for your members until you switch over.",
+      );
+      expect(screen.getByTestId("sso-update-chip").textContent).toContain(
+        "Setting up",
+      );
+    });
+  });
+
+  describe("when sign-in has been switched to the new connection", () => {
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("names the new connection and says the way back is still open", () => {
+      render(
+        migrationScreen({
+          migration: migrationWith({
+            phase: "GRACE_DIRECT",
+            selectedRoute: "direct",
+          }),
+        }),
+      );
+
+      expect(screen.getByTestId("sso-update-status").textContent).toBe(
+        "Everyone signs in through Acme. You can switch back to Auth0 until you finish the update.",
+      );
+      expect(screen.getByTestId("sso-update-chip").textContent).toContain(
+        "Switched over",
+      );
+    });
+  });
+
+  describe("when checks are outstanding", () => {
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("says what to do about each one, in the customer's own words", () => {
+      const { container } = render(
+        migrationScreen({
+          migration: migrationWith({
+            members: {
+              activeCount: 3,
+              linkedCount: 1,
+              stragglers: [],
+              nextCursor: null,
+            },
+            blockers: [
+              {
+                code: "members-not-linked",
+                message:
+                  "2 active members are not linked to the replacement yet.",
+              },
+              {
+                code: "legacy-activity-not-quiet",
+                message:
+                  "Wait for seven days without a successful legacy sign-in.",
+              },
+            ],
+          }),
+        }),
+      );
+
+      expect(container.textContent).toContain(
+        "2 members have not signed in through the new connection yet.",
+      );
+      expect(container.textContent).toContain(
+        "Wait for seven days with nobody signing in through Auth0.",
+      );
+      // The server's own sentences are written in the ledger's vocabulary,
+      // and the code-keyed copy is what replaces them.
+      expect(container.textContent).not.toContain("the replacement");
+      expect(container.textContent).not.toContain("legacy sign-in");
+    });
+
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("offers the whole list of conditions without leaving the page", () => {
+      render(
+        migrationScreen({
+          migration: migrationWith({
+            blockers: [{ code: "replacement-not-tested", message: "x" }],
+          }),
+        }),
+      );
+
+      expect(screen.getByTestId("sso-update-conditions-help")).toBeDefined();
+      expect(UPDATE_FINISH_CONDITIONS.length).toBe(UPDATE_CHECK_CODES.length);
+    });
+
+    /**
+     * The pin copywriting.md asks for: the list is complete against the checks
+     * the service can actually report, in both directions.
+     */
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("has words for every check the service can report, and no others", () => {
+      const reported = new Set([
+        ...migrationBlockers({
+          selectedRoute: "legacy",
+          testSignInDone: false,
+          liveRecoveryCount: 0,
+          linkedCount: 0,
+          activeCount: 2,
+          quietComplete: false,
+          scimStatus: "needs-repointing",
+          sharedLegacyIdentifiers: true,
+        }).map((blocker) => blocker.code),
+        ...finalizationBlockers([], {
+          replacementActive: false,
+          qualifiedProofs: 0,
+          recovery: false,
+          legacyAccounts: {
+            remaining: 1,
+            unassociated: 1,
+            ambiguous: true,
+            unverifiedDirectMembers: 1,
+          },
+        }).map((blocker) => blocker.code),
+      ]);
+
+      expect([...reported].sort()).toEqual([...UPDATE_CHECK_CODES].sort());
+    });
+  });
+
+  describe("when any phase is rendered", () => {
+    /** @scenario "The update reports where it stands and what is outstanding" */
+    it("never calls any of it a migration", () => {
+      for (const phase of [
+        "SETUP",
+        "GRACE_LEGACY",
+        "GRACE_DIRECT",
+        "FINALIZING",
+        "FINALIZED",
+      ] as const) {
+        const { container } = render(
+          migrationScreen({
+            migration: migrationWith({
+              phase,
+              blockers: [{ code: "replacement-not-active", message: "x" }],
+            }),
+          }),
+        );
+        expect(container.textContent?.toLowerCase()).not.toContain("migrat");
+        cleanup();
+      }
     });
   });
 });

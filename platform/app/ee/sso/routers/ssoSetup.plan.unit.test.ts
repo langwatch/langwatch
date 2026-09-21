@@ -19,6 +19,7 @@ const { mockSelfServe, mockBreakGlass, mockAuditLog, mockPlan } = vi.hoisted(
     mockSelfServe: {
       getSetup: vi.fn(),
       registerConnection: vi.fn(),
+      startLegacyMigration: vi.fn(),
       activate: vi.fn(),
       breakGlassHistory: vi.fn(),
       breakGlassCandidates: vi.fn(),
@@ -206,6 +207,48 @@ describe("the organization's single sign-on setup surface", () => {
         "Enterprise plan",
       );
       expect(mockSelfServe.registerConnection).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The refusal is KNOWABLE and the customer can act on it, so it carries
+     * the code the client registry writes copy for. A bare `FORBIDDEN` left
+     * the administrator reading "something went wrong" above a sentence that
+     * explained it perfectly (ADR-045).
+     */
+    /** @scenario "An organization not on an Enterprise plan is told the plan is what refuses" */
+    it("refuses connecting an identity provider of their own with the plan's own code", async () => {
+      const refusal = await caller()
+        .startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_legacy",
+          providerId: "okta",
+          idp: OIDC,
+        })
+        .catch((error: unknown) => error);
+
+      // The handled error rides as the TRPCError's cause, which is what the
+      // client reads its copy off — the tRPC code itself has no 402.
+      expect((refusal as { cause?: { code?: string } }).cause?.code).toBe(
+        "enterprise_plan_required",
+      );
+      expect(mockSelfServe.startLegacyMigration).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Registering an identity provider needs an Enterprise plan" */
+    it("refuses registration with the same code", async () => {
+      const refusal = await caller()
+        .register({
+          organizationId: "org_acme",
+          providerId: "okta",
+          idp: OIDC,
+        })
+        .catch((error: unknown) => error);
+
+      // The handled error rides as the TRPCError's cause, which is what the
+      // client reads its copy off — the tRPC code itself has no 402.
+      expect((refusal as { cause?: { code?: string } }).cause?.code).toBe(
+        "enterprise_plan_required",
+      );
     });
 
     /** @scenario "Going live needs an Enterprise plan" */
