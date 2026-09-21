@@ -8,9 +8,13 @@ import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const onboardingWeb = defineWebModule("onboarding")
   .withHosts({
-    requires: ["OnboardingHostApi"],
+    requires: ["OnboardingHostApi", "GuidedOnboardingHostApi"],
     mounts: {
       OnboardingHostApi: { load: () => import("./behavior/onboarding-host-mount.tsx") },
+      GuidedOnboardingHostApi: {
+        load: () =>
+          import("./features/guided-onboarding/behavior/guided-onboarding-host-mount.tsx"),
+      },
     },
   })
   .withScreens({

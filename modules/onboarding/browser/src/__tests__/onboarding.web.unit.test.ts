@@ -25,6 +25,20 @@ describe("given a browser that installs onboarding", () => {
     });
   });
 
+  describe("when the guided-onboarding host mount is asked for", () => {
+    it("requires GuidedOnboardingHostApi and mounts it", () => {
+      expect(onboardingWeb.installation.hosts.requires).toContain("GuidedOnboardingHostApi");
+      expect(onboardingWeb.installation.hosts.mounts).toHaveProperty("GuidedOnboardingHostApi");
+    });
+
+    it("answers with the GuidedOnboardingHostMount component", async () => {
+      const mount = onboardingWeb.installation.hosts.mounts["GuidedOnboardingHostApi"];
+      const loaded = await mount?.load();
+
+      expect(loaded).toHaveProperty("default");
+    });
+  });
+
   describe("when a screen the declaration names is asked for", () => {
     it("answers with the Onboarding component", async () => {
       const screen = onboardingWeb.installation.screens["pages/onboarding"];
