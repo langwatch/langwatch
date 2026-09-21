@@ -23,6 +23,7 @@ import { githubServer } from "@langwatch/github-process";
 import { governanceServer } from "@langwatch/enterprise-governance-process";
 import { hostedMcpServer } from "@langwatch/hosted-mcp-process";
 import { identityServer } from "@langwatch/identity-process";
+import { instantEvalServer } from "@langwatch/instant-eval-process";
 import { langyServer } from "@langwatch/langy-process";
 import { licensingServer } from "@langwatch/enterprise-licensing-process";
 import { logServer } from "@langwatch/log-process";
@@ -31,6 +32,7 @@ import { metricServer } from "@langwatch/metric-process";
 import { modelProviderServer } from "@langwatch/model-provider-process";
 import { monitorServer } from "@langwatch/monitor-process";
 import { notificationServer } from "@langwatch/notification-process";
+import { onboardingServer } from "@langwatch/onboarding-process";
 import { opsServer } from "@langwatch/ops-process";
 import { organizationServer } from "@langwatch/organization-process";
 import { platformHealthServer } from "@langwatch/platform-health-process";
@@ -75,6 +77,7 @@ export const serverModules = [
   governanceServer,
   hostedMcpServer,
   identityServer,
+  instantEvalServer,
   langyServer,
   licensingServer,
   logServer,
@@ -83,6 +86,7 @@ export const serverModules = [
   modelProviderServer,
   monitorServer,
   notificationServer,
+  onboardingServer,
   opsServer,
   organizationServer,
   platformHealthServer,

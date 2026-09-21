@@ -357,6 +357,12 @@
       "path": "packages/installed-web-modules/tsconfig.json"
     },
     {
+      "path": "modules/instant-eval/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/instant-eval/process/tsconfig.json"
+    },
+    {
       "path": "packages/kernel/tsconfig.test.json"
     },
     {
@@ -433,6 +439,12 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/process/tsconfig.json"
     },
     {
       "path": "modules/ops/browser/tsconfig.json"

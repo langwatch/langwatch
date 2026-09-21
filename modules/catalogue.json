@@ -134,6 +134,12 @@
       "subjects": ["identity"]
     },
     {
+      "id": "instant-eval",
+      "root": "modules/instant-eval",
+      "classification": "core",
+      "subjects": ["instant-eval"]
+    },
+    {
       "id": "langy",
       "root": "modules/langy",
       "classification": "core",

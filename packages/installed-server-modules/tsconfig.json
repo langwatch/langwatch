@@ -96,6 +96,9 @@
       "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/instant-eval/process/tsconfig.build.json"
+    },
+    {
       "path": "../kernel/tsconfig.build.json"
     },
     {
@@ -115,6 +118,9 @@
     },
     {
       "path": "../../modules/notification/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/onboarding/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/ops/process/tsconfig.build.json"
