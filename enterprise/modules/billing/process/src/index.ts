@@ -131,6 +131,23 @@ export {
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
 export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptions-report.repository.ts";
+export {
+  createScenarioRunMilestonesSubscriber,
+  type ScenarioRunMilestonesSubscriberDeps,
+} from "./eventing/scenario-run-milestones.subscriber.ts";
+export { isConnectedAgentRunSucceeded } from "./rules/scenario-run-milestones.rules.ts";
+export {
+  ProjectActiveDayTrackerService,
+  type ProjectActiveDayTrackerDeps,
+  type ProjectActiveDaySource,
+  type ProjectAdminResolution,
+} from "./services/project-active-day-tracker.service.ts";
+export { ProjectActiveDayRepository } from "./repositories/project-active-day.repository.ts";
+export { MemoryProjectActiveDayRepository } from "./repositories/memory/memory.project-active-day.repository.ts";
+export { PostHogChannel, type PostHogEventInput } from "./channels/posthog.channel.ts";
+export { HttpPostHogChannel } from "./channels/http/http.posthog.channel.ts";
+export { MemoryPostHogChannel } from "./channels/memory/memory.posthog.channel.ts";
+export { postHogChannels } from "./channels/posthog-channels.registry.ts";
 
 // The rows this module owns, and the two tiers behind them. A process selects
 // one tier and is handed every row; it constructs no repository itself.

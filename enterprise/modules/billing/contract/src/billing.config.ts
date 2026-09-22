@@ -2,10 +2,18 @@ import { Config, type ConfigOf } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
-/** Neither is a credential: a payment-link id and a Slack channel address. */
+/**
+ * Neither is a credential: a payment-link id and a Slack channel address.
+ * `productAnalytics` is the same public PostHog project key every other
+ * reader in this tree takes as plain config — the browser ships it too.
+ */
 export const billingConfig = Config.define((c) => ({
   licensePaymentLinkId: c.env("STRIPE_LICENSE_PAYMENT_LINK_ID", z.string().optional()),
   slackSubscriptionsChannel: c.env("SLACK_CHANNEL_SUBSCRIPTIONS", z.string().optional()),
+  productAnalytics: {
+    key: c.env("POSTHOG_KEY", z.string().optional()),
+    host: c.env("POSTHOG_HOST", z.string().optional()),
+  },
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;

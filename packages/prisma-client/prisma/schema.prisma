@@ -3967,6 +3967,15 @@ model ApiKey {
   @@index([ingestionTemplateId])
 }
 
+model ProjectActiveDay {
+  id        String   @id @default(cuid())
+  projectId String
+  day       String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, day])
+}
+
 model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String

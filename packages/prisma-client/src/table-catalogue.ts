@@ -104,6 +104,7 @@ export const prismaTableCatalogue = {
   "GrantUsage": "GrantUsage",
   "Role": "Role",
   "ApiKey": "ApiKey",
+  "ProjectActiveDay": "ProjectActiveDay",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
   "VirtualKey": "VirtualKey",
   "VirtualKeyScope": "VirtualKeyScope",
@@ -1834,6 +1835,12 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "ProjectActiveDay": [
+    "id",
+    "projectId",
+    "day",
+    "createdAt"
+  ],
   "BillingMeterCheckpoint": [
     "id",
     "organizationId",
@@ -2914,6 +2921,7 @@ export const prismaRelationCatalogue = {
     "organization": "Organization",
     "roleBindings": "RoleBinding"
   },
+  "ProjectActiveDay": {},
   "BillingMeterCheckpoint": {},
   "VirtualKey": {
     "principalUser": "User",
