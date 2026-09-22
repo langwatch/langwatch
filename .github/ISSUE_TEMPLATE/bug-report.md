@@ -21,10 +21,10 @@ Steps to reproduce the behavior:
 - Given [context], when [action], then [expected outcome]
 - Given [context], when [action], then [expected outcome]
 
-## Definition of Done
+**Definition of Done**
 
 - [ ] Regression scenario in a `specs/**/*.feature` file tagged `@unit`/`@integration`/`@e2e`
-- [ ] Scenario binds via `// @scenario`
+- [ ] Scenario binds via `/** @scenario`
 - [ ] Tests pass (regression fails without the fix)
 - [ ] Use-proof embedded in the PR
 - [ ] Docs updated if needed
