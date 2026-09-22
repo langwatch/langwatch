@@ -2119,9 +2119,9 @@ const PG_LOAD_FIXTURE_ROWS_PER_TENANT = 250;
 const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
   // Column-named against the real, migrated Annotation table (it now has far
   // more columns than the six the fixture fills, all nullable). No parent
-  // Project/Team/Organization rows for the filler tenants: the schema is
-  // `relationMode = "prisma"`, so the migrations emit no database foreign keys
-  // (verified: `0_init` contains zero `FOREIGN KEY` clauses) and an orphan
+  // Project/Team/Organization rows for the filler tenants: the Annotation
+  // table's parent relations are `relationMode = "prisma"`, enforced in
+  // application code rather than by a database foreign key, so an orphan
   // Annotation inserts cleanly.
   `INSERT INTO ${PG_SCHEMA}."Annotation" ` +
     `("id", "projectId", "traceId", "isThumbsUp", "comment", "email", "createdAt", "updatedAt") ` +
@@ -2133,32 +2133,6 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
   `ANALYZE ${PG_SCHEMA}."Annotation"`,
 ];
 
-/**
- * One tenant's rows in every mapped base relation, followed by one row per
- * every *other* derived view's base model (the generic seed).
- *
- * Parameterized rather than fixed to the two harness fixtures because the
- * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
- * under those, exactly as they already seed their own ClickHouse rows. Every
- * relation for every tenant, so that an isolation assertion always has
- * something it could have leaked.
- *
- * Excluded columns carry a recognisable `excluded-` marker, which is what lets
- * a test assert the *data* never reached the LangWatchQL schema rather than only
- * that the column name was refused.
- *
- * `traceIds` ties annotations to whatever traces the caller seeded on the
- * ClickHouse side, so an annotation-to-trace join has matching rows; the
- * default is the shape the isolation suite seeds.
- *
- * The generic seed runs last (its rows may reference the explicit ones as
- * foreign keys) and skips {@link LWQL_EXPLICITLY_SEEDED_MODELS} so a model
- * this function already inserted never gets a second, colliding row. Every
- * caller of this function — not only {@link startLangWatchQLPostgres} — needs
- * this, since `postgresEngineIsolation.integration.test.ts` and friends read
- * every derived view's engine table and would otherwise find nothing seeded
- * for the ~85 views the explicit seed above does not cover.
- */
 /**
  * The models {@link postgresTenantSeedStatements} hand-seeds, so the generic
  * {@link postgresModelSeedStatements} skips them rather than seeding a second,
@@ -2194,6 +2168,32 @@ const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
   overrides: LWQL_POSTGRES_ALL_OVERRIDES,
 });
 
+/**
+ * One tenant's rows in every mapped base relation, followed by one row per
+ * every *other* derived view's base model (the generic seed).
+ *
+ * Parameterized rather than fixed to the two harness fixtures because the
+ * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
+ * under those, exactly as they already seed their own ClickHouse rows. Every
+ * relation for every tenant, so that an isolation assertion always has
+ * something it could have leaked.
+ *
+ * Excluded columns carry a recognisable `excluded-` marker, which is what lets
+ * a test assert the *data* never reached the LangWatchQL schema rather than only
+ * that the column name was refused.
+ *
+ * `traceIds` ties annotations to whatever traces the caller seeded on the
+ * ClickHouse side, so an annotation-to-trace join has matching rows; the
+ * default is the shape the isolation suite seeds.
+ *
+ * The generic seed runs last (its rows may reference the explicit ones as
+ * foreign keys) and skips {@link LWQL_EXPLICITLY_SEEDED_MODELS} so a model
+ * this function already inserted never gets a second, colliding row. Every
+ * caller of this function — not only {@link startLangWatchQLPostgres} — needs
+ * this, since `postgresEngineIsolation.integration.test.ts` and friends read
+ * every derived view's engine table and would otherwise find nothing seeded
+ * for the ~85 views the explicit seed above does not cover.
+ */
 export function postgresTenantSeedStatements({
   tenantId,
   organizationId = `${tenantId}-org`,

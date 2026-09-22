@@ -75,7 +75,7 @@ describe("given the derived Postgres catalog", () => {
       for (const orgView of [
         "virtual_keys",
         "model_providers",
-        "subscriptions",
+        "departments",
       ]) {
         expect(byName.get(orgView)!.postgres!.tenantPath).toEqual(
           organizationTenantPath(),
@@ -131,24 +131,19 @@ describe("given the derived Postgres catalog", () => {
   describe("when the safe defaults are applied", () => {
     /** @scenario "Secret material is stripped from every derived view" */
     it("strips secrets from every view and keeps an Id column as an id", () => {
-      const secret =
-        /(apikey|accesskey|secret|password|credential|privatekey|publickey|lwqlkey|pepper)/i;
+      // Assert against the production classifier rather than a copy of its
+      // regexes, so the two can never drift: no exposed column reads from a
+      // source the safe defaults would have stripped. Checked on the source
+      // column, not the exposed alias — an alias like `EmailSuppressionId`
+      // contains "email" yet reads from a plain `id`.
       for (const view of catalog) {
         for (const column of view.columns) {
-          const lower = column.name.toLowerCase();
-          expect(
-            secret.test(lower),
-            `${view.name}.${column.name} exposes secret material`,
-          ).toBe(false);
-          const suffixSecret =
-            (lower.endsWith("token") ||
-              lower.endsWith("hash") ||
-              lower.endsWith("key")) &&
-            !lower.endsWith("id");
-          expect(
-            suffixSecret,
-            `${view.name}.${column.name} exposes secret material`,
-          ).toBe(false);
+          for (const source of column.sourceColumns) {
+            expect(
+              isStrippedByDefault(source),
+              `${view.name}.${column.name} exposes secret material`,
+            ).toBeUndefined();
+          }
         }
       }
       // A column ending in Id is not treated as a key: it survives.

@@ -30,8 +30,22 @@ import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST } from "../prismaManifest";
 import type { PrismaManifest } from "../prismaSchema";
 
-const DERIVED_MODEL_COUNT = 93;
-const SKIPPED_MODEL_COUNT = 50;
+const DERIVED_MODEL_COUNT = 88;
+const SKIPPED_MODEL_COUNT = 55;
+
+/**
+ * Organization/admin-tier models the application reads only behind a distinct
+ * permission a project's `analytics:view` key does not hold. None may be a
+ * derived view — deriving them would let any project API key read organization
+ * billing, audit and webhook data through the analytics surface.
+ */
+const PERMISSION_GATED_MODELS = [
+  "AuditLog",
+  "WebhookEndpoint",
+  "Subscription",
+  "Invoice",
+  "InvoiceItem",
+] as const;
 
 const modelNames = LWQL_PRISMA_MANIFEST.models.map((model) => model.name);
 const tableByModel = new Map(
@@ -74,6 +88,19 @@ describe("given every model in the committed Prisma manifest", () => {
         modelNames,
         `skip entry "${model}" (${LWQL_POSTGRES_SKIPPED_MODELS[model]}) names no manifest model`,
       ).toContain(model);
+    }
+  });
+
+  it("never derives an organization/admin-tier permission-gated model", () => {
+    for (const model of PERMISSION_GATED_MODELS) {
+      expect(
+        derivedBaseRelations.has(tableByModel.get(model)!),
+        `${model} is permission-gated and must not be a derived view`,
+      ).toBe(false);
+      expect(
+        postgresSkipReason(model, LWQL_POSTGRES_SKIPPED_MODELS),
+        `${model} must be skipped with a permission-gated reason`,
+      ).toContain("permission-gated:");
     }
   });
 

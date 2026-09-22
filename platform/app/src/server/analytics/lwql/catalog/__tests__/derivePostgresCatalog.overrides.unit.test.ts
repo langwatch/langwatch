@@ -184,10 +184,10 @@ describe("given the derived Postgres catalog's overrides", () => {
       ).toBe(false);
     };
 
-    it("strips WebhookEndpoint.sqsExternalId despite its Id suffix", () => {
+    it("strips GithubPullRequest.authorLogin, a raw external-person handle", () => {
       assertStripped({
-        baseRelation: "WebhookEndpoint",
-        source: "sqsExternalId",
+        baseRelation: "GithubPullRequest",
+        source: "authorLogin",
       });
     });
 
@@ -208,18 +208,6 @@ describe("given the derived Postgres catalog's overrides", () => {
         baseRelation: "DiscoveredPerson",
         source: "displayText",
       });
-    });
-
-    it("strips AuditLog request forensics and payload diffs", () => {
-      for (const source of [
-        "ipAddress",
-        "userAgent",
-        "args",
-        "before",
-        "after",
-      ]) {
-        assertStripped({ baseRelation: "AuditLog", source });
-      }
     });
 
     it("strips IngestionSource credential-bearing config", () => {

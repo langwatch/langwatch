@@ -42,7 +42,6 @@
  * @see ../catalog/derivePostgresCatalog.ts — the derivation whose views this seeds
  */
 
-import type { DerivedPostgresView } from "../catalog/derivePostgresCatalog";
 import { prismaManifestEnum } from "../catalog/prismaManifest";
 import type {
   PrismaField,
@@ -53,11 +52,12 @@ import type {
 /**
  * The subset of a derived view this seeder reads, structural to stay decoupled.
  *
- * A supertype of {@link DerivedPostgresView}: `postgres` is optional here to
- * match its `LangWatchQLViewDefinition.postgres?` origin, so the derivation's
- * output feeds this seeder without a cast. The seeder only ever receives real
- * derived views, every one of which carries `postgres`, so the internals read
- * it non-null.
+ * A supertype of the derivation's `DerivedPostgresView`: `postgres` is optional
+ * here to match its `LangWatchQLViewDefinition.postgres?` origin, so the
+ * derivation's output feeds this seeder without a cast — and the entry point
+ * takes this structural type, not the concrete one, so the decoupling is real.
+ * The seeder only ever receives real derived views, every one of which carries
+ * `postgres`, so the internals read it non-null.
  */
 export interface SeedableView {
   readonly postgres?: {
@@ -516,7 +516,7 @@ export function postgresModelSeedStatements({
   organizationId: string;
   teamId: string;
   userId: string;
-  views: readonly DerivedPostgresView[];
+  views: readonly SeedableView[];
   manifest: PrismaManifest;
   alreadySeeded: readonly string[];
   explicitIds?: Readonly<Record<string, string>>;

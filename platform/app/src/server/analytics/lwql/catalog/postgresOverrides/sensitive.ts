@@ -1,17 +1,18 @@
 /**
  * Columns the safe defaults keep but must not expose: secrets that dodge the
- * name rules, raw external-person identity, and request forensics that can
- * carry unredacted payloads.
+ * name rules and raw external-person identity.
  *
  * The derivation's safe defaults strip a column whose *name* looks like a
  * secret or a person email. These `skipColumns` cover the columns whose danger
  * their name does not advertise:
- *  - a secret paired with an identifier suffix (`sqsExternalId` ends in `Id`,
- *    so the identifier rule would keep it);
+ *  - a secret nested inside a config JSON, which no name rule can see into;
  *  - raw external-person identity that is pseudonymised on erasure, so the
- *    person columns must stay opaque;
- *  - audit-log request forensics and payload diffs, which can quote
- *    credentials the actor/resource columns never would.
+ *    person columns must stay opaque.
+ *
+ * Raw external-person identity is the same class for every source: a
+ * `DiscoveredPerson.displayText` and a `GithubPullRequest.authorLogin` are both
+ * an external person's real handle, so the "no person identifiers" guarantee
+ * must strip both — the `email`-name rule alone would keep the GitHub login.
  *
  * `ModelProvider.customKeys` is *not* here: it ends in `keys`, so
  * {@link ../derivePostgresCatalog#isStrippedByDefault}'s suffix rule already
@@ -31,13 +32,6 @@ export const SENSITIVE_POSTGRES_OVERRIDES: Record<
   string,
   PostgresDatasetOverride
 > = {
-  WebhookEndpoint: {
-    skipColumns: {
-      sqsExternalId:
-        "AWS confused-deputy secret paired with the role ARN; ends in Id so the identifier rule would keep it",
-    },
-  },
-
   DiscoveredPerson: {
     skipColumns: {
       rawActorId:
@@ -47,17 +41,10 @@ export const SENSITIVE_POSTGRES_OVERRIDES: Record<
     },
   },
 
-  AuditLog: {
+  GithubPullRequest: {
     skipColumns: {
-      ipAddress:
-        "request forensics and payload diffs can carry unredacted credentials; the action/actor/resource columns stay queryable",
-      userAgent:
-        "request forensics and payload diffs can carry unredacted credentials; the action/actor/resource columns stay queryable",
-      args: "request forensics and payload diffs can carry unredacted credentials; the action/actor/resource columns stay queryable",
-      before:
-        "request forensics and payload diffs can carry unredacted credentials; the action/actor/resource columns stay queryable",
-      after:
-        "request forensics and payload diffs can carry unredacted credentials; the action/actor/resource columns stay queryable",
+      authorLogin:
+        "raw external-person identity — the PR author's GitHub handle; the same class as DiscoveredPerson.displayText, kept opaque so the no-person-identifiers guarantee holds",
     },
   },
 

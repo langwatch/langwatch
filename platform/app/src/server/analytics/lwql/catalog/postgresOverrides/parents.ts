@@ -3,10 +3,10 @@
  * declared parent.
  *
  * Each is a join table or a child row whose owning project is the parent's:
- * `GatewayBudgetLedger` belongs to its `GatewayBudget`, an `InvoiceItem` to its
- * `Invoice` (which in turn belongs to its `Subscription`), and so on. Declaring
- * the parent here is what lets these models be *derived* rather than skipped —
- * a true tenant path exists, so the opt-out contract exposes them.
+ * `GatewayBudgetLedger` belongs to its `GatewayBudget`, an `AnnotationQueueScores`
+ * to its `AnnotationQueue`, and so on. Declaring the parent here is what lets
+ * these models be *derived* rather than skipped — a true tenant path exists, so
+ * the opt-out contract exposes them.
  *
  * @see ../derivePostgresCatalog.ts#resolveTenantScope — how a parent path resolves
  */
@@ -38,11 +38,5 @@ export const PARENTS_POSTGRES_OVERRIDES: Record<
   },
   AiToolEntryDepartment: {
     tenantVia: { parent: "AiToolEntry", foreignKey: "entryId" },
-  },
-  Invoice: {
-    tenantVia: { parent: "Subscription", foreignKey: "subscriptionId" },
-  },
-  InvoiceItem: {
-    tenantVia: { parent: "Invoice", foreignKey: "invoiceId" },
   },
 };

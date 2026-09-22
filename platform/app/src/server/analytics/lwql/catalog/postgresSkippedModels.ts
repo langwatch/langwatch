@@ -9,12 +9,15 @@
  *
  * A skip is warranted only when the model (a) carries no owning tenant column
  * at all, (b) is written under an internal/system tenant no customer project
- * can hold rows under, (c) already reaches a caller through another view, or
+ * can hold rows under, (c) already reaches a caller through another view,
  * (d) is access-control plumbing that adds nothing beyond what the row policy
- * already does. Those four are the only accepted reason categories, and a
- * reason must start with one of {@link POSTGRES_SKIP_REASON_PREFIXES} so the
- * validator can check it. "Low value" is not a reason — a low-value table with
- * a real tenant column is derived, not skipped.
+ * already does, or (e) is organization/admin-tier data the application reads
+ * only behind a distinct permission (billing, audit, webhook management) that a
+ * project analytics key — whose sole grant is `analytics:view` — does not hold.
+ * Those five are the only accepted reason categories, and a reason must start
+ * with one of {@link POSTGRES_SKIP_REASON_PREFIXES} so the validator can check
+ * it. "Low value" is not a reason — a low-value table with a real tenant column
+ * is derived, not skipped.
  *
  * `User`, `Team` and `Organization` are never derived: they are the identity
  * scope itself, not a project's data.
@@ -27,7 +30,7 @@
 export type PostgresSkipMap = Record<string, string>;
 
 /**
- * The four literal reason-category prefixes. A skip reason must start with one,
+ * The five literal reason-category prefixes. A skip reason must start with one,
  * so a reason like "low value" is refused rather than silently accepted.
  */
 export const POSTGRES_SKIP_REASON_PREFIXES = [
@@ -35,6 +38,7 @@ export const POSTGRES_SKIP_REASON_PREFIXES = [
   "internal-only tenant:",
   "already exposed:",
   "access-control plumbing:",
+  "permission-gated:",
 ] as const;
 
 /**
@@ -123,6 +127,21 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
     "internal-only tenant: system-migration state keyed by an internal tenantId, not a customer project",
   SystemMigrationEnrollment:
     "internal-only tenant: system-migration enrollment bookkeeping, not customer data",
+
+  // Permission-gated — organization/admin-tier data the app reads only behind a
+  // distinct permission a project's `analytics:view` key does not hold. Deriving
+  // them would let any project API key read organization billing, audit and
+  // webhook-management data the application itself gates far more tightly.
+  AuditLog:
+    "permission-gated: organization audit trail, read behind auditLog:view (organization.ts), never analytics:view",
+  WebhookEndpoint:
+    "permission-gated: organization webhook config, read behind webhookEndpoints:view/manage, never analytics:view",
+  Subscription:
+    "permission-gated: organization billing plan and limits, admin/billing-tier only, never analytics:view",
+  Invoice:
+    "permission-gated: organization billing invoices, admin/billing-tier only, never analytics:view",
+  InvoiceItem:
+    "permission-gated: organization invoice line items, admin/billing-tier only, never analytics:view",
 
   // No tenant column — global config and inbound queues owned by no project.
   FeatureFlag: "no tenant column: global feature flags, engine/config state",

@@ -663,10 +663,21 @@ function viewDescription(
   return override.rowFilter ? `${base}${ROW_FILTER_NOTE}` : base;
 }
 
-/** The model's doc comment's first line, else a generated line. */
+/**
+ * The model's full doc comment, joined into one line, else a generated line.
+ *
+ * A Prisma doc comment wraps across `///` lines mid-sentence, so taking only
+ * the first line published fragments ("Superseded by", "Evaluated server-side
+ * at"). Joining every non-empty line with a single space reconstitutes the
+ * whole sentence for the docs, the schema endpoint and the MCP reference.
+ */
 function defaultDescription(model: PrismaModel, grain: string): string {
-  const firstLine = model.documentation.split("\n")[0]?.trim();
-  if (firstLine && firstLine.length > 0) return firstLine;
+  const full = model.documentation
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join(" ");
+  if (full.length > 0) return full;
   return `Rows of the ${model.name} table, ${grain}.`;
 }
 

@@ -107,11 +107,10 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
         ...resident,
         postgres: { ...resident.postgres, approvedView: "governed_traces" },
       };
-      const statements = lwqlPostgresApprovedViewStatements({
+      const [statement] = lwqlPostgresApprovedViewStatements({
         schema: SCHEMA,
         views: [renamed],
       });
-      const [statement] = statements;
       expect(statement).toBeDefined();
       expect(createdRelation(statement!).startsWith(GRANTED_PREFIX)).toBe(
         false,
