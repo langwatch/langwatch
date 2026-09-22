@@ -293,6 +293,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerSpendEventsCommands(program);
   registerAnnotationCommands(program);
   registerAnalyticsCommands(program);
+  registerQueryCommands(program);
   registerTraceCommands(program);
   registerSessionCommands(program);
   registerScenarioCommands(program);
@@ -2761,6 +2762,60 @@ function registerAnnotationCommands(program: Command): void {
     async (id: string) => {
       const { deleteAnnotationCommand: impl } = await import("./commands/annotations/delete.js");
       return impl(id);
+    },
+  );
+}
+
+function registerQueryCommands(program: Command): void {
+  // `run` is the DEFAULT subcommand, so `langwatch query "SELECT …"` reaches it
+  // with the statement as its argument while `langwatch query schema` still
+  // resolves to the sibling. Without the default, commander would read the
+  // statement as an unknown subcommand name.
+  const queryCmd = program
+    .command("query")
+    .description("Run LangWatchQL analytics SQL and discover what can be queried");
+
+  emitsResult(
+    queryCmd
+      .command("run [sql]", { isDefault: true })
+      .description("Run one LangWatchQL statement, exactly as written")
+      .option("--sql-file <path>", "Read the statement from a file instead of the argument")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--limit <n>", "Rows to keep from the result")
+      .option(
+        "--format <format>",
+        "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
+        "table",
+      )
+      .option(
+        "--page-by <mode>",
+        "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
+      )
+      .option("--out <file>", "Write the result to a file instead of stdout")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
+    async (sql: string | undefined, options: Record<string, string>) => {
+      const { runQueryCommand: impl } = await import("./commands/query/run.js");
+      return impl(sql, options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("schema")
+      .description("List the analytics views and columns a statement can name")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { queryLwqlSchemaCommand: impl } = await import("./commands/query/schema.js");
+      return impl(options);
     },
   );
 }

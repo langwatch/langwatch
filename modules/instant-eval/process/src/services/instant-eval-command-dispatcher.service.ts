@@ -2,7 +2,7 @@
  * The pipeline's own command senders, which exist only after it is built. Every
  * write this module makes goes through here, so a process that hosts no
  * pipeline refuses by name rather than failing on an undefined sender.
- * @see dev/docs/adr/143-instant-eval-run-is-a-judgment-job.md
+ * @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
 
 import type { InstantEvalOutcomeCommands } from "../eventing/instant-eval-processing.intent.ts";

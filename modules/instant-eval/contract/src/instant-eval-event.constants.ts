@@ -1,6 +1,6 @@
 /**
  * Stable Instant Eval event and command identifiers. The aggregate is one RUN
- * and the queue lane is the tenant. @see dev/docs/adr/143-instant-eval-run-is-a-judgment-job.md
+ * and the queue lane is the tenant. @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
 
 export const INSTANT_EVAL_EVENT_TYPES = {

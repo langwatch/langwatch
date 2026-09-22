@@ -4,7 +4,7 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
   I want a judged statement to run as a job with progress, cancellation and safe redelivery
   So that a hundred thousand rows can be judged without a caller holding a request open
 
-  Issue: Instant Evals, PR 4. ADR-137.
+  Issue: Instant Evals, PR 4. ADR-153.
 
   The shape:
   - Pass one collects the keys only, so the run knows its total before it spends anything.
@@ -30,6 +30,41 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then the run is planned with a total of twelve hundred
     And three pages are judged in order
     And the run finishes with its progress equal to its total
+
+  @unit
+  Scenario: The worker mounts one run projection, five commands and the process manager
+    Given the Instant Eval pipeline
+    When the worker builds it
+    Then the run's counters are projected on a row keyed by the run
+    And the five commands and the run's process manager are mounted
+    And no map projection or subscriber is mounted, because a page writes its own rows
+
+  @unit
+  Scenario: Every event of a run is keyed by the run, so its pages fold in order
+    Given two runs of one project judging at the same time
+    When their events are appended
+    Then each event carries its own run as the aggregate
+    And the project has one queue lane, so a run's pages never overtake each other
+
+  @unit
+  Scenario: A page recorded twice carries one event key, and the next page its own
+    Given a page that has already been recorded
+    When the same page is recorded again
+    Then it carries the event key of the first, so the second append collapses
+    And the queue dedups the redelivery inside the page's own window
+    And the next page carries a key of its own, so it is counted separately
+
+  @unit
+  Scenario: A finish delivered twice is one finish
+    Given a run that has already finished
+    When the finish is delivered again
+    Then it carries the same event key as the first
+
+  @unit
+  Scenario: A page that arrives after a later one does not rewind the run
+    Given a run that has counted its third page
+    When its second page arrives
+    Then the run's cursor and counters are unchanged and nothing is asked for
 
   @unit
   Scenario: A page never exceeds the key cap of the statement's own functions

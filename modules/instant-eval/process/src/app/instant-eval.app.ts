@@ -9,9 +9,13 @@ import {
   type InstantEvalRunInput,
   type InstantEvalJudgmentStatus,
   type InstantEvalEstimateWire,
+  type InstantEvalJudgement,
+  type InstantEvalQuestion,
   type InstantEvalResultsWire,
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
+  type InstantEvalRunReference,
+  type InstantEvalRunWindow,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
   instantEvalConfig,
@@ -48,6 +52,7 @@ import {
 } from "../rules/instant-eval-wire.rules.ts";
 import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
+import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
 import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
 import { InstantEvalCreateService } from "../services/instant-eval-create.service.ts";
 import {
@@ -197,6 +202,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
 
   private constructor(
     private readonly access: InstantEvalAccessService,
+    private readonly classifications: InstantEvalClassifyService,
     private readonly reads: InstantEvalReadsService,
     private readonly runs: InstantEvalRunService,
     private readonly dispatcher: InstantEvalCommandDispatcherService,
@@ -259,6 +265,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
 
     return new InstantEvalApp(
       access,
+      InstantEvalClassifyService.create({ judge }),
       reads,
       InstantEvalRunService.create({
         units: {
@@ -535,5 +542,20 @@ export class InstantEvalApp implements InstantEvalApiContract {
     runIds: readonly string[];
   }): Promise<InstantEvalRunProgress[]> {
     return this.reads.findRunProgress(input);
+  }
+
+  async findRunWindows(input: {
+    projectId: string;
+    references: readonly InstantEvalRunReference[];
+  }): Promise<InstantEvalRunWindow[]> {
+    return this.reads.findRunWindows(input);
+  }
+
+  async classify(input: {
+    projectId: string;
+    text: string;
+    questions: readonly InstantEvalQuestion[];
+  }): Promise<InstantEvalJudgement> {
+    return this.classifications.classify(input);
   }
 }

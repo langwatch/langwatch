@@ -2,7 +2,8 @@ import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
-import type { InstantEvalJudgmentStatus } from "./instant-eval-limits.ts";
+import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
+import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {
   InstantEvalEstimateWire,
   InstantEvalResultsWire,
@@ -52,6 +53,23 @@ export interface InstantEvalRunProgress {
   readonly error: string | null;
   readonly priceUsd: number;
   readonly finishedAtMs: number | null;
+}
+
+/** A run a client claims it registered for a chip. */
+export interface InstantEvalRunReference {
+  readonly question: string;
+  readonly target: InstantEvalTarget;
+  readonly runId: string;
+}
+
+/**
+ * A run the project owns, and the window its judgements were written in. Both
+ * ends are widened past the run's own clock, because the service that accepted
+ * the run and the worker that judged it read different ones.
+ */
+export interface InstantEvalRunWindow extends InstantEvalRunReference {
+  readonly writtenFrom: Instant;
+  readonly writtenUntil: Instant;
 }
 
 /**
@@ -132,6 +150,27 @@ export interface InstantEvalApi {
     projectId: string;
     runIds: readonly string[];
   }): Promise<InstantEvalRunProgress[]>;
+
+  /**
+   * The runs a reader named, dated, so a judgement read can be bounded by the
+   * window each was written in. Lenient like {@link findRunProgress}: a run
+   * this project does not own is dropped rather than refused.
+   */
+  findRunWindows(input: {
+    projectId: string;
+    references: readonly InstantEvalRunReference[];
+  }): Promise<InstantEvalRunWindow[]>;
+
+  /**
+   * One classification of a peer's own text rather than a run's rows, which is
+   * how the trace search bar routes a sentence. A judge that cannot answer
+   * skips, so the caller falls back instead of failing the read.
+   */
+  classify(input: {
+    projectId: string;
+    text: string;
+    questions: readonly InstantEvalQuestion[];
+  }): Promise<InstantEvalJudgement>;
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

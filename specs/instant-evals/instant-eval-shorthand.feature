@@ -4,7 +4,7 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
   I want to name a target, a trace filter and my questions
   So that the platform writes the LangWatchQL statement for me and hands it back to me to edit
 
-  Issue: Instant Evals, PR 5. ADR-137 amendment.
+  Issue: Instant Evals, PR 5. ADR-153 amendment.
 
   The shape:
   - `POST /api/v1/instant-evals` and `POST /api/v1/instant-evals/estimate` take either a

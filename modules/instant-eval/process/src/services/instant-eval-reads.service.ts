@@ -9,6 +9,8 @@ import {
   type InstantEvalJudgmentStatus,
   InstantEvalRunNotFoundError,
   type InstantEvalRunProgress,
+  type InstantEvalRunReference,
+  type InstantEvalRunWindow,
 } from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -20,7 +22,10 @@ import type {
   InstantEvalRunRepository,
   InstantEvalRunRow,
 } from "../repositories/instant-eval-run.repository.ts";
-import { instantEvalWrittenWindow } from "../rules/instant-eval-judgments.rules.ts";
+import {
+  instantEvalSkewedWrittenWindow,
+  instantEvalWrittenWindow,
+} from "../rules/instant-eval-judgments.rules.ts";
 import { publishedInstantEvalStatus } from "../rules/instant-eval-run-status.rules.ts";
 
 export class InstantEvalReadsService {
@@ -110,6 +115,37 @@ export class InstantEvalReadsService {
   }): Promise<InstantEvalRunProgress[]> {
     const rows = await Promise.all(runIds.map((runId) => this.runs.findById({ projectId, runId })));
     return rows.filter(isRow).map(toProgress);
+  }
+
+  /**
+   * The runs a reader named, each dated by the window its judgements were
+   * written in, dropping the ids it may not read for the same reason.
+   */
+  async findRunWindows({
+    projectId,
+    references,
+  }: {
+    projectId: string;
+    references: readonly InstantEvalRunReference[];
+  }): Promise<InstantEvalRunWindow[]> {
+    const now = this.now();
+    const rows = await Promise.all(
+      references.map((reference) => this.runs.findById({ projectId, runId: reference.runId })),
+    );
+
+    return references.flatMap((reference, index) => {
+      const row = rows[index];
+      if (!row) return [];
+
+      return [
+        {
+          question: reference.question,
+          target: reference.target,
+          runId: row.id,
+          ...instantEvalSkewedWrittenWindow(row, now),
+        },
+      ];
+    });
   }
 }
 

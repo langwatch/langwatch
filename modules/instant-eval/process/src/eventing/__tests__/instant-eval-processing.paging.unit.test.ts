@@ -98,6 +98,23 @@ describe("given a run judging its pages", () => {
     });
   });
 
+  describe("when a page older than the one it counted arrives", () => {
+    /** @scenario "A page that arrives after a later one does not rewind the run" */
+    it("leaves the cursor and the counters where the later page left them", () => {
+      const { ctx, emitted } = context();
+      const atThirdPage = { ...running, page: 3, cursor: "t1500", remaining: 200 };
+
+      const evolution = handleInstantEvalPageJudged(
+        atThirdPage,
+        view({ page: 2, rows: 500, cursor: "t1000", hasNextPage: true }),
+        ctx,
+      );
+
+      expect(evolution.state).toEqual(atThirdPage);
+      expect(emitted).toEqual([]);
+    });
+  });
+
   describe("when the run reports its spend", () => {
     it("sums the tokens and the requests its pages reported", () => {
       const { ctx } = context();

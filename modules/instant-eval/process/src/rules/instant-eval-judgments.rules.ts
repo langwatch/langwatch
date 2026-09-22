@@ -33,6 +33,24 @@ export function instantEvalWrittenWindow(
   };
 }
 
+/**
+ * How far past its last write a run's judgements may still land, and how far
+ * before its acceptance one could have been written: clock skew between the
+ * service that accepted the run and the worker that judged it.
+ */
+const INSTANT_EVAL_WRITE_SKEW_HOURS = 1;
+
+/** The same window for a reader of writes another process made, widened by that skew. */
+export function instantEvalSkewedWrittenWindow(
+  row: Readonly<{ createdAt: Instant; finishedAt: Instant | null }>,
+  now: Instant,
+): { readonly writtenFrom: Instant; readonly writtenUntil: Instant } {
+  return {
+    writtenFrom: row.createdAt.subtract({ hours: INSTANT_EVAL_WRITE_SKEW_HOURS }),
+    writtenUntil: (row.finishedAt ?? now).add({ hours: INSTANT_EVAL_WRITE_SKEW_HOURS }),
+  };
+}
+
 /** What one page added to a run's running totals. */
 export interface InstantEvalPageCounters {
   /** Rows judged, which is rows of the page that came back. */

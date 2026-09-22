@@ -134,6 +134,36 @@ describe("given the runs a client is looking at", () => {
     });
   });
 
+  describe("when the windows their judgements were written in are read", () => {
+    it("dates the ones it may read, keeping the reader's own question and target", async () => {
+      const createdAt = Temporal.Instant.from("2026-09-18T10:00:00Z");
+      await store(instantEvalRunRow({ id: "run-1", createdAt, finishedAt: null }));
+      await store(instantEvalRunRow({ id: "run-2", projectId: "project-2" }));
+
+      const windows = await reads.findRunWindows({
+        projectId: "project-1",
+        references: [
+          { question: "is it annoyed", target: "traces", runId: "run-1" },
+          { question: "is it annoyed", target: "threads", runId: "run-2" },
+          { question: "is it annoyed", target: "traces", runId: "run-missing" },
+        ],
+      });
+
+      expect(windows).toHaveLength(1);
+      expect(windows[0]).toMatchObject({
+        question: "is it annoyed",
+        target: "traces",
+        runId: "run-1",
+      });
+      expect(windows[0]?.writtenFrom.toString()).toBe("2026-09-18T09:00:00Z");
+      expect(windows[0]?.writtenUntil.toString()).toBe("2026-09-18T13:00:00Z");
+    });
+
+    it("answers nothing for a reader that named no run", async () => {
+      expect(await reads.findRunWindows({ projectId: "project-1", references: [] })).toEqual([]);
+    });
+  });
+
   describe("when the project's runs are listed", () => {
     it("answers an empty list for a project with none", async () => {
       expect(await reads.findRuns({ projectId: "project-3", limit: 10 })).toEqual([]);

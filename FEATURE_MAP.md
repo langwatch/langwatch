@@ -12,8 +12,8 @@ Near-complete coverage landed across three PRs:
 ## Information Architecture
 
 ```
-observability/       — Tracing, Analytics, User Events, Annotations
-evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True)
+observability/       — Tracing, Analytics, Custom Query, User Events, Annotations
+evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True), Instant Evals
 agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
@@ -64,11 +64,13 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | **Observability**            |        |        |        |     |              |     |     |                  |     |      |
 | Tracing                      |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
 | Analytics                    |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
+| Custom Query                 |   —    |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
 | User Events                  |   ✅   |   —    |   ✅   |  —  |      —       |  —  |  —  |        —         | ✅  |  ✅  |
 | Annotations                  |   ✅   |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
 | **Evaluations**              |        |        |        |     |              |     |     |                  |     |      |
 | Experiments                  |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
 | Online Evaluation (Monitors) |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Instant Evals                |   —    |   ✅   |   —    |  —  |      —       |  —  |  —  |        —         | ✅  |  ✅  |
 | **Agent Simulations**        |        |        |        |     |              |     |     |                  |     |      |
 | Scenarios                    |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
 | Runs                         |   —    |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |

@@ -1,7 +1,7 @@
 /**
  * One projection, five commands and one process manager. The judgements have no
  * map projection on purpose: a page writes up to fifteen hundred rows itself.
- * @see dev/docs/adr/143-instant-eval-run-is-a-judgment-job.md
+ * @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
 
 import {

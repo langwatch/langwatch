@@ -4,7 +4,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
   I want every judged query and run recorded as one spend record, billed monthly, and free until a budget is spent
   So that the customer pays for what was judged, a project budget caps it, and a free organization can try it first
 
-  Issue: Instant Evals, PR 5. ADR-137 §8.
+  Issue: Instant Evals, PR 5. ADR-153 §8.
 
   The shape:
   - One spend record per query or run on the same ledger the AI Gateway writes, `gateway_spend`,

@@ -1,5 +1,5 @@
 /**
- * What the process hands this module (ADR-144). The ClickHouse surface is
+ * What the process hands this module (ADR-147). The ClickHouse surface is
  * declared structurally so the package does not depend on the driver.
  */
 
