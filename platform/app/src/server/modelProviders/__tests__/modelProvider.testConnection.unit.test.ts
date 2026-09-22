@@ -207,12 +207,15 @@ describe("testConnection", () => {
       // an org row and a project override in play those are two different
       // credentials. Its catalogue models come from the materialisation, so
       // the ping has a model to name.
-      const [args] = pingMock.mock.calls[0] as [
-        { modelProvider: { id: string; models: string[] }; projectId: string },
-      ];
-      expect(args.projectId).toBe(PROJECT_ID);
-      expect(args.modelProvider.id).toBe("mp_1");
-      expect(args.modelProvider.models.length).toBeGreaterThan(0);
+      expect(pingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: PROJECT_ID,
+          modelProvider: expect.objectContaining({
+            id: "mp_1",
+            models: expect.arrayContaining([expect.any(String)]),
+          }),
+        }),
+      );
     });
 
     /** @scenario "Testing an organization-scoped provider reaches its credential" */
