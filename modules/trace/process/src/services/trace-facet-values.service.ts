@@ -4,13 +4,16 @@
  * `event.attribute.` prefixes, whose keys are whitelisted before they reach a query.
  */
 
+import { RequestValidationError } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type {
   CategoricalFacetResult,
   FacetValuesResult,
+  Protections,
   TraceListRead,
 } from "@langwatch/trace-contract";
+import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
 import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
@@ -18,12 +21,56 @@ import {
   facetValuesCacheKey,
   type FacetValuesParams,
 } from "../rules/trace-list-cache-key.rules.ts";
+import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { TtlCache } from "./trace-ttl-cache.service.ts";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 
 const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.-]+$/;
+
+/** The two spellings a REST caller may write for a trace-level attribute. */
+const TRACE_ATTRIBUTE_PREFIX = "trace.attribute.";
+const TRACE_ATTRIBUTE_PREFIX_LEGACY = "attribute.";
+
+/** Prefixes the facet store reads an attribute key out of, as it spells them. */
+const STORE_ATTRIBUTE_PREFIXES: readonly string[] = [
+  "event.attribute.",
+  "span.attribute.",
+  TRACE_ATTRIBUTE_PREFIX_LEGACY,
+];
+
+function canReadCapturedContent(protections: Protections): boolean {
+  return protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;
+}
+
+/** Whether the redactor leaves one probe key untouched for this viewer. */
+function mayReadAttributeValues({
+  key,
+  protections,
+}: {
+  key: string;
+  protections: Protections;
+}): boolean {
+  if (!canReadCapturedContent(protections)) return false;
+  const probe = { [key]: "" };
+  return (
+    TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(probe) === probe
+  );
+}
+
+function unknownFacetError(
+  field: string,
+  message: string,
+  drillableKeys: string[],
+): RequestValidationError {
+  return new RequestValidationError({
+    target: "query",
+    violations: [
+      { field: "field", type: "unknown_facet", message, expected: drillableKeys, received: field },
+    ],
+  });
+}
 
 /**
  * Stale-while-revalidate cache for facet value results: a hit returns the cached value and starts
@@ -57,6 +104,72 @@ export class TraceFacetValuesService {
     topicNaming: TraceTopicNamingService;
   }): TraceFacetValuesService {
     return new TraceFacetValuesService(repository, topicNaming);
+  }
+
+  /**
+   * The key to hand the facet store: canonical `trace.attribute.<key>` and
+   * legacy `attribute.<key>` are one case. Throws
+   * `TraceAttributeValuesWithheldError` (403) or `RequestValidationError` (422).
+   */
+  static resolveFacetKey({
+    field,
+    protections,
+  }: {
+    field: string;
+    protections: Protections;
+  }): string {
+    const trimmed = field.trim();
+    const normalized = trimmed.startsWith(TRACE_ATTRIBUTE_PREFIX)
+      ? `${TRACE_ATTRIBUTE_PREFIX_LEGACY}${trimmed.slice(TRACE_ATTRIBUTE_PREFIX.length)}`
+      : trimmed;
+    const drillableKeys = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
+      (d) => d.kind !== "range",
+    ).map((d) => d.key);
+
+    for (const prefix of STORE_ATTRIBUTE_PREFIXES) {
+      if (!normalized.startsWith(prefix)) continue;
+      if (normalized.length > prefix.length) {
+        const key = normalized.slice(prefix.length);
+        if (!mayReadAttributeValues({ key, protections })) {
+          throw new TraceAttributeValuesWithheldError(trimmed);
+        }
+        return normalized;
+      }
+      throw unknownFacetError(
+        trimmed,
+        `\`${prefix}\` needs an attribute key after it, for example \`${prefix}gen_ai.request.model\`.`,
+        drillableKeys,
+      );
+    }
+
+    if (drillableKeys.includes(normalized)) return normalized;
+
+    throw unknownFacetError(
+      trimmed,
+      `No facet named \`${trimmed}\` has values to list. Call this endpoint with no field to see which facets this project has, or GET /api/v1/query/reference for every filter field.`,
+      drillableKeys,
+    );
+  }
+
+  /** Whether a resolved facet key names an arbitrary attribute rather than a registry dimension. */
+  static isAttributeFacetKey(facetKey: string): boolean {
+    return STORE_ATTRIBUTE_PREFIXES.some((prefix) => facetKey.startsWith(prefix));
+  }
+
+  /** The window an attribute facet may read: floor raised to the caller's retention cutoff. */
+  static visibleWindow({
+    timeRange,
+    facetKey,
+    protections,
+  }: {
+    timeRange: { from: number; to: number };
+    facetKey: string;
+    protections: Protections;
+  }): { from: number; to: number } {
+    const cutoff = protections.visibilityCutoffMs;
+    if (cutoff === null || cutoff === undefined) return timeRange;
+    if (!TraceFacetValuesService.isAttributeFacetKey(facetKey)) return timeRange;
+    return { from: Math.max(timeRange.from, cutoff), to: timeRange.to };
   }
 
   /** Per-pod dedup of in-flight background refreshes. */

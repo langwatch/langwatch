@@ -11,12 +11,16 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { toEpochMs } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   TraceApi,
   TraceIdAmbiguousError,
   TraceNotFoundError,
   ProjectionValidationError,
+  discoverResultSchema,
+  traceFacetsQuerySchema,
+  traceFacetsResponseSchema,
+  traceFacetValuesResponseSchema,
   traceFormatQuerySchema,
   traceIdParamsSchema,
   traceAmbiguousPrefixBodySchema,
@@ -33,20 +37,26 @@ import {
   type Protections,
   type ProjectableTrace,
   type Trace,
+  type TraceFacetsQuery,
   type TraceSearchBody,
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 /**
- * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
- * Route order load-bearing: register :traceId sub-resources before bare :traceId.
+ * /api/traces: v1 trace reads (search, facets, get-by-id, transcript, metadata
+ * PATCH). Route order load-bearing: register :traceId sub-resources, and the
+ * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+import { TraceFacetValuesService } from "#services/trace-facet-values.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 
 const logger = createLogger("langwatch:api:traces");
+
+/** The default facets window when a caller sends no startDate. */
+const FACETS_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The page a search answers when the caller named no size: the registry's
@@ -67,6 +77,66 @@ const SHARED_ERROR_ANSWERS = documentedResponses({
   422: badRequestSchema,
   500: badRequestSchema,
 });
+/** Facets adds a 403: an attribute field withheld from a caller who cannot read its content. */
+const FACETS_ERROR_ANSWERS = documentedResponses({
+  400: badRequestSchema,
+  401: badRequestSchema,
+  403: badRequestSchema,
+  422: badRequestSchema,
+  500: badRequestSchema,
+});
+
+/** One facets window bound as epoch milliseconds, whichever way it was written. */
+function facetWindowBound(value: string): number {
+  return /^\d+$/.test(value) ? Number(value) : toEpochMs(value);
+}
+
+/** `GET /facets`: the discovery payload, or one field's paged values. */
+async function answerTraceFacets({
+  app,
+  input,
+  scope,
+  caller,
+}: {
+  app: TraceApi;
+  input: TraceFacetsQuery;
+  scope: { id: string };
+  caller: { apiKeyId: string | null; userId: string | null };
+}): Promise<Record<string, unknown>> {
+  const { field, prefix, limit, offset, startDate, endDate } = input;
+  // One clock read for both ends: two calls landing in different
+  // milliseconds would run the default window over a day.
+  const now = nowInstant().epochMilliseconds;
+  const timeRange = {
+    from: startDate === undefined ? now - FACETS_DAY_MS : facetWindowBound(startDate),
+    to: endDate === undefined ? now : facetWindowBound(endDate),
+  };
+
+  if (field === undefined) {
+    return discoverResultSchema.parse(await app.readDiscover({ tenantId: scope.id, timeRange }));
+  }
+
+  const protections = await app.resolveApiKeyProtections({
+    projectId: scope.id,
+    apiKeyId: caller.apiKeyId,
+    userId: caller.userId,
+  });
+  const facetKey = TraceFacetValuesService.resolveFacetKey({ field, protections });
+  const result = await app.readFacetValues({
+    tenantId: scope.id,
+    timeRange: TraceFacetValuesService.visibleWindow({ timeRange, facetKey, protections }),
+    facetKey,
+    limit,
+    offset,
+    ...(prefix === undefined ? {} : { prefix }),
+  });
+
+  return traceFacetValuesResponseSchema.parse({
+    values: result.values,
+    total: result.totalDistinct,
+    hasMore: offset + result.values.length < result.totalDistinct,
+  });
+}
 
 /** The one trace a `:traceId` route names, or the two errors it maps to. */
 async function readOneTraceOrThrow(input: {
@@ -325,6 +395,24 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
         headers: { "content-type": "application/json" },
       });
     });
+
+  // GET /facets - what the trace filter fields hold. Registered BEFORE
+  // :traceId so "facets" is never read as a trace id.
+  router = router
+    .get("/facets", "getTraceFacets")
+    .withQuery(traceFacetsQuerySchema)
+    .withPermission("traces:view")
+    .withOutput(traceFacetsResponseSchema)
+    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withDocs({
+      description:
+        "Discover what the trace filter fields hold in this project. Without `field`, " +
+        "every facet with its top values. With `field`, that field's values, paged.",
+      responses: FACETS_ERROR_ANSWERS,
+    })
+    .handle(async ({ app, input, scope }, _project, caller) =>
+      answerTraceFacets({ app, input, scope, caller }),
+    );
 
   // GET /:traceId/transcript - registered only where the process composed the
   // coding-agent join it reads.

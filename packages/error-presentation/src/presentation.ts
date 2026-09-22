@@ -264,6 +264,11 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
   },
+  trace_attribute_values_withheld: {
+    title: "Attribute values withheld",
+    describe: () =>
+      "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
     describe: () => "That prefix matches more than one trace. Use a longer prefix.",

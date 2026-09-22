@@ -195,6 +195,33 @@ export class TraceIngestionUnavailableError extends HandledError {
 }
 
 /**
+ * A caller who cannot read captured content asked for the values behind an
+ * attribute key — the gen_ai conventions put prompts and completions in
+ * exactly those namespaces. The key itself stays in the discovery payload.
+ */
+export class TraceAttributeValuesWithheldError extends HandledError {
+  declare readonly code: "trace_attribute_values_withheld";
+
+  constructor(field: string) {
+    super(
+      "trace_attribute_values_withheld",
+      "Attribute values are not listed to a caller who cannot read the content behind them",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        meta: { field },
+        tips: [
+          "Two rules reach this: the project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in",
+          "Facet a named field instead, for example `model`, `status` or `evaluator`",
+          "GET /api/v1/traces/facets with no field lists every facet this project has",
+        ],
+      },
+    );
+    this.name = "TraceAttributeValuesWithheldError";
+  }
+}
+
+/**
  * `traces.aiQuery`/`traces.aiAction` declare the merged-in `traces` shape,
  * but no model-invocation capability is wired into the transport yet — see
  * the merge-traces-v2 handoff.

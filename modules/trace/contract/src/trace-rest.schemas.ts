@@ -5,6 +5,7 @@
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
+import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
@@ -219,3 +220,62 @@ export const tracesRestCredentialSchema = z.object({
   apiKeyId: z.string().nullable(),
   userId: z.string().nullable(),
 });
+
+/** Values per page when a facets caller names a field and no limit. */
+export const DEFAULT_FACET_VALUE_LIMIT = 50;
+
+/** Digits only, which is how epoch milliseconds arrive on a query string. */
+const EPOCH_MILLIS = /^\d+$/;
+
+/** The calendar date at the front of an ISO string, if it starts with one. */
+const ISO_CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})/;
+
+/** Whether an ISO-shaped bound names a day that exists, by the month's real length. */
+function namesARealDay(value: string): boolean {
+  const match = ISO_CALENDAR_DATE.exec(value);
+  if (!match) return true;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const daysInMonth = Temporal.PlainYearMonth.from({ year, month }).daysInMonth;
+  return day >= 1 && day <= daysInMonth;
+}
+
+/**
+ * A facets window bound as a query string, not a string-or-number union: a
+ * `number` arm loses precision going through the generated Go client.
+ */
+export const facetWindowBoundSchema = z
+  .string()
+  .refine(
+    (value) =>
+      EPOCH_MILLIS.test(value) || (namesARealDay(value) && Number.isFinite(toEpochMs(value))),
+    { message: "Expected epoch milliseconds or a date string" },
+  );
+
+/** `GET /api/v1/traces/facets`: with `field`, one field's values, paged. */
+export const traceFacetsQuerySchema = z.object({
+  field: z.string().min(1).max(512).optional(),
+  prefix: z.string().max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).default(DEFAULT_FACET_VALUE_LIMIT),
+  offset: z.coerce.number().int().min(0).default(0),
+  startDate: facetWindowBoundSchema.optional(),
+  endDate: facetWindowBoundSchema.optional(),
+});
+
+export type TraceFacetsQuery = z.infer<typeof traceFacetsQuerySchema>;
+
+/** One facet's values, paged, as `GET /facets?field=...` answers them. */
+export const traceFacetValuesResponseSchema = z.object({
+  values: z.array(z.object({ value: z.string(), label: z.string().optional(), count: z.number() })),
+  total: z.number().describe("Distinct values the field holds in the window, before paging."),
+  hasMore: z.boolean(),
+});
+
+/**
+ * `GET /facets` answers one of two shapes depending on `field` - the
+ * discovery payload or one field's paged values - too open to enumerate as
+ * one strict schema; the precise per-shape docs live on the route.
+ */
+export const traceFacetsResponseSchema = z.object({}).passthrough();

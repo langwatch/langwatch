@@ -24,6 +24,7 @@ import type {
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type {
   TraceQueryClassification,
@@ -411,8 +412,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
-  readDiscover(params: unknown): Promise<unknown>;
-  readFacetValues(params: unknown): Promise<unknown>;
+  readDiscover(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+  }): Promise<DiscoverResult>;
+  readFacetValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    facetKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<FacetValuesResult>;
   readTraceSummary(input: {
     projectId: string;
     traceId: string;
