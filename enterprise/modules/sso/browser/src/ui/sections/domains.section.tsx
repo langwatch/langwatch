@@ -25,10 +25,11 @@ import {
   PENDING_DOMAIN_WORDS,
   type PendingDomainChange,
 } from "../../model/pending-domain-change.ts";
-import { useSsoHost } from "../../model/sso-host.ts";
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
 import { DomainStatusChip } from "../elements/domain-status-chip.tsx";
+import { InlineRefusal } from "../elements/refusals.tsx";
 import { SettingsCard } from "../elements/settings-card.tsx";
+import { SettingsTable } from "../elements/settings-table.tsx";
 
 export function DomainsSection({
   organizationId,
@@ -49,7 +50,6 @@ export function DomainsSection({
   /** The setup read this section changed, so the screen can read it again. */
   onChanged?: () => void;
 }) {
-  const host = useSsoHost();
   const [domain, setDomain] = useState("");
   // Issued once and never returned again: a caller that does not catch the
   // value has thrown the ceremony's answer away, and pressing "prove" a
@@ -79,7 +79,6 @@ export function DomainsSection({
           setDomain("");
           onChanged?.();
         },
-        onError: (error) => host.failed({ error, fallbackTitle: "Claiming that domain" }),
       },
     );
   };
@@ -105,7 +104,7 @@ export function DomainsSection({
           .
         </Text>
       ) : (
-        <Table.Root size="sm" data-testid="connection-domains-table">
+        <SettingsTable testId="connection-domains-table">
           <Table.Header>
             <Table.Row background="transparent">
               <Table.ColumnHeader>Domain</Table.ColumnHeader>
@@ -132,7 +131,7 @@ export function DomainsSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </SettingsTable>
       )}
 
       {canManage && (
@@ -156,6 +155,8 @@ export function DomainsSection({
           </Button>
         </HStack>
       )}
+
+      {canManage && <InlineRefusal error={claim.error} what="Claiming that domain" />}
 
       {minted && (
         <PublishedRecord
@@ -202,7 +203,6 @@ function DomainTableRow({
   /** The removal landed; the row stands until the read says otherwise. */
   onRemovalAccepted: () => void;
 }) {
-  const host = useSsoHost();
   const claim = ssoApi.ssoSetup.claimDomain.useMutation();
   const prove = ssoApi.ssoSetup.proveDomain.useMutation();
   const remove = ssoApi.ssoSetup.removeDomain.useMutation();
@@ -220,7 +220,6 @@ function DomainTableRow({
     if (next.kind === "claim-again") {
       claim.mutate(target, {
         onSuccess: () => onChanged?.(),
-        onError: (error) => host.failed({ error, fallbackTitle: `Claiming ${row.domain}` }),
       });
 
       return;
@@ -231,7 +230,6 @@ function DomainTableRow({
         if (!proof.proved) onMinted(proof.record);
         onChanged?.();
       },
-      onError: (error) => host.failed({ error, fallbackTitle: `Proving ${row.domain}` }),
     });
   };
 
@@ -251,6 +249,10 @@ function DomainTableRow({
               {row.claim.note}
             </Text>
           )}
+          <InlineRefusal
+            error={claim.error ?? prove.error ?? remove.error}
+            what={`That step on ${row.domain}`}
+          />
         </VStack>
       </Table.Cell>
       <Table.Cell verticalAlign="top">
@@ -281,8 +283,6 @@ function DomainTableRow({
                     onRemovalAccepted();
                     onChanged?.();
                   },
-                  onError: (error) =>
-                    host.failed({ error, fallbackTitle: `Removing ${row.domain}` }),
                 })
               }
             >
@@ -313,14 +313,10 @@ function PublishedRecord({
   connectionId: string;
   onProved: () => void;
 }) {
-  const host = useSsoHost();
   const checkRecord = ssoApi.ssoSetup.checkDomainRecord.useMutation();
   const checkFile = ssoApi.ssoSetup.checkDomainFile.useMutation();
   const target = { organizationId, connectionId, domain: record.domain };
-  const settled = (fallbackTitle: string) => ({
-    onSuccess: () => onProved(),
-    onError: (error: unknown) => host.failed({ error, fallbackTitle }),
-  });
+  const settled = { onSuccess: () => onProved() };
 
   return (
     <VStack align="stretch" gap={2} data-testid="connection-domain-record">
@@ -341,9 +337,7 @@ function PublishedRecord({
           <Button
             size="sm"
             loading={checkRecord.isPending}
-            onClick={() =>
-              checkRecord.mutate(target, settled(`Checking the record for ${record.domain}`))
-            }
+            onClick={() => checkRecord.mutate(target, settled)}
           >
             Check for it now
           </Button>
@@ -351,14 +345,19 @@ function PublishedRecord({
             size="sm"
             variant="outline"
             loading={checkFile.isPending}
-            onClick={() =>
-              checkFile.mutate(target, settled(`Checking the file for ${record.domain}`))
-            }
+            onClick={() => checkFile.mutate(target, settled)}
           >
             Check the file instead
           </Button>
         </HStack>
       )}
+      {/* The verdict, where the reader is looking. A check that found nothing
+          is the commonest thing to happen here, and it must say so rather than
+          appear to do nothing. */}
+      <InlineRefusal
+        error={checkRecord.error ?? checkFile.error}
+        what={`Checking ${record.domain}`}
+      />
     </VStack>
   );
 }

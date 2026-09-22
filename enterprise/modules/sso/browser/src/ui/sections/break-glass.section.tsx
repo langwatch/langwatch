@@ -20,6 +20,7 @@ import {
 } from "../../model/break-glass-grants.ts";
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
 import { SettingsCard } from "../elements/settings-card.tsx";
+import { SettingsTable } from "../elements/settings-table.tsx";
 
 /**
  * Thirty days, not the ninety the window allows: a default should be the
@@ -77,7 +78,7 @@ export function BreakGlassSection({
           Nobody can get in without your identity provider yet.
         </Text>
       ) : (
-        <Table.Root size="sm" data-testid="connection-break-glass-table">
+        <SettingsTable testId="connection-break-glass-table">
           <Table.Header>
             <Table.Row background="transparent">
               <Table.ColumnHeader>Who</Table.ColumnHeader>
@@ -99,7 +100,7 @@ export function BreakGlassSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </SettingsTable>
       )}
 
       {live.length > 0 && <WhereTheyGetIn />}

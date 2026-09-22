@@ -22,6 +22,9 @@ vi.mock("../../../behavior/sso-api.ts", () => {
   const recorder = (calls: Call[]) => ({
     useMutation: () => ({
       isPending: false,
+      // What the last attempt was refused with, which is what the section
+      // renders beside its button.
+      error: state.refusal,
       mutate: (input: Call["input"], options?: Call["options"]) => {
         calls.push({ input, options });
         if (state.refusal) options?.onError?.(state.refusal);
@@ -152,6 +155,31 @@ describe("registering an identity provider", () => {
     });
   });
 
+  describe("given the boxes each protocol needs", () => {
+    /** @scenario "The administrator chooses which kind of provider they have" */
+    it("asks for an issuer, a client id and a client secret by default", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-okta"));
+
+      expect(screen.getByLabelText("Issuer address")).toBeInTheDocument();
+      expect(screen.getByLabelText("Client id")).toBeInTheDocument();
+      expect(screen.getByLabelText("Client secret")).toBeInTheDocument();
+    });
+
+    /** @scenario "The administrator chooses which kind of provider they have" */
+    it("asks for metadata, or a sign-in address and certificate, once SAML is chosen", () => {
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("identity-provider-saml"));
+
+      expect(screen.getByLabelText("Sign-in address")).toBeInTheDocument();
+      expect(screen.getByLabelText("Metadata")).toBeInTheDocument();
+      expect(screen.getByLabelText("Entity id")).toBeInTheDocument();
+      expect(screen.getByLabelText("Signing certificate")).toBeInTheDocument();
+    });
+  });
+
   describe("given a reader who arrived holding a protocol", () => {
     it("does not ask again under the tile they just pressed", () => {
       renderSection();
@@ -271,16 +299,15 @@ describe("registering an identity provider", () => {
   });
 
   describe("when the registration is refused", () => {
-    it("hands the refusal to the host, whose registry holds the words", () => {
+    it("says so beside the button, not in a toast that leaves the step stuck", () => {
       state.refusal = new Error("refused");
       const { host } = renderSection();
 
       fireEvent.click(screen.getByTestId("identity-provider-saml"));
-      fill("Sign-in address", "https://sso.acme.com/saml2/sso");
-      fireEvent.click(screen.getByTestId("sso-register"));
 
-      expect(host.failures).toHaveLength(1);
-      expect(host.failures[0]?.fallbackTitle).toBe("Registering that connection");
+      expect(screen.getByTestId("sso-inline-refusal")).toBeInTheDocument();
+      expect(screen.getByText("Registering that connection didn't work")).toBeInTheDocument();
+      expect(host.failures).toEqual([]);
     });
   });
 

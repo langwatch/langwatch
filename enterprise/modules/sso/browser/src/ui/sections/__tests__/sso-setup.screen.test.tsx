@@ -14,6 +14,7 @@ const { state } = vi.hoisted(() => ({
     view: null as unknown,
     isLoading: false,
     isError: false,
+    error: null as unknown,
     calls: [] as Call[],
     invalidated: 0,
   },
@@ -48,6 +49,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             data: state.view,
             isLoading: state.isLoading,
             isError: state.isError,
+            error: state.error,
           }),
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
@@ -136,6 +138,7 @@ beforeEach(() => {
   state.view = setupView();
   state.isLoading = false;
   state.isError = false;
+  state.error = null;
   state.calls = [];
   state.invalidated = 0;
 });
@@ -155,14 +158,24 @@ describe("the single sign-on setup page", () => {
   });
 
   describe("given a read that failed", () => {
-    it("says so rather than showing the organization as unregistered", () => {
+    it("names the failure rather than showing the organization as unregistered", () => {
       state.isError = true;
+      state.error = new Error("offline");
+      state.view = null;
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByTestId("sso-load-failure")).toBeInTheDocument();
+      expect(screen.getByText(/We could not load single sign-on setup\./)).toBeInTheDocument();
+      expect(screen.queryByText(/No identity provider is registered/)).toBeNull();
+    });
+
+    it("still says the setup is unavailable when the read answered nothing at all", () => {
       state.view = null;
 
       renderWithSsoHost(<SsoSetupScreen />);
 
       expect(screen.getByTestId("sso-setup-unavailable")).toBeInTheDocument();
-      expect(screen.queryByText(/No identity provider is registered/)).toBeNull();
     });
   });
 

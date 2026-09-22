@@ -11,7 +11,11 @@ type Call = { input: { domain: string }; options?: { onSuccess?: (result: unknow
 
 /** Every options bag the settling read was mounted with, newest last. */
 const { state, polls } = vi.hoisted(() => {
-  const operation = () => ({ calls: [] as Call[], answer: void 0 as unknown });
+  const operation = () => ({
+    calls: [] as Call[],
+    answer: void 0 as unknown,
+    refusal: null as unknown,
+  });
 
   return {
     polls: [] as { enabled: boolean; refetchInterval: number | false }[],
@@ -29,6 +33,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
   const recorder = (name: keyof typeof state) => ({
     useMutation: () => ({
       isPending: false,
+      error: state[name].refusal,
       mutate: (input: Call["input"], options?: Call["options"]) => {
         state[name].calls.push({ input, options });
         options?.onSuccess?.(state[name].answer);
@@ -113,6 +118,7 @@ beforeEach(() => {
   for (const operation of Object.values(state)) {
     operation.calls.length = 0;
     operation.answer = void 0;
+    operation.refusal = null;
   }
   polls.length = 0;
 });
@@ -281,5 +287,24 @@ describe("given a connection with no domains at all", () => {
     renderSection({ claims: [] });
 
     expect(screen.getByText(/no domain has been claimed yet/i)).toBeTruthy();
+  });
+});
+
+describe("given a step on a domain that was refused", () => {
+  it("says which step failed beside the domain, rather than in a toast", () => {
+    state.proveDomain.refusal = new Error("refused");
+    const { host } = renderSection();
+
+    expect(screen.getAllByTestId("sso-inline-refusal").length).toBeGreaterThan(0);
+    expect(screen.getByText("That step on acme.com didn't work")).toBeInTheDocument();
+    expect(host.failures).toEqual([]);
+  });
+
+  it("names the claim beside the box that was typed into", () => {
+    state.claimDomain.refusal = new Error("refused");
+
+    renderSection({ evidence: [], claims: [] });
+
+    expect(screen.getByText("Claiming that domain didn't work")).toBeInTheDocument();
   });
 });

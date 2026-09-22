@@ -37,6 +37,7 @@ import type { ServiceProviderAddresses } from "../../model/service-provider-rows
 import { useSsoHost } from "../../model/sso-host.ts";
 import { IdentityProviderTile } from "../elements/identity-provider-tile.tsx";
 import { ProtocolChoice } from "../elements/protocol-choice.tsx";
+import { InlineRefusal } from "../elements/refusals.tsx";
 import { ServiceProviderSection } from "./service-provider.section.tsx";
 
 type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
@@ -110,8 +111,6 @@ export function RegisterConnectionSection({
           ACKNOWLEDGEMENTS[replacesConnectionId === undefined ? "first" : "replacement"],
         );
       },
-      onError: (error: unknown) =>
-        host.failed({ error, fallbackTitle: "Registering that connection" }),
     };
 
     if (replacesConnectionId !== undefined) {
@@ -159,6 +158,7 @@ export function RegisterConnectionSection({
             pending={register.isPending || migrate.isPending}
             onSubmit={submit}
             submitLabel={replacesConnectionId === undefined ? "Register" : "Register replacement"}
+            refusal={register.error ?? migrate.error}
           />
         </>
       )}
@@ -253,6 +253,7 @@ function CredentialsAct({
   pending,
   onSubmit,
   submitLabel,
+  refusal,
 }: {
   preset: IdentityProviderPreset;
   protocol: SsoProtocol;
@@ -262,6 +263,8 @@ function CredentialsAct({
   pending: boolean;
   onSubmit: () => void;
   submitLabel: string;
+  /** What the last attempt was refused with, beside the button that made it. */
+  refusal: unknown;
 }) {
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-credentials">
@@ -296,6 +299,7 @@ function CredentialsAct({
       ) : (
         <SamlFields preset={preset} form={form} update={update} />
       )}
+      <InlineRefusal error={refusal} what="Registering that connection" />
       <Button alignSelf="start" loading={pending} onClick={onSubmit} data-testid="sso-register">
         {submitLabel}
       </Button>

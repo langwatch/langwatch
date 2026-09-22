@@ -17,6 +17,7 @@ import {
   SSO_POLICY_BY_ANSWER,
   type ArrivalAnswer,
 } from "../../model/arrivals.ts";
+import { InlineRefusal } from "../elements/refusals.tsx";
 import { SettingsCard } from "../elements/settings-card.tsx";
 
 /**
@@ -35,6 +36,7 @@ export function ArrivalsSection({
   policy,
   decided,
   saving = false,
+  refusal,
   onSave,
 }: {
   connectionState: SsoConnectionLifecycleState;
@@ -44,6 +46,8 @@ export function ArrivalsSection({
   /** Whether anybody has answered yet, which is what going live waits for. */
   decided: boolean;
   saving?: boolean;
+  /** What the last save was refused with, said beside the control. */
+  refusal?: unknown;
   onSave: (policy: SsoArrivalPolicy) => void;
 }) {
   const [selected, setSelected] = useState<SsoArrivalPolicy>(policy);
@@ -61,6 +65,8 @@ export function ArrivalsSection({
           Verify a domain to configure who can join.
         </Text>
       )}
+
+      <InlineRefusal error={refusal} what="Saving who this admits" />
 
       <RadioGroup.Root
         value={selected}

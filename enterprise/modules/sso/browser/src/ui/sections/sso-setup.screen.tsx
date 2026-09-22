@@ -15,6 +15,7 @@ import { domainClaimsOf, domainEvidenceOf, provesWithLicense } from "../../model
 import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
+import { LoadFailure } from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
 import {
@@ -44,7 +45,9 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
 
   // A read that failed is not an organization without single sign-on: the
   // journey's first step would invite somebody to register a second provider.
-  if (setup.isError || !setup.data) {
+  if (setup.isError) return <LoadFailure error={setup.error} what="single sign-on setup" />;
+
+  if (!setup.data) {
     return (
       <Text color="fg.error" fontSize="sm" data-testid="sso-setup-unavailable">
         Your single sign-on setup could not be loaded.
@@ -133,13 +136,9 @@ function ConnectedJourney({
   });
 
   const saveArrivals = (policy: SetupConnection["arrivalPolicy"]) => {
-    setArrivals.mutate(
-      { organizationId, connectionId, policy },
-      {
-        onSuccess: refresh,
-        onError: (error) => host.failed({ error, fallbackTitle: "Saving who gets in" }),
-      },
-    );
+    // No toast: the refusal is rendered beside the control that caused it,
+    // where the reader is still mid-step.
+    setArrivals.mutate({ organizationId, connectionId, policy }, { onSuccess: refresh });
   };
 
   const renameConnection = (command: { name: string }) => {
@@ -249,6 +248,7 @@ function ConnectedJourney({
             policy={connection.arrivalPolicy}
             decided={goLive?.arrivalsDecided ?? false}
             saving={setArrivals.isPending}
+            refusal={setArrivals.error}
             onSave={saveArrivals}
           />
         </SetupStep>
