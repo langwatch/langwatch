@@ -13,7 +13,7 @@
  * the product uses at runtime: the nlpgo proxy for the OpenAI-compatible
  * lanes, the AI gateway for codex. What comes back is the verdict.
  *
- * Spec: specs/model-providers/connection-test.feature
+ * Spec: specs/model-providers/credential-validation.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -76,22 +76,38 @@ export class ProviderUsageLimitError extends HandledError {
  * first chat model the row itself names. Null when neither has one, which is
  * the one case that reports back as unchecked.
  */
+/** A catalogue id without its provider prefix, the way a row spells it. */
+function bareModelId(id: string): string {
+  return id.split("/").slice(1).join("/");
+}
+
 export function pingModelOf(
   modelProvider: MaybeStoredModelProvider,
 ): string | null {
   // A row that names its own models is asked about one of those; a row that
   // names none inherits the whole catalogue for its provider, which is what
   // the pickers show for it too.
+  //
+  // The two sides spell a model differently: the catalogue keys it
+  // `openai/gpt-5-mini`, a row keys it `gpt-5-mini`, because the lists a row
+  // is filled from (`getProviderModelOptions`, and the picker behind it) drop
+  // the provider prefix. Both spellings are accepted so a row written either
+  // way still names a model.
   const named = modelProvider.models ?? [];
   const cheapest = getModelsForProvider(modelProvider.provider)
     .filter((model) => model.mode === "chat")
-    .filter((model) => named.length === 0 || named.includes(model.id))
+    .filter(
+      (model) =>
+        named.length === 0 ||
+        named.includes(bareModelId(model.id)) ||
+        named.includes(model.id),
+    )
     .sort(
       (a, b) =>
         (a.pricing.inputCostPerToken ?? Number.POSITIVE_INFINITY) -
         (b.pricing.inputCostPerToken ?? Number.POSITIVE_INFINITY),
     )[0];
-  if (cheapest) return cheapest.id.split("/").slice(1).join("/");
+  if (cheapest) return bareModelId(cheapest.id);
   return modelProvider.customModels?.[0]?.modelId ?? null;
 }
 
@@ -124,21 +140,26 @@ function classify({
   return "other";
 }
 
-/** Whatever the SDK threw, as a status and a body, with the key taken out. */
-function readFailure({ error, apiKey }: { error: unknown; apiKey: string }): {
+/**
+ * Whatever the SDK threw, as a status and a body.
+ *
+ * The body stays in this module: it is read to classify the refusal and
+ * nothing more. It is the provider's own prose, and an OpenAI 401 answers
+ * with `Incorrect API key provided: sk-…`, so neither the log line nor the
+ * customer ever sees it. What travels is the status and the class.
+ */
+function readFailure(error: unknown): {
   status: number | undefined;
   body: string;
 } {
   const carrier = error as { statusCode?: unknown; responseBody?: unknown };
   const status =
     typeof carrier?.statusCode === "number" ? carrier.statusCode : undefined;
-  const raw = [
+  const body = [
     error instanceof Error ? error.message : String(error ?? ""),
     typeof carrier?.responseBody === "string" ? carrier.responseBody : "",
   ].join(" ");
-  // The body is read for classification and logged, so the credential it
-  // quotes back comes out first. Nothing from here reaches the customer.
-  return { status, body: apiKey ? raw.split(apiKey).join("[redacted]") : raw };
+  return { status, body };
 }
 
 /**
@@ -153,23 +174,22 @@ function readFailure({ error, apiKey }: { error: unknown; apiKey: string }): {
 function verdictOf({
   provider,
   error,
-  apiKey,
   hasConfigurableEndpoint,
 }: {
   provider: string;
   error: unknown;
-  apiKey: string;
   hasConfigurableEndpoint: boolean;
 }): ValidationResult {
-  const { status, body } = readFailure({ error, apiKey });
+  const { status, body } = readFailure(error);
+  const classified =
+    status === undefined && /abort|timeout|fetch failed|network/i.test(body)
+      ? ("unreachable" as const)
+      : classify({ status, body });
   logger.info(
-    { provider, status, upstreamMessage: body.slice(0, 300) },
+    { provider, status, classifiedAs: classified },
     "provider refused a connection ping",
   );
-  if (
-    status === undefined &&
-    /abort|timeout|fetch failed|network/i.test(body)
-  ) {
+  if (classified === "unreachable") {
     return {
       outcome: "refused",
       valid: false,
@@ -184,7 +204,7 @@ function verdictOf({
     usage_limit: () => new ProviderUsageLimitError({ provider }),
     auth: () => new ProviderKeyInvalidError({ provider }),
     other: () => new ProviderRefusedError({ provider, status: status ?? 502 }),
-  }[classify({ status, body })];
+  }[classified];
   return {
     outcome: "refused",
     valid: false,
@@ -215,9 +235,6 @@ export async function pingModelProvider({
   const model = pingModelOf(modelProvider);
   if (!model) return null;
 
-  const customKeys = (modelProvider.customKeys ?? {}) as Record<string, string>;
-  const apiKey = customKeys[definition.apiKey]?.trim() ?? "";
-
   try {
     const handle =
       provider === CODEX_PROVIDER_KEY
@@ -243,7 +260,6 @@ export async function pingModelProvider({
     return verdictOf({
       provider,
       error,
-      apiKey,
       hasConfigurableEndpoint: !!definition.endpointKey,
     });
   }

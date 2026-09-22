@@ -195,8 +195,7 @@ describe("tracesV2.routeSearch", () => {
       expect(result).toEqual({
         kind: "free_text",
         query: '"annoyed users"',
-        decidedBy: "fallback",
-        fellBackFrom: "instant_eval",
+        decidedBy: "model",
       });
       expect(JSON.stringify(model.doGenerateCalls[0]?.prompt)).toContain(
         "`instant_eval` is not available on this project",

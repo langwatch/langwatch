@@ -156,16 +156,13 @@ async function routeWithModel(
       return finishFilter({ context, generated: decision.query, decidedBy });
     case "instant_eval":
       if (!context.available.isInstantEvalAvailable) {
-        // The route the model picked is not open to this project, so the
-        // phrase is the search that runs. It is still a fallback and the
-        // strip under the bar says so: a sentence that came back as a
-        // quoted phrase with nothing to explain it is the silence this
-        // signal exists to end.
-        return freeText({
-          context,
-          decidedBy: "fallback",
-          fellBackFrom: "instant_eval",
-        });
+        // A guard, not a path: the model is told the route is closed and the
+        // decision reader downgrades an answer naming it anyway, so this only
+        // catches a `routeWithModel` that does neither. The phrase is what
+        // the model settled on once the closed route is taken off the table,
+        // and nothing about the project's models is wrong, so no strip and
+        // no model trouble.
+        return freeText({ context, decidedBy });
       }
       return instantEval({
         context,
