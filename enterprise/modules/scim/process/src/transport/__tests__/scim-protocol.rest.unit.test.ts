@@ -8,7 +8,11 @@
  * when wiring provisioning, so it must name the right resource.
  */
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
-import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
+import type {
+  ScimListResponse,
+  ScimTokenEntitlement,
+  ScimUser,
+} from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
