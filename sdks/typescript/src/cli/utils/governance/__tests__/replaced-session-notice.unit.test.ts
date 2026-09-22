@@ -81,5 +81,33 @@ describe("replacedSessionNotice()", () => {
 
       expect(notice).toContain("someone@acme.example in acme");
     });
+
+    /** @scenario "an organization with no name is named by its id" */
+    it("names the stored organization by its id when it has neither", () => {
+      const notice = replacedSessionNotice({
+        previous: {
+          user: { email: "someone@acme.example" },
+          organization: { id: "org_acme" },
+        },
+        next: OTHER,
+      });
+
+      expect(notice).toContain("someone@acme.example in org_acme");
+    });
+  });
+
+  describe("when the new organization arrives with no name either", () => {
+    it("names it by its id, so the sentence still names two sides", () => {
+      const notice = replacedSessionNotice({
+        previous: ACME,
+        next: {
+          user: { email: "someone+test@acme.example" },
+          organization: { id: "org_test" },
+        },
+      });
+
+      expect(notice).toContain("someone@acme.example in ACME");
+      expect(notice).toContain("someone+test@acme.example in org_test");
+    });
   });
 });

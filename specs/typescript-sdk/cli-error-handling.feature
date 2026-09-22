@@ -115,6 +115,14 @@ Feature: CLI error handling
       And the sentence alone was not read as evidence of a transport
 
     @unit
+    Scenario: a transport failure the SDK wrapped is still a transport failure
+      Given the SDK wrapped an expired-certificate failure as originalError,
+        which carries a code but no errno
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+      And the certificate code is not claimed as one the platform chose
+
+    @unit
     Scenario: a Node error code is not a transport code
       Given a TypeError carries Node's own ERR_INVALID_URL, thrown while
         building a URL from a scheme-less endpoint

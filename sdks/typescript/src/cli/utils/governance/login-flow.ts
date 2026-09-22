@@ -369,13 +369,16 @@ export function replacedSessionNotice({
 	const hadOrg = previous.organization?.id;
 	if (!hadOrg || hadOrg === next.organization.id) return undefined;
 
-	const was = [
-		previous.user?.email,
-		previous.organization?.name ?? previous.organization?.slug,
-	]
+	// The id is the last fallback rather than no name at all: a session stored
+	// before the name was recorded, or one the server sent without either, would
+	// otherwise read as an empty identity being signed out.
+	const orgName = (org?: { id?: string; name?: string; slug?: string }) =>
+		org?.name ?? org?.slug ?? org?.id;
+
+	const was = [previous.user?.email, orgName(previous.organization)]
 		.filter(Boolean)
 		.join(" in ");
-	const now = [next.user.email, next.organization.name ?? next.organization.slug]
+	const now = [next.user.email, orgName(next.organization)]
 		.filter(Boolean)
 		.join(" in ");
 

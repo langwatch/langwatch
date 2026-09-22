@@ -405,6 +405,14 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And names the account and organization every command now runs as
 
   @unit
+  Scenario: an organization with no name is named by its id
+    Given a stored session whose organization was recorded with neither a name
+      nor a slug
+    When the user completes a login for a different organization
+    Then the notice names that organization by its id
+    And neither side of the sentence reads as an empty identity
+
+  @unit
   Scenario: Logging in again as the same organization says nothing extra
     Given the machine holds a device session for one organization
     When the user completes a login for that same organization

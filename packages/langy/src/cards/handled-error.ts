@@ -559,11 +559,16 @@ const isTransportCode = (code: unknown): boolean =>
  * evidence: `TypeError("fetch failed")` is also what a program fault in a
  * dependency reads like, and a substring match would file it as something a
  * retry clears.
+ *
+ * `originalError` is scanned beside `cause` because the SDK's HTTP layer wraps
+ * a throw under that name, and `handledErrorFromThrown` reads it as the body:
+ * an expired certificate arriving there carries `CERT_HAS_EXPIRED` and no
+ * `errno`, so without this it would be read as a code the platform had chosen.
  */
 const hasTransportEvidence = (error: unknown): boolean => {
   const outer = asRecord(error);
-  const cause = asRecord(outer?.cause);
-  return [outer, cause].some(
+  const original = asRecord(outer?.originalError);
+  return [outer, asRecord(outer?.cause), original, asRecord(original?.cause)].some(
     (candidate) =>
       typeof candidate?.syscall === "string" ||
       typeof candidate?.errno === "number" ||

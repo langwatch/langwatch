@@ -704,6 +704,22 @@ describe("handledErrorFromThrown, given a fault in our own code", () => {
     expect(handledErrorFromThrown(badUrl).code).toBe("internal_error");
   });
 
+  /** @scenario "a transport failure the SDK wrapped is still a transport failure" */
+  it("finds the transport under originalError, which the body reader unwraps", () => {
+    const wrapped = Object.assign(new Error("request failed"), {
+      originalError: Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("certificate has expired"), {
+          code: "CERT_HAS_EXPIRED",
+        }),
+      }),
+    });
+
+    const parsed = handledErrorFromThrown(wrapped);
+
+    expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
+    expect(parsed.code).not.toBe("CERT_HAS_EXPIRED");
+  });
+
   it("reads undici's own codes as the transport speaking", () => {
     const socket = Object.assign(new TypeError("fetch failed"), {
       cause: Object.assign(new Error("other side closed"), {
