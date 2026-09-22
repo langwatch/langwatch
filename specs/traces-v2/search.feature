@@ -1469,7 +1469,8 @@ Rule: Enter routes a sentence
     When the router runs
     Then the result is an Instant Eval whose question is "frustrated users"
     And it carries no criteria, the way a chip typed by hand does
-    And it says the model failed, which the strip under the bar reads
+    And it says the model failed, with the handled code it failed with
+    And the strip under the bar reads both
     And the log line names the cause: the handled code, the model and the status
 
   @unit
@@ -1480,20 +1481,23 @@ Rule: Enter routes a sentence
     Then the result is an Instant Eval whose question is "frustrated users"
     And it says no model is connected, which the strip under the bar reads
 
+  # One line, because the question is already on screen twice: in the chip
+  # and in the progress bar over the table.
   @integration
   Scenario: A search that ran without a model says so
     Given a judgement ran on the sentence as typed
-    Then a strip under the bar reads "Interpreted as: a judgement of every result, asking frustrated users"
-    And under it a hint names which of the two model problems it was
-    And the hint carries a "Configure models" button to the model provider settings
-    And a phrase search another route fell back to gets the same strip, reading "Interpreted as: the words as one phrase."
+    Then a strip under the bar reads "Interpreted as an Instant Eval. The search model failed (ai_query_provider_error), so your words are judged as typed."
+    And it names no code when the failure carried none
+    And it reads "No model is connected for search" when that is the problem instead
+    And it carries a "Configure models" button to the model provider settings
+    And a phrase search another route fell back to gets the same strip, reading "Interpreted as a phrase. No model is connected for search, so your words are matched as typed."
 
   @integration
-  Scenario: The hint under the bar can be dismissed
-    Given the strip under the bar is showing its hint
+  Scenario: The way to fix it can be dismissed
+    Given the strip under the bar is showing its "Configure models" button
     When the reader dismisses it
-    Then the hint goes and what the search was read as stays
-    And the hint stays dismissed for that project on later searches
+    Then the button goes and the line saying what the search was read as stays
+    And it stays dismissed for that project on later searches
 
   @unit
   Scenario: An existing evaluator answers the judgement as a filter
@@ -1541,7 +1545,7 @@ Rule: Enter routes a sentence
     Then the query `"annoyed users"` is applied
     And the result says no model is connected
     And the strip under the bar says the words were read as one phrase
-    And its hint links to the model provider settings in a new tab
+    And it links to the model provider settings in a new tab
 
   @integration
   Scenario: Back returns to the search before

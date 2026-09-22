@@ -49,7 +49,7 @@ import {
   freeText,
   instantEval,
   langy,
-  modelTroubleOf,
+  modelFailureOf,
   type RouteContext,
 } from "./routes";
 
@@ -136,8 +136,8 @@ async function routeWithModel(
       ...context.available,
     });
   } catch (error) {
-    const modelTrouble = modelTroubleOf(error);
-    if (modelTrouble === "model_failed") {
+    const failure = modelFailureOf(error);
+    if (failure.modelTrouble === "model_failed") {
       logger.warn(
         { projectId: input.projectId, err: error },
         "Model could not route the search; searching the phrase instead",
@@ -146,7 +146,7 @@ async function routeWithModel(
     return freeText({
       context,
       decidedBy: "fallback",
-      modelTrouble,
+      failure,
       fellBackFrom: "routing",
     });
   }

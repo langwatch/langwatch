@@ -23,7 +23,7 @@ import type {
 import { combineQueries, quoteAsPhrase } from "../query-language/mutations";
 import { parse } from "../query-language/parse";
 import type {
-  ModelTrouble,
+  ModelFailure,
   RouteAvailability,
   RouteSearchInput,
   RouteSearchResult,
@@ -45,12 +45,13 @@ const MODEL_UNAVAILABLE_CODES: readonly string[] = [
   "model_provider_disabled",
 ];
 
-/** Which of the two model problems this failure is. */
-export function modelTroubleOf(error: unknown): ModelTrouble {
-  const unavailable =
-    error instanceof HandledError &&
-    MODEL_UNAVAILABLE_CODES.includes(error.code);
-  return unavailable ? "no_model" : "model_failed";
+/** Which of the two model problems this failure is, and the code it carried. */
+export function modelFailureOf(error: unknown): ModelFailure {
+  if (!(error instanceof HandledError)) return { modelTrouble: "model_failed" };
+  if (MODEL_UNAVAILABLE_CODES.includes(error.code)) {
+    return { modelTrouble: "no_model" };
+  }
+  return { modelTrouble: "model_failed", modelErrorCode: error.code };
 }
 
 /**
@@ -121,12 +122,12 @@ function phraseSearch({
 export function freeText({
   context,
   decidedBy,
-  modelTrouble,
+  failure,
   fellBackFrom,
 }: {
   context: RouteContext;
   decidedBy: SearchRouteDecidedBy;
-  modelTrouble?: ModelTrouble;
+  failure?: ModelFailure;
   fellBackFrom?: SearchRouteKind | "routing";
 }): RouteSearchResult {
   context.deps.recordDecision({ route: "free_text", decidedBy });
@@ -135,7 +136,7 @@ export function freeText({
     query: phraseSearch(context),
     decidedBy,
     ...(fellBackFrom ? { fellBackFrom } : {}),
-    ...(modelTrouble ? { modelTrouble } : {}),
+    ...failure,
   };
 }
 
@@ -172,12 +173,12 @@ export function instantEval({
   context,
   question,
   decidedBy,
-  modelTrouble,
+  failure,
 }: {
   context: RouteContext;
   question: { instructions: string; criteria?: [string, string] };
   decidedBy: SearchRouteDecidedBy;
-  modelTrouble?: ModelTrouble;
+  failure?: ModelFailure;
 }): RouteSearchResult {
   context.deps.recordDecision({ route: "instant_eval", decidedBy });
   return {
@@ -187,7 +188,7 @@ export function instantEval({
     otherQuery: context.explicitQuery,
     fallbackQuery: phraseSearch(context),
     decidedBy,
-    ...(modelTrouble ? { modelTrouble } : {}),
+    ...failure,
   };
 }
 
@@ -224,7 +225,7 @@ export async function buildFilterRoute({
     return freeText({
       context,
       decidedBy: "fallback",
-      modelTrouble: modelTroubleOf(error),
+      failure: modelFailureOf(error),
       fellBackFrom: "filter",
     });
   }
@@ -261,7 +262,7 @@ export async function buildInstantEvalRoute({
       context,
       question: { instructions: context.sentence },
       decidedBy: "fallback",
-      modelTrouble: modelTroubleOf(error),
+      failure: modelFailureOf(error),
     });
   }
   if (built.kind === "filter") {

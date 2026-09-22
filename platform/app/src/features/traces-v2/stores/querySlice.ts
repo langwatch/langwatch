@@ -251,9 +251,9 @@ export interface SearchNotice {
   query: string;
   /** What the sentence was read as. */
   interpretedAs: "instant_eval" | "free_text";
-  /** The question being judged, when it is one. */
-  question?: string;
   modelTrouble: ModelTrouble;
+  /** The handled code of the failure, when it carried one. */
+  modelErrorCode?: string;
 }
 
 const EMPTY_AST: LiqeQuery = {

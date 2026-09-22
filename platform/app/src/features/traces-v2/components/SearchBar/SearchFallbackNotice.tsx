@@ -1,19 +1,23 @@
-import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, IconButton, Text } from "@chakra-ui/react";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ModelTrouble } from "~/server/app-layer/traces/search-router/contracts";
 import NextLink from "~/utils/compat/next-link";
 import { useExplorerStore } from "../../stores/explorerStore";
+import type { SearchNotice } from "../../stores/querySlice";
 import { MODEL_PROVIDERS_HREF } from "../TracesPage/InstantEvalRefusalPopover";
 
-/** What the reader is told, per model problem. */
-const HINT: Record<ModelTrouble, string> = {
-  no_model:
-    "No model is connected for search. With one, a sentence typed here becomes a sharper question, a filter, or a job for the assistant.",
-  model_failed:
-    "The model connected for search did not answer, so your words were used as written. Check its provider, or pick another model.",
+/** What the sentence was read as. */
+const INTERPRETED_AS: Record<SearchNotice["interpretedAs"], string> = {
+  instant_eval: "Interpreted as an Instant Eval.",
+  free_text: "Interpreted as a phrase.",
+};
+
+/** What happened to the words instead of being sharpened. */
+const AS_TYPED: Record<SearchNotice["interpretedAs"], string> = {
+  instant_eval: "so your words are judged as typed",
+  free_text: "so your words are matched as typed",
 };
 
 /**
@@ -22,8 +26,8 @@ const HINT: Record<ModelTrouble, string> = {
  * Per project because the model is configured per project, so a reader who
  * has decided to live with it in one workspace has decided nothing about
  * another. Storage can be unavailable (a private window, blocked site data),
- * and the strip is worth more than the memory of it being dismissed, so a
- * failure to read or write leaves the hint showing.
+ * and the button is worth more than the memory of it being dismissed, so a
+ * failure to read or write leaves it showing.
  */
 const dismissKey = (projectId: string) =>
   `traces-v2:search-model-hint-dismissed:${projectId}`;
@@ -41,39 +45,45 @@ function writeDismissed(projectId: string): void {
   try {
     window.localStorage.setItem(dismissKey(projectId), "1");
   } catch {
-    // The hint shows again next time, which is the harmless direction.
+    // The button shows again next time, which is the harmless direction.
   }
 }
 
-/** The one line naming what the sentence was read as. */
-function interpretation(notice: {
-  interpretedAs: "instant_eval" | "free_text";
-  question?: string;
-}): React.ReactNode {
-  if (notice.interpretedAs === "free_text") {
-    return "Interpreted as: the words as one phrase.";
+/** The line: what the search was read as, and why it was not sharpened. */
+function line(notice: SearchNotice): React.ReactNode {
+  const asTyped = AS_TYPED[notice.interpretedAs];
+  const read = INTERPRETED_AS[notice.interpretedAs];
+  if (notice.modelTrouble === "no_model") {
+    return `${read} No model is connected for search, ${asTyped}.`;
   }
   return (
     <>
-      Interpreted as: a judgement of every result, asking{" "}
-      <Text as="span" color="fg" fontFamily="mono">
-        {notice.question}
-      </Text>
+      {`${read} The search model failed`}
+      {notice.modelErrorCode ? (
+        <>
+          {" ("}
+          <Text as="span" color="fg" fontFamily="mono">
+            {notice.modelErrorCode}
+          </Text>
+          {")"}
+        </>
+      ) : null}
+      {`, ${asTyped}.`}
     </>
   );
 }
 
 /**
- * Why no model shaped the search, and the way to fix that.
+ * The way to fix it, which can be dismissed.
  *
- * Dismissible, and dismissed per project, so it is mounted under the
- * project's own key: the remount is what re-reads storage for the project
- * now on screen rather than leaving the previous one's answer in state.
+ * The line itself is not dismissible: it explains the chips now on screen
+ * and it is how a reader learns the search ran degraded. The button is,
+ * because a reader who knows where the setting is should not be offered it
+ * on every search. Mounted under the project's own key, so the remount is
+ * what re-reads storage for the project now on screen rather than leaving
+ * the previous one's answer in state.
  */
-const ModelTroubleHint: React.FC<{
-  projectId: string;
-  modelTrouble: ModelTrouble;
-}> = ({ projectId, modelTrouble }) => {
+const ConfigureModels: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [isDismissed, setIsDismissed] = useState(() =>
     readDismissed(projectId),
   );
@@ -85,10 +95,7 @@ const ModelTroubleHint: React.FC<{
   if (isDismissed) return null;
 
   return (
-    <HStack gap={2} paddingLeft={5}>
-      <Text textStyle="xs" color="fg.muted" flex={1}>
-        {HINT[modelTrouble]}
-      </Text>
+    <>
       <NextLink
         href={MODEL_PROVIDERS_HREF}
         target="_blank"
@@ -107,7 +114,7 @@ const ModelTroubleHint: React.FC<{
       >
         <X size={11} />
       </IconButton>
-    </HStack>
+    </>
   );
 };
 
@@ -115,11 +122,9 @@ const ModelTroubleHint: React.FC<{
  * The strip under the bar after a search ran without the model that shapes
  * it.
  *
- * Two things, in the order they matter. What the sentence was read as, which
- * is not dismissible because it explains the chips or the quotes now on
- * screen. Then why no model shaped it, with the way to fix that, which is
- * dismissible: the search still ran, and a reader who knows already should
- * not be told again.
+ * One line: what the sentence was read as, and why the words were used as
+ * they were typed. The question is not repeated here, since the chip and the
+ * progress bar over the table both already carry it.
  *
  * Spec: specs/traces-v2/search.feature ("A search without a model says so").
  */
@@ -137,9 +142,8 @@ export const SearchFallbackNotice: React.FC = () => {
   }
 
   return (
-    <VStack
-      align="stretch"
-      gap={1}
+    <HStack
+      gap={2}
       paddingX={3}
       paddingY={1.5}
       borderBottomWidth="1px"
@@ -147,17 +151,11 @@ export const SearchFallbackNotice: React.FC = () => {
       bg="bg.subtle"
       role="status"
     >
-      <HStack gap={2}>
-        <Sparkles size={11} />
-        <Text textStyle="xs" color="fg.muted" flex={1}>
-          {interpretation(notice)}
-        </Text>
-      </HStack>
-      <ModelTroubleHint
-        key={notice.projectId}
-        projectId={notice.projectId}
-        modelTrouble={notice.modelTrouble}
-      />
-    </VStack>
+      <Sparkles size={11} />
+      <Text textStyle="xs" color="fg.muted" flex={1}>
+        {line(notice)}
+      </Text>
+      <ConfigureModels key={notice.projectId} projectId={notice.projectId} />
+    </HStack>
   );
 };

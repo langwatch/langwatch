@@ -43,6 +43,19 @@ export type SearchRouteDecidedBy = "classifier" | "model" | "fallback";
  */
 export type ModelTrouble = "no_model" | "model_failed";
 
+/**
+ * Which model problem this was, and the code it carried.
+ *
+ * The code is a handled one or nothing. Handled codes are written to be read
+ * by a customer, so it is the one part of a provider failure the strip under
+ * the bar can name. It is absent on `no_model`, where it would only restate
+ * the sentence beside it, and on a failure that carried no code.
+ */
+export interface ModelFailure {
+  modelTrouble: ModelTrouble;
+  modelErrorCode?: string;
+}
+
 export interface RouteSearchInput {
   projectId: string;
   /** The whole submitted text: bare words plus any explicit terms. */
@@ -94,6 +107,8 @@ export type RouteSearchResult =
        * hand does.
        */
       modelTrouble?: ModelTrouble;
+      /** {@link ModelFailure}. */
+      modelErrorCode?: string;
     }
   | {
       kind: "free_text";
@@ -108,6 +123,8 @@ export type RouteSearchResult =
        * strip offers model settings only where they are the fix.
        */
       modelTrouble?: ModelTrouble;
+      /** {@link ModelFailure}. */
+      modelErrorCode?: string;
     }
   | {
       kind: "langy";

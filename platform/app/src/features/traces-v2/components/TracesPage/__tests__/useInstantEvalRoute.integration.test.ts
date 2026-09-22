@@ -170,6 +170,7 @@ describe("given the router handed over a question", () => {
           ...payload,
           question: { instructions: "frustrated users" },
           modelTrouble: "model_failed",
+          modelErrorCode: "ai_query_provider_error",
         }),
       );
       // No criteria on the wire: the judge reads the words as they stand.
@@ -197,8 +198,8 @@ describe("given the router handed over a question", () => {
         projectId: "project-1",
         query: 'service:api AND eval:"frustrated users"',
         interpretedAs: "instant_eval",
-        question: "frustrated users",
         modelTrouble: "model_failed",
+        modelErrorCode: "ai_query_provider_error",
       });
     });
 

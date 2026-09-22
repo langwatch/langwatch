@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  *
  * The strip under the search bar after a search ran without the model that
- * shapes it: what the sentence was read as, and the hint that can be
- * dismissed.
+ * shapes it: one line saying what the sentence was read as and why the words
+ * were used as typed, beside a button that can be dismissed.
  *
  * Spec: specs/traces-v2/search.feature ("A search that ran without a model
  * says so").
@@ -40,8 +40,8 @@ function noticeFor(
     projectId: "project-1",
     query: useExplorerStore.getState().queryText,
     interpretedAs: "instant_eval",
-    question: "frustrated users",
     modelTrouble: "model_failed",
+    modelErrorCode: "ai_query_provider_error",
     ...notice,
   });
 }
@@ -50,15 +50,12 @@ describe("given a judgement ran on the sentence as typed", () => {
   describe("when the strip renders", () => {
     /** @scenario "A judge question no model could write is judged as typed" */
     /** @scenario "A search that ran without a model says so" */
-    it("names the question being judged and offers the model settings", () => {
+    it("names the reading, the code it failed with, and offers the model settings", () => {
       noticeFor();
       render(<SearchFallbackNotice />, { wrapper });
 
       expect(screen.getByRole("status")).toHaveTextContent(
-        "Interpreted as: a judgement of every result, asking frustrated users",
-      );
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "The model connected for search did not answer",
+        "Interpreted as an Instant Eval. The search model failed (ai_query_provider_error), so your words are judged as typed.",
       );
       expect(
         screen.getByRole("link", { name: "Configure models" }),
@@ -66,22 +63,30 @@ describe("given a judgement ran on the sentence as typed", () => {
     });
 
     it("says no model is connected when that is the problem", () => {
-      noticeFor({ modelTrouble: "no_model" });
+      noticeFor({ modelTrouble: "no_model", modelErrorCode: undefined });
       render(<SearchFallbackNotice />, { wrapper });
       expect(screen.getByRole("status")).toHaveTextContent(
-        "No model is connected for search",
+        "Interpreted as an Instant Eval. No model is connected for search, so your words are judged as typed.",
+      );
+    });
+
+    it("says only that the model failed when the failure carried no code", () => {
+      noticeFor({ modelErrorCode: undefined });
+      render(<SearchFallbackNotice />, { wrapper });
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "The search model failed, so your words are judged as typed.",
       );
     });
   });
 
-  describe("when the hint is dismissed", () => {
-    /** @scenario "The hint under the bar can be dismissed" */
+  describe("when the button is dismissed", () => {
+    /** @scenario "The way to fix it can be dismissed" */
     it("keeps what the search was read as, and stays dismissed on the next search", () => {
       noticeFor();
       const first = render(<SearchFallbackNotice />, { wrapper });
 
       fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-      expect(screen.getByRole("status")).toHaveTextContent("Interpreted as:");
+      expect(screen.getByRole("status")).toHaveTextContent("Interpreted as");
       expect(
         screen.queryByRole("link", { name: "Configure models" }),
       ).toBeNull();
@@ -120,7 +125,7 @@ describe("given a phrase search that another route fell back to", () => {
       });
       render(<SearchFallbackNotice />, { wrapper });
       expect(screen.getByRole("status")).toHaveTextContent(
-        "Interpreted as: the words as one phrase.",
+        "Interpreted as a phrase. No model is connected for search, so your words are matched as typed.",
       );
     });
   });

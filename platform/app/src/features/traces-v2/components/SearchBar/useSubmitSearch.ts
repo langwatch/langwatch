@@ -76,6 +76,9 @@ function useApplyRoute({
               query: useExplorerStore.getState().queryText,
               interpretedAs: "free_text",
               modelTrouble: result.modelTrouble,
+              ...(result.modelErrorCode
+                ? { modelErrorCode: result.modelErrorCode }
+                : {}),
             });
           }
           return;
@@ -93,6 +96,9 @@ function useApplyRoute({
             timeRange,
             ...(result.modelTrouble
               ? { modelTrouble: result.modelTrouble }
+              : {}),
+            ...(result.modelErrorCode
+              ? { modelErrorCode: result.modelErrorCode }
               : {}),
           });
           return;

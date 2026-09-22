@@ -13,6 +13,7 @@ import {
   input,
   NoModel,
   ProviderDisabled,
+  ProviderError,
   RANGE,
 } from "./harness";
 
@@ -157,7 +158,7 @@ describe("given the classifier is configured", () => {
       const d = deps({
         classifier: answering("instant_eval"),
         buildQuestion: vi.fn(async () => {
-          throw new Error("502 from the provider");
+          throw new ProviderError();
         }),
       });
       const result = await createSearchRouter(d).route(
@@ -171,6 +172,7 @@ describe("given the classifier is configured", () => {
         fallbackQuery: 'status:error AND "frustrated users"',
         decidedBy: "fallback",
         modelTrouble: "model_failed",
+        modelErrorCode: "ai_query_provider_error",
       });
       expect(d.recordDecision).toHaveBeenCalledWith({
         route: "instant_eval",

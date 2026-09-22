@@ -46,6 +46,8 @@ export interface InstantEvalRoutePayload {
    * bar reads to say so, and to offer the model settings.
    */
   modelTrouble?: ModelTrouble;
+  /** The handled code of that failure, when it carried one. */
+  modelErrorCode?: string;
 }
 
 /**
@@ -276,8 +278,10 @@ function useInstantEvalStarter({
         projectId: payload.projectId,
         query: useExplorerStore.getState().queryText,
         interpretedAs: "instant_eval",
-        question: payload.question.instructions,
         modelTrouble: payload.modelTrouble,
+        ...(payload.modelErrorCode
+          ? { modelErrorCode: payload.modelErrorCode }
+          : {}),
       });
     },
     [applyQueryText, recordSearchNotice, registerEvalRun],
