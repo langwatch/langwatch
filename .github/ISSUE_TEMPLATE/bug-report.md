@@ -16,8 +16,20 @@ Steps to reproduce the behavior:
 2. Click on '....'
 3. See error
 
-**Expected behavior**
-A clear description of what you expected to happen.
+**Expected behaviour as acceptance criteria**
+
+- Given <context>, when <action>, then <expected outcome>
+- Given <context>, when <action>, then <expected outcome>
+
+## Definition of Done
+
+- [ ] Regression scenario in a `specs/**/*.feature` file tagged `@unit`/`@integration`/`@e2e`
+- [ ] Scenario binds via `// @scenario`
+- [ ] Tests pass (regression fails without the fix)
+- [ ] Use-proof embedded in the PR
+- [ ] Docs updated if needed
+
+See `specs/README.md` for feature file binding.
 
 **Environment**
 - Component: [langwatch/langwatch_nlp/langwatch_mcp_server/langwatch_sdk_python/langwatch_sdk_typescript/langwatch_sdk_go]
