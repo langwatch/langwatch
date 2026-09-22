@@ -435,11 +435,15 @@ export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
     });
     if (configStoreEntities.length > 0) return "config_store";
 
-    // The config store owns nothing; is the app-owned SQL-store user present?
+    // The config store owns nothing; is the app-owned user present in any SQL
+    // access store? Excluding `users_xml` (the config store, already checked
+    // above and the same literal `inventoryConfigStoreLwqlEntities` filters on)
+    // rather than pinning `local_directory` keeps this correct on ClickHouse
+    // deployments whose SQL storage is `replicated`, `memory`, etc.
     const result = await client.query({
       query:
         "SELECT count() AS n FROM system.users " +
-        "WHERE name = {user:String} AND storage = 'local_directory'",
+        "WHERE name = {user:String} AND storage != 'users_xml'",
       query_params: { user: names.restrictedUser },
       format: "JSONEachRow",
     });
