@@ -258,9 +258,8 @@ function TestSection({
   const agentTestingFlagLoading = workspaceLoading
     ? true
     : flagReadCanRun && flagReadLoading;
-  // A person who clicked "go back" on the new-simulations callout reads the
-  // Simulations group on this browser while the flag stays on for the rest
-  // of the project.
+  // A browser that recorded the previous-screens preference reads the
+  // Simulations group while the flag stays on for the rest of the project.
   const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   return (

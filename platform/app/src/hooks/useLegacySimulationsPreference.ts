@@ -2,11 +2,10 @@
  * A per-project, per-browser choice to keep the previous simulations screens
  * while the Agent Testing release flag is on for the project.
  *
- * The person who clicks "go back" on the welcome callout gets the previous
- * screens on this machine only: the sidebar offers the Simulations group
- * again and `/simulations` addresses stop redirecting to Agent Testing.
- * Everyone else on the project keeps the new screens. The return banner on
- * the previous screens clears the choice again.
+ * A browser that recorded the preference gets the previous screens on this
+ * machine only: the sidebar offers the Simulations group again and
+ * `/simulations` addresses stop redirecting to Agent Testing. Everyone else
+ * on the project keeps the new screens.
  *
  * The write dispatches {@link CHANGE_EVENT} so every mounted reader (the
  * main menu above all) re-reads without a page load; the `storage` event

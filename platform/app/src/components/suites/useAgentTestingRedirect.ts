@@ -45,8 +45,8 @@ export function useAgentTestingRedirect({
       enabled: !!organizationId,
     },
   );
-  // Someone who chose the previous screens on this browser reads this page,
-  // whatever the flag says. See the new-simulations callout.
+  // A browser that recorded the previous-screens preference reads this
+  // page, whatever the flag says.
   const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   const projectSlug = router.query.project;
