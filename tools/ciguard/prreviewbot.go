@@ -157,6 +157,14 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 		return []string{fmt.Sprintf("%s declares no top-level permissions block", PRReviewBotWorkflow)}
 	}
 
+	return comparePRReviewBotPermissionScopes(scopes)
+}
+
+// comparePRReviewBotPermissionScopes diffs a workflow's effective permission
+// scopes against prReviewBotRequiredPermissions in both directions: keys the
+// review job needs but doesn't have (missing or wrong value), and keys it
+// has but doesn't need (broader than the invariant allows).
+func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	requiredKeys := make([]string, 0, len(prReviewBotRequiredPermissions))
 	for key := range prReviewBotRequiredPermissions {
 		requiredKeys = append(requiredKeys, key)
