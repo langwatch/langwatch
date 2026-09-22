@@ -15,25 +15,36 @@
  * Spec: specs/typescript-sdk/cli-projects-api-keys.feature
  */
 
+import { scopedApiKey } from "@/internal/credentialContext";
 import { loadConfig } from "./governance/config";
 
 /**
  * The extra line for an authorization failure, or nothing when there is
- * nothing to add: another code, no login on this machine, or a login made
- * before the permissions were recorded. Silence beats a guess here, since a
- * wrong list would send the reader after the wrong fix.
+ * nothing to add: another code, no login on this machine, a login made before
+ * the permissions were recorded, or a request that authenticated with some
+ * other key. Silence beats a guess here, since a wrong list would send the
+ * reader after the wrong fix.
+ *
+ * The permissions belong to the LOGIN key, so the line is only true when the
+ * request used it. `--api-key` and `LANGWATCH_API_KEY` win over the login
+ * (utils/apiKey.ts) and carry permissions this machine never recorded, so a
+ * refusal there is described by listing what some other credential holds.
  */
 export const loginPermissionsHint = (code: string): string | undefined => {
   if (code !== "unauthorized") return undefined;
 
   let permissions: string[] | undefined;
+  let loginKey: string | undefined;
   try {
-    permissions = loadConfig()?.cli_api_key_scope?.permissions;
+    const cfg = loadConfig();
+    permissions = cfg?.cli_api_key_scope?.permissions;
+    loginKey = cfg?.cli_api_key?.trim();
   } catch {
     // An unreadable config is not worth a second failure on the error path.
     return undefined;
   }
   if (!permissions?.length) return undefined;
+  if (!loginKey || scopedApiKey() !== loginKey) return undefined;
 
   return `Your login carries ${[...permissions].sort().join(", ")}. A command needing a permission that is not listed there is refused whatever your role is: run \`langwatch login\` again to approve more, or use an API key that already has it.`;
 };

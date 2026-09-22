@@ -107,6 +107,20 @@ Feature: CLI error handling
       And the certificate code is not presented as the platform's own
 
     @unit
+    Scenario: fetch failed with nothing behind it is a fault in our code
+      Given a TypeError says "fetch failed" and carries no system error, no
+        errno and no transport code as its cause
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And the sentence alone was not read as evidence of a transport
+
+    @unit
+    Scenario: a body that would not parse stays a network failure
+      Given a proxy answered with an HTML page and reading it as JSON threw
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+
+    @unit
     Scenario: chart schema names a payload it does not recognise
       Given the analytics schema comes back without its list of views
       When the user runs `langwatch chart schema`

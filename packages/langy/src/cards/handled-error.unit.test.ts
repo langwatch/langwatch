@@ -670,12 +670,28 @@ describe("handledErrorFromThrown, given a fault in our own code", () => {
     for (const thrown of [
       new RangeError("out of range"),
       new ReferenceError("x is not defined"),
-      new SyntaxError("Unexpected token"),
     ]) {
       expect(handledErrorFromThrown(thrown).code, thrown.name).toBe(
         "internal_error",
       );
     }
+  });
+
+  /** @scenario "a body that would not parse stays a network failure" */
+  it("leaves a SyntaxError a network failure, since it is a body that would not parse", () => {
+    const parsed = handledErrorFromThrown(
+      new SyntaxError("Unexpected token '<', \"<html>\" is not valid JSON"),
+    );
+
+    expect(parsed.code).toBe("network_error");
+  });
+
+  /** @scenario "fetch failed with nothing behind it is a fault in our code" */
+  it("does not take the sentence 'fetch failed' as evidence of a transport", () => {
+    const parsed = handledErrorFromThrown(new TypeError("fetch failed"));
+
+    expect(parsed.code).toBe("internal_error");
+    expect(parsed.code).not.toBe("network_error");
   });
 
   /** @scenario "a request that never landed is still a network failure" */

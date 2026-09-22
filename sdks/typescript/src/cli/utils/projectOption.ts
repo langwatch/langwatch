@@ -11,8 +11,8 @@
  * Two lists carry everything that is not a plain data-plane command, each
  * entry with the reason it is there. A command absent from both gets the flag,
  * so a new one inherits it and leaving it out is a deliberate edit rather than
- * an oversight. `cli-project-option.unit.test.ts` walks the tree and fails on
- * any leaf that is neither marked nor listed.
+ * an oversight. `src/cli/__tests__/project-option.unit.test.ts` walks the tree
+ * and fails on any leaf that is neither marked nor listed.
  *
  * The value does not travel through the commands. A command's action would
  * have to accept it, thread it into `resolveCredentials({ project })` and be
@@ -165,6 +165,14 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   "webhooks update": "answers for the organization",
   "spend-events by-user": "answers for the organization",
   "spend-events replay": "answers for the organization",
+  // The budget, not the traffic: `list` reads every scope the organization
+  // has, and the other three act on a budget id. Pointing the credential at a
+  // project would change which role binding the server reads without changing
+  // the budget that answers.
+  "gateway-budgets archive": "answers for the organization",
+  "gateway-budgets list": "answers for the organization",
+  "gateway-budgets reset": "answers for the organization",
+  "gateway-budgets update": "answers for the organization",
 
   // Names projects rather than running inside one.
   "projects create": "names projects rather than running inside one",
@@ -248,6 +256,6 @@ export const isProjectScoped = (cmd: Command): boolean =>
  */
 export const projectSelectorOf = (cmd: Command): string | undefined => {
   if (!isProjectScoped(cmd)) return undefined;
-  const value = (cmd.opts() as { project?: unknown }).project;
+  const value = cmd.opts<{ project?: unknown }>().project;
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 };

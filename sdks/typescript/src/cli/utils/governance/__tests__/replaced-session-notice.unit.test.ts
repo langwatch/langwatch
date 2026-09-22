@@ -17,52 +17,69 @@ const OTHER = {
   organization: { id: "org_test", slug: "test-org", name: "Test Org" },
 };
 
-describe("given the machine already holds a login", () => {
-  /** @scenario "Logging in as another organization says whose login it replaced" */
-  it("names both sides when the organization changes", () => {
-    const notice = replacedSessionNotice(ACME, OTHER);
+describe("replacedSessionNotice()", () => {
+  describe("when the machine already holds another organization's login", () => {
+    /** @scenario "Logging in as another organization says whose login it replaced" */
+    it("names both sides", () => {
+      const notice = replacedSessionNotice({ previous: ACME, next: OTHER });
 
-    expect(notice).toContain("someone@acme.example in ACME");
-    expect(notice).toContain("someone+test@acme.example in Test Org");
+      expect(notice).toContain("someone@acme.example in ACME");
+      expect(notice).toContain("someone+test@acme.example in Test Org");
+    });
+
+    it("says the previous login is signed out, not merely changed", () => {
+      expect(replacedSessionNotice({ previous: ACME, next: OTHER })).toContain(
+        "signed out",
+      );
+    });
   });
 
-  it("says the previous login is signed out, not merely changed", () => {
-    expect(replacedSessionNotice(ACME, OTHER)).toContain("signed out");
+  describe("when the same organization logs in again", () => {
+    /** @scenario "Logging in again as the same organization says nothing extra" */
+    it("says nothing", () => {
+      expect(
+        replacedSessionNotice({
+          previous: ACME,
+          next: {
+            user: { email: "someone@acme.example" },
+            organization: { id: "org_acme", slug: "acme", name: "ACME" },
+          },
+        }),
+      ).toBeUndefined();
+    });
+
+    it("says nothing for a different account inside that organization", () => {
+      expect(
+        replacedSessionNotice({
+          previous: ACME,
+          next: {
+            user: { email: "colleague@acme.example" },
+            organization: { id: "org_acme", slug: "acme", name: "ACME" },
+          },
+        }),
+      ).toBeUndefined();
+    });
   });
 
-  /** @scenario "Logging in again as the same organization says nothing extra" */
-  it("says nothing when the same organization logs in again", () => {
-    expect(
-      replacedSessionNotice(ACME, {
-        user: { email: "someone@acme.example" },
-        organization: { id: "org_acme", slug: "acme", name: "ACME" },
-      }),
-    ).toBeUndefined();
+  describe("when the machine holds no login yet", () => {
+    it("says nothing, because nothing is being replaced", () => {
+      expect(
+        replacedSessionNotice({ previous: {}, next: OTHER }),
+      ).toBeUndefined();
+    });
   });
 
-  it("says nothing for a different account inside the same organization", () => {
-    expect(
-      replacedSessionNotice(ACME, {
-        user: { email: "colleague@acme.example" },
-        organization: { id: "org_acme", slug: "acme", name: "ACME" },
-      }),
-    ).toBeUndefined();
-  });
-});
+  describe("when the stored login predates recorded organization names", () => {
+    it("falls back to the slug rather than printing a blank", () => {
+      const notice = replacedSessionNotice({
+        previous: {
+          user: { email: "someone@acme.example" },
+          organization: { id: "org_acme", slug: "acme" },
+        },
+        next: OTHER,
+      });
 
-describe("given the machine holds no login yet", () => {
-  it("says nothing, because nothing is being replaced", () => {
-    expect(replacedSessionNotice({}, OTHER)).toBeUndefined();
-  });
-});
-
-describe("given a login stored before organization names were recorded", () => {
-  it("falls back to the slug rather than printing a blank", () => {
-    const notice = replacedSessionNotice(
-      { user: { email: "someone@acme.example" }, organization: { id: "org_acme", slug: "acme" } },
-      OTHER,
-    );
-
-    expect(notice).toContain("someone@acme.example in acme");
+      expect(notice).toContain("someone@acme.example in acme");
+    });
   });
 });

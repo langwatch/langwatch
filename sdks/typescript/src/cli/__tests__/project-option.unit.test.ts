@@ -31,7 +31,7 @@ const leafAt = (program: Command, path: string): Command => {
     (leaf) => commandPath(leaf) === path,
   );
   expect(found, `no leaf command "${path}" in the tree`).toBeDefined();
-  return found as Command;
+  return found!;
 };
 
 const declaresProject = (cmd: Command): boolean =>
@@ -74,6 +74,20 @@ describe("given the command tree the CLI runs", () => {
     expect(declaresProject(local)).toBe(false);
     expect(isProjectScoped(local)).toBe(false);
     expect(COMMANDS_WITHOUT_PROJECT["config get"]).toContain("this machine");
+  });
+
+  /** @scenario "a management command keeps the credential where the resource lives" */
+  it("leaves the gateway-budgets management commands without the flag", () => {
+    const program = tree();
+    for (const path of [
+      "gateway-budgets archive",
+      "gateway-budgets list",
+      "gateway-budgets reset",
+      "gateway-budgets update",
+    ]) {
+      expect(declaresProject(leafAt(program, path)), path).toBe(false);
+      expect(isProjectScoped(leafAt(program, path)), path).toBe(false);
+    }
   });
 
   it("records a reason for every command it exempts", () => {

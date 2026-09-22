@@ -32,6 +32,7 @@ interface CredentialHolder {
   apiKey?: string;
   projectId?: string;
   requestedProject?: string;
+  warnedProjectEnvIgnored?: boolean;
 }
 
 const storage = new AsyncLocalStorage<CredentialHolder>();
@@ -119,6 +120,22 @@ export function requestedProject(): string | undefined {
 }
 
 /**
+ * Take the right to warn that `LANGWATCH_PROJECT_ID` was ignored, once per
+ * request. True the first time it is asked in this holder, false afterwards.
+ *
+ * Request-scoped rather than process-scoped because the daemon serves many
+ * requests from one process: a module-level flag would warn the first caller
+ * and leave every later one running against the key's own project with
+ * nothing on screen saying so, which is the silence the warning exists to end.
+ */
+export function claimProjectEnvIgnoredWarning(): boolean {
+  const holder = currentHolder();
+  if (holder.warnedProjectEnvIgnored) return false;
+  holder.warnedProjectEnvIgnored = true;
+  return true;
+}
+
+/**
  * Clear the process-local fallback holder. Test-only: a unit test that sets a
  * key outside any scope would otherwise leak it into the next test.
  */
@@ -126,4 +143,5 @@ export function resetFallbackCredentialHolder(): void {
   fallbackHolder.apiKey = undefined;
   fallbackHolder.projectId = undefined;
   fallbackHolder.requestedProject = undefined;
+  fallbackHolder.warnedProjectEnvIgnored = undefined;
 }

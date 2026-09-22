@@ -132,6 +132,14 @@ Feature: CLI Projects and API Keys management
       Then no permissions line is added, rather than a guess
 
     @unit
+    Scenario: a refusal for another key does not list the login's permissions
+      Given the request authenticated with --api-key or LANGWATCH_API_KEY
+      And a login on this machine recorded its own permission slugs
+      When the command is refused as unauthorized
+      Then no permissions line is added, since those slugs belong to a
+        credential the command did not use
+
+    @unit
     Scenario: a failure that is not an authorization one is left alone
       Given a command fails as not_found
       When the refusal is rendered

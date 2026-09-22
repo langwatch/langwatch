@@ -383,7 +383,7 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     // applies the right side to each of its elements.
     if (operator.startsWith(".")) {
       const left = applyJq(path, data);
-      return /\[\]/.test(path) && Array.isArray(left)
+      return path.includes("[]") && Array.isArray(left)
         ? left.map((item) => applyJq(operator, item))
         : applyJq(operator, left);
     }

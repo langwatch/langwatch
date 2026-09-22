@@ -158,6 +158,18 @@ const detailLines = (domain: CliHandledError): string[] => {
 };
 
 /**
+ * The fallback advice, plus what only this machine knows: the permissions the
+ * login here was minted with. Applied to both renderings, so a person and an
+ * agent are told the same thing about why a 403 happened.
+ */
+const withCliAdvice = (domain: CliHandledError): CliHandledError => {
+  const enriched = withFallbackSuggestions(domain);
+  const hint = loginPermissionsHint(enriched.code);
+  if (!hint) return enriched;
+  return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
+};
+
+/**
  * The human rendering: the sentence, then everything else that was on the error.
  *
  *   Error: <sentence>
@@ -178,18 +190,6 @@ const detailLines = (domain: CliHandledError): string[] => {
  * `network_error`), and dressing that up as though the platform had said it
  * would be inventing precision that does not exist.
  */
-/**
- * The fallback advice, plus what only this machine knows: the permissions the
- * login here was minted with. Applied to both renderings, so a person and an
- * agent are told the same thing about why a 403 happened.
- */
-const withCliAdvice = (domain: CliHandledError): CliHandledError => {
-  const enriched = withFallbackSuggestions(domain);
-  const hint = loginPermissionsHint(enriched.code);
-  if (!hint) return enriched;
-  return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
-};
-
 export const renderErrorForHumans = (domain: CliHandledError): string => {
   if (!domain.isHandled) return domain.message;
 

@@ -356,13 +356,16 @@ export async function runDeviceFlowLogin(
  * browser approval: refusing there would reject an approval the person has
  * already given, and the point is that they can see what happened.
  */
-export function replacedSessionNotice(
-	previous: Pick<GovernanceConfig, "user" | "organization">,
+export function replacedSessionNotice({
+	previous,
+	next,
+}: {
+	previous: Pick<GovernanceConfig, "user" | "organization">;
 	next: {
 		user: { email?: string };
 		organization: { id: string; name?: string; slug?: string };
-	},
-): string | undefined {
+	};
+}): string | undefined {
 	const hadOrg = previous.organization?.id;
 	if (!hadOrg || hadOrg === next.organization.id) return undefined;
 
@@ -383,7 +386,7 @@ function persistDeviceSession(
 	cfg: GovernanceConfig,
 	result: ExchangeDeviceSessionResult,
 ): void {
-	const replaced = replacedSessionNotice(cfg, result);
+	const replaced = replacedSessionNotice({ previous: cfg, next: result });
 	if (replaced) {
 		console.log();
 		console.log(chalk.yellow(replaced));

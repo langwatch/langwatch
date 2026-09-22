@@ -491,31 +491,47 @@ export const isTerminalFailure = (error: CliHandledError): boolean =>
  * the code `network_error` with the advice to check their connection: a fix
  * they cannot make, for a failure that was not theirs, and a crash filed as
  * something transient that a retry would clear.
+ *
+ * `SyntaxError` is deliberately absent. With no HTTP status it is almost
+ * always `response.json()` over a body that was not JSON — a proxy's HTML
+ * error page, a truncated answer — which `parseHandledError` already treats as
+ * infrastructure, and which a retry genuinely can clear.
  */
 const PROGRAM_FAULT_NAMES = new Set([
   "TypeError",
   "RangeError",
   "ReferenceError",
-  "SyntaxError",
 ]);
+
+/**
+ * The shape of a code libuv, OpenSSL and undici put on a transport failure:
+ * `ECONNREFUSED`, `ENOTFOUND`, `CERT_HAS_EXPIRED`, `UND_ERR_SOCKET`. Nothing
+ * the CLI throws sets a SCREAMING_SNAKE `code` on an Error, so the shape is
+ * the discriminant a message cannot be.
+ */
+const TRANSPORT_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$|^E[A-Z0-9]{2,}$/;
 
 /**
  * Evidence that the throw came from the TRANSPORT rather than from our code.
  *
  * `fetch` reports a dead socket as `TypeError("fetch failed")` whose `cause` is
  * the libuv system error, so the constructor alone cannot tell a refused
- * connection from a bug: both are a TypeError with no HTTP status. The system
- * error is what distinguishes them — it carries `syscall`/`errno`, and undici
- * always attaches it as the cause under that exact message.
+ * connection from a bug: both are a TypeError with no HTTP status. The cause is
+ * what distinguishes them — it carries `syscall`/`errno` for a socket, and a
+ * code of its own for a TLS failure, which has neither. The message is not
+ * evidence: `TypeError("fetch failed")` is also what a program fault in a
+ * dependency reads like, and a substring match would file it as something a
+ * retry clears.
  */
 const hasTransportEvidence = (error: unknown): boolean => {
-  if (error instanceof Error && error.message === "fetch failed") return true;
   const outer = asRecord(error);
   const cause = asRecord(outer?.cause);
   return [outer, cause].some(
     (candidate) =>
       typeof candidate?.syscall === "string" ||
-      typeof candidate?.errno === "number",
+      typeof candidate?.errno === "number" ||
+      (typeof candidate?.code === "string" &&
+        TRANSPORT_CODE.test(candidate.code)),
   );
 };
 

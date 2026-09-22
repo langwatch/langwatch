@@ -101,6 +101,15 @@ Feature: CLI cross-project access with the user-scoped login key
       Then the value is not read as the credential scope for the login itself
 
     @unit
+    Scenario: a management command keeps the credential where the resource lives
+      Given `langwatch gateway-budgets list`, and the three commands that act
+        on a budget id
+      When the command tree is built
+      Then none of them declares --project
+      And the list that exempts them records that they answer for the
+        organization
+
+    @unit
     Scenario: the whole instant-eval family takes the flag
       Given the command tree the CLI runs
       When the instant-eval commands are listed
@@ -151,6 +160,22 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs a command that reads from a project
       Then the command runs against the key's own project
       And a warning on stderr says the variable was ignored and why
+
+    @unit
+    Scenario: every request warns that LANGWATCH_PROJECT_ID was ignored
+      Given the CLI daemon serves several commands from one process
+      And each of them carries a project key and LANGWATCH_PROJECT_ID
+      When the commands run one after another
+      Then every one of them prints the warning
+      And a single command prints it once however often its credential resolves
+
+    @unit
+    Scenario: a project key given by flag is not blamed on the environment
+      Given the user passes a project key with --api-key
+      When they run a command with --project naming another project
+      Then the command exits non-zero
+      And the refusal names --api-key as the credential in hand
+      And it does not tell them to unset an environment variable they never set
 
   Rule: projects list shows the key's reach
 

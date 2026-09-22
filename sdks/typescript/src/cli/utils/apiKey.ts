@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { config } from "dotenv";
 import { isUserScopedApiKey } from "@/internal/api/auth";
 import {
+  claimProjectEnvIgnoredWarning,
   requestedProject,
   setResolvedApiKey,
   setResolvedProjectId,
@@ -145,7 +146,7 @@ export const resolveCredentials = async (
     const projectId = await applyProjectScope({
       project: opts.project,
       apiKey: flagKey,
-      keySource: "supplied-key",
+      keySource: "flag-key",
     });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
@@ -165,7 +166,7 @@ export const resolveCredentials = async (
     const projectId = await applyProjectScope({
       project: opts.project,
       apiKey: envKey,
-      keySource: "supplied-key",
+      keySource: "env-key",
     });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
@@ -346,11 +347,17 @@ async function resolveFromSession({
       keySource: "personal-project-login",
     })) ?? session.projectId;
   setResolvedProjectId(projectId);
-  // A named project puts the identity on the command line, so there is
-  // nothing implicit left to warn about. A command that acts as the person
-  // reads no project either way, so the notice about which project it reads
-  // would be wrong; that command names its own login.
-  if (currentProjectSelector(project) === undefined && !isLoginKeyRequired) {
+  // A NAMED project puts the identity on the command line, so there is
+  // nothing implicit left to warn about. `LANGWATCH_PROJECT_ID` does not: it
+  // is ambient, and this path does not even read it (the personal project
+  // answers), so suppressing the notice for it would leave nothing on screen
+  // saying which project replied. A command that acts as the person reads no
+  // project either way, so the notice about which project it reads would be
+  // wrong; that command names its own login.
+  if (
+    currentProjectSelector(project)?.source !== "named" &&
+    !isLoginKeyRequired
+  ) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,
@@ -395,9 +402,6 @@ const currentProjectSelector = (
   return undefined;
 };
 
-/** Said once per process: a repeated warning is one the reader stops seeing. */
-let warnedProjectEnvIgnored = false;
-
 /**
  * Resolve the named project into the request's target project and publish it.
  *
@@ -416,7 +420,8 @@ async function applyProjectScope({
   cfg?: GovernanceConfig;
   /** The key the request will authenticate with, which decides what it can honour. */
   apiKey?: string;
-  keySource?: BoundKeySource;
+  /** Where that key came from, which decides what the refusal tells the user. */
+  keySource: BoundKeySource;
 }): Promise<string | undefined> {
   const selector = currentProjectSelector(project);
   if (!selector) return undefined;
@@ -427,11 +432,13 @@ async function applyProjectScope({
   if (apiKey && !isUserScopedApiKey(apiKey)) {
     const refusal = projectScopeNotSupported({
       selector: selector.value,
-      keySource: keySource ?? "supplied-key",
+      keySource,
     });
     if (selector.source === "named") reportProjectScopeError(refusal);
-    if (!warnedProjectEnvIgnored) {
-      warnedProjectEnvIgnored = true;
+    // Once per request, not once per process: the daemon runs every command
+    // of a session in one process, and a warning said once there is one the
+    // next caller never sees.
+    if (claimProjectEnvIgnoredWarning()) {
       console.error(
         chalk.yellow(
           `Warning: ${refusal.message} LANGWATCH_PROJECT_ID was ignored, and this command ran against the key's own project.`,
