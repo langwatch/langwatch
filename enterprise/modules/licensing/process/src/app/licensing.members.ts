@@ -66,12 +66,23 @@ export type OrganizationLicenseCandidate = {
 };
 
 /**
- * Persistence and seat-count port. Concrete database adapters stay in
- * apps, except `tryReadLicense`, inherited from `OrganizationLicense` so a
- * plan-resolution-only process can compose that read alone, without seats.
+ * The platform-access scan: every organization running on an activated key.
+ * An installation with no instance key is licensed by these rows alone.
  */
-export interface LicenseStorage extends OrganizationLicense {
+export interface OrganizationLicenseCandidates {
   findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;
+}
+
+/** Both licence reads, which is what a repository over the rows answers. */
+export interface OrganizationLicenseReads
+  extends OrganizationLicense, OrganizationLicenseCandidates {}
+
+/**
+ * Persistence and seat-count port. Concrete database adapters stay in
+ * apps, except the reads, inherited from `OrganizationLicenseReads` so a
+ * plan-resolution-only process can compose those alone, without seats.
+ */
+export interface LicenseStorage extends OrganizationLicenseReads {
   organizationExists(organizationId: string): Promise<boolean>;
   storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
   removeLicense(organizationId: string): Promise<void>;

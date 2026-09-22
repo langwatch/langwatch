@@ -57,6 +57,8 @@ function toOrganizationConnection(state: SsoConnectionState): OrganizationSsoCon
     // The provider id IS the word an administrator reads today: registration
     // collected it under that name and nothing routes on it.
     displayName: state.idpMetadata.providerId,
+    providerId: state.idpMetadata.providerId,
+    verifiedDomains: state.verifiedDomains,
     type: state.type,
     state: state.state,
   };

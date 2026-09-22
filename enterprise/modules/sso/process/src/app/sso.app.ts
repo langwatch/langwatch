@@ -54,6 +54,7 @@ import {
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
   type SsoSetupRenameInput,
+  type SsoSelfServeContext,
   type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
 import {
@@ -73,6 +74,11 @@ import {
 import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
+import {
+  InstanceLicenseProof,
+  LicenseDomainClaimAuthority,
+  SsoSelfServeContextService,
+} from "../services/sso-self-serve-context.service.ts";
 import type {
   SsoActivityLogger,
   SsoBreakGlassLedger,
@@ -221,6 +227,7 @@ export class SsoApp implements SsoApiContract {
   /** The deployment an identity provider is pointed back at. */
   readonly #baseUrl: string;
   readonly #historyActivity: SsoHistoryActivityService;
+  readonly #selfServeContext: SsoSelfServeContextService;
   readonly #operators: OpsApi;
   readonly #users: UserApi;
   readonly #auditLog: AuditLogApi;
@@ -234,7 +241,7 @@ export class SsoApp implements SsoApiContract {
     breakGlass: SsoBreakGlassLedger,
     history: SsoConnectionHistoryReads,
     setup: SsoSetupReads,
-    baseUrl: string,
+    configuration: SsoConfiguration,
     logger: SsoActivityLogger,
     dependencies: SsoSetup["dependencies"],
   ) {
@@ -245,8 +252,24 @@ export class SsoApp implements SsoApiContract {
     this.#breakGlass = breakGlass;
     this.#history = history;
     this.#setup = setup;
-    this.#baseUrl = baseUrl;
+    this.#baseUrl = configuration.baseUrl;
     this.#historyActivity = SsoHistoryActivityService.create({ history, logger });
+    const isHosted = () => configuration.isSaas;
+    this.#selfServeContext = SsoSelfServeContextService.create({
+      authority: LicenseDomainClaimAuthority.create({
+        isHosted,
+        licensedAtStartup: () => gate.platformAllowed(),
+      }),
+      licenseProof: InstanceLicenseProof.create({
+        licensing: dependencies.licensing,
+        instanceLicenseKey: configuration.instanceLicenseKey,
+      }),
+      // Hosted self-serve (tier 3) is not offered: nothing stages the claim
+      // queue it waits on. When it ships this reads the organization's
+      // `self_serve_sso` opt-in - handoff §10.
+      optIn: { isOptedIn: async () => false },
+      isHosted,
+    });
     this.#operators = dependencies.operators;
     this.#users = dependencies.users;
     this.#auditLog = dependencies.auditLog;
@@ -317,7 +340,7 @@ export class SsoApp implements SsoApiContract {
         getMigrationProgress: (input) =>
           dependencies.identity.ssoSetup().getMigrationProgress(input),
       },
-      configuration.baseUrl,
+      configuration,
       members.logger,
       dependencies,
     );
@@ -338,6 +361,11 @@ export class SsoApp implements SsoApiContract {
         connectionId: journey.connection?.connectionId ?? null,
       }),
     };
+  }
+
+  /** Which tier this organization's own setup runs under (D05). */
+  getSelfServeContext(input: SsoSetupOrganizationInput): Promise<SsoSelfServeContext> {
+    return this.#selfServeContext.resolve(input);
   }
 
   /** One cutover's members, paged. The setup read carries the first page. */

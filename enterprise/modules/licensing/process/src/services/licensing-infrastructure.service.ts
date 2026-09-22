@@ -1,5 +1,5 @@
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
-import type { LicenseStorage, OrganizationLicense } from "../app/licensing.members.ts";
+import type { LicenseStorage, OrganizationLicenseReads } from "../app/licensing.members.ts";
 import {
   PrismaOrganizationLicenseRepository,
   type OrganizationLicenseDatabase,
@@ -8,26 +8,26 @@ import {
 /** The licence rows this deployment stores, over its own connection. */
 export function createOrganizationLicenses(
   database: OrganizationLicenseDatabase,
-): OrganizationLicense {
+): OrganizationLicenseReads {
   return PrismaOrganizationLicenseRepository.create(database);
 }
 
 /**
- * The live license read, plus explicit refusals for write/enforcement ports not composed here.
+ * The live licence reads, plus explicit refusals for write/enforcement ports not composed here.
  * Seat counts are a peer module's own repository, so this service never reaches for them itself -
  * the caller (the app's own composition) may supply real ones; unsupplied, they refuse too.
  */
 export function createUnavailableLicensingInfrastructure(options: {
-  database: OrganizationLicenseDatabase;
+  licenses: OrganizationLicenseReads;
   processName: string;
   getMemberCount?: (organizationId: string) => Promise<number>;
   getMembersLiteCount?: (organizationId: string) => Promise<number>;
 }): LicensingInfrastructure {
-  const licenses = createOrganizationLicenses(options.database);
+  const licenses = options.licenses;
   const unavailable = () => new Error(`${options.processName} does not compose license mutation`);
   const repository: LicenseStorage = {
     tryReadLicense: (organizationId) => licenses.tryReadLicense(organizationId),
-    findOrganizationsWithLicense: () => Promise.reject(unavailable()),
+    findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
     organizationExists: () => Promise.reject(unavailable()),
     storeLicense: () => Promise.reject(unavailable()),
     removeLicense: () => Promise.reject(unavailable()),

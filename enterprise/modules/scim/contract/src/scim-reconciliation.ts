@@ -49,6 +49,9 @@ export const connectionReconciliationSchema = z
     connectionId: z.string(),
     /** What the administrator registered the provider as. */
     providerId: z.string(),
+    /** The domains this connection proved, which are the ones it routes.
+     *  Empty until one is proved. */
+    verifiedDomains: z.string().array(),
     /** Identity's lifecycle word for the connection itself. */
     connectionState: z.string(),
     /** Identity's word for the sync, null where no token has ever been minted. */

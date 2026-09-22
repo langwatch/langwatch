@@ -18,12 +18,14 @@ function connection({
   providerId,
   state,
   createdAtMs,
+  verifiedDomains = [],
 }: {
   connectionId: string;
   organizationId: string;
   providerId: string;
   state: SsoConnectionState["state"];
   createdAtMs: number;
+  verifiedDomains?: string[];
 }): SsoConnectionState {
   const empty = emptySsoConnection({ connectionId });
   return {
@@ -31,6 +33,7 @@ function connection({
     organizationId,
     state,
     createdAtMs,
+    verifiedDomains,
     idpMetadata: { ...empty.idpMetadata, providerId },
   };
 }
@@ -60,7 +63,7 @@ function serviceOver(states: SsoConnectionState[]) {
 
 describe("given a peer module asking which connections an organization holds", () => {
   describe("when the organization has registered some", () => {
-    it("answers the id, the word an administrator reads, and the state", async () => {
+    it("answers the id, the word an administrator reads, the domains it routes, and the state", async () => {
       const service = serviceOver([
         connection({
           connectionId: "ssoc_acme",
@@ -68,11 +71,19 @@ describe("given a peer module asking which connections an organization holds", (
           providerId: "okta",
           state: "ACTIVE",
           createdAtMs: 2,
+          verifiedDomains: ["acme.com"],
         }),
       ]);
 
       await expect(service.findForOrganization({ organizationId: ACME })).resolves.toEqual([
-        { connectionId: "ssoc_acme", displayName: "okta", type: "oidc", state: "ACTIVE" },
+        {
+          connectionId: "ssoc_acme",
+          displayName: "okta",
+          providerId: "okta",
+          verifiedDomains: ["acme.com"],
+          type: "oidc",
+          state: "ACTIVE",
+        },
       ]);
     });
 

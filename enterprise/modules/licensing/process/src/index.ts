@@ -20,6 +20,7 @@ export {
   type LicensePlanReader,
   type LicensingEntitlementSourceAdapterMode,
 } from "./services/licensing-entitlement-source.service.ts";
+export { MemoryOrganizationLicenseRepository } from "./repositories/memory/memory.organization-license.repository.ts";
 export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";
 export type {
   LicenseCryptography,
@@ -31,6 +32,8 @@ export type {
   LicenseUsageCount,
   OrganizationLicense,
   OrganizationLicenseCandidate,
+  OrganizationLicenseCandidates,
+  OrganizationLicenseReads,
   StoredLicense,
 } from "./app/licensing.members.ts";
 export type { LicensePlanSourceOptions } from "./services/license-plan-source.service.ts";

@@ -28,7 +28,10 @@ import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
-import { createUnavailableLicensingInfrastructure } from "../services/licensing-infrastructure.service.ts";
+import {
+  createOrganizationLicenses,
+  createUnavailableLicensingInfrastructure,
+} from "../services/licensing-infrastructure.service.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import type {
   LicenseCryptography,
@@ -132,7 +135,7 @@ export class LicensingApp implements LicensingApiContract {
 
   static create({ members, config }: LicensingSetup): LicensingApp {
     const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
-    // Derived from the closed prisma member: the licence read is live, the seat
+    // Derived from the closed prisma member: the licence reads are live, the seat
     // counts are entitlement's own membership classification (peer, not owned
     // here), and the mutation/enforcement ports refuse by name until a process
     // composes them.
@@ -140,7 +143,7 @@ export class LicensingApp implements LicensingApiContract {
       members.infrastructure !== undefined
         ? members.infrastructure
         : createUnavailableLicensingInfrastructure({
-            database: members.prisma,
+            licenses: createOrganizationLicenses(members.prisma),
             processName: "this process",
             ...seatCountsOverPrisma(members.prisma),
           });

@@ -129,11 +129,27 @@ describe("the scimToken tRPC namespace", () => {
       it("answers the connections identity holds, lifecycle state and all", async () => {
         const { caller } = mount({
           connections: [
-            { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
-            { connectionId: "ssoconn_2", displayName: "Entra ID", type: "oidc", state: "DRAFT" },
+            {
+              connectionId: "ssoconn_1",
+              displayName: "Okta",
+              providerId: "Okta",
+              verifiedDomains: [],
+              type: "oidc",
+              state: "ACTIVE",
+            },
+            {
+              connectionId: "ssoconn_2",
+              displayName: "Entra ID",
+              providerId: "Entra ID",
+              verifiedDomains: [],
+              type: "oidc",
+              state: "DRAFT",
+            },
           ],
         });
 
+        // The page is offered the word and the state, and not the provider id
+        // or the domains: this list is a picker, not the connection itself.
         await expect(caller.connections({ organizationId: "org_1" })).resolves.toEqual([
           { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
           { connectionId: "ssoconn_2", displayName: "Entra ID", type: "oidc", state: "DRAFT" },
@@ -148,7 +164,14 @@ describe("the scimToken tRPC namespace", () => {
         const { caller } = mount({
           permits: (permission) => permission === "organization:view",
           connections: [
-            { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+            {
+              connectionId: "ssoconn_1",
+              displayName: "Okta",
+              providerId: "Okta",
+              verifiedDomains: [],
+              type: "oidc",
+              state: "ACTIVE",
+            },
           ],
         });
 
@@ -185,7 +208,14 @@ describe("the scimToken tRPC namespace", () => {
       const { caller } = mount({
         ...seeing,
         connections: [
-          { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+          {
+            connectionId: "ssoconn_1",
+            displayName: "Okta",
+            providerId: "Okta",
+            verifiedDomains: [],
+            type: "oidc",
+            state: "ACTIVE",
+          },
         ],
       });
 

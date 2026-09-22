@@ -58,6 +58,20 @@ Feature: Enterprise licensing lifecycle
       When an organization uploads it
       Then it activates as it always did
 
+  Rule: An installation licensed by an organization key is a licensed installation
+
+    A self-hosted deployment is licensed either by an instance key or by a key
+    activated on one of its organizations. A process that composes no licence
+    mutation still has to read the second kind, or every platform capability
+    behind the gate - single sign-on first among them - is refused on an
+    installation that paid for it.
+
+    @unit
+    Scenario: A process that composes no licence mutation still scans the licence rows
+      Given an organization carrying a signed license and no instance license key
+      When that process inspects platform access
+      Then the stored key is accepted and only the mutation ports refuse
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

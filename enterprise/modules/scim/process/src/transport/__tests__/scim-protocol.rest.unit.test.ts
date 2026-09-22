@@ -228,6 +228,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
           {
             connectionId: RETIRED_CONNECTION_ID,
             displayName: "Okta",
+            providerId: "Okta",
+            verifiedDomains: [],
             type: "oidc",
             state: "ACTIVE",
           },

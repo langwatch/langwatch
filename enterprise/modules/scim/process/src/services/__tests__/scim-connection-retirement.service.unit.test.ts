@@ -16,6 +16,8 @@ function connection(state: string, connectionId = CONNECTION_ID): OrganizationSs
   return {
     connectionId,
     displayName: "Okta",
+    providerId: "Okta",
+    verifiedDomains: [],
     type: "oidc",
     state: state as OrganizationSsoConnection["state"],
   };

@@ -34,6 +34,12 @@ export interface OrganizationSsoConnection {
    * name of its own, that is the provider id registration collected.
    */
   displayName: string;
+  /** What registration called the provider. Carried on the row rather than
+   *  fetched per connection: a peer listing connections needs it for every
+   *  one of them. */
+  providerId: string;
+  /** Proved, and the only ones that ever route. Empty until one is. */
+  verifiedDomains: string[];
   /** Which protocol this connection speaks, as identity recorded it at
    *  registration: the word a card shows beside the name. */
   type: SsoConnectionType;

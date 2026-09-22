@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { SsoSelfServeContext } from "./sso-self-serve.contract.ts";
 import type {
   SsoBreakGlassBinding,
   SsoBreakGlassBindingInput,
@@ -106,6 +107,12 @@ export interface SsoApi {
   /** Where this organization's setup stands, with the addresses this module
    *  serves folded in beside identity's own reading of the journey. */
   getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView>;
+
+  /**
+   * Which tier this organization's own setup runs under (D05): the
+   * deployment, what its licence authorizes, and whether it was opted in.
+   */
+  getSelfServeContext(input: SsoSetupOrganizationInput): Promise<SsoSelfServeContext>;
 
   /**
    * One cutover's members, paged. The migration is null where the organization

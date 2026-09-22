@@ -24,6 +24,8 @@ function connection(overrides: Partial<OrganizationSsoConnection> = {}): Organiz
   return {
     connectionId: ACME_OKTA,
     displayName: "okta",
+    providerId: "okta",
+    verifiedDomains: ["acme.com"],
     type: "oidc",
     state: "ACTIVE",
     ...overrides,
@@ -65,10 +67,19 @@ function person(id: string, name: string): UserFullProfile {
 
 type PanelReads = ScimReconciliationReads & {
   findForOrganization: ReturnType<typeof vi.fn>;
+  getProvider: ReturnType<typeof vi.fn>;
 };
 
 function createReads({
-  connections = [connection(), connection({ connectionId: ACME_SECOND, displayName: "entra" })],
+  connections = [
+    connection(),
+    connection({
+      connectionId: ACME_SECOND,
+      displayName: "entra",
+      providerId: "entra",
+      verifiedDomains: [],
+    }),
+  ],
   syncs = [sync()],
   ownership = Array.from({ length: 12 }, (_, index) => ({
     connectionId: ACME_OKTA,
@@ -99,16 +110,18 @@ function createReads({
   people?: UserFullProfile[];
 } = {}): PanelReads {
   const findForOrganization = vi.fn(async () => connections);
+  const getProvider = vi.fn(async ({ connectionId }: { connectionId: string }) => ({
+    connectionId,
+    providerId: "never asked",
+  }));
 
   return {
     findForOrganization,
+    getProvider,
     identity: {
       ssoConnectionReads: () => ({
         findForOrganization,
-        getProvider: async ({ connectionId }: { connectionId: string }) => ({
-          connectionId,
-          providerId: connectionId === ACME_OKTA ? "okta" : "entra",
-        }),
+        getProvider,
       }),
       scimSyncReads: () => ({
         findForOrganization: async () => syncs,
@@ -174,6 +187,14 @@ describe("the organization's directory sync panel", () => {
       expect(okta?.status.headline).toBe("Syncing");
       expect(okta?.status.waitingFor).toMatch(/pushing changes/i);
       expect(okta?.status.waitingFor).not.toMatch(/SYNCING|TOKEN_ISSUED/);
+    });
+
+    it("names each connection's provider and domains from the one list read", async () => {
+      const panel = await service.getAll({ organizationId: ACME });
+
+      expect(panel.connections.map((entry) => entry.providerId)).toEqual(["okta", "entra"]);
+      expect(panel.connections.map((entry) => entry.verifiedDomains)).toEqual([["acme.com"], []]);
+      expect(reads.getProvider).not.toHaveBeenCalled();
     });
 
     it("counts the last push and the people the directory manages, per connection", async () => {

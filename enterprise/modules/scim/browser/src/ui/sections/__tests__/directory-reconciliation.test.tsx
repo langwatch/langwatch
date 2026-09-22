@@ -37,6 +37,7 @@ function connection(overrides: Record<string, unknown> = {}) {
   return {
     connectionId: "ssoconn_1",
     providerId: "Okta",
+    verifiedDomains: ["acme.com"],
     connectionState: "ACTIVE",
     state: "SYNCING",
     status: {

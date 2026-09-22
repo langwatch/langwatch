@@ -175,8 +175,15 @@ function ConnectionCard({ connection }: { connection: ConnectionReconciliationRo
     <Card.Root width="full" data-testid="directory-connection">
       <Card.Body>
         <VStack align="stretch" gap={4}>
-          <HStack>
-            <Text fontWeight="600">{connection.providerId}</Text>
+          <HStack align="start">
+            <VStack align="start" gap={0}>
+              <Text fontWeight="600">{connection.providerId}</Text>
+              {connection.verifiedDomains.length > 0 && (
+                <Text fontSize="xs" color="fg.muted" data-testid="directory-connection-domains">
+                  {connection.verifiedDomains.join(", ")}
+                </Text>
+              )}
+            </VStack>
             <Spacer />
             <Badge colorPalette={TONE_PALETTE[connection.status.tone] ?? "gray"}>
               {connection.status.headline}

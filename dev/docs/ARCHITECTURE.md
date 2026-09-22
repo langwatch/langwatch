@@ -1353,6 +1353,11 @@ mounting: **enterprise routes are always mounted and refuse per-organization
 on entitlement**. Entitlement depends on the installed `LicensingApi` peer.
 Licensing resolves each organization’s signed license; an absent or invalid
 license is a normal domain result, not deployment-level capability absence.
+An adapter that reads a licence, a signature or a feature flag to decide what
+a tier may do lives in the **enterprise module that holds the gate**, which may
+depend on `@langwatch/enterprise-licensing-contract` and
+`@langwatch/feature-flag-contract` and asks a core module for facts through its
+`*Api` only — a core module never grows a supply token for a tier context.
 
 ---
 

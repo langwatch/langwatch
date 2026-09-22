@@ -176,8 +176,9 @@ export function createTestLicensingApp(
         notifyLimitReached,
         reportError,
       },
+      isSaas: false,
     },
-    config: { publicKey: TEST_PUBLIC_KEY, isSaas: false },
+    config: { publicKey: TEST_PUBLIC_KEY },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

@@ -58,6 +58,11 @@ export {
   type SsoSetupStartMigrationInput,
 } from "./sso-setup.contract.ts";
 export {
+  SSO_SELF_SERVE_DEPLOYMENTS,
+  ssoSelfServeContextSchema,
+  type SsoSelfServeContext,
+} from "./sso-self-serve.contract.ts";
+export {
   activateSsoConnectionInputSchema,
   backofficeSsoConnectionPageSchema,
   backofficeSsoConnectionSchema,
