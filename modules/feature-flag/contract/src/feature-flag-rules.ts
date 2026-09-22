@@ -13,6 +13,7 @@ const KNOWN_MATCH_KEYS = [
   "organizationId",
   "organizationCreatedAfter",
   "percentage",
+  "emailDomain",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
@@ -31,6 +32,12 @@ const featureFlagRuleMatchSchema = z
      * organization" is one rule.
      */
     percentage: z.number().int().min(0).max(100).optional(),
+    /**
+     * Team QA in production: matches every signed-in user whose email is at
+     * one of these lowercase domains (no `@`), compared exactly against the
+     * part after the last `@` of `userEmail`. No user email, no match.
+     */
+    emailDomain: z.union([z.string(), z.array(z.string())]).optional(),
   })
   // Future-proof: keeps unknown fields rather than rejecting them, so a
   // newer writer's rule shape still deserializes here. The matcher itself
@@ -72,7 +79,33 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
     {
       message: "A new-users targeting rule needs a date the organization was created on or after",
     },
+  )
+  .refine(
+    (rules) =>
+      rules.every((rule) => {
+        if (rule.match.emailDomain === undefined) return true;
+        const domains = emailDomainsOf(rule.match.emailDomain);
+        return domains.length > 0 && domains.every(isWritableEmailDomain);
+      }),
+    {
+      message: "An email domain rule needs one or more lowercase domains without the @",
+    },
   );
+
+/** The domains an `emailDomain` condition names, one or several, as a list. */
+export function emailDomainsOf(emailDomain: string | string[] | undefined): string[] {
+  if (emailDomain === undefined) return [];
+  return Array.isArray(emailDomain) ? emailDomain : [emailDomain];
+}
+
+/**
+ * The stored form of one domain: lowercase, no padding, no `@`, no
+ * whitespace. The matcher still reads a padded or capitalised domain, but a
+ * canonical row is what the Ops UI reopens and the summary line names.
+ */
+function isWritableEmailDomain(domain: string): boolean {
+  return domain.length > 0 && domain === domain.trim().toLowerCase() && !/[@\s]/.test(domain);
+}
 
 export type FeatureFlagRuleMatch = z.infer<typeof featureFlagRuleMatchSchema>;
 export type FeatureFlagRule = z.infer<typeof featureFlagRuleSchema>;
@@ -93,6 +126,12 @@ export interface RuleEvaluationContext {
    * "unknown" — no age rule matches.
    */
   organizationCreatedAt?: Instant | string | null;
+  /**
+   * The signed-in user's email, for an email domain rule. Absent on every
+   * read without a session (a job, an API key, a sign-up), so no domain
+   * rule can match there.
+   */
+  userEmail?: string;
 }
 
 /**
@@ -205,7 +244,27 @@ function matchesContext(
   ) {
     return false;
   }
+  if (match.emailDomain !== undefined && !isEmailInDomain(match.emailDomain, ctx.userEmail)) {
+    return false;
+  }
   return true;
+}
+
+/**
+ * Whether the read's user is at one of the rule's domains, compared
+ * lowercase and exact: `acme.com` does not match `eu.acme.com` unless
+ * listed. Fails closed on no email and on an email with no `@`.
+ */
+function isEmailInDomain(emailDomain: string | string[], userEmail: string | undefined): boolean {
+  if (!userEmail) return false;
+  const at = userEmail.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = userEmail
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (domain === "") return false;
+  return emailDomainsOf(emailDomain).some((candidate) => candidate.trim().toLowerCase() === domain);
 }
 
 /**

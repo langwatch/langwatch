@@ -1326,6 +1326,10 @@ interface StreamEntry {
   [key: string]: unknown;
 }
 
+function isStreamEntry(value: unknown): value is StreamEntry {
+  return typeof value === "object" && value !== null;
+}
+
 /** One card as the conversation's durable record holds it. */
 export interface RecordWait {
   waitId: string;
@@ -1351,8 +1355,9 @@ export function pendingWaitDispatches({
   for (const wait of waits) {
     if (!wait.waitId || wait.status !== "pending") continue;
     if (answered.has(wait.waitId)) continue;
+    if (!isStreamEntry(wait)) continue;
     dispatches.push({
-      entry: wait as StreamEntry,
+      entry: wait,
       turnId: wait.turnId,
       kind: wait.kind,
     });
@@ -1369,8 +1374,9 @@ function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void)
     const payload = trimmed.slice(5).trim();
     if (!payload) continue;
     try {
-      const entry = JSON.parse(payload).json as StreamEntry;
-      if (entry && typeof entry === "object") onEntry(entry);
+      const parsed: unknown = JSON.parse(payload);
+      if (typeof parsed !== "object" || parsed === null || !("json" in parsed)) continue;
+      if (isStreamEntry(parsed.json)) onEntry(parsed.json);
     } catch (error) {
       // A frame the suite does not understand is not this suite's business.
       console.debug(`[fixture] unparsed stream frame: ${String(error)}`);
@@ -1417,6 +1423,254 @@ async function readTurnEntries({
 }
 
 /** Watches the conversation, answers its cards (README.md "local-control-fixture.ts"). */
+/** The mutable ground every closure of a watched conversation reads and writes. */
+interface ConversationWatchState {
+  adapter: LangyAdapter;
+  policy: PermissionPolicy;
+  answerQuestion?: QuestionAnswerPicker;
+  permissions: PermissionAsk[];
+  questions: QuestionAsk[];
+  workspaceEvents: { state: string; name: string; root: string }[];
+  turnIds: string[];
+  navigateHrefs: string[];
+  toolEvents: LangyToolEvent[];
+  answeredWaits: Set<string>;
+  watchedTurns: Set<string>;
+  controller: AbortController;
+  /** What the developer answered, waiting to be put in front of the judge. */
+  answerNotes: string[];
+  stopped: boolean;
+  /** The one card the terminal is about to answer, while it is armed. */
+  leftToTerminal: RegExp | null;
+}
+
+function decideLangyPermission(
+  policy: PermissionPolicy,
+  summary: string,
+): "allow_once" | "allow_pattern" | "deny" {
+  if ((policy.deny ?? []).some((rule) => rule.test(summary))) return "deny";
+  if ((policy.allowPattern ?? []).some((rule) => rule.test(summary))) return "allow_pattern";
+  return policy.fallback ?? "allow_once";
+}
+
+async function answerLangyPermission(
+  state: ConversationWatchState,
+  entry: StreamEntry,
+  turnId: string,
+): Promise<void> {
+  const waitId = stringField(entry.waitId);
+  if (!waitId || state.answeredWaits.has(waitId)) return;
+  if (entry.status !== "pending") return;
+  state.answeredWaits.add(waitId);
+  const summary = stringField(entry.summary);
+  // The terminal takes the first matching card, on its default option, which
+  // is the session grant. Nothing is sent from here for that one.
+  const inTerminal = state.leftToTerminal?.test(summary) === true;
+  if (inTerminal) state.leftToTerminal = null;
+  const decision = inTerminal ? "allow_pattern" : decideLangyPermission(state.policy, summary);
+  const ask: PermissionAsk = {
+    waitId,
+    callId: stringField(entry.callId),
+    summary,
+    pattern: stringField(entry.pattern),
+    reason: stringField(entry.reason),
+    skipOffered: entry.skipOffered === true,
+    decision,
+    answeredIn: inTerminal ? "terminal" : "panel",
+    turnId,
+    askedAt: Date.now(),
+  };
+  state.permissions.push(ask);
+  state.answerNotes.push(permissionAnswerNote(ask));
+  if (inTerminal) return;
+  const cookie = await getSessionCookie();
+  await trpcMutate({
+    cookie,
+    path: "langy.answerLocalPermission",
+    input: {
+      projectId: CONFIG.PROJECT_ID,
+      conversationId: state.adapter.state.conversationId,
+      waitId,
+      decision,
+    },
+  }).catch((error) => {
+    // A card that settled before the answer is the product's own race, not
+    // a fixture failure: record it and let the assertions speak.
+    console.log(`[fixture] permission answer refused: ${String(error)}`);
+  });
+}
+
+async function answerLangyQuestion(
+  state: ConversationWatchState,
+  entry: StreamEntry,
+  turnId: string,
+): Promise<void> {
+  const waitId = stringField(entry.waitId);
+  if (!waitId || state.answeredWaits.has(waitId)) return;
+  if (entry.status !== "pending") return;
+  state.answeredWaits.add(waitId);
+  const asked = (Array.isArray(entry.questions) ? entry.questions : []) as QuestionAsk["questions"];
+  const answers: { question: string; selected: string[] }[] = [];
+  for (const question of asked) {
+    answers.push({
+      question: question.question,
+      selected:
+        (await state.answerQuestion?.(question)) ??
+        (question.options?.[0]?.label ? [question.options[0].label] : []),
+    });
+  }
+  const ask: QuestionAsk = { waitId, questions: asked, answered: answers, turnId };
+  state.questions.push(ask);
+  state.answerNotes.push(questionAnswerNote(ask));
+  const cookie = await getSessionCookie();
+  await trpcMutate({
+    cookie,
+    path: "langy.answerQuestion",
+    input: {
+      projectId: CONFIG.PROJECT_ID,
+      conversationId: state.adapter.state.conversationId,
+      waitId,
+      answers,
+    },
+  }).catch((error) => {
+    console.log(`[fixture] question answer refused: ${String(error)}`);
+  });
+}
+
+function watchLangyTurn(state: ConversationWatchState, turnId: string): void {
+  if (state.watchedTurns.has(turnId)) return;
+  state.watchedTurns.add(turnId);
+  state.turnIds.push(turnId);
+  void (async () => {
+    const cookie = await getSessionCookie();
+    await readTurnEntries({
+      cookie,
+      conversationId: state.adapter.state.conversationId ?? "",
+      turnId,
+      signal: state.controller.signal,
+      onEntry: (entry) => {
+        if (entry.type === "local_permission") {
+          void answerLangyPermission(state, entry, turnId);
+        } else if (entry.type === "question") {
+          void answerLangyQuestion(state, entry, turnId);
+        } else if (entry.type === "navigate" && typeof entry.href === "string") {
+          state.navigateHrefs.push(entry.href);
+        } else if (entry.type === "tool") {
+          const event = toolEventOf({ entry, turnId });
+          if (event) state.toolEvents.push(event);
+        } else if (entry.type === "local_workspace") {
+          state.workspaceEvents.push({
+            state: stringField(entry.state),
+            name: stringField(entry.name),
+            root: stringField(entry.root),
+          });
+        }
+      },
+    }).catch(() => undefined);
+  })();
+}
+
+async function readLangyConversation(state: ConversationWatchState): Promise<{
+  currentTurnId: string | null;
+  /** The last turn's failure, as the record stored it, or null. */
+  lastError: string | null;
+  messages: { id: string; role: string; parts: Record<string, unknown>[] }[];
+} | null> {
+  const conversationId = state.adapter.state.conversationId;
+  if (!conversationId) return null;
+  const cookie = await getSessionCookie();
+  return trpcQuery({
+    cookie,
+    path: "langy.messages",
+    input: { projectId: CONFIG.PROJECT_ID, conversationId },
+  });
+}
+
+/** Every card this conversation's record holds, answered ones included. */
+async function readLangyRecordWaits(state: ConversationWatchState): Promise<RecordWait[]> {
+  const conversationId = state.adapter.state.conversationId;
+  if (!conversationId) return [];
+  const cookie = await getSessionCookie();
+  const record = await trpcQuery<{ waits?: RecordWait[] }>({
+    cookie,
+    path: "langy.localRecord",
+    input: { projectId: CONFIG.PROJECT_ID, conversationId },
+  });
+  return record?.waits ?? [];
+}
+
+// Cards come off the record, not off the stream. The record folds the whole
+// event log per call, so it is read while a turn is in flight and not
+// between turns, which is also the only time a card can be up.
+async function answerLangyRecordWaits(state: ConversationWatchState): Promise<void> {
+  const dispatches = pendingWaitDispatches({
+    waits: await readLangyRecordWaits(state),
+    answered: state.answeredWaits,
+  });
+  for (const dispatch of dispatches) {
+    if (dispatch.kind === "question") {
+      void answerLangyQuestion(state, dispatch.entry, dispatch.turnId);
+    } else {
+      void answerLangyPermission(state, dispatch.entry, dispatch.turnId);
+    }
+  }
+}
+
+/** The background loop that keeps turns watched and cards answered. */
+async function pollLangyConversation(state: ConversationWatchState): Promise<void> {
+  while (!state.stopped) {
+    try {
+      const snapshot = await readLangyConversation(state);
+      if (snapshot?.currentTurnId) watchLangyTurn(state, snapshot.currentTurnId);
+      if (state.adapter.state.currentTurnId) {
+        watchLangyTurn(state, state.adapter.state.currentTurnId);
+      }
+      if (snapshot?.currentTurnId ?? state.adapter.state.currentTurnId) {
+        await answerLangyRecordWaits(state);
+      }
+    } catch (error) {
+      // The conversation may not exist yet, or the app may be busy.
+      console.debug(`[fixture] conversation read retry: ${String(error)}`);
+    }
+    await sleep(1_000);
+  }
+}
+
+function langyMessageText(message: { role: string; parts: Record<string, unknown>[] }): string {
+  return storedProse(message.parts);
+}
+
+/** Reads a turn's answer, waiting for it to be stored (README.md "local-control-fixture.ts"). */
+async function readLangyTurnAnswer(
+  state: ConversationWatchState,
+  { turnId, timeoutMs = 60_000 }: { turnId?: string; timeoutMs?: number },
+): Promise<StoredMessage | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const snapshot = await readLangyConversation(state).catch(() => null);
+    const messages = (snapshot?.messages ?? []) as StoredMessage[];
+    const answer = turnId
+      ? answerOfTurn(messages, turnId)
+      : (messages.filter((message) => message.role === "assistant").pop() ?? null);
+    // A named turn that stored its answer is readable whatever happened
+    // after it. Without a name, the last answer is only this turn's answer
+    // while the conversation has not failed.
+    if (answer && (turnId || !snapshot?.lastError)) return answer;
+    if (snapshot?.lastError) {
+      throw new Error(turnFailureMessage({ turnId, failure: snapshot.lastError }));
+    }
+    if (Date.now() > deadline) {
+      if (!turnId) return null;
+      throw new Error(
+        `Turn ${turnId} stored no answer within ${Math.round(
+          timeoutMs / 1000,
+        )}s, and the conversation records no failure for it`,
+      );
+    }
+    await sleep(1_000);
+  }
+}
+
 export function watchLangyConversation({
   adapter,
   policy = {},
@@ -1426,272 +1680,48 @@ export function watchLangyConversation({
   policy?: PermissionPolicy;
   answerQuestion?: QuestionAnswerPicker;
 }): ConversationWatcher {
-  const permissions: PermissionAsk[] = [];
-  const questions: QuestionAsk[] = [];
-  const workspaceEvents: {
-    state: string;
-    name: string;
-    root: string;
-  }[] = [];
-  const turnIds: string[] = [];
-  const navigateHrefs: string[] = [];
-  const toolEvents: LangyToolEvent[] = [];
-  const answeredWaits = new Set<string>();
-  const watchedTurns = new Set<string>();
-  const controller = new AbortController();
-  /** What the developer answered, waiting to be put in front of the judge. */
-  let answerNotes: string[] = [];
-  let stopped = false;
-  /** The one card the terminal is about to answer, while it is armed. */
-  let leftToTerminal: RegExp | null = null;
-
-  const decide = (summary: string): "allow_once" | "allow_pattern" | "deny" => {
-    if ((policy.deny ?? []).some((rule) => rule.test(summary))) return "deny";
-    if ((policy.allowPattern ?? []).some((rule) => rule.test(summary))) {
-      return "allow_pattern";
-    }
-    return policy.fallback ?? "allow_once";
+  const state: ConversationWatchState = {
+    adapter,
+    policy,
+    answerQuestion,
+    permissions: [],
+    questions: [],
+    workspaceEvents: [],
+    turnIds: [],
+    navigateHrefs: [],
+    toolEvents: [],
+    answeredWaits: new Set<string>(),
+    watchedTurns: new Set<string>(),
+    controller: new AbortController(),
+    answerNotes: [],
+    stopped: false,
+    leftToTerminal: null,
   };
 
-  const answerPermission = async (entry: StreamEntry, turnId: string): Promise<void> => {
-    const waitId = stringField(entry.waitId);
-    if (!waitId || answeredWaits.has(waitId)) return;
-    if (entry.status !== "pending") return;
-    answeredWaits.add(waitId);
-    const summary = stringField(entry.summary);
-    // The terminal takes the first matching card, on its default option, which
-    // is the session grant. Nothing is sent from here for that one.
-    const inTerminal = leftToTerminal?.test(summary) === true;
-    if (inTerminal) leftToTerminal = null;
-    const decision = inTerminal ? "allow_pattern" : decide(summary);
-    const ask: PermissionAsk = {
-      waitId,
-      callId: stringField(entry.callId),
-      summary,
-      pattern: stringField(entry.pattern),
-      reason: stringField(entry.reason),
-      skipOffered: entry.skipOffered === true,
-      decision,
-      answeredIn: inTerminal ? "terminal" : "panel",
-      turnId,
-      askedAt: Date.now(),
-    };
-    permissions.push(ask);
-    answerNotes.push(permissionAnswerNote(ask));
-    if (inTerminal) return;
-    const cookie = await getSessionCookie();
-    await trpcMutate({
-      cookie,
-      path: "langy.answerLocalPermission",
-      input: {
-        projectId: CONFIG.PROJECT_ID,
-        conversationId: adapter.state.conversationId,
-        waitId,
-        decision,
-      },
-    }).catch((error) => {
-      // A card that settled before the answer is the product's own race, not
-      // a fixture failure: record it and let the assertions speak.
-      console.log(`[fixture] permission answer refused: ${String(error)}`);
-    });
-  };
-
-  const answerQuestionCard = async (entry: StreamEntry, turnId: string): Promise<void> => {
-    const waitId = stringField(entry.waitId);
-    if (!waitId || answeredWaits.has(waitId)) return;
-    if (entry.status !== "pending") return;
-    answeredWaits.add(waitId);
-    const asked = (
-      Array.isArray(entry.questions) ? entry.questions : []
-    ) as QuestionAsk["questions"];
-    const answers: { question: string; selected: string[] }[] = [];
-    for (const question of asked) {
-      answers.push({
-        question: question.question,
-        selected:
-          (await answerQuestion?.(question)) ??
-          (question.options?.[0]?.label ? [question.options[0].label] : []),
-      });
-    }
-    const ask: QuestionAsk = {
-      waitId,
-      questions: asked,
-      answered: answers,
-      turnId,
-    };
-    questions.push(ask);
-    answerNotes.push(questionAnswerNote(ask));
-    const cookie = await getSessionCookie();
-    await trpcMutate({
-      cookie,
-      path: "langy.answerQuestion",
-      input: {
-        projectId: CONFIG.PROJECT_ID,
-        conversationId: adapter.state.conversationId,
-        waitId,
-        answers,
-      },
-    }).catch((error) => {
-      console.log(`[fixture] question answer refused: ${String(error)}`);
-    });
-  };
-
-  const watchTurn = (turnId: string): void => {
-    if (watchedTurns.has(turnId)) return;
-    watchedTurns.add(turnId);
-    turnIds.push(turnId);
-    void (async () => {
-      const cookie = await getSessionCookie();
-      await readTurnEntries({
-        cookie,
-        conversationId: adapter.state.conversationId ?? "",
-        turnId,
-        signal: controller.signal,
-        onEntry: (entry) => {
-          if (entry.type === "local_permission") {
-            void answerPermission(entry, turnId);
-          } else if (entry.type === "question") {
-            void answerQuestionCard(entry, turnId);
-          } else if (entry.type === "navigate" && typeof entry.href === "string") {
-            navigateHrefs.push(entry.href);
-          } else if (entry.type === "tool") {
-            const event = toolEventOf({ entry, turnId });
-            if (event) toolEvents.push(event);
-          } else if (entry.type === "local_workspace") {
-            workspaceEvents.push({
-              state: stringField(entry.state),
-              name: stringField(entry.name),
-              root: stringField(entry.root),
-            });
-          }
-        },
-      }).catch(() => undefined);
-    })();
-  };
-
-  const readConversation = async (): Promise<{
-    currentTurnId: string | null;
-    /** The last turn's failure, as the record stored it, or null. */
-    lastError: string | null;
-    messages: {
-      id: string;
-      role: string;
-      parts: Record<string, unknown>[];
-    }[];
-  } | null> => {
-    const conversationId = adapter.state.conversationId;
-    if (!conversationId) return null;
-    const cookie = await getSessionCookie();
-    return trpcQuery({
-      cookie,
-      path: "langy.messages",
-      input: { projectId: CONFIG.PROJECT_ID, conversationId },
-    });
-  };
-
-  /** Every card this conversation's record holds, answered ones included. */
-  const readRecordWaits = async (): Promise<RecordWait[]> => {
-    const conversationId = adapter.state.conversationId;
-    if (!conversationId) return [];
-    const cookie = await getSessionCookie();
-    const record = await trpcQuery<{ waits?: RecordWait[] }>({
-      cookie,
-      path: "langy.localRecord",
-      input: { projectId: CONFIG.PROJECT_ID, conversationId },
-    });
-    return record?.waits ?? [];
-  };
-
-  void (async () => {
-    while (!stopped) {
-      try {
-        const snapshot = await readConversation();
-        if (snapshot?.currentTurnId) watchTurn(snapshot.currentTurnId);
-        if (adapter.state.currentTurnId) {
-          watchTurn(adapter.state.currentTurnId);
-        }
-        // Cards come off the record, not off the stream. The record folds the
-        // whole event log per call, so it is read while a turn is in flight and
-        // not between turns, which is also the only time a card can be up.
-        if (snapshot?.currentTurnId ?? adapter.state.currentTurnId) {
-          const dispatches = pendingWaitDispatches({
-            waits: await readRecordWaits(),
-            answered: answeredWaits,
-          });
-          for (const dispatch of dispatches) {
-            if (dispatch.kind === "question") {
-              void answerQuestionCard(dispatch.entry, dispatch.turnId);
-            } else {
-              void answerPermission(dispatch.entry, dispatch.turnId);
-            }
-          }
-        }
-      } catch (error) {
-        // The conversation may not exist yet, or the app may be busy.
-        console.debug(`[fixture] conversation read retry: ${String(error)}`);
-      }
-      await sleep(1_000);
-    }
-  })();
-
-  const messageText = (message: { role: string; parts: Record<string, unknown>[] }): string =>
-    storedProse(message.parts);
-
-  /** Reads a turn's answer, waiting for it to be stored (README.md "local-control-fixture.ts"). */
-  const readTurnAnswer = async ({
-    turnId,
-    timeoutMs = 60_000,
-  }: {
-    turnId?: string;
-    timeoutMs?: number;
-  }): Promise<StoredMessage | null> => {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const snapshot = await readConversation().catch(() => null);
-      const messages = (snapshot?.messages ?? []) as StoredMessage[];
-      const answer = turnId
-        ? answerOfTurn(messages, turnId)
-        : (messages.filter((message) => message.role === "assistant").pop() ?? null);
-      // A named turn that stored its answer is readable whatever happened
-      // after it. Without a name, the last answer is only this turn's answer
-      // while the conversation has not failed.
-      if (answer && (turnId || !snapshot?.lastError)) return answer;
-      if (snapshot?.lastError) {
-        throw new Error(turnFailureMessage({ turnId, failure: snapshot.lastError }));
-      }
-      if (Date.now() > deadline) {
-        if (!turnId) return null;
-        throw new Error(
-          `Turn ${turnId} stored no answer within ${Math.round(
-            timeoutMs / 1000,
-          )}s, and the conversation records no failure for it`,
-        );
-      }
-      await sleep(1_000);
-    }
-  };
+  void pollLangyConversation(state);
 
   return {
-    permissions,
-    questions,
+    permissions: state.permissions,
+    questions: state.questions,
     drainAnswerNotes: () => {
-      const notes = answerNotes;
-      answerNotes = [];
+      const notes = state.answerNotes;
+      state.answerNotes = [];
       return notes;
     },
     leaveNextPermissionToTerminal: (match) => {
-      leftToTerminal = match;
+      state.leftToTerminal = match;
     },
-    workspaceEvents,
-    navigateHrefs,
-    toolEvents,
-    turnIds,
-    turnsStartedWithoutUs: (knownTurnIds) => turnIds.filter((id) => !knownTurnIds.includes(id)),
+    workspaceEvents: state.workspaceEvents,
+    navigateHrefs: state.navigateHrefs,
+    toolEvents: state.toolEvents,
+    turnIds: state.turnIds,
+    turnsStartedWithoutUs: (knownTurnIds) =>
+      state.turnIds.filter((id) => !knownTurnIds.includes(id)),
     waitForNewTurn: async ({ knownTurnIds, timeoutMs = 240_000 }) =>
       waitFor({
         what: "a turn the panel started on its own",
         timeoutMs,
-        read: () => turnIds.find((id) => !knownTurnIds.includes(id)) ?? null,
+        read: () => state.turnIds.find((id) => !knownTurnIds.includes(id)) ?? null,
       }),
     waitForIdle: async (timeoutMs = 600_000) => {
       // A turn that has not started yet also reads as idle, so the wait first
@@ -1701,38 +1731,38 @@ export function watchLangyConversation({
         timeoutMs,
         intervalMs: 2_000,
         read: async () => {
-          const snapshot = await readConversation();
+          const snapshot = await readLangyConversation(state);
           return snapshot !== null && snapshot.currentTurnId === null;
         },
       });
     },
     transcript: async () => {
-      const snapshot = await readConversation();
+      const snapshot = await readLangyConversation(state);
       const body = (snapshot?.messages ?? [])
-        .map((message) => `### ${message.role}\n\n${messageText(message)}`)
+        .map((message) => `### ${message.role}\n\n${langyMessageText(message)}`)
         .join("\n\n");
       // The failure is part of what happened, so it is read where the rest of
       // the conversation is read.
       return snapshot?.lastError ? `${body}\n\n### turn failed\n\n${snapshot.lastError}` : body;
     },
     lastAssistantText: async (input = {}) => {
-      const answer = await readTurnAnswer(input);
-      return answer ? messageText(answer) : "";
+      const answer = await readLangyTurnAnswer(state, input);
+      return answer ? langyMessageText(answer) : "";
     },
     lastTurnMessages: async (input = {}) => {
-      const answer = await readTurnAnswer(input);
+      const answer = await readLangyTurnAnswer(state, input);
       if (!answer) return [];
       return judgeMessages(answer);
     },
     cardAnsweredInsideTurn: async ({ turnId }) => {
-      const answer = await readTurnAnswer({ turnId });
+      const answer = await readLangyTurnAnswer(state, { turnId });
       return (answer?.parts ?? []).some(
         (part) => part.type === "tool-question" && part.state === "output-available",
       );
     },
     stop: () => {
-      stopped = true;
-      controller.abort();
+      state.stopped = true;
+      state.controller.abort();
     },
   };
 }

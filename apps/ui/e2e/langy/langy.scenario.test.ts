@@ -5,6 +5,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import {
   deleteEvaluator,
@@ -74,6 +75,18 @@ describe("Langy via HTTP wrapper", () => {
     await deleteAllTestDatasets();
   });
 
+  describeAnalyticsAndTraces();
+  describeReadOnlyListings();
+  describeEntityCreation();
+  describeEntityUpdateAndWorkflow();
+  describeSurfaceLocation();
+  describeSessionState();
+  describeMultiTurnConversations();
+  describeOutOfScopeRequests();
+  describeGithubPrConnect();
+});
+
+function describeAnalyticsAndTraces(): void {
   describe("when user asks about analytics or traces", () => {
     it("answers a traces request by calling search_traces", async () => {
       const langy = makeLangyAdapter();
@@ -319,7 +332,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
     });
   });
+}
 
+function describeReadOnlyListings(): void {
   describe("when user requests read-only listings", () => {
     it("lists evaluators", async () => {
       const langy = makeLangyAdapter();
@@ -567,8 +582,10 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
     });
   });
+}
 
-  describe("when user requests entity creation or update", () => {
+function describeEntityCreation(): void {
+  describe("when user requests entity creation", () => {
     it("creates a dataset when asked (Layer 2: appears in API)", async () => {
       const langy = makeLangyAdapter();
       const datasetName = `langy-scenario-test-${Date.now()}`;
@@ -879,7 +896,11 @@ describe("Langy via HTTP wrapper", () => {
       );
       expect(newOnes.length).toBeGreaterThan(0);
     });
+  });
+}
 
+function describeEntityUpdateAndWorkflow(): void {
+  describe("when user requests entity update or a multi-step workflow", () => {
     // The trigger-creation scenario that used to sit here asserted a refusal.
 
     it("updates an existing evaluator (Layer 2: name changed)", async () => {
@@ -1035,7 +1056,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(created).toBeTruthy();
     });
   });
+}
 
+function describeSurfaceLocation(): void {
   /**
    * These scenarios used to require Langy to author a URL.
    */
@@ -1125,7 +1148,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
     });
   });
+}
 
+function describeSessionState(): void {
   describe("when the conversation carries session state", () => {
     it("maintains session context across two turns", async () => {
       const langy = makeLangyAdapter();
@@ -1159,7 +1184,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(langy.state.conversationId).toBeTruthy();
     });
   });
+}
 
+function describeMultiTurnConversations(): void {
   describe("when the conversation spans multiple turns", () => {
     it("multi-turn: discovery then create (3 turns)", async () => {
       const langy = makeLangyAdapter();
@@ -1352,7 +1379,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBeGreaterThan(0);
     });
   });
+}
 
+function describeOutOfScopeRequests(): void {
   describe("when the request is out of scope or unanswerable", () => {
     it("declines an out-of-scope request without going off-topic", async () => {
       const langy = makeLangyAdapter();
@@ -1504,7 +1533,9 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
     });
   });
+}
 
+function describeGithubPrConnect(): void {
   describe("when user asks to open a GitHub PR", () => {
     // Unconnected: the worker's github.md skill instructs Langy to emit the
     // `[langy:connect-github]` sentinel so the sidebar can render the in-chat Connect
@@ -1542,4 +1573,4 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
     });
   });
-});
+}
