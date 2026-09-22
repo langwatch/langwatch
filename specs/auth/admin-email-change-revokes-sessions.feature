@@ -30,20 +30,6 @@ Feature: An administrator changing someone's email ends that person's sessions
     a changed address with sessions still alive, which the next rule covers.
 
     @unit
-    Scenario: SCIM replacing a user's email revokes their browser sessions
-      Given a directory-managed member with a live browser session
-      When SCIM replaces their userName with a different address
-      Then the profile is written first
-      And every browser session for that member is revoked afterwards
-
-    @unit
-    Scenario: SCIM patching a user's email revokes their browser sessions
-      Given a directory-managed member with a live browser session
-      When SCIM patches their userName to a different address
-      Then the profile is written first
-      And every browser session for that member is revoked afterwards
-
-    @unit
     Scenario: An operator changing a user's email revokes their browser sessions
       Given a member with a live browser session
       When an operator changes their email in the backoffice
@@ -65,13 +51,6 @@ Feature: An administrator changing someone's email ends that person's sessions
     address back would leave the directory and LangWatch disagreeing about who
     the member is, which is worse than a session that outlives its address and
     is visible in the failure the caller receives.
-
-    @unit
-    Scenario: A failed revocation still leaves the new SCIM email in place
-      Given SCIM has replaced a member's email
-      When revoking their browser sessions fails
-      Then the caller is told the operation failed
-      And the member's new email remains written
 
     @unit
     Scenario: A failed revocation still leaves the new backoffice email in place

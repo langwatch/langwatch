@@ -278,6 +278,8 @@ class ApiSurface {
       if (!scim) throw new SurfaceUnverifiedError("scimToken");
       const directory = await scim.authenticateDirectory({
         authorization: request.headers.get("authorization"),
+        method: request.method,
+        path: new URL(request.url).pathname,
       });
 
       recordScimCredential(request, directory);
