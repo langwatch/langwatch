@@ -57,6 +57,11 @@ function docsViewNames(): string[] {
 }
 
 describe("LWQL docs-catalog parity", () => {
+  // The docs' published view list is derived from the same catalog the include
+  // lists feed, so a byte-identical published surface after the opt-out → opt-in
+  // flip is exactly what "the docs name every catalog view, both directions"
+  // proves here (the fixture regeneration proves the machine-readable half).
+  /** @scenario "The catalogued views regenerate byte-identical from the include lists" */
   it("lists exactly the catalog's view names, both directions", () => {
     const catalogNames = new Set(LWQL_VIEW_CATALOG.map((view) => view.name));
     const docNames = docsViewNames();

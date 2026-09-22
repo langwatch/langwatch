@@ -1,11 +1,11 @@
 /**
  * Derives the PostgreSQL-resident half of the LangWatchQL catalog from the
- * Prisma manifest, opt-*out* exactly as {@link ./defineDatasetFromTable#deriveDefaultCatalog}
+ * Prisma manifest, opt-*in* exactly as {@link ./defineDatasetFromTable#deriveDefaultCatalog}
  * does for the ClickHouse half.
  *
- * Every tenant-scoped Prisma model becomes a {@link LangWatchQLViewDefinition}
- * unless it is on {@link ./postgresSkippedModels#LWQL_POSTGRES_SKIPPED_MODELS}
- * with a reason. A model earns a view by carrying an owning project — directly
+ * A tenant-scoped Prisma model becomes a {@link LangWatchQLViewDefinition} only
+ * when it is named on {@link ./postgresIncludedModels#LWQL_POSTGRES_INCLUDED_MODELS}.
+ * An included model earns a view by carrying an owning project — directly
  * (`projectId`), through its team or organization (fanned out to one row per
  * project), or through a declared parent (`tenantVia`). The safe defaults
  * strip secrets and person emails, gate free-text/cost columns, and never
@@ -18,7 +18,7 @@
  * `postgresViews.ts` are now overrides on this derivation.
  *
  * @see ./prismaManifest.ts — the model/field facts this reads
- * @see ./postgresSkippedModels.ts — what opt-out leaves off, and why
+ * @see ./postgresIncludedModels.ts — the only way a model enters the catalog
  * @see ../provisioning/postgresMapping.ts — the tenant join-chain helpers
  * @see specs/lwql/postgres-catalog.feature
  */
@@ -32,10 +32,6 @@ import {
   teamTenantPath,
 } from "../provisioning/postgresMapping";
 import { defaultColumnGates } from "./defineDatasetFromTable";
-import {
-  type PostgresSkipMap,
-  postgresSkipReason,
-} from "./postgresSkippedModels";
 import { prismaManifestModel } from "./prismaManifest";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./prismaSchema";
 import type {
@@ -503,7 +499,7 @@ function parentTenantScope(
     throw new Error(
       `lwql postgres catalog: model "${model.name}" has no owning tenant column ` +
         `(projectId, teamId or organizationId) and no tenantVia override; ` +
-        `catalogue it with a parent or skip it with a reason`,
+        `give it a tenantVia override or take it off the include list`,
     );
   }
   if (!context) {
@@ -1015,26 +1011,55 @@ function assertAnnotationsExposed(
 // ---------------------------------------------------------------------------
 
 /**
- * Every tenant-scoped Prisma model that is not skipped, as a derived view
- * definition, in manifest order (the caller sorts by name).
+ * Resolves the include list to the set of models to derive, refusing an entry
+ * that names no manifest model and a duplicate entry — the two ways the list
+ * stops describing the schema it is supposed to gate.
+ */
+function includedModelSet(
+  manifest: PrismaManifest,
+  include: readonly string[],
+): ReadonlySet<string> {
+  const modelNames = new Set(manifest.models.map((model) => model.name));
+  const seen = new Set<string>();
+  for (const entry of include) {
+    if (!modelNames.has(entry)) {
+      throw new Error(
+        `lwql postgres catalog: include entry "${entry}" names no manifest model`,
+      );
+    }
+    if (seen.has(entry)) {
+      throw new Error(
+        `lwql postgres catalog: include entry "${entry}" is listed more than once`,
+      );
+    }
+    seen.add(entry);
+  }
+  return seen;
+}
+
+/**
+ * Every included tenant-scoped Prisma model, as a derived view definition, in
+ * manifest order (the caller sorts by name).
  *
- * A model earns a view by carrying an owning project; it stays off only by
- * being in `skip` with a reason. Defaults are safe — secrets and emails
- * stripped, free-text and cost columns gated, an internal `tenantId` never
- * exposed — and an override refines any of them.
+ * A model earns a view by being named on `include`; a model not on the list is
+ * simply not queryable and needs no entry anywhere. An include entry that names
+ * no manifest model — or is listed twice — fails loudly. Defaults are safe —
+ * secrets and emails stripped, free-text and cost columns gated, an internal
+ * `tenantId` never exposed — and an override refines any of them.
  */
 export function derivePostgresCatalog({
   manifest,
-  skip,
+  include,
   overrides = {},
 }: {
   manifest: PrismaManifest;
-  skip: PostgresSkipMap;
+  include: readonly string[];
   overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
 }): DerivedPostgresView[] {
   const context: TenantResolveContext = { manifest, overrides };
+  const included = includedModelSet(manifest, include);
   return manifest.models
-    .filter((model) => postgresSkipReason(model.name, skip) === undefined)
+    .filter((model) => included.has(model.name))
     .map((model) =>
       deriveModel({ model, override: overrides[model.name] ?? {}, context }),
     );

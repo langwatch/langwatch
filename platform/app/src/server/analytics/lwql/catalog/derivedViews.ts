@@ -1,19 +1,19 @@
 /**
  * The full derived half of the LangWatchQL catalog: every ClickHouse table
- * that is neither hand-written (a `LangWatchQLViewDefinition` authored
- * directly in `./lwqlViews.ts`) nor skipped (`./skippedTables.ts`), turned
+ * named on the include list (`./includedTables.ts`) that is not hand-written
+ * (a `LangWatchQLViewDefinition` authored directly in `./lwqlViews.ts`), turned
  * into a view by {@link deriveDefaultCatalog}, refined by every table's
  * override.
  *
- * This is the single place the manifest, the skip map and every domain
+ * This is the single place the manifest, the include list and every domain
  * override file (`./overrides/*.ts`) are assembled — `lwqlViews.ts` imports
  * only {@link LWQL_DERIVED_CATALOG} to spread into `LWQL_VIEW_CATALOG`, and
  * `./__tests__/tenantTableCoverage.unit.test.ts` imports the same export
  * rather than re-deriving it, so the coverage guard and the shipped catalog
  * can never compute two different answers.
  *
- * @see ./defineDatasetFromTable.ts — the builder and its opt-out catalog
- * @see ./skippedTables.ts — what is deliberately left off
+ * @see ./defineDatasetFromTable.ts — the builder and its opt-in catalog
+ * @see ./includedTables.ts — the only way a table enters the catalog
  * @see ./overrides — per-table refinements to the safe defaults
  */
 
@@ -22,6 +22,7 @@ import {
   type DatasetOverride,
   deriveDefaultCatalog,
 } from "./defineDatasetFromTable";
+import { LWQL_CLICKHOUSE_INCLUDED_TABLES } from "./includedTables";
 import { AUDIT_OVERRIDES } from "./overrides/audit";
 import { CODING_OVERRIDES } from "./overrides/coding";
 import { EXPERIMENTS_OVERRIDES } from "./overrides/experiments";
@@ -31,7 +32,6 @@ import { LANGY_OVERRIDES } from "./overrides/langy";
 import { LEGACY_OVERRIDES } from "./overrides/legacy";
 import { METRICS_OVERRIDES } from "./overrides/metrics";
 import { OBSERVABILITY_OVERRIDES } from "./overrides/observability";
-import { LWQL_CATALOG_SKIPPED_TABLES } from "./skippedTables";
 import type { LangWatchQLViewDefinition } from "./types";
 
 /**
@@ -75,15 +75,15 @@ export const LWQL_ALL_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
 };
 
 /**
- * Every manifest table neither hand-written nor skipped, as a view —
- * ordered by exposed view name so the merge into `LWQL_VIEW_CATALOG` (and
- * the manifest lists it feeds) is deterministic regardless of physical table
- * name or override iteration order.
+ * Every included manifest table that is not hand-written, as a view — ordered
+ * by exposed view name so the merge into `LWQL_VIEW_CATALOG` (and the manifest
+ * lists it feeds) is deterministic regardless of physical table name or override
+ * iteration order.
  */
 export const LWQL_DERIVED_CATALOG: readonly LangWatchQLViewDefinition[] = [
   ...deriveDefaultCatalog({
     manifest: LWQL_COLUMNS_MANIFEST,
-    skip: LWQL_CATALOG_SKIPPED_TABLES,
+    include: LWQL_CLICKHOUSE_INCLUDED_TABLES,
     handWritten: LWQL_HAND_WRITTEN_SOURCE_TABLES,
     overrides: LWQL_ALL_OVERRIDES,
   }),

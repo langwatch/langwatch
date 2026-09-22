@@ -76,7 +76,7 @@ import { migrateUp } from "../../../clickhouse/goose";
 import { lwqlTenantCapability } from "../capability";
 import { derivePostgresCatalog } from "../catalog/derivePostgresCatalog";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../catalog/postgresSkippedModels";
+import { LWQL_POSTGRES_INCLUDED_MODELS } from "../catalog/postgresIncludedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../catalog/postgresViews";
 import { LWQL_PRISMA_MANIFEST } from "../catalog/prismaManifest";
 import {
@@ -2191,7 +2191,7 @@ export const LWQL_EXPLICITLY_SEEDED_MODELS = [
 
 /**
  * The whole derived Postgres catalog, computed once from the same manifest,
- * skip map and overrides the shipped catalog is built from.
+ * include list and overrides the shipped catalog is built from.
  *
  * Shared between {@link postgresTenantSeedStatements} (every generic caller's
  * seed) and {@link startLangWatchQLPostgres} (the view/reader-role setup), so
@@ -2199,7 +2199,7 @@ export const LWQL_EXPLICITLY_SEEDED_MODELS = [
  */
 const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
   manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
+  include: LWQL_POSTGRES_INCLUDED_MODELS,
   overrides: LWQL_POSTGRES_ALL_OVERRIDES,
 });
 

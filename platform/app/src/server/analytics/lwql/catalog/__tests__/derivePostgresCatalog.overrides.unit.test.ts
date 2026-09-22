@@ -1,7 +1,7 @@
 /**
  * The Postgres catalog derivation's override handling: the six
- * formerly-hand-written views, topic clustering internals, re-admit reasons,
- * name-rule-dodging columns and the skip-list guard.
+ * formerly-hand-written views, topic clustering internals, re-admit reasons and
+ * name-rule-dodging columns.
  *
  * Split out of `./derivePostgresCatalog.unit.test.ts` (which covers naming,
  * tenant scope and safe defaults) to keep each file under the repo's per-file
@@ -17,17 +17,13 @@ import {
   derivePostgresCatalog,
   type PostgresDatasetOverride,
 } from "../derivePostgresCatalog";
-import {
-  assertPostgresSkipReasons,
-  LWQL_POSTGRES_SKIPPED_MODELS,
-  POSTGRES_SKIP_REASON_PREFIXES,
-} from "../postgresSkippedModels";
+import { LWQL_POSTGRES_INCLUDED_MODELS } from "../postgresIncludedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST } from "../prismaManifest";
 
 const catalog = derivePostgresCatalog({
   manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
+  include: LWQL_POSTGRES_INCLUDED_MODELS,
   overrides: LWQL_POSTGRES_ALL_OVERRIDES,
 });
 const byModel = new Map(
@@ -133,7 +129,7 @@ describe("given the derived Postgres catalog's overrides", () => {
       expect(() =>
         derivePostgresCatalog({
           manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
+          include: LWQL_POSTGRES_INCLUDED_MODELS,
           overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withReason },
         }),
       ).not.toThrow();
@@ -144,7 +140,7 @@ describe("given the derived Postgres catalog's overrides", () => {
       expect(() =>
         derivePostgresCatalog({
           manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
+          include: LWQL_POSTGRES_INCLUDED_MODELS,
           overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withoutReason },
         }),
       ).toThrow(/re-admits/);
@@ -157,7 +153,7 @@ describe("given the derived Postgres catalog's overrides", () => {
       expect(() =>
         derivePostgresCatalog({
           manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
+          include: LWQL_POSTGRES_INCLUDED_MODELS,
           overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...badOverride },
         }),
       ).toThrow(/skipColumns names "notARealColumn"/);
@@ -266,23 +262,6 @@ describe("given the derived Postgres catalog's overrides", () => {
         ).toBeDefined();
         expect(statement).toContain("\nWHERE (");
       }
-    });
-  });
-
-  describe("when the skip list is validated", () => {
-    /** @scenario "A skip needs a recorded reason" */
-    it("accepts every category prefix and refuses empty, low-value or unprefixed reasons", () => {
-      for (const prefix of POSTGRES_SKIP_REASON_PREFIXES) {
-        expect(
-          () => assertPostgresSkipReasons({ X: `${prefix} really` }),
-          `"${prefix}" should be an accepted category`,
-        ).not.toThrow();
-      }
-      expect(() => assertPostgresSkipReasons({ X: "" })).toThrow();
-      expect(() => assertPostgresSkipReasons({ X: "low value" })).toThrow();
-      expect(() =>
-        assertPostgresSkipReasons({ X: "some arbitrary unprefixed reason" }),
-      ).toThrow();
     });
   });
 });

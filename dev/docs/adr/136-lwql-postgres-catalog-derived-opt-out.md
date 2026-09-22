@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-18
 
-**Status:** Accepted
+**Status:** Accepted — inclusion policy amended by [ADR-142](./142-lwql-catalog-inclusion-is-opt-in.md) (opt-out → opt-in); the derivation machinery below stands unchanged.
 
 **Relates to:** [ADR-084](./084-lwql-postgres-mapping-tenant-predicate.md) (the approved-view / engine-table / tenant-predicate chain this ADR now generates for many tables instead of six), the ClickHouse opt-out precedent in [`catalog/derivedViews.ts`](../../../platform/app/src/server/analytics/lwql/catalog/derivedViews.ts).
 

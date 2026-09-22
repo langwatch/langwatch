@@ -21,7 +21,7 @@
  * knowing it was derived.
  *
  * @see ./columnsManifest.ts — where the column types come from
- * @see ./skippedTables.ts — what opt-out leaves off, and why
+ * @see ./includedTables.ts — the only way a table enters the catalog
  * @see ./types.ts — the shape this produces
  */
 
@@ -32,7 +32,6 @@ import {
   columnsManifestTable,
 } from "./columnsManifest";
 import { contentFilteredMapSql } from "./contentGating";
-import { skipReason } from "./skippedTables";
 import type {
   LangWatchQLColumnUnit,
   LangWatchQLViewColumn,
@@ -1011,34 +1010,72 @@ function deriveDataset({
 }
 
 /**
- * Every manifest table that is neither hand-written nor skipped, as a derived
- * view definition.
+ * Resolves the include list to the set of tables to derive, refusing an entry
+ * that names no manifest table, a duplicate entry, and an entry that is also
+ * hand-written — the three ways the list stops describing the schema it gates.
+ */
+function includedTableSet({
+  manifest,
+  include,
+  handWrittenSet,
+}: {
+  manifest: ColumnsManifest;
+  include: readonly string[];
+  handWrittenSet: ReadonlySet<string>;
+}): ReadonlySet<string> {
+  const tableNames = new Set(manifest.tables.map((table) => table.name));
+  const seen = new Set<string>();
+  for (const entry of include) {
+    if (!tableNames.has(entry)) {
+      throw new Error(
+        `lwql catalog: include entry "${entry}" names no manifest table`,
+      );
+    }
+    if (handWrittenSet.has(entry)) {
+      throw new Error(
+        `lwql catalog: include entry "${entry}" is already hand-written`,
+      );
+    }
+    if (seen.has(entry)) {
+      throw new Error(
+        `lwql catalog: include entry "${entry}" is listed more than once`,
+      );
+    }
+    seen.add(entry);
+  }
+  return seen;
+}
+
+/**
+ * Every included manifest table (and not hand-written), as a derived view
+ * definition.
  *
- * The catalog's opt-out half: a table earns a view by existing, and stays
- * off only by being in {@link ./skippedTables} with a reason. Defaults are safe
- * — content columns gated `output`, cost columns gated `costs`, a partition
- * column and grain chosen from the schema — and an override refines any of them,
- * including lifting a column's default gate with `columnGates: { Col: [] }`.
+ * The catalog's opt-in half: a table earns a view by being named on `include`;
+ * a table not on the list is simply not queryable and needs no entry anywhere.
+ * An include entry that names no manifest table — is listed twice, or is also
+ * hand-written — fails loudly. Defaults are safe — content columns gated
+ * `output`, cost columns gated `costs`, a partition column and grain chosen from
+ * the schema — and an override refines any of them, including lifting a column's
+ * default gate with `columnGates: { Col: [] }`.
  */
 export function deriveDefaultCatalog({
   manifest,
-  skip,
+  include,
   handWritten,
   overrides = {},
 }: {
   manifest: ColumnsManifest;
-  /** The skip map — {@link ./skippedTables#LWQL_CATALOG_SKIPPED_TABLES}. */
-  skip: Record<string, string>;
+  /** The include list — {@link ./includedTables#LWQL_CLICKHOUSE_INCLUDED_TABLES}. */
+  include: readonly string[];
   /** Source tables already carried by hand-written catalog entries. */
   handWritten: readonly string[];
   /** Per-table refinements to the defaults. */
   overrides?: Record<string, Partial<DatasetOverride>>;
 }): LangWatchQLViewDefinition[] {
   const handWrittenSet = new Set(handWritten);
-  const candidates = manifest.tables.filter(
-    (table) =>
-      !handWrittenSet.has(table.name) &&
-      skipReason(table.name, skip) === undefined,
+  const included = includedTableSet({ manifest, include, handWrittenSet });
+  const candidates = manifest.tables.filter((table) =>
+    included.has(table.name),
   );
   const sharedColumns = columnsSharedAcrossTables(candidates);
 

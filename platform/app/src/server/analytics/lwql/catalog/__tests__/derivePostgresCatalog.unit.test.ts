@@ -25,13 +25,13 @@ import {
   resolveTenantScope,
   sanitizeDescription,
 } from "../derivePostgresCatalog";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../postgresSkippedModels";
+import { LWQL_POSTGRES_INCLUDED_MODELS } from "../postgresIncludedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
 
 const catalog = derivePostgresCatalog({
   manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
+  include: LWQL_POSTGRES_INCLUDED_MODELS,
   overrides: LWQL_POSTGRES_ALL_OVERRIDES,
 });
 const byModel = new Map(
@@ -97,7 +97,7 @@ describe("given the derived Postgres catalog", () => {
 
   describe("when a model has no tenant column but a declared parent", () => {
     /** @scenario "A model without a tenant column is reached through a declared parent" */
-    it("takes its TenantId from the parent and needs no skip entry", () => {
+    it("takes its TenantId from the parent and needs only its include entry and a tenantVia override", () => {
       const view = byName.get("gateway_budget_ledgers")!;
       expect(view.postgres!.tenantPath?.[0]).toEqual({
         relation: "GatewayBudget",
@@ -108,7 +108,9 @@ describe("given the derived Postgres catalog", () => {
       expect(view.postgres!.tenantPath?.slice(1)).toEqual(
         organizationTenantPath(),
       );
-      expect(LWQL_POSTGRES_SKIPPED_MODELS.GatewayBudgetLedger).toBeUndefined();
+      // Reached through a tenantVia override, so its only entry is on the
+      // include list — no separate skip machinery.
+      expect(LWQL_POSTGRES_INCLUDED_MODELS).toContain("GatewayBudgetLedger");
     });
   });
 
@@ -177,7 +179,7 @@ describe("given the derived Postgres catalog", () => {
       expect(isStrippedByDefault("userId")).toBeUndefined();
     });
 
-    /** @scenario "Identity tables are skipped and person columns stay opaque" */
+    /** @scenario "Identity tables are never on the include list and person columns stay opaque" */
     it("does not derive User, Team or Organization and keeps userId opaque", () => {
       expect(byModel.has("User")).toBe(false);
       expect(byModel.has("Team")).toBe(false);

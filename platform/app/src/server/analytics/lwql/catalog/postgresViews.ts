@@ -2,26 +2,26 @@
  * LangWatchQL analytics SQL — the PostgreSQL-resident half of the catalog,
  * assembled from the derivation.
  *
- * ## Why opt-out
+ * ## Why opt-in
  *
  * This file used to hand-write five-then-six views and explain "why these and
  * no others". That is no longer the contract. The Postgres half now mirrors the
- * ClickHouse half (`derivedViews.ts`): every tenant-scoped Prisma model becomes
- * a view *by default*, and a model stays off only by being on
- * {@link ./postgresSkippedModels#LWQL_POSTGRES_SKIPPED_MODELS} with a reason.
- * A new table that carries an owning project is therefore catalogued and
- * content-gated automatically, rather than silently staying off until someone
- * remembers to add it — and `tenantModelCoverage.unit.test.ts` fails until
- * every model is either derived or skipped-with-a-reason.
+ * ClickHouse half (`derivedViews.ts`): a tenant-scoped Prisma model becomes a
+ * view only when it is named on
+ * {@link ./postgresIncludedModels#LWQL_POSTGRES_INCLUDED_MODELS}. A new model is
+ * not queryable until it is deliberately listed — exposure is never accidental,
+ * which matters because the app now writes grants straight from the catalog
+ * (ADR-141), so a smaller catalog is smaller grants. `tenantModelCoverage.unit.test.ts`
+ * pins the split so the include list cannot silently drift from the manifest.
  *
- * This module is the single assembly point: it feeds the manifest, the skip map
- * and every override file to {@link derivePostgresCatalog} and exports the
+ * This module is the single assembly point: it feeds the manifest, the include
+ * list and every override file to {@link derivePostgresCatalog} and exports the
  * result. `lwqlViews.ts` imports {@link LWQL_POSTGRES_CATALOG} unchanged to
  * spread into `LWQL_VIEW_CATALOG`; the six formerly-hand-written views are now
  * overrides in `./postgresOverrides/core.ts`.
  *
  * @see ./derivePostgresCatalog.ts — the derivation and its overrides
- * @see ./postgresSkippedModels.ts — what is deliberately left off, and why
+ * @see ./postgresIncludedModels.ts — the only way a model enters the catalog
  * @see ./postgresOverrides — per-model refinements to the safe defaults
  * @see specs/lwql/postgres-catalog.feature
  */
@@ -37,7 +37,7 @@ import { PARENTS_POSTGRES_OVERRIDES } from "./postgresOverrides/parents";
 import { SENSITIVE_POSTGRES_OVERRIDES } from "./postgresOverrides/sensitive";
 import { TOPICS_POSTGRES_OVERRIDES } from "./postgresOverrides/topics";
 import { VISIBILITY_POSTGRES_OVERRIDES } from "./postgresOverrides/visibility";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "./postgresSkippedModels";
+import { LWQL_POSTGRES_INCLUDED_MODELS } from "./postgresIncludedModels";
 import { LWQL_PRISMA_MANIFEST } from "./prismaManifest";
 import type { LangWatchQLViewDefinition } from "./types";
 
@@ -92,14 +92,14 @@ export const LWQL_POSTGRES_ALL_OVERRIDES: Record<
 ]);
 
 /**
- * Every tenant-scoped Prisma model that is not skipped, as a PostgreSQL-resident
- * view — ordered by exposed view name so the merge into `LWQL_VIEW_CATALOG` (and
- * the manifest lists it feeds) is deterministic.
+ * Every included tenant-scoped Prisma model, as a PostgreSQL-resident view —
+ * ordered by exposed view name so the merge into `LWQL_VIEW_CATALOG` (and the
+ * manifest lists it feeds) is deterministic.
  */
 export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
   ...derivePostgresCatalog({
     manifest: LWQL_PRISMA_MANIFEST,
-    skip: LWQL_POSTGRES_SKIPPED_MODELS,
+    include: LWQL_POSTGRES_INCLUDED_MODELS,
     overrides: LWQL_POSTGRES_ALL_OVERRIDES,
   }),
   // Locale-independent: `localeCompare` orders by the runtime's default locale,

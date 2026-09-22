@@ -5,8 +5,8 @@
  * into a view definition — the column list and types come from the manifest, the
  * caller supplies the rest — and this checks the mapping: renames, skips, gates,
  * descriptions and the dedup key it defaults from the sorting key.
- * {@link deriveDefaultCatalog} makes the catalog opt-*out*, yielding a dataset
- * for every table that is neither hand-written nor skipped, and this pins its
+ * {@link deriveDefaultCatalog} makes the catalog opt-*in*, yielding a dataset
+ * for every included table that is not hand-written, and this pins its
  * safe-by-default gate classification against the real committed manifest, so a
  * content column that stopped being gated is a red test.
  */
@@ -29,8 +29,8 @@ import {
 // `lwqlViews` is imported before `derivedViews` deliberately — see the same
 // note in tenantTableCoverage.unit.test.ts: both sit in one ESM cycle, and
 // only entering it through lwqlViews resolves cleanly.
+import { LWQL_CLICKHOUSE_INCLUDED_TABLES } from "../includedTables";
 import { LWQL_VIEW_CATALOG } from "../lwqlViews";
-import { LWQL_CATALOG_SKIPPED_TABLES, skipReason } from "../skippedTables";
 
 const FAKE_MANIFEST: ColumnsManifest = {
   tables: [
@@ -190,23 +190,20 @@ describe("given the default gate classifier", () => {
   });
 });
 
-describe("given the opt-out catalog over the committed manifest", () => {
+describe("given the opt-in catalog over the committed manifest", () => {
   // Widened to a plain string array: manifest table names are dynamic strings,
   // not the literal union `LWQL_HAND_WRITTEN_SOURCE_TABLES` carries, and
   // `.includes` on a `readonly [...] as const` tuple requires an argument of
   // that exact literal union.
   const handWritten: readonly string[] = LWQL_HAND_WRITTEN_SOURCE_TABLES;
+  const included = new Set(LWQL_CLICKHOUSE_INCLUDED_TABLES);
   const derived = LWQL_DERIVED_CATALOG;
   const bySource = new Map(derived.map((view) => [view.sourceTable, view]));
 
-  it("yields a definition for every table that is neither hand-written nor skipped", () => {
+  it("yields a definition for every included table that is not hand-written", () => {
     const expected = LWQL_COLUMNS_MANIFEST.tables
       .map((table) => table.name)
-      .filter(
-        (name) =>
-          !handWritten.includes(name) &&
-          skipReason(name, LWQL_CATALOG_SKIPPED_TABLES) === undefined,
-      );
+      .filter((name) => included.has(name) && !handWritten.includes(name));
     expect([...bySource.keys()].sort()).toEqual([...expected].sort());
     const catalogSourceTables = new Set(
       LWQL_VIEW_CATALOG.map((view) => view.sourceTable),
@@ -220,10 +217,13 @@ describe("given the opt-out catalog over the committed manifest", () => {
     expect(derived.length).toBeGreaterThan(0);
   });
 
-  it("excludes hand-written and skipped tables", () => {
+  it("derives only included tables and never a hand-written one", () => {
     for (const source of bySource.keys()) {
       expect(handWritten).not.toContain(source);
-      expect(skipReason(source, LWQL_CATALOG_SKIPPED_TABLES)).toBeUndefined();
+      expect(
+        included.has(source),
+        `"${source}" is derived but not on the include list`,
+      ).toBe(true);
     }
   });
 

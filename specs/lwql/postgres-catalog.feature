@@ -1,45 +1,39 @@
-Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by default
+Feature: A tenant-scoped Postgres table is queryable through LangWatchQL when it is on the include list
 
   As a LangWatch project member or API client using the LangWatchQL query door
-  I want every Postgres table that holds data my project can access to be a view, without anyone hand-adding it
-  So that a topic name, a dataset size, or an alert count is as reachable as a trace, and a new table cannot silently stay off the catalog
+  I want the Postgres tables that hold data my project can access to be views, each deliberately listed
+  So that a topic name, a dataset size, or an alert count is as reachable as a trace, and a new table is never queryable until it is deliberately exposed
 
-  Issue: #8207.
+  Issue: #8263.
 
-  # The ClickHouse half of the catalog already works this way: catalog/derivedViews.ts
-  # derives every table unless it is hand-written or named, with a reason, in
-  # catalog/skippedTables.ts, and tenantTableCoverage.unit.test.ts fails on a table
-  # that is neither. This feature gives the Postgres half the same contract.
+  # The ClickHouse half of the catalog works the same way: catalog/derivedViews.ts
+  # derives a table only when it is named on catalog/includedTables.ts (and not
+  # hand-written), and tenantTableCoverage.unit.test.ts pins the split. This
+  # feature gives the Postgres half the same opt-in contract — flipping ADR-136's
+  # opt-out to opt-in per ADR-142, so exposure is never accidental now that the
+  # app writes grants straight from the catalog (ADR-141).
   #
   # Bound by the derivation in catalog/derivePostgresCatalog.ts and its tests.
 
   Background:
     Given the LangWatchQL Postgres catalog is derived from the Prisma schema
 
-  Rule: Exposure is the default, not a decision
+  Rule: Exposure is a deliberate choice, not the default
 
     @unit
     Scenario: A model with a project column becomes a view without a hand-written definition
-      Given a Prisma model that carries a projectId column and is not on the skip list
+      Given a Prisma model that carries a projectId column and is on the include list
       When the Postgres catalog is derived
       Then a view named after the model in snake_case exists in the catalog
       And its projectId column is exposed as TenantId
       And every other column is exposed in PascalCase
 
     @unit
-    Scenario: A new tenant-scoped model that is neither derived, overridden nor skipped fails the build
-      Given a Prisma model with a tenant column that no view, override or skip entry names
-      When the tenant model coverage check runs
+    Scenario: An include-listed model with no owning tenant column and no tenantVia fails the build
+      Given an included Prisma model with no owning tenant column and no tenantVia override
+      When the Postgres catalog is derived
       Then it fails and names the model
-      And the failure says to catalogue it or skip it with a reason
-
-    @unit
-    Scenario: A skip needs a recorded reason
-      Given a model placed on the Postgres skip list
-      When the skip list is validated
-      Then every entry carries a non-empty reason
-      And the only accepted reasons are: no tenant column, an internal-only tenant, data already exposed through another view, or access-control plumbing
-      And "low value" is not one of them
+      And the failure says to give it a tenantVia override or take it off the include list
 
     @unit
     Scenario: A hand-written view is an override on the derived default, not a second definition
@@ -81,7 +75,7 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       Given a model with no tenant column but a declared parent path to a tenant-scoped model
       When the Postgres catalog is derived
       Then the view exists and takes its TenantId from the parent
-      And the model does not need a skip entry
+      And the model needs only its include entry and a tenantVia override
 
     @unit
     Scenario: A model with more than one tenant column uses the narrowest
@@ -107,7 +101,7 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       And a caller with content access reads it
 
     @unit
-    Scenario: Identity tables are skipped and person columns stay opaque
+    Scenario: Identity tables are never on the include list and person columns stay opaque
       Given the User, Team and Organization models
       When the Postgres catalog is derived
       Then none of them has a view
@@ -190,11 +184,3 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
-
-  Rule: The gap list burns down to zero
-
-    @unit
-    Scenario: No model is left on the skip list with a TODO reason
-      Given the Postgres skip list
-      When it is validated
-      Then no entry's reason contains TODO(#8207)
