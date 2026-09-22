@@ -389,3 +389,98 @@ export const ssoSetupRenameSchema = z.object({
 });
 
 export type SsoSetupRenameInput = z.infer<typeof ssoSetupRenameSchema>;
+
+/**
+ * One way back in, as the page reads it (D05, ADR-117 §5): the two people on
+ * it named, and how long it has left. A row in user ids answers "who can
+ * still get in without the identity provider" for nobody.
+ */
+export const ssoBreakGlassGrantSchema = z
+  .object({
+    bindingId: z.string(),
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    grantedByUserId: z.string(),
+    grantedByName: z.string().nullable(),
+    grantedAtMs: z.number(),
+    expiresAtMs: z.number(),
+    /** Set where a renewal replaced this row, which is history rather than a
+     *  live way in. */
+    supersededAtMs: z.number().nullable(),
+    live: z.boolean(),
+    daysRemaining: z.number(),
+  })
+  .strict();
+
+export type SsoBreakGlassGrant = z.infer<typeof ssoBreakGlassGrantSchema>;
+
+/** Somebody a way back in can be granted to: an administrator, today. */
+export const ssoBreakGlassCandidateSchema = z
+  .object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+  })
+  .strict();
+
+export type SsoBreakGlassCandidate = z.infer<typeof ssoBreakGlassCandidateSchema>;
+
+/**
+ * The binding itself, as the command that wrote it answers. Immutable: a
+ * renewal writes a NEW row naming the one it replaced, so the date a way in
+ * previously ended stays readable afterwards.
+ */
+export const ssoBreakGlassBindingSchema = z
+  .object({
+    bindingId: z.string(),
+    organizationId: z.string(),
+    userId: z.string(),
+    grantedByUserId: z.string(),
+    grantedAtMs: z.number(),
+    expiresAtMs: z.number(),
+    supersededAtMs: z.number().nullable(),
+    renewedFromBindingId: z.string().nullable(),
+    /** Which end-of-grant warnings have already gone out. */
+    warnedDays: z.array(z.number()),
+  })
+  .strict();
+
+export type SsoBreakGlassBinding = z.infer<typeof ssoBreakGlassBindingSchema>;
+
+/** Grant one. Never open-ended: the expiry is the whole of what stops a way
+ *  back in from quietly becoming a permanent second door. */
+export const ssoBreakGlassGrantInputSchema = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  userId: z.string().min(1),
+  expiresAtMs: z.number().int().positive(),
+});
+
+export type SsoBreakGlassGrantInput = z.infer<typeof ssoBreakGlassGrantInputSchema>;
+
+/** Extend one to a new date, by writing a new grant that names the old. */
+export const ssoBreakGlassRenewalInputSchema = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  bindingId: z.string().min(1),
+  expiresAtMs: z.number().int().positive(),
+});
+
+export type SsoBreakGlassRenewalInput = z.infer<typeof ssoBreakGlassRenewalInputSchema>;
+
+/** Which grant is being ended now. */
+export const ssoBreakGlassBindingInputSchema = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  bindingId: z.string().min(1),
+});
+
+export type SsoBreakGlassBindingInput = z.infer<typeof ssoBreakGlassBindingInputSchema>;
+
+/** A renewal answers both rows: the new grant, and the one it replaced. */
+export const ssoBreakGlassRenewalSchema = z
+  .object({
+    renewed: ssoBreakGlassBindingSchema,
+    replaced: ssoBreakGlassBindingSchema,
+  })
+  .strict();
+
+export type SsoBreakGlassRenewal = z.infer<typeof ssoBreakGlassRenewalSchema>;

@@ -71,6 +71,18 @@ describe("given an organization nobody holds a way back in for", () => {
   });
 });
 
+describe("given the words the section is offered in", () => {
+  /** @scenario "A way back in is not offered in our words" */
+  it("describes it as a password that still works, naming nothing of ours", () => {
+    const { container } = renderSection();
+
+    expect(
+      screen.getByText(/can still sign in with a password if it ever stops working/),
+    ).toBeTruthy();
+    expect(container.textContent).not.toMatch(/break.glass|binding|SAML|OIDC|provisioning/i);
+  });
+});
+
 describe("given a live grant", () => {
   it("names the holder, who gave it, and the day it ends in words", () => {
     renderSection({ grants: [HOLDER] });

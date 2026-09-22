@@ -25,6 +25,7 @@ import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import { LoadFailure } from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
+import { BreakGlassSection } from "./break-glass.section.tsx";
 import {
   ConnectionRemovalSection,
   type ConnectionRemovalCommand,
@@ -383,11 +384,18 @@ function SetupJourneySteps({
         />
       </SetupStep>
 
-      {/* Upstream's fourth step — naming a way back in — waits on
-            identity's break-glass commands, so its precondition is shown in
-            the last step and pressed nowhere. */}
+      {/* Before the last two steps, because it is the one that decides what
+            happens when the identity provider cannot answer at all. */}
+      <SetupStep number={4} title="Name someone who can still get in" state={progress.breakGlass}>
+        <BreakGlassStep
+          organizationId={organizationId}
+          canManage={canManage}
+          onChanged={onChanged}
+        />
+      </SetupStep>
+
       <SetupStep
-        number={4}
+        number={5}
         title="Say who it lets in"
         state={progress.arrivals}
         summary={arrivalAnswerLabel(SSO_ANSWER_BY_POLICY[connection.arrivalPolicy])}
@@ -404,7 +412,7 @@ function SetupJourneySteps({
       </SetupStep>
 
       <SetupStep
-        number={5}
+        number={6}
         title="Turn it on"
         state={progress.goLive}
         note={progress.goLiveBlockedBecause ?? void 0}
@@ -420,5 +428,69 @@ function SetupJourneySteps({
         />
       </SetupStep>
     </SetupSteps>
+  );
+}
+
+/**
+ * The way back in, with its two reads where they are read. The candidates are
+ * `sso:manage` and the grants are `sso:view`, so a reader who may only look
+ * still sees who can get in and is asked nothing about who could be.
+ */
+function BreakGlassStep({
+  organizationId,
+  canManage,
+  onChanged,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const host = useSsoHost();
+  const utils = ssoApi.useUtils();
+  const grants = ssoApi.ssoSetup.breakGlassBindings.useQuery({ organizationId });
+  const candidates = ssoApi.ssoSetup.breakGlassCandidates.useQuery(
+    { organizationId },
+    { enabled: canManage },
+  );
+  const grant = ssoApi.ssoSetup.grantBreakGlass.useMutation();
+  const renew = ssoApi.ssoSetup.renewBreakGlass.useMutation();
+  const revoke = ssoApi.ssoSetup.revokeBreakGlass.useMutation();
+  // Which row is waiting, so only that row reads as busy.
+  const [settlingBindingId, setSettlingBindingId] = useState<string | null>(null);
+
+  const settled = (title: string) => ({
+    onSuccess: () => {
+      setSettlingBindingId(null);
+      void utils.ssoSetup.breakGlassBindings.invalidate();
+      // The grant is one of going live's preconditions, so the step above
+      // it stops saying what is outstanding in the same breath.
+      onChanged();
+      host.succeeded({ title });
+    },
+    onError: (error: unknown) => {
+      setSettlingBindingId(null);
+      host.failed({ error, fallbackTitle: title });
+    },
+  });
+
+  return (
+    <BreakGlassSection
+      canManage={canManage}
+      grants={grants.data ?? []}
+      candidates={candidates.data ?? []}
+      granting={grant.isPending}
+      settlingBindingId={settlingBindingId}
+      onGrant={(command) =>
+        grant.mutate({ organizationId, ...command }, settled("Granting a way back in"))
+      }
+      onRenew={(command) => {
+        setSettlingBindingId(command.bindingId);
+        renew.mutate({ organizationId, ...command }, settled("Extending a way back in"));
+      }}
+      onRevoke={(command) => {
+        setSettlingBindingId(command.bindingId);
+        revoke.mutate({ organizationId, ...command }, settled("Ending a way back in"));
+      }}
+    />
   );
 }

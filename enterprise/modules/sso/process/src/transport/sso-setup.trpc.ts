@@ -106,6 +106,34 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupActivate(input, administratorOf(actor)))
 
+  /**
+   * `sso:view`, deliberately below the rest: who can still get in without the
+   * identity provider is what a security reviewer reads this page for. Not
+   * plan-gated anywhere in this block — a lapsed plan must never close the
+   * way back in.
+   */
+  .procedure("breakGlassBindings")
+  .withPermission("sso:view")
+  .handle(({ app, input }) => app.findBreakGlassGrants(input))
+
+  /** `sso:manage`: the administrators with their addresses, which only
+   *  somebody who can actually grant one needs. */
+  .procedure("breakGlassCandidates")
+  .withPermission("sso:manage")
+  .handle(({ app, input }) => app.findBreakGlassCandidates(input))
+
+  .procedure("grantBreakGlass")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupGrantBreakGlass(input, administratorOf(actor)))
+
+  .procedure("renewBreakGlass")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRenewBreakGlass(input, administratorOf(actor)))
+
+  .procedure("revokeBreakGlass")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRevokeBreakGlass(input, administratorOf(actor)))
+
   .procedure("discardConnection")
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupDiscardConnection(input, administratorOf(actor)))

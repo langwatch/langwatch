@@ -1,6 +1,13 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
+  SsoBreakGlassBinding,
+  SsoBreakGlassBindingInput,
+  SsoBreakGlassCandidate,
+  SsoBreakGlassGrant,
+  SsoBreakGlassGrantInput,
+  SsoBreakGlassRenewal,
+  SsoBreakGlassRenewalInput,
   SsoConnectionHistoryEntry,
   SsoDomainClaimOutcome,
   SsoDomainProof,
@@ -155,6 +162,29 @@ export interface SsoApi {
   setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   setupDiscardConnection(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void>;
+
+  /**
+   * The way back in (D05): who can still sign in when the identity provider
+   * cannot. NONE of these is plan-gated — a lapsed subscription must never be
+   * the reason an organization cannot reach its own recovery path.
+   */
+  findBreakGlassGrants(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassGrant[]>;
+  /** The organization's administrators, as the picker names them. */
+  findBreakGlassCandidates(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassCandidate[]>;
+  /** Never self-served: the grantor is the administrator this surface
+   *  authenticated, never an argument. */
+  setupGrantBreakGlass(
+    input: SsoBreakGlassGrantInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassBinding>;
+  setupRenewBreakGlass(
+    input: SsoBreakGlassRenewalInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassRenewal>;
+  setupRevokeBreakGlass(
+    input: SsoBreakGlassBindingInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassBinding>;
 }
 
 export const SsoApi = moduleApi<SsoApi>()("sso");

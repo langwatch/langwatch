@@ -14,6 +14,7 @@ import {
   createSsoTestApp,
   createSsoTestEntitlements,
   createSsoTestIdentity,
+  RecordingSsoBreakGlass,
   RecordingSsoConnectionLedger,
   RecordingSsoDomainCeremony,
   RecordingSsoSetupCommands,
@@ -97,6 +98,7 @@ async function harness(
   const getHistory = vi.fn(async () => [ENTRY]);
   const ceremony = RecordingSsoDomainCeremony.create();
   const commands = RecordingSsoSetupCommands.create();
+  const breakGlass = RecordingSsoBreakGlass.create();
   const getMigrationProgress = vi.fn<SsoSetupApi["getMigrationProgress"]>(async () => ({
     migration: options.migration ?? null,
   }));
@@ -113,13 +115,17 @@ async function harness(
     connections,
     dependencies: {
       auditLog,
-      identity: createSsoTestIdentity(
+      identity: createSsoTestIdentity({
         connections,
-        { getHistory },
+        history: { getHistory },
         ceremony,
-        createApiFixture<SsoSetupApi>({ getSetup: async () => journey, getMigrationProgress }),
+        setup: createApiFixture<SsoSetupApi>({
+          getSetup: async () => journey,
+          getMigrationProgress,
+        }),
         commands,
-      ),
+        breakGlass,
+      }),
       entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
     },
   });
@@ -132,6 +138,7 @@ async function harness(
 
   return {
     auditLog,
+    breakGlass,
     ceremony,
     commands,
     getHistory,
@@ -151,6 +158,8 @@ describe("the organization's own single sign-on surface", () => {
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "activate",
+        "breakGlassBindings",
+        "breakGlassCandidates",
         "checkDomainFile",
         "checkDomainRecord",
         "claimDomain",
@@ -159,12 +168,15 @@ describe("the organization's own single sign-on surface", () => {
         "getHistory",
         "getMigrationProgress",
         "getSetup",
+        "grantBreakGlass",
         "onHistoryActivity",
         "proveDomain",
         "register",
         "removeConnection",
         "removeDomain",
         "rename",
+        "renewBreakGlass",
+        "revokeBreakGlass",
         "selectMigrationRoute",
         "setArrivals",
         "startLegacyMigration",
@@ -633,6 +645,120 @@ describe("the organization's own single sign-on surface", () => {
         route: "legacy",
         actor: { userId: "user_ana" },
       });
+    });
+  });
+
+  describe("given the way back in", () => {
+    /** @scenario "The ways back in are listed with who holds them and until when" */
+    it("names who holds each grant and when it ends, to a reader who may only look", async () => {
+      const { caller, breakGlass } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(
+        caller.breakGlassBindings({ organizationId: "org_acme" }),
+      ).resolves.toMatchObject([
+        { userId: "user_ana", name: "Ana", grantedByName: "Bo", live: true },
+      ]);
+      expect(breakGlass.findGrants).toHaveBeenCalledWith({ organizationId: "org_acme" });
+    });
+
+    /** @scenario "A reader who may not manage single sign-on is offered no grant" */
+    it("refuses that same reader the candidates, which only a granter needs", async () => {
+      const { caller, breakGlass } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(
+        caller.breakGlassCandidates({ organizationId: "org_acme" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(breakGlass.findCandidates).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Granting a way back in names a person and a date" */
+    it("names the session administrator as the grantor, never an id from the input", async () => {
+      const { caller, breakGlass } = await harness();
+
+      await expect(
+        caller.grantBreakGlass({
+          organizationId: "org_acme",
+          userId: "user_cyd",
+          expiresAtMs: 1_766_000_000_000,
+        }),
+      ).resolves.toMatchObject({ userId: "user_cyd", expiresAtMs: 1_766_000_000_000 });
+      expect(breakGlass.grant).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        userId: "user_cyd",
+        expiresAtMs: 1_766_000_000_000,
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    /** @scenario "A lapsed subscription does not take the way back in away" */
+    it("grants one on a lapsed plan, because that is the morning it is for", async () => {
+      const { caller, breakGlass } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.grantBreakGlass({
+          organizationId: "org_acme",
+          userId: "user_cyd",
+          expiresAtMs: 1_766_000_000_000,
+        }),
+      ).resolves.toMatchObject({ userId: "user_cyd" });
+      expect(breakGlass.grant).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A way back in can be extended before it ends" */
+    it("answers both rows of a renewal, so the date it previously ended stays readable", async () => {
+      const { caller } = await harness();
+
+      await expect(
+        caller.renewBreakGlass({
+          organizationId: "org_acme",
+          bindingId: "bgb_1",
+          expiresAtMs: 1_768_000_000_000,
+        }),
+      ).resolves.toMatchObject({
+        renewed: { expiresAtMs: 1_768_000_000_000, renewedFromBindingId: "bgb_1" },
+        replaced: { bindingId: "bgb_1", supersededAtMs: 1_764_000_000_000 },
+      });
+    });
+
+    /** @scenario "A way back in can be ended on purpose" */
+    it("records the attempt before ending one, so a refusal is still on the trail", async () => {
+      const { auditLog, breakGlass, caller } = await harness();
+      breakGlass.revoke.mockRejectedValueOnce(new Error("the last way in"));
+
+      await expect(
+        caller.revokeBreakGlass({ organizationId: "org_acme", bindingId: "bgb_1" }),
+      ).rejects.toThrow("the last way in");
+
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.revokeBreakGlass",
+        args: { organizationId: "org_acme", bindingId: "bgb_1" },
+        targetKind: "ssoConnection",
+      });
+    });
+
+    it("refuses a reader who may see single sign-on to grant, renew or end one", async () => {
+      const { breakGlass, caller } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(
+        caller.grantBreakGlass({
+          organizationId: "org_acme",
+          userId: "user_cyd",
+          expiresAtMs: 1_766_000_000_000,
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller.revokeBreakGlass({ organizationId: "org_acme", bindingId: "bgb_1" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(breakGlass.grant).not.toHaveBeenCalled();
+      expect(breakGlass.revoke).not.toHaveBeenCalled();
     });
   });
 

@@ -7,6 +7,7 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import {
   ssoDomainRecordLocation,
   type IdentityApi,
+  type SsoBreakGlassApi,
   type SsoConnectionBackofficeApi,
   type SsoConnectionHistoryApi,
   type SsoDomainCeremonyApi,
@@ -172,20 +173,107 @@ export class RecordingSsoGateLogger implements SsoGateLogger {
 }
 
 /** The identity peer, narrowed to the capabilities sso reads off it. */
-export function createSsoTestIdentity(
-  connections: SsoConnectionBackofficeApi,
-  history?: SsoConnectionHistoryApi,
-  ceremony?: SsoDomainCeremonyApi,
-  setup?: SsoSetupApi,
-  commands?: SsoSetupCommandsApi,
-): IdentityApi {
+export function createSsoTestIdentity({
+  connections,
+  history,
+  ceremony,
+  setup,
+  commands,
+  breakGlass,
+}: {
+  connections: SsoConnectionBackofficeApi;
+  history?: SsoConnectionHistoryApi;
+  ceremony?: SsoDomainCeremonyApi;
+  setup?: SsoSetupApi;
+  commands?: SsoSetupCommandsApi;
+  breakGlass?: SsoBreakGlassApi;
+}): IdentityApi {
   return createApiFixture<IdentityApi>({
     ssoBackoffice: () => connections,
     ...(history ? { ssoConnectionHistory: () => history } : {}),
     ...(ceremony ? { ssoDomainCeremony: () => ceremony } : {}),
     ...(setup ? { ssoSetup: () => setup } : {}),
     ...(commands ? { ssoSetupCommands: () => commands } : {}),
+    ...(breakGlass ? { ssoBreakGlass: () => breakGlass } : {}),
   });
+}
+
+/**
+ * The ways back in, recorded as identity would receive them. Two grants: one
+ * live, one already superseded, so a surface that shows history and a surface
+ * that shows what is live can be told apart.
+ */
+export class RecordingSsoBreakGlass implements SsoBreakGlassApi {
+  static create(): RecordingSsoBreakGlass {
+    return new RecordingSsoBreakGlass();
+  }
+
+  readonly findGrants = vi.fn<SsoBreakGlassApi["findGrants"]>(async () => [
+    {
+      bindingId: "bgb_1",
+      userId: "user_ana",
+      name: "Ana",
+      email: "ana@acme.com",
+      grantedByUserId: "user_bo",
+      grantedByName: "Bo",
+      grantedAtMs: 1_764_000_000_000,
+      expiresAtMs: 1_766_000_000_000,
+      supersededAtMs: null,
+      live: true,
+      daysRemaining: 23,
+    },
+  ]);
+  readonly findCandidates = vi.fn<SsoBreakGlassApi["findCandidates"]>(async () => [
+    { userId: "user_ana", name: "Ana", email: "ana@acme.com" },
+  ]);
+  readonly grant = vi.fn<SsoBreakGlassApi["grant"]>(
+    async ({ organizationId, userId, expiresAtMs }) => ({
+      bindingId: "bgb_2",
+      organizationId,
+      userId,
+      grantedByUserId: "user_ana",
+      grantedAtMs: 1_764_000_000_000,
+      expiresAtMs,
+      supersededAtMs: null,
+      renewedFromBindingId: null,
+      warnedDays: [],
+    }),
+  );
+  readonly renew = vi.fn<SsoBreakGlassApi["renew"]>(async ({ organizationId, expiresAtMs }) => ({
+    renewed: {
+      bindingId: "bgb_3",
+      organizationId,
+      userId: "user_ana",
+      grantedByUserId: "user_ana",
+      grantedAtMs: 1_764_000_000_000,
+      expiresAtMs,
+      supersededAtMs: null,
+      renewedFromBindingId: "bgb_1",
+      warnedDays: [],
+    },
+    replaced: {
+      bindingId: "bgb_1",
+      organizationId,
+      userId: "user_ana",
+      grantedByUserId: "user_bo",
+      grantedAtMs: 1_764_000_000_000,
+      expiresAtMs: 1_766_000_000_000,
+      supersededAtMs: 1_764_000_000_000,
+      renewedFromBindingId: null,
+      warnedDays: [],
+    },
+  }));
+  readonly revoke = vi.fn<SsoBreakGlassApi["revoke"]>(async ({ organizationId, bindingId }) => ({
+    bindingId,
+    organizationId,
+    userId: "user_ana",
+    grantedByUserId: "user_bo",
+    grantedAtMs: 1_764_000_000_000,
+    expiresAtMs: 1_764_000_000_000,
+    supersededAtMs: null,
+    renewedFromBindingId: null,
+    warnedDays: [],
+  }));
 }
 
 /** The organization's own presses, recorded as identity would receive them. */
@@ -260,7 +348,7 @@ export function createSsoTestApp(
       operators: input.dependencies?.operators ?? createSsoTestOperators(),
       users: input.dependencies?.users ?? createSsoTestUsers(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
-      identity: input.dependencies?.identity ?? createSsoTestIdentity(connections),
+      identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
       entitlements: input.dependencies?.entitlements ?? createSsoTestEntitlements(),
     },
     members: {

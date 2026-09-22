@@ -11,6 +11,11 @@ import type {
   ListSsoConnectionsInput,
   RegisterSsoConnectionInput,
   RejectSsoDomainClaimInput,
+  SsoBreakGlassBinding,
+  SsoBreakGlassBindingInput,
+  SsoBreakGlassCandidate,
+  SsoBreakGlassGrant,
+  SsoBreakGlassRenewal,
   SsoConnectionByIdInput,
   SsoConnectionReasonInput,
   SsoConnectionTarget,
@@ -123,6 +128,30 @@ export interface SsoSetupCommandLedger {
     input: SsoSetupRemovalInput & { graceMs: number },
     actor: SsoSelfServeActor,
   ): Promise<{ removal: "discarded" | "teardown-requested" }>;
+}
+
+/**
+ * The way back in (D05, ADR-117 §5), as identity offers it. Two reads and
+ * three presses, kept apart from the journey above because none of them is
+ * plan-gated: a lapsed subscription must never close an organization's own
+ * recovery path.
+ */
+export interface SsoBreakGlassLedger {
+  findGrants(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassGrant[]>;
+  findCandidates(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassCandidate[]>;
+  /** The grantor is the actor, never an argument — one is never self-served. */
+  grant(
+    input: { organizationId: string; userId: string; expiresAtMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<SsoBreakGlassBinding>;
+  /** Writes a NEW grant naming the old, so the date the previous one ended
+   *  stays readable. */
+  renew(
+    input: { organizationId: string; bindingId: string; expiresAtMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<SsoBreakGlassRenewal>;
+  /** Ends one now. Refused while it is a live connection's only way back in. */
+  revoke(input: SsoBreakGlassBindingInput): Promise<SsoBreakGlassBinding>;
 }
 
 /**

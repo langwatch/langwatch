@@ -22,6 +22,13 @@ import {
   type ListSsoConnectionsInput,
   type RegisterSsoConnectionInput,
   type RejectSsoDomainClaimInput,
+  type SsoBreakGlassBinding,
+  type SsoBreakGlassBindingInput,
+  type SsoBreakGlassCandidate,
+  type SsoBreakGlassGrant,
+  type SsoBreakGlassGrantInput,
+  type SsoBreakGlassRenewal,
+  type SsoBreakGlassRenewalInput,
   type SsoConfig,
   type SsoConfiguration,
   type SsoConnectionByIdInput,
@@ -68,6 +75,7 @@ import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import type {
   SsoActivityLogger,
+  SsoBreakGlassLedger,
   SsoConnectionLedgerOperator,
   SsoConnectionHistoryReads,
   SsoConnectionLedger,
@@ -207,6 +215,7 @@ export class SsoApp implements SsoApiContract {
   readonly #connections: SsoConnectionLedger;
   readonly #ceremony: SsoDomainCeremonyLedger;
   readonly #selfServe: SsoSetupCommandLedger;
+  readonly #breakGlass: SsoBreakGlassLedger;
   readonly #history: SsoConnectionHistoryReads;
   readonly #setup: SsoSetupReads;
   /** The deployment an identity provider is pointed back at. */
@@ -222,6 +231,7 @@ export class SsoApp implements SsoApiContract {
     connections: SsoConnectionLedger,
     ceremony: SsoDomainCeremonyLedger,
     selfServe: SsoSetupCommandLedger,
+    breakGlass: SsoBreakGlassLedger,
     history: SsoConnectionHistoryReads,
     setup: SsoSetupReads,
     baseUrl: string,
@@ -232,6 +242,7 @@ export class SsoApp implements SsoApiContract {
     this.#connections = connections;
     this.#ceremony = ceremony;
     this.#selfServe = selfServe;
+    this.#breakGlass = breakGlass;
     this.#history = history;
     this.#setup = setup;
     this.#baseUrl = baseUrl;
@@ -280,6 +291,14 @@ export class SsoApp implements SsoApiContract {
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
       removeConnection: (input, actor) => setup().removeConnection({ ...input, actor }),
     };
+    const ways = () => dependencies.identity.ssoBreakGlass();
+    const breakGlass: SsoBreakGlassLedger = {
+      findGrants: (input) => ways().findGrants(input),
+      findCandidates: (input) => ways().findCandidates(input),
+      grant: (input, actor) => ways().grant({ ...input, actor }),
+      renew: (input, actor) => ways().renew({ ...input, actor }),
+      revoke: (input) => ways().revoke(input),
+    };
     const configuration = await resolveConfiguration(config, members, secrets);
     return new SsoApp(
       SsoGateService.create({
@@ -291,6 +310,7 @@ export class SsoApp implements SsoApiContract {
       connections,
       domains,
       selfServe,
+      breakGlass,
       { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
       {
         getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input),
@@ -630,6 +650,53 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
+   * The ways back in this organization holds. A read, and never plan-gated:
+   * the whole point of the grant is the morning the identity provider is
+   * broken, which is no moment to discover the plan lapsed too.
+   */
+  findBreakGlassGrants(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassGrant[]> {
+    return this.#breakGlass.findGrants(input);
+  }
+
+  /** Who one can be granted to: the organization's administrators. */
+  findBreakGlassCandidates(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassCandidate[]> {
+    return this.#breakGlass.findCandidates(input);
+  }
+
+  /**
+   * Grant one, with the date it ends. The grantor is the session this surface
+   * authenticated, so a way back in is never self-served, and the attempt is
+   * recorded before the grant is made.
+   */
+  setupGrantBreakGlass(
+    input: SsoBreakGlassGrantInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassBinding> {
+    return this.#attempted(by, "grantBreakGlass", { ...input }, (actor) =>
+      this.#breakGlass.grant(input, actor),
+    );
+  }
+
+  setupRenewBreakGlass(
+    input: SsoBreakGlassRenewalInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassRenewal> {
+    return this.#attempted(by, "renewBreakGlass", { ...input }, (actor) =>
+      this.#breakGlass.renew(input, actor),
+    );
+  }
+
+  /** Ending one is identity's refusal to make while it is the last way in. */
+  setupRevokeBreakGlass(
+    input: SsoBreakGlassBindingInput,
+    by: SsoAdministrator,
+  ): Promise<SsoBreakGlassBinding> {
+    return this.#attempted(by, "revokeBreakGlass", { ...input }, () =>
+      this.#breakGlass.revoke(input),
+    );
+  }
+
+  /**
    * Changing an organization's single sign-on takes an Enterprise plan (D09).
    * READS are deliberately never gated: a page that refuses to render cannot
    * say what it is refusing.
@@ -648,7 +715,7 @@ export class SsoApp implements SsoApiContract {
   async #attempted<T>(
     by: SsoAdministrator,
     action: string,
-    args: Record<string, string | null> & { organizationId: string },
+    args: Record<string, string | number | null> & { organizationId: string },
     ceremony: (actor: SsoSelfServeActor) => Promise<T>,
   ): Promise<T> {
     await this.#auditLog.record({
@@ -657,9 +724,7 @@ export class SsoApp implements SsoApiContract {
       action: `ssoSetup.${action}`,
       args: { ...args },
       targetKind: AUDIT_TARGET_KIND,
-      ...(args.connectionId === undefined || args.connectionId === null
-        ? {}
-        : { targetId: args.connectionId }),
+      ...(typeof args.connectionId === "string" ? { targetId: args.connectionId } : {}),
     });
 
     return ceremony({ userId: by.id });

@@ -2,6 +2,13 @@ export { SsoApi, type SsoAdministrator, type SsoOperator } from "./sso.api.ts";
 export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
 export { ssoSetupTrpc } from "./sso-setup.trpc.ts";
 export {
+  ssoBreakGlassBindingInputSchema,
+  ssoBreakGlassBindingSchema,
+  ssoBreakGlassCandidateSchema,
+  ssoBreakGlassGrantInputSchema,
+  ssoBreakGlassGrantSchema,
+  ssoBreakGlassRenewalInputSchema,
+  ssoBreakGlassRenewalSchema,
   ssoConnectionHistoryEntrySchema,
   ssoDomainClaimOutcomeSchema,
   ssoDomainProofSchema,
@@ -22,6 +29,13 @@ export {
   ssoSetupRemovalSchema,
   ssoSetupRenameSchema,
   ssoSetupStartMigrationSchema,
+  type SsoBreakGlassBinding,
+  type SsoBreakGlassBindingInput,
+  type SsoBreakGlassCandidate,
+  type SsoBreakGlassGrant,
+  type SsoBreakGlassGrantInput,
+  type SsoBreakGlassRenewal,
+  type SsoBreakGlassRenewalInput,
   type SsoConnectionHistoryEntry,
   type SsoDomainClaimOutcome,
   type SsoDomainProof,

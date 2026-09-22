@@ -17,6 +17,9 @@ const { state } = vi.hoisted(() => ({
     error: null as unknown,
     calls: [] as Call[],
     invalidated: 0,
+    breakGlassInvalidated: 0,
+    grants: [] as unknown[],
+    candidates: [] as unknown[],
   },
 }));
 
@@ -41,6 +44,11 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             },
           },
           getHistory: { invalidate: () => {} },
+          breakGlassBindings: {
+            invalidate: () => {
+              state.breakGlassInvalidated += 1;
+            },
+          },
         },
       }),
       ssoSetup: {
@@ -70,6 +78,15 @@ vi.mock("../../../behavior/sso-api.ts", () => {
         removeDomain: mutation("removeDomain"),
         checkDomainRecord: mutation("checkDomainRecord"),
         checkDomainFile: mutation("checkDomainFile"),
+        breakGlassBindings: {
+          useQuery: () => ({ data: state.grants, isLoading: false, isError: false }),
+        },
+        breakGlassCandidates: {
+          useQuery: () => ({ data: state.candidates, isLoading: false, isError: false }),
+        },
+        grantBreakGlass: mutation("grantBreakGlass"),
+        renewBreakGlass: mutation("renewBreakGlass"),
+        revokeBreakGlass: mutation("revokeBreakGlass"),
       },
     },
   };
@@ -166,6 +183,9 @@ beforeEach(() => {
   state.error = null;
   state.calls = [];
   state.invalidated = 0;
+  state.breakGlassInvalidated = 0;
+  state.grants = [];
+  state.candidates = [{ userId: "user_cyd", name: "Cyd", email: "cyd@acme.com" }];
 });
 
 afterEach(cleanup);
@@ -430,6 +450,54 @@ describe("the single sign-on setup page", () => {
     });
   });
 
+  describe("given the way back in on the journey", () => {
+    /** @scenario "Granting a way back in names a person and a date" */
+    it("grants one for the organization on the page, and re-reads the grants after", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      fireEvent.change(screen.getByLabelText("Who can still get in"), {
+        target: { value: "user_cyd" },
+      });
+      fireEvent.change(screen.getByLabelText("Until"), { target: { value: "2026-10-30" } });
+      fireEvent.click(screen.getByRole("button", { name: "Grant a way back in" }));
+
+      const granted = state.calls.find((call) => call.name === "grantBreakGlass");
+      expect(granted?.input).toMatchObject({ organizationId: "org-1", userId: "user_cyd" });
+      expect(state.breakGlassInvalidated).toBe(1);
+      // Going live waits on this grant, so the step above it re-reads too.
+      expect(state.invalidated).toBeGreaterThan(0);
+    });
+
+    /** @scenario "The ways back in are listed with who holds them and until when" */
+    it("names who holds a live grant and offers the two things that can be done to it", () => {
+      state.grants = [
+        {
+          bindingId: "bgb_1",
+          userId: "user_ana",
+          name: "Ana",
+          email: "ana@acme.com",
+          grantedByUserId: "user_bo",
+          grantedByName: "Bo",
+          grantedAtMs: 1_764_000_000_000,
+          expiresAtMs: 1_766_000_000_000,
+          supersededAtMs: null,
+          live: true,
+          daysRemaining: 23,
+        },
+      ];
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByText("Ana")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "End now" }));
+
+      expect(state.calls.find((call) => call.name === "revokeBreakGlass")?.input).toEqual({
+        organizationId: "org-1",
+        bindingId: "bgb_1",
+      });
+    });
+  });
+
   describe("given a reader who may see single sign-on but not manage it", () => {
     /** @scenario "Only administrators can confirm the initial arrival choice" */
     it("reads the journey with no control on it, and neither history nor removal", () => {
@@ -437,6 +505,9 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("connection-arrivals")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
+      // The ways back in are still listed to them; granting one is not.
+      expect(screen.getByTestId("connection-break-glass")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Grant a way back in" })).toBeNull();
       expect(screen.queryByTestId("connection-history")).toBeNull();
       expect(screen.queryByTestId("sso-remove")).toBeNull();
     });

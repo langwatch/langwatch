@@ -8,6 +8,13 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
+  ssoBreakGlassBindingInputSchema,
+  ssoBreakGlassBindingSchema,
+  ssoBreakGlassCandidateSchema,
+  ssoBreakGlassGrantInputSchema,
+  ssoBreakGlassGrantSchema,
+  ssoBreakGlassRenewalInputSchema,
+  ssoBreakGlassRenewalSchema,
   ssoConnectionHistoryEntrySchema,
   ssoDomainClaimOutcomeSchema,
   ssoDomainProofSchema,
@@ -142,6 +149,44 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
   .mutation("activate")
   .withInput(ssoSetupConnectionSchema)
   .withOutput(z.void())
+
+  /**
+   * The ways back in this organization holds, with who holds them and their
+   * dates. `sso:view` rather than `sso:manage`: "who can still get in without
+   * the identity provider" is precisely what a security reviewer reads this
+   * surface for.
+   */
+  .query("breakGlassBindings")
+  .withInput(ssoSetupOrganizationSchema)
+  .withOutput(ssoBreakGlassGrantSchema.array())
+
+  /** Who one can be granted to. `sso:manage`, unlike the list above: this is
+   *  the administrators with their addresses, and only somebody who can
+   *  actually grant one needs it. */
+  .query("breakGlassCandidates")
+  .withInput(ssoSetupOrganizationSchema)
+  .withOutput(ssoBreakGlassCandidateSchema.array())
+
+  /**
+   * Grant somebody a way in that does not go through the identity provider,
+   * with the date it ends. Never plan-gated: a lapsed subscription must never
+   * be the reason an organization cannot reach its own recovery path.
+   */
+  .mutation("grantBreakGlass")
+  .withInput(ssoBreakGlassGrantInputSchema)
+  .withOutput(ssoBreakGlassBindingSchema)
+
+  /** Extend one, by writing a new one that names the old. */
+  .mutation("renewBreakGlass")
+  .withInput(ssoBreakGlassRenewalInputSchema)
+  .withOutput(ssoBreakGlassRenewalSchema)
+
+  /** End a grant now, on purpose. Refused while it is a live connection's
+   *  only way back in — the lever exists for the moment the identity provider
+   *  fails. */
+  .mutation("revokeBreakGlass")
+  .withInput(ssoBreakGlassBindingInputSchema)
+  .withOutput(ssoBreakGlassBindingSchema)
 
   /** Undo a registration that never went live: the journey opens back on the
    *  register step, and the history keeps what was tried. */

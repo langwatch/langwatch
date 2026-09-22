@@ -45,12 +45,10 @@ async function appReading(connection: SsoSetupView["connection"]) {
   const getSetup = vi.fn<SsoSetupApi["getSetup"]>(async () => journeyOf(connection));
   const app = await createSsoTestApp({
     dependencies: {
-      identity: createSsoTestIdentity(
-        RecordingSsoConnectionLedger.create(),
-        void 0,
-        void 0,
-        createApiFixture<SsoSetupApi>({ getSetup }),
-      ),
+      identity: createSsoTestIdentity({
+        connections: RecordingSsoConnectionLedger.create(),
+        setup: createApiFixture<SsoSetupApi>({ getSetup }),
+      }),
     },
   });
 
