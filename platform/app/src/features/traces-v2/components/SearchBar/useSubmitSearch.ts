@@ -11,9 +11,13 @@ import {
   requoteBareTerms,
   splitBareWords,
 } from "~/server/app-layer/traces/query-language/mutations";
-import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/contracts";
+import type {
+  ModelTrouble,
+  RouteSearchResult,
+} from "~/server/app-layer/traces/search-router/contracts";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
+import type { SearchNotice } from "../../stores/querySlice";
 import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute";
 
 interface UseSubmitSearchOptions {
@@ -44,6 +48,46 @@ interface RoutedSubmit {
   timeRange: { from: number; to: number };
 }
 
+/**
+ * The model problem a route reported, in the shape its reader keeps it.
+ *
+ * Both fields are absent on a route that had no model trouble, so they
+ * travel together rather than as a pair of conditions at each call site.
+ */
+function modelFailureOf(result: {
+  modelTrouble?: ModelTrouble;
+  modelErrorCode?: string;
+}): { modelTrouble?: ModelTrouble; modelErrorCode?: string } {
+  return {
+    ...(result.modelTrouble ? { modelTrouble: result.modelTrouble } : {}),
+    ...(result.modelErrorCode ? { modelErrorCode: result.modelErrorCode } : {}),
+  };
+}
+
+/**
+ * The strip a phrase search gets, or null when it does not get one.
+ *
+ * A phrase the classifier picked is the right answer and says nothing
+ * further. A phrase that is what is left of another route gets the strip, so
+ * the quotes around the words are explained rather than just appearing.
+ */
+function phraseNotice({
+  result,
+  projectId,
+}: {
+  result: Extract<RouteSearchResult, { kind: "free_text" }>;
+  projectId: string;
+}): SearchNotice | null {
+  if (!result.fellBackFrom || !result.modelTrouble) return null;
+  return {
+    projectId,
+    query: useExplorerStore.getState().queryText,
+    interpretedAs: "free_text",
+    modelTrouble: result.modelTrouble,
+    ...(result.modelErrorCode ? { modelErrorCode: result.modelErrorCode } : {}),
+  };
+}
+
 /** Puts one router answer on screen: chips, a phrase, a question, or a run. */
 function useApplyRoute({
   onLangy,
@@ -64,24 +108,14 @@ function useApplyRoute({
           // to offer the sentence back as a phrase.
           recordAiTranslation({ projectId, prompt: text, query: result.query });
           return;
-        case "free_text":
+        case "free_text": {
           applyQueryText(result.query);
-          // A phrase the classifier picked is the right answer and says
-          // nothing further. A phrase that is what is left of another route
-          // gets the strip, so the quotes around the words are explained
-          // rather than just appearing.
-          if (result.fellBackFrom && result.modelTrouble) {
-            recordSearchNotice({
-              projectId,
-              query: useExplorerStore.getState().queryText,
-              interpretedAs: "free_text",
-              modelTrouble: result.modelTrouble,
-              ...(result.modelErrorCode
-                ? { modelErrorCode: result.modelErrorCode }
-                : {}),
-            });
-          }
+          // After the apply, against the text the store settled on: the strip
+          // shows while the bar still holds the query it is about.
+          const notice = phraseNotice({ result, projectId });
+          if (notice) recordSearchNotice(notice);
           return;
+        }
         case "langy":
           onLangy(result.question);
           return;
@@ -94,12 +128,7 @@ function useApplyRoute({
             otherQuery: result.otherQuery,
             fallbackQuery: result.fallbackQuery,
             timeRange,
-            ...(result.modelTrouble
-              ? { modelTrouble: result.modelTrouble }
-              : {}),
-            ...(result.modelErrorCode
-              ? { modelErrorCode: result.modelErrorCode }
-              : {}),
+            ...modelFailureOf(result),
           });
           return;
       }
