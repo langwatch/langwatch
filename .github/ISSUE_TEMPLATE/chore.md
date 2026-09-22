@@ -15,8 +15,8 @@ Why is this task needed? Any background or related issues?
 
 ## Acceptance criteria
 
-- Given <context>, when <action>, then <outcome>
-- Given <context>, when <action>, then <outcome>
+- Given [context], when [action], then [outcome]
+- Given [context], when [action], then [outcome]
 
 Only if behaviour changes.
 
