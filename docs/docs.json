@@ -294,6 +294,7 @@
                   "platform/members-and-teams",
                   "platform/rbac",
                   "platform/sso",
+                  "platform/sso-update",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",

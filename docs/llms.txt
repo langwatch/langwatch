@@ -178,6 +178,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
 - [Single sign-on and provisioning](https://langwatch.ai/docs/platform/sso.md): Set up your identity provider, directory provisioning and sign-in policies in LangWatch.
+- [Move to your own identity provider](https://langwatch.ai/docs/platform/sso-update.md): Replace the single sign-on LangWatch set up for your organization with a connection you run yourself, without interrupting anybody's sign-in.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
 - [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed.
 - [Data Privacy](https://langwatch.ai/docs/platform/data-privacy.md): One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level.
