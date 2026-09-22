@@ -9,7 +9,7 @@ keywords: sso, single sign-on, identity provider, update, migrate, okta, entra, 
   This page is for organizations whose single sign-on LangWatch set up on their
   behalf, usually after a request to support. If you connected your identity
   provider yourself in **Settings > Authentication**, you already run it and
-  nothing here applies. Single sign-on is an Enterprise feature.
+  this guide does not apply to you. Single sign-on is an Enterprise feature.
 </Note>
 
 Until now, changing anything about that sign-in meant asking us. You can now
@@ -19,7 +19,7 @@ up when you are ready. Nobody is signed out along the way.
 
 ## What changes, and what does not
 
-- **Nothing changes until you switch over.** Registering your identity provider
+- **Sign-in stays the same until you switch over.** Registering your identity provider
   puts it beside the sign-in you have today. Everyone keeps signing in the way
   they do now until an administrator switches sign-in over.
 - **You can switch back.** After switching over, one action returns everybody
@@ -44,8 +44,8 @@ up when you are ready. Nobody is signed out along the way.
 - Pick a colleague who has set a password on their LangWatch account. Before
   the update can finish, at least one person must be able to sign in without
   your identity provider.
-- If directory sync (SCIM) provisions your people today, nothing changes for
-  it. It moves to the new connection when you finish. See [Directory
+- If directory sync (SCIM) provisions your people today, it keeps working for
+  you. It moves to the new connection when you finish. See [Directory
   sync](#directory-sync).
 
 ## 1. Open the Authentication overview
@@ -175,7 +175,7 @@ moving them still needs:
 
 | Beside a member | What to do |
 | --- | --- |
-| Moves across at their next sign-in | Nothing. The new connection recognizes them by their address. |
+| Moves across at their next sign-in | No action needed. The new connection recognizes them by their address. |
 | Has to sign in through the new connection once | Ask them to sign in. Your previous provider is their only way in, so finishing waits until they have another. |
 | Cannot be matched: their address is not confirmed | Ask them to confirm their email address in their account settings, or remove them from the organization if they have left. |
 | Cannot be matched: another account has the same address | Contact support. |
@@ -233,7 +233,7 @@ You can revoke the one you no longer use there.
 
 ## 6. Finish the update
 
-When nothing is outstanding, select **Finish the update**. The status reads
+When every check has passed, select **Finish the update**. The status reads
 **Finishing** while access through the previous provider is taken away, then
 **Complete**: your new connection is the only way your people sign in.
 
