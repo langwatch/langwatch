@@ -23,6 +23,7 @@ import { TourLayer } from "../ui/tour/tour-layer.tsx";
 import { useGuidedTourStore } from "./guided-tour-store.ts";
 import { useRegisterTourActions } from "./tour-registry.ts";
 import { useGuidedOnboarding } from "./use-guided-onboarding.ts";
+import { useOnboardingExperimentRegistration } from "./use-onboarding-experiment-registration.ts";
 
 /**
  * Queues the kickoff once Langy announces it is scoped to `organizationId`.
@@ -90,6 +91,7 @@ export function GuidedOnboardingHost() {
   });
 
   useHostTourActions(host);
+  useOnboardingExperimentRegistration();
 
   /* one landing per path per page load: a re-render, a refetch or a double
      effect must not start a second tour or queue a second kickoff */

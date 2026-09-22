@@ -27,6 +27,7 @@ let guidedView: {
   guided: boolean;
   state: Record<string, unknown> | null;
   organizationId: string | null;
+  variant?: "guided" | "classic" | null;
 };
 
 vi.mock("../use-guided-onboarding.ts", () => ({
@@ -35,6 +36,14 @@ vi.mock("../use-guided-onboarding.ts", () => ({
 
 vi.mock("../../ui/tour/tour-layer.tsx", () => ({
   TourLayer: () => <div data-testid="tour-layer" />,
+}));
+
+const { mockRegisterOnboardingExperiment } = vi.hoisted(() => ({
+  mockRegisterOnboardingExperiment: vi.fn(),
+}));
+
+vi.mock("../../../../behavior/onboarding-experiment-registration.ts", () => ({
+  registerOnboardingExperiment: mockRegisterOnboardingExperiment,
 }));
 
 import {
@@ -139,6 +148,7 @@ describe("GuidedOnboardingHost", () => {
   beforeEach(() => {
     recordTourMutate.mockClear();
     invalidateGuidedState.mockClear();
+    mockRegisterOnboardingExperiment.mockClear();
     recordTourOnSuccess = undefined;
     useGuidedTourStore.setState({
       running: false,
@@ -291,5 +301,29 @@ describe("GuidedOnboardingHost", () => {
     unmount();
 
     expect(host.governanceSetSampleChoice).toHaveBeenCalledWith(false);
+  });
+
+  /** @scenario "the browser registers the experiment property once the organization's variant is known" */
+  it("wires the experiment registration to the organization's variant", () => {
+    guidedView = { guided: false, state: null, organizationId: "org_1", variant: "guided" };
+    const host = new TestOnboardingHost({
+      pathname: "/project/p1/traces",
+      organizationId: "org_1",
+    });
+    mount(host);
+
+    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith("guided");
+  });
+
+  /** @scenario "the browser registers nothing for an organization without a variant" */
+  it("wires no-variant through to the registration the same way", () => {
+    guidedView = { guided: false, state: null, organizationId: "org_1", variant: null };
+    const host = new TestOnboardingHost({
+      pathname: "/project/p1/traces",
+      organizationId: "org_1",
+    });
+    mount(host);
+
+    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith(null);
   });
 });
