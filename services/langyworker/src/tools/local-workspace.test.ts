@@ -849,7 +849,7 @@ describe("the local workspace tools", () => {
       // The panel reads this first line to tell a call that RAISED the card
       // from one the tool answered itself, and draws a card only for the
       // first. `LANGY_CODE_ACCESS_CARD_ANSWER` in
-      // platform/app/src/features/langy/logic/langyCodeAccessTool.ts is the
+      // modules/langy/browser (langyCodeAccessTool) is the
       // same words; change one and change the other.
       expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
       expect(text).toContain("npx langwatch@latest langy --share-control");
