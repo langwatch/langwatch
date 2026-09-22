@@ -490,6 +490,14 @@ describe("given persisted migration evidence", () => {
     expect((await inspect())?.legacyAccessRetired).toBe(true);
   });
 
+  // @scenario "A revoked legacy directory sync is not one left to repoint"
+  it("stops asking for a repoint once the legacy sync is revoked", async () => {
+    await sync(legacyId, "REVOKED");
+
+    expect((await progress())?.scim.status).toBe("not-applicable");
+    expect((await inspect())?.blockers).toEqual([]);
+  });
+
   it("requires usable recovery even when a binding row exists and deduplicates its blocker", async () => {
     holdsPassword.mockResolvedValue(false);
     recovery.hasLiveBinding.mockResolvedValue(false);
