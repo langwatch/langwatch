@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import type { paths } from "@/internal/generated/openapi/api-client";
 import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -33,11 +34,15 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
   "pass-rate": "eval-pass-rate",
 };
 
-// The metric paths the platform accepts, mirrored from the analytics
-// registry (platform/app/src/server/analytics/registry.ts,
-// `flattenAnalyticsMetricsEnum`). Checked here so a mistyped path is refused
-// with the list in hand, before a request is made.
-const KNOWN_METRICS = [
+/** One metric path, as the timeseries endpoint's own schema declares them. */
+type AnalyticsMetric =
+  paths["/api/analytics/timeseries"]["post"]["requestBody"]["content"]["application/json"]["series"][number]["metric"];
+
+// The metric paths the platform accepts, checked here so a mistyped path is
+// refused with the list in hand, before a request is made. `satisfies` pins
+// the list to the generated schema: a metric the platform renames or drops
+// stops compiling here rather than reaching the API as a rejected body.
+const KNOWN_METRICS: readonly string[] = [
   "metadata.trace_id",
   "metadata.user_id",
   "metadata.thread_id",
@@ -63,7 +68,7 @@ const KNOWN_METRICS = [
   "evaluations.evaluation_pass_rate",
   "evaluations.evaluation_runs",
   "threads.average_duration_per_thread",
-];
+] satisfies readonly AnalyticsMetric[];
 
 /** The presets and metric paths a `--metric` value can name, for an error. */
 const metricChoices = (): string =>
