@@ -456,6 +456,56 @@ describe("simulationRunStateFoldProjection", () => {
       const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
       expect(metadata.source).toBe("provider");
     });
+
+    /** @scenario "A re-drive that lost its recording clears the run's audio link" */
+    it("clears a stale audioUrl when the refresh carries null", () => {
+      const state = foldEvents([
+        // The first attempt had a recording and wrote its proxy url.
+        createRunStartedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              langwatch: { targetType: "voice" },
+            },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        // The retry has no recording, so its refresh carries audioUrl: null.
+        createMetadataRefreshedEvent(
+          {
+            metadata: {
+              source: "browser",
+              audioUrl: null,
+              langwatch: { isCutAtLimit: false },
+            },
+          },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "done",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      // The stale link is gone: the run must not offer a Play control for a
+      // recording the latest attempt does not have (#8032).
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.audioUrl).toBeNull();
+      expect(metadata.source).toBe("browser");
+      // The reserved namespace is still deep-merged, not dropped.
+      expect(metadata.langwatch).toEqual({
+        targetType: "voice",
+        isCutAtLimit: false,
+      });
+    });
   });
 
   describe("when an event carries secret parameters on its metadata", () => {

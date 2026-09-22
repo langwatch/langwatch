@@ -167,7 +167,12 @@ export async function writeVoiceCallRun({
       metadata: {
         source: record.source,
         langwatch: { isCutAtLimit: record.isCutAtLimit },
-        ...(record.audioUrl ? { audioUrl: record.audioUrl } : {}),
+        // Always carry audioUrl, as null when this attempt has no recording:
+        // a first attempt that had audio then a retry that does not must clear
+        // the stale link, else the run keeps offering a Play control for a
+        // recording that is no longer there (#8032). The fold overwrites the
+        // top-level key, so null replaces the earlier url.
+        audioUrl: record.audioUrl ?? null,
       },
       occurredAt: record.endedAt,
     });

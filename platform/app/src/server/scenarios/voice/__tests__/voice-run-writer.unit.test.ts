@@ -142,7 +142,7 @@ describe("writeVoiceCallRun", () => {
         expect(refresh.occurredAt).toBe(2);
       });
 
-      it("omits audioUrl from the refresh when this attempt still has none", async () => {
+      it("carries audioUrl: null in the refresh when this attempt has none, clearing any stale link", async () => {
         await writeVoiceCallRun({
           projectId: "project_1",
           scenarioRunId: "run_1",
@@ -157,7 +157,10 @@ describe("writeVoiceCallRun", () => {
         const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
           metadata: Record<string, unknown>;
         };
-        expect(refresh.metadata).not.toHaveProperty("audioUrl");
+        // The key is present and null so the fold overwrites — a first attempt
+        // that had audio then a retry that does not must lose the stale Play
+        // link, not keep it (#8032).
+        expect(refresh.metadata).toHaveProperty("audioUrl", null);
         expect(refresh.metadata.source).toBe("browser");
       });
     });
