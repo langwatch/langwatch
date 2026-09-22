@@ -49,28 +49,12 @@ export function SingleSignOnPreviewCard({
    */
   updatePhase?: SsoMigrationPhase | null;
 }) {
-  // An update in flight OUTRANKS the lifecycle state. The connection this card
-  // is describing is a replacement for one that is signing the whole company
-  // in, so "still setting up" is true of the row and useless to the reader:
-  // what they need is which step of the update they are on, in the words the
-  // single sign-on page uses for the same state.
-  //
-  // A connection that exists otherwise says where it stands in its own words;
-  // one that does not says so plainly rather than borrowing a lifecycle state.
-  const chip = updatePhase
-    ? singleSignOnUpdateChipFor(updatePhase)
-    : state === null
-      ? {
-          label: "Not set up",
-          tone: "neutral" as const,
-          title: "No identity provider is connected to this organization.",
-        }
-      : connectionStatusChipFor({ state, goLiveBlockedBecause });
+  const copy = previewCopyFor({ state, goLiveBlockedBecause, updatePhase });
 
   return (
     <OverviewCard
       title="Single sign-on"
-      chip={chip}
+      chip={copy.chip}
       data-testid="single-sign-on-preview-card"
       actions={
         canManage ? (
@@ -79,11 +63,7 @@ export function SingleSignOnPreviewCard({
             data-testid="single-sign-on-preview-action"
           >
             <Button size="sm" variant="solid" colorPalette="orange">
-              {updatePhase
-                ? "Where it stands"
-                : state === null
-                  ? "Set it up"
-                  : "Carry on setting it up"}
+              {copy.action}
               <ArrowRight size={14} />
             </Button>
           </Link>
@@ -101,17 +81,64 @@ export function SingleSignOnPreviewCard({
         <Text>Anyone with an address at a domain you prove is yours.</Text>
       </OverviewDetail>
 
-      <OverviewDetail
-        label={updatePhase || state !== null ? "Next step" : "First step"}
-      >
-        <Text color="fg.muted">
-          {updatePhase
-            ? chip.title
-            : state === null
-              ? "Telling us about your identity provider."
-              : "Carry on where you left off."}
-        </Text>
+      <OverviewDetail label={copy.stepLabel}>
+        <Text color="fg.muted">{copy.step}</Text>
       </OverviewDetail>
     </OverviewCard>
   );
+}
+
+/**
+ * The words for the three situations the card can be in, decided once.
+ *
+ * An update in flight OUTRANKS the lifecycle state. The connection this card
+ * is describing is a replacement for one that is signing the whole company
+ * in, so "still setting up" is true of the row and useless to the reader:
+ * what they need is which step of the update they are on, in the words the
+ * single sign-on page uses for the same state.
+ *
+ * A connection that exists otherwise says where it stands in its own words;
+ * one that does not says so plainly rather than borrowing a lifecycle state.
+ */
+function previewCopyFor({
+  state,
+  goLiveBlockedBecause,
+  updatePhase,
+}: {
+  state: SsoConnectionLifecycleState | null;
+  goLiveBlockedBecause: string | null | undefined;
+  updatePhase: SsoMigrationPhase | null;
+}): {
+  chip: ReturnType<typeof connectionStatusChipFor>;
+  action: string;
+  stepLabel: string;
+  step: string;
+} {
+  if (updatePhase) {
+    const chip = singleSignOnUpdateChipFor(updatePhase);
+    return {
+      chip,
+      action: "Where it stands",
+      stepLabel: "Next step",
+      step: chip.title,
+    };
+  }
+  if (state === null) {
+    return {
+      chip: {
+        label: "Not set up",
+        tone: "neutral",
+        title: "No identity provider is connected to this organization.",
+      },
+      action: "Set it up",
+      stepLabel: "First step",
+      step: "Telling us about your identity provider.",
+    };
+  }
+  return {
+    chip: connectionStatusChipFor({ state, goLiveBlockedBecause }),
+    action: "Carry on setting it up",
+    stepLabel: "Next step",
+    step: "Carry on where you left off.",
+  };
 }

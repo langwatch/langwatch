@@ -17,7 +17,10 @@ import {
   resourceSchema,
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { isStorableSpanTimeMs } from "../../event-sourcing/pipelines/trace-processing/utils/storableSpanTime";
+import {
+  storableSpanTimesOf,
+  type UnstorableSpanTime,
+} from "../../event-sourcing/pipelines/trace-processing/utils/storableSpanTime";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   codexHelperThreadMarkersOf,
@@ -35,6 +38,13 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  * so arbitrarily old timestamps never land in cold ClickHouse partitions.
  */
 export const SPAN_MAX_PAST_MS = 31 * ONE_DAY_MS;
+
+/** What the producer is told, naming the field it has to fix. */
+function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
+  return field === "startTimeUnixMs"
+    ? "span start time is not a valid timestamp"
+    : "span end time is not a valid timestamp";
+}
 
 export type SpanIngestionStatus =
   | "collected"
@@ -344,59 +354,24 @@ export class TraceRequestCollectionService {
       };
     }
 
-    // A wire value the nanosecond decoder refuses is one span's problem, not the
-    // batch's: it is dropped here, with its siblings still dispatched, rather
-    // than thrown out of the whole request.
-    let startTimeUnixMs: number;
-    let endTimeUnixMs: number;
-    try {
-      startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-        TraceRequestUtils.normalizeOtlpUnixNano(
-          spanParseResult.data.startTimeUnixNano,
-        ),
-      );
-    } catch {
+    // A time span storage cannot hold — undecodable, zero, or past the storage
+    // ceiling, which nothing bounded before — is refused at the door: minted
+    // into a record id after the event is appended it throws permanently, on a
+    // retrying lane. It is one span's problem, not the batch's, so its siblings
+    // are still dispatched. The same decision the replay edge makes.
+    const decoded = storableSpanTimesOf(spanParseResult.data);
+    if ("unstorable" in decoded) {
       return {
         status: "dropped",
-        error: "span start time is not a valid timestamp",
+        error: unstorableSpanTimeMessage(decoded.unstorable),
       };
     }
-    try {
-      endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-        TraceRequestUtils.normalizeOtlpUnixNano(
-          spanParseResult.data.endTimeUnixNano,
-        ),
-      );
-    } catch {
-      return {
-        status: "dropped",
-        error: "span end time is not a valid timestamp",
-      };
-    }
-    const now = Date.now();
+    const { startTimeUnixMs } = decoded.times;
 
-    if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
+    if (startTimeUnixMs < Date.now() - SPAN_MAX_PAST_MS) {
       return {
         status: "dropped",
         error: "span start time is more than 31 days in the past",
-      };
-    }
-
-    // The future edge, which nothing bounded before: a start time past what span
-    // storage can represent cannot be written at all, and the record id minted
-    // from it throws once the span is already an appended event — permanently,
-    // on a retrying lane. Refuse it at the door instead. The end time is checked
-    // with it because it is written to the same kind of column.
-    if (!isStorableSpanTimeMs(startTimeUnixMs)) {
-      return {
-        status: "dropped",
-        error: "span start time is not a valid timestamp",
-      };
-    }
-    if (!isStorableSpanTimeMs(endTimeUnixMs)) {
-      return {
-        status: "dropped",
-        error: "span end time is not a valid timestamp",
       };
     }
 

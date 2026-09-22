@@ -94,6 +94,9 @@ vi.mock("../../utils/api", () => ({
       getUsage: { useQuery: () => ({ data: undefined }) },
     },
     user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
+    checkup: {
+      startupNotice: { useQuery: () => ({ data: undefined }) },
+    },
     twoStepVerification: {
       standing: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) },
     },

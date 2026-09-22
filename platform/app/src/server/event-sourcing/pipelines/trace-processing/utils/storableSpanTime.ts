@@ -1,4 +1,5 @@
 import type { SpanReceivedEvent } from "../schemas/events";
+import type { OtlpSpan } from "../schemas/otlp";
 import { TraceRequestUtils } from "./traceRequest.utils";
 
 /**
@@ -50,15 +51,44 @@ export function isStorableSpanTimeMs(
   );
 }
 
-/** The one unstorable field a skipped span is named by, and its value. */
-interface UnstorableSpanTime {
+/** The one unstorable field a refused span is named by, and its value. */
+export interface UnstorableSpanTime {
   field: "startTimeUnixMs" | "endTimeUnixMs";
+  /** What the producer sent, or `null` when it could not even be decoded. */
   valueMs: number | null;
 }
 
+/** Both of a span's times, decoded and known to be storable. */
+export interface StorableSpanTimes {
+  startTimeUnixMs: number;
+  endTimeUnixMs: number;
+}
+
+/** One wire time, in ms, or the field that refused it. */
+function decodeSpanTime({
+  field,
+  unixNano,
+}: {
+  field: UnstorableSpanTime["field"];
+  unixNano: OtlpSpan["startTimeUnixNano"];
+}): { valueMs: number } | { unstorable: UnstorableSpanTime } {
+  let valueMs: number;
+  try {
+    valueMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+      TraceRequestUtils.normalizeOtlpUnixNano(unixNano),
+    );
+  } catch {
+    return { unstorable: { field, valueMs: null } };
+  }
+  return isStorableSpanTimeMs(valueMs)
+    ? { valueMs }
+    : { unstorable: { field, valueMs } };
+}
+
 /**
- * The first of the span's own times that cannot be stored, or `null` when both
- * can.
+ * Both of a span's times as storable epoch ms, or the first one that is not:
+ * the one decision both edges make, so the ingestion door and the replay-edge
+ * gate can never disagree on what they refuse.
  *
  * Both are checked because both are written: the store hands ClickHouse
  * `new Date(startTimeUnixMs)` and `new Date(endTimeUnixMs)` for two
@@ -68,40 +98,38 @@ interface UnstorableSpanTime {
  * instant, on the same retry-forever lane as the start time.
  *
  * A wire value the nanosecond decoder refuses is the same condition, not a
- * different one — there is no storable time in the event either way — so the
- * conversion is read inside the guard rather than left to throw later out of
- * normalization. The `try` covers only that conversion, so no other failure is
- * swallowed by it.
+ * different one — there is no storable time either way — so the conversion is
+ * read inside the guard rather than left to throw later out of normalization.
+ * Each `try` covers only its own conversion, so nothing else is swallowed and
+ * the field named is the one that failed.
  */
+export function storableSpanTimesOf({
+  startTimeUnixNano,
+  endTimeUnixNano,
+}: Pick<OtlpSpan, "startTimeUnixNano" | "endTimeUnixNano">):
+  | { times: StorableSpanTimes }
+  | { unstorable: UnstorableSpanTime } {
+  const start = decodeSpanTime({
+    field: "startTimeUnixMs",
+    unixNano: startTimeUnixNano,
+  });
+  if ("unstorable" in start) return start;
+  const end = decodeSpanTime({
+    field: "endTimeUnixMs",
+    unixNano: endTimeUnixNano,
+  });
+  if ("unstorable" in end) return end;
+  return {
+    times: { startTimeUnixMs: start.valueMs, endTimeUnixMs: end.valueMs },
+  };
+}
+
+/** The first of the event's span times that cannot be stored, or `null`. */
 function unstorableSpanTimeOf(
   event: SpanReceivedEvent,
 ): UnstorableSpanTime | null {
-  let startTimeUnixMs: number;
-  let endTimeUnixMs: number;
-  try {
-    startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        event.data.span.startTimeUnixNano,
-      ),
-    );
-  } catch {
-    return { field: "startTimeUnixMs", valueMs: null };
-  }
-  try {
-    endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.endTimeUnixNano),
-    );
-  } catch {
-    return { field: "endTimeUnixMs", valueMs: null };
-  }
-
-  if (!isStorableSpanTimeMs(startTimeUnixMs)) {
-    return { field: "startTimeUnixMs", valueMs: startTimeUnixMs };
-  }
-  if (!isStorableSpanTimeMs(endTimeUnixMs)) {
-    return { field: "endTimeUnixMs", valueMs: endTimeUnixMs };
-  }
-  return null;
+  const decoded = storableSpanTimesOf(event.data.span);
+  return "unstorable" in decoded ? decoded.unstorable : null;
 }
 
 /** The minimum a consumer's logger has to offer to report a skipped span. */
