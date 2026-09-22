@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { TestSignInFailureNotice } from "@ee/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "@ee/sso/hooks/useTestSignIn";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@ee/sso/logic/connectionStatus";
 import { domainProofChipFor } from "@ee/sso/logic/domainProofChip";
 import type { SelfServeSetupView } from "@ee/sso/sso-self-serve.types";
-import { ExternalLink, RefreshCw, Settings2 } from "lucide-react";
+import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import {
   OverviewCard,
@@ -19,6 +19,7 @@ import {
 } from "~/components/settings/authentication/OverviewCard";
 import { Link } from "~/components/ui/link";
 import { identityProviderPreset } from "../singleSignOn/identityProviders";
+import { singleSignOnUpdateChipFor } from "../singleSignOn/migration-progress";
 
 /**
  * The protocol's own mark, from the catalogue the setup journey picks from —
@@ -103,6 +104,8 @@ export function SingleSignOnCard({
           the provider that refused, not in a corner for eight seconds. */}
       {failure && <TestSignInFailureNotice failure={failure} />}
 
+      <UpdateNotice setup={setup} canManage={canManage} />
+
       {/* FOUR ROWS, AND SHORT ONES. An overview card is read at a glance and
           is the wrong place for everything true about a connection: five rows
           with sentence-long labels wrapped onto two lines each and turned a
@@ -177,6 +180,74 @@ export function SingleSignOnCard({
         )}
       </OverviewDetail>
     </OverviewCard>
+  );
+}
+
+/**
+ * The one thing on this overview that is not a fact about today.
+ *
+ * TWO STATES, AND ONLY ONE OF THEM IS AN INVITATION. An organization whose
+ * single sign-on LangWatch set up can take it over by connecting its own
+ * identity provider, and this is where somebody who never opens the provider
+ * page finds that out — with one action, which goes to the step that does it.
+ * Once that is under way the same spot reports where it got to instead, in the
+ * same words the provider page uses, because two screens with two vocabularies
+ * for one state read as two states.
+ *
+ * Held to `sso:view` by the page above, and the ACTION to `sso:manage`: a
+ * reader who cannot act still gets the status, and never a control that would
+ * refuse them.
+ */
+function UpdateNotice({
+  setup,
+  canManage,
+}: {
+  setup: LiveSetup;
+  canManage: boolean;
+}) {
+  if (setup.migration) {
+    const chip = singleSignOnUpdateChipFor(setup.migration.phase);
+    return (
+      <OverviewDetail label="Update">
+        <HStack gap={2}>
+          <IdentityChip
+            label={chip.label}
+            tone={chip.tone}
+            title={chip.title}
+            data-testid="sso-update-chip"
+          />
+          <Link href="/settings/authentication/provider">Where it stands</Link>
+        </HStack>
+      </OverviewDetail>
+    );
+  }
+
+  if (setup.connection.source !== "legacy-grandfathered") return null;
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="md"
+      padding={3}
+      data-testid="sso-update-notice"
+    >
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="13px" color="fg.muted">
+          {canManage
+            ? "LangWatch set this single sign-on up for your organization. Connect your own identity provider to run it yourself."
+            : "LangWatch set this single sign-on up for your organization. An organization administrator can connect your own identity provider to run it yourselves."}
+        </Text>
+        {canManage && (
+          <Link href="/settings/authentication/provider">
+            <Button size="sm" variant="solid" colorPalette="orange">
+              Update single sign-on
+              <ArrowRight size={14} />
+            </Button>
+          </Link>
+        )}
+      </VStack>
+    </Box>
   );
 }
 

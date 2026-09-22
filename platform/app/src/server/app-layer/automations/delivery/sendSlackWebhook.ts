@@ -3,6 +3,7 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
+import { tracePlatformUrl } from "~/app/api/shared/trace-platform-url";
 import { env } from "~/env.mjs";
 import {
   type AlertType,
@@ -32,6 +33,49 @@ interface TriggerData {
   output: string;
   fullTrace: Trace;
 }
+
+interface LinkedTrace {
+  traceId?: string;
+  graphId?: string;
+  occurredAtMs?: number | null;
+}
+
+/** The link a trigger row points at: the custom graph, else the trace with its partition hint. */
+const linkFor = ({
+  projectSlug,
+  trace,
+}: {
+  projectSlug: string;
+  trace: LinkedTrace;
+}): string => {
+  if (trace.graphId) {
+    return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${trace.graphId}`;
+  }
+  if (trace.traceId) {
+    return tracePlatformUrl({
+      projectSlug,
+      traceId: trace.traceId,
+      occurredAtMs: trace.occurredAtMs,
+    });
+  }
+  return "#";
+};
+
+const displayTextFor = (trace: LinkedTrace): string =>
+  trace.graphId ? "View Graph" : (trace.traceId ?? "View");
+
+const alertIcon = (alertType: AlertType | null): string => {
+  switch (alertType) {
+    case AlertTypeEnum.INFO:
+      return "ℹ️";
+    case AlertTypeEnum.WARNING:
+      return "⚠️";
+    case AlertTypeEnum.CRITICAL:
+      return "🔴";
+    default:
+      return "🔔";
+  }
+};
 
 export const sendSlackWebhook = async ({
   triggerWebhook,
@@ -64,34 +108,15 @@ export const sendSlackWebhook = async ({
         input: data.input,
         output: data.output,
         events: data.fullTrace?.events ?? [],
+        occurredAtMs: data.fullTrace?.timestamps?.started_at,
       };
     })
     .slice(0, 10);
 
-  const getLink = (data: { traceId?: string; graphId?: string }) => {
-    // Check if this is a custom graph trigger
-    if (data.graphId) {
-      return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${data.graphId}`;
-    }
-    // Regular trace link
-    if (data.traceId) {
-      return `${env.BASE_HOST}/${projectSlug}/traces/${data.traceId}`;
-    }
-    return "#";
-  };
-
-  const getDisplayText = (data: { traceId?: string; graphId?: string }) => {
-    // For custom graphs, show a more user-friendly text
-    if (data.graphId) {
-      return "View Graph";
-    }
-    return data.traceId ?? "View";
-  };
-
   const traceLinks = traceIds.map((trace) => {
     const isCustomGraph = !!trace.graphId;
 
-    return `\n<${getLink(trace)}|${getDisplayText(trace)}>
+    return `\n<${linkFor({ projectSlug, trace })}|${displayTextFor(trace)}>
     ${
       !triggerMessage && !isCustomGraph
         ? ` \n*Input:* ${escapeMrkdwn(trace.input)}
@@ -121,19 +146,6 @@ export const sendSlackWebhook = async ({
       }
      `;
   });
-
-  const alertIcon = (alertType: AlertType | null) => {
-    switch (alertType) {
-      case AlertTypeEnum.INFO:
-        return "ℹ️";
-      case AlertTypeEnum.WARNING:
-        return "⚠️";
-      case AlertTypeEnum.CRITICAL:
-        return "🔴";
-      default:
-        return "🔔";
-    }
-  };
 
   try {
     await webhook.send({

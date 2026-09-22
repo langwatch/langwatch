@@ -18,12 +18,14 @@
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
+import { Play } from "lucide-react";
 import { extractPlatformUrl, isAppPath } from "~/utils/platformHref";
 import {
   type CapabilityData,
   useCapabilityData,
 } from "../../hooks/useCapabilityData";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
+import { type LangySend, useLangySend } from "../LangySendContext";
 import { StreamingStatCard } from "../StreamingStatCard";
 import type { CapabilityFact } from "./capabilityCatalog";
 import {
@@ -43,6 +45,7 @@ import {
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
+import { LangyCardActionChip } from "./LangyCardActionChip";
 import { isPlottable, TimeseriesPlot } from "./LangyTimeseriesCard";
 
 const MAX_ROWS = 5;
@@ -505,6 +508,41 @@ function DiffBody({
   );
 }
 
+/**
+ * The offer a freshly created scenario carries: its first run. It is worded,
+ * not scheduled. The message goes through the composer, so Langy resolves the
+ * target (the connected agent when one is online) and asks what it has to
+ * ask, the way the scenarios skill does for a typed request. Nothing is
+ * offered where no request can be routed (a replayed turn) or when the card
+ * has no name to put in the sentence.
+ */
+function createdScenarioRunOffer({
+  descriptor,
+  name,
+  send,
+}: {
+  descriptor: CapabilityDescriptor;
+  name: string | null;
+  send: LangySend | null;
+}) {
+  const createdScenario =
+    descriptor.tone === "created" &&
+    descriptor.command.resource === "scenario" &&
+    descriptor.command.verb === "create";
+  if (!createdScenario || !send || !name) return undefined;
+  return (
+    <LangyCardActionChip
+      label="Run against my agent"
+      icon={<Play size={12} />}
+      disabled={send.isTurnInFlight}
+      onClick={() =>
+        send.send(`Run scenario "${name}" against my connected agent`)
+      }
+      testId="langy-card-run-scenario"
+    />
+  );
+}
+
 /** The settled-write sentence, by tone. */
 function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   switch (tone) {
@@ -534,6 +572,7 @@ export function LangyDeclarativeCard({
 }: CapabilityCardInput) {
   const projectSlug = rawProjectSlug ?? null;
   const { tone, body, noun } = descriptor;
+  const send = useLangySend();
 
   // Hydration is for COLLECTION reads: fresh names and links for the entities
   // the result referenced. Facts/stats/diff keep the stored structure (the
@@ -580,6 +619,7 @@ export function LangyDeclarativeCard({
         resourceId={removed ? null : id}
         platformUrl={removed ? null : extractPlatformUrl(output)}
         icon={descriptor.icon}
+        actions={createdScenarioRunOffer({ descriptor, name, send })}
       >
         <BodyLine>{writeSentence(tone)}</BodyLine>
       </LangyCapabilityCard>

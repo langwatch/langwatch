@@ -1,12 +1,16 @@
 import { Button, Text } from "@chakra-ui/react";
 import { connectionStatusChipFor } from "@ee/sso/logic/connectionStatus";
-import type { SsoConnectionLifecycleState } from "@langwatch/identity";
+import type {
+  SsoConnectionLifecycleState,
+  SsoMigrationPhase,
+} from "@langwatch/identity";
 import { ArrowRight } from "lucide-react";
 import {
   OverviewCard,
   OverviewDetail,
 } from "~/components/settings/authentication/OverviewCard";
 import { Link } from "~/components/ui/link";
+import { singleSignOnUpdateChipFor } from "../singleSignOn/migration-progress";
 
 /**
  * What single sign-on would give this organization, before there is one to
@@ -28,6 +32,7 @@ export function SingleSignOnPreviewCard({
   state = null,
   canManage = false,
   goLiveBlockedBecause,
+  updatePhase = null,
 }: {
   /** Where a half-built connection got to, or null when there is none. */
   state?: SsoConnectionLifecycleState | null;
@@ -38,28 +43,27 @@ export function SingleSignOnPreviewCard({
    * announced as ready while the journey still has steps in it.
    */
   goLiveBlockedBecause?: string | null;
+  /**
+   * Where an update to the organization's own identity provider got to, when
+   * one is under way.
+   */
+  updatePhase?: SsoMigrationPhase | null;
 }) {
-  // A connection that exists says where it stands in its own words; one that
-  // does not says so plainly rather than borrowing a lifecycle state.
-  const chip =
-    state === null
-      ? {
-          label: "Not set up",
-          tone: "neutral" as const,
-          title: "No identity provider is connected to this organization.",
-        }
-      : connectionStatusChipFor({ state, goLiveBlockedBecause });
+  const copy = previewCopyFor({ state, goLiveBlockedBecause, updatePhase });
 
   return (
     <OverviewCard
       title="Single sign-on"
-      chip={chip}
+      chip={copy.chip}
       data-testid="single-sign-on-preview-card"
       actions={
         canManage ? (
-          <Link href="/settings/authentication/provider">
+          <Link
+            href="/settings/authentication/provider"
+            data-testid="single-sign-on-preview-action"
+          >
             <Button size="sm" variant="solid" colorPalette="orange">
-              {state === null ? "Set it up" : "Carry on setting it up"}
+              {copy.action}
               <ArrowRight size={14} />
             </Button>
           </Link>
@@ -77,13 +81,64 @@ export function SingleSignOnPreviewCard({
         <Text>Anyone with an address at a domain you prove is yours.</Text>
       </OverviewDetail>
 
-      <OverviewDetail label={state === null ? "First step" : "Next step"}>
-        <Text color="fg.muted">
-          {state === null
-            ? "Telling us about your identity provider."
-            : "Carry on where you left off."}
-        </Text>
+      <OverviewDetail label={copy.stepLabel}>
+        <Text color="fg.muted">{copy.step}</Text>
       </OverviewDetail>
     </OverviewCard>
   );
+}
+
+/**
+ * The words for the three situations the card can be in, decided once.
+ *
+ * An update in flight OUTRANKS the lifecycle state. The connection this card
+ * is describing is a replacement for one that is signing the whole company
+ * in, so "still setting up" is true of the row and useless to the reader:
+ * what they need is which step of the update they are on, in the words the
+ * single sign-on page uses for the same state.
+ *
+ * A connection that exists otherwise says where it stands in its own words;
+ * one that does not says so plainly rather than borrowing a lifecycle state.
+ */
+function previewCopyFor({
+  state,
+  goLiveBlockedBecause,
+  updatePhase,
+}: {
+  state: SsoConnectionLifecycleState | null;
+  goLiveBlockedBecause: string | null | undefined;
+  updatePhase: SsoMigrationPhase | null;
+}): {
+  chip: ReturnType<typeof connectionStatusChipFor>;
+  action: string;
+  stepLabel: string;
+  step: string;
+} {
+  if (updatePhase) {
+    const chip = singleSignOnUpdateChipFor(updatePhase);
+    return {
+      chip,
+      action: "Where it stands",
+      stepLabel: "Next step",
+      step: chip.title,
+    };
+  }
+  if (state === null) {
+    return {
+      chip: {
+        label: "Not set up",
+        tone: "neutral",
+        title: "No identity provider is connected to this organization.",
+      },
+      action: "Set it up",
+      stepLabel: "First step",
+      step: "Telling us about your identity provider.",
+    };
+  }
+  return {
+    chip: connectionStatusChipFor({ state, goLiveBlockedBecause }),
+    action: "Carry on setting it up",
+    stepLabel: "Next step",
+    step: "Carry on where you left off.",
+  };
 }

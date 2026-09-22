@@ -313,17 +313,61 @@ export class SsoArrivalService {
     policy: SsoArrivalPolicy;
     organizationId: string;
   } | null> {
-    // Cheap first: most accounts through this seam are not connections at all.
-    if (!looksLikeSsoConnectionId(connectionId)) return null;
+    // Cheap first: most accounts through this seam are not connections at all,
+    // so this is the expected path and reads at debug, not one line per
+    // ordinary sign-in.
+    if (!looksLikeSsoConnectionId(connectionId)) {
+      logger.debug(
+        { reason: "not_a_connection_id", connectionId },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
     const connection = await this.deps.connections.findConnectionForSignIn({
       connectionId,
     });
-    if (!connection) return null;
+    if (!connection) {
+      logger.info(
+        { reason: "connection_not_found", connectionId },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
 
     const standing = domainStanding({ connection, domain });
-    if (!standing.live) return null;
-    if (!standing.proved) return null;
-    if (standing.lapsed) return null;
+    if (!standing.live) {
+      logger.info(
+        {
+          reason: "domain_not_live",
+          connectionId,
+          organizationId: connection.organizationId,
+        },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
+    if (!standing.proved) {
+      logger.info(
+        {
+          reason: "domain_not_proved",
+          connectionId,
+          organizationId: connection.organizationId,
+        },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
+    if (standing.lapsed) {
+      logger.info(
+        {
+          reason: "domain_proof_lapsed",
+          connectionId,
+          organizationId: connection.organizationId,
+        },
+        "a single sign-on arrival was not considered for admission",
+      );
+      return null;
+    }
 
     // Read off the connection rather than re-derived here. There is one field
     // and one answer, which is the point of there being one field: this is the

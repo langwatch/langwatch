@@ -201,7 +201,7 @@ function useConnectionRegistration({
             ? "Replacement registered"
             : "Identity provider registered",
           description: replacesConnectionId
-            ? "Your current sign-in keeps working until you switch traffic over."
+            ? "Your current sign-in keeps working until you switch everyone over."
             : "Next, prove you own the domain your people sign in with.",
           type: "success",
         });

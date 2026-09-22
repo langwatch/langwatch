@@ -5468,6 +5468,17 @@ export interface operations {
                                 id: string;
                                 url: string;
                                 parameterNotes: string[];
+                                scope: {
+                                    /** @constant */
+                                    kind: "shared";
+                                } | {
+                                    /** @constant */
+                                    kind: "owner";
+                                } | {
+                                    /** @constant */
+                                    kind: "host";
+                                    hostLabel: string;
+                                };
                             }[];
                             heartbeatIntervalMs: number;
                             instanceId: string;

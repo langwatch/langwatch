@@ -246,8 +246,11 @@ describe("given an organization replacing the provider it already has", () => {
 
     expect(screen.getByText("Single sign-on is active")).toBeDefined();
     expect(
-      screen.getByText(/Your existing Auth0 sign-in remains active/),
+      screen.getByText(/Your people sign in through Auth0 today/),
     ).toBeDefined();
+    // What is offered is the registration form, against the connection it
+    // replaces. A bare "migrate" button, which decides nothing and asks for
+    // nothing, is still not on this screen.
     expect(screen.queryByRole("button", { name: /Migrate from Auth0/ })).toBe(
       null,
     );

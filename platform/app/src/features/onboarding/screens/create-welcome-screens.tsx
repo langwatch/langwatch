@@ -62,7 +62,13 @@ const OrganizationScreen: React.FC = () => {
           its way past says exactly what carrying on means, which lands them
           right back on this form with nothing lost. What changed is only that
           the question is now asked where it can be heard. */}
-      <JoinYourTeamTakeover dismissLabel="Create a new organization instead" />
+      <JoinYourTeamTakeover
+        dismissLabel="Create a new organization instead"
+        // Onboarding has no organization context at all — explicit `null`,
+        // not omission, so a pending request for ANY organization still
+        // blocks workspace creation here.
+        currentOrganizationId={null}
+      />
 
       {/* The soft notice stays for the case the screen above does not cover:
           somebody who already declined for this domain, and is now looking at

@@ -1,12 +1,18 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import type { NormalizedSpan } from "../../schemas/spans";
+import { isStorableSpanTimeMs } from "../../utils/storableSpanTime";
 
 /**
- * Validates whether a timestamp value is usable (positive, finite number).
+ * Validates whether a timestamp value is usable: an epoch-ms instant storage can
+ * actually hold. Delegates to {@link isStorableSpanTimeMs} so "usable timing" and
+ * "storable time" are one rule — a value past the `DateTime64(3)` ceiling is no
+ * more usable as `min(start)` / `max(end)` than it is as a stored column, and
+ * `TraceSummaryData.occurredAt` accumulated here is what the trace summary's own
+ * KSUID is minted from downstream.
  */
 export const isValidTimestamp = (ts: number | undefined | null): ts is number =>
-  typeof ts === "number" && ts > 0 && Number.isFinite(ts);
+  isStorableSpanTimeMs(ts);
 
 /**
  * Accumulates trace-level timing from individual spans.

@@ -1374,7 +1374,11 @@ Rule: Enter routes a sentence
   project has); a deployment without the classifier asks the FAST model to
   decide and build in one call; a deployment with neither searches the
   phrase and says why. Routing is counted on a metric and never metered.
-  A failure on the way is a phrase search, never an error state in the bar.
+  A failure on the way degrades, it is not an error state in the bar: a
+  filter that cannot be written becomes the phrase, and a judge question
+  that cannot be written becomes a judgement of the sentence as typed. The
+  strip under the bar says which, and offers the model settings when a
+  model is what was missing.
   See dev/docs/adr/139-trace-search-routes-on-enter.md.
 
   Background:
@@ -1455,6 +1459,46 @@ Rule: Enter routes a sentence
     And the target is "threads" on the Conversations lens and "traces" on every other lens
     And the result carries the explicit terms as `otherQuery` and the phrase search as `fallbackQuery`
 
+  # A sentence classified as a judgement describes a judgement whether or not
+  # a model is there to sharpen it. Matching the words literally instead is a
+  # different search that answers a question nobody asked.
+  @unit
+  Scenario: A judge question no model could write is judged as typed
+    Given the classifier answers "instant_eval" for "frustrated users status:error"
+    And the FAST model fails to write the judge question
+    When the router runs
+    Then the result is an Instant Eval whose question is "frustrated users"
+    And it carries no criteria, the way a chip typed by hand does
+    And it says the model failed, with the handled code it failed with
+    And the strip under the bar reads both
+    And the log line names the cause: the handled code, the model and the status
+
+  @unit
+  Scenario: A project with no model still judges the sentence
+    Given the classifier answers "instant_eval" for "frustrated users"
+    And the project has no FAST model configured
+    When the router runs
+    Then the result is an Instant Eval whose question is "frustrated users"
+    And it says no model is connected, which the strip under the bar reads
+
+  # One line, because the question is already on screen twice: in the chip
+  # and in the progress bar over the table.
+  @integration
+  Scenario: A search that ran without a model says so
+    Given a judgement ran on the sentence as typed
+    Then a strip under the bar reads "Interpreted as an Instant Eval. The search model failed (ai_query_provider_error), so your words are judged as typed."
+    And it names no code when the failure carried none
+    And it reads "No model is connected for search" when that is the problem instead
+    And it carries a "Configure models" button to the model provider settings
+    And a phrase search another route fell back to gets the same strip, reading "Interpreted as a phrase. No model is connected for search, so your words are matched as typed."
+
+  @integration
+  Scenario: The way to fix it can be dismissed
+    Given the strip under the bar is showing its "Configure models" button
+    When the reader dismisses it
+    Then the button goes and the line saying what the search was read as stays
+    And it stays dismissed for that project on later searches
+
   @unit
   Scenario: An existing evaluator answers the judgement as a filter
     Given the classifier answers "instant_eval" for "hallucinated answers"
@@ -1499,9 +1543,9 @@ Rule: Enter routes a sentence
     And the project has no FAST model configured
     When the user submits "annoyed users"
     Then the query `"annoyed users"` is applied
-    And the result says a model is unavailable
-    And the bar shows the "Connect a model for smarter search" popover once per session, closable
-    And the popover links to the model provider settings in a new tab
+    And the result says no model is connected
+    And the strip under the bar says the words were read as one phrase
+    And it links to the model provider settings in a new tab
 
   @integration
   Scenario: Back returns to the search before
@@ -1533,7 +1577,7 @@ Rule: Enter routes a sentence
     And the project's FAST model belongs to a provider that is disabled
     When the user submits "annoyed users"
     Then the query `"annoyed users"` is applied
-    And the result says a model is unavailable
+    And the result says no model is connected
 
   @unit
   Scenario: A classified route that finds the provider disabled says a model is unavailable
@@ -1541,7 +1585,7 @@ Rule: Enter routes a sentence
     And the project's FAST model belongs to a provider that is disabled
     When the user submits "failing calls"
     Then the query `"failing calls"` is applied
-    And the result says a model is unavailable
+    And the result says no model is connected
 
   @unit
   Scenario: A model failure is a phrase search, not an error
@@ -1549,7 +1593,15 @@ Rule: Enter routes a sentence
     When the user submits "annoyed users"
     Then the query `"annoyed users"` is applied
     And no error banner is shown
-    And the result does not say a model is unavailable
+    And the result says the model failed rather than that none is connected
+
+  @integration
+  Scenario: A router call that fails says the words were searched instead
+    Given `tracesV2.routeSearch` cannot be reached
+    When the user submits "annoyed users"
+    Then the words are applied as a quoted phrase
+    And a warning toast carries the registry's words for the failure
+    And it adds "The words were searched as a phrase instead."
 
   @unit
   Scenario: The client refuses a sentence past the term ceiling before sending it

@@ -1,23 +1,48 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
+import {
+  configuredSsoProviderStatus,
+  extractEmailDomain,
+  type OrganizationSsoProviderLookup,
+} from "@ee/sso/matching";
 
 import type { PrismaClient, User } from "~/generated/prisma/client";
 
 import { sessionRevocation } from "../app-layer/identity/runtime";
 import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
+/** The collaborators a caller may hand in; each defaults over `prisma`. */
+interface UserServiceCollaborators {
+  cliTokenRevocation?: CliTokenRevocationService;
+  /**
+   * Composed over this service's OWN client rather than the app's, so a
+   * caller handing in a client — every test here does — revokes against the
+   * one it handed in.
+   */
+  sessions?: SessionRevocationService;
+  /**
+   * The same legacy `ssoDomain`/`ssoProvider` lookup the sign-in hooks
+   * read, injected so a test can fake it without a database.
+   */
+  legacySsoOrganizations?: OrganizationSsoProviderLookup;
+}
+
 export class UserService {
+  private readonly cliTokenRevocation: CliTokenRevocationService;
+  private readonly sessions: SessionRevocationService;
+  private readonly legacySsoOrganizations: OrganizationSsoProviderLookup;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly cliTokenRevocation: CliTokenRevocationService = CliTokenRevocationService.create(),
-    /**
-     * Composed over this service's OWN client rather than the app's, so a
-     * caller handing in a client — every test here does — revokes against the
-     * one it handed in.
-     */
-    private readonly sessions: SessionRevocationService = sessionRevocation({
-      prisma,
-    }),
-  ) {}
+    collaborators: UserServiceCollaborators = {},
+  ) {
+    this.cliTokenRevocation =
+      collaborators.cliTokenRevocation ?? CliTokenRevocationService.create();
+    this.sessions = collaborators.sessions ?? sessionRevocation({ prisma });
+    this.legacySsoOrganizations =
+      collaborators.legacySsoOrganizations ??
+      new PrismaLegacySsoOrganizationRepository(prisma);
+  }
 
   static create(prisma: PrismaClient): UserService {
     return new UserService(prisma);
@@ -121,6 +146,28 @@ export class UserService {
     return user ? { createdAt: user.createdAt } : null;
   }
 
+  /**
+   * A live answer, not a stored one: the flag on `User.pendingSsoSetup` is
+   * set once at sign-in and otherwise only ever cleared by a later sign-in
+   * (see `clearPendingSsoSetupForConfiguredProvider` in
+   * `../better-auth/hooks.ts`) — so a member whose next correct sign-in never
+   * happened to fire that clearing branch would otherwise carry the flag
+   * forever, even after they already hold a sign-in that satisfies their
+   * organization's SSO requirement.
+   *
+   * This read re-asks the identical question the hook asks
+   * (`configuredSsoProviderStatus`, shared so the two can never disagree on
+   * what a match is) against every account the user already holds, rather
+   * than trusting the stored flag once it is true. It never writes: the flag
+   * itself is left alone here, and the hooks still clear it in the database
+   * on the next sign-in.
+   *
+   * Known gap: this only re-checks the legacy `ssoDomain`/`ssoProvider`
+   * pin. A member admitted through the newer `SsoConnection` path (the
+   * `ssoMigration`/`ssoArrival` branches in the hooks) is not re-checked
+   * here — reaching that decision needs the SSO arrival/connection services,
+   * which this service has no clean way to reach without crossing layers.
+   */
   async getSsoStatus({
     id,
   }: {
@@ -128,9 +175,30 @@ export class UserService {
   }): Promise<{ pendingSsoSetup: boolean }> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { pendingSsoSetup: true },
+      select: { pendingSsoSetup: true, email: true },
     });
-    return { pendingSsoSetup: user?.pendingSsoSetup ?? false };
+    if (!user?.pendingSsoSetup) return { pendingSsoSetup: false };
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return { pendingSsoSetup: true };
+
+    const accounts = await this.prisma.account.findMany({
+      where: { userId: id },
+      select: { provider: true, providerAccountId: true },
+    });
+
+    // Only a pin that still exists can still be pending: an organization that
+    // has dropped its provider since the flag was set leaves nothing to link.
+    const status = await configuredSsoProviderStatus({
+      organizations: this.legacySsoOrganizations,
+      domain,
+      accounts: accounts.map((account) => ({
+        providerId: account.provider,
+        accountId: account.providerAccountId,
+      })),
+    });
+
+    return { pendingSsoSetup: status === "unmatched" };
   }
 
   /**

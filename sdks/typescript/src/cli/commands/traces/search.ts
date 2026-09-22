@@ -26,6 +26,31 @@ const PROGRESS_CHUNK = 5;
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
 /**
+ * A query carrying an email address. Email addresses are redacted before a
+ * trace is stored whenever the project's data privacy settings redact PII,
+ * which they do by default, so the text never holds one and the search finds
+ * nothing however many traces mention it. Named so an empty result says so.
+ */
+const EMAIL_ADDRESS = /[^\s@<>"']+@[^\s@<>"']+\.[A-Za-z]{2,}/;
+
+const EMAIL_HINT =
+  "Email addresses are redacted before a trace is stored when the project redacts PII (the default), so a search for one finds nothing. Search by a thread id, a trace id or a name instead, or check the project's data privacy settings.";
+
+/** What an empty result should say about the query, or nothing. */
+export function emptySearchHint({
+  query,
+}: {
+  query: string | undefined;
+}): string | undefined {
+  if (!query) return undefined;
+  if (BOOLEAN_OPERATORS.test(query)) {
+    return "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.";
+  }
+  if (EMAIL_ADDRESS.test(query)) return EMAIL_HINT;
+  return undefined;
+}
+
+/**
  * The window flags take an ISO-8601 instant or epoch milliseconds, which is
  * what the Trace Explorer's page context and its links carry. `new Date()`
  * reads an integer string as a calendar date and answers NaN.
@@ -136,19 +161,17 @@ export const searchTracesCommand = async (options: {
   if (resolveOutputOptions(options).format !== "table") {
     reportProgress({ events, total: traces.length, matched });
   }
-  await printResult(result, {
+  // The hint rides on the document too, so a machine caller reading zero
+  // traces is told the cause the same way a person is.
+  const hint =
+    traces.length === 0 ? emptySearchHint({ query: options.query }) : undefined;
+  await printResult(hint ? { ...result, hint } : result, {
     ...options,
     table: () => {
       if (traces.length === 0) {
         console.log();
         console.log(chalk.gray("No traces found matching your criteria."));
-        if (options.query && BOOLEAN_OPERATORS.test(options.query)) {
-          console.log(
-            chalk.gray(
-              "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
-            ),
-          );
-        }
+        if (hint) console.log(chalk.gray(hint));
         if (options.filter) {
           // A filter that parses and matches nothing is almost always a value
           // spelled the way a person would spell it rather than the way the

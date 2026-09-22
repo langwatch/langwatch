@@ -123,7 +123,7 @@
 		"@langwatch/react-rum": "workspace:*",
 		"@langwatch/redaction": "workspace:*",
 		"@langwatch/redis-client": "workspace:*",
-		"@langwatch/scenario": "file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz",
+		"@langwatch/scenario": "file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz",
 		"@langwatch/ssrf": "workspace:*",
 		"@langwatch/system-migrations": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.29.0",

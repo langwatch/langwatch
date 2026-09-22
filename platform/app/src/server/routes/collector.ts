@@ -19,6 +19,7 @@ import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.s
 import { PlanLimitExceededError } from "../app-layer/usage/errors";
 import type { UsageLimitResult } from "../app-layer/usage/usage.service";
 import { prisma } from "../db";
+import { isStorableSpanTimeMs } from "../event-sourcing/pipelines/trace-processing/utils/storableSpanTime";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
 import type {
@@ -576,12 +577,25 @@ secured
       const startedAtCutoff = Date.now() - SPAN_MAX_PAST_MS;
       const freshSpans: Span[] = [];
       let droppedOldSpans = 0;
+      let droppedUnstorableSpans = 0;
       for (const span of spans) {
         if (
           span.timestamps.started_at &&
           span.timestamps.started_at < startedAtCutoff
         ) {
           droppedOldSpans++;
+          continue;
+        }
+        // The same predicate the OTLP door applies, on the same two fields:
+        // a time this path accepts becomes a `DateTime64(3)` column and a KSUID
+        // over its start seconds, and neither can hold a value past the storage
+        // ceiling. The 13-digit check above is not this check — it passes a
+        // zero `started_at` straight through, which files the span in 1970.
+        if (
+          !isStorableSpanTimeMs(span.timestamps.started_at) ||
+          !isStorableSpanTimeMs(span.timestamps.finished_at)
+        ) {
+          droppedUnstorableSpans++;
           continue;
         }
         freshSpans.push(span);
@@ -592,15 +606,26 @@ secured
           "dropped spans with start time more than 31 days in the past",
         );
       }
+      if (droppedUnstorableSpans > 0) {
+        logger.warn(
+          { projectId: project.id, traceId, droppedUnstorableSpans },
+          "dropped spans whose start or end time is not a valid timestamp",
+        );
+      }
 
-      let rejectedSpans = droppedOldSpans;
+      let rejectedSpans = droppedOldSpans + droppedUnstorableSpans;
       let dispatchFailures = 0;
-      let rejectionErrors: string[] =
-        droppedOldSpans > 0
-          ? [
-              `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
-            ]
-          : [];
+      let rejectionErrors: string[] = [];
+      if (droppedOldSpans > 0) {
+        rejectionErrors.push(
+          `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
+        );
+      }
+      if (droppedUnstorableSpans > 0) {
+        rejectionErrors.push(
+          `${droppedUnstorableSpans} span(s) dropped: started_at or finished_at is not a valid timestamp`,
+        );
+      }
       try {
         const resource = CollectorSpanUtils.buildResource({
           reservedTraceMetadata,

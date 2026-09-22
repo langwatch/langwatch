@@ -8,11 +8,18 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
+import { PIIRedactionAlert } from "~/components/ui/PIIRedactionNotice";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
 import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
+import {
+  looksLikeEmail,
+  redactsEmailAddresses,
+} from "../../utils/emailShapedQuery";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (
@@ -161,6 +168,32 @@ interface ActionButton {
   primary?: boolean;
 }
 
+/**
+ * Why a search for an email address finds nothing: the address was replaced
+ * with a marker before the trace was stored. Shown only when the project
+ * redacts PII, read from the effective privacy policy; a policy that cannot
+ * be read (a viewer without project access, a request in flight) shows
+ * nothing rather than a guess.
+ */
+const EmailRedactionNotice: React.FC = () => {
+  const { project } = useOrganizationTeamProject();
+  const snapshot = api.dataPrivacy.getSnapshot.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, retry: false },
+  );
+  const pii = snapshot.data?.effective.pii;
+  if (!pii || !redactsEmailAddresses(pii)) return null;
+  return (
+    <Box width="full" textAlign="left">
+      <PIIRedactionAlert>
+        Email addresses are redacted before a trace is stored by this project's
+        privacy settings, so a search for one finds nothing. Search by a thread
+        id, a trace id or a name instead.
+      </PIIRedactionAlert>
+    </Box>
+  );
+};
+
 function rangePreset(days: number, label: string): TimeRange {
   const now = Date.now();
   return {
@@ -307,6 +340,8 @@ export const EmptyFilterState: React.FC = () => {
             {content.description}
           </Text>
         </Stack>
+
+        {hasFilters && looksLikeEmail(queryText) && <EmailRedactionNotice />}
 
         {actions.length > 0 && (
           <HStack gap={2} flexWrap="wrap" justify="center">
