@@ -37,8 +37,12 @@ function connection({
 
 function serviceOver(states: SsoConnectionState[]) {
   class StubReads extends SsoConnectionReadRepository {
-    async tryFindConnection(): Promise<null> {
-      return null;
+    async tryFindConnection({
+      connectionId,
+    }: {
+      connectionId: string;
+    }): Promise<SsoConnectionState | null> {
+      return states.find((state) => state.connectionId === connectionId) ?? null;
     }
     async tryFindDomainOwner(): Promise<null> {
       return null;
@@ -93,5 +97,39 @@ describe("given a peer module asking which connections an organization holds", (
 
       await expect(service.findForOrganization({ organizationId: ACME })).resolves.toEqual([]);
     });
+  });
+});
+
+describe("given a peer asking what one of the organization's connections speaks to", () => {
+  const acme = connection({
+    connectionId: "ssoc_acme",
+    organizationId: ACME,
+    providerId: "waad|acme",
+    state: "ACTIVE",
+    createdAtMs: 2,
+  });
+
+  it("answers the provider the rows that peer owns were stamped with", async () => {
+    const service = serviceOver([acme]);
+
+    await expect(
+      service.getProvider({ organizationId: ACME, connectionId: "ssoc_acme" }),
+    ).resolves.toEqual({ connectionId: "ssoc_acme", providerId: "waad|acme" });
+  });
+
+  it("refuses a connection that is another organization's", async () => {
+    const service = serviceOver([{ ...acme, organizationId: "org_globex" }]);
+
+    await expect(
+      service.getProvider({ organizationId: ACME, connectionId: "ssoc_acme" }),
+    ).rejects.toMatchObject({ code: "sso_connection_not_found" });
+  });
+
+  it("refuses a connection nobody registered", async () => {
+    const service = serviceOver([]);
+
+    await expect(
+      service.getProvider({ organizationId: ACME, connectionId: "ssoc_gone" }),
+    ).rejects.toMatchObject({ code: "sso_connection_not_found" });
   });
 });

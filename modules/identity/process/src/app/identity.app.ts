@@ -343,6 +343,7 @@ export class IdentityApp implements IdentityApi {
       connections: setup.repositories.ssoConnections,
       users: setup.repositories.users,
       memberships: setup.dependencies.organizations,
+      trail: ssoActivity,
     });
     const memberships = migrationMemberships(setup.dependencies.organizations);
     const legacyAccess = legacySsoAccess(setup.dependencies.auth);

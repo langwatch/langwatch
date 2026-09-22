@@ -119,12 +119,12 @@ export interface AuthApi {
   countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number>;
 }
 
-/** Which accounts a legacy-access question is about. */
+/** Which accounts a legacy-access question is about: the connection being
+ *  retired, and nothing the asking module does not own. Auth resolves the
+ *  members and the provider itself, from the modules that own each. */
 export interface LegacySsoAccessQuery {
-  /** The organization's members, from the module that owns membership. */
-  userIds: readonly string[];
-  /** The connection's provider, as the module that owns it recorded it. */
-  providerId: string;
+  organizationId: string;
+  connectionId: string;
 }
 
 /**

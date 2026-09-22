@@ -8,6 +8,7 @@ import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
  */
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
@@ -55,6 +56,7 @@ async function appFor(
       } as never,
       featureFlags: {} as never,
       identity: createApiFixture<IdentityApi>(),
+      organizations: createApiFixture<OrganizationApi>(),
     },
     members: {
       logger: createLogger("langwatch:auth:test"),

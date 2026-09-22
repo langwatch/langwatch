@@ -59,7 +59,7 @@ export interface SsoMigrationDirectoryReads {
  * legacy access is gone is somebody else's answer.
  */
 export interface SsoLegacyAccessReads {
-  count(args: { userIds: string[]; providerId: string }): Promise<number>;
+  count(args: { organizationId: string; connectionId: string }): Promise<number>;
 }
 
 /** The facts finalization must re-read before and after every durable step. */
@@ -275,8 +275,8 @@ export class SsoMigrationProgressService {
     if (held) return false;
 
     const accounts = await this.deps.legacyAccess.count({
-      userIds,
-      providerId: legacy.idpMetadata.providerId,
+      organizationId: legacy.organizationId,
+      connectionId: legacy.connectionId,
     });
 
     return accounts === 0;

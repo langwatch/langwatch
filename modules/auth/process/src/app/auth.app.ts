@@ -26,6 +26,7 @@ import {
   type RoutingDecision,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Secret } from "@langwatch/secrets";
@@ -39,7 +40,11 @@ import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.b
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
-import { LegacySsoAccessService } from "../services/legacy-sso-access.service.ts";
+import {
+  LegacySsoAccessService,
+  type LegacySsoAccessConnections,
+  type LegacySsoAccessMemberships,
+} from "../services/legacy-sso-access.service.ts";
 import {
   SignUpVerificationService,
   type SignUpAccountDirectory,
@@ -146,6 +151,9 @@ export class AuthApp implements AuthApiContract {
     featureFlags: FeatureFlagApi,
     /** Whose connections decide what a federated sign-in arrives into. */
     identity: IdentityApi,
+    /** Who the members of an organization are, when a cutover asks auth what
+     *  the retiring connection still holds open for them. */
+    organizations: OrganizationApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -216,6 +224,8 @@ export class AuthApp implements AuthApiContract {
       { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
       LegacySsoAccessService.create({
         accounts: PrismaBetterAuthHooksRepository.create(members.prisma),
+        memberships: legacyAccessMemberships(dependencies.organizations),
+        connections: legacyAccessConnections(dependencies.identity),
       }),
     );
 
@@ -554,4 +564,22 @@ function signUpVerification({
       `${signUp.baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     now,
   });
+}
+
+/** The members a cutover is asked about, from the module that owns the rows. */
+function legacyAccessMemberships(organizations: OrganizationApi): LegacySsoAccessMemberships {
+  return {
+    listMemberIds: async ({ organizationId }) => {
+      const members = await organizations.getAllMembers({ organizationId });
+      return members.map((member) => member.id);
+    },
+  };
+}
+
+/** The provider the retiring connection speaks to, from the module that
+ *  registered it: auth is told a connection, never a name it does not own. */
+function legacyAccessConnections(identity: IdentityApi): LegacySsoAccessConnections {
+  return {
+    getProvider: (args) => identity.ssoConnectionReads().getProvider(args),
+  };
 }

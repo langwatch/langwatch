@@ -49,6 +49,7 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "nanoid": "^6.0.0",
     "prom-client": "catalog:",
     "samlify": "2.13.1",

@@ -440,10 +440,12 @@ export const createAuthOptions = ({
     },
     session: {
       create: {
-        before: async (session) =>
+        before: async (session, context) =>
           beforeSessionCreate({
             repo,
             session: { userId: session.userId },
+            path: context?.path,
+            collaborators: hooks,
           }),
         after: async (session) => {
           await afterSessionCreate({

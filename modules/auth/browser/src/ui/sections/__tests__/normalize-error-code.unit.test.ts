@@ -3,7 +3,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { normalizeSignInErrorCode } from "../../../model/sign-in-error-code.ts";
+import {
+  cutoverSignInRefusal,
+  normalizeSignInErrorCode,
+} from "../../../model/sign-in-error-code.ts";
 import { isStableAuthError, STABLE_AUTH_ERRORS } from "../sign-in-error-screen.tsx";
 
 describe("normalizeSignInErrorCode", () => {
@@ -83,6 +86,34 @@ describe("isStableAuthError", () => {
 
     it("treats an unknown code as not stable", () => {
       expect(isStableAuthError("some_other_error")).toBe(false);
+    });
+  });
+});
+
+describe("a sign-in the organization's move refused", () => {
+  describe("when the old way in has been retired", () => {
+    it("says so in words about their sign-in, and does not send them back to it", () => {
+      expect(cutoverSignInRefusal("SSO_LEGACY_AUTH_RETIRED")).toEqual({
+        title: "Your organization moved its sign-in",
+        body: expect.stringContaining("retired"),
+      });
+      expect(isStableAuthError("SSO_LEGACY_AUTH_RETIRED")).toBe(true);
+    });
+  });
+
+  describe("when the session itself was refused mid-cutover", () => {
+    it.each(["SSO_MIGRATION_AUTH_NOT_ALLOWED", "SSO_MIGRATION_AUTH_AMBIGUOUS"])(
+      "has words for %s",
+      (code) => {
+        expect(cutoverSignInRefusal(code)?.title).toBeTruthy();
+        expect(isStableAuthError(code)).toBe(true);
+      },
+    );
+  });
+
+  describe("when the code names no refusal of ours", () => {
+    it("has no words to put under our branding", () => {
+      expect(cutoverSignInRefusal("some_other_error")).toBeUndefined();
     });
   });
 });

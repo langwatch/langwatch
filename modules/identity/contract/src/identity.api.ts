@@ -77,7 +77,11 @@ import type {
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
 import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
-import type { SsoMigrationAccountLinkDecision, SsoMigrationView } from "./sso-migration.ts";
+import type {
+  SsoMigrationAccountLinkDecision,
+  SsoMigrationAuthenticationDecision,
+  SsoMigrationView,
+} from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
@@ -229,6 +233,19 @@ export interface SsoConnectionApi {
  */
 export interface SsoConnectionReadsApi {
   findForOrganization(args: { organizationId: string }): Promise<OrganizationSsoConnection[]>;
+  /** What one of the organization's connections speaks to. Asked by a peer
+   *  holding rows stamped with the provider rather than the connection, so it
+   *  never has to be told a name identity owns. */
+  getProvider(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SsoConnectionProviderReading>;
+}
+
+/** One connection, named the way the rows a peer owns were stamped. */
+export interface SsoConnectionProviderReading {
+  connectionId: string;
+  providerId: string;
 }
 
 /**
@@ -466,6 +483,19 @@ export interface SsoMigrationCallbackApi {
      *  owns them: identity decides, auth supplies its own rows. */
     otherAccounts: readonly { providerId: string; accountId: string }[];
   }): Promise<SsoMigrationAccountLinkDecision>;
+  /**
+   * Whether the way in this callback used still authenticates, asked once the
+   * person is known and before the session exists. Records the sign-in against
+   * the connection it belongs to, which is what a cutover counts stragglers by.
+   */
+  authorizeAndRecordAuthentication(args: {
+    userId: string;
+    /** better-auth's own endpoint path, which names the callback. */
+    callbackPath: string | undefined;
+    /** The federated accounts this person holds, from the module that owns
+     *  them: identity decides, auth supplies its own rows. */
+    accounts: readonly { providerId: string; accountId: string }[];
+  }): Promise<SsoMigrationAuthenticationDecision>;
 }
 
 /**

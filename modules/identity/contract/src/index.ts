@@ -145,6 +145,8 @@ export {
 } from "./sso-setup.ts";
 export {
   type SsoMigrationAccountLinkDecision,
+  type SsoMigrationAuthenticationDecision,
+  type SsoMigrationAuthenticationRefusalCode,
   type SsoMigrationBlockerView,
   type SsoMigrationConnectionRef,
   type SsoMigrationLinkRefusalCode,

@@ -3,16 +3,19 @@ import {
   normalizeDomain,
   type SsoConnectionState,
   type SsoMigrationAccountLinkDecision,
+  type SsoMigrationAuthenticationDecision,
 } from "@langwatch/identity-contract";
 
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
 import {
   keepableAccountsForPair,
+  migrationAuthenticationDecision,
   migrationCallbackPairs,
   pairProvesDomain,
   resolveMigrationLinkPair,
   findStandaloneLegacyConnections,
+  ssoCallbackForPath,
   type MigrationCallbackAccount,
   type SsoMigrationCallbackPair,
 } from "../rules/sso-migration-callback.rules.ts";
@@ -22,13 +25,24 @@ export interface SsoMigrationMemberships {
   organizationIdsForMember(args: { userId: string }): Promise<string[]>;
 }
 
+/** The trail a connection's sign-ins leave, written by whoever owns it. */
+export interface SsoAuthenticationTrail {
+  record(args: {
+    connectionId: string;
+    userId: string;
+    providerAccountId?: string | null;
+  }): Promise<void>;
+}
+
 export interface SsoMigrationCallbackServiceDeps {
   connections: SsoConnectionReadRepository;
   users: IdentityUsersRepository;
   memberships: SsoMigrationMemberships;
+  trail: SsoAuthenticationTrail;
 }
 
 const NOT_MIGRATING = { kind: "not_migrating" } as const;
+const CONTINUE = { action: "continue" } as const;
 
 /**
  * Which connection a callback belongs to while an organization cuts over to
@@ -66,6 +80,37 @@ export class SsoMigrationCallbackService {
         ? resolved.pair.replacement.connectionId
         : resolved.pair.legacy.connectionId,
     };
+  }
+
+  /**
+   * Whether the way in this callback used still authenticates (ADR-117 §6).
+   * The decision above sees only a NEW account row, so a member who linked
+   * before the cutover would otherwise keep signing in through a retired side.
+   */
+  async authorizeAndRecordAuthentication({
+    userId,
+    callbackPath,
+    accounts,
+  }: {
+    userId: string;
+    callbackPath: string | undefined;
+    accounts: readonly MigrationCallbackAccount[];
+  }): Promise<SsoMigrationAuthenticationDecision> {
+    const callback = ssoCallbackForPath({ path: callbackPath });
+    if (!callback.recognized) return CONTINUE;
+
+    const pairs = migrationCallbackPairs(await this.connectionsForMemberOf({ userId }));
+    if (pairs.length === 0) return CONTINUE;
+
+    const outcome = migrationAuthenticationDecision({ callback, accounts, pairs });
+    if (outcome.action !== "record") return outcome;
+
+    await this.deps.trail.record({
+      connectionId: outcome.connectionId,
+      userId,
+      providerAccountId: outcome.providerAccountId,
+    });
+    return CONTINUE;
   }
 
   /**

@@ -5,14 +5,31 @@ import type {
   FederatedAccountRow,
 } from "../repositories/better-auth-hooks.repository.ts";
 
+/** The organization's own member rows, asked for rather than queried: auth
+ *  owns no membership. */
+export interface LegacySsoAccessMemberships {
+  listMemberIds(args: { organizationId: string }): Promise<string[]>;
+}
+
+/** What the retiring connection speaks to, from the module that registered
+ *  it. Refuses for a connection that is not this organization's. */
+export interface LegacySsoAccessConnections {
+  getProvider(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<{ providerId: string }>;
+}
+
 export interface LegacySsoAccessServiceDeps {
   accounts: BetterAuthHooksRepository;
+  memberships: LegacySsoAccessMemberships;
+  connections: LegacySsoAccessConnections;
 }
 
 /**
  * What a retiring SSO connection still holds open, over auth's own `Account`
- * rows. The provider comparison is the one the sign-in door already enforces,
- * so what a cutover counts and what a sign-in accepts cannot disagree.
+ * rows. Named by the connection alone, and matched the way the sign-in door
+ * matches, so counting and admitting cannot disagree.
  */
 export class LegacySsoAccessService {
   static create(deps: LegacySsoAccessServiceDeps): LegacySsoAccessService {
@@ -39,9 +56,14 @@ export class LegacySsoAccessService {
   }
 
   private async matching({
-    userIds,
-    providerId,
+    organizationId,
+    connectionId,
   }: LegacySsoAccessQuery): Promise<FederatedAccountRow[]> {
+    const { providerId } = await this.deps.connections.getProvider({
+      organizationId,
+      connectionId,
+    });
+    const userIds = await this.deps.memberships.listMemberIds({ organizationId });
     if (userIds.length === 0) return [];
 
     const accounts = await this.deps.accounts.findFederatedAccountsForUsers({ userIds });

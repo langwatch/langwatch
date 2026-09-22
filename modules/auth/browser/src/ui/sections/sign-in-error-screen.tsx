@@ -5,7 +5,11 @@ import { isSameOrigin, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
-import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
+import {
+  CUTOVER_SIGN_IN_ERRORS,
+  cutoverSignInRefusal,
+  normalizeSignInErrorCode,
+} from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 
@@ -17,6 +21,9 @@ export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
   "SSO_PROVIDER_NOT_ALLOWED",
+  // A refusal the organization's move decided: sending them back to the same
+  // button five seconds later would loop them through it.
+  ...Object.keys(CUTOVER_SIGN_IN_ERRORS),
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>
@@ -43,7 +50,7 @@ const errorTitle = (error: string): string => {
     case "SSO_PROVIDER_NOT_ALLOWED":
       return "Use your organization's sign-in";
     default:
-      return "Something went wrong signing you in";
+      return cutoverSignInRefusal(error)?.title ?? "Something went wrong signing you in";
   }
 };
 
@@ -154,6 +161,20 @@ function SignInErrorDescription({
           </Text>
           <Button asChild marginTop={4} color="white">
             <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
+  const refusal = cutoverSignInRefusal(error);
+  if (refusal) {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>{refusal.body}</Text>
+          <Button asChild marginTop={4} color="white">
+            <Link href="/auth/signin">Back to sign in</Link>
           </Button>
         </VStack>
       </Alert.Description>

@@ -37,6 +37,24 @@ export type SsoMigrationAccountLinkDecision =
   | { kind: "allow_replacement_pair"; arrivalConnectionId: string }
   | { kind: "reject"; code: SsoMigrationLinkRefusalCode };
 
+/**
+ * Why a sign-in arriving mid-cutover may not mint a session. Better Auth's
+ * own code spelling, for the same reason the link refusals are.
+ */
+export type SsoMigrationAuthenticationRefusalCode =
+  | "SSO_LEGACY_AUTH_RETIRED"
+  | "SSO_MIGRATION_AUTH_AMBIGUOUS"
+  | "SSO_MIGRATION_AUTH_NOT_ALLOWED";
+
+/**
+ * What the cutover makes of a callback that is about to mint a session:
+ * `continue` for everything outside a cutover, and a refusal for a way in the
+ * cutover has already closed.
+ */
+export type SsoMigrationAuthenticationDecision =
+  | { action: "continue" }
+  | { action: "reject"; code: SsoMigrationAuthenticationRefusalCode };
+
 /** A member who still holds no identifier on the replacement. */
 export interface SsoMigrationStragglerView {
   userId: string;

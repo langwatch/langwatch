@@ -17,3 +17,44 @@ export const normalizeSignInErrorCode = (error: string | null | undefined): stri
   }
   return error;
 };
+
+/** What one refused sign-in says to the person it refused. */
+export interface SignInRefusalCopy {
+  title: string;
+  body: string;
+}
+
+/**
+ * The sign-ins an organization's move to its own single sign-on refuses, in
+ * words about the person's way in rather than the move behind it.
+ */
+export const CUTOVER_SIGN_IN_ERRORS: Readonly<Record<string, SignInRefusalCopy>> = {
+  SSO_LEGACY_AUTH_RETIRED: {
+    title: "Your organization moved its sign-in",
+    body: "The way you used to sign in has been retired. Go back and sign in with your organization's single sign-on.",
+  },
+  SSO_MIGRATION_AUTH_NOT_ALLOWED: {
+    title: "Use your organization's sign-in",
+    body: "This account is not one your organization's single sign-on recognises. Go back and sign in with your organization's single sign-on.",
+  },
+  SSO_MIGRATION_LINK_NOT_ALLOWED: {
+    title: "Use your organization's sign-in",
+    body: "This account is not one your organization's single sign-on recognises. Go back and sign in with your organization's single sign-on.",
+  },
+  SSO_MIGRATION_AUTH_AMBIGUOUS: {
+    title: "We could not tell which account this is",
+    body: "You hold more than one account with this provider, so we cannot tell which workspace to open. Ask an administrator in your organization for help.",
+  },
+  SSO_MIGRATION_LINK_AMBIGUOUS: {
+    title: "We could not tell which account this is",
+    body: "You hold more than one account with this provider, so we cannot tell which workspace to open. Ask an administrator in your organization for help.",
+  },
+  SSO_MIGRATION_LINK_UNVERIFIED: {
+    title: "Your sign-in did not confirm your email",
+    body: "Your organization's single sign-on did not confirm your email address, so we could not connect it to your account. Ask an administrator in your organization for help.",
+  },
+};
+
+/** The words for a refused sign-in, or nothing where the code names none. */
+export const cutoverSignInRefusal = (error: string): SignInRefusalCopy | undefined =>
+  CUTOVER_SIGN_IN_ERRORS[error];

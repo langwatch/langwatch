@@ -27,8 +27,8 @@ const PROVED_STATES = new Set(["VERIFIED", "PRIMARY"]);
  *  module that owns the rows (ADR-129). */
 export interface SsoLegacyAccessRetirement extends SsoLegacyAccessReads {
   retire(args: {
-    userIds: string[];
-    providerId: string;
+    organizationId: string;
+    connectionId: string;
   }): Promise<{ retired: number; remaining: number }>;
 }
 
@@ -92,8 +92,8 @@ export class SsoLegacyIdentityRetirementService {
     }
 
     await this.deps.legacyAccess.retire({
-      userIds,
-      providerId: legacy.idpMetadata.providerId,
+      organizationId: request.organizationId,
+      connectionId: legacy.connectionId,
     });
   }
 

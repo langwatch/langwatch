@@ -7673,6 +7673,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0

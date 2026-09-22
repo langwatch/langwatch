@@ -518,21 +518,44 @@ export const afterAccountUpdate = async ({
 };
 
 /**
- * Called before a Session is created. Blocks deactivated users at this last
- * layer, and enforces DIFFERENT_EMAIL_NOT_ALLOWED — if the current session's
- * user has a different email than the incoming one, reject.
+ * Blocks deactivated users at this last layer, and refuses a way in the
+ * cutover retired: a member linked before it started creates no account row,
+ * so this is the only hook their sign-in passes through.
  */
 export const beforeSessionCreate = async ({
   repo,
   session,
+  path,
+  collaborators,
 }: {
   repo: BetterAuthHooksRepository;
   session: { userId: string };
+  /** better-auth's own endpoint path, which names the callback. */
+  path: string | undefined;
+  collaborators: BetterAuthHookCollaborators;
 }): Promise<boolean | undefined> => {
   const user = await repo.tryFindUserForHooks({ userId: session.userId });
   if (user?.deactivatedAt) {
     logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
+  }
+
+  const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({
+    userId: session.userId,
+    callbackPath: path,
+    accounts: await repo.findFederatedAccountsForUser({ userId: session.userId }),
+  });
+  if (authentication.action === "reject") {
+    logger.warn(
+      { userId: session.userId, code: authentication.code },
+      "Blocked session create: the connection this callback arrived through no longer authenticates",
+    );
+    // Thrown rather than returned false, so Better Auth carries the code to
+    // the sign-in screen as `?error=` instead of a bare failure.
+    throw APIError.from("FORBIDDEN", {
+      code: authentication.code,
+      message: authentication.code,
+    });
   }
   return undefined;
 };

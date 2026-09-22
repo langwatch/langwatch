@@ -103,21 +103,42 @@ class Connections extends SsoConnectionReadRepository {
   }
 }
 
+interface TrailEntry {
+  connectionId: string;
+  userId: string;
+  providerAccountId?: string | null;
+}
+
+function recordingTrail() {
+  const recorded: TrailEntry[] = [];
+  return {
+    recorded,
+    trail: {
+      record: async (entry: TrailEntry) => {
+        recorded.push(entry);
+      },
+    },
+  };
+}
+
 function serviceOver({
   rows,
   organizations = [ORGANIZATION_ID],
   emails = { [USER_ID]: "sam@acme.com" },
   unverified = [] as readonly string[],
+  trail = recordingTrail().trail,
 }: {
   rows: readonly SsoConnectionState[];
   organizations?: string[];
   emails?: Record<string, string>;
   unverified?: readonly string[];
+  trail?: { record: (entry: TrailEntry) => Promise<void> };
 }) {
   return SsoMigrationCallbackService.create({
     connections: new Connections(rows),
     users: inMemoryIdentityUsers({ emails, unverified }),
     memberships: { organizationIdsForMember: async () => organizations },
+    trail,
   });
 }
 
@@ -236,5 +257,84 @@ describe("given the cutover has been finalized", () => {
       kind: "allow_replacement_pair",
       arrivalConnectionId: REPLACEMENT_ID,
     });
+  });
+});
+
+describe("given a session about to be minted from a callback", () => {
+  const authorize = (
+    service: SsoMigrationCallbackService,
+    callbackPath: string | undefined,
+    accounts: { providerId: string; accountId: string }[],
+  ) => service.authorizeAndRecordAuthentication({ userId: USER_ID, callbackPath, accounts });
+
+  it("has nothing to say about a sign-in that arrived through no callback", async () => {
+    const { recorded, trail } = recordingTrail();
+    const service = serviceOver({ rows: [replacement("GRACE_LEGACY"), legacy()], trail });
+
+    await expect(authorize(service, "/sign-in/email", [])).resolves.toEqual({
+      action: "continue",
+    });
+    expect(recorded).toEqual([]);
+  });
+
+  it("records the legacy sign-in against the connection it arrived through", async () => {
+    const { recorded, trail } = recordingTrail();
+    const service = serviceOver({ rows: [replacement("GRACE_LEGACY"), legacy()], trail });
+
+    await expect(
+      authorize(service, "/callback/auth0", [{ providerId: "auth0", accountId: "sub-old" }]),
+    ).resolves.toEqual({ action: "continue" });
+    expect(recorded).toEqual([
+      { connectionId: LEGACY_ID, userId: USER_ID, providerAccountId: "sub-old" },
+    ]);
+  });
+
+  it("records the replacement's own callback against the replacement", async () => {
+    const { recorded, trail } = recordingTrail();
+    const service = serviceOver({ rows: [replacement("GRACE_DIRECT"), legacy()], trail });
+
+    await expect(
+      authorize(service, `/sso/callback/${REPLACEMENT_ID}`, [
+        { providerId: REPLACEMENT_ID, accountId: "sub-new" },
+      ]),
+    ).resolves.toEqual({ action: "continue" });
+    expect(recorded).toEqual([
+      { connectionId: REPLACEMENT_ID, userId: USER_ID, providerAccountId: "sub-new" },
+    ]);
+  });
+
+  it.each(["FINALIZING", "FINALIZED"] as const)(
+    "refuses a member who is still linked to the retired legacy side in %s",
+    async (phase) => {
+      const { recorded, trail } = recordingTrail();
+      const service = serviceOver({ rows: [replacement(phase), legacy()], trail });
+
+      await expect(
+        authorize(service, "/callback/auth0", [{ providerId: "auth0", accountId: "sub-old" }]),
+      ).resolves.toEqual({ action: "reject", code: "SSO_LEGACY_AUTH_RETIRED" });
+      expect(recorded).toEqual([]);
+    },
+  );
+
+  it("refuses a connection's own door presented by somebody bound to neither side", async () => {
+    const { recorded, trail } = recordingTrail();
+    const service = serviceOver({ rows: [replacement("GRACE_DIRECT"), legacy()], trail });
+
+    await expect(
+      authorize(service, `/sso/callback/${REPLACEMENT_ID}`, [
+        { providerId: "google", accountId: "sub-else" },
+      ]),
+    ).resolves.toEqual({ action: "reject", code: "SSO_MIGRATION_AUTH_NOT_ALLOWED" });
+    expect(recorded).toEqual([]);
+  });
+
+  it("has nothing to say where the organization is running no cutover", async () => {
+    const { recorded, trail } = recordingTrail();
+    const service = serviceOver({ rows: [legacy()], trail });
+
+    await expect(
+      authorize(service, "/callback/auth0", [{ providerId: "auth0", accountId: "sub-old" }]),
+    ).resolves.toEqual({ action: "continue" });
+    expect(recorded).toEqual([]);
   });
 });

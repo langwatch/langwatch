@@ -145,7 +145,7 @@ describe("retiring the identities a grandfathered connection minted", () => {
     expect(detachIdentifier).toHaveBeenCalledWith(
       expect.objectContaining({ userId: ANA, identifierId: "idf_legacy" }),
     );
-    expect(retire).toHaveBeenCalledWith({ userIds: [ANA], providerId: "waad|acme" });
+    expect(retire).toHaveBeenCalledWith({ organizationId: ORG, connectionId: LEGACY });
   });
 
   it("hands primary to the replacement before the legacy one goes", async () => {
