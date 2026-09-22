@@ -80,6 +80,9 @@ import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import {
   type LwqlReconvergenceWatch,
+  lwqlAccessModelOwner,
+  lwqlSelfProvisionInputs,
+  selfProvisionAll,
   startLwqlReconvergenceWatch,
 } from "./server/analytics/lwql/provisioning";
 import { createApiRouter } from "./server/api-router";
@@ -124,11 +127,6 @@ import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
-import {
-  lwqlAccessModelOwner,
-  lwqlSelfProvisionInputs,
-  selfProvisionAll,
-} from "./tasks/provisionLwql";
 
 const logger = createLogger("langwatch:start");
 

@@ -6,7 +6,7 @@
  * the runtime `LWQL_*` connection. No I/O happens here — every function
  * takes its inputs as parameters and returns SQL statements, a name, or a
  * plan, so the composition itself is unit-testable without a database.
- * `src/tasks/provisionLwql.ts` is the only caller and the only place that
+ * `selfProvisionEntry.ts` is the only caller and the only place that
  * touches a client, an env var beyond what it hands in here, or Postgres.
  *
  * ## What this module composes
@@ -17,7 +17,7 @@
  * remains here is the PostgreSQL half and the key map: this module composes
  * the PostgreSQL-side approved views
  * ({@link productionPostgresApprovedViewStatements}) and the key-map backfill
- * plan ({@link planLwqlKeyMapBackfill}) that `src/tasks/provisionLwql.ts` runs.
+ * plan ({@link planLwqlKeyMapBackfill}) that `selfProvisionEntry.ts` runs.
  *
  * @see specs/lwql/api.feature
  */

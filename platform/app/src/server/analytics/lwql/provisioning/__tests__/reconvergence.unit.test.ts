@@ -21,7 +21,7 @@
  *    single warning and never re-provisions.
  *
  * @see ../reconvergence.ts
- * @see ../../../../../tasks/provisionLwql.ts — lwqlAccessModelOwner
+ * @see ../selfProvisionEntry.ts — lwqlAccessModelOwner
  * @see specs/lwql/api.feature
  */
 

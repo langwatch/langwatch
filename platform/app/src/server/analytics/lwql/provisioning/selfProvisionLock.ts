@@ -33,7 +33,7 @@
  * ClickHouse DDL run on other connections. Routing the ClickHouse work through
  * `tx` is impossible (different datastore) and unnecessary.
  *
- * @see ../../../tasks/provisionLwql.ts — the sole caller (`selfProvisionAll`)
+ * @see ./selfProvisionEntry.ts — the sole caller (`selfProvisionAll`)
  * @see ../../datasets/dataset-lock.ts — the canonical advisory-lock idiom
  */
 import type { PrismaClient } from "~/generated/prisma/client";

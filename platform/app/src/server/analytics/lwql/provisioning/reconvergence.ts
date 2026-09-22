@@ -16,12 +16,12 @@
  * before the first probe still reads correctly. Only a probe that authoritatively
  * reports `"none"` re-provisions, and it does so exactly once.
  *
- * Both the probe and the converge are injected — `provisionLwql` exports the
- * real implementations (`lwqlAccessModelOwner` and `selfProvisionAll`) so the
+ * Both the probe and the converge are injected — `selfProvisionEntry` exports
+ * the real implementations (`lwqlAccessModelOwner` and `selfProvisionAll`) so the
  * env/name derivation is not duplicated, and this module stays free of the
  * database graph and unit-testable with fakes.
  *
- * @see ../../../../tasks/provisionLwql.ts
+ * @see ./selfProvisionEntry.ts — lwqlAccessModelOwner, selfProvisionAll
  * @see ./clickhouseStatementRunner.ts — inventoryConfigStoreLwqlEntities
  * @see specs/lwql/api.feature
  */

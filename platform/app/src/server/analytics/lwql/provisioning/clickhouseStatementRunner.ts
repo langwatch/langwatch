@@ -14,7 +14,7 @@
  * crash the boot. This runner is that tolerance, kept out of the task module so
  * a test can exercise it without pulling the task's Prisma/db graph.
  *
- * @see ../../../../tasks/provisionLwql.ts — the only caller with I/O
+ * @see ./selfProvisionEntry.ts — the only caller with I/O
  * @see specs/lwql/api.feature
  */
 

@@ -43,5 +43,6 @@ A helm upgrade opens a short window where the access model exists nowhere. The n
 - Issue: https://github.com/langwatch/langwatch/issues/8258
 - Related: ADR-101 (superseded by this decision)
 - Related: `charts/langwatch/README.md` ("LangWatchQL (LWQL)")
-- Related: `platform/app/src/tasks/provisionLwql.ts`
+- Related: `platform/app/src/tasks/provisionLwql.ts` (deploy-task entrypoint)
+- Related: `platform/app/src/server/analytics/lwql/provisioning/selfProvisionEntry.ts` (shared inputs/converge/probe)
 - Related: `specs/lwql/api.feature`

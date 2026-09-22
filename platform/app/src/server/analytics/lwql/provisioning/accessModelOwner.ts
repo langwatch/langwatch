@@ -11,7 +11,7 @@
  *
  * @see ./clickhouseStatementRunner.ts — inventoryConfigStoreLwqlEntities
  * @see ./selfProvisioning.ts — the probe/classify shape this mirrors
- * @see ../../../../tasks/provisionLwql.ts — lwqlAccessModelOwner, the wrapper
+ * @see ./selfProvisionEntry.ts — lwqlAccessModelOwner, the wrapper
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

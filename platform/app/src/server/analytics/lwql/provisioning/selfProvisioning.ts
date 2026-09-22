@@ -21,7 +21,7 @@
  *    {@link selfHostedPostgresReaderStatements}) — sequences the reference
  *    builders (`accessModel.ts`, `postgresMapping.ts`, `catalogStatements.ts`) in the
  *    order the integration harness proves works: access model, bridge,
- *    views. Pure; `src/tasks/provisionLwql.ts` is the only caller with I/O.
+ *    views. Pure; `selfProvisionEntry.ts` is the only caller with I/O.
  *
  * The names are one convention across every distribution, so every operator
  * reading the docs sees the same objects.

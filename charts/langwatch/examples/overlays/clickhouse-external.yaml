@@ -18,7 +18,8 @@ clickhouse:
 # LangWatchQL (lwql.enabled, default true) self-provisions its access model
 # via app SQL DDL, the same as on every other ClickHouse posture. Your
 # ClickHouse must already have: custom_settings_prefixes including "custom_",
-# and the app's administrative user granted access_management +
+# access_control_improvements.settings_constraints_replace_previous set to
+# true, and the app's administrative user granted access_management +
 # named_collection_control. See "LangWatchQL (LWQL) prerequisites"
 # (../../README.md#langwatchql-lwql-prerequisites), and ADR-141
 # (../../../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).

@@ -60,6 +60,11 @@ export {
   startLwqlReconvergenceWatch,
 } from "./reconvergence";
 export {
+  lwqlAccessModelOwner,
+  lwqlSelfProvisionInputs,
+  selfProvisionAll,
+} from "./selfProvisionEntry";
+export {
   canProvisionAppFunctions,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
