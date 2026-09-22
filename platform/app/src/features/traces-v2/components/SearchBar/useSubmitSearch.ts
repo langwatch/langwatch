@@ -9,10 +9,7 @@ import {
   requoteBareTerms,
   splitBareWords,
 } from "~/server/app-layer/traces/query-language/mutations";
-import type {
-  RouteSearchResult,
-  SearchRouteKind,
-} from "~/server/app-layer/traces/search-router/contracts";
+import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/contracts";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute";
@@ -35,15 +32,6 @@ interface UseSubmitSearchOptions {
   onSupersede: () => void;
   /** Enter fell back to a phrase because no model could route it. */
   onModelUnavailable: () => void;
-}
-
-/** What a caller knows about a submit the user did not type. */
-export interface SubmitSearchOptions {
-  /**
-   * The route this text already took once. Skips the classifier, so a text
-   * the page knows is a judgement is judged again rather than reclassified.
-   */
-  forceKind?: SearchRouteKind;
 }
 
 interface RoutedSubmit {
@@ -167,12 +155,7 @@ function useRouteSubmit({
 > & {
   submitSeqRef: MutableRefObject<number>;
 }): {
-  route: (args: {
-    text: string;
-    seq: number;
-    projectId: string;
-    options: SubmitSearchOptions | undefined;
-  }) => void;
+  route: (args: { text: string; seq: number; projectId: string }) => void;
   isRouting: boolean;
 } {
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
@@ -188,12 +171,10 @@ function useRouteSubmit({
       text,
       seq,
       projectId,
-      options,
     }: {
       text: string;
       seq: number;
       projectId: string;
-      options: SubmitSearchOptions | undefined;
     }) => {
       // Read at submit time: the range the user sees is the one the search
       // runs in, not the debounced copy a pending timer may still hold.
@@ -207,7 +188,6 @@ function useRouteSubmit({
           activeQuery: queryText,
           lensId: useExplorerStore.getState().activeLensId,
           isLangyAvailable,
-          ...(options?.forceKind ? { forceKind: options.forceKind } : {}),
         },
         {
           onSuccess: (result) => {
@@ -246,7 +226,7 @@ export function useSubmitSearch({
   onSupersede,
   onModelUnavailable,
 }: UseSubmitSearchOptions): {
-  submitSearch: (text: string, options?: SubmitSearchOptions) => void;
+  submitSearch: (text: string) => void;
   isRouting: boolean;
 } {
   const { project } = useOrganizationTeamProject();
@@ -284,7 +264,7 @@ export function useSubmitSearch({
   );
 
   const submitSearch = useCallback(
-    (text: string, options?: SubmitSearchOptions) => {
+    (text: string) => {
       const trimmed = text.trim();
       const seq = ++submitSeqRef.current;
       // Before anything else, including the early returns: an empty bar or a
@@ -305,7 +285,7 @@ export function useSubmitSearch({
         applyQueryText(requoteBareTerms(trimmed));
         return;
       }
-      route({ text: trimmed, seq, projectId, options });
+      route({ text: trimmed, seq, projectId });
     },
     [
       applyFilter,
