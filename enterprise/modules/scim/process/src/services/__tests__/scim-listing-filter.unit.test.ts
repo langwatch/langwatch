@@ -68,9 +68,6 @@ function userService(): ScimUserProvisioning {
     findById: vi.fn(async () => storedUser),
     findByEmail: vi.fn(async () => null),
     create: vi.fn(async () => storedUser),
-    updateProfile: vi.fn(async () => storedUser),
-    deactivate: vi.fn(async () => ({ ...storedUser, deactivatedAt: new Date() })),
-    reactivate: vi.fn(async () => storedUser),
   } satisfies ScimUserProvisioning;
 }
 
@@ -99,7 +96,6 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
       prisma: repository,
       writer: new GrantsFake(),
       users,
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
       governance: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
@@ -124,7 +120,7 @@ describe("ScimService.listUsers", () => {
         status: "400",
         scimType: "invalidFilter",
       });
-      expect(repository.listMemberships).not.toHaveBeenCalled();
+      expect(repository.findOrganizationUsers).not.toHaveBeenCalled();
     });
   });
 
@@ -138,8 +134,8 @@ describe("ScimService.listUsers", () => {
         filter: 'userName eq "alice@acme.com"',
       });
 
-      expect(repository.listMemberships).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "alice@acme.com" }),
+      expect(repository.findOrganizationUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ userName: "alice@acme.com" }),
       );
     });
   });
@@ -185,7 +181,7 @@ describe("ScimService.updateUser", () => {
           user: storedUser,
         })),
       });
-      const { service, users } = scimService(repository);
+      const { service } = scimService(repository);
 
       await service.updateUser({
         id: PERSON,
@@ -193,7 +189,9 @@ describe("ScimService.updateUser", () => {
         patchRequest: patch({ op: "replace", path: "name.familyName", value: "Byron" }),
       });
 
-      expect(users.updateProfile).toHaveBeenCalledWith({ id: PERSON, name: "Alice Byron" });
+      expect(repository.saveUserResource).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: PERSON, name: "Alice Byron" }),
+      );
     });
   });
 
@@ -207,7 +205,7 @@ describe("ScimService.updateUser", () => {
           user: storedUser,
         })),
       });
-      const { service, users } = scimService(repository);
+      const { service } = scimService(repository);
 
       await service.updateUser({
         id: PERSON,
@@ -219,7 +217,9 @@ describe("ScimService.updateUser", () => {
         }),
       });
 
-      expect(users.updateProfile).toHaveBeenCalledWith({ id: PERSON, name: "Augusta Byron" });
+      expect(repository.saveUserResource).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: PERSON, name: "Augusta Byron" }),
+      );
     });
   });
 });

@@ -1,4 +1,3 @@
-import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
@@ -16,7 +15,6 @@ export interface PostgresScimAdapterOptions {
   database: PrismaClient;
   writer: AuthzGrantsService;
   users: UserApi;
-  auth: BrowserSessionApi;
   governance: GovernanceRestApi;
   organization: ScimOrganizationAdministration;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -32,7 +30,6 @@ export class PostgresScimService {
     repository: ScimRepository;
     writer: AuthzGrantsService;
     users: UserApi;
-    auth: BrowserSessionApi;
     governance: GovernanceRestApi;
     organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -43,7 +40,6 @@ export class PostgresScimService {
       prisma: options.repository,
       writer: options.writer,
       users: options.users,
-      auth: options.auth,
       governance: options.governance,
       organization: options.organization,
       entitlements: options.entitlements,

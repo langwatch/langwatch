@@ -11,6 +11,7 @@
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
 import type {
   IssuedScimToken,
   ScimDirectoryConnection,
@@ -94,12 +95,26 @@ export interface ScimApi {
    * @throws {ScimProtocolError} 401 for a missing, malformed or unknown
    * bearer, 403 for one whose organization no longer holds the plan.
    */
-  authenticateDirectory(input: { authorization: string | null }): Promise<ScimDirectoryScope>;
+  authenticateDirectory(input: {
+    authorization: string | null;
+    /** What the provider asked for, so an attributable refusal can be filed
+     *  against the connection it was meant for (ADR-126). A door that does
+     *  not supply them refuses exactly as before and records nothing. */
+    method?: string | undefined;
+    path?: string | undefined;
+  }): Promise<ScimDirectoryScope>;
   /**
    * The same verification, answered rather than thrown, for the intake that
    * owns its own refusal bodies.
    */
   verifyToken(input: { token: string }): Promise<ScimTokenEntitlement>;
+
+  /**
+   * Every request one connection's directory made, newest first (ADR-126) —
+   * including the ones refused before a handler saw them, which appear in no
+   * activity feed because they decided nothing.
+   */
+  findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]>;
 
   // ── SCIM 2.0 users ───────────────────────────────────────────────────────
 

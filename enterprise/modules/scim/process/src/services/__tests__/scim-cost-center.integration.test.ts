@@ -22,7 +22,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * Spec: specs/ai-gateway/governance/departments.feature
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
@@ -80,11 +80,6 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
     findByEmail: ({ email }) => prisma.user.findUnique({ where: { email } }),
     findById: ({ id }) => prisma.user.findUnique({ where: { id } }),
     create: ({ name, email }) => prisma.user.create({ data: { name, email } }),
-    updateProfile: ({ id, name, email }) =>
-      prisma.user.update({ where: { id }, data: { name, email } }),
-    deactivate: ({ id }) =>
-      prisma.user.update({ where: { id }, data: { deactivatedAt: new Date() } }),
-    reactivate: ({ id }) => prisma.user.update({ where: { id }, data: { deactivatedAt: null } }),
   });
 
   const scim = () => {
@@ -94,7 +89,6 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
       prisma: PrismaScimRepository.create(prisma),
       writer: new GrantsFake(),
       users: provisioning(),
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
       governance: {
         departmentResolveByNameOrCreate: (input) => governance.resolveByNameOrCreate(input),
         departmentAssignUser: (input) => governance.assignUser(input),

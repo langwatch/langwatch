@@ -21,10 +21,15 @@ import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { scimApi } from "../../behavior/scim-api.ts";
-import { chosenConnectionOf, isActiveConnection } from "../../model/connection-lifecycle.ts";
+import {
+  chosenConnectionOf,
+  isActiveConnection,
+  isRunningConnection,
+} from "../../model/connection-lifecycle.ts";
 import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
+import { DirectoryRequests } from "./directory-requests.tsx";
 
 export default function ScimScreen() {
   const organizationId = useScimHost().organizationId();
@@ -177,9 +182,19 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                       {token.lastUsedAt ? (
                         readableDate(token.lastUsedAt).toLocaleDateString()
                       ) : (
-                        <Badge size="sm" colorPalette="gray">
-                          Never
-                        </Badge>
+                        // A token nothing recognizes is refused before we know
+                        // whose it is, so a mistyped one can never reach the
+                        // request list. This is the whole remedy, so it says
+                        // what it means and points at the provider.
+                        <VStack align="start" gap={0}>
+                          <Badge size="sm" colorPalette="gray">
+                            Never
+                          </Badge>
+                          <Text fontSize="xs" color="fg.muted">
+                            Nothing has presented this token yet. If your identity provider says it
+                            is syncing, check the token it is using.
+                          </Text>
+                        </VStack>
                       )}
                     </Table.Cell>
                     <Table.Cell>
@@ -198,6 +213,13 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
             </Table.Root>
           </Card.Body>
         </Card.Root>
+
+        <DirectoryRequests
+          organizationId={organizationId}
+          connections={connectionOptions.filter((option) =>
+            isRunningConnection({ connectionState: option.state }),
+          )}
+        />
       </VStack>
 
       {/* Generate Token Dialog */}

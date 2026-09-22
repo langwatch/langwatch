@@ -5,7 +5,7 @@
  * Critical: token shown exactly once; generate shows plaintext, list never shows secrets.
  */
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, calls } = vi.hoisted(() => ({
@@ -18,8 +18,11 @@ const { state, calls } = vi.hoisted(() => ({
       state: string;
     }[],
     minted: { token: "scim_live_secret_value" },
+    /** Recorded requests, keyed by the tenant AND connection they were asked
+     *  for: a feed answered for any other key is a feed nobody may read. */
+    requests: {} as Record<string, Record<string, unknown>[]>,
   },
-  calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn() },
+  calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn(), getRequests: vi.fn() },
 }));
 
 vi.mock("../../../behavior/scim-api.ts", () => ({
@@ -48,6 +51,19 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
             options?.onSuccess?.();
           },
         }),
+      },
+    },
+    scimReconciliation: {
+      getRequests: {
+        useQuery: (input: { organizationId: string; connectionId: string }) => {
+          calls.getRequests(input);
+
+          return {
+            data: state.requests[`${input.organizationId}/${input.connectionId}`] ?? [],
+            isLoading: false,
+            isError: false,
+          };
+        },
       },
     },
   },
@@ -96,6 +112,7 @@ beforeEach(() => {
   state.rows = [];
   state.connections = [connection()];
   state.minted = { token: "scim_live_secret_value" };
+  state.requests = {};
 });
 
 afterEach(cleanup);
@@ -244,5 +261,85 @@ describe("given a token issued against a connection since retired", () => {
     renderWithScimHost(<ScimScreen />);
 
     expect(screen.getByText("Okta")).toBeTruthy();
+  });
+});
+
+const request = (overrides: Record<string, unknown> = {}) => ({
+  id: "req-1",
+  method: "POST",
+  resource: "Users",
+  status: 400,
+  reason: "invalid_resource",
+  detail: "The resource is not valid: externalId",
+  occurredAt: "2026-08-26T10:10:52.000Z",
+  ...overrides,
+});
+
+describe("given the directory has been pushing through a connection", () => {
+  /** @scenario "The requests a connection has served are on the SCIM settings page" */
+  it("reads them newest first, refusals in our own words", () => {
+    state.requests["org-1/ssoconn_1"] = [
+      request(),
+      request({
+        id: "req-0",
+        method: "GET",
+        resource: "Users",
+        status: 200,
+        reason: null,
+        detail: null,
+        occurredAt: "2026-08-26T10:09:00.000Z",
+      }),
+    ];
+
+    renderWithScimHost(<ScimScreen />);
+
+    const feed = screen.getByTestId("directory-requests");
+    expect(within(feed).getByText(/POST users/)).toBeTruthy();
+    expect(within(feed).getByText("Refused")).toBeTruthy();
+    expect(within(feed).getByText(/The resource is not valid: externalId/)).toBeTruthy();
+    // The slug is what a reader branches on, never what they read.
+    expect(within(feed).queryByText("invalid_resource")).toBeNull();
+    // The server answers newest first and the page keeps that order.
+    const badges = within(feed)
+      .getAllByText(/Refused|Accepted/)
+      .map((node) => node.textContent);
+    expect(badges).toEqual(["Refused", "Accepted"]);
+  });
+
+  it("says what it still holds rather than that nothing was ever sent", () => {
+    renderWithScimHost(<ScimScreen />);
+
+    const feed = screen.getByTestId("directory-requests");
+    expect(within(feed).getByText(/thirty days/i)).toBeTruthy();
+    expect(within(feed).queryByText(/never sent|nothing was sent/i)).toBeNull();
+  });
+});
+
+describe("given another organization's directory has been pushing too", () => {
+  /** @scenario "Another organization's requests are not there to read" */
+  it("asks for the tenant as well as the connection, so only ours come back", () => {
+    state.requests["org-globex/ssoconn_1"] = [
+      request({ id: "req-globex", detail: "Globex asked for something" }),
+    ];
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(calls.getRequests).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      connectionId: "ssoconn_1",
+    });
+    expect(screen.queryByText(/Globex asked for something/)).toBeNull();
+  });
+});
+
+describe("given a token nothing has ever presented", () => {
+  /** @scenario "A token nothing has presented says so, rather than only showing a date that is missing" */
+  it("says so in words pointing at the provider, not only a missing date", () => {
+    state.rows = [token()];
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByText(/Nothing has presented this token yet/)).toBeTruthy();
+    expect(screen.getByText(/check the token it is using/)).toBeTruthy();
   });
 });

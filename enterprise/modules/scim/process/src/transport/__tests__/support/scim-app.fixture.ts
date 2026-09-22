@@ -10,9 +10,16 @@
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { ScimService, type ScimTokenEntitlement } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimService,
+  type ScimRequestLogEntry,
+  type ScimRequestLogQuery,
+  type ScimRequestRecord,
+  type ScimTokenEntitlement,
+} from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
 import { ScimApp } from "../../../app/scim.app.ts";
@@ -28,6 +35,11 @@ export class ScimServiceFake extends ScimService {
     }),
   );
   readonly createUser = vi.fn();
+  readonly recordRequest = vi.fn(async (_request: ScimRequestRecord): Promise<void> => void 0);
+  readonly findRequestLog = vi.fn(
+    async (_query: ScimRequestLogQuery): Promise<ScimRequestLogEntry[]> => [],
+  );
+  readonly sweepExpiredRequests = vi.fn(async (_input: { now: Instant }): Promise<number> => 0);
   readonly findOrganizationBySsoDomain = vi.fn();
   readonly listUsers = vi.fn();
   readonly deleteUser = vi.fn();
@@ -73,7 +85,10 @@ export function scimTestApp(
   const scim = options.scim ?? new ScimServiceFake();
   const offered = options.connections ?? [];
   const identity: ScimConnectionReads = {
-    ssoConnectionReads: () => ({ findForOrganization: () => Promise.resolve(offered) }),
+    ssoConnectionReads: () => ({
+      findForOrganization: () => Promise.resolve(offered),
+      getProvider: ({ connectionId }) => Promise.resolve({ connectionId, providerId: "oidc" }),
+    }),
   };
   const audited: unknown[] = [];
   const entitlements: Pick<EntitlementApi, "getActivePlan"> = {

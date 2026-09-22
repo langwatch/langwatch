@@ -7,6 +7,23 @@ export {
 } from "./scim.api.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export { ScimService } from "./scim.service.ts";
+export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
+export {
+  SCIM_REQUEST_FEED_LIMIT,
+  SCIM_REQUEST_LOG_RETENTION_MS,
+  scimConnectionRequestsInputSchema,
+  scimRequestEntrySchema,
+  scimRefusalReasonSchema,
+  scimRequestLogEntrySchema,
+  scimRequestLogQuerySchema,
+  scimRequestRecordSchema,
+  type ScimConnectionRequestsInput,
+  type ScimRefusalReason,
+  type ScimRequestEntry,
+  type ScimRequestLogEntry,
+  type ScimRequestLogQuery,
+  type ScimRequestRecord,
+} from "./scim-request-log.ts";
 export {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,

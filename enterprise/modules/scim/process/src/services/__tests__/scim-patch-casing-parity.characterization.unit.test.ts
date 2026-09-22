@@ -80,16 +80,13 @@ function userService(): ScimUserProvisioning {
     lastLoginAt: null,
     deactivatedAt: null,
   };
-  // The three this file exercises answer; the other three throw, because a
-  // patch that reached user creation or a profile write would mean the casing
+  // The one this file exercises answers; the other two throw, because a patch
+  // that reached user creation or an address lookup would mean the casing
   // parity under test had routed somewhere it should not.
   return {
     findById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
-    deactivate: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
-    reactivate: vi.fn(async () => current),
     findByEmail: vi.fn(notReached),
     create: vi.fn(notReached),
-    updateProfile: vi.fn(notReached),
   } satisfies ScimUserProvisioning;
 }
 
@@ -142,12 +139,10 @@ describe("SCIM PATCH operation casing parity", () => {
         },
       })),
     });
-    const users = userService();
     const service = ScimService.create({
       prisma: repo,
       writer: new GrantsFake(),
-      users,
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
+      users: userService(),
       governance: governance(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
@@ -159,7 +154,13 @@ describe("SCIM PATCH operation casing parity", () => {
       organizationId: "org-1",
       patchRequest: parse([{ op: "Replace", path: "active", value: false }]),
     });
-    expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+    expect(repo.saveUserResource).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1", active: false }),
+    );
+    expect(repo.removeMembership).toHaveBeenCalledWith({
+      userId: "user-1",
+      organizationId: "org-1",
+    });
   });
 
   it("applies a capitalized Replace to group renaming", async () => {

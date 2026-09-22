@@ -1,3 +1,10 @@
+import type { Instant } from "@langwatch/time";
+
+import type {
+  ScimRequestLogEntry,
+  ScimRequestLogQuery,
+  ScimRequestRecord,
+} from "./scim-request-log.ts";
 import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
@@ -29,6 +36,15 @@ export abstract class ScimService {
     connectionId: string;
   }): Promise<{ revoked: number }>;
   abstract verifyToken(input: { token: string }): Promise<ScimTokenEntitlement>;
+
+  // ── What the directory asked, and what we answered (ADR-126) ─────────────
+
+  /** Files one served request. Never throws: the request was already answered. */
+  abstract recordRequest(request: ScimRequestRecord): Promise<void>;
+  /** What this connection has served, newest first. */
+  abstract findRequestLog(query: ScimRequestLogQuery): Promise<ScimRequestLogEntry[]>;
+  /** Drops what has aged out, answering how many rows went. */
+  abstract sweepExpiredRequests(input: { now: Instant }): Promise<number>;
   abstract createUser(input: {
     organizationId: string;
     connectionId?: string | null;

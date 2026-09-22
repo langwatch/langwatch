@@ -9,6 +9,9 @@ import {
   type ScimListResponse,
   type ScimPatchRequest,
   type ScimReplaceGroupRequest,
+  type ScimRequestLogEntry,
+  type ScimRequestLogQuery,
+  type ScimRequestRecord,
   type ScimUser,
   ScimService as ScimServiceContract,
   ScimConnectionNotFoundError,
@@ -18,7 +21,7 @@ import {
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "../app/scim.members.ts";
@@ -29,23 +32,21 @@ import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.
 import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
-import type { ScimSessionRevocation } from "./scim-user-profile.service.ts";
+import { ScimRequestLogService } from "./scim-request-log.service.ts";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
  * All operations are scoped to an organization for multi-tenancy.
  */
 /**
- * SCIM takes the two dependencies it passes down, not the two whole services
- * they came from: `ScimSessionRevocation` is `auth.revokeAllBrowserSessions`
- * and `ScimDepartmentAssignment` is Governance's two department calls, each
- * declared beside the leaf service that makes the call.
+ * SCIM takes the dependencies it passes down, not the whole services they
+ * came from: `ScimDepartmentAssignment` is Governance's two department calls,
+ * declared beside the leaf service that makes them.
  *
- * Asking for a whole `BrowserSessionApi` and a whole `GovernanceRestApi` to use three
- * methods is what forced every test here to build a one-method object and cast
- * it at a service it shares nothing else with. The cast is the signal: a
- * dependency that can only be satisfied by lying about it is asking for more
- * than it needs.
+ * Asking for a whole `GovernanceRestApi` to use two methods is what forced
+ * every test here to build a one-method object and cast it at a service it
+ * shares nothing else with. The cast is the signal: a dependency that can only
+ * be satisfied by lying about it is asking for more than it needs.
  */
 export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepository;
@@ -54,12 +55,12 @@ export class ScimService extends ScimServiceContract {
   private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly identities: ScimDirectoryIdentityService;
   private readonly lifecycle: ScimSyncLifecycle;
+  private readonly requests: ScimRequestLogService;
 
   private constructor({
     prisma,
     writer,
     users,
-    auth,
     governance,
     organization,
     entitlements,
@@ -69,7 +70,6 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
     users: ScimUserProvisioning;
-    auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -78,6 +78,7 @@ export class ScimService extends ScimServiceContract {
   }) {
     super();
     this.repository = prisma;
+    this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create(prisma);
     this.lifecycle = lifecycle;
     const grants = ScimGrantsService.create({ repository: prisma, grants: writer });
@@ -86,7 +87,6 @@ export class ScimService extends ScimServiceContract {
       writer,
       grants,
       users,
-      auth,
       governance,
       organization,
       lifecycle,
@@ -105,7 +105,6 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
     users: ScimUserProvisioning;
-    auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -117,6 +116,20 @@ export class ScimService extends ScimServiceContract {
 
   findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
     return this.repository.findOrganizationBySsoDomain(input);
+  }
+
+  // ── What the directory asked, and what we answered (ADR-126) ─────────────
+
+  recordRequest(request: ScimRequestRecord): Promise<void> {
+    return this.requests.record(request);
+  }
+
+  findRequestLog(query: ScimRequestLogQuery): Promise<ScimRequestLogEntry[]> {
+    return this.requests.findForConnection(query);
+  }
+
+  sweepExpiredRequests(input: { now: Instant }): Promise<number> {
+    return this.requests.sweepExpired(input);
   }
 
   async generateToken(input: {
@@ -201,7 +214,11 @@ export class ScimService extends ScimServiceContract {
       organizationId: stored.organizationId,
     });
     if (plan.type !== "ENTERPRISE") {
-      return { status: "plan_not_entitled", organizationId: stored.organizationId };
+      return {
+        status: "plan_not_entitled",
+        organizationId: stored.organizationId,
+        connectionId: stored.connectionId,
+      };
     }
 
     await this.repository.recordTokenUse({ tokenId: stored.id, usedAt: nowInstant() });

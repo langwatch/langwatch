@@ -5,7 +5,7 @@ import {
   type ScimCreateUserRequest,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { UpdateUserProfileInput, UserProfile } from "@langwatch/user-contract";
+import type { UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../../__tests__/support/grants-fake.ts";
@@ -66,15 +66,6 @@ function harness(
     findByEmail: vi.fn(async () => options.existingUser ?? null),
     findById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
-    updateProfile: vi.fn(async (_input: UpdateUserProfileInput) => currentUser),
-    deactivate: vi.fn(async () => {
-      currentUser = user({ ...currentUser, deactivatedAt: now });
-      return currentUser;
-    }),
-    reactivate: vi.fn(async () => {
-      currentUser = user({ ...currentUser, deactivatedAt: null });
-      return currentUser;
-    }),
   } satisfies ScimUserProvisioning;
   const governance = {
     departmentResolveByNameOrCreate: vi.fn(async () => ({
@@ -89,14 +80,10 @@ function harness(
     departmentAssignUser: vi.fn(async () => undefined),
   };
   const writer = new GrantsFake();
-  const auth = {
-    revokeAllBrowserSessions: vi.fn(async () => undefined),
-  };
   const service = ScimService.create({
     prisma: repo,
     writer,
     users,
-    auth,
     governance,
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
@@ -106,7 +93,7 @@ function harness(
   if (options.membership !== void 0) {
     vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);
   }
-  return { repo, users, auth, governance, writer, service };
+  return { repo, users, governance, writer, service };
 }
 
 describe("SCIM user parity", () => {
@@ -288,8 +275,8 @@ describe("SCIM user parity", () => {
 
   it("lists members and passes an exact userName filter to persistence", async () => {
     const repo = repository({
-      listMemberships: vi.fn(async () => ({
-        rows: [{ userId: "user-1", organizationId: "org-1", user: user() }],
+      findOrganizationUsers: vi.fn(async () => ({
+        rows: [{ user: user(), resource: null }],
         total: 1,
       })),
     });
@@ -304,9 +291,9 @@ describe("SCIM user parity", () => {
       totalResults: 1,
       Resources: [{ userName: "alice@acme.com" }],
     });
-    expect(repo.listMemberships).toHaveBeenCalledWith({
+    expect(repo.findOrganizationUsers).toHaveBeenCalledWith({
       organizationId: "org-1",
-      email: "alice@acme.com",
+      userName: "alice@acme.com",
       startIndex: 1,
       count: 100,
     });
@@ -345,7 +332,10 @@ describe("SCIM user parity", () => {
       userId: "user-1",
       organizationId: "org-1",
     });
-    expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+    expect(usedRepo.markUserResourceDeleted).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org-1", userId: "user-1" }),
+    );
+    expect(users.findById).toHaveBeenCalledWith({ id: "user-1" });
   });
 
   describe("when proven offboarding is switched on", () => {
@@ -395,20 +385,22 @@ describe("SCIM user parity", () => {
       expect(writer.attachBindings).not.toHaveBeenCalled();
     });
 
-    it("still deactivates the user, which both paths owe", async () => {
-      const { users, service } = harness({
+    it("still tombstones the directory resource, which both paths owe", async () => {
+      const { repo, service } = harness({
         membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },
         provenOffboarding: true,
       });
 
       await service.deleteUser({ id: "user-1", organizationId: "org-1" });
 
-      expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+      expect(repo.markUserResourceDeleted).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", userId: "user-1" }),
+      );
     });
 
     /** @scenario "Deactivating a user deprovisions them with the same proof" */
     it("routes a push of active false through the same proof before deactivating", async () => {
-      const { writer, users, service } = harness({
+      const { writer, repo, service } = harness({
         membership: { user: user() },
         currentUser: user({ deactivatedAt: null }),
         provenOffboarding: true,
@@ -428,17 +420,19 @@ describe("SCIM user parity", () => {
       expect(writer.offboard).toHaveBeenCalledWith(
         expect.objectContaining({ userId: "user-1", organizationId: "org-1" }),
       );
-      expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+      expect(repo.saveUserResource).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", active: false }),
+      );
     });
 
     it("refuses a user outside the organization before removing anything", async () => {
-      const { writer, users, service } = harness({ membership: null, provenOffboarding: true });
+      const { writer, repo, service } = harness({ membership: null, provenOffboarding: true });
 
       await expect(
         service.deleteUser({ id: "user-1", organizationId: "org-1" }),
       ).rejects.toMatchObject({ response: { status: "404" } });
       expect(writer.offboard).not.toHaveBeenCalled();
-      expect(users.deactivate).not.toHaveBeenCalled();
+      expect(repo.markUserResourceDeleted).not.toHaveBeenCalled();
     });
   });
 
@@ -453,7 +447,7 @@ describe("SCIM user parity", () => {
   });
 
   it("deactivates a user through an active=false PATCH", async () => {
-    const { users, service } = harness({
+    const { repo, service } = harness({
       membership: { user: user() },
       currentUser: user({ deactivatedAt: now }),
     });
@@ -468,11 +462,14 @@ describe("SCIM user parity", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+    expect(repo.removeMembership).toHaveBeenCalledWith({
+      userId: "user-1",
+      organizationId: "org-1",
+    });
   });
 
   it("deactivates a user through a full replace", async () => {
-    const { users, service } = harness({ membership: { user: user() } });
+    const { repo, service } = harness({ membership: { user: user() } });
 
     await expect(
       service.replaceUser({
@@ -486,81 +483,51 @@ describe("SCIM user parity", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
-  });
-
-  /** @scenario "SCIM replacing a user's email revokes their browser sessions" */
-  it("revokes browser sessions after a full replace changes an email", async () => {
-    const { auth, users, service } = harness({ membership: { user: user() } });
-    const order: string[] = [];
-    vi.mocked(users.updateProfile).mockImplementation(async (input) => {
-      order.push("profile");
-      return user({ email: input.email ?? "alice@acme.com" });
-    });
-    vi.mocked(auth.revokeAllBrowserSessions).mockImplementation(async () => {
-      order.push("sessions");
-    });
-
-    await service.replaceUser({
-      id: "user-1",
+    expect(repo.removeMembership).toHaveBeenCalledWith({
+      userId: "user-1",
       organizationId: "org-1",
-      request: {
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-        userName: "new@acme.com",
-      },
     });
-
-    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
-    expect(order).toEqual(["profile", "sessions"]);
   });
 
-  /** @scenario "SCIM patching a user's email revokes their browser sessions" */
-  it("revokes browser sessions after a PATCH changes an email", async () => {
-    const { auth, users, service } = harness({ membership: { user: user() } });
-    const order: string[] = [];
-    vi.mocked(users.updateProfile).mockImplementation(async (input) => {
-      order.push("profile");
-      return user({ email: input.email ?? "alice@acme.com" });
-    });
-    vi.mocked(auth.revokeAllBrowserSessions).mockImplementation(async () => {
-      order.push("sessions");
-    });
+  /**
+   * The address a directory pushes is the organization's own name for
+   * somebody, so neither a PUT nor a PATCH of `userName` reaches the account
+   * behind it — and nothing a session was established against moves.
+   */
+  it("renames the directory resource on a PUT and a PATCH without touching the account", async () => {
+    for (const rename of [
+      (service: ScimService) =>
+        service.replaceUser({
+          id: "user-1",
+          organizationId: "org-1",
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "new@acme.com",
+          },
+        }),
+      (service: ScimService) =>
+        service.updateUser({
+          id: "user-1",
+          organizationId: "org-1",
+          patchRequest: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [{ op: "replace", value: { userName: "new@acme.com" } }],
+          },
+        }),
+    ]) {
+      const { repo, users, service } = harness({ membership: { user: user() } });
 
-    await service.updateUser({
-      id: "user-1",
-      organizationId: "org-1",
-      patchRequest: {
-        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-        Operations: [{ op: "replace", value: { userName: "new@acme.com" } }],
-      },
-    });
+      await expect(rename(service)).resolves.toMatchObject({ userName: "new@acme.com" });
 
-    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
-    expect(order).toEqual(["profile", "sessions"]);
-  });
-
-  /** @scenario "A failed revocation still leaves the new SCIM email in place" */
-  it("retains a SCIM profile update when session revocation fails", async () => {
-    const { auth, users, service } = harness({ membership: { user: user() } });
-    vi.mocked(users.updateProfile).mockResolvedValue(user({ email: "new@acme.com" }));
-    vi.mocked(auth.revokeAllBrowserSessions).mockRejectedValue(new Error("cache unavailable"));
-
-    await expect(
-      service.replaceUser({
-        id: "user-1",
-        organizationId: "org-1",
-        request: {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+      expect(repo.saveUserResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          userId: "user-1",
           userName: "new@acme.com",
-        },
-      }),
-    ).rejects.toThrow("cache unavailable");
-
-    expect(users.updateProfile).toHaveBeenCalledWith({
-      id: "user-1",
-      name: "new",
-      email: "new@acme.com",
-    });
+        }),
+      );
+      expect(Object.keys(users)).toEqual(["findByEmail", "findById", "create"]);
+    }
   });
 });
 

@@ -19,6 +19,7 @@ import {
   type ScimSyncLifecycleAdapterDeps,
 } from "./services/scim-sync-lifecycle.service.ts";
 import { scimProtocolRest, scimRestCredential } from "./transport/scim-protocol.rest.ts";
+import { scimReconciliationTrpcTransport } from "./transport/scim-reconciliation.trpc.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
@@ -27,7 +28,13 @@ export type { ScimBespokeMembers } from "./app/scim.app.ts";
 
 export const scimServer = defineServerModule("scim")
   .withApp(ScimApp)
-  .withTransports(scimTokenRest, scimTokenTrpcTransport, scimProtocolRest, scimWebhookRest)
+  .withTransports(
+    scimTokenRest,
+    scimTokenTrpcTransport,
+    scimReconciliationTrpcTransport,
+    scimProtocolRest,
+    scimWebhookRest,
+  )
   // Who a management key stands for: the member it acts as, or the key itself
   // where it acts as nobody - one stable string per credential either way.
   .withTransportFacts(() => [

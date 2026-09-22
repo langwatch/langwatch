@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { ScimCreateUserRequest, ScimUser } from "@langwatch/enterprise-scim-contract";
+import { toDate } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
+
+import type { ScimUserResourceRecord } from "../repositories/scim.repository.ts";
 
 /** Postgres reports a duplicate key as P2002; SCIM answers it with 409, not 500. */
 export function isUniqueViolation(error: unknown): boolean {
@@ -9,14 +12,20 @@ export function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-/** One user as the SCIM 2.0 core schema describes them. */
-export function scimUserOf(user: UserProfile): ScimUser {
-  const { givenName, familyName } = splitName(user.name ?? "");
+/**
+ * One user as the SCIM 2.0 core schema describes them, read through the
+ * organization's own directory resource where it has one: the userName, the
+ * display name and `active` are the tenant's, and only the account beneath
+ * them answers for somebody no directory has claimed.
+ */
+export function scimUserOf(user: UserProfile, resource?: ScimUserResourceRecord | null): ScimUser {
+  const { givenName, familyName } = splitName((resource ? resource.name : user.name) ?? "");
+  const userName = resource?.userName ?? user.email ?? "";
 
   return {
     schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
     id: user.id,
-    userName: user.email ?? "",
+    userName,
     name: {
       givenName,
       familyName,
@@ -24,15 +33,15 @@ export function scimUserOf(user: UserProfile): ScimUser {
     emails: [
       {
         primary: true,
-        value: user.email ?? "",
+        value: userName,
         type: "work",
       },
     ],
-    active: user.deactivatedAt === null,
+    active: resource?.active ?? user.deactivatedAt === null,
     meta: {
       resourceType: "User",
-      created: user.createdAt.toISOString(),
-      lastModified: user.updatedAt.toISOString(),
+      created: (resource ? toDate(resource.createdAt) : user.createdAt).toISOString(),
+      lastModified: (resource ? toDate(resource.updatedAt) : user.updatedAt).toISOString(),
     },
   };
 }

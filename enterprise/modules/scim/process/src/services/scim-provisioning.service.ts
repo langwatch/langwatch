@@ -14,7 +14,11 @@ import {
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { UserProfile, UserApi } from "@langwatch/user-contract";
 
-import type { ScimRepository } from "../repositories/scim.repository.ts";
+import type {
+  ScimRepository,
+  ScimUserRecord,
+  ScimUserResourceRecord,
+} from "../repositories/scim.repository.ts";
 import {
   ScimCostCenterService,
   type ScimDepartmentAssignment,
@@ -24,26 +28,27 @@ import {
   type ScimOrganizationAdministration,
 } from "./scim-deprovision.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
-import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service.ts";
-import {
-  ScimUserProfileService,
-  type ScimSessionRevocation,
-  type ScimUserProfileReadWrite,
-} from "./scim-user-profile.service.ts";
+import { ScimUserPatchService } from "./scim-user-patch.service.ts";
 
 /**
  * Everything SCIM asks of `UserApi`: the two reads that decide whether a
- * directory user already exists here, the create, and what the leaf services
- * need to change a profile or flip `active`. Six of the contract's twenty-two
- * members.
+ * directory user already exists here, and the create. Nothing else — a
+ * directory states what is true of a person INSIDE ITS ORGANIZATION, and that
+ * lives on the organization's own resource rather than on the account they
+ * sign in with.
  */
-export type ScimUserProvisioning = ScimUserActivation &
-  ScimUserProfileReadWrite &
-  Pick<UserApi, "findByEmail" | "create">;
+export type ScimUserProvisioning = Pick<UserApi, "findById" | "findByEmail" | "create">;
 import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import { parseScimFilter, type ScimFilterTerm } from "../rules/scim-filter.rules.ts";
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import { isUniqueViolation, nameFromScimRequest, scimUserOf } from "../rules/scim-user.rules.ts";
+
+/** The person this organization holds, and what it says about them. */
+type ScimOrganizationUser = {
+  user: ScimUserRecord;
+  resource: ScimUserResourceRecord | null;
+  hasMembership: boolean;
+};
 
 export class ScimProvisioningService {
   private readonly prisma: ScimRepository;
@@ -55,14 +60,12 @@ export class ScimProvisioningService {
   private readonly provenOffboarding: boolean;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
-  private readonly profiles: ScimUserProfileService;
 
   private constructor({
     prisma,
     writer,
     grants,
     users,
-    auth,
     governance,
     organization,
     lifecycle,
@@ -72,7 +75,6 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
@@ -81,7 +83,6 @@ export class ScimProvisioningService {
     this.prisma = prisma;
     this.writer = writer;
     this.userService = users;
-    this.profiles = ScimUserProfileService.create({ users, auth });
     this.grants = grants;
     this.deprovision = ScimDeprovisionService.create({
       grants: writer,
@@ -91,14 +92,7 @@ export class ScimProvisioningService {
     this.provenOffboarding = provenOffboarding;
     this.costCenters = ScimCostCenterService.create(governance);
     this.organization = organization;
-    this.patches = ScimUserPatchService.create(
-      this.userService,
-      this.profiles,
-      this.costCenters,
-      this.deprovision,
-      organization,
-      provenOffboarding,
-    );
+    this.patches = ScimUserPatchService.create(this.costCenters);
   }
 
   static create(options: {
@@ -106,7 +100,6 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
@@ -164,6 +157,126 @@ export class ScimProvisioningService {
     });
   }
 
+  /**
+   * Who a push means, inside this organization: the person a live resource of
+   * that name belongs to, else the account that answers to it. A directory
+   * alias is only ever read here — never as sign-in proof.
+   */
+  private async resolveUser({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<UserProfile | null> {
+    return (
+      (await this.prisma.findUserByResourceName({ organizationId, userName: email })) ??
+      (await this.userService.findByEmail({ email }))
+    );
+  }
+
+  /**
+   * The person as this organization holds them. A deleted resource answers for
+   * nobody even while the account and its other organizations carry on.
+   */
+  private async findOrganizationUser(
+    organizationId: string,
+    id: string,
+  ): Promise<ScimOrganizationUser | null> {
+    const [resource, membership] = await Promise.all([
+      this.prisma.findUserResource({ organizationId, userId: id }),
+      this.prisma.findMembership({ organizationId, userId: id }),
+    ]);
+    if (resource?.deletedAt || (!resource && !membership)) return null;
+
+    const user = await this.userService.findById({ id });
+
+    return user ? { user, resource, hasMembership: membership !== null } : null;
+  }
+
+  /** A name one person already answers to in this organization is refused, not taken. */
+  private async assertUserNameIsFree({
+    organizationId,
+    userId,
+    userName,
+  }: {
+    organizationId: string;
+    userId?: string;
+    userName: string;
+  }): Promise<void> {
+    const holder = await this.prisma.findUserByResourceName({ organizationId, userName });
+    const conflicting =
+      (holder !== null && holder.id !== userId) ||
+      (await this.prisma.hasLegacyNameConflict({ organizationId, userId, userName }));
+
+    if (conflicting) {
+      this.scimError({
+        status: "409",
+        scimType: "uniqueness",
+        detail: "User name already exists in this organization",
+      });
+    }
+  }
+
+  /** The store's own uniqueness is the last word, and it reads as 409 too. */
+  private async saveResource(input: {
+    organizationId: string;
+    userId: string;
+    userName: string;
+    name: string | null;
+    active: boolean;
+  }): Promise<ScimUserResourceRecord> {
+    try {
+      return await this.prisma.saveUserResource(input);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      return this.scimError({
+        status: "409",
+        scimType: "uniqueness",
+        detail: "User name already exists in this organization",
+      });
+    }
+  }
+
+  /**
+   * Access in this organization goes before the resource is marked inactive,
+   * and the organization's own last-administrator refusal is asked either way:
+   * the flag chooses HOW access is removed, never whether an organization may
+   * be left with nobody to administer it.
+   */
+  private async removeOrganizationAccess({
+    userId,
+    organizationId,
+    connectionId,
+    op,
+  }: {
+    userId: string;
+    organizationId: string;
+    connectionId: string | null;
+    op: "deactivate_user" | "delete_user";
+  }): Promise<void> {
+    if (this.provenOffboarding) {
+      await this.deprovision.removeAccess({ userId, organizationId, connectionId, op });
+
+      return;
+    }
+
+    await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
+    const visibleGrants = await this.prisma.listRoleBindings({
+      kind: "member-offboarding",
+      organizationId,
+      userId,
+    });
+    await this.writer.offboardMember({
+      organizationId,
+      userId,
+      revokedGrantIds: visibleGrants.map((row) => row.id),
+      actor: ScimProvisioningService.ACTOR,
+    });
+    await this.prisma.removeMembership({ userId, organizationId });
+  }
+
   async createUser({
     request,
     organizationId,
@@ -171,132 +284,79 @@ export class ScimProvisioningService {
     request: ScimCreateUserRequest;
     organizationId: string;
   }): Promise<ScimUser> {
-    const email = request.userName;
-    const name = nameFromScimRequest(request);
-
-    const existingUser = await this.userService.findByEmail({ email });
+    assertScimOrganizationId(organizationId);
+    const existingUser = await this.resolveUser({ organizationId, email: request.userName });
 
     if (existingUser) {
-      return this.createExistingUser({ existingUser, organizationId, request });
-    }
-
-    return this.createNewUser({ name, email, organizationId, request });
-  }
-
-  private async createExistingUser({
-    existingUser,
-    organizationId,
-    request,
-  }: {
-    existingUser: UserProfile;
-    organizationId: string;
-    request: ScimCreateUserRequest;
-  }): Promise<ScimUser> {
-    const existingMembership = await this.prisma.findMembership({
-      userId: existingUser.id,
-      organizationId,
-    });
-    if (existingMembership) {
-      return this.scimError({
-        status: "409",
-        detail: "User already exists in this organization",
-      });
-    }
-
-    try {
-      await this.prisma.addMembership({
-        userId: existingUser.id,
-        organizationId,
-        role: "MEMBER",
-      });
-    } catch (error) {
-      if (!isUniqueViolation(error)) {
-        throw error;
-      }
-
-      await this.reconcileOrganizationMembership({
-        userId: existingUser.id,
-        organizationId,
-      });
-
-      return this.toScimUser(existingUser);
-    }
-
-    await this.reconcileOrganizationMembership({
-      userId: existingUser.id,
-      organizationId,
-    });
-    if (existingUser.deactivatedAt) {
-      await this.userService.reactivate({ id: existingUser.id });
-    }
-
-    await this.costCenters.sync({
-      userId: existingUser.id,
-      organizationId,
-      costCenter: this.costCenters.findFromRequest(request),
-    });
-
-    const reloadedUser = await this.userService.findById({ id: existingUser.id });
-    if (!reloadedUser) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-
-    return this.toScimUser(reloadedUser);
-  }
-
-  private async createNewUser({
-    name,
-    email,
-    organizationId,
-    request,
-  }: {
-    name: string;
-    email: string;
-    organizationId: string;
-    request: ScimCreateUserRequest;
-  }): Promise<ScimUser> {
-    const newUser = await this.userService.create({ name, email });
-    try {
-      await this.prisma.addMembership({
-        userId: newUser.id,
-        organizationId,
-        role: "MEMBER",
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) {
+      const [membership, previous] = await Promise.all([
+        this.prisma.findMembership({ organizationId, userId: existingUser.id }),
+        this.prisma.findUserResource({ organizationId, userId: existingUser.id }),
+      ]);
+      if (membership && !previous?.deletedAt) {
         return this.scimError({
           status: "409",
           detail: "User already exists in this organization",
         });
       }
-
-      throw error;
     }
 
-    await this.reconcileOrganizationMembership({
-      userId: newUser.id,
+    await this.assertUserNameIsFree({
       organizationId,
-    });
-    await this.costCenters.sync({
-      userId: newUser.id,
-      organizationId,
-      costCenter: this.costCenters.findFromRequest(request),
+      ...(existingUser ? { userId: existingUser.id } : {}),
+      userName: request.userName,
     });
 
-    return this.toScimUser(newUser);
+    const name = nameFromScimRequest(request);
+    // Minting the account is the only global state a directory push writes.
+    const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
+    const active = request.active !== false;
+
+    if (active) {
+      await this.admit({ userId: user.id, organizationId });
+      await this.costCenters.sync({
+        userId: user.id,
+        organizationId,
+        costCenter: this.costCenters.findFromRequest(request),
+      });
+    }
+
+    const resource = await this.saveResource({
+      organizationId,
+      userId: user.id,
+      userName: request.userName,
+      name,
+      active,
+    });
+
+    return scimUserOf(user, resource);
+  }
+
+  /** A retried create still repairs the grant beside an existing membership. */
+  private async admit({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    try {
+      await this.prisma.addMembership({ userId, organizationId, role: "MEMBER" });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+    }
+
+    await this.reconcileOrganizationMembership({ userId, organizationId });
   }
 
   async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {
-    const membership = await this.prisma.findMembership({
-      userId: id,
-      organizationId,
-    });
+    assertScimOrganizationId(organizationId);
+    const found = await this.findOrganizationUser(organizationId, id);
 
-    if (!membership) {
+    if (!found) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    return this.toScimUser(membership.user);
+    return scimUserOf(found.user, found.resource);
   }
 
   /**
@@ -330,13 +390,13 @@ export class ScimProvisioningService {
 
     const narrowing = await this.listNarrowing({ connectionId, term: parsed.term });
 
-    const { rows: memberships, total: totalCount } = await this.prisma.listMemberships({
+    const { rows, total: totalCount } = await this.prisma.findOrganizationUsers({
       organizationId,
       ...narrowing,
       startIndex,
       count,
     });
-    const resources = memberships.map((m) => this.toScimUser(m.user));
+    const resources = rows.map((row) => scimUserOf(row.user, row.resource));
 
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -359,7 +419,7 @@ export class ScimProvisioningService {
   }: {
     connectionId: string | null;
     term: ScimFilterTerm | null;
-  }): Promise<{ email?: string; userIds?: readonly string[] }> {
+  }): Promise<{ userName?: string; userIds?: readonly string[] }> {
     if (!term) return {};
 
     if (term.attribute === "externalId") {
@@ -370,7 +430,7 @@ export class ScimProvisioningService {
       return { userIds: userId ? [userId] : [] };
     }
 
-    return { email: term.value };
+    return { userName: term.value };
   }
 
   async replaceUser({
@@ -384,56 +444,40 @@ export class ScimProvisioningService {
     request: ScimCreateUserRequest;
     connectionId?: string | null;
   }): Promise<ScimUser> {
-    const membership = await this.prisma.findMembership({
-      userId: id,
-      organizationId,
-    });
+    assertScimOrganizationId(organizationId);
+    const found = await this.findOrganizationUser(organizationId, id);
 
-    if (!membership) {
+    if (!found) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    const name = nameFromScimRequest(request);
+    await this.assertUserNameIsFree({ organizationId, userId: id, userName: request.userName });
     const active = request.active !== false;
 
-    const updatedUser = await this.profiles.updateProfile({
-      id,
-      name,
-      email: request.userName,
-    });
-
-    if (active && updatedUser.deactivatedAt) {
-      await this.userService.reactivate({ id });
-    } else if (!active && !updatedUser.deactivatedAt) {
-      if (this.provenOffboarding) {
-        await this.deprovision.removeAccess({
-          userId: id,
-          organizationId,
-          connectionId,
-          op: "deactivate_user",
-        });
-      } else {
-        await this.organization.assertRemovalKeepsAnAdministrator({
-          organizationId,
-          userId: id,
-        });
-      }
-
-      await this.userService.deactivate({ id });
+    if (!active && found.hasMembership) {
+      await this.removeOrganizationAccess({
+        userId: id,
+        organizationId,
+        connectionId,
+        op: "deactivate_user",
+      });
+    } else if (active && found.hasMembership) {
+      await this.costCenters.sync({
+        userId: id,
+        organizationId,
+        costCenter: this.costCenters.findFromRequest(request),
+      });
     }
 
-    await this.costCenters.sync({
-      userId: id,
+    const resource = await this.saveResource({
       organizationId,
-      costCenter: this.costCenters.findFromRequest(request),
+      userId: id,
+      userName: request.userName,
+      name: nameFromScimRequest(request),
+      active,
     });
 
-    const reloadedUser = await this.userService.findById({ id });
-    if (!reloadedUser) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-
-    return this.toScimUser(reloadedUser);
+    return scimUserOf(found.user, resource);
   }
 
   async updateUser({
@@ -447,25 +491,43 @@ export class ScimProvisioningService {
     patchRequest: ScimPatchRequest;
     connectionId?: string | null;
   }): Promise<ScimUser> {
-    const membership = await this.prisma.findMembership({
-      userId: id,
+    assertScimOrganizationId(organizationId);
+    const found = await this.findOrganizationUser(organizationId, id);
+
+    if (!found) {
+      return this.scimError({ status: "404", detail: "User not found" });
+    }
+
+    const patched = this.patches.fold({
+      operations: patchRequest.Operations,
+      active: found.resource?.active ?? found.user.deactivatedAt === null,
+      name: found.resource ? found.resource.name : found.user.name,
+      userName: found.resource?.userName ?? found.user.email ?? "",
+    });
+    await this.assertUserNameIsFree({ organizationId, userId: id, userName: patched.userName });
+
+    if (patched.deactivating && found.hasMembership) {
+      await this.removeOrganizationAccess({
+        userId: id,
+        organizationId,
+        connectionId,
+        op: "deactivate_user",
+      });
+    } else if (found.hasMembership) {
+      for (const costCenter of patched.costCenters) {
+        await this.costCenters.sync({ userId: id, organizationId, costCenter });
+      }
+    }
+
+    const resource = await this.saveResource({
       organizationId,
+      userId: id,
+      userName: patched.userName,
+      name: patched.name,
+      active: patched.active,
     });
 
-    if (!membership) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-
-    for (const operation of patchRequest.Operations) {
-      await this.patches.apply({ id, organizationId, connectionId, operation });
-    }
-
-    const reloadedUser = await this.userService.findById({ id });
-    if (!reloadedUser) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-
-    return this.toScimUser(reloadedUser);
+    return scimUserOf(found.user, resource);
   }
 
   async deleteUser({
@@ -477,50 +539,32 @@ export class ScimProvisioningService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<void> {
-    const membership = await this.prisma.findMembership({
-      userId: id,
-      organizationId,
-    });
+    assertScimOrganizationId(organizationId);
+    const found = await this.findOrganizationUser(organizationId, id);
 
-    if (!membership) {
+    if (!found) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    if (this.provenOffboarding) {
-      await this.deprovision.removeAccess({
+    if (found.hasMembership) {
+      await this.removeOrganizationAccess({
         userId: id,
         organizationId,
         connectionId,
         op: "delete_user",
       });
-    } else {
-      // The previous write path removes the membership row itself, so it asks
-      // the same refusal the proven path asks through `removeAccess`.
-      await this.organization.assertRemovalKeepsAnAdministrator({
-        organizationId,
-        userId: id,
-      });
-      const visibleGrants = await this.prisma.listRoleBindings({
-        kind: "member-offboarding",
-        organizationId,
-        userId: id,
-      });
-      await this.writer.offboardMember({
-        organizationId,
-        userId: id,
-        revokedGrantIds: visibleGrants.map((row) => row.id),
-        actor: ScimProvisioningService.ACTOR,
-      });
-      await this.prisma.removeMembership({ userId: id, organizationId });
     }
 
-    await this.userService.deactivate({ id });
-
-    return;
+    await this.prisma.markUserResourceDeleted({
+      organizationId,
+      userId: id,
+      userName: found.resource?.userName ?? found.user.email ?? "",
+      name: found.resource ? found.resource.name : found.user.name,
+    });
   }
 
-  toScimUser(user: UserProfile): ScimUser {
-    return scimUserOf(user);
+  toScimUser(user: UserProfile, resource?: ScimUserResourceRecord | null): ScimUser {
+    return scimUserOf(user, resource);
   }
 
   private scimError({

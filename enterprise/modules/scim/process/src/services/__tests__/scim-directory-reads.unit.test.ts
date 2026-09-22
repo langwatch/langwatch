@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import type { ScimMembershipRecord } from "../../repositories/scim.repository.ts";
+import type { ScimOrganizationUserRecord } from "../../repositories/scim.repository.ts";
 import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
@@ -59,31 +59,27 @@ function directory({
   lookups?: { connectionId: string; externalId: string }[];
 }) {
   return scimRepositoryFixture({
-    listMemberships: vi.fn(
+    findOrganizationUsers: vi.fn(
       async (input: {
         organizationId: string;
-        email?: string;
+        userName?: string;
         userIds?: readonly string[];
         startIndex: number;
         count: number;
-      }): Promise<{ rows: ScimMembershipRecord[]; total: number }> => {
+      }): Promise<{ rows: ScimOrganizationUserRecord[]; total: number }> => {
         const matched = people
           .toSorted((left, right) => left.id.localeCompare(right.id))
           .filter(
             (candidate) =>
-              (input.email === undefined ||
-                candidate.email.toLowerCase() === input.email.toLowerCase()) &&
+              (input.userName === undefined ||
+                candidate.email.toLowerCase() === input.userName.toLowerCase()) &&
               (input.userIds === undefined || input.userIds.includes(candidate.id)),
           );
 
         return {
           rows: matched
             .slice(input.startIndex - 1, input.startIndex - 1 + input.count)
-            .map((candidate) => ({
-              userId: candidate.id,
-              organizationId: input.organizationId,
-              user: profileOf(candidate),
-            })),
+            .map((candidate) => ({ user: profileOf(candidate), resource: null })),
           total: matched.length,
         };
       },
@@ -132,9 +128,6 @@ function userService(): ScimUserProvisioning {
     findById: vi.fn(async () => stored),
     findByEmail: vi.fn(async () => null),
     create: vi.fn(async () => stored),
-    updateProfile: vi.fn(async () => stored),
-    deactivate: vi.fn(async () => ({ ...stored, deactivatedAt: new Date() })),
-    reactivate: vi.fn(async () => stored),
   };
 }
 
@@ -143,7 +136,6 @@ function serviceOver(repository: ReturnType<typeof directory>) {
     prisma: repository,
     writer: new GrantsFake(),
     users: userService(),
-    auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     governance: departments(),
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),

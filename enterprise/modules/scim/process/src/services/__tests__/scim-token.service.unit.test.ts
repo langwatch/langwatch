@@ -48,14 +48,10 @@ function service(
   return ScimService.create({
     prisma: repository,
     writer: new GrantsFake(),
-    auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
       findByEmail: vi.fn(async () => null),
       findById: vi.fn(async () => null),
       create: vi.fn(),
-      updateProfile: vi.fn(),
-      deactivate: vi.fn(),
-      reactivate: vi.fn(),
     } satisfies ScimUserProvisioning,
     governance: {
       departmentResolveByNameOrCreate: vi.fn(),

@@ -74,6 +74,9 @@ class ScimServiceFake extends ScimService {
   readonly createUser: ScimService["createUser"] = vi.fn(async () => scimUser);
   readonly listUsers: ScimService["listUsers"] = vi.fn(async () => scimUserList);
   readonly deleteUser = vi.fn(async () => {});
+  readonly recordRequest = vi.fn(async () => undefined);
+  readonly findRequestLog = vi.fn(async () => []);
+  readonly sweepExpiredRequests = vi.fn(async () => 0);
   // `ScimService` grew this and the fake did not follow.
   readonly revokeTokensForConnection: ScimService["revokeTokensForConnection"] = vi.fn();
   readonly generateToken: ScimService["generateToken"] = vi.fn();

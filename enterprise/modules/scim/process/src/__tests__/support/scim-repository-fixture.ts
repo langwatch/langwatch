@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { fromDate } from "@langwatch/time";
 import { vi } from "vitest";
 
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
@@ -28,7 +29,21 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     findTokenByHash: vi.fn(async () => null),
     recordTokenUse: vi.fn(async () => undefined),
     findMembership: vi.fn(async () => null),
-    listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
+    findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
+    recordRequest: vi.fn(async () => undefined),
+    findRequestLog: vi.fn(async () => []),
+    findExpiredRequestIds: vi.fn(async () => []),
+    deleteRequests: vi.fn(async () => 0),
+    findUserResource: vi.fn(async () => null),
+    findUserByResourceName: vi.fn(async () => null),
+    hasLegacyNameConflict: vi.fn(async () => false),
+    saveUserResource: vi.fn(async (input) => ({
+      ...input,
+      deletedAt: null,
+      createdAt: fromDate(new Date(0)),
+      updatedAt: fromDate(new Date(0)),
+    })),
+    markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
     findGroup: vi.fn(async () => null),

@@ -1,10 +1,35 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { ScimTokenRecord } from "@langwatch/enterprise-scim-contract";
+import type {
+  ScimRequestLogEntry,
+  ScimRequestRecord,
+  ScimTokenRecord,
+} from "@langwatch/enterprise-scim-contract";
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
 /** SCIM-owned persistence records. Prisma models do not cross this seam. */
 export type ScimUserRecord = UserProfile;
+/**
+ * One organization's own SCIM state for a person: the userName a directory
+ * pushed, the display name it sent and whether it says they are active. The
+ * account underneath belongs to nobody in particular, so none of this is
+ * written on it — a person in two organizations carries two of these.
+ */
+export interface ScimUserResourceRecord {
+  organizationId: string;
+  userId: string;
+  userName: string;
+  name: string | null;
+  active: boolean;
+  deletedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+}
+/** A person this organization holds, with its directory resource where one exists. */
+export interface ScimOrganizationUserRecord {
+  user: ScimUserRecord;
+  resource: ScimUserResourceRecord | null;
+}
 export interface ScimMembershipRecord {
   userId: string;
   organizationId: string;
@@ -92,15 +117,50 @@ export abstract class ScimRepository extends ScimGrantRepository {
     organizationId: string;
     userId: string;
   }) => Promise<ScimMembershipRecord | null>;
-  abstract listMemberships: (input: {
+  /**
+   * Who this organization holds: everyone carrying a live directory resource,
+   * then the members who carry none. A person whose resource is deleted is in
+   * neither half — the tombstone is the answer, not the membership row.
+   */
+  abstract findOrganizationUsers: (input: {
     organizationId: string;
-    email?: string;
+    /** Matched against the directory userName, and against the account's own
+     *  address for a member no directory has claimed. */
+    userName?: string;
     /** When present the page narrows to these members and no others; an empty
      *  array is an empty page rather than "everybody". */
     userIds?: readonly string[];
     startIndex: number;
     count: number;
-  }) => Promise<{ rows: ScimMembershipRecord[]; total: number }>;
+  }) => Promise<{ rows: ScimOrganizationUserRecord[]; total: number }>;
+  abstract findUserResource: (input: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<ScimUserResourceRecord | null>;
+  /** The account a live directory resource of this name belongs to, if any. */
+  abstract findUserByResourceName: (input: {
+    organizationId: string;
+    userName: string;
+  }) => Promise<ScimUserRecord | null>;
+  /** Whether a member no directory has claimed already answers to this name. */
+  abstract hasLegacyNameConflict: (input: {
+    organizationId: string;
+    userId?: string;
+    userName: string;
+  }) => Promise<boolean>;
+  abstract saveUserResource: (input: {
+    organizationId: string;
+    userId: string;
+    userName: string;
+    name: string | null;
+    active: boolean;
+  }) => Promise<ScimUserResourceRecord>;
+  abstract markUserResourceDeleted: (input: {
+    organizationId: string;
+    userId: string;
+    userName: string;
+    name: string | null;
+  }) => Promise<void>;
   abstract addMembership: (input: {
     organizationId: string;
     userId: string;
@@ -170,6 +230,16 @@ export abstract class ScimRepository extends ScimGrantRepository {
     organizationId: string;
     connectionId: string;
   }): Promise<boolean>;
+  // ── What the directory asked, and what we answered (ADR-126) ─────────────
+  abstract recordRequest: (request: ScimRequestRecord) => Promise<void>;
+  abstract findRequestLog(input: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<ScimRequestLogEntry[]>;
+  /** The ids of rows that have aged out, at most `limit` of them. */
+  abstract findExpiredRequestIds(input: { before: Instant; limit: number }): Promise<string[]>;
+  abstract deleteRequests(input: { ids: readonly string[] }): Promise<number>;
   abstract findDirectoryUserId(input: {
     connectionId: string;
     externalId: string;

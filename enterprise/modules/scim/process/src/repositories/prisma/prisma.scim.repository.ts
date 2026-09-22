@@ -1,3 +1,8 @@
+import {
+  scimRefusalReasonSchema,
+  type ScimRequestLogEntry,
+  type ScimRequestRecord,
+} from "@langwatch/enterprise-scim-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   OrganizationUserRole,
@@ -12,10 +17,36 @@ import {
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
   type ScimMembershipRecord,
+  type ScimOrganizationUserRecord,
   type ScimRoleBindingRecord,
   type ScimTokenRecord,
   type ScimTokenIdentity,
+  type ScimUserRecord,
+  type ScimUserResourceRecord,
 } from "../scim.repository.ts";
+
+/** The Prisma directory-resource row as the SCIM seam reads it. */
+function scimUserResourceOf(row: {
+  organizationId: string;
+  userId: string;
+  userName: string;
+  name: string | null;
+  active: boolean;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): ScimUserResourceRecord {
+  return {
+    organizationId: row.organizationId,
+    userId: row.userId,
+    userName: row.userName,
+    name: row.name,
+    active: row.active,
+    deletedAt: row.deletedAt === null ? null : fromDate(row.deletedAt),
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
 
 /** The Prisma group row as the SCIM seam reads it: one clock above this line. */
 function scimGroupRecordOf(row: {
@@ -123,34 +154,206 @@ export class PrismaScimRepository extends ScimRepository {
       include: { user: true },
     });
   };
-  listMemberships = async (input: {
+  /**
+   * The page runs over two disjoint halves — the live directory resources,
+   * then the members no directory has claimed — because a person can be
+   * either without being the other, and a deleted resource is neither.
+   *
+   * Both halves are ordered by user id and the first half is exhausted before
+   * the second begins, so a page is a slice of one settled sequence: Postgres
+   * promises no order without being asked, and an unordered scan hands the
+   * same person to two pages and never hands over somebody else at all.
+   */
+  findOrganizationUsers = async (input: {
     organizationId: string;
-    email?: string;
+    userName?: string;
     userIds?: readonly string[];
     startIndex: number;
     count: number;
-  }): Promise<{ rows: ScimMembershipRecord[]; total: number }> => {
-    const where = {
+  }): Promise<{ rows: ScimOrganizationUserRecord[]; total: number }> => {
+    const narrowing = input.userIds ? { userId: { in: [...input.userIds] } } : {};
+    const named = input.userName;
+    const claimedWhere = {
       organizationId: input.organizationId,
-      ...(input.email
-        ? { user: { email: { equals: input.email, mode: Prisma.QueryMode.insensitive } } }
-        : {}),
-      ...(input.userIds ? { userId: { in: [...input.userIds] } } : {}),
+      deletedAt: null,
+      ...narrowing,
+      ...(named ? { userName: { equals: named, mode: Prisma.QueryMode.insensitive } } : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.organizationUser.findMany({
-        where,
-        include: { user: true },
-        skip: input.startIndex - 1,
-        take: input.count,
-        // A page is skip/take over a result set and Postgres promises no order
-        // without being asked: an unordered scan hands the same person to two
-        // pages and never hands over somebody else at all.
-        orderBy: { userId: "asc" },
-      }),
-      this.prisma.organizationUser.count({ where }),
+    const unclaimedWhere = {
+      organizationId: input.organizationId,
+      ...narrowing,
+      user: {
+        scimUserResources: { none: { organizationId: input.organizationId } },
+        ...(named ? { email: { equals: named, mode: Prisma.QueryMode.insensitive } } : {}),
+      },
+    };
+    const [claimed, unclaimed] = await Promise.all([
+      this.prisma.scimUserResource.count({ where: claimedWhere }),
+      this.prisma.organizationUser.count({ where: unclaimedWhere }),
     ]);
-    return { rows, total };
+    const skip = input.startIndex - 1;
+    const fromClaimed = Math.max(0, Math.min(input.count, claimed - skip));
+    const fromUnclaimed = input.count - fromClaimed;
+    const rows: ScimOrganizationUserRecord[] = [];
+    if (fromClaimed > 0) {
+      const resources = await this.prisma.scimUserResource.findMany({
+        where: claimedWhere,
+        include: { user: true },
+        orderBy: { userId: "asc" },
+        skip,
+        take: fromClaimed,
+      });
+      rows.push(...resources.map((row) => ({ user: row.user, resource: scimUserResourceOf(row) })));
+    }
+    if (fromUnclaimed > 0) {
+      const members = await this.prisma.organizationUser.findMany({
+        where: unclaimedWhere,
+        include: { user: true },
+        orderBy: { userId: "asc" },
+        skip: Math.max(0, skip - claimed),
+        take: fromUnclaimed,
+      });
+      rows.push(...members.map((row) => ({ user: row.user, resource: null })));
+    }
+    return { rows, total: claimed + unclaimed };
+  };
+  recordRequest = async (request: ScimRequestRecord): Promise<void> => {
+    await this.prisma.scimRequestLog.create({ data: request });
+  };
+  async findRequestLog(input: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<ScimRequestLogEntry[]> {
+    const rows = await this.prisma.scimRequestLog.findMany({
+      // The organization is in the predicate as well as the connection: a
+      // connection id is not a tenant, and this table is read by a surface
+      // that has one.
+      where: { organizationId: input.organizationId, connectionId: input.connectionId },
+      orderBy: { occurredAt: "desc" },
+      take: input.limit,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      connectionId: row.connectionId,
+      method: row.method,
+      resource: row.resource,
+      status: row.status,
+      reason: scimRefusalReasonSchema.safeParse(row.reason).data ?? null,
+      detail: row.detail,
+      occurredAt: row.occurredAt,
+    }));
+  }
+  async findExpiredRequestIds(input: { before: Instant; limit: number }): Promise<string[]> {
+    const rows = await this.prisma.scimRequestLog.findMany({
+      where: { occurredAt: { lt: toDate(input.before) } },
+      select: { id: true },
+      take: input.limit,
+    });
+
+    return rows.map((row) => row.id);
+  }
+  async deleteRequests(input: { ids: readonly string[] }): Promise<number> {
+    const { count } = await this.prisma.scimRequestLog.deleteMany({
+      where: { id: { in: [...input.ids] } },
+    });
+
+    return count;
+  }
+  findUserResource = async (input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ScimUserResourceRecord | null> => {
+    const row = await this.prisma.scimUserResource.findUnique({
+      where: { organizationId_userId: input },
+    });
+    return row ? scimUserResourceOf(row) : null;
+  };
+  findUserByResourceName = async (input: {
+    organizationId: string;
+    userName: string;
+  }): Promise<ScimUserRecord | null> => {
+    const row = await this.prisma.scimUserResource.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        deletedAt: null,
+        userName: { equals: input.userName.trim(), mode: Prisma.QueryMode.insensitive },
+      },
+      include: { user: true },
+    });
+    return row?.user ?? null;
+  };
+  hasLegacyNameConflict = async (input: {
+    organizationId: string;
+    userId?: string;
+    userName: string;
+  }): Promise<boolean> => {
+    const holder = await this.prisma.organizationUser.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        ...(input.userId === void 0 ? {} : { userId: { not: input.userId } }),
+        user: {
+          scimUserResources: { none: { organizationId: input.organizationId } },
+          email: { equals: input.userName.trim(), mode: Prisma.QueryMode.insensitive },
+        },
+      },
+      select: { userId: true },
+    });
+    return holder !== null;
+  };
+  saveUserResource = async (input: {
+    organizationId: string;
+    userId: string;
+    userName: string;
+    name: string | null;
+    active: boolean;
+  }): Promise<ScimUserResourceRecord> => {
+    const userName = input.userName.trim().toLowerCase();
+    const row = await this.prisma.scimUserResource.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: input.organizationId,
+          userId: input.userId,
+        },
+      },
+      create: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        userName,
+        name: input.name,
+        active: input.active,
+        deletedAt: null,
+      },
+      update: { userName, name: input.name, active: input.active, deletedAt: null },
+    });
+    return scimUserResourceOf(row);
+  };
+  markUserResourceDeleted = async (input: {
+    organizationId: string;
+    userId: string;
+    userName: string;
+    name: string | null;
+  }): Promise<void> => {
+    const deletedAt = new Date();
+    await this.prisma.scimUserResource.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: input.organizationId,
+          userId: input.userId,
+        },
+      },
+      create: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        userName: input.userName.trim().toLowerCase(),
+        name: input.name,
+        active: false,
+        deletedAt,
+      },
+      update: { active: false, deletedAt },
+    });
   };
   addMembership = async (input: {
     organizationId: string;

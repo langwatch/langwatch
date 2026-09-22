@@ -245,7 +245,11 @@ describe("given a directory holding this organization's SCIM bearer token", () =
     it("answers the protocol's own 403 document, not a 401 or a 404", async () => {
       class UnentitledDirectory extends ScimServiceFake {
         override readonly verifyToken = vi.fn(
-          async () => ({ status: "plan_not_entitled", organizationId: ORGANIZATION_ID }) as const,
+          async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
+            status: "plan_not_entitled",
+            organizationId: ORGANIZATION_ID,
+            connectionId: null,
+          }),
         );
       }
       const { app } = scimTestApp({ scim: new UnentitledDirectory() });

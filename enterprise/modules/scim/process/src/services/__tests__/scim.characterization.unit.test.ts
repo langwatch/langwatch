@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -32,7 +33,21 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
     listDirectoryConnectionsForUser: vi.fn(async () => []),
     findMembership: vi.fn(async () => null),
-    listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
+    findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
+    recordRequest: vi.fn(async () => undefined),
+    findRequestLog: vi.fn(async () => []),
+    findExpiredRequestIds: vi.fn(async () => []),
+    deleteRequests: vi.fn(async () => 0),
+    findUserResource: vi.fn(async () => null),
+    findUserByResourceName: vi.fn(async () => null),
+    hasLegacyNameConflict: vi.fn(async () => false),
+    saveUserResource: vi.fn(async (input) => ({
+      ...input,
+      deletedAt: null,
+      createdAt: fromDate(new Date(0)),
+      updatedAt: fromDate(new Date(0)),
+    })),
+    markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
     findGroup: vi.fn(async () => null),
@@ -77,14 +92,10 @@ function service(
   return ScimService.create({
     prisma: repo,
     writer: new GrantsFake(),
-    auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
       findByEmail: vi.fn(async () => null),
       findById: vi.fn(async () => null),
       create: vi.fn(),
-      updateProfile: vi.fn(),
-      deactivate: vi.fn(),
-      reactivate: vi.fn(),
     } satisfies ScimUserProvisioning,
     governance: {
       departmentResolveByNameOrCreate: vi.fn(async () => ({
@@ -216,6 +227,7 @@ describe("SCIM characterization: token lifecycle", () => {
     expect(await service(repo, false).verifyToken({ token: "valid" })).toEqual({
       status: "plan_not_entitled",
       organizationId: "org_1",
+      connectionId: "connection_1",
     });
     expect(repo.recordTokenUse).not.toHaveBeenCalled();
     await expect(
@@ -228,7 +240,7 @@ describe("SCIM characterization: provisioning invariants", () => {
   /** @scenario "A page reports how many resources it actually carries" */
   it("reports the page it holds rather than the page that was asked for", async () => {
     const repo = repository({
-      listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
+      findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
     });
     await expect(
       service(repo).listUsers({ organizationId: "org_1", startIndex: 1, count: 100 }),
@@ -273,16 +285,12 @@ describe("SCIM characterization: provisioning invariants", () => {
         pendingSsoSetup: false,
         lastLoginAt: null,
       })),
-      reactivate: vi.fn(),
       create: vi.fn(),
-      updateProfile: vi.fn(),
-      deactivate: vi.fn(),
     } satisfies ScimUserProvisioning;
     const scim = ScimService.create({
       prisma: repo,
       users,
       writer,
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
       governance: {
         departmentResolveByNameOrCreate: vi.fn(async () => ({
           id: "department_1",
@@ -349,14 +357,10 @@ describe("SCIM characterization: provisioning invariants", () => {
             pendingSsoSetup: false,
             lastLoginAt: null,
           })),
-          updateProfile: vi.fn(),
-          deactivate: vi.fn(),
-          reactivate: vi.fn(),
         } satisfies ScimUserProvisioning;
         const scim = ScimService.create({
           prisma: repository({ addMembership: vi.fn(async () => undefined) }),
           writer,
-          auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
           users,
           governance: {
             departmentResolveByNameOrCreate: vi.fn(async () => ({
