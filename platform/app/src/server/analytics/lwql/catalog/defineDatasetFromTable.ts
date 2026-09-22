@@ -32,6 +32,7 @@ import {
   columnsManifestTable,
 } from "./columnsManifest";
 import { contentFilteredMapSql } from "./contentGating";
+import { assertIncludeEntries } from "./includeList";
 import type {
   LangWatchQLColumnUnit,
   LangWatchQLViewColumn,
@@ -1023,27 +1024,19 @@ function includedTableSet({
   include: readonly string[];
   handWrittenSet: ReadonlySet<string>;
 }): ReadonlySet<string> {
-  const tableNames = new Set(manifest.tables.map((table) => table.name));
-  const seen = new Set<string>();
   for (const entry of include) {
-    if (!tableNames.has(entry)) {
-      throw new Error(
-        `lwql catalog: include entry "${entry}" names no manifest table`,
-      );
-    }
     if (handWrittenSet.has(entry)) {
       throw new Error(
         `lwql catalog: include entry "${entry}" is already hand-written`,
       );
     }
-    if (seen.has(entry)) {
-      throw new Error(
-        `lwql catalog: include entry "${entry}" is listed more than once`,
-      );
-    }
-    seen.add(entry);
   }
-  return seen;
+  return assertIncludeEntries({
+    include,
+    known: new Set(manifest.tables.map((table) => table.name)),
+    label: "catalog",
+    kind: "table",
+  });
 }
 
 /**

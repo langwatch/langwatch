@@ -46,6 +46,24 @@ const PERMISSION_GATED_MODELS = [
   "BillingMeterCheckpoint",
 ] as const;
 
+/**
+ * Models that carry live credential material. Each also carries `projectId`
+ * or `organizationId`, so the tenant-column derivation would happily grant
+ * one a view — and each model's ciphertext columns are not guaranteed to
+ * match the secret-name stripping the safe defaults apply, so an included
+ * credential model could leak key material through a derived view. None may
+ * ever be on the include list.
+ */
+const CREDENTIAL_BEARING_MODELS = [
+  "ProjectSecret",
+  "ApiKey",
+  "SsoCredential",
+  "AccountCredential",
+  "Passkey",
+  "TwoFactor",
+  "ScimToken",
+] as const;
+
 const modelNames = LWQL_PRISMA_MANIFEST.models.map((model) => model.name);
 const tableByModel = new Map(
   LWQL_PRISMA_MANIFEST.models.map((model) => [model.name, model.tableName]),
@@ -81,12 +99,8 @@ const projectIdField: PrismaField = {
 };
 
 describe("given every model in the committed Prisma manifest", () => {
-  it("is included or unlisted — exactly once", () => {
+  it("derives a view for exactly the included models", () => {
     for (const model of modelNames) {
-      const buckets = [includeSet.has(model), !includeSet.has(model)].filter(
-        Boolean,
-      ).length;
-      expect(buckets, `"${model}" should land in exactly one bucket`).toBe(1);
       // An included model backs a derived view; an unlisted one does not.
       expect(derivedBaseRelations.has(tableByModel.get(model)!)).toBe(
         includeSet.has(model),
@@ -131,6 +145,19 @@ describe("given every model in the committed Prisma manifest", () => {
       expect(
         derivedBaseRelations.has(tableByModel.get(model)!),
         `${model} is permission-gated and must not be a derived view`,
+      ).toBe(false);
+    }
+  });
+
+  it("never includes a credential-bearing model", () => {
+    for (const model of CREDENTIAL_BEARING_MODELS) {
+      expect(
+        includeSet.has(model),
+        `${model} carries credential material and must not be on the include list`,
+      ).toBe(false);
+      expect(
+        derivedBaseRelations.has(tableByModel.get(model)!),
+        `${model} carries credential material and must not be a derived view`,
       ).toBe(false);
     }
   });
@@ -261,6 +288,35 @@ describe("given every model in the committed Prisma manifest", () => {
       }
       expect(message).toContain("NoSuchModel");
       expect(message).toContain("names no manifest model");
+    });
+  });
+
+  describe("when the include list names the same model twice", () => {
+    it("fails the build and names the entry", () => {
+      const manifest: PrismaManifest = {
+        models: [
+          {
+            name: "Zebra",
+            tableName: "Zebra",
+            documentation: "",
+            primaryKey: ["id"],
+            fields: [idField, projectIdField],
+          },
+        ],
+        enums: [],
+      };
+      let message = "";
+      try {
+        derivePostgresCatalog({
+          manifest,
+          include: ["Zebra", "Zebra"],
+          overrides: {} as Record<string, PostgresDatasetOverride>,
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain("Zebra");
+      expect(message).toContain("is listed more than once");
     });
   });
 });

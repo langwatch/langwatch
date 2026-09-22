@@ -32,6 +32,7 @@ import {
   teamTenantPath,
 } from "../provisioning/postgresMapping";
 import { defaultColumnGates } from "./defineDatasetFromTable";
+import { assertIncludeEntries } from "./includeList";
 import { prismaManifestModel } from "./prismaManifest";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./prismaSchema";
 import type {
@@ -1019,22 +1020,12 @@ function includedModelSet(
   manifest: PrismaManifest,
   include: readonly string[],
 ): ReadonlySet<string> {
-  const modelNames = new Set(manifest.models.map((model) => model.name));
-  const seen = new Set<string>();
-  for (const entry of include) {
-    if (!modelNames.has(entry)) {
-      throw new Error(
-        `lwql postgres catalog: include entry "${entry}" names no manifest model`,
-      );
-    }
-    if (seen.has(entry)) {
-      throw new Error(
-        `lwql postgres catalog: include entry "${entry}" is listed more than once`,
-      );
-    }
-    seen.add(entry);
-  }
-  return seen;
+  return assertIncludeEntries({
+    include,
+    known: new Set(manifest.models.map((model) => model.name)),
+    label: "postgres catalog",
+    kind: "model",
+  });
 }
 
 /**

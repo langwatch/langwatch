@@ -55,6 +55,31 @@ const HAND_WRITTEN_TABLE_COUNT = 11;
 const INCLUDED_TABLE_COUNT = 29;
 const UNLISTED_TABLE_COUNT = 5;
 
+// Two disjoint names so a grant assertion built from this manifest cannot
+// pass by accident.
+const TWO_TABLE_MANIFEST: ColumnsManifest = {
+  tables: [
+    {
+      name: "alpha_rows",
+      engine: "ReplacingMergeTree",
+      sortingKey: "TenantId, RowId",
+      columns: [
+        { name: "TenantId", type: "String", comment: "Project." },
+        { name: "RowId", type: "String", comment: "" },
+      ],
+    },
+    {
+      name: "omega_rows",
+      engine: "ReplacingMergeTree",
+      sortingKey: "TenantId, RowId",
+      columns: [
+        { name: "TenantId", type: "String", comment: "Project." },
+        { name: "RowId", type: "String", comment: "" },
+      ],
+    },
+  ],
+};
+
 describe("given every table in the committed ClickHouse columns manifest", () => {
   it("is hand-written, included, or unlisted — exactly once", () => {
     for (const table of manifestTableNames) {
@@ -123,34 +148,10 @@ describe("given every table in the committed ClickHouse columns manifest", () =>
   });
 
   describe("when a table is not on the include list", () => {
-    // Two disjoint names so the grant assertion cannot pass by accident.
-    const manifest: ColumnsManifest = {
-      tables: [
-        {
-          name: "alpha_rows",
-          engine: "ReplacingMergeTree",
-          sortingKey: "TenantId, RowId",
-          columns: [
-            { name: "TenantId", type: "String", comment: "Project." },
-            { name: "RowId", type: "String", comment: "" },
-          ],
-        },
-        {
-          name: "omega_rows",
-          engine: "ReplacingMergeTree",
-          sortingKey: "TenantId, RowId",
-          columns: [
-            { name: "TenantId", type: "String", comment: "Project." },
-            { name: "RowId", type: "String", comment: "" },
-          ],
-        },
-      ],
-    };
-
     /** @scenario "A table that is not on the include list is not queryable" */
     it("derives no view for it and no grant references it", () => {
       const views = deriveDefaultCatalog({
-        manifest,
+        manifest: TWO_TABLE_MANIFEST,
         include: ["alpha_rows"],
         handWritten: [],
       });
@@ -179,6 +180,40 @@ describe("given every table in the committed ClickHouse columns manifest", () =>
       }
       expect(message).toContain("no_such_table");
       expect(message).toContain("names no manifest table");
+    });
+  });
+
+  describe("when the include list names the same table twice", () => {
+    it("fails the build and names the entry", () => {
+      let message = "";
+      try {
+        deriveDefaultCatalog({
+          manifest: TWO_TABLE_MANIFEST,
+          include: ["alpha_rows", "alpha_rows"],
+          handWritten: [],
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain("alpha_rows");
+      expect(message).toContain("is listed more than once");
+    });
+  });
+
+  describe("when the include list names a table that is already hand-written", () => {
+    it("fails the build and names the entry", () => {
+      let message = "";
+      try {
+        deriveDefaultCatalog({
+          manifest: TWO_TABLE_MANIFEST,
+          include: ["alpha_rows"],
+          handWritten: ["alpha_rows"],
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain("alpha_rows");
+      expect(message).toContain("already hand-written");
     });
   });
 });

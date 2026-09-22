@@ -15,7 +15,10 @@
  *
  * `User`, `Team` and `Organization` — the identity scope itself — are not here,
  * and neither is any organization/admin-tier model (billing, audit, webhook
- * management) a project's `analytics:view` key must never read.
+ * management) a project's `analytics:view` key must never read. Nor is any
+ * credential-bearing model (`ProjectSecret`, `ApiKey`, `SsoCredential`,
+ * `AccountCredential`, `Passkey`, `TwoFactor`, `ScimToken`) — each is deliberately
+ * absent, guarded by {@link ./__tests__/tenantModelCoverage.unit.test.ts}.
  *
  * A model named here whose Prisma model no longer exists fails the build
  * loudly: the derivation throws naming the entry, and

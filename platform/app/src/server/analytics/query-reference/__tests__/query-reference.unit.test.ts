@@ -381,6 +381,7 @@ describe("the published trace filter syntax document", () => {
 
 describe("the MCP server's committed reference fixture", () => {
   /** @scenario "The MCP server's committed reference fixture matches the platform" */
+  /** @scenario "The catalogued views regenerate byte-identical from the include lists" */
   it("equals the reference the platform builds", () => {
     const fixture: unknown = JSON.parse(
       readFileSync(MCP_FIXTURE_PATH, "utf-8"),
