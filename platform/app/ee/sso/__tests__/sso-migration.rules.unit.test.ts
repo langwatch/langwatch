@@ -51,12 +51,12 @@ describe("scimStatusOf", () => {
   });
 });
 
-/** @scenario "The quiet period counts from the switch-over and the last sign-in through the previous provider" */
 describe("quietPeriodOf", () => {
   const switchedOverAtMs = Date.parse("2026-09-01T09:00:00.000Z");
   const hour = 60 * 60 * 1000;
 
   describe("given nobody signs in through the previous provider after the switch-over", () => {
+    /** @scenario "The quiet period counts from the switch-over and the last sign-in through the previous provider" */
     it("opens finishing two days after the switch-over", () => {
       const clearsAtMs = switchedOverAtMs + MIGRATION_QUIET_FLOOR_MS;
       expect(

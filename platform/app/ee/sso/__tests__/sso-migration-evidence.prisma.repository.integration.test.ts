@@ -841,6 +841,7 @@ describe("given persisted migration evidence", () => {
 
   for (const wayIn of ["replacement", "another", "passkey-only"] as const) {
     /** @scenario "Native legacy retirement leaves every member a way in" */
+    /** @scenario "Finishing moves the previous connection's directory sync across" */
     it(`${wayIn === "passkey-only" ? "refuses to retire" : "retires"} adopted legacy bindings when the member holds ${wayIn === "replacement" ? "a verified replacement" : wayIn === "another" ? "another verified way in" : "only a passkey besides"}`, async () => {
       const ownerId = userId("admin");
       const foreignId = await member("foreign", {
@@ -924,7 +925,6 @@ describe("given persisted migration evidence", () => {
             userId: ownerId,
           }),
         );
-        // @scenario "Finishing moves the previous connection's directory sync across"
         expect(moveToConnection).toHaveBeenCalledExactlyOnceWith({
           organizationId,
           fromConnectionId: legacyId,

@@ -1867,7 +1867,7 @@ keywords: sso, single sign-on, identity provider, update, migrate, okta, entra, 
   This page is for organizations whose single sign-on LangWatch set up on their
   behalf, usually after a request to support. If you connected your identity
   provider yourself in **Settings > Authentication**, you already run it and
-  nothing here applies. Single sign-on is an Enterprise feature.
+  this guide does not apply to you. Single sign-on is an Enterprise feature.
 </Note>
 
 Until now, changing anything about that sign-in meant asking us. You can now
@@ -1877,7 +1877,7 @@ up when you are ready. Nobody is signed out along the way.
 
 ## What changes, and what does not
 
-- **Nothing changes until you switch over.** Registering your identity provider
+- **Sign-in stays the same until you switch over.** Registering your identity provider
   puts it beside the sign-in you have today. Everyone keeps signing in the way
   they do now until an administrator switches sign-in over.
 - **You can switch back.** After switching over, one action returns everybody
@@ -1902,9 +1902,9 @@ up when you are ready. Nobody is signed out along the way.
 - Pick a colleague who has set a password on their LangWatch account. Before
   the update can finish, at least one person must be able to sign in without
   your identity provider.
-- If your directory sync (SCIM) provisions people today, plan to issue a new
-  provisioning token for the new connection. See [Point your directory sync at
-  the new connection](#point-your-directory-sync-at-the-new-connection).
+- If directory sync (SCIM) provisions your people today, it keeps working for
+  you. It moves to the new connection when you finish. See [Directory
+  sync](#directory-sync).
 
 ## 1. Open the Authentication overview
 
@@ -2023,8 +2023,21 @@ connection.
 
 Members do not need to do anything special. The next time each person signs
 in, they arrive through the new connection and are matched to their existing
-account. The **Members moved across** row counts how many have done so, and
-**See who has not** lists the rest so you can nudge them.
+account by their email address. That works before and after you finish, so
+most members never hold the update up. The **Members moved across** row counts
+who has signed in through the new connection, and how many more will be moved
+across at their next sign-in.
+
+Under **Not moved across yet**, each remaining member is listed with what
+moving them still needs:
+
+| Beside a member | What to do |
+| --- | --- |
+| Moves across at their next sign-in | No action needed. The new connection recognizes them by their address. |
+| Has to sign in through the new connection once | Ask them to sign in. Your previous provider is their only way in, so finishing waits until they have another. |
+| Cannot be matched: their address is not confirmed | Ask them to confirm their email address in their account settings, or remove them from the organization if they have left. |
+| Cannot be matched: another account has the same address | Contact support. |
+| Cannot be matched: their address is not on a domain you proved | Prove that domain on the new connection, or remove them from the organization if they have left. |
 
 If something is wrong, **Switch back to _your previous provider_** returns
 everybody to it immediately. You can switch back and forth until you start
@@ -2049,31 +2062,36 @@ has passed**.
 | The new connection is on | Turn it on in the setup steps. |
 | The new connection holds a current proof of your domain | Prove the domain again if the proof lapsed. |
 | Somebody can still sign in without your identity provider, with a password set | Name a recovery administrator who has set a password. A password can only be set while somebody is still signed in, so do this before finishing. |
-| Every member has signed in through the new connection | Ask the members listed under **See who has not** to sign in once. Members who have left can be removed in **Settings > Directory**. |
-| Every current member has a verified sign-in on the new connection | Same as above; a sign-in that was interrupted before it completed does not count. |
-| Nobody has signed in through the previous provider for seven days | Wait. The seven days start from the last successful sign-in through the previous provider, so switching back resets the clock. |
-| Your directory sync points at the new connection | See below. |
+| Every member has moved across, or will at their next sign-in | Deal with the members listed under **Not moved across yet**, as above. Members who have left can be removed in **Settings > Directory**. |
+| No deactivated member can only sign in through the previous provider | Remove those members from the organization in **Settings > Directory**. |
+| Two days have passed since switching over, and seven since anybody last signed in through the previous provider | Wait. The page shows the time you can finish from. A sign-in through the previous provider after the switch moves that to seven days after the sign-in, and switching back starts the two days again. |
 | No account is shared with another organization, and no account is covered by another organization's provider | Contact support. These are cases LangWatch cannot resolve safely on its own. |
 
-### Point your directory sync at the new connection
+### Directory sync
 
-Provisioning tokens belong to one connection. If your identity provider pushes
-people into LangWatch through SCIM today, that token belongs to the previous
-connection and stops working when the update finishes.
+If your identity provider pushes people into LangWatch through SCIM today,
+that sync was set up together with your sign-in, and you never held its token.
+So the update does not ask you to touch it. The **Directory sync** row reads
+**Moves across when you finish** while the update is in progress, and
+**Ready** once it has finished.
 
-1. Open **Settings > Authentication > Connectors**.
-2. Choose **Issue token**, select the new connection and describe the token.
-3. Paste the provisioning address and the new token into your identity
-   provider's SCIM settings, replacing the old token.
-4. Run or wait for a sync. The **Directory sync** row on the update reads
-   **Ready** once the new connection has received one.
+Finishing moves the sync to the new connection: the token your identity
+provider already presents keeps working, the people and groups it provisioned
+stay provisioned, and the next push lands on the new connection. Nobody is
+deprovisioned by the switch.
 
-People the old token provisioned are adopted by the new connection on their
-next sync; nobody is deprovisioned by the switch.
+People the sync provisioned who have never signed in do not hold the update
+either. The sync's word that they belong is enough for the new connection to
+recognize them, so they are listed as moving across at their next sign-in,
+whenever that is.
+
+If you had already issued a token for the new connection yourself under
+**Settings > Authentication > Connectors**, both tokens work after finishing.
+You can revoke the one you no longer use there.
 
 ## 6. Finish the update
 
-When nothing is outstanding, select **Finish the update**. The status reads
+When every check has passed, select **Finish the update**. The status reads
 **Finishing** while access through the previous provider is taken away, then
 **Complete**: your new connection is the only way your people sign in.
 
