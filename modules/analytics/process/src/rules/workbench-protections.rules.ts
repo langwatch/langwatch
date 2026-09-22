@@ -123,6 +123,35 @@ export async function resolveApiKeyProtections(input: {
   };
 }
 
+/**
+ * What the PROJECT itself may read, with nobody asking: content as a no-session
+ * caller sees it, and the project's own costs, because the job IS the project.
+ */
+export async function resolveProjectProtections(input: {
+  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
+  projectId: string;
+}): Promise<LangWatchQLProtections> {
+  const { dataPrivacy, projectId } = input;
+
+  let policy: ResolvedDataPrivacy;
+  try {
+    policy = await dataPrivacy.getResolvedForProject({ projectId });
+  } catch (error) {
+    logger.error(
+      { error, projectId },
+      "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+    );
+
+    return { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: false };
+  }
+
+  return {
+    canSeeCosts: true,
+    canSeeCapturedInput: isContentVisibleToPublic(policy.categories.input),
+    canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
+  };
+}
+
 /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
 function keyPermitted(input: {
   authz: Pick<AuthzApi, "hasApiKeyPermission">;

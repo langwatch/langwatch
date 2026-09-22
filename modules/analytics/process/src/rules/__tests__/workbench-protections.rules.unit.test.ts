@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -7,11 +8,11 @@ import {
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   resolveApiKeyProtections,
+  resolveProjectProtections,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../workbench-protections.rules.ts";
@@ -354,6 +355,36 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+  });
+});
+
+describe("given a job judging a project's own rows", () => {
+  describe("when nobody is asking", () => {
+    it("reads the public cut of the content and the project's own costs", async () => {
+      const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
+
+      const resolved = await resolveProjectProtections({ dataPrivacy, projectId: "project-1" });
+
+      expect(resolved).toEqual({
+        canSeeCosts: true,
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+      });
+    });
+
+    it("hides captured content when the policy cannot be read", async () => {
+      const { dataPrivacy } = dataPrivacyResolving(async () => {
+        throw new Error("the policy store is away");
+      });
+
+      const resolved = await resolveProjectProtections({ dataPrivacy, projectId: "project-1" });
+
+      expect(resolved).toEqual({
+        canSeeCosts: true,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+      });
     });
   });
 });

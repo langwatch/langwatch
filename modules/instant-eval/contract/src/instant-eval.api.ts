@@ -1,3 +1,4 @@
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
@@ -26,6 +27,15 @@ export interface InstantEvalRunInput {
    */
   readonly limit?: number;
 }
+
+/**
+ * Who is asking. A run executes a statement as the project's restricted
+ * identity, and what that statement may read is the asker's own protections:
+ * a member's, resolved from their session, or a credential's.
+ */
+export type InstantEvalActor =
+  | Readonly<{ kind: "member"; userId: string }>
+  | Readonly<{ kind: "credential"; credential: RestCredentialPrincipal }>;
 
 /** One run's counters, which is all a chip and a progress bar read. */
 export interface InstantEvalRunProgress {

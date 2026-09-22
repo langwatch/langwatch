@@ -54,6 +54,7 @@ import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-quest
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
+  resolveProjectProtections as resolveProjectProtectionsRule,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
@@ -316,6 +317,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return this.#dependencies.langWatchQL.available;
   }
 
+  /** The database this deployment's LangWatchQL views live in. */
+  langWatchQLDatabase(): string {
+    return this.#dependencies.langWatchQL.database;
+  }
+
   /** The datasets and columns one member's protections unlock. */
   async describeLangWatchQLSchema(
     input: Readonly<{ projectId: string; protections: LangWatchQLProtections }>,
@@ -452,6 +458,20 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return savedWorkbenchChartPlatformUrl_({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
+    });
+  }
+
+  /**
+   * What the PROJECT itself may read, with nobody asking — the protections a
+   * worker judging that project's own rows runs under, where there is neither
+   * a session nor a credential to resolve.
+   */
+  resolveProjectProtections(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<LangWatchQLProtections> {
+    return resolveProjectProtectionsRule({
+      dataPrivacy: this.#dependencies.dataPrivacy,
+      projectId: input.projectId,
     });
   }
 

@@ -20,6 +20,7 @@ import type {
   InstantEvalRunRepository,
   InstantEvalRunRow,
 } from "../repositories/instant-eval-run.repository.ts";
+import { instantEvalWrittenWindow } from "../rules/instant-eval-judgments.rules.ts";
 import { publishedInstantEvalStatus } from "../rules/instant-eval-run-status.rules.ts";
 
 export class InstantEvalReadsService {
@@ -86,7 +87,7 @@ export class InstantEvalReadsService {
     return this.judgments.getPage({
       projectId,
       runId,
-      ...writtenWindow(row, this.now()),
+      ...instantEvalWrittenWindow(row, this.now()),
       limit,
       ...(questionId === undefined ? {} : { questionId }),
       ...(isMatched === undefined ? {} : { matched: isMatched }),
@@ -128,16 +129,5 @@ function toProgress(row: InstantEvalRunRow): InstantEvalRunProgress {
     error: row.error,
     priceUsd: row.priceUsd,
     finishedAtMs: row.finishedAt?.epochMilliseconds ?? null,
-  };
-}
-
-/** The window a run's judgements were written in, from the run's own clock. */
-function writtenWindow(
-  row: Pick<InstantEvalRunRow, "createdAt" | "startedAt" | "finishedAt">,
-  now: Instant,
-): { writtenFrom: Instant; writtenUntil: Instant } {
-  return {
-    writtenFrom: row.startedAt ?? row.createdAt,
-    writtenUntil: row.finishedAt ?? now,
   };
 }

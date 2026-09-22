@@ -6,6 +6,7 @@
  */
 
 import type { InstantEvalJudgmentStatus } from "@langwatch/instant-eval-contract";
+import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalJudgmentRecord } from "../repositories/instant-eval-judgments.repository.ts";
 import {
@@ -20,6 +21,17 @@ import {
 } from "./instant-eval-row-keys.rules.ts";
 import type { InstantEvalRunQuestion } from "./instant-eval-run-questions.rules.ts";
 import { countsForQuestion, isBooleanMatch, verdictOf } from "./instant-eval-verdicts.rules.ts";
+
+/** The window a run's judgements were written in, read off the run's own clock. */
+export function instantEvalWrittenWindow(
+  row: Readonly<{ createdAt: Instant; startedAt: Instant | null; finishedAt: Instant | null }>,
+  now: Instant,
+): { readonly writtenFrom: Instant; readonly writtenUntil: Instant } {
+  return {
+    writtenFrom: row.startedAt ?? row.createdAt,
+    writtenUntil: row.finishedAt ?? now,
+  };
+}
 
 /** What one page added to a run's running totals. */
 export interface InstantEvalPageCounters {

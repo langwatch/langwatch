@@ -207,6 +207,11 @@ export class LangWatchQLService {
     return this.deps.executor != null;
   }
 
+  /** The database this deployment's LangWatchQL views live in. */
+  get database(): string {
+    return this.deps.database;
+  }
+
   /** The LangWatchQL schema this caller's permissions unlock. */
   describeSchema({
     protections,

@@ -10,6 +10,7 @@ import type {
   AnalyticsEvaluationUpsertInput,
 } from "./analytics.evaluation.ts";
 import type {
+  LangWatchQLCaller,
   LangWatchQLExecuteInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
@@ -88,6 +89,11 @@ export interface AnalyticsApi {
   ): Promise<void>;
   isLangWatchQLAvailable(): boolean;
   /**
+   * The database this deployment's LangWatchQL views live in, which a module
+   * writing a statement against them has to name.
+   */
+  langWatchQLDatabase(): string;
+  /**
    * Whether the eval functions are published as available is Analytics' own
    * answer, read from this project's rollout — which is why the project is
    * named and the caller never states the gate.
@@ -129,6 +135,14 @@ export interface AnalyticsApi {
     projectId: string;
     credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections>;
+  /**
+   * What the PROJECT itself may see, with nobody asking — the protections a
+   * job judging that project's own rows runs under, where there is neither a
+   * session nor a credential to resolve.
+   */
+  resolveProjectProtections(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<LangWatchQLProtections>;
   /** The deep link back to the Workbench editor for a saved chart in this project. */
   savedWorkbenchChartPlatformUrl(input: { projectSlug: string }): string;
   /**
@@ -137,6 +151,11 @@ export interface AnalyticsApi {
    * no longer exists.
    */
   resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller>;
+  /**
+   * What the PROJECT itself may see, with nobody asking — what a job judging that
+   * project's own rows runs under, with neither a session nor a credential.
+   */
+  resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
 }
 
 export const AnalyticsApi = moduleApi<AnalyticsApi>()("analytics");

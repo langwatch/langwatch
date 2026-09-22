@@ -223,6 +223,8 @@ export type LangWatchQLValidationInput = Readonly<{
  */
 export abstract class LangWatchQLService {
   abstract get available(): boolean;
+  /** The database this deployment's views live in. */
+  abstract get database(): string;
   abstract close(): Promise<void>;
   abstract describeSchema(
     input: { protections: LangWatchQLProtections } & LangWatchQLEvalGate,

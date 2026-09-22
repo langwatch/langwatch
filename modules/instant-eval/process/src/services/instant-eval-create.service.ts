@@ -61,6 +61,14 @@ export class InstantEvalCreateService {
     return new InstantEvalCreateService(runs, commands, now);
   }
 
+  /**
+   * A fresh run id, before the row exists: a budget hold is keyed by it, so
+   * the id has to be known to whoever takes the hold.
+   */
+  nextRunId(): string {
+    return newInstantEvalRunId();
+  }
+
   async createRun({
     projectId,
     runId = newInstantEvalRunId(),
