@@ -48,9 +48,9 @@ Issues are written as Scrum stories: `As a <role>, I want <capability>, so that 
 
 When an issue is picked up, the story becomes the `Feature:` narrative (the As/I want/So that lines) and each acceptance criterion becomes one `Scenario:` in the feature file.
 
-Tests bind scenarios via `// @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has a test and every tagged test has exactly one scenario.
+Tests bind scenarios via `// @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has at least one bound test.
 
-See `specs/README.md` for feature file binding details.
+See the "Binding Scenarios to Tests" section below.
 
 ## Binding Scenarios to Tests
 
