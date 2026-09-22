@@ -248,7 +248,10 @@ export function useSubmitSearch({
         // answered it. Enter starts that run, under the same estimate and
         // cost rule a routed sentence gets.
         if (!project?.id || isSamplePreview) return;
-        const run = typedEvalRunOf({ queryText: trimmed, projectId: project.id });
+        const run = typedEvalRunOf({
+          queryText: trimmed,
+          projectId: project.id,
+        });
         if (run) onInstantEval(run);
         return;
       }

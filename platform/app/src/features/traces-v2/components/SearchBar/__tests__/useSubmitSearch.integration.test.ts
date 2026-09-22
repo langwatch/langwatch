@@ -292,7 +292,9 @@ describe("given the text is an eval chip typed by hand", () => {
         .setTimeRange({ from: 1000, to: 2000, label: "Custom" });
       const { result } = renderSubmit();
       act(() =>
-        result.current.submitSearch('status:error AND eval:"the user is annoyed"'),
+        result.current.submitSearch(
+          'status:error AND eval:"the user is annoyed"',
+        ),
       );
       // The chip is on screen while the run is arranged, so the reader sees
       // what they typed rather than an empty bar.

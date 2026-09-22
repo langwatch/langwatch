@@ -46,6 +46,22 @@ describe("handleKey", () => {
       });
 
       /** @scenario "A space belongs to the question being typed" */
+      it("keeps the rest of the word when the space lands mid-word", () => {
+        const action = handleKey(
+          ctx({ text: "eval:annoyed status:error", cursorPos: 8 }),
+          " ",
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 0,
+          tokenEnd: 12,
+          replacement: 'eval:"ann oyed"',
+          reopenInValueMode: false,
+          caretBack: 5,
+        });
+      });
+
+      /** @scenario "A space belongs to the question being typed" */
       it("keeps the terms typed before it", () => {
         const action = handleKey(
           ctx({ text: "status:error eval.llm:slow", cursorPos: 26 }),

@@ -1,5 +1,9 @@
 import { isInstantEvalField } from "~/server/app-layer/traces/query-language/instantEvalChips";
-import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
+import {
+  getSuggestionState,
+  SEARCH_GRAMMAR,
+  type SuggestionState,
+} from "./getSuggestionState";
 
 const FIELD_VALUE_SEPARATOR = ":";
 
@@ -121,17 +125,34 @@ function quoteSentenceValueAction(ctx: EditorContext): KeyAction | null {
   const live = getSuggestionState(ctx.text, ctx.cursorPos);
   if (!live.open || live.mode !== "value") return null;
   if (!takesSentence(live.field)) return null;
+  // The token runs past the caret when the space is typed mid-word; that tail
+  // stays inside the quotes, after the space, where the reader put it.
+  const tokenEnd = activeTokenEnd(ctx.text, ctx.cursorPos);
+  const tail = ctx.text.slice(ctx.cursorPos, tokenEnd);
+  if (tail.includes('"')) return null;
   const value = live.query;
   return {
     kind: "accept",
     tokenStart: live.tokenStart,
-    tokenEnd: ctx.cursorPos,
+    tokenEnd,
     // An empty value swallows the space: the question starts at its first
     // word, and a leading space in a chip is dropped when it is read anyway.
-    replacement: `${live.field}${FIELD_VALUE_SEPARATOR}"${value}${value ? " " : ""}"`,
+    replacement: `${live.field}${FIELD_VALUE_SEPARATOR}"${value}${value ? " " : ""}${tail}"`,
     reopenInValueMode: false,
-    caretBack: 1,
+    caretBack: 1 + tail.length,
   };
+}
+
+/** Where the token under the caret ends: the next terminator, or the text's end. */
+function activeTokenEnd(text: string, cursorPos: number): number {
+  let end = cursorPos;
+  while (
+    end < text.length &&
+    !SEARCH_GRAMMAR.tokenTerminators.has(text[end] as string)
+  ) {
+    end += 1;
+  }
+  return end;
 }
 
 export function handleKey(ctx: EditorContext, key: string): KeyAction {
