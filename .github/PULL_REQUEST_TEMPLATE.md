@@ -21,7 +21,7 @@ Copy from the issue. Tick each. Link its scenario.
 
 ## Definition of Done
 
-- [ ] Feature file exists in `specs/**/*.feature`
+- [ ] Feature file exists in `specs/**/*.feature` (when behaviour changes)
 - [ ] Parity check passes (`check-feature-parity` gate in CI)
 - [ ] Tests pass
 - [ ] Use-proof embedded in this PR
