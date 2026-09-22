@@ -167,7 +167,7 @@ service-watch:
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
 		air --build.cmd "mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service" \
-			--build.bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
+			--build.full_bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
 			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
 			--build.include_dir "cmd,pkg,services" \
