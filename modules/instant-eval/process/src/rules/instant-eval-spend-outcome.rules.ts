@@ -5,13 +5,13 @@
  * @see specs/instant-evals/instant-eval-billing.feature
  */
 
-import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_REQUEST_TYPE,
+  type InstantEvalPricing,
+} from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 
 import { INSTANT_EVAL_PRICING } from "./instant-eval-pricing.rules.ts";
-
-/** The request type every Instant Eval spend row carries on `gateway_spend`. */
-export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
 
 /** The model the ledger names for a judgement: the shipped classifier. */
 export const INSTANT_EVAL_SPEND_MODEL = "jev";

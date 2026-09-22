@@ -5,7 +5,10 @@
  * @see specs/instant-evals/instant-eval-billing.feature
  */
 
-import { InstantEvalFreeBudgetExhaustedError } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_REQUEST_TYPE,
+  InstantEvalFreeBudgetExhaustedError,
+} from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { InstantEvalBudgetReservationsChannel } from "../channels/instant-eval-budget-reservations.channel.ts";
@@ -19,10 +22,7 @@ import {
   paidInstantEvalStanding,
   type InstantEvalFreeBudgetStanding,
 } from "../rules/instant-eval-budget.rules.ts";
-import {
-  INSTANT_EVAL_REQUEST_TYPE,
-  NANO_USD_PER_USD,
-} from "../rules/instant-eval-spend-outcome.rules.ts";
+import { NANO_USD_PER_USD } from "../rules/instant-eval-spend-outcome.rules.ts";
 
 const CACHE_TTL_MS = 60_000;
 

@@ -5,12 +5,15 @@
  */
 import {
   langWatchQLProtectionsSchema,
+  langWatchQLReachSchema,
   lwqlResultSchema,
   lwqlSchemaSchema,
   lwqlStatementSchema,
+  queryReferenceSchema,
   type AnalyticsApi,
   type LangWatchQLCaller,
 } from "@langwatch/analytics-contract";
+import { anyAuthenticated } from "@langwatch/api/access";
 import {
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
@@ -31,7 +34,7 @@ import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostic
  */
 export interface AnalyticsQueryApi extends Pick<
   AnalyticsApi,
-  "describeLangWatchQLSchema" | "executeLangWatchQL"
+  "describeLangWatchQLSchema" | "describeQueryReference" | "executeLangWatchQL"
 > {
   /**
    * The project identity one execution runs under, for a CREDENTIAL rather
@@ -53,7 +56,21 @@ export const langWatchQLCallerProtections = defineRestMiddleware(
   langWatchQLProtectionsSchema,
 );
 
+/**
+ * How far this credential reaches, resolved by the door: whether the key may
+ * run LangWatchQL decides which half of the reference is published, and the
+ * answer is the KEY's own ceiling rather than anything the request states.
+ */
+export const langWatchQLCallerReach = defineRestMiddleware(
+  "langWatchQLCallerReach",
+  langWatchQLReachSchema,
+);
+
 const QUERY_TAGS = ["Query"];
+
+/** Why the reference door names no permission of its own. */
+const REFERENCE_IS_THE_VOCABULARY_OF_BOTH_LANGUAGES =
+  "Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused.";
 
 const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\n" +
@@ -64,6 +81,15 @@ const RUN_DESCRIPTION =
 const SCHEMA_DESCRIPTION =
   "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\n" +
   "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
+
+const REFERENCE_DESCRIPTION =
+  "Describes both query languages in one payload: LangWatchQL (SQL over the analytics datasets) with its schema, limits and endpoints, and the trace filter (a Lucene-flavoured string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\n" +
+  "It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator before it ships, so a published example parses; whether THIS key can run one is its own `available` flag.\n\n" +
+  "Pure: it reads the catalogues and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.\n\n" +
+  "The document is shaped by the calling credential — `available`, the embedded schema and the gated columns all differ between keys — so never cache it beyond the key that asked for it. Ask again rather than storing it.\n\n" +
+  "The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
+  "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\n" +
+  "Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalogue rather than repeating it.";
 
 /**
  * The type is written out rather than inferred so the declaration emit
@@ -137,5 +163,35 @@ export const queryRest: Readonly<{
   })
   .handle(({ app, scope }, protections) =>
     app.describeLangWatchQLSchema({ projectId: scope.id, protections }),
+  )
+
+  /**
+   * `GET /api/v1/query/reference` — describe both query languages. A sibling of
+   * `/schema` rather than a replacement: this is the document a caller reads
+   * when it does not yet know WHICH language answers its question.
+   */
+  .get("/reference", "getApiV1QueryReference")
+  .withAccess(anyAuthenticated({ reason: REFERENCE_IS_THE_VOCABULARY_OF_BOTH_LANGUAGES }))
+  .withMiddleware(langWatchQLCallerProtections, langWatchQLCallerReach)
+  .withOutput(queryReferenceSchema)
+  .withDocs({
+    summary: "Discover both query languages",
+    description: REFERENCE_DESCRIPTION,
+    tags: QUERY_TAGS,
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description:
+          "The LangWatchQL schema and limits, the trace filter's syntax and fields, worked examples in both languages, and which language answers which kind of question.",
+        content: { "application/json": { schema: resolver(queryReferenceSchema) } },
+      },
+    },
+  })
+  .handle(({ app, scope }, protections, reach) =>
+    app.describeQueryReference({
+      projectId: scope.id,
+      protections,
+      canRunLangWatchQL: reach.canRunLangWatchQL,
+    }),
   )
   .build();

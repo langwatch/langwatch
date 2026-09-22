@@ -6,7 +6,10 @@
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import type { FieldProtection } from "../rules/lwql-field-protection.rules.ts";
+import {
+  heldFieldProtections,
+  type FieldProtection,
+} from "../rules/lwql-field-protection.rules.ts";
 
 /**
  * What a column's numbers are measured in.
@@ -139,26 +142,6 @@ export interface LangWatchQLViewDefinition {
  */
 const SUMMED_COLUMN_TYPE = /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64))$/;
 
-/**
- * The permissions a caller holds.
- */
-function heldPermissions(protections: LangWatchQLProtections): ReadonlySet<FieldProtection> {
-  const held = new Set<FieldProtection>();
-  if (protections.canSeeCapturedInput === true) {
-    held.add("input");
-  }
-
-  if (protections.canSeeCapturedOutput === true) {
-    held.add("output");
-  }
-
-  if (protections.canSeeCosts === true) {
-    held.add("costs");
-  }
-
-  return held;
-}
-
 /** Derivations over the LangWatchQL view catalog: what a caller may name and see. */
 export class LangWatchQLCatalogShapesService {
   static create(): LangWatchQLCatalogShapesService {
@@ -169,7 +152,7 @@ export class LangWatchQLCatalogShapesService {
 
   /** The content permissions this caller holds. */
   heldPermissions(protections: LangWatchQLProtections): ReadonlySet<FieldProtection> {
-    return heldPermissions(protections);
+    return heldFieldProtections(protections);
   }
 
   /**
@@ -325,7 +308,7 @@ export class LangWatchQLCatalogShapesService {
     protections: LangWatchQLProtections;
     views: readonly LangWatchQLViewDefinition[];
   }): readonly string[] {
-    const held = heldPermissions(protections);
+    const held = heldFieldProtections(protections);
     const withheld = views.flatMap((view) =>
       view.columns
         .filter((column) => this.columnGates({ view, column }).some((gate) => !held.has(gate)))
@@ -345,7 +328,7 @@ export class LangWatchQLCatalogShapesService {
     protections: LangWatchQLProtections;
     views: readonly LangWatchQLViewDefinition[];
   }): readonly LangWatchQLViewDefinition[] {
-    const held = heldPermissions(protections);
+    const held = heldFieldProtections(protections);
 
     return views.filter((view) =>
       view.columns.some((column) =>

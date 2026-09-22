@@ -84,6 +84,7 @@ Reusable framework decisions live with their packages:
 | [136](./136-lwql-app-functions-identity-udfs.md)                       | LangWatchQL app functions are projection UDFs plus a post-execution hydration stage                                       | Accepted                  |
 | [153](./153-instant-eval-run-is-a-judgment-job.md)                     | An Instant Eval run is a judgment job over the same statement, not a monitor run                                          | Accepted                  |
 | [150](./150-nx-task-runner.md)                                         | Nx is the workspace task runner, over inferred pnpm targets                                                               | Accepted                  |
+| [154](./154-one-reference-door-two-query-languages.md)                 | One reference door describes both query languages, and every consumer reads it                                            | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

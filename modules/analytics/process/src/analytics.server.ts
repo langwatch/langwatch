@@ -24,7 +24,11 @@ import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
-import { langWatchQLCallerProtections, queryRest } from "./transport/query.rest.ts";
+import {
+  langWatchQLCallerProtections,
+  langWatchQLCallerReach,
+  queryRest,
+} from "./transport/query.rest.ts";
 
 export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
 
@@ -37,8 +41,9 @@ export const analyticsServer = defineServerModule("analytics")
     analyticsTrpcTransport,
     analyticsLwqlTrpcTransport,
   )
-  // The query door's own two routes declare this fact: what this credential's
-  // own project content and spend protections resolve to.
+  // The query door's own routes declare two facts: what this credential's own
+  // project content and spend protections resolve to, and whether it reaches
+  // LangWatchQL at all — the reference answers either way.
   .withTransportFacts(({ app }) => [
     bindRestMiddleware(langWatchQLCallerProtections, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
@@ -48,6 +53,11 @@ export const analyticsServer = defineServerModule("analytics")
         credential: credentialPrincipalOfToken(credential),
       });
     }),
+    bindRestMiddleware(langWatchQLCallerReach, async (context) => ({
+      canRunLangWatchQL: await app.canApiKeyRunLangWatchQL({
+        credential: credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),
+      }),
+    })),
   ]);
 
 /**

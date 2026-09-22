@@ -20,14 +20,16 @@ describe("given the query REST family", () => {
   });
 
   describe("when its routes are read", () => {
-    it("publishes the run and the schema endpoints, both behind analytics:view", () => {
+    it("publishes the run and the schema endpoints behind analytics:view", () => {
       expect(
-        declaration.routes.map((route) => ({
-          method: route.method,
-          path: route.path,
-          operation: route.operation,
-          permission: route.permission,
-        })),
+        declaration.routes
+          .filter((route) => route.operation !== "getApiV1QueryReference")
+          .map((route) => ({
+            method: route.method,
+            path: route.path,
+            operation: route.operation,
+            permission: route.permission,
+          })),
       ).toEqual([
         { method: "post", path: "/", operation: "postApiV1Query", permission: "analytics:view" },
         {
@@ -39,12 +41,32 @@ describe("given the query REST family", () => {
       ]);
     });
 
-    it("asks the process for the credential's own content protections on both", () => {
+    /**
+     * @scenario 'An anonymous caller is refused before reaching the handler'
+     * @see specs/analytics/query-reference.feature
+     */
+    it("publishes the reference to any authenticated credential, naming no permission", () => {
+      const reference = declaration.routes.find(
+        (route) => route.operation === "getApiV1QueryReference",
+      );
+
+      expect({ method: reference?.method, path: reference?.path }).toEqual({
+        method: "get",
+        path: "/reference",
+      });
+      expect(reference?.access?.kind).toBe("authenticated");
+    });
+
+    it("asks the process for the credential's own content protections on every route", () => {
       expect(
         declaration.routes.map((route) =>
           (route.middleware ?? []).map((middleware) => middleware.name),
         ),
-      ).toEqual([["langWatchQLCallerProtections"], ["langWatchQLCallerProtections"]]);
+      ).toEqual([
+        ["langWatchQLCallerProtections"],
+        ["langWatchQLCallerProtections"],
+        ["langWatchQLCallerProtections", "langWatchQLCallerReach"],
+      ]);
     });
   });
 });

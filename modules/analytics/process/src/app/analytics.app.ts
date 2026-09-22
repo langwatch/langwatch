@@ -9,6 +9,7 @@ import {
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
   CustomChartPlaygroundNotEnabledError,
+  MAX_LWQL_LENGTH,
   type AnalyticsFeedbacksResult,
   type AnalyticsFilterOption,
   type AnalyticsReadInput,
@@ -29,6 +30,7 @@ import {
   type LangWatchQLService,
   type LangWatchQLTextHydrationInput,
   type LangWatchQLValidationInput,
+  type QueryReference,
   type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
@@ -54,14 +56,18 @@ import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import {
+  keyPermitted,
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
   resolveProjectProtections as resolveProjectProtectionsRule,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
@@ -382,6 +388,58 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return this.#dependencies.langWatchQL.describeSchema({
       protections: input.protections,
       isInstantEvalsEnabled: await this.#isInstantEvalsEnabled(input.projectId),
+    });
+  }
+
+  /**
+   * The SQL half is withheld rather than hidden from a caller that cannot run
+   * it — `/schema` refuses such a key — while the filter half is answered in
+   * full either way. See ADR-154.
+   */
+  async describeQueryReference(
+    input: Readonly<{
+      projectId: string;
+      protections: LangWatchQLProtections;
+      canRunLangWatchQL: boolean;
+    }>,
+  ): Promise<QueryReference> {
+    const database = this.langWatchQLDatabase();
+
+    return buildQueryReference({
+      protections: input.protections,
+      lwqlEnabled: input.canRunLangWatchQL,
+      database,
+      schema: input.canRunLangWatchQL
+        ? await this.describeLangWatchQLSchema({
+            projectId: input.projectId,
+            protections: input.protections,
+          })
+        : { database, datasets: [], appFunctions: [] },
+      limits: {
+        maxStatementLength: MAX_LWQL_LENGTH,
+        maxRowsReturned: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
+        maxResultBytes: DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes,
+        maxExecutionTimeSeconds: DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds,
+      },
+      // The filter language's worked examples are trace's to publish; the
+      // document carries the SQL half's alone until `TRACE_FILTER_EXAMPLES`
+      // is exported from `@langwatch/trace-contract`.
+      traceFilterExamples: [],
+    });
+  }
+
+  /**
+   * Whether this credential reaches LangWatchQL at all — the one caller fact
+   * the reference document depends on, asked of the KEY rather than enforced,
+   * because a key entitled only to traces still reads the filter half.
+   */
+  canApiKeyRunLangWatchQL(
+    input: Readonly<{ credential: RestCredentialPrincipal }>,
+  ): Promise<boolean> {
+    return keyPermitted({
+      authz: this.#dependencies.authz,
+      credential: input.credential,
+      permission: "analytics:view",
     });
   }
 

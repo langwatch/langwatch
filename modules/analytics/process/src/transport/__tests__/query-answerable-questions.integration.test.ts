@@ -6,6 +6,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/kernel";
 import { Temporal } from "@langwatch/time";
@@ -21,11 +22,18 @@ import {
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
+import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
-import { AnalyticsQueryApi, langWatchQLCallerProtections, queryRest } from "../query.rest.ts";
+import {
+  AnalyticsQueryApi,
+  langWatchQLCallerProtections,
+  langWatchQLCallerReach,
+  queryRest,
+} from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
@@ -1371,6 +1379,20 @@ function mountQueryDoor({
   const queryApi: AnalyticsQueryApi = {
     resolveApiKeyRunCaller: async () => tenant(),
     describeLangWatchQLSchema: async ({ protections }) => service().describeSchema({ protections }),
+    describeQueryReference: async ({ protections, canRunLangWatchQL }) =>
+      buildQueryReference({
+        protections,
+        lwqlEnabled: canRunLangWatchQL,
+        database: LWQL_EXAMPLE_DATABASE,
+        schema: service().describeSchema({ protections }),
+        limits: {
+          maxStatementLength: MAX_LWQL_LENGTH,
+          maxRowsReturned: 10_000,
+          maxResultBytes: 8_000_000,
+          maxExecutionTimeSeconds: 10,
+        },
+        traceFilterExamples: [],
+      }),
     executeLangWatchQL: (input) => service().execute(input),
   };
 
@@ -1393,6 +1415,7 @@ function mountQueryDoor({
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,
         })),
+        bindRestMiddleware(langWatchQLCallerReach, () => ({ canRunLangWatchQL: true })),
       ],
     }),
   );

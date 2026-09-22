@@ -1,7 +1,7 @@
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  INSTANT_EVAL_REQUEST_TYPE,
   INSTANT_EVAL_SPEND_MODEL,
   instantEvalPricedSpend,
   instantEvalRateVersion,

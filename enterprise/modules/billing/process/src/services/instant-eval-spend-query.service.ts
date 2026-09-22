@@ -5,11 +5,11 @@
  * @see specs/instant-evals/instant-eval-billing.feature
  */
 
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
   billingMonthWindowMs,
-  INSTANT_EVAL_REQUEST_TYPE,
   nanoUsdToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
 import type { BillableEventsTotalResult } from "./billable-events-query.service.ts";

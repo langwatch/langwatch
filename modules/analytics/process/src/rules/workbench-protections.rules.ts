@@ -153,10 +153,10 @@ export async function resolveProjectProtections(input: {
 }
 
 /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
-function keyPermitted(input: {
+export function keyPermitted(input: {
   authz: Pick<AuthzApi, "hasApiKeyPermission">;
   credential: RestCredentialPrincipal;
-  permission: "cost:view";
+  permission: "cost:view" | "analytics:view";
 }): Promise<boolean> {
   const { authz, credential, permission } = input;
   if (credential.kind !== "apiKey") return Promise.resolve(true);
