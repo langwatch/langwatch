@@ -164,8 +164,10 @@ describe("Langy's routing table", () => {
 });
 
 // Backs specs/langy/langy-trace-explorer-actions.feature ("A trace search
-// names no origin"): the Explorer already leaves Langy's own traces out server
-// side, so naming `application` narrows the card's link below its own count.
+// names no origin"): the Explorer already leaves Langy's own traces out, so a
+// search naming no origin counts what the Explorer counts; naming `application`
+// also drops evaluation, simulation, sample and gateway traces, and the card's
+// link then opens narrower than the count beside it.
 describe("every skill that tells Langy to run a trace search", () => {
   describe("given the commands they print", () => {
     /** @scenario "A trace search names no origin" */

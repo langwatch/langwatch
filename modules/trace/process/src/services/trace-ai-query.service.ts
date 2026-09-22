@@ -1,7 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import {
   AiQueryProviderError,
+  type InstantEvalQuestionResult,
+  type InstantEvalSearchTarget,
   isEmptyAST,
+  type KnownProjectSignals,
   parse,
   type AiActionErrorDetails,
   type AiActionResult,
@@ -14,6 +17,7 @@ import { z } from "zod";
 
 import {
   buildActionSystemPrompt,
+  buildInstantEvalQuestionPrompt,
   buildSystemPrompt,
 } from "../rules/trace-ai-query-prompt.rules.ts";
 
@@ -53,6 +57,33 @@ export interface AiQueryInput {
   resolveModel: AiQueryModelResolver;
   traces: Pick<TraceApi, "buildQueryFieldCatalogue">;
 }
+
+const instantEvalQuestionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("question"),
+    instructions: z
+      .string()
+      .min(1)
+      .max(600)
+      .describe(
+        "The judge question, one or two sentences, asked of a single trace or conversation.",
+      ),
+    yes: z.string().min(1).max(300).describe("What a yes looks like in the text being judged."),
+    no: z.string().min(1).max(300).describe("What a no looks like in the text being judged."),
+  }),
+  z.object({
+    kind: z.literal("filter"),
+    query: z
+      .string()
+      .min(1)
+      .describe("A trace query using an evaluator or event the project already has."),
+    reason: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe("One sentence naming the evaluator or event that answers it."),
+  }),
+]);
 
 const aiActionSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -261,7 +292,12 @@ export class TraceAiQueryService {
       attempts.lastProviderError = e;
       attempts.lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
-        { projectId: input.projectId, attempt, lastError: attempts.lastError, err: e },
+        TraceAiQueryService.providerErrorLogPayload({
+          projectId: input.projectId,
+          attempt,
+          error: e,
+          model: modelIdOf(model),
+        }),
         "AI action generation failed",
       );
 
@@ -294,6 +330,88 @@ export class TraceAiQueryService {
     );
 
     return null;
+  }
+
+  /**
+   * Rewrites a sentence into a judge question with yes/no criteria, or points at
+   * an evaluator or event that already answers it. Raises
+   * {@link AiQueryProviderError} when the model does not answer usably.
+   */
+  static async generateInstantEvalQuestion(input: {
+    projectId: string;
+    /** The sentence the operator typed, bare words only. */
+    text: string;
+    target: InstantEvalSearchTarget;
+    known: KnownProjectSignals;
+    resolveModel: AiQueryModelResolver;
+  }): Promise<InstantEvalQuestionResult> {
+    const model = await input.resolveModel({
+      projectId: input.projectId,
+      featureKey: "traces.ai_search",
+    });
+    let object: z.infer<typeof instantEvalQuestionSchema>;
+    try {
+      const generated = await generateObject({
+        model,
+        schemaName: "InstantEvalQuestion",
+        schemaDescription:
+          "A yes/no judge question over one trace, or a filter using an existing evaluator or event.",
+        schema: instantEvalQuestionSchema,
+        system: buildInstantEvalQuestionPrompt({ target: input.target, known: input.known }),
+        prompt: input.text,
+        maxRetries: 1,
+      });
+      object = generated.object;
+    } catch (e) {
+      logger.error(
+        TraceAiQueryService.providerErrorLogPayload({
+          projectId: input.projectId,
+          error: e,
+          model: modelIdOf(model),
+        }),
+        "Instant Eval question generation failed",
+      );
+      throw new AiQueryProviderError(
+        TraceAiQueryService.summarizeProviderError(e, { model: modelIdOf(model) }),
+      );
+    }
+    if (object.kind === "filter") {
+      const validation = validateQuery(object.query);
+      if (!validation.ok) {
+        throw new AiQueryProviderError({ reason: validation.error, lastQuery: object.query });
+      }
+      return { kind: "filter", query: object.query, reason: object.reason };
+    }
+    return {
+      kind: "question",
+      instructions: object.instructions,
+      criteria: [object.yes, object.no],
+    };
+  }
+
+  /**
+   * What a provider failure may put in the log. A rejected key makes the provider's
+   * body the credential, so the line carries the disclosure's curated fields only.
+   */
+  static providerErrorLogPayload({
+    projectId,
+    attempt,
+    error,
+    model,
+  }: {
+    projectId: string;
+    attempt?: number;
+    error: unknown;
+    model?: string;
+  }): { projectId: string; attempt?: number; providerError: AiActionErrorDetails } {
+    return {
+      projectId,
+      ...(attempt === undefined ? {} : { attempt }),
+      providerError: TraceAiQueryService.summarizeProviderError(
+        error,
+        model ? { model } : undefined,
+      ),
+    };
   }
 
   /**

@@ -1,8 +1,12 @@
 import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import { nowInstant } from "@langwatch/time";
-import { type TimeRange, useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
+import { type TimeRange, useExplorerStore } from "@langwatch/trace-browser-kit";
+import { queryWithoutInstantEvalChips } from "@langwatch/trace-contract";
 import type React from "react";
 
+import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
+import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
+import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
 
 const LangWatchMark: React.FC = () => (
@@ -25,15 +29,71 @@ interface EmptyContent {
   description: string;
 }
 
-function emptyContent({
+/**
+ * What an empty table says about the eval chip in the query, or null when no
+ * chip explains it. A chip with no run for this scope matches no rows here, and
+ * a run still judging has not reached them yet; neither is "nothing matches".
+ */
+function instantEvalEmptyContent({
+  isJudging,
+  hasUnjudgedEval,
+}: {
+  isJudging: boolean;
+  hasUnjudgedEval: boolean;
+}): EmptyContent | null {
+  if (hasUnjudgedEval) {
+    return {
+      title: "These results are not judged yet",
+      description:
+        "No Instant Eval has judged this question over this window, lens and filter. Judge these results to see which ones match.",
+    };
+  }
+  if (isJudging) {
+    return {
+      title: "No matches yet",
+      description:
+        "The Instant Eval is still judging. Matches appear here as each page of results finishes.",
+    };
+  }
+  return null;
+}
+
+/** What a window shorter than a day says about itself, or null when it is longer. */
+function shortRangeEmptyContent(rangeHours: number): EmptyContent | null {
+  if (rangeHours < 1) {
+    const minutes = Math.round(rangeHours * MINUTES_PER_HOUR);
+    return {
+      title: "Quiet for the last few minutes",
+      description: `The current range covers ${minutes} minute${minutes === 1 ? "" : "s"}. Try widening it.`,
+    };
+  }
+  if (rangeHours < 24) {
+    const hours = Math.round(rangeHours);
+    return {
+      title: "Nothing in this window",
+      description: `The current range covers ${hours} hour${hours === 1 ? "" : "s"}.`,
+    };
+  }
+  return null;
+}
+
+export function emptyContent({
   activeLensId,
   hasFilters,
   rangeHours,
+  isJudging,
+  hasUnjudgedEval = false,
 }: {
   activeLensId: string;
   hasFilters: boolean;
   rangeHours: number;
+  /** An Instant Eval behind one of the query's chips is still running. */
+  isJudging: boolean;
+  /** An eval chip has no run for this window, lens and filter. */
+  hasUnjudgedEval?: boolean;
 }): EmptyContent {
+  const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval });
+  if (judging) return judging;
   if (activeLensId === "errors") {
     return {
       title: "No errors here, lucky you",
@@ -55,20 +115,8 @@ function emptyContent({
         "Your query is valid, there's just nothing matching it in this window. Try widening the window, or clearing all filters.",
     };
   }
-  if (rangeHours < 1) {
-    const minutes = Math.round(rangeHours * MINUTES_PER_HOUR);
-    return {
-      title: "Quiet for the last few minutes",
-      description: `The current range covers ${minutes} minute${minutes === 1 ? "" : "s"}. Try widening it.`,
-    };
-  }
-  if (rangeHours < 24) {
-    const hours = Math.round(rangeHours);
-    return {
-      title: "Nothing in this window",
-      description: `The current range covers ${hours} hour${hours === 1 ? "" : "s"}.`,
-    };
-  }
+  const shortRange = shortRangeEmptyContent(rangeHours);
+  if (shortRange) return shortRange;
   // Else branch: not errors/conversations lens, no filters, range is days-or-more. The
   // project has had traces at some point (otherwise the empty-state journey would have
   // intercepted via firstMessage= false) — there just aren't any in *this* window.
@@ -95,21 +143,63 @@ function rangePreset(days: number, label: string): TimeRange {
   };
 }
 
-export const EmptyFilterState: React.FC = () => {
-  const clearAll = useFilterStore((s) => s.clearAll);
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const setTimeRange = useFilterStore((s) => s.setTimeRange);
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const selectLens = useViewStore((s) => s.selectLens);
+/** The wider windows offered when the current one is short. */
+function widerRangeActions({
+  rangeHours,
+  setTimeRange,
+}: {
+  rangeHours: number;
+  setTimeRange: (range: TimeRange) => void;
+}): ActionButton[] {
+  const preset = (days: number, label: string): ActionButton => ({
+    label,
+    onClick: () => setTimeRange(rangePreset(days, label)),
+  });
+  if (rangeHours < 24) {
+    return [preset(1, "Last 24 hours"), preset(7, "Last 7 days")];
+  }
+  if (rangeHours < 24 * 7) {
+    return [preset(7, "Last 7 days"), preset(30, "Last 30 days")];
+  }
+  return [];
+}
 
-  const hasFilters = queryText.trim().length > 0;
-  const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
-  const content = emptyContent({ activeLensId, hasFilters, rangeHours });
-
+/**
+ * The buttons under the empty state, in the order they are offered. An unjudged
+ * eval chip leads, because judging the results is what fills the table; every
+ * other action widens what is searched.
+ */
+function emptyStateActions({
+  activeLensId,
+  hasFilters,
+  isJudging,
+  rangeHours,
+  unjudgedChip,
+  clearAll,
+  selectLens,
+  setTimeRange,
+  judgeTheseResults,
+}: {
+  activeLensId: string;
+  hasFilters: boolean;
+  isJudging: boolean;
+  rangeHours: number;
+  unjudgedChip: { question: string } | null;
+  clearAll: () => void;
+  selectLens: (lensId: string) => void;
+  setTimeRange: (range: TimeRange) => void;
+  judgeTheseResults: () => void;
+}): ActionButton[] {
   const actions: ActionButton[] = [];
-  if (hasFilters) {
-    actions.push({ label: "Clear filters", onClick: clearAll, primary: true });
+  // The question goes back through the search bar as a sentence, so the run
+  // gets the same estimate, cost rule and refusals a typed one gets.
+  if (unjudgedChip) {
+    actions.push({ label: "Judge these results", primary: true, onClick: judgeTheseResults });
+  }
+  // While a run judges, the way out is Stop on the progress bar. Offering
+  // "Clear filters" as the main action would throw the run's chip away.
+  if (hasFilters && !isJudging) {
+    actions.push({ label: "Clear filters", onClick: clearAll, primary: !unjudgedChip });
   }
   if (activeLensId !== "all-traces") {
     actions.push({
@@ -118,25 +208,51 @@ export const EmptyFilterState: React.FC = () => {
       primary: !hasFilters,
     });
   }
-  if (rangeHours < 24) {
-    actions.push({
-      label: "Last 24 hours",
-      onClick: () => setTimeRange(rangePreset(1, "Last 24 hours")),
-    });
-    actions.push({
-      label: "Last 7 days",
-      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-    });
-  } else if (rangeHours < 24 * 7) {
-    actions.push({
-      label: "Last 7 days",
-      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-    });
-    actions.push({
-      label: "Last 30 days",
-      onClick: () => setTimeRange(rangePreset(30, "Last 30 days")),
-    });
-  }
+  actions.push(...widerRangeActions({ rangeHours, setTimeRange }));
+  return actions;
+}
+
+export const EmptyFilterState: React.FC = () => {
+  const clearAll = useExplorerStore((s) => s.clearAll);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const setTimeRange = useExplorerStore((s) => s.setTimeRange);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const selectLens = useExplorerStore((s) => s.selectLens);
+
+  const { instantEval } = useExplorerCounts();
+  const isJudging = instantEval !== null;
+  const { chips: evalChips } = useInstantEvalRuns();
+  const unjudgedChip = evalChips.find((chip) => chip.runId === null);
+  const requestSubmit = useSearchSubmitRequestStore((s) => s.requestSubmit);
+
+  const hasFilters = queryText.trim().length > 0;
+  const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
+  const content = emptyContent({
+    activeLensId,
+    hasFilters,
+    rangeHours,
+    isJudging,
+    hasUnjudgedEval: Boolean(unjudgedChip),
+  });
+
+  const actions = emptyStateActions({
+    activeLensId,
+    hasFilters,
+    isJudging,
+    rangeHours,
+    unjudgedChip: unjudgedChip ?? null,
+    clearAll,
+    selectLens,
+    setTimeRange,
+    judgeTheseResults: () => {
+      if (!unjudgedChip) return;
+      requestSubmit({
+        text: `${queryWithoutInstantEvalChips(queryText)} ${unjudgedChip.question}`.trim(),
+        forceKind: "instant_eval",
+      });
+    },
+  });
 
   return (
     <Flex align="center" justify="center" height="full" paddingX={6} paddingY={12}>

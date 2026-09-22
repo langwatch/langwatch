@@ -308,9 +308,8 @@ const presentations = {
     describe: () => "Narrow the time range or filters, or step forward with Next.",
   },
   filter_too_complex: {
-    title: "That filter is too complex to run",
-    describe: () =>
-      "The filter has more clauses than a single search can evaluate. Split it into two searches, or drop the clauses that narrow it least.",
+    title: "Too many separate terms",
+    describe: () => "Put the sentence in quotes to search it as one phrase.",
   },
   filter_parse_error: {
     title: "This filter isn't valid",

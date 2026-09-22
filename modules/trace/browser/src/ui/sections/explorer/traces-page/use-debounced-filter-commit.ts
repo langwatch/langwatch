@@ -1,8 +1,11 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
+import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
 
-// Query-text edits wait longer than time-range changes before hitting the backend.
-const QUERY_DEBOUNCE_MS = 600;
+// The store's query only changes on discrete actions: Enter in the search bar, a
+// facet click, a chip removed, a range slider released. None of them is a keystroke
+// storm (typing never reaches the store), so both timers only coalesce a burst of
+// clicks into one request.
+const QUERY_DEBOUNCE_MS = 300;
 const TIME_RANGE_DEBOUNCE_MS = 300;
 
 /**
@@ -10,9 +13,9 @@ const TIME_RANGE_DEBOUNCE_MS = 300;
  * drives network requests, so typing doesn't refetch on every key.
  */
 export const useDebouncedFilterCommit = (): void => {
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const commitDebounced = useFilterStore((s) => s.commitDebounced);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const commitDebounced = useExplorerStore((s) => s.commitDebounced);
 
   useEffect(() => {
     const timer = setTimeout(commitDebounced, QUERY_DEBOUNCE_MS);

@@ -4,7 +4,11 @@
  * service reads them through one substitution.
  */
 
-import { QUERY_SYNTAX_DOC } from "@langwatch/trace-contract";
+import {
+  type InstantEvalSearchTarget,
+  type KnownProjectSignals,
+  QUERY_SYNTAX_DOC,
+} from "@langwatch/trace-contract";
 /** The action prompt, with {{FIELDS}} standing in for the field catalogue. */
 const ACTION_SYSTEM_PROMPT = `You are an expert at translating LangWatch operators' natural-language
 requests into a trace-view action. The operator is looking at a list of
@@ -161,4 +165,68 @@ If the request is genuinely ambiguous, off-topic, or unexpressible in
 the query language, output an empty string. An empty string is a
 legitimate, polite "I couldn't translate that"; hallucinating a filter
 the operator didn't ask for is worse.`;
+}
+
+/** What one judgement covers, per lens the search ran in. */
+const JUDGED_UNIT: Record<InstantEvalSearchTarget, string> = {
+  threads: "a whole conversation (every turn between the user and the assistant)",
+  llm_spans: "a single model call (its input and output)",
+  traces: "a single trace (one request to the AI application, with its spans)",
+};
+
+/**
+ * The sentence-to-judge-question prompt. It offers the project's own evaluator
+ * and event names first, so a question the project already answers becomes a
+ * filter rather than a second judgement.
+ */
+export function buildInstantEvalQuestionPrompt({
+  target,
+  known,
+}: {
+  target: InstantEvalSearchTarget;
+  known: KnownProjectSignals;
+}): string {
+  const unit = JUDGED_UNIT[target];
+  const evaluators = known.evaluators.length > 0 ? known.evaluators.join(", ") : "(none)";
+  const events = known.events.length > 0 ? known.events.join(", ") : "(none)";
+  return `You turn an operator's sentence into a question a judge model answers
+with yes or no about ${unit}. The operator typed the sentence into a trace
+search bar, so it describes what they want to find, not a full question.
+
+Reply with a JSON object matching the \`InstantEvalQuestion\` schema.
+
+# Prefer what the project already records
+
+The project already has these evaluator results: ${evaluators}
+and these event names: ${events}
+
+If one of them answers the sentence, reply with kind \`filter\` and a trace
+query using it, plus a one-sentence \`reason\` naming it. Evaluator filters
+look like \`evaluator:<name> AND evaluatorVerdict:fail\` or
+\`evaluator:<name> AND evaluatorScore:<0.5\`; event filters look like
+\`event:<name>\`. Use only names from the lists above, spelled exactly.
+
+# Otherwise write the question
+
+Reply with kind \`question\`:
+- \`instructions\`: one or two sentences, second person, asked of the text
+  being judged. Say what to look for, not how the search bar works.
+- \`yes\`: what a yes looks like in the text.
+- \`no\`: what a no looks like in the text.
+
+Keep the operator's words where they are precise ("refund", "German"),
+replace vague ones with observable behaviour ("annoyed" becomes "the user
+expresses frustration, repeats a request, or complains about the answer").
+
+# Examples
+
+"annoyed users" →
+{"kind":"question","instructions":"Does the user express frustration or annoyance at any point in the conversation?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated, useless, ridiculous.","no":"The user stays neutral or satisfied throughout."}
+
+"answers that promise a refund" →
+{"kind":"question","instructions":"Does the assistant promise or confirm a refund?","yes":"The assistant states a refund will be issued or has been issued.","no":"The assistant explains a policy, declines, or never mentions a refund."}
+
+With evaluators including "ragas/faithfulness":
+"hallucinated answers" →
+{"kind":"filter","query":"evaluator:ragas/faithfulness AND evaluatorVerdict:fail","reason":"The faithfulness evaluator already flags unsupported answers."}`;
 }

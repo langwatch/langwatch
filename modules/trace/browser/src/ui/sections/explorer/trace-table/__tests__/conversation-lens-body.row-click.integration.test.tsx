@@ -140,6 +140,21 @@ describe("given the conversations lens is showing grouped rows", () => {
     });
   });
 
+  describe("when the table unmounts with a conversation open", () => {
+    /** @scenario "Open rows leave the component and survive a remount" */
+    it("shows the same conversation open when it mounts again", async () => {
+      const user = userEvent.setup();
+      const first = renderBody([conversationRow()]);
+      await user.click(expandToggle());
+      first.unmount();
+
+      renderBody([conversationRow()]);
+
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+      expect(Array.from(useExplorerStore.getState().expandedRows)).toEqual(["conv-1"]);
+    });
+  });
+
   describe("when the read named no trace for a conversation", () => {
     // Only client-grouped rows (onboarding sample preview) and skeletons get
     // here; expanding keeps the row useful rather than making it dead surface.

@@ -37,6 +37,7 @@ import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
 import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
+import { ExplorerTotal } from "./explorer-total.tsx";
 import { FacetManagerPopover } from "./facet-manager-popover.tsx";
 import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data.ts";
 import { HoverHighlightStyle } from "./hover-highlight-style.tsx";
@@ -426,6 +427,20 @@ export const FilterSidebar: React.FC = () => {
           </Tooltip>
         </HStack>
       </HStack>
+      {/* The same number the pagination line shows, from the same read, so the
+          sidebar can never claim more or fewer rows than the table. It gets a
+          row of its own: the header's buttons leave no room for it, and while
+          an Instant Eval judges the summary is a sentence. */}
+      <Box
+        flexShrink={0}
+        paddingX={3}
+        paddingY={1}
+        borderBottomWidth="1px"
+        borderColor="border"
+        _empty={{ display: "none" }}
+      >
+        <ExplorerTotal />
+      </Box>
       <Box
         flex="1"
         display="flex"

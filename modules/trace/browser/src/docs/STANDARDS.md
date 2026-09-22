@@ -122,13 +122,12 @@ features/traces-v2/
 │   │   └── useTraceFacets.test.ts
 │   └── index.ts
 ├── stores/
-│   ├── filterStore.ts
-│   ├── viewStore.ts
+│   ├── explorer.store.ts   (query/view/selection/rows slices, in browser-kit)
 │   ├── drawerStore.ts
 │   ├── uiStore.ts
 │   ├── __tests__/
-│   │   ├── filterStore.test.ts
-│   │   └── viewStore.test.ts
+│   │   ├── query.slice.test.ts
+│   │   └── view.slice.test.ts
 │   └── index.ts
 ├── types/
 │   ├── trace.ts
@@ -154,7 +153,7 @@ features/traces-v2/
 
 - Component files: `PascalCase.tsx`
 - Hook files: `camelCase.ts` (e.g., `useTraceList.ts`)
-- Store files: `camelCase.ts` (e.g., `filterStore.ts`)
+- Store files: `kebab-case.ts` (e.g., `explorer.store.ts`, `query.slice.ts`)
 - Type files: `camelCase.ts` (e.g., `trace.ts`)
 - Utility files: `camelCase.ts` (e.g., `formatters.ts`)
 - Test files: `{SourceFile}.test.tsx` (unit), `{SourceFile}.integration.test.tsx` (integration)
@@ -220,7 +219,7 @@ export const TraceTableRow: React.FC<TraceTableRowProps> = ({ trace, isSelected,
 ```tsx
 // ❌ Too much logic in the component
 export const TraceTable: React.FC<TraceTableProps> = () => {
-  const ast = useFilterStore((s) => s.ast);
+  const ast = useExplorerStore((s) => s.ast);
   const filters = astToApiFilter(ast);
   const { data } = api.tracesV2.list.useQuery({ filters });
   const sorted = useMemo(() => data?.sort(...), [data]);
@@ -301,12 +300,13 @@ These rules were discovered during the throwaway mock and prevent real bugs:
 
 ## 3. State Management
 
-### Zustand — 4 Slices
+### Zustand — one Explorer store, four slices
 
-Each slice owns one domain of user intent. Slices are separate stores, not a monolithic store.
+Each slice owns one domain of user intent, and all four compose into the one
+Explorer store in `@langwatch/trace-browser-kit` (ADR-152).
 
 ```tsx
-// stores/filterStore.ts
+// query.slice.ts
 interface FilterState {
   ast: FilterNode; // source of truth for all filters
   setFilter: (field: string, value: FilterValue) => void;
@@ -315,7 +315,7 @@ interface FilterState {
   setFromSearchString: (query: string) => void;
 }
 
-export const useFilterStore = create<FilterState>((set) => ({
+export const createQuerySlice: StateCreator<ExplorerStore, [], [], QuerySlice> = (set) => ({
   ast: emptyAst(),
   setFilter: (field, value) => set((s) => ({ ast: addFilter(s.ast, field, value) })),
   removeFilter: (field) => set((s) => ({ ast: removeFilter(s.ast, field) })),
@@ -325,7 +325,7 @@ export const useFilterStore = create<FilterState>((set) => ({
 ```
 
 ```tsx
-// stores/viewStore.ts
+// view.slice.ts
 interface ViewState {
   activeLensId: string;
   presetFilters: FilterNode[]; // locked filters owned by the active lens
@@ -370,7 +370,7 @@ interface UiState {
 - One store per slice. Not a single combined store.
 - Immutable updates via `set()`.
 - Actions are methods on the store interface, not separate functions.
-- Selectors: subscribe to the narrowest slice possible (`useFilterStore(s => s.ast)`).
+- Selectors: subscribe to the narrowest slice possible (`useExplorerStore(s => s.ast)`).
 - No async logic in stores. Async lives in data hooks.
 
 ### Data Hooks (Adapter Pattern)
@@ -382,8 +382,8 @@ Components never know which phase they're in.
 ```tsx
 // hooks/useTraceList.ts
 export function useTraceList() {
-  const ast = useFilterStore((s) => s.ast);
-  const { columns, sortOrder, grouping } = useViewStore((s) => ({
+  const ast = useExplorerStore((s) => s.ast);
+  const { columns, sortOrder, grouping } = useExplorerStore((s) => ({
     columns: s.columns,
     sortOrder: s.sortOrder,
     grouping: s.grouping,
@@ -668,7 +668,7 @@ hooks/__tests__/
   useTraceList.test.ts              ← unit
 
 stores/__tests__/
-  filterStore.test.ts               ← unit
+  query.slice.test.ts               ← unit
 ```
 
 ### Naming conventions
@@ -731,14 +731,11 @@ import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { useTraceList } from "../useTraceList";
 
-// Mock the stores
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: vi.fn((selector) => selector({ ast: emptyAst() })),
-}));
-
-vi.mock("../../stores/viewStore", () => ({
-  useViewStore: vi.fn((selector) =>
+// Mock the store: one module, every slice the hook reads
+vi.mock("@langwatch/trace-browser-kit", () => ({
+  useExplorerStore: vi.fn((selector) =>
     selector({
+      ast: emptyAst(),
       columns: defaultColumns,
       sortOrder: { field: "timestamp", dir: "desc" },
       grouping: "flat",

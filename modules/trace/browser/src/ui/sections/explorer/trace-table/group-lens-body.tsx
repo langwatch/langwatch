@@ -1,5 +1,9 @@
 import { Flex, Text } from "@chakra-ui/react";
-import { useFilterStore, type LensConfig, groupByForGrouping } from "@langwatch/trace-browser-kit";
+import {
+  useExplorerStore,
+  type LensConfig,
+  groupByForGrouping,
+} from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -36,12 +40,13 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     () => (groupBy ? buildGroups(traces, groupBy) : []),
     [traces, groupBy],
   );
-  const pageSize = useFilterStore((s) => s.pageSize);
+  const pageSize = useExplorerStore((s) => s.pageSize);
   const groups = useMemo(
     () => (isLoading ? buildGroupPlaceholderRows(pageSize) : realGroups),
     [isLoading, pageSize, realGroups],
   );
-  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
+  const openKeys = useExplorerStore((s) => s.expandedRows);
+  const toggleExpandedRow = useExplorerStore((s) => s.toggleExpandedRow);
   const [sorting, setSorting] = useState<SortingState>([
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
@@ -72,7 +77,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   if (!groupBy) return <NoTracesToGroupMessage />;
   if (!isLoading && groups.length === 0) return <NoTracesToGroupMessage />;
 
-  const toggleExpanded = (key: string) => setOpenKeys((prev) => withKeyToggled(prev, key));
+  const toggleExpanded = (key: string) => toggleExpandedRow({ key });
 
   return (
     <TraceTableShell table={table} minWidth={GROUP_MIN_WIDTH} stickyFirstColumn>
@@ -100,14 +105,6 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     </TraceTableShell>
   );
 };
-
-/** The open-group keys with one key flipped. */
-function withKeyToggled(keys: Set<string>, key: string): Set<string> {
-  const next = new Set(keys);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  return next;
-}
 
 const NoTracesToGroupMessage: React.FC = () => (
   <Flex align="center" justify="center" padding={8} direction="column" gap={2}>

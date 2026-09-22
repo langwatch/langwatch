@@ -29,6 +29,15 @@ export interface KnownProjectSignals {
   events: readonly string[];
 }
 
+/**
+ * Either a judge question with its yes/no criteria, or a filter the model
+ * preferred because an evaluator or event the project already has answers the
+ * same sentence.
+ */
+export type InstantEvalQuestionResult =
+  | { kind: "question"; instructions: string; criteria: [string, string] }
+  | { kind: "filter"; query: string; reason: string };
+
 export const routeSearchInputSchema = z.object({
   projectId: z.string(),
   /** The whole submitted text: bare words plus any explicit terms. */

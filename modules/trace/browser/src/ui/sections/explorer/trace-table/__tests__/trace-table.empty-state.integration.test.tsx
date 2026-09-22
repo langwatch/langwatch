@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -51,11 +51,54 @@ vi.mock("../../hooks/use-session-groups.ts", () => ({
 // gating through the same table shell.
 let mockGrouping: "flat" | "by-conversation" = "flat";
 
+// The applied query, which the table's "search it as one phrase" fix reads and
+// rewrites when the server refused it as too complex.
+const mockFilterState = {
+  queryText: "",
+  timeRange: { from: Date.now() - 3600000, to: Date.now(), label: "Last 1h" },
+  clearAll: vi.fn(),
+  setTimeRange: vi.fn(),
+  applyQueryText: vi.fn(),
+};
+
+// The page-wide count read, answering from whichever source the active lens
+// paginates, the way the real selector does.
+vi.mock("../../hooks/use-explorer-counts.ts", () => ({
+  useExplorerCounts: () =>
+    mockGrouping === "by-conversation"
+      ? {
+          totalHits: mockSessionGroupsResult.totalHits,
+          itemNoun: "conversations",
+          pageTraceIds: [],
+          isLoading: mockSessionGroupsResult.isLoading,
+          isFetching: mockSessionGroupsResult.isFetching,
+          isPlaceholderData: mockSessionGroupsResult.isPlaceholderData,
+          instantEval: null,
+          summary: `${mockSessionGroupsResult.totalHits} conversations`,
+        }
+      : {
+          totalHits: mockTraceListResult.totalHits,
+          itemNoun: "traces",
+          pageTraceIds: mockTraceListResult.data.map((trace) => trace.traceId),
+          isLoading: mockTraceListResult.isLoading,
+          isFetching: mockTraceListResult.isFetching,
+          isPlaceholderData: mockTraceListResult.isPlaceholderData,
+          instantEval: null,
+          summary: `${mockTraceListResult.totalHits} traces`,
+        },
+}));
+
 vi.mock("@langwatch/trace-browser-kit", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
       sort: { columnId: "timestamp", direction: "desc" },
+    }),
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
+    selector({
+      activeLensId: "all-traces",
+      sort: { columnId: "timestamp", direction: "desc" },
+      ...mockFilterState,
     }),
   useEffectiveLens: () => ({
     id: "all-traces",
@@ -65,17 +108,7 @@ vi.mock("@langwatch/trace-browser-kit", () => ({
   }),
   rowKindForGrouping: (grouping: string) =>
     grouping === "by-conversation" ? "conversation" : "trace",
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      queryText: "",
-      timeRange: {
-        from: Date.now() - 3600000,
-        to: Date.now(),
-        label: "Last 1h",
-      },
-      clearAll: vi.fn(),
-      setTimeRange: vi.fn(),
-    }),
+  useFilterStore: (selector: (s: unknown) => unknown) => selector(mockFilterState),
 }));
 
 // ─── Lens body stubs ──────────────────────────────────────────────────────────
@@ -140,6 +173,7 @@ afterEach(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGrouping = "flat";
+  mockFilterState.queryText = "";
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -246,6 +280,51 @@ describe("<TraceTable /> empty-state gating", () => {
 });
 
 describe("<TraceTable /> failed-read gating", () => {
+  describe("given the server refused the query as too complex", () => {
+    /** @scenario "A sentence past the term ceiling offers to search it as one phrase" */
+    it("offers a one-click fix that requotes the bare words and searches again", () => {
+      mockFilterState.queryText =
+        "status:error one two three four five six seven eight nine ten eleven";
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        isError: true,
+        error: {
+          data: {
+            error: {
+              code: "filter_too_complex",
+              httpStatus: 422,
+              fault: "customer",
+              meta: { maxNodes: 20 },
+            },
+          },
+        },
+      };
+
+      renderTable();
+
+      expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Search it as one phrase" }));
+      expect(mockFilterState.applyQueryText).toHaveBeenCalledWith(
+        'status:error AND "one two three four five six seven eight nine ten eleven"',
+      );
+    });
+
+    it("offers nothing for a refusal that has no bare words to quote", () => {
+      mockFilterState.queryText = "status:error";
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        isError: true,
+        error: { data: { error: { code: "filter_too_complex", httpStatus: 422 } } },
+      };
+
+      renderTable();
+
+      expect(
+        screen.queryByRole("button", { name: "Search it as one phrase" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("given the trace list query failed", () => {
     describe("when the failure leaves no rows behind", () => {
       // The failure mode this pins: a failed read and an empty result are

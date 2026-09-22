@@ -12,6 +12,7 @@ import {
   quoteAsPhrase,
   splitBareWords,
   type AiActionResult,
+  type InstantEvalQuestionResult,
   type InstantEvalSearchTarget,
   type KnownProjectSignals,
   type RouteSearchAvailability,
@@ -58,11 +59,6 @@ export interface TraceSearchClassifyRequest {
 export interface TraceSearchClassifier {
   classify(request: TraceSearchClassifyRequest): Promise<TraceSearchClassification>;
 }
-
-/** Either a judge question, or a filter an existing signal already answers. */
-export type InstantEvalQuestionResult =
-  | { kind: "question"; instructions: string; criteria: [string, string] }
-  | { kind: "filter"; query: string; reason: string };
 
 /** Where a sentence goes when the classifier is not there to say. */
 export type SearchRouteDecision =

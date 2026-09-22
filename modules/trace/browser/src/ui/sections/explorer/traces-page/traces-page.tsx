@@ -22,6 +22,7 @@ import { DensityProvider } from "../density-provider.tsx";
 import { ExportConfigDialog } from "../export-config-dialog.tsx";
 import { FilterSidebar } from "../filter-sidebar/filter-sidebar.tsx";
 import { FindBar } from "../find-bar/index.ts";
+import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 import { useLensFilterDirtySync } from "../hooks/use-lens-filter-dirty-sync.ts";
 import { useLensSync } from "../hooks/use-lens-sync.ts";
 import { useResetSelectionOnViewChange } from "../hooks/use-reset-selection-on-view-change.ts";
@@ -413,8 +414,10 @@ function useAuroraRibbon({
 }
 
 const ResultsPane: React.FC = React.memo(() => {
-  const { data, totalHits } = useTraceListQuery();
-  const pageTraceIds = useMemo(() => data.map((t) => t.traceId), [data]);
+  const { data } = useTraceListQuery();
+  // The selection header's count is the same read the pagination line and the
+  // sidebar total show.
+  const { totalHits, pageTraceIds } = useExplorerCounts();
   // Name lookup for the "Add to context" action, so a trace lands in Langy as
   // its name rather than a raw id.
   const traceNamesById = useMemo(

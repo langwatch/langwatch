@@ -110,6 +110,10 @@ vi.mock("@langwatch/trace-contract", async (importOriginal) => {
   };
 });
 
+vi.mock("../explorer-total.tsx", () => ({
+  ExplorerTotal: () => null,
+}));
+
 vi.mock("../section-renderer.tsx", () => ({
   SectionRenderer: () => <div data-testid="section-renderer" />,
 }));

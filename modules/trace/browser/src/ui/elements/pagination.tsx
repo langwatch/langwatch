@@ -34,6 +34,12 @@ export interface PaginationProps {
   /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
   unitLabel?: string;
   /**
+   * The totals segment written out, in place of `<total> <unitLabel>`. For a
+   * count that is still moving, such as a judgement run mid-way, where the
+   * caller has more to say than a number.
+   */
+  totalSummary?: string;
+  /**
    * Rows actually rendered on this page. Given, the range copy ends where the data ends
    * rather than where a full page would; omitted or zero (a count nobody has taken
    * yet), a full page is assumed and the range is capped by the total.
@@ -86,9 +92,25 @@ function PageSizeField({
   );
 }
 
+/** The totals half of the line: the caller's sentence, else the count and its noun. */
+function totalsSegment({
+  totalSummary,
+  totalCount,
+  unitLabel,
+}: {
+  totalSummary?: string;
+  totalCount: number;
+  unitLabel?: string;
+}): string[] {
+  if (totalSummary) return [totalSummary];
+  if (unitLabel) return [`${totalCount.toLocaleString()} ${unitLabel}`];
+  return [];
+}
+
 function PageSummary({
   totalCount,
   unitLabel,
+  totalSummary,
   rangeStart,
   rangeEnd,
   pageSize,
@@ -98,6 +120,7 @@ function PageSummary({
 }: {
   totalCount: number;
   unitLabel?: string;
+  totalSummary?: string;
   rangeStart: number;
   rangeEnd: number;
   pageSize: number;
@@ -105,7 +128,7 @@ function PageSummary({
   disabled: boolean;
   onPageSizeChange?: (size: number) => void;
 }) {
-  const segments = unitLabel ? [`${totalCount.toLocaleString()} ${unitLabel}`] : [];
+  const segments = totalsSegment({ totalSummary, totalCount, unitLabel });
   segments.push(`showing ${rangeStart}–${rangeEnd}`);
   if (onPageSizeChange) segments.push("per page");
 
@@ -249,6 +272,7 @@ export function Pagination({
   isLoading = false,
   navDisabled = false,
   unitLabel,
+  totalSummary,
   visibleCount,
   isPageReachable,
   canGoNext = true,
@@ -265,7 +289,10 @@ export function Pagination({
 
   return (
     <Grid
-      templateColumns="1fr auto 1fr"
+      // The navigator is centred while there is room. In a narrow table the
+      // empty third track gives way first, so the summary keeps its width and
+      // the page numbers sit beside it instead of under it.
+      templateColumns="minmax(max-content, 1fr) auto minmax(0, 1fr)"
       alignItems="center"
       gap={3}
       paddingX={2}
@@ -287,6 +314,7 @@ export function Pagination({
         <PageSummary
           totalCount={totalCount}
           unitLabel={unitLabel}
+          totalSummary={totalSummary}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pageSize={pageSize}

@@ -15,11 +15,8 @@ import { NewTracesScrollUpIndicator } from "./new-traces-scroll-up-indicator.tsx
 import { Pagination } from "./pagination.tsx";
 
 interface TraceTableLayoutProps {
-  totalHits: number;
   nextCursor?: PageCursor | null;
   visibleCount?: number;
-  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
-  itemNoun?: string;
   children: React.ReactNode;
   /**
    * When true, hide the pagination chrome (totals are unknown until
@@ -39,10 +36,8 @@ interface TraceTableLayoutProps {
 }
 
 export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
-  totalHits,
   nextCursor = null,
   visibleCount = 0,
-  itemNoun = "traces",
   children,
   isLoading = false,
   isTransitioning = false,
@@ -100,10 +95,8 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />
       <ColumnEducationDialog />
       <Pagination
-        totalHits={totalHits}
         nextCursor={nextCursor}
         visibleCount={visibleCount}
-        itemNoun={itemNoun}
         isLoading={isLoading}
         isTransitioning={isTransitioning}
         maxPageSize={maxPageSize}

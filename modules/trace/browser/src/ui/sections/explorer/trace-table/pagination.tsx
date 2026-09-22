@@ -1,19 +1,17 @@
-import { type PageCursor, useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
+import { type PageCursor, useExplorerStore } from "@langwatch/trace-browser-kit";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import type React from "react";
 
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 import { Pagination as PaginationBar } from "../../../elements/pagination.tsx";
+import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 
 interface PaginationProps {
-  totalHits: number;
   /** Cursor returned by the current batch; null means the end. */
   nextCursor?: PageCursor | null;
   visibleCount?: number;
-  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
-  itemNoun?: string;
   /**
    * Renders a placeholder bar in place of the page description while data is loading,
    * so the pagination row doesn't pop in when the first page resolves.
@@ -49,25 +47,27 @@ function reachableWithCursorsOnly({
 }
 
 /**
- * Store-driven pagination for the trace table: translates the filter store's page state
- * into the shared bar's props, one translation per lens.
+ * Store-driven pagination for the trace table: translates the explorer store's page
+ * state into the shared bar's props, one translation per lens. The total and its noun
+ * come from `useExplorerCounts`, the read every count on the page shares.
  */
 export const Pagination: React.FC<PaginationProps> = ({
-  totalHits,
   nextCursor = null,
   visibleCount = 0,
-  itemNoun = "traces",
   isLoading = false,
   isTransitioning = false,
   maxPageSize,
 }) => {
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const pageCursors = useFilterStore((s) => s.pageCursors);
-  const setPage = useFilterStore((s) => s.setPage);
-  const setPageCursor = useFilterStore((s) => s.setPageCursor);
-  const setPageSize = useFilterStore((s) => s.setPageSize);
-  const cursorOnly = useViewStore((s) => s.grouping) === "by-conversation";
+  // One string for both surfaces: the pagination line and the sidebar total render
+  // the same `summary`, so neither the number nor the noun can differ between them.
+  const { totalHits, summary } = useExplorerCounts();
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const pageCursors = useExplorerStore((s) => s.pageCursors);
+  const setPage = useExplorerStore((s) => s.setPage);
+  const setPageCursor = useExplorerStore((s) => s.setPageCursor);
+  const setPageSize = useExplorerStore((s) => s.setPageSize);
+  const cursorOnly = useExplorerStore((s) => s.grouping) === "by-conversation";
   const scrollElement = useTraceTableScrollElement();
 
   // The size the data source actually pages by, which is what the range
@@ -102,7 +102,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       page={currentPage}
       pageSize={effectivePageSize}
       totalCount={totalHits}
-      unitLabel={itemNoun}
+      totalSummary={summary}
       visibleCount={visibleCount}
       pageSizeOptions={sizeOptions}
       isLoading={isLoading}

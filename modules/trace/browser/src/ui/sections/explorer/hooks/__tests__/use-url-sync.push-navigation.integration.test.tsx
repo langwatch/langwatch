@@ -7,10 +7,15 @@ import {
 // @vitest-environment jsdom
 // Deep links navigate via same-route fragments (React Router's `navigate()`,
 // never `popstate`).
+import { setFilter, setLens, setTimeRange } from "@langwatch/trace-contract";
 import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  commitExplorerState,
+  readExplorerState,
+} from "../../../../../behavior/explorer/commit-explorer-state.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 let pushHash: ((hash: string) => void) | null = null;
@@ -125,6 +130,61 @@ describe("useURLSync applying a same-route push while already mounted", () => {
       );
       expect(fragment.get("q")).toBe('"checkout"');
       expect(fragment.get("preset")).toBe("24h");
+    });
+  });
+});
+
+describe("useURLSync applying a link that opens the Explorer", () => {
+  describe("given a link that opens the Explorer on a filter", () => {
+    /** @scenario "Opening a View in Trace Explorer link selects no rows" */
+    it("applies the filter and leaves the selection empty", () => {
+      render(<Harness />);
+      act(() => pushHash!("#all-traces?q=refund&preset=7d"));
+
+      const { selection } = useFilterStore.getState();
+      expect(barState().queryText).toBe("refund");
+      expect(selection.mode).toBe("explicit");
+      expect(selection.traceIds.size).toBe(0);
+    });
+  });
+});
+
+describe("useURLSync writing the merged store", () => {
+  describe("given the Trace Explorer is open", () => {
+    describe("when a transformed state with a query, a preset and a lens is committed", () => {
+      /** @scenario "The fragment is written from the merged store" */
+      it("names that lens, query and preset in the URL fragment", () => {
+        vi.useFakeTimers();
+        try {
+          render(<Harness />);
+          const lenses = useViewStore.getState().allLenses;
+
+          act(() => {
+            const lens = setLens({
+              state: readExplorerState(),
+              payload: { lensId: "errors" },
+              context: { lenses },
+            });
+            const range = setTimeRange({ state: lens.state, payload: { preset: "7d" } });
+            const filter = setFilter({
+              state: range.state,
+              payload: { query: "model:gpt-5-mini" },
+            });
+            commitExplorerState(filter.state);
+          });
+          act(() => {
+            vi.advanceTimersByTime(200);
+          });
+
+          const fragment = window.location.hash;
+          expect(fragment.startsWith("#errors?")).toBe(true);
+          const params = new URLSearchParams(fragment.slice(fragment.indexOf("?") + 1));
+          expect(params.get("q")).toBe("model:gpt-5-mini");
+          expect(params.get("preset")).toBe("7d");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     });
   });
 });

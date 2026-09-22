@@ -1,11 +1,15 @@
+import { Button } from "@chakra-ui/react";
 import {
   type PageCursor,
   rowKindForGrouping,
   useEffectiveLens,
+  useExplorerStore,
 } from "@langwatch/trace-browser-kit";
+import { requoteBareTerms } from "@langwatch/trace-contract";
 import type React from "react";
 
-import { HandledErrorState } from "../../errors/index.ts";
+import { HandledErrorState, readHandledError } from "../../errors/index.ts";
+import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
@@ -19,9 +23,9 @@ import { TraceLensBody } from "./trace-lens-body.tsx";
 import { TraceTableLayout } from "./trace-table-layout.tsx";
 
 /**
- * What the table shell (totals copy, pagination, empty state) reads, from
- * whichever data source the active lens paginates: the sessions lens walks
- * its own server-grouped rows, every other lens walks the traces.
+ * What the table shell (totals copy, pagination, empty state) reads, from the
+ * source the active lens paginates: the sessions lens walks its own grouped
+ * rows, every other lens the traces. The total is `useExplorerCounts`'s.
  */
 interface TableShell {
   totalHits: number;
@@ -41,8 +45,14 @@ interface TableShell {
   maxPageSize?: number;
 }
 
-const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
-  totalHits: sessions.totalHits,
+const sessionsShell = ({
+  sessions,
+  totalHits,
+}: {
+  sessions: SessionGroupsResult;
+  totalHits: number;
+}): TableShell => ({
+  totalHits,
   nextCursor: sessions.nextCursor,
   visibleCount: sessions.groups.length,
   isLoading: sessions.isLoading,
@@ -70,7 +80,11 @@ function shellPlaceholder(shell: TableShell): React.ReactNode | null {
       <HandledErrorState
         error={shell.error}
         fallbackTitle={`We could not load your ${shell.itemNoun}`}
-      />
+      >
+        {readHandledError(shell.error)?.code === "filter_too_complex" && (
+          <SearchAsOnePhraseAction />
+        )}
+      </HandledErrorState>
     );
   }
   const isEmpty =
@@ -81,10 +95,32 @@ function shellPlaceholder(shell: TableShell): React.ReactNode | null {
   return isEmpty ? <EmptyFilterState /> : null;
 }
 
+/**
+ * The one-click fix for `filter_too_complex`: the bare words of the applied
+ * query become one quoted phrase, the explicit terms stay, and the search runs
+ * again.
+ * @see specs/traces-v2/search.feature
+ */
+const SearchAsOnePhraseAction: React.FC = () => {
+  const queryText = useExplorerStore((s) => s.queryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const requoted = requoteBareTerms(queryText);
+  if (requoted === queryText) return null;
+  return (
+    <Button
+      size="sm"
+      variant="surface"
+      colorPalette="orange"
+      onClick={() => applyQueryText(requoted)}
+    >
+      Search it as one phrase
+    </Button>
+  );
+};
+
 export const TraceTable: React.FC = () => {
   const {
     data: traces,
-    totalHits,
     nextCursor,
     isLoading,
     isFetching,
@@ -97,6 +133,7 @@ export const TraceTable: React.FC = () => {
   // (specs/traces-v2/sessions-lens.feature). The hook only queries while the
   // by-conversation grouping is active.
   const sessions = useSessionGroups();
+  const { totalHits } = useExplorerCounts();
   const activeLens = useEffectiveLens();
 
   if (!activeLens) return <EmptyFilterState />;
@@ -104,7 +141,7 @@ export const TraceTable: React.FC = () => {
   const rowKind = rowKindForGrouping(activeLens.grouping);
   const shell =
     rowKind === "conversation"
-      ? sessionsShell(sessions)
+      ? sessionsShell({ sessions, totalHits })
       : tracesShell({
           totalHits,
           nextCursor,
@@ -121,13 +158,11 @@ export const TraceTable: React.FC = () => {
 
   return (
     <TraceTableLayout
-      totalHits={shell.totalHits}
       nextCursor={shell.nextCursor}
       visibleCount={shell.visibleCount}
       isLoading={shell.isLoading}
       isTransitioning={shell.isTransitioning}
       isEmpty={shell.visibleCount === 0}
-      itemNoun={shell.itemNoun}
       maxPageSize={shell.maxPageSize}
     >
       {rowKind === "conversation" && (

@@ -1,5 +1,6 @@
 import {
   FIELD_VALUES,
+  isInstantEvalField,
   SEARCH_FIELDS,
   type SearchFieldMeta,
   type TraceQueryFieldCatalogueInput,
@@ -31,6 +32,10 @@ export class TraceQueryFieldCatalogueService {
     const lines: string[] = [];
 
     for (const [name, metadata] of Object.entries(SEARCH_FIELDS)) {
+      // An `eval` chip stands for a run the Explorer starts under its cost rule;
+      // the model never writes one, the search router decides when a sentence is
+      // a judgement.
+      if (isInstantEvalField(name)) continue;
       const sample = this.pickSampleValues(name, metadata.facetField, dynamicValues);
       const example = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
       lines.push(`- ${name} (${metadata.valueType}): ${metadata.label}${example}`);

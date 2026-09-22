@@ -89,13 +89,37 @@ function readFragment(): string {
   return window.location.hash;
 }
 
-function writeFragment(fragmentBody: string): void {
+/**
+ * Writes the fragment. `asNewEntry` pushes a history entry, so Back returns to
+ * the search before it; otherwise the current entry is rewritten in place.
+ */
+function writeFragment(fragmentBody: string, { asNewEntry }: { asNewEntry: boolean }): void {
   if (typeof window === "undefined") return;
   const newHash = fragmentBody ? `#${fragmentBody}` : "";
   const newURL = `${window.location.pathname}${window.location.search}${newHash}`;
   const currentURL = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (newURL === currentURL) return;
+  if (asNewEntry) {
+    window.history.pushState(null, "", newURL || window.location.pathname);
+    return;
+  }
   window.history.replaceState(null, "", newURL || window.location.pathname);
+}
+
+/**
+ * Whether a change of the bar state is a search the reader can come back to:
+ * query, window and lens move only on a submit, while run keys ride into the
+ * entry that submit made and a mount's first write restates the address.
+ */
+export function isNewSearchEntry({
+  previousSearch,
+  nextSearch,
+}: {
+  /** The body without run keys last seen, or null before the first write. */
+  previousSearch: string | null;
+  nextSearch: string;
+}): boolean {
+  return previousSearch !== null && previousSearch !== nextSearch;
 }
 
 /**
@@ -425,6 +449,7 @@ export function useURLSync(): void {
   // but `computeOverrides`/`buildFragment` allocate per char, and effect
   // re-runs on every keystroke add up. 150ms is below human perception of
   // URL trailing the editor.
+  const lastSearchBody = useRef<string | null>(null);
   useEffect(() => {
     if (!hasAppliedFragment.current) return;
 
@@ -433,6 +458,12 @@ export function useURLSync(): void {
       // writes now reads back as "nothing left to apply" — and only this
       // entry: older ones keep whatever body they were written with.
       const body = liveBody({ activeLensId, queryText, timeRange, evalRuns });
+      const searchBody = liveBody({
+        activeLensId,
+        queryText,
+        timeRange,
+        evalRuns: NO_RUNS,
+      });
 
       // A fragment naming a lens that hasn't hydrated is a live deep link, not stale state.
       // Collapsing it to the default fallback's empty body made a shared `#custom-…` link
@@ -446,7 +477,14 @@ export function useURLSync(): void {
       // valid, body in place until the lens hydrates.
       if (!allLenses.some((l) => l.id === activeLensId)) return;
 
-      writeFragment(body);
+      // A state Back or Forward just restored already is the address, so the
+      // write below is a no-op for it and only the bookkeeping moves.
+      const asNewEntry = isNewSearchEntry({
+        previousSearch: lastSearchBody.current,
+        nextSearch: searchBody,
+      });
+      lastSearchBody.current = searchBody;
+      writeFragment(body, { asNewEntry });
     }, 150);
 
     return () => window.clearTimeout(handle);

@@ -12,6 +12,7 @@ import type {
   RangeSectionData,
   Section,
 } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import {
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
@@ -38,7 +39,10 @@ import {
 } from "../../../../../behavior/numeric-mode.store.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
-import { mergeFacetDescriptors } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
+import {
+  type FacetCountState,
+  mergeFacetDescriptors,
+} from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
 import { useFilteredTraceFacets } from "../../hooks/use-filtered-trace-facets.ts";
 import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
@@ -104,14 +108,19 @@ export function useFilterSidebarData() {
   // discovery; the counts come from the read under the active query. ADR-139.
   const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
   const filtered = useFilteredTraceFacets();
+  // The sample preview has no ClickHouse footprint, so its fixture descriptors
+  // are the counts.
+  const isSamplePreview = usePreviewTracesActive();
   const { descriptors, countState } = useMemo(
     () =>
-      mergeFacetDescriptors({
-        discovered,
-        filtered: filtered.data,
-        filteredIsPlaceholder: filtered.isPlaceholderData,
-      }),
-    [discovered, filtered.data, filtered.isPlaceholderData],
+      isSamplePreview
+        ? { descriptors: discovered, countState: "settled" as const }
+        : mergeFacetDescriptors({
+            discovered,
+            filtered: filtered.data,
+            filteredIsPlaceholder: filtered.isPlaceholderData,
+          }),
+    [isSamplePreview, discovered, filtered.data, filtered.isPlaceholderData],
   );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
@@ -291,6 +300,7 @@ export function useFilterSidebarData() {
       const baseItems = buildFacetItems({
         cat,
         isSynthetic: cat.synthetic ?? isSynthetic,
+        countState,
       });
       // Surface user-typed values as no-count AST rows, pinned to top so active
       // filters stay visible above the show-more cut.
@@ -313,7 +323,11 @@ export function useFilterSidebarData() {
     // Discrete numeric facets render through FacetSection too — build their
     // tick-list items from the descriptor's distinct values.
     for (const [key, range] of discreteEligible) {
-      const baseItems = buildDiscreteFacetItems(range, range.synthetic ?? isSynthetic);
+      const baseItems = buildDiscreteFacetItems({
+        range,
+        synthetic: range.synthetic ?? isSynthetic,
+        countState,
+      });
       // Same AST-extra handling as categoricals above: a selected discrete
       // value that discover dropped from the distinct set would otherwise
       // vanish from the sidebar while its filter stays active, leaving the
@@ -336,7 +350,7 @@ export function useFilterSidebarData() {
       map.set(key, [...extras, ...baseItems]);
     }
     return map;
-  }, [categoricals, discreteEligible, isSynthetic, ast]);
+  }, [categoricals, discreteEligible, isSynthetic, ast, countState]);
 
   const getValueStates = useMemo(() => {
     const map = new Map<string, (value: string) => FacetValueState>();
@@ -569,15 +583,24 @@ function synthesizeDefaultDescriptors(): Descriptors {
  * becomes a tickable row (value === label === the number), so the existing
  * categorical FacetSection renders the "Discrete" presentation unchanged.
  */
-function buildDiscreteFacetItems(range: RangeSectionData, synthetic: boolean): FacetItem[] {
+function buildDiscreteFacetItems({
+  range,
+  synthetic,
+  countState,
+}: {
+  range: RangeSectionData;
+  synthetic: boolean;
+  countState: FacetCountState;
+}): FacetItem[] {
   const dimmed = !VIBRANT_FIELDS.has(range.key);
   return (range.discrete?.values ?? []).map((dv) => ({
     value: String(dv.value),
     label: String(dv.value),
-    count: dv.count,
+    count: countState === "pending" ? 0 : dv.count,
     dotColor: hashColor(String(dv.value)),
     dimmed,
     synthetic,
+    countState,
   }));
 }
 
@@ -589,9 +612,11 @@ function buildDiscreteFacetItems(range: RangeSectionData, synthetic: boolean): F
 export function buildFacetItems({
   cat,
   isSynthetic,
+  countState = "settled",
 }: {
   cat: CategoricalSection;
   isSynthetic: boolean;
+  countState?: FacetCountState;
 }): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
@@ -623,10 +648,13 @@ export function buildFacetItems({
   return orderedValues.map((value) => ({
     value,
     label: labels.get(value) ?? facetLabel(value, cat.key),
-    count: counts.get(value) ?? 0,
+    // A warm-start row carries no count the reader can act on; see
+    // `mergeFacetDescriptors`.
+    count: countState === "pending" ? 0 : (counts.get(value) ?? 0),
     dotColor: dotColorFor(value),
     dimmed,
     synthetic: isSynthetic,
+    countState,
     aggregates: aggregates.get(value),
     eventMetrics: eventMetrics.get(value),
   }));

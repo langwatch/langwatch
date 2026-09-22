@@ -106,6 +106,19 @@ vi.mock("../use-trace-list-refresh.ts", () => ({
   useTraceListRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 
+const pulse = vi.hoisted(() => vi.fn());
+vi.mock("../../../../../behavior/refresh-ui.store.ts", () => ({
+  useRefreshUIStore: (selector: (s: unknown) => unknown) => selector({ pulse }),
+}));
+
+/** The runs behind the query's eval chips, swapped to move the query identity. */
+const instantEvalRuns = vi.hoisted(() => ({
+  current: undefined as Record<string, unknown> | undefined,
+}));
+vi.mock("../use-instant-eval-runs.ts", () => ({
+  useInstantEvalRuns: () => ({ chips: [], evalRuns: instantEvalRuns.current }),
+}));
+
 const lastCall = (): QueryCall => {
   const call = capturedCalls[capturedCalls.length - 1];
   if (!call) {
@@ -128,6 +141,7 @@ describe("useTraceNewCount", () => {
     stores.sseConnectionState = "disconnected";
     stores.fastPollRequestedAt = 0;
     stores.liveUpdatesMode = "live";
+    instantEvalRuns.current = undefined;
     vi.clearAllMocks();
   });
 
@@ -216,6 +230,37 @@ describe("useTraceNewCount", () => {
       });
 
       expect(lastOptions().refetchInterval).toBe(5000);
+    });
+  });
+
+  describe("when a run registers behind an eval chip", () => {
+    /** @scenario "A registered run resets the new-count baseline" */
+    it("resets the baseline, so the next count is not compared against another context", () => {
+      const { rerender } = renderHook(() => useTraceNewCount());
+
+      act(() => {
+        queryResult.data = { count: 0 };
+        queryResult.dataUpdatedAt = 1_000;
+        rerender();
+      });
+
+      act(() => {
+        instantEvalRuns.current = {
+          key1: { question: "annoyed", target: "traces", runId: "run-1" },
+        };
+        rerender();
+      });
+      expect(lastCall().input).toMatchObject({
+        evalRuns: { key1: { runId: "run-1" } },
+      });
+
+      act(() => {
+        queryResult.data = { count: 5 };
+        queryResult.dataUpdatedAt = 2_000;
+        rerender();
+      });
+
+      expect(pulse).not.toHaveBeenCalled();
     });
   });
 });

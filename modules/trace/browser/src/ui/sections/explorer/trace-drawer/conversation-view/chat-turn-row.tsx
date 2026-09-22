@@ -113,7 +113,7 @@ interface ChatTurnRowProps {
   /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
   /** Whether the inter-turn gap is long enough to surface as a divider. */
-  showGap: boolean;
+  shouldShowGap: boolean;
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
@@ -146,7 +146,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userMedia = EMPTY_MEDIA,
   assistantMedia = EMPTY_MEDIA,
   gapSecs,
-  showGap,
+  shouldShowGap,
   index,
   isCurrent,
   onSelect,
@@ -272,7 +272,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
-      {showGap && (
+      {shouldShowGap && (
         <Flex align="center" gap={2}>
           <Box height="1px" flex={1} bg="border.muted" />
           <Text textStyle="2xs" color="fg.subtle">

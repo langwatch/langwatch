@@ -123,6 +123,10 @@ vi.mock("../facet-manager-popover.tsx", () => ({
   FacetManagerPopover: () => <div data-testid="facet-manager" />,
 }));
 
+vi.mock("../explorer-total.tsx", () => ({
+  ExplorerTotal: () => null,
+}));
+
 vi.mock("../section-renderer.tsx", () => ({
   SectionRenderer: () => <div data-testid="section-renderer" />,
 }));

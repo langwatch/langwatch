@@ -39,6 +39,12 @@ export interface FacetItem {
    * Synthesised from FACET_DEFAULTS while real descriptors are still loading.
    */
   synthetic?: boolean;
+  /**
+   * What `count` means. `pending`: no filtered count has landed for this input
+   * and the row shows none; `stale`: the previous input's count, shown muted
+   * while the new one loads; absent or `settled`: the active filter's count.
+   */
+  countState?: "settled" | "stale" | "pending";
   /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
   aggregates?: FacetItemAggregates;
   /** Set only for the event facet — see {@link EventMetricValues}. */

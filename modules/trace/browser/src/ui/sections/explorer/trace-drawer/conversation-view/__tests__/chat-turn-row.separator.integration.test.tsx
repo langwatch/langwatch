@@ -101,7 +101,7 @@ function renderRow({
   gap,
   eventCount = 0,
 }: {
-  gap?: { gapSecs: number; showGap: boolean };
+  gap?: { gapSecs: number; shouldShowGap: boolean };
   eventCount?: number;
 } = {}) {
   return render(
@@ -121,7 +121,7 @@ function renderRow({
         assistantText="an answer"
         assistantReasoning=""
         gapSecs={gap?.gapSecs ?? 0}
-        showGap={gap?.showGap ?? false}
+        shouldShowGap={gap?.shouldShowGap ?? false}
         index={3}
         isCurrent={false}
         onSelect={() => undefined}
@@ -166,7 +166,7 @@ describe("ChatTurnRow separator ledger", () => {
   describe("given a turn preceded by a long pause", () => {
     it("renders the inter-turn gap divider", () => {
       const { container } = renderRow({
-        gap: { gapSecs: 12.5, showGap: true },
+        gap: { gapSecs: 12.5, shouldShowGap: true },
       });
       expect(container.textContent ?? "").toMatch(/12\.5s gap/);
     });
@@ -174,7 +174,7 @@ describe("ChatTurnRow separator ledger", () => {
 
   describe("given the first turn, with no preceding pause", () => {
     it("does not render a gap divider", () => {
-      const { container } = renderRow({ gap: { gapSecs: 0, showGap: false } });
+      const { container } = renderRow({ gap: { gapSecs: 0, shouldShowGap: false } });
       expect(container.textContent ?? "").not.toMatch(/gap/i);
     });
   });
