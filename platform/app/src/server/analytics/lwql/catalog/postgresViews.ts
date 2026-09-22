@@ -30,6 +30,7 @@ import {
   derivePostgresCatalog,
   type PostgresDatasetOverride,
 } from "./derivePostgresCatalog";
+import { LWQL_POSTGRES_INCLUDED_MODELS } from "./postgresIncludedModels";
 import { CONTENT_POSTGRES_OVERRIDES } from "./postgresOverrides/content";
 import { CORE_POSTGRES_OVERRIDES } from "./postgresOverrides/core";
 import { DESCRIPTIONS_POSTGRES_OVERRIDES } from "./postgresOverrides/descriptions";
@@ -37,7 +38,6 @@ import { PARENTS_POSTGRES_OVERRIDES } from "./postgresOverrides/parents";
 import { SENSITIVE_POSTGRES_OVERRIDES } from "./postgresOverrides/sensitive";
 import { TOPICS_POSTGRES_OVERRIDES } from "./postgresOverrides/topics";
 import { VISIBILITY_POSTGRES_OVERRIDES } from "./postgresOverrides/visibility";
-import { LWQL_POSTGRES_INCLUDED_MODELS } from "./postgresIncludedModels";
 import { LWQL_PRISMA_MANIFEST } from "./prismaManifest";
 import type { LangWatchQLViewDefinition } from "./types";
 
