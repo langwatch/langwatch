@@ -1,11 +1,14 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
+import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { parseInstantOrNull } from "../../utils/instant";
 import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseOriginOption } from "./origin-filter";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
@@ -17,6 +20,18 @@ const PROGRESS_CHUNK = 5;
  * Named here so an empty result says which of the two it is.
  */
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
+
+/**
+ * The window flags take an ISO-8601 instant or epoch milliseconds, which is
+ * what the Trace Explorer's page context and its links carry. `new Date()`
+ * reads an integer string as a calendar date and answers NaN.
+ */
+const parseInstantFlag = (value: string, flag: string): number => {
+  const parsed = parseInstantOrNull(value);
+  if (parsed !== null) return parsed;
+  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
+  process.exit(1);
+};
 
 export const searchTracesCommand = async (
   options: {
@@ -43,8 +58,10 @@ export const searchTracesCommand = async (
     const now = Date.now();
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
-    const startDate = options.startDate ? new Date(options.startDate).getTime() : oneDayAgo;
-    const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
+    const startDate = options.startDate
+      ? parseInstantFlag(options.startDate, "--start-date")
+      : oneDayAgo;
+    const endDate = options.endDate ? parseInstantFlag(options.endDate, "--end-date") : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
     // "Show me my failed traces" has no text to search for: the error lives on

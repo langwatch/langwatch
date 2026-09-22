@@ -27,23 +27,28 @@ function readFor(rules: FeatureFlagRules, userEmail: string | undefined): boolea
 describe("given a rule enabling the flag for users at acme.com", () => {
   const rules = domainRule("acme.com");
 
+  /** @scenario "an email domain rule enables the flag for a user at that domain" */
   it("resolves enabled for a user at that domain", () => {
     expect(readFor(rules, "qa@acme.com")).toBe(true);
   });
 
+  /** @scenario "a user at another domain sees no change" */
   it("matches nothing for a user at another domain", () => {
     expect(readFor(rules, "someone@example.com")).toBeNull();
   });
 
+  /** @scenario "the domain comparison ignores the case of the email" */
   it("ignores the case of the email", () => {
     expect(readFor(rules, "QA@Acme.COM")).toBe(true);
   });
 
+  /** @scenario "a subdomain only matches when it is listed" */
   it("does not match a subdomain, because the comparison is exact", () => {
     expect(readFor(rules, "qa@eu.acme.com")).toBeNull();
     expect(readFor(domainRule(["acme.com", "eu.acme.com"]), "qa@eu.acme.com")).toBe(true);
   });
 
+  /** @scenario "a read with no user email matches no email domain rule" */
   it("matches nothing rather than every caller whose email is unknown", () => {
     expect(readFor(rules, undefined)).toBeNull();
     expect(readFor(rules, "")).toBeNull();
@@ -63,6 +68,7 @@ describe("given a rule enabling the flag for users at acme.com", () => {
 describe("given a rule naming several domains", () => {
   const rules = domainRule(["acme.com", "acme.io"]);
 
+  /** @scenario "a rule may name several domains" */
   it("matches either domain and no third one", () => {
     expect(readFor(rules, "qa@acme.com")).toBe(true);
     expect(readFor(rules, "qa@acme.io")).toBe(true);
@@ -75,6 +81,7 @@ describe("given a rule naming both an organization and a domain", () => {
     { match: { organizationId: "organization_acme", emailDomain: "acme.com" }, enabled: true },
   ];
 
+  /** @scenario "an email domain rule combines with the other conditions" */
   it("combines with the other conditions", () => {
     expect(
       evaluateRules(rules, { organizationId: "organization_other", userEmail: "qa@acme.com" }),
@@ -100,6 +107,7 @@ describe("given rules where a domain rule sits above a catch-all", () => {
 });
 
 describe("given an operator writing an email domain rule", () => {
+  /** @scenario "an operator cannot save an email domain rule that cannot match" */
   it("rejects a domain that is blank, padded, carries an @ or is not lowercase", () => {
     for (const bad of ["", " acme.com", "@acme.com", "Acme.com", "acme .com"]) {
       const result = featureFlagRulesWriteSchema.safeParse(domainRule(bad));
