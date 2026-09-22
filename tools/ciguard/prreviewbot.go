@@ -141,7 +141,13 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 // grants exactly contents: write and pull-requests: write, with no extra
 // permissions. contents: write is required for resolveReviewThread.
 func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
-	perms := workflow.Permissions
+	if workflow.Permissions.Shorthand != "" {
+		return []string{fmt.Sprintf(
+			"%s permissions block uses shorthand %q, want an explicit contents/pull-requests mapping",
+			PRReviewBotWorkflow, workflow.Permissions.Shorthand)}
+	}
+
+	perms := workflow.Permissions.Scopes
 	if perms == nil {
 		return []string{fmt.Sprintf("%s declares no top-level permissions block", PRReviewBotWorkflow)}
 	}

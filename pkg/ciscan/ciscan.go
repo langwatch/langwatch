@@ -153,17 +153,41 @@ func (c Concurrency) CancelsInProgress() bool {
 	return false
 }
 
+// Permissions models the workflow's top-level `permissions:` block. GitHub
+// accepts either a per-scope mapping (`contents: write`) or a shorthand
+// string (`read-all` / `write-all`); modeling only the mapping form turned
+// the shorthand into a decode error that failed LoadAll for every guard —
+// the same failure mode On and Concurrency were fixed for. Scopes holds the
+// mapping form, keyed by scope with its grant. Shorthand holds the string
+// form. Both are zero when the workflow declares no permissions block.
+type Permissions struct {
+	Scopes    map[string]string
+	Shorthand string
+}
+
+// UnmarshalYAML decodes the mapping form of `permissions:` into Scopes and
+// the scalar shorthand form into Shorthand, tolerating either so a workflow
+// written with the shorthand does not fail a LoadAll that only needs some
+// other file.
+func (p *Permissions) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.MappingNode:
+		return node.Decode(&p.Scopes)
+	case yaml.ScalarNode:
+		return node.Decode(&p.Shorthand)
+	default:
+		return nil
+	}
+}
+
 // Workflow is a single .yml file under .github/workflows.
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
-	Path string
-	On   On `yaml:"on"`
-	// Permissions is the top-level `permissions:` block, keyed by scope
-	// (e.g. "contents") with its grant ("read"/"write"). Nil when the
-	// workflow declares none.
-	Permissions map[string]string `yaml:"permissions"`
-	Concurrency Concurrency       `yaml:"concurrency"`
-	Jobs        map[string]Job    `yaml:"jobs"`
+	Path        string
+	On          On             `yaml:"on"`
+	Permissions Permissions    `yaml:"permissions"`
+	Concurrency Concurrency    `yaml:"concurrency"`
+	Jobs        map[string]Job `yaml:"jobs"`
 }
 
 // WorkflowDir is where GitHub requires workflows to live.

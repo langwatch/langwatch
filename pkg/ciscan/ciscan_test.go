@@ -11,10 +11,11 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// LoadAll parses every workflow in the repo, so a single file that writes `on:`
-// or `concurrency:` in one of GitHub's legal shorthand forms must not fail the
-// load — modeling those keys as structs turned each shorthand into an unmarshal
-// error that took down every guard. The shorthand yields no data, not an error.
+// LoadAll parses every workflow in the repo, so a single file that writes
+// `on:`, `concurrency:`, or `permissions:` in one of GitHub's legal shorthand
+// forms must not fail the load — modeling those keys as structs turned each
+// shorthand into an unmarshal error that took down every guard. The
+// shorthand yields no mapping data, not an error.
 func TestLoadAllToleratesWorkflowShorthand(t *testing.T) {
 	const jobsBlock = "\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
 
@@ -47,6 +48,33 @@ func TestLoadAllToleratesWorkflowShorthand(t *testing.T) {
 				assert.Equal(t, []string{"opened"}, w.On.PullRequest.Types)
 				assert.Empty(t, w.Concurrency.Group)
 				assert.False(t, w.Concurrency.CancelsInProgress())
+			},
+		},
+		{
+			name:    "permissions mapping form",
+			content: "name: X\non:\n  pull_request:\n    types: [opened]\npermissions:\n  contents: write" + jobsBlock,
+			check: func(t *testing.T, w *ciscan.Workflow) {
+				t.Helper()
+				assert.Equal(t, map[string]string{"contents": "write"}, w.Permissions.Scopes)
+				assert.Empty(t, w.Permissions.Shorthand)
+			},
+		},
+		{
+			name:    "permissions write-all shorthand",
+			content: "name: X\non:\n  pull_request:\n    types: [opened]\npermissions: write-all" + jobsBlock,
+			check: func(t *testing.T, w *ciscan.Workflow) {
+				t.Helper()
+				assert.Empty(t, w.Permissions.Scopes)
+				assert.Equal(t, "write-all", w.Permissions.Shorthand)
+			},
+		},
+		{
+			name:    "permissions absent",
+			content: "name: X\non:\n  pull_request:\n    types: [opened]" + jobsBlock,
+			check: func(t *testing.T, w *ciscan.Workflow) {
+				t.Helper()
+				assert.Empty(t, w.Permissions.Scopes)
+				assert.Empty(t, w.Permissions.Shorthand)
 			},
 		},
 	}

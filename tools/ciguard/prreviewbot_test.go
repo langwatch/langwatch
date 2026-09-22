@@ -212,6 +212,44 @@ func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "write")
 }
 
+func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		"permissions:\n  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution\n  pull-requests: write\n",
+		"", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no top-level permissions block")
+}
+
+func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
+	withoutPullRequests := strings.Replace(goodPRReviewBotWorkflow,
+		"  pull-requests: write\n", "", 1)
+	root := writePRReviewBotWorkflow(t, withoutPullRequests)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `missing "pull-requests"`)
+}
+
+func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
+	shorthand := strings.Replace(goodPRReviewBotWorkflow,
+		"permissions:\n  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution\n  pull-requests: write\n",
+		"permissions: write-all\n", 1)
+	root := writePRReviewBotWorkflow(t, shorthand)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `shorthand "write-all"`)
+}
+
 func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	withExtra := strings.Replace(goodPRReviewBotWorkflow,
 		"  pull-requests: write",
