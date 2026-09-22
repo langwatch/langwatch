@@ -77,6 +77,7 @@ import type { Hono } from "hono";
 import { register } from "prom-client";
 import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
+import { startLwqlReconvergenceWatch } from "./server/analytics/lwql/provisioning";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import {
@@ -119,6 +120,11 @@ import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
+import {
+  configStoreOwnedLwqlEntityCount,
+  lwqlSelfProvisionInputs,
+  selfProvisionAll,
+} from "./tasks/provisionLwql";
 
 const logger = createLogger("langwatch:start");
 
@@ -179,6 +185,26 @@ function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
   } else {
     res.end(buildChartFrameHtml({ nonce }));
   }
+}
+
+/**
+ * Arms the server-side LangWatchQL reconvergence watch. The deploy task
+ * (`provisionLwql`) is short-lived — it returns and exits — so it cannot wait out
+ * the helm-upgrade window where the previous ClickHouse pod still serves the
+ * config-store access model and the app-owned DDL is skipped (495). This watch
+ * polls the config store from the long-running app server and re-provisions once
+ * that pod's rendered model is gone. Only the app server arms it (never the
+ * standalone worker process), and only when LangWatchQL is configured and
+ * provisioning is not explicitly skipped. Its timers are unref'd, so a pending
+ * poll never holds shutdown open.
+ */
+function armLwqlReconvergenceWatch(): void {
+  const lwqlInputs = lwqlSelfProvisionInputs();
+  if (!lwqlInputs || process.env.SKIP_LWQL_PROVISION === "true") return;
+  startLwqlReconvergenceWatch({
+    probe: configStoreOwnedLwqlEntityCount,
+    converge: () => selfProvisionAll(lwqlInputs),
+  });
 }
 
 export const startApp = async (dir = resolveAppPackageRoot()) => {
@@ -504,6 +530,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       "langwatch listening",
     );
   });
+
+  // Close the chart-upgrade window from the long-running server — the short-lived
+  // deploy task cannot (see armLwqlReconvergenceWatch).
+  armLwqlReconvergenceWatch();
 
   // Assigned by the in-process worker boot below. Declared here so the
   // shutdown handler can drain it, and so the boot can run *after* the signal

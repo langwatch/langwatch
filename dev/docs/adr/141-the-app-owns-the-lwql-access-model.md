@@ -20,7 +20,7 @@ The ClickHouse server's only LangWatchQL-related config is the admin user's `acc
 
 One owner means one catalog and no parity tests. The catalog is authoritative. BYO ClickHouse must grant the app administrative DDL rights to create these objects — `access_management`, `named_collection_control`, and the `custom_` settings prefix. This requirement is unchanged from ADR-101's BYO path. The PostgreSQL reader role `lwql_ro` is converged by the app on whatever PostgreSQL database the `DATABASE_URL` names, so that role needs CREATE/ALTER ROLE rights during provisioning. If those rights are not available, provisioning degrades to a logged, fail-closed refusal rather than a boot-time crash.
 
-Migration from a rendered copy is not an outage. Operators remove the XML entity from ClickHouse config when convenient, and the next app boot converges the SQL-owned entity to match.
+Migration from a rendered copy is not an outage. Operators remove the XML entity from ClickHouse config when convenient, and the app converges the SQL-owned entity to match — on the next boot, and, within a single upgrade, because the running app watches the config store and re-provisions once the old pod's rendered model is gone (see Residual risk).
 
 ## Consequences
 
@@ -35,6 +35,8 @@ The sibling SaaS change (langwatch-saas#1255) deletes the SaaS rendered copy ind
 ### Residual risk
 
 A config-store-owned LangWatchQL entity (user, settings profile, row policy, named collection) is trusted as-is — the app skips it by name and does not verify its substance (readonly setting, profile constraints, row-policy predicate, collection target). A wrongly defined config-owned entity can therefore widen or break tenant isolation, and the operator owns removing or correcting it. The app's boot-time WARN log names each such entity. A 495 (ACCESS_STORAGE_READONLY) error on an entity NOT found in the config-store inventory is treated as a failure, not a skip.
+
+A helm upgrade opens a short window where the access model exists nowhere. The new app image can boot against the OLD ClickHouse pod, which still serves `users.d/lwql.yaml`, so the access-model DDL is skipped as config-store-owned (495). Moments later the StatefulSet rolls to the new chart, which renders no access model — the XML identity disappears and, without intervention, nothing re-provisions until the next app boot. The running app watches the config store and re-provisions once the old pod's rendered model is gone: the deploy task is a short-lived process (it returns and exits, so unref'd timers in it would never fire), so the watch lives in the long-running app server (`src/start.ts`, armed once it is listening). It polls the config store on an exponential backoff (30s, doubling, capped at 5 minutes); the moment a probe finds the config store owns zero LangWatchQL entities it re-provisions the app-owned model once and stops. A probe that throws (the ClickHouse pod is mid-roll) is treated as still-waiting; a first probe of zero means there was no upgrade window and the watch stops silently; a config store that never releases the model gives up at a ~30-minute budget with a warning. The poll timers are unref'd, so they never hold shutdown open, and a hard provisioning failure (as opposed to a config-store skip) is left fail-closed for the next boot rather than retried.
 
 ## References
 

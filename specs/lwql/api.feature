@@ -930,6 +930,28 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then no langwatch_lwql user, lwql_restricted profile, row policy or lwql_postgres named collection is rendered
     And the default user keeps access_management and named_collection_control and the custom_ settings prefix
 
+  # Issue #8258: a helm upgrade can boot the app against the OLD ClickHouse pod,
+  # which still serves users.d/lwql.yaml, so the access-model DDL is skipped as
+  # config-store-owned (495). Moments later the pod rolls to the new chart, which
+  # renders no access model — the XML identity is gone and, without this, nothing
+  # re-provisions until the next app boot. The deploy task is a short-lived
+  # process, so the long-running app server watches the config store instead: it
+  # polls on a backoff and re-provisions the app-owned model once the old pod's
+  # rendered model is gone. A probe that throws (ClickHouse mid-roll) is treated
+  # as still-waiting, and because that failure marks the window, a clean zero
+  # that follows still re-provisions — the pod rolled to a config store that owns
+  # nothing. Only a first probe of zero with no prior failure means no upgrade
+  # window and stops silently; a config store that never releases gives up at a
+  # ~30-minute budget with a warning.
+  @unit
+  Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
+    Given the running app server watches the ClickHouse config store after a chart upgrade
+    When a later probe finds the config store no longer owns any LangWatchQL entities
+    Then the app re-provisions the app-owned access model exactly once and stops watching
+    And while the config store still owns them, or a probe throws, the watch keeps polling on a backoff
+    And a clean zero that follows a probe failure re-provisions once, since ClickHouse was mid-roll
+    And a config store that never releases the model gives up at the budget with a warning
+
   @integration
   Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
     Given a pod holds the LangWatchQL self-provision lock inside its transaction

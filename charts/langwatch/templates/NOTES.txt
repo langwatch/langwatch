@@ -354,10 +354,13 @@ No chart template renders any of this — Section 7 lists the two passwords
 app to converge those identities with.
 
 This needs the admin user allowed access-management DDL
-(`access_management`, `named_collection_control`) and the server to declare
-the `custom_` settings prefix. The `langwatch/clickhouse-serverless` image
-ships both; on a bring-your-own ClickHouse server, add them yourself (see the
-chart README's LangWatchQL section) or set lwql.enabled=false. If the server
+(`access_management`, `named_collection_control`), the server to declare
+the `custom_` settings prefix, and
+`access_control_improvements.settings_constraints_replace_previous=true` (so
+the app's CHANGEABLE_IN_READONLY settings profile is accepted). The
+`langwatch/clickhouse-serverless` image ships all three; on a bring-your-own
+ClickHouse server, add them yourself (see the chart README's LangWatchQL
+section) or set lwql.enabled=false. If the server
 refuses the DDL the app logs it and LangWatchQL stays unavailable — nothing
 else breaks. Likewise, the PostgreSQL role that DATABASE_URL points at must be
 allowed to CREATE/ALTER ROLE, or the `lwql_ro` convergence logs and

@@ -251,7 +251,7 @@ At boot the app derives the ClickHouse target from `CLICKHOUSE_URL` and the
 PostgreSQL bridge endpoint from `DATABASE_URL`, then self-provisions the
 whole model via SQL DDL, degrading to a logged, fail-closed refusal if the
 server rejects a statement. This is true whether ClickHouse is chart-managed
-or bring-your-own — either way, your ClickHouse must satisfy three
+or bring-your-own — either way, your ClickHouse must satisfy four
 prerequisites before enabling `lwql.enabled`:
 
 | Prerequisite | Why | Where it lives on the chart-managed path |
@@ -259,6 +259,7 @@ prerequisites before enabling `lwql.enabled`:
 | `custom_settings_prefixes` includes `custom_` | The `<database>_profile` settings profile (`langwatch_profile` by default) carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
 | The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, the `<database>_profile` settings profile (`langwatch_profile` by default), and the row policies. | The `langwatch/clickhouse-serverless` image grants this to its `default` user out of the box. |
 | `named_collection_control: 1` on that same administrative user | Required specifically to create/drop the `lwql_postgres` named collection via SQL (`CREATE NAMED COLLECTION`), distinct from the general `access_management` grant. | Same as above. |
+| `access_control_improvements.settings_constraints_replace_previous` is `true` | The `<database>_profile` settings profile marks `custom_api_key_hash` `CHANGEABLE_IN_READONLY`; without this server-level setting, ClickHouse rejects that constraint on the profile. | Rendered by `renderServerSettings` into `config.d/zz-server-settings.yaml` in `infra/clickhouse-serverless/internal/render/access.go`. |
 
 Grant these on your ClickHouse server before pointing this chart at it with
 `lwql.enabled: true`; see `examples/overlays/clickhouse-external.yaml`. If the

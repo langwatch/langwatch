@@ -51,6 +51,10 @@ export {
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
+  type LwqlReconvergenceWatch,
+  startLwqlReconvergenceWatch,
+} from "./reconvergence";
+export {
   canProvisionAppFunctions,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
