@@ -37,11 +37,14 @@ class ProviderFailed extends HandledError {
   }
 }
 
-/** The message of the one warning the router wrote. */
-function warnedMessage(): string {
-  expect(warnMock).toHaveBeenCalledTimes(1);
-  const [, message] = warnMock.mock.calls[0] as [unknown, string];
-  return message;
+/**
+ * The messages the router warned with, in order.
+ *
+ * Every test here expects exactly one, and asserts that itself: a helper that
+ * asserted on the way past would hide which test the count belonged to.
+ */
+function warnedMessages(): string[] {
+  return warnMock.mock.calls.map((call) => String(call[1]));
 }
 
 beforeEach(() => {
@@ -59,9 +62,9 @@ describe("given a route that degraded", () => {
         }),
       });
       await createSearchRouter(d).route(input({ text: "frustrated users" }));
-      expect(warnedMessage()).toBe(
+      expect(warnedMessages()).toEqual([
         "Instant Eval question could not be written; judging the sentence as typed (ai_query_provider_error openai/gpt-5-mini openai HTTP 429)",
-      );
+      ]);
     });
 
     it("carries nothing the provider itself wrote", async () => {
@@ -74,7 +77,9 @@ describe("given a route that degraded", () => {
       await createSearchRouter(d).route(input());
       // The handled message is ours, but it is copy: the log reads the code
       // and the curated fields, never the sentence.
-      expect(warnedMessage()).not.toContain("did not answer usably");
+      expect(warnedMessages().join("\n")).not.toContain(
+        "did not answer usably",
+      );
     });
   });
 
@@ -88,11 +93,11 @@ describe("given a route that degraded", () => {
         }),
       });
       await createSearchRouter(d).route(input());
-      const message = warnedMessage();
-      expect(message).toBe(
+      const messages = warnedMessages();
+      expect(messages).toEqual([
         "Filter route could not be built; searching the phrase instead (TypeError)",
-      );
-      expect(message).not.toContain("api.example.com");
+      ]);
+      expect(messages.join("\n")).not.toContain("api.example.com");
     });
   });
 });
