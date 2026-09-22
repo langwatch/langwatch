@@ -202,6 +202,23 @@ describe("listAgentsCommand() with stale sibling rows", () => {
       expect(output).toContain("--all");
     });
 
+    /** @scenario "The collapsed listing counts the rows it ships" */
+    it("counts the rows it ships, and says how many it hid", async () => {
+      service.list.mockResolvedValue({
+        data: siblings(),
+        pagination: { page: 1, limit: 100, total: 3, totalPages: 1 },
+      });
+
+      const result = await listAgentsCommand();
+
+      const document = result?.data as {
+        pagination: { total: number };
+        hiddenStaleRows: number;
+      };
+      expect(document.pagination.total).toBe(2);
+      expect(document.hiddenStaleRows).toBe(1);
+    });
+
     /** @scenario "The --all flag lists every row" */
     it("lists every row under --all", async () => {
       service.list.mockResolvedValue({

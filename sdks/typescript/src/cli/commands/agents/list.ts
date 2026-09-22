@@ -164,9 +164,13 @@ export const listAgentsCommand = async (
       ? result.data
       : collapseStaleSiblings({ agents: result.data });
     const hidden = result.data.length - agents.length;
+    // The rows this command ships, not the rows the project has: a reader of
+    // the machine document counts what it was given, and a total that includes
+    // the collapsed siblings reads as a truncated page.
+    const total = result.pagination.total - hidden;
 
     spinner.succeed(
-      `Found ${result.pagination.total} agent${result.pagination.total !== 1 ? "s" : ""}${
+      `Found ${total} agent${total !== 1 ? "s" : ""}${
         hidden > 0
           ? ` (${hidden} stale row${hidden !== 1 ? "s" : ""} hidden, --all lists them)`
           : ""
@@ -174,7 +178,12 @@ export const listAgentsCommand = async (
     );
 
     return {
-      data: { ...result, data: agents },
+      data: {
+        ...result,
+        data: agents,
+        pagination: { ...result.pagination, total },
+        hiddenStaleRows: hidden,
+      },
       table: () => {
         if (agents.length === 0) {
           console.log();

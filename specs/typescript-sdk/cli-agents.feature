@@ -36,6 +36,14 @@ Feature: The agent commands show connected agents and run them through the relay
       And the row seen three days ago is not
       And the summary says one stale row is hidden and names --all
 
+    # A reader of the machine document counts what it was given, so a total
+    # that still included the collapsed siblings would read as a page cut short.
+    Scenario: The collapsed listing counts the rows it ships
+      Given "support-agent" in development has an online row, an offline row last seen three days ago and an offline row last seen an hour ago
+      When I run "langwatch agent list"
+      Then the listing's total is the number of rows it lists
+      And it reports how many stale rows it hid
+
     Scenario: A lone offline row is never collapsed
       Given "support-agent" in staging has one offline row last seen a month ago
       When I run "langwatch agent list"
