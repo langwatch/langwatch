@@ -98,6 +98,7 @@ async function identifier({
   connectionId = directId,
   accountId = null,
   provider = "oidc",
+  value = null,
 }: {
   name: string;
   user: string;
@@ -105,12 +106,14 @@ async function identifier({
   connectionId?: string | null;
   accountId?: string | null;
   provider?: string;
+  value?: string | null;
 }) {
   await prisma.identifier.create({
     data: {
       id: `${namespace}-identifier-${name}`,
       userId: user,
       provider,
+      value,
       state,
       connectionId,
       accountId,
@@ -175,6 +178,7 @@ function retirementWithSpies() {
   const accounts = identityCeremonies();
   const detach = vi.spyOn(identity, "detachIdentifier").mockResolvedValue([]);
   const markPrimary = vi.spyOn(identity, "markPrimary").mockResolvedValue([]);
+  const verify = vi.spyOn(identity, "verifyIdentifier").mockResolvedValue([]);
   const beforeDelete = vi
     .spyOn(accounts, "beforeAccountDelete")
     .mockResolvedValue(void 0);
@@ -194,7 +198,14 @@ function retirementWithSpies() {
       replacementConnectionId: directId,
       actorUserId: userId("admin"),
     });
-  return { retire, detach, markPrimary, beforeDelete, moveToConnection };
+  return {
+    retire,
+    detach,
+    markPrimary,
+    verify,
+    beforeDelete,
+    moveToConnection,
+  };
 }
 
 async function sync(connectionId: string, state: string) {
@@ -487,6 +498,59 @@ describe("given persisted migration evidence", () => {
       ]);
     });
 
+    /** @scenario "Finishing confirms the address the previous provider proved rather than asking the member to sign in first" */
+    /** @scenario "Native legacy retirement leaves every member a way in" */
+    it("confirms the address the previous identity proved when finishing, instead of asking the member to sign in once", async () => {
+      const flo = await member("flo", { email: addressOf("flo") });
+      await prisma.scimDirectoryUser.create({
+        data: { organizationId, connectionId: legacyId, userId: flo },
+      });
+      await identifier({
+        name: "flo-legacy",
+        user: flo,
+        connectionId: legacyId,
+        state: "PRIMARY",
+        value: addressOf("flo"),
+      });
+      await identifier({
+        name: "flo-address",
+        user: flo,
+        connectionId: null,
+        provider: "email",
+        state: "ATTACHED",
+        value: addressOf("flo"),
+      });
+
+      expect((await progress())?.members.stragglers).toMatchObject([
+        { userId: flo, move: "next-sign-in" },
+      ]);
+      expect((await inspect())?.blockers).toEqual([]);
+
+      const { retire, verify, markPrimary, detach } = retirementWithSpies();
+      await retire();
+      const address = `${namespace}-identifier-flo-address`;
+      expect(verify).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          userId: flo,
+          identifierId: address,
+          verificationId: null,
+          method: "oauth",
+        }),
+      );
+      expect(markPrimary).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ userId: flo, identifierId: address }),
+      );
+      expect(detach).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          userId: flo,
+          identifierId: `${namespace}-identifier-flo-legacy`,
+        }),
+      );
+      expect(verify.mock.invocationCallOrder[0]).toBeLessThan(
+        detach.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
     /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
     it("asks a member whose only way in is the previous provider to sign in once, and never retires it", async () => {
       const dee = await member("dee", {
@@ -498,6 +562,7 @@ describe("given persisted migration evidence", () => {
         user: dee,
         connectionId: legacyId,
         state: "PRIMARY",
+        value: `${userId("dee")}@elsewhere.test`,
       });
       await identifier({
         name: "dee-address",
@@ -505,6 +570,7 @@ describe("given persisted migration evidence", () => {
         connectionId: null,
         provider: "email",
         state: "ATTACHED",
+        value: addressOf("dee"),
       });
 
       expect((await progress())?.members.stragglers).toMatchObject([
@@ -531,6 +597,23 @@ describe("given persisted migration evidence", () => {
         user: eve,
         connectionId: legacyId,
       });
+      const gus = await member("gus", {
+        disabled: true,
+        email: addressOf("gus"),
+      });
+      for (const [name, provider, state, connectionId] of [
+        ["gus-legacy", "oidc", "VERIFIED", legacyId],
+        ["gus-address", "email", "ATTACHED", null],
+      ] as const) {
+        await identifier({
+          name,
+          user: gus,
+          provider,
+          state,
+          connectionId,
+          value: addressOf("gus"),
+        });
+      }
 
       const view = await progress();
       expect(view?.members).toMatchObject({

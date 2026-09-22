@@ -10,6 +10,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 import {
+  addressFinishingConfirms,
   connectionRefOf,
   finalizationBlockers,
   identifierBelongsToMigrationConnection,
@@ -346,21 +347,7 @@ export class PrismaSsoMigrationEvidenceRepository
         user: { select: { email: true, emailVerified: true } },
       },
     });
-    const candidates = await this.#prisma.identifier.findMany({
-      where: {
-        userId: { in: members.map(({ userId }) => userId) },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-      },
-      select: {
-        id: true,
-        userId: true,
-        state: true,
-        provider: true,
-        connectionId: true,
-        providerId: true,
-        providerAccountId: true,
-      },
-    });
+    const candidates = await this.#liveIdentifiersOf(members);
     const belongsTo =
       (connection: SsoConnectionState) =>
       (identifier: (typeof candidates)[number]) =>
@@ -375,6 +362,11 @@ export class PrismaSsoMigrationEvidenceRepository
     const previousIsOnlyWayIn = previousOnlyWayInOf({
       candidates,
       legacyIdentifiers,
+      confirmable: await this.#addressesFinishingConfirms({
+        members,
+        candidates,
+        legacyIdentifiers,
+      }),
     });
     const unmoved = members.filter(({ userId }) => !linked.has(userId));
     const moves = await this.#movesOf({
@@ -405,6 +397,25 @@ export class PrismaSsoMigrationEvidenceRepository
       ),
       legacyIdentifierCount: legacyIdentifiers.length,
     };
+  }
+
+  #liveIdentifiersOf(members: readonly { userId: string }[]) {
+    return this.#prisma.identifier.findMany({
+      where: {
+        userId: { in: members.map(({ userId }) => userId) },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+      select: {
+        id: true,
+        userId: true,
+        state: true,
+        provider: true,
+        value: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
   }
 
   /** What moving each active member who has not moved across still needs. */
@@ -465,6 +476,61 @@ export class PrismaSsoMigrationEvidenceRepository
             replacementProvesDomain({ replacement: replacementRow, domain }),
         }),
       ]),
+    );
+  }
+
+  /**
+   * The people whose address finishing confirms in place of their identity
+   * on the previous provider.
+   *
+   * Only where no other account holds the address: confirming an address
+   * somebody else holds is refused by the identity guards, and finishing
+   * would stop on it half way.
+   */
+  async #addressesFinishingConfirms({
+    members,
+    candidates,
+    legacyIdentifiers,
+  }: {
+    members: MemberRow[];
+    candidates: readonly {
+      id: string;
+      userId: string;
+      provider: string;
+      state: string;
+      value: string | null;
+    }[];
+    legacyIdentifiers: readonly { id: string }[];
+  }): Promise<Set<string>> {
+    const legacyIdentifierIds = new Set(legacyIdentifiers.map(({ id }) => id));
+    const confirmed = new Map<string, string>();
+    for (const [userId, identifiers] of Map.groupBy(
+      candidates,
+      (identifier) => identifier.userId,
+    )) {
+      const confirm = addressFinishingConfirms({
+        identifiers,
+        legacyIdentifierIds,
+      });
+      const address = identifiers.find(
+        ({ id }) => id === confirm?.identifierId,
+      )?.value;
+      if (address) confirmed.set(userId, address.toLowerCase());
+    }
+    const holders = await this.#accountsHoldingAddresses([
+      ...new Set(confirmed.values()),
+    ]);
+    const ownAddress = new Map(
+      members.map(({ userId, user }) => [userId, user.email?.toLowerCase()]),
+    );
+    return new Set(
+      [...confirmed]
+        .filter(
+          ([userId, address]) =>
+            (holders.get(address) ?? 0) ===
+            (ownAddress.get(userId) === address ? 1 : 0),
+        )
+        .map(([userId]) => userId),
     );
   }
 
@@ -642,7 +708,8 @@ export class PrismaSsoMigrationEvidenceRepository
 
 /**
  * The people whose only verified way in is an identity on the previous
- * provider, so finishing would leave them none.
+ * provider, and whose address finishing cannot confirm in its place, so
+ * finishing would leave them none.
  *
  * A passkey does not count as another way in: it has no address behind it,
  * and the identity guards refuse to leave anybody holding passkeys alone.
@@ -650,7 +717,9 @@ export class PrismaSsoMigrationEvidenceRepository
 function previousOnlyWayInOf({
   candidates,
   legacyIdentifiers,
+  confirmable,
 }: {
+  confirmable: ReadonlySet<string>;
   candidates: readonly {
     id: string;
     userId: string;
@@ -675,7 +744,7 @@ function previousOnlyWayInOf({
     legacyIdentifiers
       .filter(isVerifiedState)
       .map(({ userId }) => userId)
-      .filter((userId) => !otherWayIn.has(userId)),
+      .filter((userId) => !otherWayIn.has(userId) && !confirmable.has(userId)),
   );
 }
 

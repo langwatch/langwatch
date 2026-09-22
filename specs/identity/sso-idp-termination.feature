@@ -476,7 +476,8 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   # Finishing used to wait for every member to sign in through the replacement,
   # although the replacement already recognises most of them by address. The
   # update now waits only for the people it could not recognise, and for the
-  # people whose only way in is the provider being taken away.
+  # people whose only way in is the provider being taken away and whose
+  # address that provider did not prove.
 
   @unit @integration
   Scenario: Members the new connection can match do not have to sign in before the update finishes
@@ -498,8 +499,19 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And finishing is refused with "members-cannot-move-across" until they sign in through the replacement or the reason is cleared
 
   @unit @integration
+  Scenario: Finishing confirms the address the previous provider proved rather than asking the member to sign in first
+    Given a member can be matched by address but holds no verified way in other than the previous provider
+    And their identity on the previous provider proved the same address their account holds unconfirmed
+    And no other account holds that address
+    When the administrator opens the update
+    Then the member is listed as moving across at their next sign-in
+    And they do not stop the update from finishing
+    And finishing confirms their address, recorded as proven by the previous provider, before taking that identity away
+
+  @unit @integration
   Scenario: A member whose only way in is the previous provider signs in once before the update finishes
     Given a member can be matched by address but holds no verified way in other than the previous provider
+    And their identity on the previous provider did not prove the address their account holds
     When the administrator opens the update
     Then the member is listed as having to sign in through the replacement once
     And finishing is refused with "members-cannot-move-across" rather than taking their only way in away
@@ -507,9 +519,10 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   @integration @regression
   Scenario: A deactivated member left on the previous provider is named before finishing rather than halfway through it
     Given a deactivated member's only way in is the previous provider
+    And finishing cannot confirm their address in its place
     When the administrator opens the update
     Then the update asks for them to be removed from the organization before it can finish
-    And a deactivated member who keeps another way in does not hold the update
+    And a deactivated member who keeps another way in, or whose address finishing confirms, does not hold the update
 
   @unit @integration
   Scenario: The quiet period counts from the switch-over and the last sign-in through the previous provider
@@ -711,7 +724,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   Scenario: Native legacy retirement leaves every member a way in
     Given a legacy identifier was adopted without a connection annotation
     When its legacy access is retired
-    Then retirement requires a verified replacement identifier, or another verified way in, for that user
+    Then retirement requires a verified replacement identifier, another verified way in, or an address the legacy identity proved, for that user
     And accounts belonging only to another organization remain untouched
 
   @unit @regression

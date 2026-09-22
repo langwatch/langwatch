@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addressFinishingConfirms,
   MIGRATION_QUIET_FLOOR_MS,
   MIGRATION_QUIET_PERIOD_MS,
   memberMoveOf,
@@ -163,6 +164,57 @@ describe("memberMoveOf", () => {
     expect(
       memberMoveOf({ arrival: "unproved-domain", previousIsOnlyWayIn: true }),
     ).toBe("unproved-domain");
+  });
+});
+
+describe("addressFinishingConfirms", () => {
+  const legacyIdentifierIds = new Set(["legacy"]);
+  const legacy = {
+    id: "legacy",
+    provider: "oidc",
+    state: "PRIMARY",
+    value: "kim@acme.test",
+  };
+  const address = {
+    id: "address",
+    provider: "email",
+    state: "ATTACHED",
+    value: "kim@acme.test",
+  };
+
+  describe("when the previous identity proved the address the account holds unconfirmed", () => {
+    /** @scenario "Finishing confirms the address the previous provider proved rather than asking the member to sign in first" */
+    it("names the address to confirm, as proven by the previous provider's protocol", () => {
+      expect(
+        addressFinishingConfirms({
+          identifiers: [legacy, address],
+          legacyIdentifierIds,
+        }),
+      ).toEqual({ identifierId: "address", method: "oauth" });
+      expect(
+        addressFinishingConfirms({
+          identifiers: [{ ...legacy, provider: "saml" }, address],
+          legacyIdentifierIds,
+        }),
+      ).toEqual({ identifierId: "address", method: "saml" });
+    });
+  });
+
+  describe("when the previous identity did not prove that address", () => {
+    /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
+    it("confirms nothing", () => {
+      for (const identifiers of [
+        [{ ...legacy, value: "kim@elsewhere.test" }, address],
+        [{ ...legacy, value: null }, address],
+        [{ ...legacy, state: "ATTACHED" }, address],
+        [{ ...legacy, id: "not-legacy" }, address],
+        [legacy],
+      ]) {
+        expect(
+          addressFinishingConfirms({ identifiers, legacyIdentifierIds }),
+        ).toBeNull();
+      }
+    });
   });
 });
 

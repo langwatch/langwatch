@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { isLiveIdentifierState } from "@langwatch/identity";
+import {
+  IdentityCommandRefusedError,
+  isLiveIdentifierState,
+} from "@langwatch/identity";
 import type { IdentityService } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
+import {
+  addressFinishingConfirms,
+  identifierBelongsToMigrationConnection,
+} from "./sso-migration.rules";
 import {
   type SsoLegacyIdentityRetirementPort,
   SsoMigrationFinalizationBlockedError,
@@ -162,9 +168,11 @@ export class PrismaSsoLegacyIdentityRetirement
    * The replacement is the way in of choice. A person who has not signed in
    * through it yet keeps any other verified way in, typically their verified
    * address, and the replacement matches them by that address at their next
-   * sign-in. A passkey alone is not enough: it has no address behind it. The
-   * update's own checks name everybody this refuses before finishing starts;
-   * this is the last line, so nobody is ever left without a way in.
+   * sign-in. Failing both, their unconfirmed address is confirmed on the
+   * previous provider's word where its identity proved that same address. A
+   * passkey alone is not enough: it has no address behind it. The update's
+   * own checks name everybody this refuses before finishing starts; this is
+   * the last line, so nobody is ever left without a way in.
    */
   private async ensureWayInRemains({
     userId,
@@ -181,7 +189,12 @@ export class PrismaSsoLegacyIdentityRetirement
   }): Promise<void> {
     const successor =
       (await this.replacementWayIn({ userId, replacementConnectionId })) ??
-      (await this.otherWayIn({ userId, legacyIdentifierIds }));
+      (await this.otherWayIn({ userId, legacyIdentifierIds })) ??
+      (await this.confirmedAddressWayIn({
+        userId,
+        legacyIdentifierIds,
+        actorUserId,
+      }));
     if (!successor) {
       throw blocked(
         "members-cannot-move-across",
@@ -244,6 +257,48 @@ export class PrismaSsoLegacyIdentityRetirement
       select: { id: true, state: true, provider: true },
     });
     return others.find(({ provider }) => provider === "email") ?? others[0];
+  }
+
+  /**
+   * Confirms the address the previous identity proved, when the person's own
+   * address identity holds it unconfirmed, and returns it as their way in.
+   * A refusal by the identity guards, typically another account holding the
+   * address, means there is no such way in rather than a failed finish.
+   */
+  private async confirmedAddressWayIn({
+    userId,
+    legacyIdentifierIds,
+    actorUserId,
+  }: {
+    userId: string;
+    legacyIdentifierIds: string[];
+    actorUserId: string;
+  }) {
+    const identifiers = await this.deps.prisma.identifier.findMany({
+      where: { userId, state: { in: ["ATTACHED", "VERIFIED", "PRIMARY"] } },
+      select: { id: true, provider: true, state: true, value: true },
+    });
+    const confirm = addressFinishingConfirms({
+      identifiers,
+      legacyIdentifierIds: new Set(legacyIdentifierIds),
+    });
+    if (!confirm) return null;
+    try {
+      await this.deps.identity.verifyIdentifier({
+        tenantId: userId,
+        userId,
+        commandId: this.deps.newCommandId(),
+        identifierId: confirm.identifierId,
+        verificationId: null,
+        method: confirm.method,
+        occurredAtMs: this.deps.now(),
+        actor: { type: "user", id: actorUserId },
+      });
+    } catch (error) {
+      if (error instanceof IdentityCommandRefusedError) return null;
+      throw error;
+    }
+    return { id: confirm.identifierId, state: "VERIFIED" };
   }
 
   private async retireAccount({

@@ -104,8 +104,9 @@ export function quietPeriodOf({
  * can match them and whether the previous provider is their only way in.
  *
  * A person the replacement can match still has to sign in once when the
- * previous provider is the only verified way in they hold: finishing takes
- * that away, and nobody may be left with no way in at all.
+ * previous provider is the only verified way in they hold and finishing
+ * cannot confirm their address in its place (`addressFinishingConfirms`):
+ * finishing takes that way in away, and nobody may be left with none.
  */
 export function memberMoveOf({
   arrival,
@@ -116,6 +117,48 @@ export function memberMoveOf({
 }): SsoMigrationMemberMove {
   if (arrival !== "matched") return arrival;
   return previousIsOnlyWayIn ? "sign-in-once" : "next-sign-in";
+}
+
+/**
+ * The unconfirmed address finishing confirms for a person, and how it was
+ * proven, or null.
+ *
+ * A verified identity on the previous provider proved its address when the
+ * person signed in with it. When their own address identity holds that same
+ * address, still unconfirmed, finishing confirms it on the previous
+ * provider's word before taking the identity away, so the person keeps a way
+ * in without having to sign in first. One answer for the progress and for
+ * retirement, so the page never promises a move retirement then refuses.
+ */
+export function addressFinishingConfirms({
+  identifiers,
+  legacyIdentifierIds,
+}: {
+  identifiers: readonly {
+    id: string;
+    provider: string;
+    state: string;
+    value: string | null;
+  }[];
+  legacyIdentifierIds: ReadonlySet<string>;
+}): { identifierId: string; method: "oauth" | "saml" } | null {
+  const proofs = identifiers.filter(
+    ({ id, state, value }) =>
+      legacyIdentifierIds.has(id) &&
+      (state === "VERIFIED" || state === "PRIMARY") &&
+      value !== null,
+  );
+  for (const address of identifiers) {
+    if (address.provider !== "email" || address.state !== "ATTACHED") continue;
+    const proof = proofs.find(({ value }) => value === address.value);
+    if (proof) {
+      return {
+        identifierId: address.id,
+        method: proof.provider === "saml" ? "saml" : "oauth",
+      };
+    }
+  }
+  return null;
 }
 
 type ConnectionState = SsoConnectionState;
