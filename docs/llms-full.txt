@@ -2083,8 +2083,8 @@ deprovisioned by the switch.
 
 People the sync provisioned who have never signed in do not hold the update
 either. The new connection recognizes them by their address like everyone
-else, so they are listed as moving across at their next sign-in, whenever
-that is.
+else, and the page lists each of them the same way it lists any other
+member.
 
 If you had already issued a token for the new connection yourself under
 **Settings > Authentication > Connectors**, both tokens work after finishing.

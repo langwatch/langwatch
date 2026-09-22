@@ -396,6 +396,11 @@ describe("given persisted migration evidence", () => {
     it("lists whether it recognises each one, confirmed address or not, and holds the update for none of them", async () => {
       await member("kim", { verified: true, email: addressOf("kim") });
       await member("pat", { email: addressOf("pat") });
+      // Pat was pushed by the previous connection's directory sync and never
+      // signed in: that holds finishing no more than any other member.
+      await prisma.scimDirectoryUser.create({
+        data: { organizationId, connectionId: legacyId, userId: userId("pat") },
+      });
       await member("bo", { verified: true, email: addressOf("bo") });
       await prisma.user.create({
         data: {
