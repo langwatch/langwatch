@@ -45,6 +45,7 @@ import type {
 import {
   buildFilterRoute,
   buildInstantEvalRoute,
+  describeCause,
   finishFilter,
   freeText,
   instantEval,
@@ -140,7 +141,7 @@ async function routeWithModel(
     if (failure.modelTrouble === "model_failed") {
       logger.warn(
         { projectId: input.projectId, err: error },
-        "Model could not route the search; searching the phrase instead",
+        `Model could not route the search; searching the phrase instead (${describeCause(error)})`,
       );
     }
     return freeText({

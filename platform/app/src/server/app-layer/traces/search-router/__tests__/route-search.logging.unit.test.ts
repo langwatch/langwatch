@@ -100,4 +100,20 @@ describe("given a route that degraded", () => {
       expect(messages.join("\n")).not.toContain("api.example.com");
     });
   });
+
+  describe("when the deployment has no classifier and the model decides", () => {
+    /** @scenario "A model failure is a phrase search, not an error" */
+    it("names the cause on that path too", async () => {
+      const d = deps({
+        classifier: null,
+        routeWithModel: vi.fn(async () => {
+          throw new ProviderFailed();
+        }),
+      });
+      await createSearchRouter(d).route(input());
+      expect(warnedMessages()).toEqual([
+        "Model could not route the search; searching the phrase instead (ai_query_provider_error openai/gpt-5-mini openai HTTP 429)",
+      ]);
+    });
+  });
 });

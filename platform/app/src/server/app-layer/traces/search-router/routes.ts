@@ -64,7 +64,7 @@ export function modelFailureOf(error: unknown): ModelFailure {
  * (`summarizeProviderError` extracts a status, a vendor name and a model id
  * and no prose), so nothing the provider wrote travels with it.
  */
-function describeCause(error: unknown): string {
+export function describeCause(error: unknown): string {
   if (error instanceof HandledError) {
     const meta = error.meta as {
       httpStatus?: unknown;
