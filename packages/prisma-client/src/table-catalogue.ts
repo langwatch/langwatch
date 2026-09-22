@@ -441,7 +441,8 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "connectionId",
     "userId",
-    "authenticatedAt"
+    "authenticatedAt",
+    "providerAccountId"
   ],
   "SsoProvider": [
     "id",
