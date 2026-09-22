@@ -361,7 +361,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then it works as it always did
     And nothing quietly attaches it to a connection
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing a connection ends the tokens issued against it
     Given a directory provisions "acme" through a token issued against its connection
     When the connection is removed

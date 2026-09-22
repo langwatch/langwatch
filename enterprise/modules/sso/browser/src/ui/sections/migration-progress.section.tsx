@@ -16,6 +16,7 @@ import {
   type MigrationView,
   type SsoMigrationRoute,
 } from "../../model/migration-route.ts";
+import { InlineRefusal } from "../elements/refusals.tsx";
 import { SettingsCard } from "../elements/settings-card.tsx";
 
 export function MigrationProgressSection({
@@ -23,6 +24,7 @@ export function MigrationProgressSection({
   canManage,
   connectionActive,
   pending = false,
+  refusal,
   members,
   membersLoading = false,
   membersFailed = false,
@@ -39,6 +41,9 @@ export function MigrationProgressSection({
   /** Both levers decide where sign-in goes, so neither moves while it is off. */
   connectionActive: boolean;
   pending?: boolean;
+  /** What the last lever was refused with, said beside the levers rather
+   *  than in a toast that leaves mid-cutover. */
+  refusal?: unknown;
   /** The page being shown; the view's own first page when none is given. */
   members?: MigrationMembersView;
   membersLoading?: boolean;
@@ -72,6 +77,7 @@ export function MigrationProgressSection({
           {migration.inheritedDomains.map(inheritedDomainLine).join(", ")}
         </Text>
       )}
+      <InlineRefusal error={refusal} what="This cutover" />
       <MigrationStragglers
         previous={previous}
         members={members ?? migration.members}

@@ -5,7 +5,12 @@
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { describe, expect, it } from "vitest";
 
-import { domainClaimsOf, domainEvidenceOf, provesWithLicense } from "../setup-view.ts";
+import {
+  domainClaimsOf,
+  domainEvidenceOf,
+  goLiveFactsOf,
+  provesWithLicense,
+} from "../setup-view.ts";
 
 type Connection = NonNullable<SsoSetupPageView["connection"]>;
 
@@ -102,5 +107,37 @@ describe("whether this installation proves with its licence", () => {
   it("says no while nothing names the licence, so nobody is sent to publish nothing", () => {
     expect(provesWithLicense({ connection: connection([proof()]), record: null })).toBe(false);
     expect(provesWithLicense({ connection: null, record: null })).toBe(false);
+  });
+});
+
+describe("the facts the last step reads", () => {
+  it("reads each one off the journey the read answered", () => {
+    expect(
+      goLiveFactsOf({
+        domainProved: true,
+        testSignIn: { done: true },
+        breakGlass: { inPlace: true, liveCount: 2 },
+        arrivalsDecided: true,
+        ready: true,
+        activated: true,
+      }),
+    ).toEqual({
+      domainProved: true,
+      testSignInDone: true,
+      breakGlassInPlace: true,
+      arrivalsDecided: true,
+      activated: true,
+    });
+  });
+
+  /** Nothing done is what an unread journey looks like — never "on". */
+  it("says nothing is done where the read answered no journey at all", () => {
+    expect(goLiveFactsOf(null)).toEqual({
+      domainProved: false,
+      testSignInDone: false,
+      breakGlassInPlace: false,
+      arrivalsDecided: false,
+      activated: false,
+    });
   });
 });

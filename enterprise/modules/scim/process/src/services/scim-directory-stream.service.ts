@@ -12,6 +12,7 @@ import {
   SCIM_WEBHOOK_TOLERANCE_SECONDS,
   verifyScimWebhookSignature,
 } from "../rules/scim-webhook-signature.rules.ts";
+import type { ScimConnectionRetirementService } from "./scim-connection-retirement.service.ts";
 
 /** Deliveries already seen inside the freshness window, by their nonce. */
 class ScimWebhookReplayWindow {
@@ -72,17 +73,22 @@ export class ScimDirectoryStreamService {
 
   private constructor(
     private readonly scim: ScimService,
+    private readonly retirement: ScimConnectionRetirementService,
     private readonly webhookSecret: () => string | undefined,
   ) {}
 
   static create({
     scim,
+    retirement,
     webhookSecret,
   }: {
     scim: ScimService;
+    /** The same credential rule the protocol door holds: a token whose
+     *  connection the organization no longer holds provisions nothing. */
+    retirement: ScimConnectionRetirementService;
     webhookSecret: () => string | undefined;
   }): ScimDirectoryStreamService {
-    return new ScimDirectoryStreamService(scim, webhookSecret);
+    return new ScimDirectoryStreamService(scim, retirement, webhookSecret);
   }
 
   /**
@@ -125,6 +131,16 @@ export class ScimDirectoryStreamService {
 
     if (entitlement.status === "invalid_token") return { status: "unauthorized" };
     if (entitlement.status !== "ok") return { status: "forbidden" };
+
+    if (
+      entitlement.connectionId !== null &&
+      !(await this.retirement.admits({
+        organizationId: entitlement.organizationId,
+        connectionId: entitlement.connectionId,
+      }))
+    ) {
+      return { status: "unauthorized" };
+    }
 
     const parsed = findEvents(delivery.body);
 

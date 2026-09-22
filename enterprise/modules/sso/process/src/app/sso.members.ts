@@ -103,6 +103,8 @@ export interface SsoSetupCommandLedger {
     input: SsoSetupConnectionInput & { route: SsoSetupMigrationRouteInput["route"] },
     actor: SsoSelfServeActor,
   ): Promise<void>;
+  /** The cutover's end, re-read and resumable where identity states it. */
+  finalizeLegacyMigration(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
   rename(
     input: SsoSetupConnectionInput & { name: string },
     actor: SsoSelfServeActor,
@@ -111,6 +113,9 @@ export interface SsoSetupCommandLedger {
     input: SsoSetupConnectionInput & { arrivalPolicy: SsoSetupArrivalsInput["policy"] },
     actor: SsoSelfServeActor,
   ): Promise<void>;
+  /** Going live reads its own evidence: what the connection recorded decides,
+   *  never an account the caller names. */
+  activate(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
   discardConnection(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
   /** Which removal it was is read from where the connection stands, never
    *  chosen by the caller. */

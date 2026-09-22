@@ -51,3 +51,24 @@ export function provesWithLicense({
 
   return connection?.domainProofs.some((proof) => proof.method === "license-token") ?? false;
 }
+
+/**
+ * The five facts the step states, the checklist and the last step all read.
+ * A read that answered no journey at all means nothing is done yet — which is
+ * what an unregistered connection's journey looks like from here anyway.
+ */
+export function goLiveFactsOf(goLive: SsoSetupPageView["goLive"]): {
+  domainProved: boolean;
+  testSignInDone: boolean;
+  breakGlassInPlace: boolean;
+  arrivalsDecided: boolean;
+  activated: boolean;
+} {
+  return {
+    domainProved: goLive?.domainProved ?? false,
+    testSignInDone: goLive?.testSignIn.done ?? false,
+    breakGlassInPlace: goLive?.breakGlass.inPlace ?? false,
+    arrivalsDecided: goLive?.arrivalsDecided ?? false,
+    activated: goLive?.activated ?? false,
+  };
+}

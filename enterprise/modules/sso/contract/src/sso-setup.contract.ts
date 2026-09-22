@@ -187,8 +187,14 @@ export const ssoSetupPageViewSchema = z
     claims: z.array(ssoSetupClaimSchema),
     record: ssoSetupRecordSchema.nullable(),
     goLive: ssoSetupGoLiveSchema.nullable(),
-    /** The compatibility route a grandfathered connection stands in for. */
-    legacyRoute: z.object({ domain: z.string(), provider: z.string() }).strict().nullable(),
+    /** The compatibility route a grandfathered connection stands in for. It
+     *  names its connection: a replacement registered against that id
+     *  inherits what it proved, where one registered against nothing is a
+     *  rival to the route people are signing in through right now. */
+    legacyRoute: z
+      .object({ connectionId: z.string(), domain: z.string(), provider: z.string() })
+      .strict()
+      .nullable(),
     /** Where the cutover stands, when this connection replaces a
      *  grandfathered one. Null for every connection outside a pair. */
     migration: ssoSetupMigrationSchema.nullable(),

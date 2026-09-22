@@ -10,6 +10,7 @@
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -24,15 +25,16 @@ const BEARER = "Bearer scim_token_acme";
 
 /** The directory the twelve provisioning routes read, with one token minted. */
 class DirectoryFake extends ScimServiceFake {
-  override readonly verifyToken = vi.fn(async ({ token }: { token: string }) =>
-    token === "scim_token_acme"
-      ? ({
-          status: "ok",
-          id: "scim_token_1",
-          organizationId: ORGANIZATION_ID,
-          connectionId: null,
-        } as const)
-      : ({ status: "invalid_token" } as const),
+  override readonly verifyToken = vi.fn(
+    async ({ token }: { token: string }): Promise<ScimTokenEntitlement> =>
+      token === "scim_token_acme"
+        ? {
+            status: "ok",
+            id: "scim_token_1",
+            organizationId: ORGANIZATION_ID,
+            connectionId: null,
+          }
+        : { status: "invalid_token" },
   );
   override readonly listUsers = vi.fn(async (): Promise<ScimListResponse<ScimUser>> => ({
     schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -43,9 +45,28 @@ class DirectoryFake extends ScimServiceFake {
   }));
 }
 
-function mount(onError = scimProtocolErrorHandler) {
-  const scim = new DirectoryFake();
-  const { app } = scimTestApp({ scim });
+const RETIRED_CONNECTION_ID = "ssoc_removed";
+
+/** The same directory, minted against a connection rather than organization-wide. */
+class RetiredConnectionDirectory extends DirectoryFake {
+  override readonly verifyToken = vi.fn(async ({ token }: { token: string }) =>
+    token === "scim_token_acme"
+      ? ({
+          status: "ok",
+          id: "scim_token_1",
+          organizationId: ORGANIZATION_ID,
+          connectionId: RETIRED_CONNECTION_ID,
+        } as const)
+      : ({ status: "invalid_token" } as const),
+  );
+}
+
+function mount(
+  onError = scimProtocolErrorHandler,
+  options: { scim?: ScimServiceFake; connections?: OrganizationSsoConnection[] } = {},
+) {
+  const scim = options.scim ?? new DirectoryFake();
+  const { app } = scimTestApp({ scim, connections: options.connections });
   const directories = new WeakMap<Request, { connectionId: string | null }>();
 
   const runtime = createRestRuntime({
@@ -166,6 +187,53 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       await expect(response.json()).resolves.toMatchObject({
         detail: "Bearer token is not valid",
       });
+    });
+  });
+
+  describe("when a directory pushes through a token whose connection was removed", () => {
+    /** @scenario "Removing a connection ends the tokens issued against it" */
+    it("refuses the push and retires every token issued against that connection", async () => {
+      const scim = new RetiredConnectionDirectory();
+      const api = mount(scimProtocolErrorHandler, { scim, connections: [] });
+
+      const response = await api.get("/api/scim/v2/Users", BEARER);
+
+      expect(response.status).toBe(401);
+      expect(scim.revokeTokensForConnection).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION_ID,
+        connectionId: RETIRED_CONNECTION_ID,
+      });
+      expect(scim.listUsers).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A token that names no connection is left exactly as it was" */
+    it("asks nothing about a connection for a token that names none", async () => {
+      const api = mount();
+
+      const response = await api.get("/api/scim/v2/Users", BEARER);
+
+      expect(response.status).toBe(200);
+      expect(api.scim.revokeTokensForConnection).not.toHaveBeenCalled();
+    });
+
+    it("leaves a live connection's directory provisioning exactly as it was", async () => {
+      const scim = new RetiredConnectionDirectory();
+      const api = mount(scimProtocolErrorHandler, {
+        scim,
+        connections: [
+          {
+            connectionId: RETIRED_CONNECTION_ID,
+            displayName: "Okta",
+            type: "oidc",
+            state: "ACTIVE",
+          },
+        ],
+      });
+
+      const response = await api.get("/api/scim/v2/Users", BEARER);
+
+      expect(response.status).toBe(200);
+      expect(scim.revokeTokensForConnection).not.toHaveBeenCalled();
     });
   });
 

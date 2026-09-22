@@ -113,6 +113,15 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
   .withInput(ssoSetupMigrationRouteSchema)
   .withOutput(z.void())
 
+  /**
+   * End the cutover: the replacement keeps sign-in, the grandfathered
+   * connection's access is retired, and the pair closes. Gated like the
+   * registration that opened it.
+   */
+  .mutation("finalizeLegacyMigration")
+  .withInput(ssoSetupConnectionSchema)
+  .withOutput(z.void())
+
   /** The word on the card. Never plan-gated: a rename decides nothing about
    *  who signs in, and an organization whose plan lapsed still reads it. */
   .mutation("rename")
@@ -123,6 +132,15 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
    *  and "turn everybody away" is an answer. */
   .mutation("setArrivals")
   .withInput(ssoSetupArrivalsSchema)
+  .withOutput(z.void())
+
+  /**
+   * Turn the connection on. Enterprise-gated like registration, because it is
+   * the same purchase; the preconditions are refused one at a time, so the
+   * page can name the step that is still outstanding.
+   */
+  .mutation("activate")
+  .withInput(ssoSetupConnectionSchema)
   .withOutput(z.void())
 
   /** Undo a registration that never went live: the journey opens back on the

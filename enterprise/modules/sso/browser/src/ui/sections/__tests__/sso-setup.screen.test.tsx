@@ -53,12 +53,18 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           }),
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+        getMigrationProgress: {
+          useQuery: () => ({ data: void 0, isLoading: false, isError: false, refetch: () => {} }),
+        },
         register: mutation("register"),
         startLegacyMigration: mutation("startLegacyMigration"),
         rename: mutation("rename"),
         setArrivals: mutation("setArrivals"),
         discardConnection: mutation("discardConnection"),
         removeConnection: mutation("removeConnection"),
+        activate: mutation("activate"),
+        selectMigrationRoute: mutation("selectMigrationRoute"),
+        finalizeLegacyMigration: mutation("finalizeLegacyMigration"),
         claimDomain: mutation("claimDomain"),
         proveDomain: mutation("proveDomain"),
         removeDomain: mutation("removeDomain"),
@@ -134,6 +140,25 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
   };
 }
 
+function migrationView(
+  overrides: Partial<NonNullable<SsoSetupPageView["migration"]>> = {},
+): NonNullable<SsoSetupPageView["migration"]> {
+  return {
+    legacy: { connectionId: "ssoc_legacy", source: "legacy-grandfathered", providerId: "auth0" },
+    replacement: { connectionId: "ssoc_1", source: "self-serve", providerId: "Okta" },
+    phase: "GRACE_LEGACY",
+    selectedRoute: "legacy",
+    inheritedDomains: [],
+    testSignIn: { done: true, atMs: null },
+    members: { activeCount: 4, linkedCount: 2, stragglers: [], nextCursor: null },
+    quietPeriod: { lastLegacyAuthenticationAtMs: null, complete: false },
+    scim: { status: "not-applicable" },
+    blockers: [],
+    canFinalize: true,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   state.view = setupView();
   state.isLoading = false;
@@ -185,7 +210,7 @@ describe("the single sign-on setup page", () => {
       state.view = setupView({
         connection: null,
         goLive: null,
-        legacyRoute: { domain: "acme.com", provider: "okta" },
+        legacyRoute: { connectionId: "ssoc_legacy", domain: "acme.com", provider: "okta" },
       });
 
       renderWithSsoHost(<SsoSetupScreen />);
@@ -290,6 +315,36 @@ describe("the single sign-on setup page", () => {
       expect(state.invalidated).toBe(1);
     });
 
+    /** @scenario "Going live with all three preconditions met turns the connection on" */
+    it("turns the connection on, and says the status is catching up", () => {
+      state.view = setupView({
+        goLive: {
+          domainProved: true,
+          testSignIn: { done: true },
+          breakGlass: { inPlace: true, liveCount: 1 },
+          arrivalsDecided: true,
+          ready: true,
+          activated: false,
+        },
+      });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+      fireEvent.click(screen.getByTestId("connection-go-live-activate"));
+
+      expect(state.calls).toEqual([
+        { name: "activate", input: { organizationId: "org-1", connectionId: "ssoc_1" } },
+      ]);
+      expect(state.invalidated).toBe(1);
+      expect(screen.getByRole("status").textContent).toContain("Activation accepted");
+    });
+
+    it("names what is outstanding instead of a control that would be refused", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.queryByTestId("connection-go-live-activate")).toBeNull();
+      expect(screen.getByTestId("connection-go-live").textContent).toContain("Turning it on needs");
+    });
+
     /** @scenario "An administrator removes their own live connection on teardown's terms" */
     it("tears a live connection down, naming no reason the administrator did not give", () => {
       state.view = setupView({ connection: connectionView({ state: "ACTIVE" }) });
@@ -318,6 +373,60 @@ describe("the single sign-on setup page", () => {
       expect(state.calls).toEqual([
         { name: "discardConnection", input: { organizationId: "org-1", connectionId: "ssoc_1" } },
       ]);
+    });
+  });
+
+  describe("given a cutover from a grandfathered provider", () => {
+    it("shows where sign-in is being decided, above the journey it changes", () => {
+      state.view = setupView({
+        connection: connectionView({ state: "ACTIVE" }),
+        migration: migrationView(),
+      });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByTestId("sso-migration")).toBeInTheDocument();
+    });
+
+    it("carries the route lever to selectMigrationRoute, naming the connection the page is on", () => {
+      state.view = setupView({
+        connection: connectionView({ state: "ACTIVE" }),
+        migration: migrationView(),
+      });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+      fireEvent.click(screen.getByTestId("sso-migration-route"));
+
+      expect(state.calls).toEqual([
+        {
+          name: "selectMigrationRoute",
+          input: { organizationId: "org-1", connectionId: "ssoc_1", route: "direct" },
+        },
+      ]);
+      expect(state.invalidated).toBe(1);
+    });
+
+    it("carries the finalize lever to finalizeLegacyMigration", () => {
+      state.view = setupView({
+        connection: connectionView({ state: "ACTIVE" }),
+        migration: migrationView({ selectedRoute: "direct", phase: "GRACE_DIRECT" }),
+      });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+      fireEvent.click(screen.getByTestId("sso-migration-finalize"));
+
+      expect(state.calls).toEqual([
+        {
+          name: "finalizeLegacyMigration",
+          input: { organizationId: "org-1", connectionId: "ssoc_1" },
+        },
+      ]);
+    });
+
+    it("shows no cutover for a connection that is in none", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.queryByTestId("sso-migration")).toBeNull();
     });
   });
 

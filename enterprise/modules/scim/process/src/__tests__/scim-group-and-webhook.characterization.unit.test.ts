@@ -8,6 +8,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimDirectoryService } from "../services/scim-directory.service.ts";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
@@ -135,6 +136,12 @@ describe("SCIM characterization: Auth0 webhook", () => {
     const service = new ScimServiceFake();
     await ScimDirectoryStreamService.create({
       scim: service,
+      // The relay is past the credential, so nothing here asks the retirement
+      // anything: it refuses a delivery at `admit`, which this never reaches.
+      retirement: ScimConnectionRetirementService.create({
+        connections: { findConnections: async () => [] },
+        tokens: service,
+      }),
       webhookSecret: () => undefined,
     }).relay({
       organizationId: "org_1",

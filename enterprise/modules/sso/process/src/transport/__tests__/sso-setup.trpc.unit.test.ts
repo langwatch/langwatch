@@ -150,10 +150,12 @@ describe("the organization's own single sign-on surface", () => {
       const { router } = await harness();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "activate",
         "checkDomainFile",
         "checkDomainRecord",
         "claimDomain",
         "discardConnection",
+        "finalizeLegacyMigration",
         "getHistory",
         "getMigrationProgress",
         "getSetup",
@@ -382,6 +384,16 @@ describe("the organization's own single sign-on surface", () => {
       });
     });
 
+    /** @scenario "Going live needs an Enterprise plan" */
+    it("refuses to turn the connection on, which is the same purchase", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.activate(TARGET)).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required" },
+      });
+      expect(commands.activate).not.toHaveBeenCalled();
+    });
+
     /** @scenario "A lapsed subscription does not take the way back in away" */
     it("still removes the connection, because a lapse must strand nobody", async () => {
       const { caller, commands } = await harness({ planType: "LAUNCH" });
@@ -418,6 +430,59 @@ describe("the organization's own single sign-on surface", () => {
         code: "FORBIDDEN",
       });
       expect(commands.setArrivals).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator finishing a cutover", () => {
+    it("carries the press to identity, naming the session administrator", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.finalizeLegacyMigration(TARGET)).resolves.toBeUndefined();
+      expect(commands.finalizeLegacyMigration).toHaveBeenCalledWith({
+        ...TARGET,
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("refuses it to a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.finalizeLegacyMigration(TARGET)).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.finalizeLegacyMigration).not.toHaveBeenCalled();
+    });
+
+    it("refuses it on a plan that does not carry single sign-on", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.finalizeLegacyMigration(TARGET)).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required" },
+      });
+      expect(commands.finalizeLegacyMigration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator turning the connection on", () => {
+    it("names the session administrator and supplies no account of its own", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.activate(TARGET)).resolves.toBeUndefined();
+      expect(commands.activate).toHaveBeenCalledWith({
+        ...TARGET,
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("refuses a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.activate(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(commands.activate).not.toHaveBeenCalled();
     });
   });
 

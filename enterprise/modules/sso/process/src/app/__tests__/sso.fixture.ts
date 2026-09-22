@@ -203,6 +203,9 @@ export class RecordingSsoSetupCommands implements SsoSetupCommandsApi {
   readonly selectMigrationRoute = vi.fn<SsoSetupCommandsApi["selectMigrationRoute"]>(
     async () => {},
   );
+  readonly finalizeLegacyMigration = vi.fn<SsoSetupCommandsApi["finalizeLegacyMigration"]>(
+    async () => {},
+  );
   readonly rename = vi.fn<SsoSetupCommandsApi["rename"]>(async () => {});
   readonly setArrivals = vi.fn<SsoSetupCommandsApi["setArrivals"]>(async () => {});
   readonly activate = vi.fn<SsoSetupCommandsApi["activate"]>(async () => {});

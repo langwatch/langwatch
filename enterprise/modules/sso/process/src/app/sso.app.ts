@@ -272,8 +272,11 @@ export class SsoApp implements SsoApiContract {
       register: (input, actor) => setup().register({ ...input, actor }),
       startLegacyMigration: (input, actor) => setup().startLegacyMigration({ ...input, actor }),
       selectMigrationRoute: (input, actor) => setup().selectMigrationRoute({ ...input, actor }),
+      finalizeLegacyMigration: (input, actor) =>
+        setup().finalizeLegacyMigration({ ...input, actor }),
       rename: (input, actor) => setup().rename({ ...input, actor }),
       setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
+      activate: (input, actor) => setup().activate({ ...input, actor }),
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
       removeConnection: (input, actor) => setup().removeConnection({ ...input, actor }),
     };
@@ -549,6 +552,23 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
+   * Finishing the cutover is part of the rollout that was bought, so it is
+   * gated like the registration that started it. What finalizing takes with
+   * it — and whether the evidence still allows it — is identity's, re-read
+   * there at the moment of the press.
+   */
+  async setupFinalizeLegacyMigration(
+    input: SsoSetupConnectionInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    await this.#requireEnterprisePlan(input.organizationId);
+
+    await this.#attempted(by, "finalizeLegacyMigration", { ...input }, (actor) =>
+      this.#selfServe.finalizeLegacyMigration(input, actor),
+    );
+  }
+
+  /**
    * Ungated: a rename decides nothing about who signs in, and an organization
    * whose plan lapsed still reads these cards. The name is audited in full —
    * it is the word the card shows, and who changed it is what the history
@@ -576,6 +596,19 @@ export class SsoApp implements SsoApiContract {
         },
         actor,
       ),
+    );
+  }
+
+  /**
+   * Turning it on is the same purchase registering was, so it is gated the
+   * same way. The preconditions are the aggregate's and are refused one at a
+   * time, so the page can name the one step still outstanding.
+   */
+  async setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void> {
+    await this.#requireEnterprisePlan(input.organizationId);
+
+    await this.#attempted(by, "activate", { ...input }, (actor) =>
+      this.#selfServe.activate(input, actor),
     );
   }
 

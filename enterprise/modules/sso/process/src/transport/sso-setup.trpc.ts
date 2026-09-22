@@ -85,6 +85,14 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupSelectMigrationRoute(input, administratorOf(actor)))
 
+  /** Gated inside the application, like the registration that opened the
+   *  cutover — the permission refusal comes first either way. */
+  .procedure("finalizeLegacyMigration")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) =>
+    app.setupFinalizeLegacyMigration(input, administratorOf(actor)),
+  )
+
   .procedure("rename")
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
@@ -92,6 +100,11 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .procedure("setArrivals")
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupSetArrivals(input, administratorOf(actor)))
+
+  /** The plan gate runs inside the application, like registration's. */
+  .procedure("activate")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupActivate(input, administratorOf(actor)))
 
   .procedure("discardConnection")
   .withPermission("sso:manage")

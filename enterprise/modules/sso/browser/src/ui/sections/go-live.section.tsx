@@ -10,7 +10,7 @@ import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 
 import { setupProgressFor } from "../../model/setup-progress.ts";
-import { SettingsCard } from "../elements/settings-card.tsx";
+import { InlineRefusal } from "../elements/refusals.tsx";
 
 export function GoLiveSection({
   canManage,
@@ -21,6 +21,7 @@ export function GoLiveSection({
   arrivalsDecided,
   activating = false,
   settling = false,
+  refusal,
   onActivate,
   onSetUpProvisioning,
 }: {
@@ -34,6 +35,9 @@ export function GoLiveSection({
   activating?: boolean;
   /** Set between the activation being accepted and the read catching up. */
   settling?: boolean;
+  /** What the last attempt was refused with, said beside the control that
+   *  caused it rather than in a toast that leaves. */
+  refusal?: unknown;
   onActivate: () => void;
   /** Where the errand carries on once it is on, as the screen routes it. */
   onSetUpProvisioning?: () => void;
@@ -47,15 +51,15 @@ export function GoLiveSection({
   });
 
   return (
-    <SettingsCard
-      title="Turn it on"
-      hint="Until it is on, nobody's sign-in goes anywhere near your identity provider."
-      testId="connection-go-live"
-    >
+    <VStack align="stretch" gap={3} width="full" data-testid="connection-go-live">
       {activated ? (
         <LiveAndWhatIsNext onSetUpProvisioning={onSetUpProvisioning} />
       ) : (
         <VStack align="stretch" gap={3}>
+          <Text color="fg.muted" fontSize="sm">
+            Until it is on, nobody&apos;s sign-in goes anywhere near your identity provider.
+          </Text>
+          <InlineRefusal error={refusal} what="Turning it on" />
           <Precondition
             met={domainProved}
             metText="A domain of yours is proved"
@@ -109,7 +113,7 @@ export function GoLiveSection({
           )}
         </VStack>
       )}
-    </SettingsCard>
+    </VStack>
   );
 }
 

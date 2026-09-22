@@ -9,9 +9,16 @@ import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
+import { useMigrationMembers } from "../../behavior/use-migration-members.ts";
+import { useSettlingSetup } from "../../behavior/use-settling-setup.ts";
 import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
-import { domainClaimsOf, domainEvidenceOf, provesWithLicense } from "../../model/setup-view.ts";
+import {
+  domainClaimsOf,
+  domainEvidenceOf,
+  goLiveFactsOf,
+  provesWithLicense,
+} from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
@@ -23,7 +30,9 @@ import {
   type ConnectionRemovalCommand,
 } from "./connection-removal.section.tsx";
 import { DomainsSection } from "./domains.section.tsx";
+import { GoLiveSection } from "./go-live.section.tsx";
 import { HistorySection } from "./history.section.tsx";
+import { MigrationProgressSection } from "./migration-progress.section.tsx";
 import { RegisterConnectionSection } from "./register-connection.section.tsx";
 import { ServiceProviderSection } from "./service-provider.section.tsx";
 import { TestSignInSection } from "./test-sign-in.section.tsx";
@@ -109,15 +118,15 @@ function ConnectedJourney({
   const host = useSsoHost();
   const canManage = host.canManage();
   const utils = ssoApi.useUtils();
-  const setArrivals = ssoApi.ssoSetup.setArrivals.useMutation();
-  const rename = ssoApi.ssoSetup.rename.useMutation();
   const discard = ssoApi.ssoSetup.discardConnection.useMutation();
   const remove = ssoApi.ssoSetup.removeConnection.useMutation();
+  const selectRoute = ssoApi.ssoSetup.selectMigrationRoute.useMutation();
+  const finalize = ssoApi.ssoSetup.finalizeLegacyMigration.useMutation();
   // Set between a removal being accepted and the read catching up, so the
   // danger zone says the press landed rather than looking like it did nothing.
   const [removalAccepted, setRemovalAccepted] = useState(false);
   const connectionId = connection.connectionId;
-  const goLive = view.goLive;
+  const migration = view.migration;
 
   useEffect(() => {
     setRemovalAccepted(false);
@@ -127,28 +136,16 @@ function ConnectedJourney({
     void utils.ssoSetup.getSetup.invalidate();
   };
 
-  const progress = setupProgressFor({
-    domainProved: goLive?.domainProved ?? false,
-    testSignInDone: goLive?.testSignIn.done ?? false,
-    breakGlassInPlace: goLive?.breakGlass.inPlace ?? false,
-    arrivalsDecided: goLive?.arrivalsDecided ?? false,
-    activated: goLive?.activated ?? false,
-  });
+  // An accepted removal reaches the projection a moment later, so the page
+  // keeps reading until what it shows is what happened.
+  useSettlingSetup({ organizationId, waiting: removalAccepted });
 
-  const saveArrivals = (policy: SetupConnection["arrivalPolicy"]) => {
-    // No toast: the refusal is rendered beside the control that caused it,
-    // where the reader is still mid-step.
-    setArrivals.mutate({ organizationId, connectionId, policy }, { onSuccess: refresh });
+  const selectMigrationRoute = (route: "legacy" | "direct") => {
+    selectRoute.mutate({ organizationId, connectionId, route }, { onSuccess: refresh });
   };
 
-  const renameConnection = (command: { name: string }) => {
-    rename.mutate(
-      { organizationId, connectionId, name: command.name },
-      {
-        onSuccess: refresh,
-        onError: (error) => host.failed({ error, fallbackTitle: "Renaming this connection" }),
-      },
-    );
+  const finalizeMigration = () => {
+    finalize.mutate({ organizationId, connectionId }, { onSuccess: refresh });
   };
 
   const removeConnection = (command: ConnectionRemovalCommand) => {
@@ -172,87 +169,29 @@ function ConnectedJourney({
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       {view.legacyRoute && <LegacyRouteNotice legacyRoute={view.legacyRoute} />}
 
-      <SetupSteps>
-        <SetupStep
-          number={1}
-          title="Your identity provider"
-          state={progress.provider}
-          summary={connection.providerId}
-        >
-          <VStack align="stretch" gap={3}>
-            {/* The word on the card, edited in place: nothing routes on it,
-                so a whole screen for one string would be furniture. */}
-            <HStack gap={2}>
-              <Text color="fg.muted" fontSize="sm">
-                Name
-              </Text>
-              <ConnectionNameRow
-                name={connection.providerId}
-                canManage={canManage}
-                renaming={rename.isPending}
-                onRename={renameConnection}
-              />
-            </HStack>
-            <ServiceProviderSection
-              protocol={connection.type}
-              addresses={view.serviceProvider}
-              connected
-            />
-          </VStack>
-        </SetupStep>
+      {/* Above the journey: while a pair stands, where sign-in goes is the
+          fact that decides what every step below it means. */}
+      {migration && (
+        <MigrationCard
+          organizationId={organizationId}
+          connectionId={connectionId}
+          migration={migration}
+          canManage={canManage}
+          connectionActive={connection.state === "ACTIVE"}
+          pending={selectRoute.isPending || finalize.isPending}
+          refusal={selectRoute.error ?? finalize.error}
+          onSelectRoute={selectMigrationRoute}
+          onFinalize={finalizeMigration}
+        />
+      )}
 
-        <SetupStep
-          number={2}
-          title="Prove a domain is yours"
-          state={progress.domain}
-          summary={
-            connection.verifiedDomains.length > 0
-              ? `${connection.verifiedDomains.join(", ")} proved`
-              : undefined
-          }
-        >
-          <DomainsSection
-            organizationId={organizationId}
-            connectionId={connectionId}
-            canManage={canManage}
-            provesWithLicense={provesWithLicense({ connection, record: view.record })}
-            evidence={domainEvidenceOf(connection)}
-            claims={domainClaimsOf(view.claims)}
-            onChanged={refresh}
-          />
-        </SetupStep>
-
-        <SetupStep number={3} title="Sign in through it once" state={progress.testSignIn}>
-          <TestSignInSection
-            connectionId={connectionId}
-            providerName={connection.providerId}
-            canManage={canManage}
-            testSignIn={{ done: goLive?.testSignIn.done ?? false, atMs: null }}
-            connectionState={connection.state}
-            verifiedDomains={connection.verifiedDomains}
-          />
-        </SetupStep>
-
-        {/* Upstream's steps four and six — a way back in, and turning it on —
-            wait on identity's break-glass and activate commands. */}
-        <SetupStep
-          number={4}
-          title="Say who it lets in"
-          state={progress.arrivals}
-          summary={arrivalAnswerLabel(SSO_ANSWER_BY_POLICY[connection.arrivalPolicy])}
-          last
-        >
-          <ArrivalsSection
-            connectionState={connection.state}
-            canManage={canManage}
-            policy={connection.arrivalPolicy}
-            decided={goLive?.arrivalsDecided ?? false}
-            saving={setArrivals.isPending}
-            refusal={setArrivals.error}
-            onSave={saveArrivals}
-          />
-        </SetupStep>
-      </SetupSteps>
+      <SetupJourneySteps
+        organizationId={organizationId}
+        view={view}
+        connection={connection}
+        canManage={canManage}
+        onChanged={refresh}
+      />
 
       {/* `sso:manage`, unlike everything above: the history is nearer an audit
           trail than a state, and the removal is the page's one way out. */}
@@ -269,5 +208,217 @@ function ConnectedJourney({
         />
       )}
     </VStack>
+  );
+}
+
+/**
+ * The cutover, with the members paged where they are read. The card itself
+ * is props-driven; only this knows there is a second page to ask for.
+ */
+function MigrationCard({
+  organizationId,
+  connectionId,
+  migration,
+  canManage,
+  connectionActive,
+  pending,
+  refusal,
+  onSelectRoute,
+  onFinalize,
+}: {
+  organizationId: string;
+  connectionId: string;
+  migration: NonNullable<SsoSetupPageView["migration"]>;
+  canManage: boolean;
+  connectionActive: boolean;
+  pending: boolean;
+  refusal: unknown;
+  onSelectRoute: (route: "legacy" | "direct") => void;
+  onFinalize: () => void;
+}) {
+  const paging = useMigrationMembers({
+    organizationId,
+    connectionId,
+    firstPage: migration.members,
+  });
+
+  return (
+    <MigrationProgressSection
+      migration={migration}
+      canManage={canManage}
+      connectionActive={connectionActive}
+      pending={pending}
+      refusal={refusal}
+      onSelectRoute={onSelectRoute}
+      onFinalize={onFinalize}
+      {...paging}
+    />
+  );
+}
+
+/**
+ * The journey itself: five steps, in the order the work happens in. It owns
+ * the commands its own steps press, so the page around it keeps the two that
+ * are not steps — the cutover above and the way out below.
+ */
+function SetupJourneySteps({
+  organizationId,
+  view,
+  connection,
+  canManage,
+  onChanged,
+}: {
+  organizationId: string;
+  view: SsoSetupPageView;
+  connection: SetupConnection;
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const host = useSsoHost();
+  const setArrivals = ssoApi.ssoSetup.setArrivals.useMutation();
+  const rename = ssoApi.ssoSetup.rename.useMutation();
+  const activate = ssoApi.ssoSetup.activate.useMutation();
+  // Set between an activation being accepted and the read saying ACTIVE.
+  const [activationAccepted, setActivationAccepted] = useState(false);
+  const connectionId = connection.connectionId;
+  const facts = goLiveFactsOf(view.goLive);
+
+  useEffect(() => {
+    setActivationAccepted(false);
+  }, [connection.state]);
+
+  useSettlingSetup({ organizationId, waiting: activationAccepted });
+
+  const progress = setupProgressFor(facts);
+
+  const saveArrivals = (policy: SetupConnection["arrivalPolicy"]) => {
+    // No toast: the refusal is rendered beside the control that caused it,
+    // where the reader is still mid-step.
+    setArrivals.mutate({ organizationId, connectionId, policy }, { onSuccess: onChanged });
+  };
+
+  const goLive = () => {
+    // No toast here either: the refusal names the precondition that is still
+    // outstanding, which is a sentence the reader acts on in place.
+    activate.mutate(
+      { organizationId, connectionId },
+      {
+        onSuccess: () => {
+          setActivationAccepted(true);
+          onChanged();
+        },
+      },
+    );
+  };
+
+  const renameConnection = (command: { name: string }) => {
+    rename.mutate(
+      { organizationId, connectionId, name: command.name },
+      {
+        onSuccess: onChanged,
+        onError: (error) => host.failed({ error, fallbackTitle: "Renaming this connection" }),
+      },
+    );
+  };
+
+  return (
+    <SetupSteps>
+      <SetupStep
+        number={1}
+        title="Your identity provider"
+        state={progress.provider}
+        summary={connection.providerId}
+      >
+        <VStack align="stretch" gap={3}>
+          {/* The word on the card, edited in place: nothing routes on it,
+                so a whole screen for one string would be furniture. */}
+          <HStack gap={2}>
+            <Text color="fg.muted" fontSize="sm">
+              Name
+            </Text>
+            <ConnectionNameRow
+              name={connection.providerId}
+              canManage={canManage}
+              renaming={rename.isPending}
+              onRename={renameConnection}
+            />
+          </HStack>
+          <ServiceProviderSection
+            protocol={connection.type}
+            addresses={view.serviceProvider}
+            connected
+          />
+        </VStack>
+      </SetupStep>
+
+      <SetupStep
+        number={2}
+        title="Prove a domain is yours"
+        state={progress.domain}
+        summary={
+          connection.verifiedDomains.length > 0
+            ? `${connection.verifiedDomains.join(", ")} proved`
+            : undefined
+        }
+      >
+        <DomainsSection
+          organizationId={organizationId}
+          connectionId={connectionId}
+          canManage={canManage}
+          provesWithLicense={provesWithLicense({ connection, record: view.record })}
+          evidence={domainEvidenceOf(connection)}
+          claims={domainClaimsOf(view.claims)}
+          onChanged={onChanged}
+        />
+      </SetupStep>
+
+      <SetupStep number={3} title="Sign in through it once" state={progress.testSignIn}>
+        <TestSignInSection
+          connectionId={connectionId}
+          providerName={connection.providerId}
+          canManage={canManage}
+          testSignIn={{ done: facts.testSignInDone, atMs: null }}
+          connectionState={connection.state}
+          verifiedDomains={connection.verifiedDomains}
+        />
+      </SetupStep>
+
+      {/* Upstream's fourth step — naming a way back in — waits on
+            identity's break-glass commands, so its precondition is shown in
+            the last step and pressed nowhere. */}
+      <SetupStep
+        number={4}
+        title="Say who it lets in"
+        state={progress.arrivals}
+        summary={arrivalAnswerLabel(SSO_ANSWER_BY_POLICY[connection.arrivalPolicy])}
+      >
+        <ArrivalsSection
+          connectionState={connection.state}
+          canManage={canManage}
+          policy={connection.arrivalPolicy}
+          decided={facts.arrivalsDecided}
+          saving={setArrivals.isPending}
+          refusal={setArrivals.error}
+          onSave={saveArrivals}
+        />
+      </SetupStep>
+
+      <SetupStep
+        number={5}
+        title="Turn it on"
+        state={progress.goLive}
+        note={progress.goLiveBlockedBecause ?? void 0}
+        last
+      >
+        <GoLiveSection
+          {...facts}
+          canManage={canManage}
+          activating={activate.isPending}
+          settling={activationAccepted}
+          refusal={activate.error}
+          onActivate={goLive}
+        />
+      </SetupStep>
+    </SetupSteps>
   );
 }

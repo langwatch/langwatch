@@ -143,9 +143,16 @@ export interface SsoApi {
     input: SsoSetupMigrationRouteInput,
     by: SsoAdministrator,
   ): Promise<void>;
+  /** The end of the cutover, on the replacement: what it takes with it is
+   *  identity's to decide, and it re-reads the evidence itself. */
+  setupFinalizeLegacyMigration(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   /** The word on the card, which routes nothing and is never plan-gated. */
   setupRename(input: SsoSetupRenameInput, by: SsoAdministrator): Promise<void>;
   setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void>;
+  /** Turn the connection on, on the strength of what it has already recorded:
+   *  the test sign-in's account is resolved where the facts are, never
+   *  supplied here. Plan-gated, because going live is the purchase. */
+  setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   setupDiscardConnection(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void>;
 }

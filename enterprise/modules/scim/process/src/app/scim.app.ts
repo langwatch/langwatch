@@ -58,6 +58,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
+import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import type { ScimSyncLifecycle } from "./scim.members.ts";
@@ -123,6 +124,7 @@ export class ScimApp implements ScimApiContract {
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #webhook: ScimDirectoryStreamService;
+  readonly #retirement: ScimConnectionRetirementService;
 
   private constructor(options: {
     scim: ScimService;
@@ -135,8 +137,13 @@ export class ScimApp implements ScimApiContract {
     this.#connections = options.connections;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
+    this.#retirement = ScimConnectionRetirementService.create({
+      connections: options.connections,
+      tokens: options.scim,
+    });
     this.#webhook = ScimDirectoryStreamService.create({
       scim: options.scim,
+      retirement: this.#retirement,
       webhookSecret: options.webhookSecret,
     });
   }
@@ -234,6 +241,19 @@ export class ScimApp implements ScimApiContract {
 
     if (entitlement.status === "plan_not_entitled") {
       throw scimRefusal(403, ENTERPRISE_FEATURE_ERRORS.SCIM);
+    }
+
+    // The token reaches no further than the connection it was issued against
+    // reaches: one the organization has taken away provisions nothing, and
+    // the refusal retires the rest of that connection's tokens with it.
+    if (
+      entitlement.connectionId !== null &&
+      !(await this.#retirement.admits({
+        organizationId: entitlement.organizationId,
+        connectionId: entitlement.connectionId,
+      }))
+    ) {
+      throw scimRefusal(401, "Bearer token is not valid");
     }
 
     return {
