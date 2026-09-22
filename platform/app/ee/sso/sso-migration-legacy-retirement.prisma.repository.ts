@@ -20,10 +20,11 @@ export class PrismaSsoLegacyIdentityRetirement
       identity: IdentityService;
       accounts: IdentityAccountCeremonies;
       directories: {
-        revokeForConnection(args: {
+        moveToConnection(args: {
           organizationId: string;
-          connectionId: string;
-        }): Promise<{ revoked: number }>;
+          fromConnectionId: string;
+          toConnectionId: string;
+        }): Promise<{ moved: number }>;
       };
       now: () => number;
       newCommandId: () => string;
@@ -89,9 +90,12 @@ export class PrismaSsoLegacyIdentityRetirement
         identifier,
       });
     }
-    await this.deps.directories.revokeForConnection({
+    // The directory sync LangWatch set up moves across rather than ending:
+    // the customer never held its token, so there is nobody to repoint it.
+    await this.deps.directories.moveToConnection({
       organizationId,
-      connectionId: legacyConnectionId,
+      fromConnectionId: legacyConnectionId,
+      toConnectionId: replacementConnectionId,
     });
   }
 

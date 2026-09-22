@@ -79,8 +79,16 @@ export function scimStatusOf({
   legacySyncs: boolean;
   replacementSyncState: string | null | undefined;
 }): SelfServeMigrationView["scim"]["status"] {
+  if (
+    replacementSyncState === "SYNCING" ||
+    replacementSyncState === "TOKEN_ISSUED"
+  ) {
+    return "ready";
+  }
   if (!legacySyncs) return "not-applicable";
-  return replacementSyncState === "SYNCING" ? "ready" : "needs-repointing";
+  // The previous connection's sync moves to the replacement when the update
+  // finishes; nothing is asked of the customer for it.
+  return "moves-with-finish";
 }
 
 export function migrationBlockers({
@@ -133,12 +141,6 @@ export function migrationBlockers({
     blockers.push({
       code: "legacy-activity-not-quiet",
       message: "Wait for seven days without a successful legacy sign-in.",
-    });
-  }
-  if (scimStatus === "needs-repointing") {
-    blockers.push({
-      code: "scim-needs-repointing",
-      message: "Repoint directory provisioning to the replacement connection.",
     });
   }
   if (sharedLegacyIdentifiers) {

@@ -9,8 +9,16 @@ function createMockPrisma() {
   return {
     $transaction: async (operations: Promise<unknown>[]) =>
       Promise.all(operations),
-    scimDirectoryUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    scimExternalId: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    scimDirectoryUser: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    scimExternalId: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     scimToken: {
       create: vi.fn(),
       // Nothing holds the value by default: `generate` asks whether a token
@@ -274,6 +282,73 @@ describe("ScimTokenService", () => {
         tokenId: null,
         cause: "teardown",
       });
+    });
+  });
+
+  describe("when an update finishes and the previous connection's sync moves across", () => {
+    beforeEach(() => {
+      (
+        prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ id: "conn-okta" });
+      (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+        [{ id: "token-legacy" }],
+      );
+      (
+        prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ count: 1 });
+      (
+        prisma.scimDirectoryUser.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([{ userId: "user-both" }]);
+    });
+
+    /** @scenario "Finishing moves the previous connection's directory sync across" */
+    it("re-homes the tokens and the people they provisioned, and starts the replacement's sync history", async () => {
+      const result = await service.moveToConnection({
+        organizationId: "org-1",
+        fromConnectionId: "conn-auth0",
+        toConnectionId: "conn-okta",
+      });
+
+      expect(result).toEqual({ moved: 1 });
+      expect(prisma.scimToken.updateMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1", connectionId: "conn-auth0" },
+        data: { connectionId: "conn-okta" },
+      });
+      // A person the replacement already provisioned itself stays its own;
+      // the previous connection's claim is dropped, not duplicated.
+      expect(prisma.scimDirectoryUser.deleteMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          connectionId: "conn-auth0",
+          userId: { in: ["user-both"] },
+        },
+      });
+      expect(syncLifecycle.tokenIssued).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        connectionId: "conn-okta",
+        tokenId: "token-legacy",
+      });
+      expect(syncLifecycle.revoked).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        connectionId: "conn-auth0",
+        tokenId: null,
+        cause: "teardown",
+      });
+    });
+
+    it("refuses a replacement the organization does not have before moving anything", async () => {
+      (
+        prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(null);
+
+      await expect(
+        service.moveToConnection({
+          organizationId: "org-1",
+          fromConnectionId: "conn-auth0",
+          toConnectionId: "conn-elsewhere",
+        }),
+      ).rejects.toMatchObject({ code: "scim_connection_not_found" });
+      expect(prisma.scimToken.updateMany).not.toHaveBeenCalled();
     });
   });
 

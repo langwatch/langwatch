@@ -455,6 +455,15 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the other organizations are found through the member, not by reading memberships outside the tenant
     And a membership read bounded only by "not this organization" is refused before it reaches the database
 
+  @unit @integration
+  Scenario: Finishing moves the previous connection's directory sync across
+    Given the previous connection's directory sync was set up by LangWatch, so the customer never held its token
+    When the update finishes
+    Then the tokens the identity provider already presents belong to the new connection, and whatever pushes today keeps pushing
+    And the people and external ids the previous connection provisioned are the new connection's, without duplicating anyone it provisioned itself
+    And the new connection's sync history starts, and the previous connection's ends
+    And before finishing, the update says the directory sync moves across when it finishes rather than asking anyone to repoint it
+
   @integration @regression
   Scenario: A revoked legacy directory sync is not one left to repoint
     Given tearing the previous connection down has revoked its directory sync

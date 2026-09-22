@@ -88,7 +88,7 @@ export interface SsoMigrationBlockerView {
 
 export type SsoMigrationScimStatus =
   | "not-applicable"
-  | "needs-repointing"
+  | "moves-with-finish"
   | "ready";
 
 export interface SelfServeMigrationView {

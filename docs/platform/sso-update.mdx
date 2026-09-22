@@ -44,9 +44,9 @@ up when you are ready. Nobody is signed out along the way.
 - Pick a colleague who has set a password on their LangWatch account. Before
   the update can finish, at least one person must be able to sign in without
   your identity provider.
-- If your directory sync (SCIM) provisions people today, plan to issue a new
-  provisioning token for the new connection. See [Point your directory sync at
-  the new connection](#point-your-directory-sync-at-the-new-connection).
+- If directory sync (SCIM) provisions your people today, nothing changes for
+  it. It moves to the new connection when you finish. See [Directory
+  sync](#directory-sync).
 
 ## 1. Open the Authentication overview
 
@@ -194,24 +194,24 @@ has passed**.
 | Every member has signed in through the new connection | Ask the members listed under **See who has not** to sign in once. Members who have left can be removed in **Settings > Directory**. |
 | Every current member has a verified sign-in on the new connection | Same as above; a sign-in that was interrupted before it completed does not count. |
 | Nobody has signed in through the previous provider for seven days | Wait. The seven days start from the last successful sign-in through the previous provider, so switching back resets the clock. |
-| Your directory sync points at the new connection | See below. |
 | No account is shared with another organization, and no account is covered by another organization's provider | Contact support. These are cases LangWatch cannot resolve safely on its own. |
 
-### Point your directory sync at the new connection
+### Directory sync
 
-Provisioning tokens belong to one connection. If your identity provider pushes
-people into LangWatch through SCIM today, that token belongs to the previous
-connection and stops working when the update finishes.
+If your identity provider pushes people into LangWatch through SCIM today,
+that sync was set up together with your sign-in, and you never held its token.
+So the update does not ask you to touch it. The **Directory sync** row reads
+**Moves across when you finish** while the update is in progress, and
+**Ready** once it has finished.
 
-1. Open **Settings > Authentication > Connectors**.
-2. Choose **Issue token**, select the new connection and describe the token.
-3. Paste the provisioning address and the new token into your identity
-   provider's SCIM settings, replacing the old token.
-4. Run or wait for a sync. The **Directory sync** row on the update reads
-   **Ready** once the new connection has received one.
+Finishing moves the sync to the new connection: the token your identity
+provider already presents keeps working, the people and groups it provisioned
+stay provisioned, and the next push lands on the new connection. Nobody is
+deprovisioned by the switch.
 
-People the old token provisioned are adopted by the new connection on their
-next sync; nobody is deprovisioned by the switch.
+If you had already issued a token for the new connection yourself under
+**Settings > Authentication > Connectors**, both tokens work after finishing.
+You can revoke the one you no longer use there.
 
 ## 6. Finish the update
 

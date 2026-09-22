@@ -470,7 +470,8 @@ describe("given persisted migration evidence", () => {
 
   it("keeps directory readiness and legacy token retirement as separate facts", async () => {
     await sync(legacyId, "SYNCING");
-    expect((await progress())?.scim.status).toBe("needs-repointing");
+    expect((await progress())?.scim.status).toBe("moves-with-finish");
+    expect((await inspect())?.blockers).toEqual([]);
     await sync(directId, "SYNCING");
     await prisma.scimToken.create({
       data: {
@@ -645,12 +646,12 @@ describe("given persisted migration evidence", () => {
       const beforeDelete = vi
         .spyOn(accounts, "beforeAccountDelete")
         .mockResolvedValue(void 0);
-      const revokeForConnection = vi.fn(async () => ({ revoked: 0 }));
+      const moveToConnection = vi.fn(async () => ({ moved: 0 }));
       const retirement = new PrismaSsoLegacyIdentityRetirement({
         prisma,
         identity,
         accounts,
-        directories: { revokeForConnection },
+        directories: { moveToConnection },
         now: () => MIGRATION_NOW.getTime(),
         newCommandId: () => "retire-binding",
       });
@@ -670,7 +671,7 @@ describe("given persisted migration evidence", () => {
         ).not.toBeNull();
         expect(beforeDelete).not.toHaveBeenCalled();
         expect(detach).not.toHaveBeenCalled();
-        expect(revokeForConnection).not.toHaveBeenCalled();
+        expect(moveToConnection).not.toHaveBeenCalled();
       } else {
         await action;
         expect(
@@ -685,9 +686,11 @@ describe("given persisted migration evidence", () => {
             userId: ownerId,
           }),
         );
-        expect(revokeForConnection).toHaveBeenCalledExactlyOnceWith({
+        // @scenario "Finishing moves the previous connection's directory sync across"
+        expect(moveToConnection).toHaveBeenCalledExactlyOnceWith({
           organizationId,
-          connectionId: legacyId,
+          fromConnectionId: legacyId,
+          toConnectionId: directId,
         });
       }
       expect(

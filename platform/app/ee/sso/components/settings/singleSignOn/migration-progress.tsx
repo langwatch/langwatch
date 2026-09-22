@@ -143,10 +143,6 @@ const UPDATE_CHECKS: Record<
     condition:
       "Nobody has signed in through the previous provider for seven days.",
   },
-  "scim-needs-repointing": {
-    act: () => "Point your directory sync at the new connection.",
-    condition: "Your directory sync points at the new connection.",
-  },
   "shared-legacy-identifiers": {
     act: ({ previous }) =>
       `An account that signs in through ${previous} is shared with another organization. Contact support to sort it out.`,
@@ -214,7 +210,7 @@ const DIRECTORY_STATUS: Record<
   string
 > = {
   "not-applicable": "Not in use",
-  "needs-repointing": "Point it at the new connection",
+  "moves-with-finish": "Moves across when you finish",
   ready: "Ready",
 };
 

@@ -443,7 +443,7 @@ describe("given an update under way", () => {
           linkedCount: 0,
           activeCount: 2,
           quietComplete: false,
-          scimStatus: "needs-repointing",
+          scimStatus: "moves-with-finish",
           sharedLegacyIdentifiers: true,
         }).map((blocker) => blocker.code),
         ...finalizationBlockers([], {
