@@ -35,6 +35,18 @@ Feature: Email search redaction notice
       Then no redaction notice is shown
 
     @integration
+    Scenario: A custom PII level that leaves email addresses out shows no notice
+      Given the query is "priya.raman@northwind.example"
+      And the project's effective PII level is custom without email addresses
+      Then no redaction notice is shown
+
+    @integration
+    Scenario: A custom PII level that names email addresses shows the notice
+      Given the query is "priya.raman@northwind.example"
+      And the project's effective PII level is custom with email addresses
+      Then a notice says email addresses are redacted before a trace is stored
+
+    @integration
     Scenario: A non-email query with no results shows no notice
       Given the query is "refund never arrived"
       Then no redaction notice is shown

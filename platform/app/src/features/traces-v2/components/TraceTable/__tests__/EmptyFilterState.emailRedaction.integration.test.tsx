@@ -67,12 +67,15 @@ vi.mock("../../../stores/searchSubmitRequestStore", () => ({
 
 import { EmptyFilterState } from "../EmptyFilterState";
 
-function piiLevel(level: string) {
+function piiLevel(level: string, entities: string[] = []) {
   snapshotQuery.mockImplementation(
     (_input: unknown, options?: { enabled?: boolean }) =>
       options?.enabled === false
         ? { data: undefined, isLoading: false }
-        : { data: { effective: { pii: { level } } }, isLoading: false },
+        : {
+            data: { effective: { pii: { level, entities } } },
+            isLoading: false,
+          },
   );
 }
 
@@ -123,6 +126,30 @@ describe("EmptyFilterState after a search for an email address", () => {
 
         expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
         expect(snapshotQuery).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the project redacts a custom set of identifiers", () => {
+    describe("when that set leaves email addresses out", () => {
+      /** @scenario "A custom PII level that leaves email addresses out shows no notice" */
+      it("shows no notice, because the addresses were stored in full", () => {
+        piiLevel("custom", ["BR_CPF", "PHONE_NUMBER"]);
+
+        renderEmptyState({ query: "priya.raman@northwind.example" });
+
+        expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when that set names email addresses", () => {
+      /** @scenario "A custom PII level that names email addresses shows the notice" */
+      it("says addresses are redacted", () => {
+        piiLevel("custom", ["EMAIL_ADDRESS"]);
+
+        renderEmptyState({ query: "priya.raman@northwind.example" });
+
+        expect(screen.getByText(NOTICE)).toBeInTheDocument();
       });
     });
   });

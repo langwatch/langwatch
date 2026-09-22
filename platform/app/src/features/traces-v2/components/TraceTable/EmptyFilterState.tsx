@@ -16,7 +16,10 @@ import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
 import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
-import { looksLikeEmail } from "../../utils/emailShapedQuery";
+import {
+  looksLikeEmail,
+  redactsEmailAddresses,
+} from "../../utils/emailShapedQuery";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (
@@ -178,8 +181,8 @@ const EmailRedactionNotice: React.FC = () => {
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id, retry: false },
   );
-  const level = snapshot.data?.effective.pii.level;
-  if (!level || level === "disabled") return null;
+  const pii = snapshot.data?.effective.pii;
+  if (!pii || !redactsEmailAddresses(pii)) return null;
   return (
     <Box width="full" textAlign="left">
       <PIIRedactionAlert>
