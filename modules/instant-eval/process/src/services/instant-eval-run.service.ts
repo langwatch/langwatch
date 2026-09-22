@@ -7,6 +7,7 @@
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
 import {
   type InstantEvalActor,
+  type InstantEvalJudgmentStatus,
   InstantEvalNotEnabledError,
   InstantEvalQueryInvalidError,
   type InstantEvalRunInput,
@@ -14,6 +15,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { InstantEvalJudgmentPage } from "../repositories/instant-eval-judgments.repository.ts";
 import type { InstantEvalRunRow } from "../repositories/instant-eval-run.repository.ts";
 import { instantEvalRowLimitOrRefuse } from "../rules/instant-eval-caps.rules.ts";
 import { getInstantEvalQueryCapability } from "../rules/instant-eval-query-capability.rules.ts";
@@ -86,7 +88,7 @@ export interface InstantEvalRunUnits {
   creates: Pick<InstantEvalCreateService, "createRun" | "nextRunId">;
   estimates: Pick<InstantEvalEstimateService, "estimateRun">;
   cancellations: Pick<InstantEvalCancelService, "cancelRun">;
-  reads: Pick<InstantEvalReadsService, "getRun">;
+  reads: Pick<InstantEvalReadsService, "getRun" | "findRuns" | "getResultsPage">;
   samples: Pick<InstantEvalSampleService, "getSample">;
   budget: Pick<
     InstantEvalFreeBudgetService,
@@ -213,6 +215,72 @@ export class InstantEvalRunService {
       runId,
       row: await this.units.reads.getRun({ projectId, runId }),
       rows,
+    });
+  }
+
+  /** The project's runs, newest first. Empty when it has none. */
+  async findRuns({
+    projectId,
+    limit,
+    before,
+    beforeId,
+  }: {
+    projectId: string;
+    limit: number;
+    before?: Instant;
+    beforeId?: string;
+  }): Promise<InstantEvalRunRow[]> {
+    await this.#assertEnabled(projectId);
+
+    return this.units.reads.findRuns({
+      projectId,
+      limit,
+      ...(before === undefined ? {} : { before }),
+      ...(beforeId === undefined ? {} : { beforeId }),
+    });
+  }
+
+  /** One run, or the refusal naming the id this project has none for. */
+  async getRun({
+    projectId,
+    runId,
+  }: {
+    projectId: string;
+    runId: string;
+  }): Promise<InstantEvalRunRow> {
+    await this.#assertEnabled(projectId);
+
+    return this.units.reads.getRun({ projectId, runId });
+  }
+
+  /** One page of a run's judgements. */
+  async getResultsPage({
+    projectId,
+    runId,
+    limit,
+    questionId,
+    isMatched,
+    status,
+    cursor,
+  }: {
+    projectId: string;
+    runId: string;
+    limit: number;
+    questionId?: string;
+    isMatched?: boolean;
+    status?: InstantEvalJudgmentStatus;
+    cursor?: string;
+  }): Promise<InstantEvalJudgmentPage> {
+    await this.#assertEnabled(projectId);
+
+    return this.units.reads.getResultsPage({
+      projectId,
+      runId,
+      limit,
+      ...(questionId === undefined ? {} : { questionId }),
+      ...(isMatched === undefined ? {} : { isMatched }),
+      ...(status === undefined ? {} : { status }),
+      ...(cursor === undefined ? {} : { cursor }),
     });
   }
 

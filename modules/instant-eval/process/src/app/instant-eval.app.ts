@@ -468,12 +468,12 @@ export class InstantEvalApp implements InstantEvalApiContract {
     before?: Instant;
     beforeId?: string;
   }): Promise<InstantEvalRunWire[]> {
-    const rows = await this.reads.findRuns(input);
+    const rows = await this.runs.findRuns(input);
     return rows.map(toInstantEvalRunWire);
   }
 
   async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunWire> {
-    return toInstantEvalRunWire(await this.reads.getRun(input));
+    return toInstantEvalRunWire(await this.runs.getRun(input));
   }
 
   async getResultsPage(input: {
@@ -485,7 +485,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     status?: InstantEvalJudgmentStatus;
     cursor?: string;
   }): Promise<InstantEvalResultsWire> {
-    const page = await this.reads.getResultsPage(input);
+    const page = await this.runs.getResultsPage(input);
     return {
       judgments: page.judgments.map(toInstantEvalJudgmentWire),
       ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),

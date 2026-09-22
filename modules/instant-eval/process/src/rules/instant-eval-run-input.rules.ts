@@ -8,6 +8,7 @@
 import {
   InstantEvalQueryInvalidError,
   type InstantEvalRunInput,
+  type InstantEvalRunInputBody,
   type InstantEvalShorthandInput,
 } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
@@ -100,4 +101,29 @@ export function instantEvalStatementFor({
     ...(filter ? { filter } : {}),
     ...(selection ? { selection } : {}),
   });
+}
+
+/**
+ * The flat body a door accepts, as the run service takes it: a caller writes
+ * flat keys on a command line, and a target with no questions is not a
+ * shorthand, so the service takes that half as one object.
+ */
+export function instantEvalRunInputOf(body: InstantEvalRunInputBody): InstantEvalRunInput {
+  return {
+    ...(body.sql === undefined ? {} : { sql: body.sql }),
+    ...(body.parameters === undefined ? {} : { parameters: body.parameters }),
+    ...(body.name === undefined ? {} : { name: body.name }),
+    ...(body.limit === undefined ? {} : { limit: body.limit }),
+    ...(body.target === undefined
+      ? {}
+      : {
+          shorthand: {
+            target: body.target,
+            questions: body.questions ?? [],
+            ...(body.filter === undefined ? {} : { filter: body.filter }),
+            ...(body.start === undefined ? {} : { start: body.start }),
+            ...(body.end === undefined ? {} : { end: body.end }),
+          },
+        }),
+  };
 }

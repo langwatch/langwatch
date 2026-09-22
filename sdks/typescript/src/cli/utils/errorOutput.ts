@@ -147,6 +147,25 @@ export const commandValidationError = (
 });
 
 /**
+ * A local "sign in first" failure the CLI checked itself, so `httpStatus` is 0:
+ * without its own code a missing login reads as `network_error`, whose advice
+ * has nothing to do with the precondition that failed.
+ */
+export const commandAuthError = (
+  message: string,
+  meta: Record<string, unknown> = {},
+): CliHandledError & { isLangWatchHandledError: true } => ({
+  isLangWatchHandledError: true,
+  code: "not_authenticated",
+  kind: "not_authenticated",
+  message,
+  httpStatus: 0,
+  meta,
+  isHandled: true,
+  retryable: false,
+});
+
+/**
  * Report failure from no-spinner path (validation, credentials, preconditions).
  * Human block or JSON + single line, depending on format. Does not exit.
  */

@@ -162,7 +162,14 @@ function harness(
           return instantEvalRunRow({ id: input.runId, status: "CANCELLED" });
         },
       },
-      reads: { getRun: async ({ runId }) => instantEvalRunRow({ id: runId }) },
+      reads: {
+        getRun: async ({ runId }) => instantEvalRunRow({ id: runId }),
+        findRuns: async ({ limit }) =>
+          Array.from({ length: Math.min(limit, 2) }, (_unused, index) =>
+            instantEvalRunRow({ id: `run-${index}` }),
+          ),
+        getResultsPage: async () => ({ judgments: [] }),
+      },
       samples: {
         getSample: async (input): Promise<InstantEvalSample> => {
           sampled.push({
@@ -403,5 +410,29 @@ describe("cancelling and sampling", () => {
     });
 
     expect(sampled).toEqual([{ runId: "instanteval_1", rows: 5, lwqlKey: "key-1" }]);
+  });
+});
+
+describe("reading runs back", () => {
+  it("lists the project's runs, newest first as the repository answers them", async () => {
+    const { service } = harness();
+
+    const runs = await service.findRuns({ projectId: "project-1", limit: 5 });
+
+    expect(runs.map((run) => run.id)).toEqual(["run-0", "run-1"]);
+  });
+
+  it("refuses every read a project the feature is not enabled for asks", async () => {
+    const { service } = harness({ peers: { isEnabled: async () => false } });
+
+    await expect(service.findRuns({ projectId: "project-1", limit: 5 })).rejects.toMatchObject({
+      code: "instant_eval_not_enabled",
+    });
+    await expect(
+      service.getRun({ projectId: "project-1", runId: "instanteval_1" }),
+    ).rejects.toMatchObject({ code: "instant_eval_not_enabled" });
+    await expect(
+      service.getResultsPage({ projectId: "project-1", runId: "instanteval_1", limit: 10 }),
+    ).rejects.toMatchObject({ code: "instant_eval_not_enabled" });
   });
 });

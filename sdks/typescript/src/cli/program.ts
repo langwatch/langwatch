@@ -3,6 +3,7 @@
  */
 
 import { Command, Option } from "commander";
+
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -446,19 +447,26 @@ function registerOpenCommands(program: Command): void {
 
 function registerWhoamiCommands(program: Command): void {
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
 }
 
 function registerClaudeCommands(program: Command): void {

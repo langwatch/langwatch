@@ -5,6 +5,8 @@
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
+import { defineRestMiddleware } from "@langwatch/api/contract";
+import type { RestProjectCredentialPrincipal } from "@langwatch/api/rest";
 import { z } from "zod";
 
 import {
@@ -426,3 +428,27 @@ export type InstantEvalJudgmentWire = z.infer<typeof instantEvalJudgmentSchema>;
 export type InstantEvalEstimateWire = z.infer<typeof instantEvalEstimateSchema>;
 export type InstantEvalResultsWire = z.infer<typeof instantEvalResultsSchema>;
 export type InstantEvalSampleWire = z.infer<typeof instantEvalSampleSchema>;
+
+/**
+ * The credential a request arrived on. A run reads its rows as the asker's own
+ * cut of the project's content, and over REST the asker is a KEY: the door's
+ * to resolve, never a handler's to reach for.
+ */
+export const instantEvalRestCredentialSchema: z.ZodType<RestProjectCredentialPrincipal> =
+  z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("apiKey"),
+      apiKeyId: z.string(),
+      userId: z.string().nullable(),
+      organizationId: z.string(),
+      projectId: z.string(),
+      teamId: z.string(),
+      isLangySessionKey: z.boolean().optional(),
+    }),
+    z.object({ kind: z.literal("legacyProjectKey") }),
+  ]);
+
+export const instantEvalRestCredential = defineRestMiddleware(
+  "instantEvalRestCredential",
+  instantEvalRestCredentialSchema,
+);
