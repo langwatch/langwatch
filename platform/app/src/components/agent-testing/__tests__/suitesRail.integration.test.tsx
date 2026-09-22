@@ -734,7 +734,8 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The rail carries the new-simulations announcement" */
-  it("carries the new-simulations announcement", () => {
+  // biome-ignore lint/suspicious/noSkippedTests: the callout retired on 2026-09-22 (real clock); lw#8254 tracks it
+  it.skip("carries the new-simulations announcement", () => {
     renderRail();
 
     expect(

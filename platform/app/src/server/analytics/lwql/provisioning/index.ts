@@ -32,6 +32,7 @@ export {
 } from "./catalogStatements";
 export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
 export {
+  LWQL_POSTGRES_READER_ROLE,
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,

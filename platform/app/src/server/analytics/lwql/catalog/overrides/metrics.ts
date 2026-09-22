@@ -32,6 +32,8 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     grain: "one row per (SeriesId, TimeUnixMs, PointId)",
     timeColumn: "TimeUnixMs",
     dedup: { versionColumn: "DedupVersion" },
+    // Both content permissions, matching logs.CanonicalPayload: the validator gates by bare column name across the catalog, so the wider set already applies to this column at query time and the schema door must say so.
+    columnGates: { CanonicalPayload: ["input", "output"] },
     columnUnits: {
       TimeUnixMs: "ms",
     },
