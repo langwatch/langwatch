@@ -51,6 +51,9 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           }),
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+        register: mutation("register"),
+        startLegacyMigration: mutation("startLegacyMigration"),
+        rename: mutation("rename"),
         setArrivals: mutation("setArrivals"),
         discardConnection: mutation("discardConnection"),
         removeConnection: mutation("removeConnection"),
@@ -123,6 +126,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
       activated: false,
     },
     legacyRoute: null,
+    migration: null,
     serviceProvider: SERVICE_PROVIDER,
     ...overrides,
   };
@@ -180,13 +184,62 @@ describe("the single sign-on setup page", () => {
 
   describe("given an organization with no connection", () => {
     /** @scenario "An organization with no sign-in route is offered the setup journey" */
-    it("opens on the register step", () => {
+    /** @scenario "An organization with no connection gets the journey" */
+    it("opens on the register step, with the form that starts one", () => {
       state.view = setupView({ connection: null, goLive: null });
 
       renderWithSsoHost(<SsoSetupScreen />);
 
       expect(screen.getByText("Connect your identity provider")).toBeInTheDocument();
+      expect(screen.getByTestId("sso-register-connection")).toBeInTheDocument();
+      expect(screen.getByText("Who signs your team in?")).toBeInTheDocument();
       expect(screen.queryByTestId("connection-domains")).toBeNull();
+    });
+
+    it("refreshes the read the moment a provider is registered", () => {
+      state.view = setupView({ connection: null, goLive: null });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+      fireEvent.click(screen.getByTestId("identity-provider-saml"));
+      fireEvent.change(screen.getByLabelText("Sign-in address"), {
+        target: { value: "https://sso.acme.com/saml2/sso" },
+      });
+      fireEvent.click(screen.getByTestId("sso-register"));
+
+      expect(state.calls.map((call) => call.name)).toEqual(["register"]);
+      expect(state.invalidated).toBe(1);
+    });
+  });
+
+  describe("given the connection's own card", () => {
+    /** @scenario "The name is offered for editing on the connection's card" */
+    it("offers the name for editing in place, and saves what was typed", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      fireEvent.click(screen.getByTestId("connection-name-edit"));
+      fireEvent.change(screen.getByTestId("connection-name-input"), {
+        target: { value: "Corporate sign-in" },
+      });
+      fireEvent.click(screen.getByTestId("connection-name-save"));
+
+      expect(state.calls).toEqual([
+        {
+          name: "rename",
+          input: {
+            organizationId: "org-1",
+            connectionId: "ssoc_1",
+            name: "Corporate sign-in",
+          },
+        },
+      ]);
+      expect(state.invalidated).toBe(1);
+    });
+
+    it("offers a reader who may not manage it no way to change it", () => {
+      renderWithSsoHost(<SsoSetupScreen />, new FakeSsoHost({ canManage: false }));
+
+      expect(screen.getByTestId("connection-name")).toBeInTheDocument();
+      expect(screen.queryByTestId("connection-name-edit")).toBeNull();
     });
   });
 

@@ -27,16 +27,22 @@ export type SsoSetupOrganizationInput = z.infer<typeof ssoSetupOrganizationSchem
  * maps identity's read onto it, and a value identity stops sending fails to
  * compile rather than reaching a screen as undefined.
  */
+/** How a domain was proved, in identity's own spellings. */
+const ssoSetupVerificationMethodSchema = z.enum([
+  "dns-txt",
+  "https-file",
+  "license-token",
+  "operator-attested",
+  "legacy-configuration",
+]);
+
+/** Which connection of a migration pair a reference names. */
+const ssoSetupConnectionSourceSchema = z.enum(["self-serve", "legacy-grandfathered"]);
+
 const ssoSetupProofSchema = z
   .object({
     domain: z.string(),
-    method: z.enum([
-      "dns-txt",
-      "https-file",
-      "license-token",
-      "operator-attested",
-      "legacy-configuration",
-    ]),
+    method: ssoSetupVerificationMethodSchema,
     qualification: z.enum(["QUALIFIED", "UNKNOWN", "LAPSED"]),
     proofState: z.enum(["VERIFIED", "WAVERING", "LAPSED"]),
     /** When a lapse becomes final; null while the evidence is there. */
@@ -59,13 +65,7 @@ const ssoSetupClaimSchema = z
 const ssoSetupRecordSchema = z
   .object({
     domain: z.string(),
-    method: z.enum([
-      "dns-txt",
-      "https-file",
-      "license-token",
-      "operator-attested",
-      "legacy-configuration",
-    ]),
+    method: ssoSetupVerificationMethodSchema,
     expiresAtMs: z.number().nullable(),
     expired: z.boolean(),
   })
@@ -101,7 +101,7 @@ const ssoSetupConnectionViewSchema = z
     type: z.enum(["oidc", "saml"]),
     providerId: z.string(),
     issuer: z.string().nullable(),
-    source: z.enum(["self-serve", "legacy-grandfathered"]),
+    source: ssoSetupConnectionSourceSchema,
     arrivalPolicy: z.enum(["admit", "request", "refuse"]),
     /** Null while the registration default stands: going live waits for a
      *  decision, and "turn everybody away" is a decision too. */
@@ -113,6 +113,73 @@ const ssoSetupConnectionViewSchema = z
   })
   .strict();
 
+/**
+ * Where one organization's legacy-to-direct cutover stands, as the card reads
+ * it. Everything here is re-read on every request: finalizing never trusts a
+ * snapshot a screen was holding. Identity's `SsoMigrationView`, repeated for
+ * the reason the page view above is repeated.
+ */
+const ssoMigrationConnectionRefSchema = z
+  .object({
+    connectionId: z.string(),
+    source: ssoSetupConnectionSourceSchema,
+    providerId: z.string(),
+  })
+  .strict();
+
+const ssoMigrationStragglerSchema = z
+  .object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    lastLegacyAuthenticationAtMs: z.number().nullable(),
+  })
+  .strict();
+
+export const ssoSetupMigrationSchema = z
+  .object({
+    legacy: ssoMigrationConnectionRefSchema,
+    replacement: ssoMigrationConnectionRefSchema,
+    phase: z.enum(["SETUP", "GRACE_LEGACY", "GRACE_DIRECT", "FINALIZING", "FINALIZED"]),
+    /** Which half decides an ordinary sign-in while the pair stands. */
+    selectedRoute: z.enum(["legacy", "direct"]),
+    /** The proofs the replacement was registered with, still qualifying. */
+    inheritedDomains: z.array(
+      z
+        .object({
+          domain: z.string(),
+          method: ssoSetupVerificationMethodSchema,
+          proofState: z.enum(["VERIFIED", "WAVERING", "LAPSED"]),
+          /** What the proof was read back against; null for one that
+           *  published nothing. */
+          evidenceRef: z.string().nullable(),
+          verifiedAtMs: z.number(),
+        })
+        .strict(),
+    ),
+    testSignIn: z.object({ done: z.boolean(), atMs: z.number().nullable() }).strict(),
+    members: z
+      .object({
+        activeCount: z.number(),
+        linkedCount: z.number(),
+        stragglers: z.array(ssoMigrationStragglerSchema),
+        nextCursor: z.string().nullable(),
+      })
+      .strict(),
+    quietPeriod: z
+      .object({ lastLegacyAuthenticationAtMs: z.number().nullable(), complete: z.boolean() })
+      .strict(),
+    /** Whether directory provisioning still points at the connection being
+     *  retired. */
+    scim: z.object({ status: z.enum(["not-applicable", "needs-repointing", "ready"]) }).strict(),
+    /** One reason finalizing would be premature, in the words the reader acts on. */
+    blockers: z.array(z.object({ code: z.string(), message: z.string() }).strict()),
+    canFinalize: z.boolean(),
+  })
+  .strict();
+
+export type SsoSetupMigration = z.infer<typeof ssoSetupMigrationSchema>;
+
 export const ssoSetupPageViewSchema = z
   .object({
     /** Null before the organization has registered its first connection. */
@@ -122,6 +189,9 @@ export const ssoSetupPageViewSchema = z
     goLive: ssoSetupGoLiveSchema.nullable(),
     /** The compatibility route a grandfathered connection stands in for. */
     legacyRoute: z.object({ domain: z.string(), provider: z.string() }).strict().nullable(),
+    /** Where the cutover stands, when this connection replaces a
+     *  grandfathered one. Null for every connection outside a pair. */
+    migration: ssoSetupMigrationSchema.nullable(),
     /** The addresses an identity provider is pointed at. This module serves
      *  them, so identity's own read does not answer them. */
     serviceProvider: z
@@ -273,3 +343,43 @@ export const ssoSetupRemovalSchema = z.object({
 });
 
 export type SsoSetupRemovalInput = z.infer<typeof ssoSetupRemovalSchema>;
+
+/** One page of a cutover's members. The first page arrives with the setup
+ *  read; this is how the card asks for the rest. */
+export const ssoSetupMigrationProgressSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  cursor: z.string().min(1).nullable().default(null),
+  limit: z.number().int().min(1).max(100).default(25),
+});
+
+export type SsoSetupMigrationProgressInput = z.infer<typeof ssoSetupMigrationProgressSchema>;
+
+/**
+ * The direct replacement for a grandfathered connection, registered with the
+ * same evidence an ordinary registration takes — and carrying over the
+ * domains the connection it replaces has already proved.
+ */
+export const ssoSetupStartMigrationSchema = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  legacyConnectionId: z.string().min(1),
+  providerId: z.string().min(1).max(100),
+  idp: ssoSetupRegistrationSchema,
+});
+
+export type SsoSetupStartMigrationInput = z.infer<typeof ssoSetupStartMigrationSchema>;
+
+/** Which half of a migration pair decides ordinary sign-ins. */
+export const ssoSetupMigrationRouteSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  route: z.enum(["legacy", "direct"]),
+});
+
+export type SsoSetupMigrationRouteInput = z.infer<typeof ssoSetupMigrationRouteSchema>;
+
+/** The word on the card; nothing routes on it. */
+export const ssoSetupRenameSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  name: z.string().trim().min(1).max(120),
+});
+
+export type SsoSetupRenameInput = z.infer<typeof ssoSetupRenameSchema>;

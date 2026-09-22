@@ -21,6 +21,9 @@ import type {
   SsoSetupArrivalsInput,
   SsoSetupConnectionInput,
   SsoSetupDomainInput,
+  SsoSetupMigration,
+  SsoSetupMigrationProgressInput,
+  SsoSetupMigrationRouteInput,
   SsoSetupOrganizationInput,
   SsoSetupPageView,
   SsoSetupRegistration,
@@ -84,6 +87,26 @@ export interface SsoSetupCommandLedger {
     },
     actor: SsoSelfServeActor,
   ): Promise<{ connectionId: string }>;
+  /** The replacement for a grandfathered connection, registered with the same
+   *  evidence and carrying over the domains that one already proved. */
+  startLegacyMigration(
+    input: {
+      organizationId: string;
+      legacyConnectionId: string;
+      providerId: string;
+      registration: SsoSetupRegistration;
+    },
+    actor: SsoSelfServeActor,
+  ): Promise<{ connectionId: string }>;
+  /** Which half of the pair decides ordinary sign-ins. */
+  selectMigrationRoute(
+    input: SsoSetupConnectionInput & { route: SsoSetupMigrationRouteInput["route"] },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  rename(
+    input: SsoSetupConnectionInput & { name: string },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
   setArrivals(
     input: SsoSetupConnectionInput & { arrivalPolicy: SsoSetupArrivalsInput["policy"] },
     actor: SsoSelfServeActor,
@@ -119,6 +142,12 @@ export type SsoSetupJourney = Omit<SsoSetupPageView, "serviceProvider">;
 
 export interface SsoSetupReads {
   getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupJourney>;
+  /** One cutover's members, paged. The migration is null where the
+   *  organization is running none, or where the connection named is not the
+   *  replacement in one. */
+  getMigrationProgress(
+    input: SsoSetupMigrationProgressInput,
+  ): Promise<{ migration: SsoSetupMigration | null }>;
 }
 
 /**

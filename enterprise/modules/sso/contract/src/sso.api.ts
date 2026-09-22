@@ -9,11 +9,16 @@ import type {
   SsoSetupArrivalsInput,
   SsoSetupConnectionInput,
   SsoSetupDomainInput,
+  SsoSetupMigration,
+  SsoSetupMigrationProgressInput,
+  SsoSetupMigrationRouteInput,
   SsoSetupOrganizationInput,
   SsoSetupPageView,
   SsoSetupRegistered,
   SsoSetupRegisterInput,
   SsoSetupRemovalInput,
+  SsoSetupRenameInput,
+  SsoSetupStartMigrationInput,
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
@@ -96,6 +101,15 @@ export interface SsoApi {
   getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView>;
 
   /**
+   * One cutover's members, paged. The migration is null where the organization
+   * is running none — identity's own shape, kept whole, because "no cutover"
+   * is an answer rather than an absence the caller has to handle.
+   */
+  getMigrationProgress(
+    input: SsoSetupMigrationProgressInput,
+  ): Promise<{ migration: SsoSetupMigration | null }>;
+
+  /**
    * The domain ceremony the organization runs itself (ADR-123), where
    * `claimDomain` above is the operator's. Both end at the same aggregate;
    * what differs is who may call and what the history names.
@@ -119,6 +133,18 @@ export interface SsoApi {
    * lapsed plan must strand nobody.
    */
   setupRegister(input: SsoSetupRegisterInput, by: SsoAdministrator): Promise<SsoSetupRegistered>;
+  /** The replacement for a grandfathered connection, and the two levers of
+   *  the cutover that follows. */
+  setupStartLegacyMigration(
+    input: SsoSetupStartMigrationInput,
+    by: SsoAdministrator,
+  ): Promise<SsoSetupRegistered>;
+  setupSelectMigrationRoute(
+    input: SsoSetupMigrationRouteInput,
+    by: SsoAdministrator,
+  ): Promise<void>;
+  /** The word on the card, which routes nothing and is never plan-gated. */
+  setupRename(input: SsoSetupRenameInput, by: SsoAdministrator): Promise<void>;
   setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void>;
   setupDiscardConnection(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
   setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void>;

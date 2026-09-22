@@ -18,6 +18,7 @@ import {
   SsoHostProvider,
   type SsoFailureNotice,
   type SsoRouteReading,
+  type SsoSuccessNotice,
   type SsoTestSignInResult,
 } from "../model/sso-host.ts";
 
@@ -66,6 +67,10 @@ class CapabilitySsoHost extends SsoHostApi {
 
   failed(failure: SsoFailureNotice): void {
     this.deps.feedback.failed(failure);
+  }
+
+  succeeded(notice: SsoSuccessNotice): void {
+    this.deps.feedback.succeeded(notice);
   }
 
   canManage(): boolean {

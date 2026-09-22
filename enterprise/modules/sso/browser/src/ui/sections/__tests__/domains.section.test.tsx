@@ -9,10 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = { input: { domain: string }; options?: { onSuccess?: (result: unknown) => void } };
 
-const { state } = vi.hoisted(() => {
+/** Every options bag the settling read was mounted with, newest last. */
+const { state, polls } = vi.hoisted(() => {
   const operation = () => ({ calls: [] as Call[], answer: void 0 as unknown });
 
   return {
+    polls: [] as { enabled: boolean; refetchInterval: number | false }[],
     state: {
       claimDomain: operation(),
       proveDomain: operation(),
@@ -37,6 +39,13 @@ vi.mock("../../../behavior/sso-api.ts", () => {
   return {
     ssoApi: {
       ssoSetup: {
+        getSetup: {
+          useQuery: (_input: unknown, options: (typeof polls)[number]) => {
+            polls.push(options);
+
+            return { data: void 0, isLoading: false, isError: false };
+          },
+        },
         claimDomain: recorder("claimDomain"),
         proveDomain: recorder("proveDomain"),
         removeDomain: recorder("removeDomain"),
@@ -69,23 +78,35 @@ const claimed: DomainClaimView = {
   waitsForReview: false,
 };
 
-function renderSection(
-  overrides: {
-    evidence?: DomainEvidenceView[];
-    claims?: DomainClaimView[];
-    canManage?: boolean;
-    provesWithLicense?: boolean;
-  } = {},
-) {
-  return renderWithSsoHost(
+type SectionProps = {
+  evidence?: DomainEvidenceView[];
+  claims?: DomainClaimView[];
+  canManage?: boolean;
+  provesWithLicense?: boolean;
+};
+
+function sectionWith(overrides: SectionProps) {
+  return (
     <DomainsSection
       {...TARGET}
       canManage={overrides.canManage ?? true}
       provesWithLicense={overrides.provesWithLicense ?? false}
       evidence={overrides.evidence ?? []}
       claims={overrides.claims ?? [claimed]}
-    />,
+    />
   );
+}
+
+function renderSection(overrides: SectionProps = {}) {
+  const rendered = renderWithSsoHost(sectionWith(overrides));
+
+  return {
+    ...rendered,
+    /** The same section, answering a read that has moved on. */
+    withRead: (next: SectionProps) => {
+      rendered.rerenderWithSsoHost(sectionWith(next));
+    },
+  };
 }
 
 beforeEach(() => {
@@ -93,6 +114,7 @@ beforeEach(() => {
     operation.calls.length = 0;
     operation.answer = void 0;
   }
+  polls.length = 0;
 });
 
 afterEach(cleanup);
@@ -130,10 +152,56 @@ describe("given a domain that has been claimed and not proved", () => {
     expect(state.checkDomainFile.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
   });
 
-  it("puts the evidence away once it has been found", () => {
+  it("keeps the value up while the status catches up, because it is issued once", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
 
+    expect(screen.getByTestId("connection-domain-record")).toBeTruthy();
+    expect(screen.getByTestId("connection-domain-pending")).toBeTruthy();
+  });
+});
+
+const PROVED: DomainEvidenceView = {
+  domain: "acme.com",
+  proved: true,
+  proofState: "VERIFIED",
+  graceEndsAtMs: null,
+};
+
+describe("given a command the server accepted before the read caught up", () => {
+  /** @scenario "A recorded proof refreshes until the setup view shows the proved domain" */
+  it("says the proof was accepted, reads again, and stops the moment it is proved", () => {
+    state.proveDomain.answer = { proved: false, record: RECORD };
+    const { withRead } = renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Prove this domain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
+
+    expect(screen.getByTestId("connection-domain-pending")).toHaveTextContent("Proof accepted");
+    expect(polls.at(-1)).toEqual({ enabled: true, refetchInterval: 1_000 });
+
+    withRead({ evidence: [PROVED], claims: [] });
+
+    expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
     expect(screen.queryByTestId("connection-domain-record")).toBeNull();
+    expect(polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+    expect(state.checkDomainRecord.calls).toHaveLength(1);
+  });
+
+  it("says a removal was accepted until the domain is gone from the rows", () => {
+    const { withRead } = renderSection({ evidence: [PROVED], claims: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(screen.getByTestId("connection-domain-pending")).toHaveTextContent("Removal accepted");
+
+    withRead({ evidence: [], claims: [] });
+
+    expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
+    expect(polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+  });
+
+  it("reads nothing again while nothing is waiting, so a settled page never polls", () => {
+    renderSection({ evidence: [PROVED], claims: [] });
+
+    expect(polls.every((options) => !options.enabled)).toBe(true);
   });
 });
 

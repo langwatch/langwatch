@@ -35,6 +35,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {

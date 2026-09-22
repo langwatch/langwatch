@@ -8,9 +8,10 @@
  */
 import { Button, HStack, Input, Table, Text, VStack } from "@chakra-ui/react";
 import type { SsoIssuedDnsRecord } from "@langwatch/enterprise-sso-contract";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
+import { useSettlingSetup } from "../../behavior/use-settling-setup.ts";
 import { domainNextStepFor } from "../../model/domain-next-step.ts";
 import { domainProofChipFor } from "../../model/domain-proof-chip.ts";
 import {
@@ -19,6 +20,11 @@ import {
   type DomainEvidenceView,
   type DomainRow,
 } from "../../model/domain-rows.ts";
+import {
+  pendingDomainSettled,
+  PENDING_DOMAIN_WORDS,
+  type PendingDomainChange,
+} from "../../model/pending-domain-change.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
 import { DomainStatusChip } from "../elements/domain-status-chip.tsx";
@@ -49,8 +55,21 @@ export function DomainsSection({
   // value has thrown the ceremony's answer away, and pressing "prove" a
   // second time replaces the record anybody has already published.
   const [minted, setMinted] = useState<SsoIssuedDnsRecord | null>(null);
+  // A command the server accepted whose projection has not arrived. The row
+  // is unchanged until it does, so the page says so and reads again.
+  const [pending, setPending] = useState<PendingDomainChange | null>(null);
   const claim = ssoApi.ssoSetup.claimDomain.useMutation();
   const rows = domainRowsFor({ evidence, claims });
+
+  useSettlingSetup({ organizationId, waiting: pending !== null });
+
+  useEffect(() => {
+    if (!pending || !pendingDomainSettled({ pending, rows })) return;
+    setPending(null);
+    // The value is issued once: it stays on screen until the domain it
+    // proves actually reads as proved.
+    if (pending.kind === "proof") setMinted(null);
+  }, [pending, rows]);
 
   const claimDomain = () => {
     claim.mutate(
@@ -109,6 +128,7 @@ export function DomainsSection({
                 recordIssued={minted?.domain === row.domain}
                 onMinted={setMinted}
                 onChanged={onChanged}
+                onRemovalAccepted={() => setPending({ domain: row.domain, kind: "removal" })}
               />
             ))}
           </Table.Body>
@@ -145,10 +165,16 @@ export function DomainsSection({
           organizationId={organizationId}
           connectionId={connectionId}
           onProved={() => {
-            setMinted(null);
+            setPending({ domain: minted.domain, kind: "proof" });
             onChanged?.();
           }}
         />
+      )}
+
+      {pending && (
+        <Text as="output" color="fg.muted" fontSize="sm" data-testid="connection-domain-pending">
+          {PENDING_DOMAIN_WORDS[pending.kind]}
+        </Text>
       )}
     </SettingsCard>
   );
@@ -163,6 +189,7 @@ function DomainTableRow({
   recordIssued,
   onMinted,
   onChanged,
+  onRemovalAccepted,
 }: {
   row: DomainRow;
   canManage: boolean;
@@ -172,6 +199,8 @@ function DomainTableRow({
   recordIssued: boolean;
   onMinted: (record: SsoIssuedDnsRecord) => void;
   onChanged?: () => void;
+  /** The removal landed; the row stands until the read says otherwise. */
+  onRemovalAccepted: () => void;
 }) {
   const host = useSsoHost();
   const claim = ssoApi.ssoSetup.claimDomain.useMutation();
@@ -248,7 +277,10 @@ function DomainTableRow({
               loading={remove.isPending}
               onClick={() =>
                 remove.mutate(target, {
-                  onSuccess: () => onChanged?.(),
+                  onSuccess: () => {
+                    onRemovalAccepted();
+                    onChanged?.();
+                  },
                   onError: (error) =>
                     host.failed({ error, fallbackTitle: `Removing ${row.domain}` }),
                 })

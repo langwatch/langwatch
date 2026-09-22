@@ -27,6 +27,12 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .withPermission("sso:view")
   .handle(({ app, input }) => app.getSetup(input))
 
+  /** The wire answers the cutover itself, as the surface it replaces did;
+   *  identity and this module carry it inside an answer of its own. */
+  .procedure("getMigrationProgress")
+  .withPermission("sso:view")
+  .handle(async ({ app, input }) => (await app.getMigrationProgress(input)).migration)
+
   .procedure("getHistory")
   .withPermission("sso:manage")
   .handle(({ app, input }) => app.findConnectionHistory(input))
@@ -67,6 +73,21 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .procedure("register")
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupRegister(input, administratorOf(actor)))
+
+  .procedure("startLegacyMigration")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupStartLegacyMigration(input, administratorOf(actor)))
+
+  /** The plan gate runs inside the application and only for `direct`: rolling
+   *  back to the grandfathered provider stays reachable however a plan
+   *  stands. */
+  .procedure("selectMigrationRoute")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupSelectMigrationRoute(input, administratorOf(actor)))
+
+  .procedure("rename")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
 
   .procedure("setArrivals")
   .withPermission("sso:manage")

@@ -11,11 +11,14 @@ import {
   SsoHostProvider,
   type SsoFailureNotice,
   type SsoRouteReading,
+  type SsoSuccessNotice,
   type SsoTestSignInResult,
 } from "./model/sso-host.ts";
 
 export class FakeSsoHost extends SsoHostApi {
   readonly failures: SsoFailureNotice[] = [];
+  /** Every acknowledgement this host was asked to show, in order. */
+  readonly acknowledgements: SsoSuccessNotice[] = [];
   /** Every test sign-in this host was asked to start, in order. */
   readonly testSignIns: {
     connectionId: string;
@@ -44,6 +47,10 @@ export class FakeSsoHost extends SsoHostApi {
 
   failed(failure: SsoFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  succeeded(notice: SsoSuccessNotice): void {
+    this.acknowledgements.push(notice);
   }
 
   canManage(): boolean {
@@ -77,14 +84,24 @@ export class FakeSsoHost extends SsoHostApi {
   }
 }
 
-/** Renders a section inside the design system's provider and a host. */
+/**
+ * Renders a section inside the design system's provider and a host.
+ * `rerenderWithSsoHost` puts new props on the same mounted tree, which is how
+ * a test watches a section answer a read that has caught up.
+ */
 export function renderWithSsoHost(element: ReactElement, host: FakeSsoHost = new FakeSsoHost()) {
+  const wrap = (child: ReactElement) => (
+    <ChakraProvider value={defaultSystem}>
+      <SsoHostProvider value={host}>{child}</SsoHostProvider>
+    </ChakraProvider>
+  );
+  const rendered = render(wrap(element));
+
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <SsoHostProvider value={host}>{element}</SsoHostProvider>
-      </ChakraProvider>,
-    ),
+    ...rendered,
+    rerenderWithSsoHost: (next: ReactElement) => {
+      rendered.rerender(wrap(next));
+    },
   };
 }

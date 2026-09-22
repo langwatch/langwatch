@@ -4,7 +4,7 @@
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { Skeleton, Text, VStack } from "@chakra-ui/react";
+import { HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
@@ -13,6 +13,7 @@ import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.t
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, domainEvidenceOf, provesWithLicense } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
+import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import { SetupStep, SetupSteps } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
@@ -22,6 +23,7 @@ import {
 } from "./connection-removal.section.tsx";
 import { DomainsSection } from "./domains.section.tsx";
 import { HistorySection } from "./history.section.tsx";
+import { RegisterConnectionSection } from "./register-connection.section.tsx";
 import { ServiceProviderSection } from "./service-provider.section.tsx";
 import { TestSignInSection } from "./test-sign-in.section.tsx";
 
@@ -56,7 +58,7 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
     return view.legacyRoute ? (
       <LegacyRouteNotice legacyRoute={view.legacyRoute} />
     ) : (
-      <UnregisteredJourney />
+      <UnregisteredJourney organizationId={organizationId} serviceProvider={view.serviceProvider} />
     );
   }
 
@@ -65,15 +67,27 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   );
 }
 
-/** Registering is `ssoSetup.register` and has no form on this page yet. */
-function UnregisteredJourney() {
+/** Nothing registered yet: the whole page is the one step that changes that. */
+function UnregisteredJourney({
+  organizationId,
+  serviceProvider,
+}: {
+  organizationId: string;
+  serviceProvider: SsoSetupPageView["serviceProvider"];
+}) {
+  const canManage = useSsoHost().canManage();
+  const utils = ssoApi.useUtils();
+
   return (
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       <SetupSteps>
         <SetupStep number={1} title="Connect your identity provider" state="current" last>
-          <Text color="fg.muted" fontSize="sm">
-            No identity provider is registered for this organization yet.
-          </Text>
+          <RegisterConnectionSection
+            organizationId={organizationId}
+            serviceProvider={serviceProvider}
+            canManage={canManage}
+            onRegistered={() => utils.ssoSetup.getSetup.invalidate()}
+          />
         </SetupStep>
       </SetupSteps>
     </VStack>
@@ -93,6 +107,7 @@ function ConnectedJourney({
   const canManage = host.canManage();
   const utils = ssoApi.useUtils();
   const setArrivals = ssoApi.ssoSetup.setArrivals.useMutation();
+  const rename = ssoApi.ssoSetup.rename.useMutation();
   const discard = ssoApi.ssoSetup.discardConnection.useMutation();
   const remove = ssoApi.ssoSetup.removeConnection.useMutation();
   // Set between a removal being accepted and the read catching up, so the
@@ -127,6 +142,16 @@ function ConnectedJourney({
     );
   };
 
+  const renameConnection = (command: { name: string }) => {
+    rename.mutate(
+      { organizationId, connectionId, name: command.name },
+      {
+        onSuccess: refresh,
+        onError: (error) => host.failed({ error, fallbackTitle: "Renaming this connection" }),
+      },
+    );
+  };
+
   const removeConnection = (command: ConnectionRemovalCommand) => {
     const settle = {
       onSuccess: () => {
@@ -155,11 +180,26 @@ function ConnectedJourney({
           state={progress.provider}
           summary={connection.providerId}
         >
-          <ServiceProviderSection
-            protocol={connection.type}
-            addresses={view.serviceProvider}
-            connected
-          />
+          <VStack align="stretch" gap={3}>
+            {/* The word on the card, edited in place: nothing routes on it,
+                so a whole screen for one string would be furniture. */}
+            <HStack gap={2}>
+              <Text color="fg.muted" fontSize="sm">
+                Name
+              </Text>
+              <ConnectionNameRow
+                name={connection.providerId}
+                canManage={canManage}
+                renaming={rename.isPending}
+                onRename={renameConnection}
+              />
+            </HStack>
+            <ServiceProviderSection
+              protocol={connection.type}
+              addresses={view.serviceProvider}
+              connected
+            />
+          </VStack>
         </SetupStep>
 
         <SetupStep

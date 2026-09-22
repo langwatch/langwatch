@@ -14,6 +14,12 @@ export type SsoFailureNotice = {
   fallbackTitle: string;
 };
 
+/** A short confirmation of something the administrator just did. */
+export type SsoSuccessNotice = {
+  title: string;
+  description?: string;
+};
+
 /** The address a section is rendering at, in the one half it reads. */
 export type SsoRouteReading = {
   /** Single-valued, as `UiRoute` hands it over. */
@@ -39,6 +45,14 @@ export abstract class SsoHostApi {
   abstract organizationId(): string | undefined;
 
   abstract failed(failure: SsoFailureNotice): void;
+
+  /**
+   * What just worked, said out loud. The screen moving underneath somebody is
+   * not an acknowledgement: a command that settles while the page still shows
+   * what it showed before reads as a press that did nothing, and the answer to
+   * that is to press again.
+   */
+  abstract succeeded(notice: SsoSuccessNotice): void;
 
   /**
    * Whether this reader may change what they are looking at. Seeing the page is

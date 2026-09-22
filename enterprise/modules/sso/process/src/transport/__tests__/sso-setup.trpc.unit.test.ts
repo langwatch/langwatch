@@ -6,7 +6,7 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
+import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,6 +51,30 @@ function runtimePorts(permits: (permission: string) => boolean): TrpcRuntimeMemb
   };
 }
 
+/** A cutover half-way through: the replacement registered, sign-in still on
+ *  the grandfathered provider. */
+const MIGRATION: SsoMigrationView = {
+  legacy: { connectionId: "ssoc_legacy", source: "legacy-grandfathered", providerId: "okta" },
+  replacement: { connectionId: "ssoc_1", source: "self-serve", providerId: "Okta" },
+  phase: "GRACE_LEGACY",
+  selectedRoute: "legacy",
+  inheritedDomains: [
+    {
+      domain: "acme.com",
+      method: "legacy-configuration",
+      proofState: "VERIFIED",
+      evidenceRef: null,
+      verifiedAtMs: 1_764_000_000_000,
+    },
+  ],
+  testSignIn: { done: true, atMs: 1_764_000_000_000 },
+  members: { activeCount: 12, linkedCount: 9, stragglers: [], nextCursor: "cur_2" },
+  quietPeriod: { lastLegacyAuthenticationAtMs: 1_764_000_000_000, complete: false },
+  scim: { status: "not-applicable" },
+  blockers: [],
+  canFinalize: false,
+};
+
 const ENTRY = {
   eventId: "evt_1",
   occurredAtMs: 1_764_000_000_000,
@@ -65,18 +89,24 @@ async function harness(
     /** The organization's plan, which the commands — and only the commands —
      *  are gated on. */
     planType?: string;
+    /** The cutover identity answers for this organization, if any. */
+    migration?: SsoMigrationView | null;
   } = {},
 ) {
   const connections = RecordingSsoConnectionLedger.create();
   const getHistory = vi.fn(async () => [ENTRY]);
   const ceremony = RecordingSsoDomainCeremony.create();
   const commands = RecordingSsoSetupCommands.create();
+  const getMigrationProgress = vi.fn<SsoSetupApi["getMigrationProgress"]>(async () => ({
+    migration: options.migration ?? null,
+  }));
   const journey = options.setup ?? {
     connection: null,
     claims: [],
     record: null,
     goLive: null,
     legacyRoute: null,
+    migration: null,
   };
   const auditLog = { record: vi.fn(async () => {}), listEntityHistory: vi.fn() };
   const app = await createSsoTestApp({
@@ -87,7 +117,7 @@ async function harness(
         connections,
         { getHistory },
         ceremony,
-        createApiFixture<SsoSetupApi>({ getSetup: async () => journey }),
+        createApiFixture<SsoSetupApi>({ getSetup: async () => journey, getMigrationProgress }),
         commands,
       ),
       entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
@@ -105,6 +135,7 @@ async function harness(
     ceremony,
     commands,
     getHistory,
+    getMigrationProgress,
     router,
     caller: router.createCaller({ actor: { id: "user_ana" } }),
   };
@@ -114,6 +145,7 @@ const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 
 describe("the organization's own single sign-on surface", () => {
   describe("given the mounted router", () => {
+    /** @scenario "Suspending a connection is not on the customer's surface" */
     it("exposes the setup read, the history and its signal, and the domain ceremony", async () => {
       const { router } = await harness();
 
@@ -123,13 +155,17 @@ describe("the organization's own single sign-on surface", () => {
         "claimDomain",
         "discardConnection",
         "getHistory",
+        "getMigrationProgress",
         "getSetup",
         "onHistoryActivity",
         "proveDomain",
         "register",
         "removeConnection",
         "removeDomain",
+        "rename",
+        "selectMigrationRoute",
         "setArrivals",
+        "startLegacyMigration",
       ]);
     });
   });
@@ -162,11 +198,17 @@ describe("the organization's own single sign-on surface", () => {
   });
 
   describe("given a reader who may see single sign-on but not manage it", () => {
-    /** @scenario "Reading migration progress does not grant permission to change it" */
     it("still reads where the setup stands, which is what the page renders", async () => {
       const { caller } = await harness({
         permits: (permission) => permission === "sso:view",
-        setup: { connection: null, claims: [], record: null, goLive: null, legacyRoute: null },
+        setup: {
+          connection: null,
+          claims: [],
+          record: null,
+          goLive: null,
+          legacyRoute: null,
+          migration: null,
+        },
       });
 
       await expect(caller.getSetup({ organizationId: "org_acme" })).resolves.toMatchObject({
@@ -303,6 +345,7 @@ describe("the organization's own single sign-on surface", () => {
   });
 
   describe("given an organization whose plan does not carry single sign-on", () => {
+    /** @scenario "Registering an identity provider needs an Enterprise plan" */
     it("refuses to register, and commands identity with nothing", async () => {
       const { caller, commands } = await harness({ planType: "LAUNCH" });
 
@@ -329,6 +372,14 @@ describe("the organization's own single sign-on surface", () => {
         cause: { code: "enterprise_plan_required" },
       });
       expect(commands.setArrivals).not.toHaveBeenCalled();
+    });
+
+    it("still answers the setup read, because a page that will not render says nothing", async () => {
+      const { caller } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.getSetup({ organizationId: "org_acme" })).resolves.toMatchObject({
+        connection: null,
+      });
     });
 
     /** @scenario "A lapsed subscription does not take the way back in away" */
@@ -392,6 +443,167 @@ describe("the organization's own single sign-on surface", () => {
       });
       expect(commands.discardConnection).not.toHaveBeenCalled();
       expect(commands.removeConnection).not.toHaveBeenCalled();
+    });
+  });
+  describe("given an organization mid-cutover", () => {
+    it("pages the members through identity, and answers the view itself", async () => {
+      const { caller, getMigrationProgress } = await harness({ migration: MIGRATION });
+
+      await expect(
+        caller.getMigrationProgress({ ...TARGET, cursor: "cur_1", limit: 50 }),
+      ).resolves.toMatchObject({ phase: "GRACE_LEGACY", members: { nextCursor: "cur_2" } });
+      expect(getMigrationProgress).toHaveBeenCalledWith({ ...TARGET, cursor: "cur_1", limit: 50 });
+    });
+
+    it("answers null where the organization is running no migration at all", async () => {
+      const { caller } = await harness();
+
+      await expect(
+        caller.getMigrationProgress({ ...TARGET, cursor: null, limit: 25 }),
+      ).resolves.toBeNull();
+    });
+
+    /** @scenario "Reading migration progress does not grant permission to change it" */
+    it("lets a reader who may only see read it, and refuses them the route", async () => {
+      const { caller, commands } = await harness({
+        migration: MIGRATION,
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(
+        caller.getMigrationProgress({ ...TARGET, cursor: null, limit: 25 }),
+      ).resolves.toMatchObject({ phase: "GRACE_LEGACY" });
+      await expect(
+        caller.selectMigrationRoute({ ...TARGET, route: "direct" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(commands.selectMigrationRoute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator replacing a grandfathered connection", () => {
+    it("names the connection being replaced, so the domains it proved carry over", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_legacy",
+          providerId: "Okta",
+          idp: {
+            protocol: "oidc",
+            issuer: "https://acme.okta.com",
+            clientId: "client",
+            clientSecret: "shhh",
+          },
+        }),
+      ).resolves.toEqual({ connectionId: "conn-replacement" });
+
+      expect(commands.startLegacyMigration).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        legacyConnectionId: "ssoc_legacy",
+        providerId: "Okta",
+        registration: {
+          protocol: "oidc",
+          issuer: "https://acme.okta.com",
+          clientId: "client",
+          clientSecret: "shhh",
+        },
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("is gated on the plan, because registering a replacement is registering", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_legacy",
+          providerId: "Okta",
+          idp: {
+            protocol: "saml",
+            entryPoint: "https://acme.okta.com/sso/saml",
+            entityId: null,
+            metadataXml: null,
+            certificate: null,
+          },
+        }),
+      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      expect(commands.startLegacyMigration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator moving the route of a cutover", () => {
+    it("carries the direction through to identity", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(
+        caller.selectMigrationRoute({ ...TARGET, route: "direct" }),
+      ).resolves.toBeUndefined();
+      expect(commands.selectMigrationRoute).toHaveBeenCalledWith({
+        ...TARGET,
+        route: "direct",
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("refuses to move traffic onto the replacement without the plan that carries it", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.selectMigrationRoute({ ...TARGET, route: "direct" }),
+      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      expect(commands.selectMigrationRoute).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A lapsed subscription does not take the way back in away" */
+    it("still rolls back to the grandfathered provider, whatever the plan says", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.selectMigrationRoute({ ...TARGET, route: "legacy" }),
+      ).resolves.toBeUndefined();
+      expect(commands.selectMigrationRoute).toHaveBeenCalledWith({
+        ...TARGET,
+        route: "legacy",
+        actor: { userId: "user_ana" },
+      });
+    });
+  });
+
+  describe("given an administrator renaming their connection", () => {
+    it("carries the name through, and is never gated on the plan", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.rename({ ...TARGET, name: "Corporate sign-in" }),
+      ).resolves.toBeUndefined();
+      expect(commands.rename).toHaveBeenCalledWith({
+        ...TARGET,
+        name: "Corporate sign-in",
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    /** @scenario "A name is required" */
+    it("refuses a blank name before identity is asked anything", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.rename({ ...TARGET, name: "   " })).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+      expect(commands.rename).not.toHaveBeenCalled();
+    });
+
+    it("refuses a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.rename({ ...TARGET, name: "Corporate sign-in" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.rename).not.toHaveBeenCalled();
     });
   });
 });

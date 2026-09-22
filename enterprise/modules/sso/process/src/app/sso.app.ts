@@ -38,11 +38,16 @@ import {
   type SsoSetupArrivalsInput,
   type SsoSetupConnectionInput,
   type SsoSetupDomainInput,
+  type SsoSetupMigration,
+  type SsoSetupMigrationProgressInput,
+  type SsoSetupMigrationRouteInput,
   type SsoSetupOrganizationInput,
   type SsoSetupPageView,
   type SsoSetupRegistered,
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
+  type SsoSetupRenameInput,
+  type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
 import {
   EntitlementApi,
@@ -265,6 +270,9 @@ export class SsoApp implements SsoApiContract {
     const setup = () => dependencies.identity.ssoSetupCommands();
     const selfServe: SsoSetupCommandLedger = {
       register: (input, actor) => setup().register({ ...input, actor }),
+      startLegacyMigration: (input, actor) => setup().startLegacyMigration({ ...input, actor }),
+      selectMigrationRoute: (input, actor) => setup().selectMigrationRoute({ ...input, actor }),
+      rename: (input, actor) => setup().rename({ ...input, actor }),
       setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
       discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
       removeConnection: (input, actor) => setup().removeConnection({ ...input, actor }),
@@ -281,7 +289,11 @@ export class SsoApp implements SsoApiContract {
       domains,
       selfServe,
       { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
-      { getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input) },
+      {
+        getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input),
+        getMigrationProgress: (input) =>
+          dependencies.identity.ssoSetup().getMigrationProgress(input),
+      },
       configuration.baseUrl,
       members.logger,
       dependencies,
@@ -303,6 +315,13 @@ export class SsoApp implements SsoApiContract {
         connectionId: journey.connection?.connectionId ?? null,
       }),
     };
+  }
+
+  /** One cutover's members, paged. The setup read carries the first page. */
+  getMigrationProgress(
+    input: SsoSetupMigrationProgressInput,
+  ): Promise<{ migration: SsoSetupMigration | null }> {
+    return this.#setup.getMigrationProgress(input);
   }
 
   async findConnectionHistory(
@@ -481,6 +500,63 @@ export class SsoApp implements SsoApiContract {
           },
           actor,
         ),
+    );
+  }
+
+  /** Registering a replacement is registering, so it is gated like one. */
+  async setupStartLegacyMigration(
+    input: SsoSetupStartMigrationInput,
+    by: SsoAdministrator,
+  ): Promise<SsoSetupRegistered> {
+    await this.#requireEnterprisePlan(input.organizationId);
+
+    return this.#attempted(
+      by,
+      "startLegacyMigration",
+      {
+        organizationId: input.organizationId,
+        connectionId: input.legacyConnectionId,
+        providerId: input.providerId,
+        protocol: input.idp.protocol,
+      },
+      (actor) =>
+        this.#selfServe.startLegacyMigration(
+          {
+            organizationId: input.organizationId,
+            legacyConnectionId: input.legacyConnectionId,
+            providerId: input.providerId,
+            registration: input.idp,
+          },
+          actor,
+        ),
+    );
+  }
+
+  /**
+   * One recovery lever with two directions. Moving ordinary traffic to the
+   * replacement is part of the paid rollout; moving it back to the
+   * grandfathered provider is always reachable, a lapsed plan included.
+   */
+  async setupSelectMigrationRoute(
+    input: SsoSetupMigrationRouteInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    if (input.route === "direct") await this.#requireEnterprisePlan(input.organizationId);
+
+    await this.#attempted(by, "selectMigrationRoute", { ...input }, (actor) =>
+      this.#selfServe.selectMigrationRoute(input, actor),
+    );
+  }
+
+  /**
+   * Ungated: a rename decides nothing about who signs in, and an organization
+   * whose plan lapsed still reads these cards. The name is audited in full —
+   * it is the word the card shows, and who changed it is what the history
+   * beside it is for.
+   */
+  async setupRename(input: SsoSetupRenameInput, by: SsoAdministrator): Promise<void> {
+    await this.#attempted(by, "rename", { ...input }, (actor) =>
+      this.#selfServe.rename(input, actor),
     );
   }
 

@@ -16,11 +16,16 @@ import {
   ssoSetupArrivalsSchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
+  ssoSetupMigrationProgressSchema,
+  ssoSetupMigrationRouteSchema,
+  ssoSetupMigrationSchema,
   ssoSetupOrganizationSchema,
   ssoSetupPageViewSchema,
   ssoSetupRegisteredSchema,
   ssoSetupRegisterSchema,
   ssoSetupRemovalSchema,
+  ssoSetupRenameSchema,
+  ssoSetupStartMigrationSchema,
 } from "./sso-setup.contract.ts";
 
 export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
@@ -35,6 +40,15 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
   .query("getSetup")
   .withInput(ssoSetupOrganizationSchema)
   .withOutput(ssoSetupPageViewSchema)
+
+  /**
+   * One cutover, paged. The setup read carries the first page of members;
+   * this answers the rest, and null where the organization is running no
+   * migration. `sso:view`, like the read it pages.
+   */
+  .query("getMigrationProgress")
+  .withInput(ssoSetupMigrationProgressSchema)
+  .withOutput(ssoSetupMigrationSchema.nullable())
 
   /** What happened to this connection, newest first. A read, permanently. */
   .query("getHistory")
@@ -80,6 +94,30 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
   .mutation("register")
   .withInput(ssoSetupRegisterSchema)
   .withOutput(ssoSetupRegisteredSchema)
+
+  /**
+   * Register the direct replacement for a grandfathered connection, which
+   * inherits the domains that connection already proved. The same evidence an
+   * ordinary registration takes, because it is one.
+   */
+  .mutation("startLegacyMigration")
+  .withInput(ssoSetupStartMigrationSchema)
+  .withOutput(ssoSetupRegisteredSchema)
+
+  /**
+   * One recovery lever with two directions: moving ordinary traffic to the
+   * replacement is part of the paid rollout, and moving it back to the
+   * grandfathered provider stays reachable however the plan stands.
+   */
+  .mutation("selectMigrationRoute")
+  .withInput(ssoSetupMigrationRouteSchema)
+  .withOutput(z.void())
+
+  /** The word on the card. Never plan-gated: a rename decides nothing about
+   *  who signs in, and an organization whose plan lapsed still reads it. */
+  .mutation("rename")
+  .withInput(ssoSetupRenameSchema)
+  .withOutput(z.void())
 
   /** Who this connection admits (ADR-117 §3). Going live waits on an answer,
    *  and "turn everybody away" is an answer. */

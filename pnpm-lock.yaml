@@ -3025,6 +3025,9 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../../packages/error-views
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
