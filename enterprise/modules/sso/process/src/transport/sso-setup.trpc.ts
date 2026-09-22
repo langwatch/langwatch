@@ -60,4 +60,23 @@ export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .procedure("checkDomainFile")
   .withPermission("sso:manage")
   .handle(({ app, input, actor }) => app.setupCheckDomainFile(input, administratorOf(actor)))
+
+  /** The Enterprise plan gate is NOT declared here and is not gone: it runs
+   *  second, inside the application, so a caller who does not hold
+   *  `sso:manage` is told that rather than told what was not bought. */
+  .procedure("register")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRegister(input, administratorOf(actor)))
+
+  .procedure("setArrivals")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupSetArrivals(input, administratorOf(actor)))
+
+  .procedure("discardConnection")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupDiscardConnection(input, administratorOf(actor)))
+
+  .procedure("removeConnection")
+  .withPermission("sso:manage")
+  .handle(({ app, input, actor }) => app.setupRemoveConnection(input, administratorOf(actor)))
   .build();

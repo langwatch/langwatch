@@ -40,6 +40,13 @@ export abstract class SsoHostApi {
 
   abstract failed(failure: SsoFailureNotice): void;
 
+  /**
+   * Whether this reader may change what they are looking at. Seeing the page is
+   * `sso:view` and every control on it is `sso:manage` (ADR-122), so the page
+   * renders for a reader who holds neither lever.
+   */
+  abstract canManage(): boolean;
+
   /** The reader's own address: every sentence about a refused test names it. */
   abstract currentUserAddress(): string | undefined;
 

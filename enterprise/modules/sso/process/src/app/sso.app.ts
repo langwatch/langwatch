@@ -35,11 +35,20 @@ import {
   type SsoDomainTarget,
   type SsoHistoryActivity,
   type SsoOperator,
+  type SsoSetupArrivalsInput,
   type SsoSetupConnectionInput,
   type SsoSetupDomainInput,
   type SsoSetupOrganizationInput,
   type SsoSetupPageView,
+  type SsoSetupRegistered,
+  type SsoSetupRegisterInput,
+  type SsoSetupRemovalInput,
 } from "@langwatch/enterprise-sso-contract";
+import {
+  EntitlementApi,
+  EnterprisePlanRequiredError,
+  isEnterpriseTier,
+} from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
@@ -60,6 +69,7 @@ import type {
   SsoDomainCeremonyLedger,
   SsoGateLogger,
   SsoSelfServeActor,
+  SsoSetupCommandLedger,
   SsoSetupReads,
 } from "./sso.members.ts";
 
@@ -166,6 +176,13 @@ const TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 /** The audit row's target, so a connection's history is one query. */
 const AUDIT_TARGET_KIND = "ssoConnection";
 
+/**
+ * What an organization whose plan does not carry single sign-on is told. The
+ * words are upstream's, carried as a literal because entitlement's feature
+ * registry has no `SSO` key yet (handoff §10).
+ */
+const SSO_ENTERPRISE_REFUSAL = "Single sign-on requires an Enterprise plan";
+
 export class SsoApp implements SsoApiContract {
   static readonly contract = SsoApi;
   static readonly dependencies = {
@@ -174,6 +191,7 @@ export class SsoApp implements SsoApiContract {
     users: UserApi,
     auditLog: AuditLogApi,
     identity: IdentityApi,
+    entitlements: EntitlementApi,
   };
   static readonly config = ssoConfig;
   static readonly secrets = ssoSecrets;
@@ -183,6 +201,7 @@ export class SsoApp implements SsoApiContract {
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
   readonly #ceremony: SsoDomainCeremonyLedger;
+  readonly #selfServe: SsoSetupCommandLedger;
   readonly #history: SsoConnectionHistoryReads;
   readonly #setup: SsoSetupReads;
   /** The deployment an identity provider is pointed back at. */
@@ -191,11 +210,13 @@ export class SsoApp implements SsoApiContract {
   readonly #operators: OpsApi;
   readonly #users: UserApi;
   readonly #auditLog: AuditLogApi;
+  readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
 
   private constructor(
     gate: SsoGateService,
     connections: SsoConnectionLedger,
     ceremony: SsoDomainCeremonyLedger,
+    selfServe: SsoSetupCommandLedger,
     history: SsoConnectionHistoryReads,
     setup: SsoSetupReads,
     baseUrl: string,
@@ -205,6 +226,7 @@ export class SsoApp implements SsoApiContract {
     this.#gate = gate;
     this.#connections = connections;
     this.#ceremony = ceremony;
+    this.#selfServe = selfServe;
     this.#history = history;
     this.#setup = setup;
     this.#baseUrl = baseUrl;
@@ -212,6 +234,7 @@ export class SsoApp implements SsoApiContract {
     this.#operators = dependencies.operators;
     this.#users = dependencies.users;
     this.#auditLog = dependencies.auditLog;
+    this.#entitlements = dependencies.entitlements;
   }
 
   static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoApp> {
@@ -239,6 +262,13 @@ export class SsoApp implements SsoApiContract {
       checkDomainRecord: (input, actor) => ceremony().checkDomainRecord({ ...input, actor }),
       checkDomainFile: (input, actor) => ceremony().checkDomainFile({ ...input, actor }),
     };
+    const setup = () => dependencies.identity.ssoSetupCommands();
+    const selfServe: SsoSetupCommandLedger = {
+      register: (input, actor) => setup().register({ ...input, actor }),
+      setArrivals: (input, actor) => setup().setArrivals({ ...input, actor }),
+      discardConnection: (input, actor) => setup().discardConnection({ ...input, actor }),
+      removeConnection: (input, actor) => setup().removeConnection({ ...input, actor }),
+    };
     const configuration = await resolveConfiguration(config, members, secrets);
     return new SsoApp(
       SsoGateService.create({
@@ -249,6 +279,7 @@ export class SsoApp implements SsoApiContract {
       }),
       connections,
       domains,
+      selfServe,
       { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
       { getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input) },
       configuration.baseUrl,
@@ -423,6 +454,83 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
+   * Registering is the purchase, so it is the press the plan gate stands in
+   * front of. The audit row records who asked for what and NOT this input: it
+   * carries a client secret, so the recorded args name the protocol instead.
+   */
+  async setupRegister(
+    input: SsoSetupRegisterInput,
+    by: SsoAdministrator,
+  ): Promise<SsoSetupRegistered> {
+    await this.#requireEnterprisePlan(input.organizationId);
+
+    return this.#attempted(
+      by,
+      "register",
+      {
+        organizationId: input.organizationId,
+        providerId: input.providerId,
+        protocol: input.idp.protocol,
+      },
+      (actor) =>
+        this.#selfServe.register(
+          {
+            organizationId: input.organizationId,
+            providerId: input.providerId,
+            registration: input.idp,
+          },
+          actor,
+        ),
+    );
+  }
+
+  /**
+   * Which answer an organization is on is the whole fact somebody asking why a
+   * stranger turned up in the member list needs, so the row carries it.
+   */
+  async setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void> {
+    await this.#requireEnterprisePlan(input.organizationId);
+
+    await this.#attempted(by, "setArrivals", { ...input }, (actor) =>
+      this.#selfServe.setArrivals(
+        {
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          arrivalPolicy: input.policy,
+        },
+        actor,
+      ),
+    );
+  }
+
+  /** Ungated, like the removal below it: a lapsed plan must never be the
+   *  reason an organization cannot take its own connection back out. */
+  async setupDiscardConnection(
+    input: SsoSetupConnectionInput,
+    by: SsoAdministrator,
+  ): Promise<void> {
+    await this.#attempted(by, "discardConnection", { ...input }, (actor) =>
+      this.#selfServe.discardConnection(input, actor),
+    );
+  }
+
+  async setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void> {
+    await this.#attempted(by, "removeConnection", { ...input }, (actor) =>
+      this.#selfServe.removeConnection({ ...input, graceMs: TEARDOWN_GRACE_MS }, actor),
+    );
+  }
+
+  /**
+   * Changing an organization's single sign-on takes an Enterprise plan (D09).
+   * READS are deliberately never gated: a page that refuses to render cannot
+   * say what it is refusing.
+   */
+  async #requireEnterprisePlan(organizationId: string): Promise<void> {
+    const plan = await this.#entitlements.getActivePlan({ organizationId });
+    if (!isEnterpriseTier(plan.type)) throw new EnterprisePlanRequiredError(SSO_ENTERPRISE_REFUSAL);
+  }
+
+  /**
    * Record the attempt, then run it: somebody asking why a domain changed at
    * 03:14 needs the try, not only the ones that worked. The fact names the
    * session the surface authenticated; the row names the operator borrowing
@@ -431,16 +539,18 @@ export class SsoApp implements SsoApiContract {
   async #attempted<T>(
     by: SsoAdministrator,
     action: string,
-    input: SsoSetupDomainInput,
+    args: Record<string, string | null> & { organizationId: string },
     ceremony: (actor: SsoSelfServeActor) => Promise<T>,
   ): Promise<T> {
     await this.#auditLog.record({
       userId: by.impersonatorId ?? by.id,
-      organizationId: input.organizationId,
+      organizationId: args.organizationId,
       action: `ssoSetup.${action}`,
-      args: { ...input },
+      args: { ...args },
       targetKind: AUDIT_TARGET_KIND,
-      targetId: input.connectionId,
+      ...(args.connectionId === undefined || args.connectionId === null
+        ? {}
+        : { targetId: args.connectionId }),
     });
 
     return ceremony({ userId: by.id });

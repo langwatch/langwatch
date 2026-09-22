@@ -13,10 +13,14 @@ import {
   ssoDomainProofSchema,
   ssoDomainProvedSchema,
   ssoHistoryActivitySchema,
+  ssoSetupArrivalsSchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
   ssoSetupOrganizationSchema,
   ssoSetupPageViewSchema,
+  ssoSetupRegisteredSchema,
+  ssoSetupRegisterSchema,
+  ssoSetupRemovalSchema,
 } from "./sso-setup.contract.ts";
 
 export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
@@ -67,4 +71,31 @@ export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
   .mutation("checkDomainFile")
   .withInput(ssoSetupDomainSchema)
   .withOutput(ssoDomainProvedSchema)
+
+  /**
+   * Register the organization's identity provider, with what it takes to dial
+   * it (D09). The credentials go to the vault and the audit row records the
+   * attempt without them.
+   */
+  .mutation("register")
+  .withInput(ssoSetupRegisterSchema)
+  .withOutput(ssoSetupRegisteredSchema)
+
+  /** Who this connection admits (ADR-117 §3). Going live waits on an answer,
+   *  and "turn everybody away" is an answer. */
+  .mutation("setArrivals")
+  .withInput(ssoSetupArrivalsSchema)
+  .withOutput(z.void())
+
+  /** Undo a registration that never went live: the journey opens back on the
+   *  register step, and the history keeps what was tried. */
+  .mutation("discardConnection")
+  .withInput(ssoSetupConnectionSchema)
+  .withOutput(z.void())
+
+  /** Take a connection away, on teardown's own terms: scheduled, graced and
+   *  reversible until it completes, so no press locks anybody out. */
+  .mutation("removeConnection")
+  .withInput(ssoSetupRemovalSchema)
+  .withOutput(z.void())
   .build();

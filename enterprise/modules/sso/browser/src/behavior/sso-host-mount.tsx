@@ -44,6 +44,9 @@ const INERT_AUTH: SsoAuthCapability = {
   },
 };
 
+/** Every control on the page, as ADR-122 gates them. */
+const SSO_MANAGE_PERMISSION = "sso:manage";
+
 class CapabilitySsoHost extends SsoHostApi {
   constructor(
     private readonly deps: {
@@ -63,6 +66,10 @@ class CapabilitySsoHost extends SsoHostApi {
 
   failed(failure: SsoFailureNotice): void {
     this.deps.feedback.failed(failure);
+  }
+
+  canManage(): boolean {
+    return this.deps.session.hasPermission(SSO_MANAGE_PERMISSION);
   }
 
   currentUserAddress(): string | undefined {

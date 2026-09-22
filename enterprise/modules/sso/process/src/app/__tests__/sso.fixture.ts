@@ -3,6 +3,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ssoSecrets, type SsoConfig } from "@langwatch/enterprise-sso-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import {
   ssoDomainRecordLocation,
   type IdentityApi,
@@ -10,6 +11,7 @@ import {
   type SsoConnectionHistoryApi,
   type SsoDomainCeremonyApi,
   type SsoSetupApi,
+  type SsoSetupCommandsApi,
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
@@ -175,12 +177,52 @@ export function createSsoTestIdentity(
   history?: SsoConnectionHistoryApi,
   ceremony?: SsoDomainCeremonyApi,
   setup?: SsoSetupApi,
+  commands?: SsoSetupCommandsApi,
 ): IdentityApi {
   return createApiFixture<IdentityApi>({
     ssoBackoffice: () => connections,
     ...(history ? { ssoConnectionHistory: () => history } : {}),
     ...(ceremony ? { ssoDomainCeremony: () => ceremony } : {}),
     ...(setup ? { ssoSetup: () => setup } : {}),
+    ...(commands ? { ssoSetupCommands: () => commands } : {}),
+  });
+}
+
+/** The organization's own presses, recorded as identity would receive them. */
+export class RecordingSsoSetupCommands implements SsoSetupCommandsApi {
+  static create(): RecordingSsoSetupCommands {
+    return new RecordingSsoSetupCommands();
+  }
+
+  readonly register = vi.fn<SsoSetupCommandsApi["register"]>(async () => ({
+    connectionId: "conn-new",
+  }));
+  readonly setArrivals = vi.fn<SsoSetupCommandsApi["setArrivals"]>(async () => {});
+  readonly activate = vi.fn<SsoSetupCommandsApi["activate"]>(async () => {});
+  readonly discardConnection = vi.fn<SsoSetupCommandsApi["discardConnection"]>(async () => {});
+  readonly removeConnection = vi.fn<SsoSetupCommandsApi["removeConnection"]>(async () => ({
+    removal: "teardown-requested" as const,
+  }));
+}
+
+/** A complete plan, at the type the gate only ever reads `.type` off. */
+export function createSsoTestPlan(type: string): Plan {
+  return {
+    planSource: "subscription",
+    type,
+    name: type,
+    free: false,
+    maxMembers: 0,
+    maxMembersLite: 0,
+    maxMessagesPerMonth: 0,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+  };
+}
+
+export function createSsoTestEntitlements(planType = "ENTERPRISE"): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
+    getActivePlan: () => Promise.resolve(createSsoTestPlan(planType)),
   });
 }
 
@@ -196,6 +238,7 @@ export function createSsoTestApp(
       users: UserApi;
       auditLog: AuditLogApi;
       identity: IdentityApi;
+      entitlements: EntitlementApi;
     }>;
   }> = {},
 ): Promise<SsoApp> {
@@ -208,6 +251,7 @@ export function createSsoTestApp(
       users: input.dependencies?.users ?? createSsoTestUsers(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity(connections),
+      entitlements: input.dependencies?.entitlements ?? createSsoTestEntitlements(),
     },
     members: {
       logger: input.members?.logger ?? RecordingSsoGateLogger.create(),

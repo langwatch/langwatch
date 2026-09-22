@@ -12,9 +12,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
+  createSsoTestEntitlements,
   createSsoTestIdentity,
   RecordingSsoConnectionLedger,
   RecordingSsoDomainCeremony,
+  RecordingSsoSetupCommands,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoSetupTrpcTransport } from "../sso-setup.trpc.ts";
 
@@ -60,11 +62,15 @@ async function harness(
   options: {
     permits?: (permission: string) => boolean;
     setup?: SsoSetupView;
+    /** The organization's plan, which the commands — and only the commands —
+     *  are gated on. */
+    planType?: string;
   } = {},
 ) {
   const connections = RecordingSsoConnectionLedger.create();
   const getHistory = vi.fn(async () => [ENTRY]);
   const ceremony = RecordingSsoDomainCeremony.create();
+  const commands = RecordingSsoSetupCommands.create();
   const journey = options.setup ?? {
     connection: null,
     claims: [],
@@ -82,7 +88,9 @@ async function harness(
         { getHistory },
         ceremony,
         createApiFixture<SsoSetupApi>({ getSetup: async () => journey }),
+        commands,
       ),
+      entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
     },
   });
   const trpc = initTRPC.context<TestContext>().create();
@@ -95,6 +103,7 @@ async function harness(
   return {
     auditLog,
     ceremony,
+    commands,
     getHistory,
     router,
     caller: router.createCaller({ actor: { id: "user_ana" } }),
@@ -112,11 +121,15 @@ describe("the organization's own single sign-on surface", () => {
         "checkDomainFile",
         "checkDomainRecord",
         "claimDomain",
+        "discardConnection",
         "getHistory",
         "getSetup",
         "onHistoryActivity",
         "proveDomain",
+        "register",
+        "removeConnection",
         "removeDomain",
+        "setArrivals",
       ]);
     });
   });
@@ -232,6 +245,153 @@ describe("the organization's own single sign-on surface", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(ceremony.removeDomain).not.toHaveBeenCalled();
       expect(ceremony.checkDomainFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator registering their identity provider", () => {
+    it("hands identity the registration and answers the connection it minted", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(
+        caller.register({
+          organizationId: "org_acme",
+          providerId: "Okta",
+          idp: {
+            protocol: "oidc",
+            issuer: "https://acme.okta.com",
+            clientId: "client",
+            clientSecret: "shhh",
+          },
+        }),
+      ).resolves.toEqual({ connectionId: "conn-new" });
+
+      expect(commands.register).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        providerId: "Okta",
+        registration: {
+          protocol: "oidc",
+          issuer: "https://acme.okta.com",
+          clientId: "client",
+          clientSecret: "shhh",
+        },
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("records the attempt without the client secret, because the row is readable", async () => {
+      const { auditLog, caller } = await harness();
+
+      await caller.register({
+        organizationId: "org_acme",
+        providerId: "Okta",
+        idp: {
+          protocol: "oidc",
+          issuer: "https://acme.okta.com",
+          clientId: "client",
+          clientSecret: "shhh",
+        },
+      });
+
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.register",
+        args: { organizationId: "org_acme", providerId: "Okta", protocol: "oidc" },
+        targetKind: "ssoConnection",
+      });
+    });
+  });
+
+  describe("given an organization whose plan does not carry single sign-on", () => {
+    it("refuses to register, and commands identity with nothing", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(
+        caller.register({
+          organizationId: "org_acme",
+          providerId: "Okta",
+          idp: {
+            protocol: "saml",
+            entryPoint: "https://acme.okta.com/sso/saml",
+            entityId: null,
+            metadataXml: null,
+            certificate: null,
+          },
+        }),
+      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      expect(commands.register).not.toHaveBeenCalled();
+    });
+
+    it("refuses to change who it admits, which is the same purchase", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.setArrivals({ ...TARGET, policy: "admit" })).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required" },
+      });
+      expect(commands.setArrivals).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A lapsed subscription does not take the way back in away" */
+    it("still removes the connection, because a lapse must strand nobody", async () => {
+      const { caller, commands } = await harness({ planType: "LAUNCH" });
+
+      await expect(caller.removeConnection({ ...TARGET, reason: null })).resolves.toBeUndefined();
+      expect(commands.removeConnection).toHaveBeenCalledWith({
+        ...TARGET,
+        reason: null,
+        graceMs: 7 * 24 * 60 * 60 * 1000,
+        actor: { userId: "user_ana" },
+      });
+    });
+  });
+
+  describe("given an administrator answering who the connection admits", () => {
+    it("carries the answer through under identity's own word for it", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.setArrivals({ ...TARGET, policy: "request" })).resolves.toBeUndefined();
+      expect(commands.setArrivals).toHaveBeenCalledWith({
+        ...TARGET,
+        arrivalPolicy: "request",
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    /** @scenario "Only administrators can confirm the initial arrival choice" */
+    it("refuses a reader who may see single sign-on but not manage it", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.setArrivals({ ...TARGET, policy: "admit" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.setArrivals).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator taking the connection back out", () => {
+    it("discards a setup that never went live, naming the session administrator", async () => {
+      const { caller, commands } = await harness();
+
+      await expect(caller.discardConnection(TARGET)).resolves.toBeUndefined();
+      expect(commands.discardConnection).toHaveBeenCalledWith({
+        ...TARGET,
+        actor: { userId: "user_ana" },
+      });
+    });
+
+    it("refuses both removals to a reader who may only see", async () => {
+      const { caller, commands } = await harness({
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.discardConnection(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.removeConnection({ ...TARGET, reason: null })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(commands.discardConnection).not.toHaveBeenCalled();
+      expect(commands.removeConnection).not.toHaveBeenCalled();
     });
   });
 });

@@ -6,10 +6,14 @@ import type {
   SsoDomainProof,
   SsoDomainProved,
   SsoHistoryActivity,
+  SsoSetupArrivalsInput,
   SsoSetupConnectionInput,
   SsoSetupDomainInput,
   SsoSetupOrganizationInput,
   SsoSetupPageView,
+  SsoSetupRegistered,
+  SsoSetupRegisterInput,
+  SsoSetupRemovalInput,
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
@@ -108,6 +112,16 @@ export interface SsoApi {
     by: SsoAdministrator,
   ): Promise<SsoDomainProved>;
   setupCheckDomainFile(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProved>;
+
+  /**
+   * The rest of the journey: registering the provider, saying who it admits,
+   * and the two ways a connection leaves. The removals are NOT plan-gated — a
+   * lapsed plan must strand nobody.
+   */
+  setupRegister(input: SsoSetupRegisterInput, by: SsoAdministrator): Promise<SsoSetupRegistered>;
+  setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void>;
+  setupDiscardConnection(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void>;
+  setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void>;
 }
 
 export const SsoApi = moduleApi<SsoApi>()("sso");

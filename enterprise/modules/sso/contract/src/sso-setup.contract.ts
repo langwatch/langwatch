@@ -210,3 +210,66 @@ export type SsoDomainProof = z.infer<typeof ssoDomainProofSchema>;
 export const ssoDomainProvedSchema = z.object({ proved: z.literal(true) }).strict();
 
 export type SsoDomainProved = z.infer<typeof ssoDomainProvedSchema>;
+
+/**
+ * What an administrator hands over to register their identity provider (D09).
+ * Two protocols and one shape each, discriminated rather than a bag of
+ * optional fields, because half the combinations are nonsense. Identity's
+ * spellings, repeated for the same reason the page view above repeats them.
+ */
+export const ssoSetupOidcRegistrationSchema = z.object({
+  protocol: z.literal("oidc"),
+  /** The address the discovery document lives under. */
+  issuer: z.string().trim().min(1).max(2048),
+  clientId: z.string().trim().min(1).max(512),
+  clientSecret: z.string().min(1).max(4096),
+});
+
+export const ssoSetupSamlRegistrationSchema = z.object({
+  protocol: z.literal("saml"),
+  /** Where a sign-in request is sent. */
+  entryPoint: z.string().trim().min(1).max(2048),
+  /** Derivable from metadata, so either this or `metadataXml` has to be there
+   *  and neither alone is required. */
+  entityId: z.string().trim().max(2048).nullable().default(null),
+  metadataXml: z.string().max(512_000).nullable().default(null),
+  certificate: z.string().max(64_000).nullable().default(null),
+});
+
+export const ssoSetupRegistrationSchema = z.discriminatedUnion("protocol", [
+  ssoSetupOidcRegistrationSchema,
+  ssoSetupSamlRegistrationSchema,
+]);
+
+export type SsoSetupRegistration = z.infer<typeof ssoSetupRegistrationSchema>;
+
+export const ssoSetupRegisterSchema = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  /** What the administrator calls this provider. */
+  providerId: z.string().min(1).max(100),
+  idp: ssoSetupRegistrationSchema,
+});
+
+export type SsoSetupRegisterInput = z.infer<typeof ssoSetupRegisterSchema>;
+
+/** The connection registering minted, which the page reads back straight away. */
+export const ssoSetupRegisteredSchema = z.object({ connectionId: z.string() }).strict();
+
+export type SsoSetupRegistered = z.infer<typeof ssoSetupRegisteredSchema>;
+
+/** Who the connection admits (ADR-117 §3). `policy` is the wire's word. */
+export const ssoSetupArrivalsSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  policy: z.enum(["admit", "request", "refuse"]),
+});
+
+export type SsoSetupArrivalsInput = z.infer<typeof ssoSetupArrivalsSchema>;
+
+/** Taking a connection away. WHICH removal that is comes from where the
+ *  connection stands, so the caller states a reason and nothing else. */
+export const ssoSetupRemovalSchema = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  reason: z.string().min(1).max(1000).nullable().default(null),
+});
+
+export type SsoSetupRemovalInput = z.infer<typeof ssoSetupRemovalSchema>;

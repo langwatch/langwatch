@@ -25,6 +25,9 @@
       "path": "../../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/identity/contract/tsconfig.build.json"
     },
     {

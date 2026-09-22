@@ -26,6 +26,8 @@ export class FakeSsoHost extends SsoHostApi {
     private readonly options: {
       organizationId?: string | null;
       currentUserAddress?: string | null;
+      /** Whether the reader holds `sso:manage`; they do unless a test says not. */
+      canManage?: boolean;
       query?: Record<string, string | undefined>;
       /** What the sign-in answers, or throws when it is an error. */
       testSignIn?: SsoTestSignInResult | Error;
@@ -42,6 +44,10 @@ export class FakeSsoHost extends SsoHostApi {
 
   failed(failure: SsoFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  canManage(): boolean {
+    return this.options.canManage ?? true;
   }
 
   currentUserAddress(): string | undefined {

@@ -18,9 +18,13 @@ import type {
   SsoDomainProof,
   SsoDomainProved,
   SsoDomainTarget,
+  SsoSetupArrivalsInput,
+  SsoSetupConnectionInput,
   SsoSetupDomainInput,
   SsoSetupOrganizationInput,
   SsoSetupPageView,
+  SsoSetupRegistration,
+  SsoSetupRemovalInput,
 } from "@langwatch/enterprise-sso-contract";
 
 /** The operator a command is appended under. The ledger mints nothing itself. */
@@ -62,6 +66,35 @@ export interface SsoDomainCeremonyLedger {
   removeDomain(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<void>;
   checkDomainRecord(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;
   checkDomainFile(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;
+}
+
+/**
+ * The rest of the organization's own journey, as identity offers it: the
+ * ceremony above is its domain half, and these are the presses either side of
+ * it. Stated as this module's own demand, so a signature identity changes
+ * stops this from compiling rather than reaching a screen half-wired.
+ */
+export interface SsoSetupCommandLedger {
+  register(
+    input: {
+      organizationId: string;
+      /** What the administrator calls this provider. */
+      providerId: string;
+      registration: SsoSetupRegistration;
+    },
+    actor: SsoSelfServeActor,
+  ): Promise<{ connectionId: string }>;
+  setArrivals(
+    input: SsoSetupConnectionInput & { arrivalPolicy: SsoSetupArrivalsInput["policy"] },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  discardConnection(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
+  /** Which removal it was is read from where the connection stands, never
+   *  chosen by the caller. */
+  removeConnection(
+    input: SsoSetupRemovalInput & { graceMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<{ removal: "discarded" | "teardown-requested" }>;
 }
 
 /**
