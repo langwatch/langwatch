@@ -190,6 +190,16 @@ export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-g
 export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";
+export type { SsoConnectionRoutingRepository } from "./repositories/sso-connection-routing.repository.ts";
+export {
+  type PrismaSsoConnectionRoutingDatabase,
+  PrismaSsoConnectionRoutingRepository,
+} from "./repositories/prisma/prisma.sso-connection-routing.repository.ts";
+export {
+  type SsoMethodConfiguration,
+  type SsoMethodDial,
+  ssoMethodDialWith,
+} from "./rules/sso-method-dial.rules.ts";
 export type {
   JoinMembership,
   JoinRequestNotifier,

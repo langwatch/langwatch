@@ -3,13 +3,19 @@ import type { SsoConnectionState } from "@langwatch/identity-contract";
 import type { SsoEngineProviderRow } from "../rules/sso-engine-provider.rules.ts";
 
 /**
- * Where the engine's provider row is kept (D09). Two verbs and no read: the
- * row is derived from the connection head on every fold, so nothing here ever
- * needs to ask what it used to say.
+ * Where the engine's provider row is kept (D09). The writes never ask what
+ * the row said - every fold derives it from the connection head - and the
+ * read asks only whether one is there, which is half of being dialable.
  */
 export abstract class SsoEngineProviderRepository {
   /** Keep this connection's row, replacing whatever stood for it. */
   abstract put(row: SsoEngineProviderRow): Promise<void>;
+  /**
+   * Whether the engine holds a provider registered for this connection: the
+   * organization's own side of being dialable, which the method this
+   * deployment mounts cannot answer for.
+   */
+  abstract findRegisteredProvider(args: { connectionId: string }): Promise<boolean>;
   /**
    * Remove it. Removed rather than disabled: a suspended or torn-down
    * connection must stop being dialable, and a row the engine can still find

@@ -16,6 +16,10 @@ export class MemorySsoEngineProviderRepository extends SsoEngineProviderReposito
     this.store.ssoEngineProviders.set(row.id, row);
   }
 
+  async findRegisteredProvider({ connectionId }: { connectionId: string }): Promise<boolean> {
+    return this.store.ssoEngineProviders.has(connectionId);
+  }
+
   async remove({ connectionId }: { connectionId: string }): Promise<void> {
     this.store.ssoEngineProviders.delete(connectionId);
   }

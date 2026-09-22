@@ -133,10 +133,13 @@ export class SsoConnectionGrandfatherService {
     }[] = [];
     for (const domain of domains) {
       const [legacy, connection] = await Promise.all([
-        this.deps.legacyRouting.tryFindConnectionForDomain({ domain }),
-        this.deps.connectionRouting.tryFindConnectionForDomain({ domain }),
+        this.deps.legacyRouting.findConnectionsForDomain({ domain }),
+        this.deps.connectionRouting.findConnectionsForDomain({ domain }),
       ]);
-      const comparison = compareConnectionRouting({ legacy, connection });
+      const comparison = compareConnectionRouting({
+        legacy: legacy[0] ?? null,
+        connection: connection[0] ?? null,
+      });
       if (!comparison.matches) {
         disagreements.push({ domain, comparison });
       }

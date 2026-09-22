@@ -44,11 +44,13 @@ function routable(
 class StubRouting implements SignInDomainRouting {
   constructor(private readonly byDomain: Record<string, RoutableConnection | null>) {}
 
-  async tryFindConnectionForDomain({ domain }: { domain: string }) {
-    return this.byDomain[domain] ?? null;
+  async findConnectionsForDomain({ domain }: { domain: string }) {
+    const routed = this.byDomain[domain];
+
+    return routed === undefined || routed === null ? [] : [routed];
   }
 
-  async listActiveConnections() {
+  async findActiveConnections() {
     return [];
   }
 }
@@ -145,10 +147,10 @@ describe("the sso connection grandfather migration", () => {
 
         // And it routes the domain exactly as the legacy string did — the
         // "without noticing" half.
-        const routedByConnection = await connectionRouting.tryFindConnectionForDomain({
+        const [routedByConnection] = await connectionRouting.findConnectionsForDomain({
           domain: "acme.com",
         });
-        const routedByLegacy = await legacyRouting.tryFindConnectionForDomain({
+        const [routedByLegacy] = await legacyRouting.findConnectionsForDomain({
           domain: "acme.com",
         });
         expect(routedByConnection?.method.id).toBe(routedByLegacy?.method.id);

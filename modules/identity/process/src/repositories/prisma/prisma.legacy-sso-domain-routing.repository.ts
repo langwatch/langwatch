@@ -27,16 +27,16 @@ export class LegacySsoDomainRoutingRepository implements SignInDomainRouting {
     private readonly instanceMethod: () => Promise<SignInMethod | null>,
   ) {}
 
-  async tryFindConnectionForDomain({
+  async findConnectionsForDomain({
     domain,
   }: {
     domain: string;
-  }): Promise<RoutableConnection | null> {
+  }): Promise<readonly RoutableConnection[]> {
     const organization = await this.prisma.organization.findUnique({
       where: { ssoDomain: domain },
       select: { id: true, ssoProvider: true },
     });
-    if (!organization?.ssoProvider) return null;
+    if (!organization?.ssoProvider) return [];
 
     // An org PINS a provider and the deployment mounts one: dialable means
     // some mounted method carries the pin, which `legacySsoDialOf` reads and
@@ -48,20 +48,22 @@ export class LegacySsoDomainRoutingRepository implements SignInDomainRouting {
       pin: organization.ssoProvider,
       mountedMethodId: mounted?.id ?? null,
     });
-    return {
-      connectionId: `org:${organization.id}`,
-      method: {
-        id: dial.dialable ? dial.methodId : organization.ssoProvider,
-        kind: "federated",
+    return [
+      {
         connectionId: `org:${organization.id}`,
+        method: {
+          id: dial.dialable ? dial.methodId : organization.ssoProvider,
+          kind: "federated",
+          connectionId: `org:${organization.id}`,
+        },
+        state: "ACTIVE",
+        configured: dial.dialable,
+        allowsJit: true,
       },
-      state: "ACTIVE",
-      configured: dial.dialable,
-      allowsJit: true,
-    };
+    ];
   }
 
-  async listActiveConnections(): Promise<readonly RoutableConnection[]> {
+  async findActiveConnections(): Promise<readonly RoutableConnection[]> {
     const method = await this.instanceMethod();
     if (!method) return [];
     return [

@@ -16,12 +16,13 @@ const logger = createLogger("langwatch:identity:signin-router");
 
 /** Org-level routing data. Never per-user: see the engine's docblock. */
 export interface SignInDomainRouting {
-  /** The connection owning an email domain, or null when none does — the
-   *  same null a domain nobody ever configured produces. */
-  tryFindConnectionForDomain(input: { domain: string }): Promise<RoutableConnection | null>;
+  /** The connection owning an email domain: one, after a migrating pair is
+   *  collapsed to the side sign-in goes through, and none when nothing owns
+   *  it - the same emptiness a domain nobody ever configured produces. */
+  findConnectionsForDomain(input: { domain: string }): Promise<readonly RoutableConnection[]>;
   /** Every connection this instance could auto-redirect to with no address
    *  in hand (the self-hosted sole-connection rule). */
-  listActiveConnections(): Promise<readonly RoutableConnection[]>;
+  findActiveConnections(): Promise<readonly RoutableConnection[]>;
 }
 
 /**
@@ -185,17 +186,16 @@ export class SignInRouterService {
     activeConnections: readonly RoutableConnection[];
   }> {
     if (domain) {
-      return {
-        domainConnection: await this.domains.tryFindConnectionForDomain({
-          domain,
-        }),
-        activeConnections: [],
-      };
+      const [domainConnection] = await this.domains.findConnectionsForDomain({
+        domain,
+      });
+
+      return { domainConnection: domainConnection ?? null, activeConnections: [] };
     }
 
     return {
       domainConnection: null,
-      activeConnections: await this.domains.listActiveConnections(),
+      activeConnections: await this.domains.findActiveConnections(),
     };
   }
 }
