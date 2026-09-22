@@ -111,6 +111,11 @@ class CapabilityTraceHost extends TraceHostApi {
   registerLangyActions(): () => void {
     return () => void 0;
   }
+
+  /** Likewise the ask: no capability carries the agent's composer yet. */
+  askLangy(): void {
+    // Nothing to hand it to.
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   evaluationContextChip,
   experimentContextChip,
   mergeContextChips,
+  namedPageChips,
   promptContextChip,
   scenarioContextChip,
   shortenChipId,
@@ -343,6 +344,34 @@ describe("traceChipDisplayName", () => {
       expect(traceContextChip("abc123def456", traceChipDisplayName({})).label).toBe(
         "Trace \u00b7 abc123\u202656",
       );
+    });
+  });
+});
+
+describe("namedPageChips", () => {
+  describe("when the dataset page registers its dataset by name", () => {
+    /** @scenario "The dataset page offers its dataset by name" */
+    it("goes ahead of the route's chip, so the merged chip carries the name and the same ref", () => {
+      const routed = datasetContextChip({ datasetId: "dataset_3f9a01c2" });
+      const named = datasetContextChip({
+        datasetId: "dataset_3f9a01c2",
+        name: "Refund conversations",
+      });
+
+      expect(mergeContextChips([...namedPageChips([named]), routed])).toEqual([
+        {
+          id: "dataset:dataset_3f9a01c2",
+          kind: "dataset",
+          label: "dataset: Refund conversations",
+          ref: "dataset_3f9a01c2",
+        },
+      ]);
+    });
+
+    it("leaves every other registered chip where it was", () => {
+      expect(
+        namedPageChips([{ id: "prompt:p1", kind: "prompt", label: "prompt: p1", ref: "p1" }]),
+      ).toEqual([]);
     });
   });
 });

@@ -107,6 +107,27 @@ export type TraceLangyActionHandler = {
 /** Every such action, by the kind the agent dispatches. */
 export type TraceLangyActionHandlers = Readonly<Record<string, TraceLangyActionHandler>>;
 
+/**
+ * One reference riding along with a question — the Explorer view, the applied
+ * search — as the agent reads it.
+ */
+export type TraceLangyContext = {
+  kind: "filter" | "trace";
+  /** Self-describing text the agent scopes the answer to. */
+  ref: string;
+  label: string;
+};
+
+/** What the screen hands the agent: a question, or a sentence to finish. */
+export type TraceLangyAskRequest = {
+  /** Asked outright on a fresh conversation; absent opens the composer. */
+  question?: string;
+  /** Starts the composer's sentence, never over what the reader wrote. */
+  draft?: string;
+  /** Attached in this order, after the ask has reset the conversation. */
+  context?: readonly TraceLangyContext[];
+};
+
 export abstract class TraceHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): TraceHostProject | undefined;
@@ -149,6 +170,13 @@ export abstract class TraceHostApi {
    * is why a screen never reaches the agent's browser half itself.
    */
   abstract registerLangyActions(handlers: TraceLangyActionHandlers): () => void;
+
+  /**
+   * Hands a question, and the view it is asked about, to the agent. An
+   * application with no agent does nothing with it — which is why a screen
+   * never reaches the agent's browser half itself.
+   */
+  abstract askLangy(request: TraceLangyAskRequest): void;
 }
 
 const TraceHostContext = createContext<TraceHostApi | undefined>(void 0);

@@ -30,6 +30,14 @@ export function toRelativeSameOriginHref({
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
+/**
+ * Whether `href` is a path inside this app. A protocol-relative `//host` and an
+ * absolute url both leave the app, so neither counts.
+ */
+export function isAppPath(href: unknown): href is string {
+  return typeof href === "string" && href.startsWith("/") && !href.startsWith("//");
+}
+
 /** Whether a platform URL identifies a concrete resource, not an index page. */
 export function isPreciseResourceHref(url: string): boolean {
   let parsed: URL;

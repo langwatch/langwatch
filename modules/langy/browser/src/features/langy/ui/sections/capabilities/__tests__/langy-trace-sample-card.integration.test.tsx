@@ -104,7 +104,56 @@ function renderCard({ totalHits, count }: { totalHits: number; count: number }) 
   );
 }
 
+// What the recorder's reduction left of a real 13-match search: every row cut
+// down to its first keys in alphabetical order, "trace_id" not among them.
+const reducedRow = {
+  "…": "5 more keys truncated",
+  error: null,
+  evaluations: [],
+  input: { value: "How long does a refund take to reach my card?" },
+  metadata: { labels: ["refund"] },
+  metrics: { total_cost: 0.002 },
+};
+
+function renderReduced() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <LangyHostProvider value={host}>
+        <LangyTraceSampleCard
+          descriptor={descriptor}
+          input={{ command }}
+          output={{
+            traces: [reducedRow, reducedRow, "… 8 more items truncated, 13 total"],
+            pagination: { totalHits: 13 },
+          }}
+          projectSlug="acme"
+        />
+      </LangyHostProvider>
+    </ChakraProvider>,
+  );
+}
+
 describe("LangyTraceSampleCard", () => {
+  describe("given recorded rows that lost their trace id", () => {
+    describe("when the card renders", () => {
+      /** @scenario "Rows the card cannot identify render as unreadable, never as an empty result" */
+      it("says it could not read the result instead of claiming nothing matched", () => {
+        renderReduced();
+
+        expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
+        expect(screen.queryByText("No traces matched.")).toBeNull();
+        expect(screen.queryByText(/showing 0/)).toBeNull();
+      });
+
+      /** @scenario "Rows the card cannot identify render as unreadable, never as an empty result" */
+      it("still offers the way through to the Trace Explorer", () => {
+        renderReduced();
+
+        expect(screen.getByText("View in Trace Explorer")).toBeTruthy();
+      });
+    });
+  });
+
   describe("given a search that matched far more traces than it returned", () => {
     describe("when the card renders", () => {
       /** @scenario "The sample never pretends to be the whole result" */

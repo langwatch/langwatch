@@ -44,6 +44,8 @@ class FixtureTraceHost extends TraceHostApi {
   succeeded() {}
   failed() {}
 
+  askLangy() {}
+
   registerLangyActions(handlers: TraceLangyActionHandlers): () => void {
     this.registered = handlers;
     return () => {

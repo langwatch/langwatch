@@ -12220,6 +12220,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -12314,6 +12317,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel

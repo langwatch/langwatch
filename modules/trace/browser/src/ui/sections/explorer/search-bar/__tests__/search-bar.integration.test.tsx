@@ -15,15 +15,6 @@ import "@testing-library/jest-dom/vitest";
 const langyMock = {
   enabled: false,
   panelOpen: false,
-  // The composer draft the handoff seeds ("Find traces where ") — but never
-  // over something already half-written, so the fixture carries the value.
-  draft: "",
-  ask: vi.fn(),
-  open: vi.fn(),
-  attach: vi.fn(),
-  setDraft: vi.fn((draft: string) => {
-    langyMock.draft = draft;
-  }),
 };
 vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => langyMock.enabled,
@@ -33,17 +24,8 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
 }));
 vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
-  const state = () => ({
-    isOpen: langyMock.panelOpen,
-    askLangy: langyMock.ask,
-    openPanel: langyMock.open,
-    attachContext: langyMock.attach,
-    // `seedDraft` reads `draft.trim()` before writing (ADR-058), so the
-    // no-typed-text path throws on an undefined draft and never reaches
-    // `attachContext`. The store really does carry both.
-    draft: langyMock.draft,
-    setDraft: langyMock.setDraft,
-  });
+  // Only whether the panel is up: the ask itself leaves through the host.
+  const state = () => ({ isOpen: langyMock.panelOpen });
   const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) => selector(state());
   useLangyStore.getState = state;
   return { ...actual, useLangyStore };
@@ -97,9 +79,56 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 
+import {
+  TraceHostApi,
+  TraceHostProvider,
+  type TraceLangyAskRequest,
+} from "../../../../../behavior/trace-host.ts";
 import { SEARCH_BAR_PLACEHOLDER } from "../placeholder-editor.tsx";
 import { SearchBar } from "../search-bar.tsx";
 import { SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff.ts";
+
+/** A host that remembers every question the bar handed to the agent. */
+class AskingTraceHost extends TraceHostApi {
+  readonly asked: TraceLangyAskRequest[] = [];
+
+  project() {
+    return { id: "project_1", slug: "demo", name: "Demo" };
+  }
+  organization() {
+    return void 0;
+  }
+  team() {
+    return void 0;
+  }
+  organizationRole() {
+    return void 0;
+  }
+  currentUser() {
+    return void 0;
+  }
+  hasPermission() {
+    return true;
+  }
+  isLoading() {
+    return false;
+  }
+  route() {
+    return { params: {}, query: {}, pathname: "/demo/traces" };
+  }
+  setQuery() {}
+  navigate() {}
+  succeeded() {}
+  failed() {}
+  registerLangyActions(): () => void {
+    return () => void 0;
+  }
+  askLangy(request: TraceLangyAskRequest): void {
+    this.asked.push(request);
+  }
+}
+
+let host = new AskingTraceHost();
 
 afterEach(() => {
   cleanup();
@@ -110,17 +139,15 @@ beforeEach(() => {
   useFilterStore.getState().clearAll();
   langyMock.enabled = false;
   langyMock.panelOpen = false;
-  langyMock.draft = "";
-  langyMock.ask.mockClear();
-  langyMock.open.mockClear();
-  langyMock.attach.mockClear();
-  langyMock.setDraft.mockClear();
+  host = new AskingTraceHost();
 });
 
 function renderSearchBar() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SearchBar />
+      <TraceHostProvider value={host}>
+        <SearchBar />
+      </TraceHostProvider>
     </ChakraProvider>,
   );
 }
@@ -225,8 +252,7 @@ describe("<SearchBar /> ask affordance", () => {
         // The floating bar's input takes over; the structured bar steps back.
         expect(screen.getByRole("textbox")).toBeInTheDocument();
         expect(document.querySelector("[data-placeholder]")).not.toBeInTheDocument();
-        expect(langyMock.open).not.toHaveBeenCalled();
-        expect(langyMock.ask).not.toHaveBeenCalled();
+        expect(host.asked).toEqual([]);
       });
 
       it("shows that the applied search will go with the question", () => {
@@ -252,10 +278,11 @@ describe("<SearchBar /> ask affordance", () => {
         });
         fireEvent.keyDown(input, { key: "Enter" });
 
-        expect(langyMock.ask).toHaveBeenCalledWith("why are these failing?");
-        expect(langyMock.attach).toHaveBeenCalledWith({
-          type: "filter",
-          id: applied,
+        expect(host.asked).toHaveLength(1);
+        expect(host.asked[0]?.question).toBe("why are these failing?");
+        expect(host.asked[0]?.context).toContainEqual({
+          kind: "filter",
+          ref: applied,
           label: `filtered: ${applied}`,
         });
       });
@@ -266,9 +293,7 @@ describe("<SearchBar /> ask affordance", () => {
 
         fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
 
-        expect(langyMock.ask).not.toHaveBeenCalled();
-        expect(langyMock.open).not.toHaveBeenCalled();
-        expect(langyMock.attach).not.toHaveBeenCalled();
+        expect(host.asked).toEqual([]);
       });
     });
 
@@ -284,13 +309,14 @@ describe("<SearchBar /> ask affordance", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
 
-        expect(langyMock.open).toHaveBeenCalled();
         // Nothing typed, so the composer opens with the sentence already
         // started — the handoff's seed, never over a half-written draft.
-        expect(langyMock.setDraft).toHaveBeenCalledWith(SEARCH_HANDOFF_DRAFT);
-        expect(langyMock.attach).toHaveBeenCalledWith({
-          type: "filter",
-          id: applied,
+        expect(host.asked).toHaveLength(1);
+        expect(host.asked[0]?.question).toBeUndefined();
+        expect(host.asked[0]?.draft).toBe(SEARCH_HANDOFF_DRAFT);
+        expect(host.asked[0]?.context).toContainEqual({
+          kind: "filter",
+          ref: applied,
           label: `filtered: ${applied}`,
         });
         // The structured search bar stays put — no floating composer.

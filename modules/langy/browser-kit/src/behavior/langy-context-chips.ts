@@ -19,6 +19,15 @@ export function mergeContextChips(
 }
 
 /**
+ * The page-registered chips that name a resource the route can only give an id
+ * for. Both chips share one id and the merge keeps the first, so these go ahead
+ * of the route's: the agent reads "dataset: Refund conversations", same ref.
+ */
+export function namedPageChips(pageContext: readonly LangyContextChip[]): LangyContextChip[] {
+  return pageContext.filter((chip) => chip.kind === "dataset");
+}
+
+/**
  * Shorten a long id for a chip label: `3f9a01…c2`. Shared so a chip minted by a
  * clicked trace row reads identically to the one the route derives — same id,
  * same label, so they dedupe instead of stacking.

@@ -1297,6 +1297,15 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the Langy panel opens and asks "why are these failing?"
     And the active search rides along as attached context
 
+  @unit
+  Scenario: Ask Langy sends the whole view with the question
+    Given the search bar contains the applied query "status:error"
+    And the Conversations lens is active over the last 7 days
+    When the user asks "why are these failing?" through Ask Langy
+    Then the view is attached first: data source, time range, lens, grouping, sort and the search
+    And the search is attached second as the filter the agent applies
+    # The explicit route sends at least what the passive page context sends.
+
   Scenario: Escape closes the ask surface without sending anything
     Given the Langy ask surface is open
     When the user presses Escape
@@ -1320,6 +1329,7 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the user presses ⌘+Enter / Ctrl+Enter
     Then the Langy panel opens and asks "why are checkout traces failing"
 
+  @unit
   Scenario: A question that is just the applied filter is not attached twice
     Given the search bar contains the applied query "status:error"
     When the user presses ⌘+Enter / Ctrl+Enter on that same text

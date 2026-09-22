@@ -8,6 +8,7 @@ import {
   type CliResultDigest,
   parseCardResult,
   extractPlatformUrl,
+  isAppPath,
 } from "@langwatch/langy-contract";
 
 import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
@@ -499,6 +500,7 @@ export function LangyDeclarativeCard({
       projectSlug={projectSlug}
       resourceId={tone === "removed" ? null : id}
       platformUrl={tone === "removed" ? null : extractPlatformUrl(output)}
+      {...dispatchedActionLink(document)}
       icon={descriptor.icon}
     >
       {parsed.ok ? (
@@ -711,4 +713,25 @@ function dispatchedActionTitle(document: unknown): string | null {
   if (typeof kind !== "string" || kind.trim() === "") return null;
   const action = kind.slice(kind.lastIndexOf(".") + 1);
   return action === "" ? null : capitalize(labelize(action));
+}
+
+/**
+ * The link a page action answered with: an action that ran with no page open
+ * says where its effect can be seen. A link out of the app is dropped.
+ */
+function dispatchedActionLink(document: unknown): {
+  deepLinkHref?: string;
+  deepLinkLabel?: string;
+} {
+  if (!document || typeof document !== "object") return {};
+  const record = document as Record<string, unknown>;
+  if (typeof record.executedVia !== "string") return {};
+  const result = record.result;
+  if (!result || typeof result !== "object") return {};
+  const { href, label } = result as Record<string, unknown>;
+  if (!isAppPath(href)) return {};
+  return {
+    deepLinkHref: href,
+    ...(typeof label === "string" ? { deepLinkLabel: label } : {}),
+  };
 }

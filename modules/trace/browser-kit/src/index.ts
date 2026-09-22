@@ -1,4 +1,5 @@
 export * from "./expand-context.ts";
+export * from "./explorer-link-lens.ts";
 export * from "./explorer.store.ts";
 export * from "./export-types.ts";
 export * from "./get-suggestion-state.ts";
@@ -27,4 +28,5 @@ export {
   isOverridesEmpty,
   parseFragment,
 } from "@langwatch/trace-contract";
+export * from "./view-context-chip.ts";
 export * from "./view.slice.ts";

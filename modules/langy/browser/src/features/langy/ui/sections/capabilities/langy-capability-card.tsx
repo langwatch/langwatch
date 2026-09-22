@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
+import { isAppPath, toRelativeSameOriginHref } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -32,6 +32,14 @@ type CapabilityCardProps = {
   projectSlug?: string | null;
   resourceId?: string | null;
   platformUrl?: string | null;
+  /**
+   * A link the result itself answered with (a page action that ran with no
+   * page open answers where to see its effect), as an app path. Wins over
+   * `platformUrl` and the rebuilt surface href.
+   */
+  deepLinkHref?: string | null;
+  /** The copy for that link, when the result names its own. */
+  deepLinkLabel?: string | null;
   icon?: CapabilityIconName;
 };
 
@@ -39,6 +47,8 @@ type CapabilityCardProps = {
 export function LangyCapabilityCard({
   actions,
   deepLink = true,
+  deepLinkHref,
+  deepLinkLabel,
   platformUrl,
   projectSlug,
   resourceId,
@@ -55,6 +65,8 @@ export function LangyCapabilityCard({
             projectSlug={projectSlug}
             resourceId={resourceId}
             platformUrl={platformUrl}
+            appHref={deepLinkHref}
+            label={deepLinkLabel ?? void 0}
           />
         ) : null}
       </HStack>
@@ -68,15 +80,24 @@ function CapabilityDeepLinkChip({
   projectSlug,
   resourceId,
   platformUrl,
+  appHref,
+  label,
 }: {
   surface: CapabilitySurface;
   projectSlug?: string | null;
   resourceId?: string | null;
   platformUrl?: string | null;
+  /** An app path the result answered with. Anything else is ignored. */
+  appHref?: string | null;
+  /** Override the default "Open in <surface>" copy. */
+  label?: string;
 }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const preciseHref = platformUrl ? toRelativeSameOriginHref({ url: platformUrl, origin }) : null;
-  const href = preciseHref ?? buildSurfaceHref({ surface, projectSlug, resourceId });
+  const href =
+    (isAppPath(appHref) ? appHref : null) ??
+    preciseHref ??
+    buildSurfaceHref({ surface, projectSlug, resourceId });
   const onClick = useSpaLinkClick(href ?? "");
   if (!href) return null;
 
@@ -93,7 +114,7 @@ function CapabilityDeepLinkChip({
       _hover={{ textDecoration: "underline" }}
       onClick={onClick}
     >
-      {`Open in ${SURFACE_LABEL[surface]}`}
+      {label ?? `Open in ${SURFACE_LABEL[surface]}`}
       <ArrowUpRight size={12} />
     </LangySpaAnchor>
   );

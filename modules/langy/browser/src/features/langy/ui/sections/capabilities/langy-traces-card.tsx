@@ -6,6 +6,7 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy-contract";
+import { useExplorerLinkLensId } from "@langwatch/trace-browser-kit";
 import { Search } from "lucide-react";
 
 import {
@@ -72,6 +73,11 @@ function parseTracesJson(output: unknown): { total: number | null; traces: Parse
     });
   }
 
+  // Rows came back and none of them can be named: the document was cut down
+  // past its ids. That is unreadable output, not a search that matched nothing.
+  const hasRows = rows.some((row) => !!row && typeof row === "object");
+  if (hasRows && traces.length === 0) return null;
+
   return { total: totalOf(document) ?? traces.length, traces };
 }
 
@@ -130,13 +136,17 @@ export function LangyTracesCard({ descriptor, input, output, projectSlug }: Capa
   // The search Langy actually ran, offered back as somewhere to GO.
   const router = useRouter();
   const search = readTraceSearchQuery(input);
-  const queryHref = search.query
+  const lensId = useExplorerLinkLensId();
+  const narrowsTheSearch =
+    !!search.query || !!search.filter || !!search.errorsOnly || (search.origins?.length ?? 0) > 0;
+  const queryHref = narrowsTheSearch
     ? buildTraceExplorerHref({
         projectSlug,
         search,
         // A `langwatch trace search` result — an absent window here is the
         // CLI's own last-24h default, not an unknown one.
         unstatedWindow: "cli-last-24h",
+        lensId,
       })
     : null;
 

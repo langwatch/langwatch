@@ -85,6 +85,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/log-contract": "workspace:*",

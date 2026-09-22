@@ -152,10 +152,16 @@ export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
  * unmount, so the chip follows the page.
  */
 export function useRegisterLangyPageContext(items: LangyContextChip[]) {
-  const { registerPageContext, clearPageContext } = useLangy();
+  // Read without `useLangy`: a page also renders where Langy is not mounted (a
+  // test, a surface outside the project layout), and naming its resource for
+  // Langy must not be what breaks it there.
+  const langy = useContext(LangyContext);
+  const registerPageContext = langy?.registerPageContext;
+  const clearPageContext = langy?.clearPageContext;
   // Serialize so a fresh array literal with the same content doesn't re-run.
   const key = JSON.stringify(items);
   useEffect(() => {
+    if (!registerPageContext || !clearPageContext) return;
     registerPageContext(items);
     return () => clearPageContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
