@@ -152,6 +152,9 @@ service:
 # leaves the running process alone and prints the compile error; only a
 # successful build restarts. The quiet window before a rebuild is
 # LANGWATCH_DEV_WATCH_DEBOUNCE_MS, the same knob the Node lane debounces on.
+# include_dir names the three Go trees the service builds from: exclude_dir
+# only matches paths directly under the root, so without it air walks every
+# nested node_modules and one dangling package link ends the whole lane.
 # Usage: make service-watch svc=aigateway
 #        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
@@ -167,7 +170,8 @@ service-watch:
 			--build.bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
 			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
-			--build.exclude_dir ".bin,tmp,vendor,node_modules"
+			--build.include_dir "cmd,pkg,services" \
+			--build.exclude_dir ".bin,tmp,vendor,node_modules,services/langyworker/node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./dev/scripts/dev.sh <preset>` directly. Preset list:

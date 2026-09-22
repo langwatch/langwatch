@@ -64,6 +64,9 @@ export NODE_ENV="${NODE_ENV:-development}"
 . "$HERE/lib/derive-dev-ports.sh"
 derive_dev_ports
 
+# shellcheck source=./lib/shell-quote.sh
+. "$HERE/lib/shell-quote.sh"
+
 # Fail fast if any port we'd bind to is already taken (a stale `pnpm dev`,
 # Docker exposing the same port, …). Without this we'd only discover the
 # conflict half a minute later, after Vite and tsx finish booting.
@@ -260,7 +263,7 @@ fi
 # concurrently's own prefix would then be a second lane column, so it is off.
 add_lane() {
   NAMES+=("$1")
-  COMMANDS+=("bash \"$HERE/lane.sh\" $1 \"$2\"")
+  COMMANDS+=("bash $(shell_quote "$HERE/lane.sh") $1 $(shell_quote "$2")")
 }
 
 add_lane ui "$RUNTIME_ENV pnpm -s --filter @langwatch/ui dev"
