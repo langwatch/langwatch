@@ -8,11 +8,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound } from "lucide-react";
 import numeral from "numeral";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
 import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
@@ -61,11 +61,17 @@ export const DashboardPageBody = ({
 }: DashboardPageBodyProps) => {
   const router = useRouter();
   const { data: session } = useRequiredSession({ required: !publicPage });
-  const { organization, team, project, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    organization,
+    team,
+    project,
+    organizationRole,
+    hasPermission,
+    isLoading: isOrganizationContextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
@@ -300,7 +306,14 @@ export const DashboardPageBody = ({
         {publicPage ? null : <StartupNotice />}
 
         <JoinYourTeamTakeover
-          currentOrganizationId={organization?.id}
+          // Three meanings, kept apart: `undefined` while the organization
+          // read is still out (the takeover decides nothing), `null` once it
+          // has answered with no organization, and the id otherwise.
+          currentOrganizationId={
+            isOrganizationContextLoading
+              ? undefined
+              : (organization?.id ?? null)
+          }
           fallback={publicPage ? null : <SecureAccountNudge />}
         />
 
@@ -324,12 +337,11 @@ export const DashboardPageBody = ({
               <HStack width="full" gap={4}>
                 <VStack align="start" gap={0} flex={1}>
                   <Alert.Title fontWeight="bold">
-                    Action Required: Link your SSO account
+                    Sign in with your organization's single sign-on
                   </Alert.Title>
                   <Text fontSize="sm">
-                    Your organization requires SSO login. Please link your
-                    account by logging in via the email input box on the sign-in
-                    page.
+                    Your organization requires single sign-on. Sign out, then
+                    sign in again by entering your work email address.
                   </Text>
                 </VStack>
                 <Button
@@ -337,12 +349,9 @@ export const DashboardPageBody = ({
                   colorPalette="red"
                   flexShrink={0}
                   color="white"
-                  asChild
+                  onClick={() => void signOut()}
                 >
-                  <Link href="/settings/security">
-                    <KeyRound size={14} />
-                    Link SSO Account
-                  </Link>
+                  Sign out
                 </Button>
               </HStack>
             </Alert.Content>
@@ -383,7 +392,11 @@ export const DashboardPageBody = ({
           offerPasskey={mfaGate.outcome.offerPasskey}
           onEnrolled={mfaGate.refresh}
         />
-      ) : userIsPartOfTeam ? (
+      ) : userIsPartOfTeam || isOrganizationContextLoading ? (
+        // A refusal is only ever drawn from an answered read: membership
+        // comes from `team` and `organizationRole`, which do not exist until
+        // the organization read lands. This gate has no loading screen of
+        // its own, so the body renders meanwhile.
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%

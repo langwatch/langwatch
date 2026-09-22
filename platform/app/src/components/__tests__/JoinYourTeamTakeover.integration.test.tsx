@@ -103,17 +103,24 @@ vi.mock("react-router", () => ({ useNavigate: () => vi.fn() }));
 import { JoinYourTeamTakeover } from "../JoinYourTeamTakeover";
 import { SecureAccountNudge } from "../me/SecureAccountNudge";
 
+// These generic tests are not about a dashboard's own organization read —
+// they exercise the offer/ask/waiting flow on its own — so they pass the
+// deliberate "no organization context at all" value (`null`), the same one
+// onboarding passes, rather than relying on omission to mean it.
 const renderTakeover = () =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <JoinYourTeamTakeover />
+      <JoinYourTeamTakeover currentOrganizationId={null} />
     </ChakraProvider>,
   );
 
 function AccountPrompts() {
   return (
     <ChakraProvider value={defaultSystem}>
-      <JoinYourTeamTakeover fallback={<SecureAccountNudge />} />
+      <JoinYourTeamTakeover
+        fallback={<SecureAccountNudge />}
+        currentOrganizationId={null}
+      />
     </ChakraProvider>
   );
 }
@@ -261,6 +268,49 @@ describe("given somebody who has already asked", () => {
       renderTakeover();
 
       expect(screen.getByTestId("join-team-waiting")).toBeInTheDocument();
+    });
+
+    /** @scenario "A pending request for another organization does not take over a dashboard that is still loading" */
+    it("decides nothing while the current organization has not resolved yet", () => {
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_other", organizationId: "org_other" }],
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={undefined}
+            fallback={<div data-testid="current-organization" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(screen.queryByTestId("join-team-waiting")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Ask to join/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("current-organization")).toBeInTheDocument();
+    });
+
+    /** @scenario "A pending request for another organization does not block the current organization" */
+    it("shows the waiting screen once the current organization has resolved and the request is for it", () => {
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_1", organizationId: "org_current" }],
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId="org_current"
+            fallback={<div data-testid="current-organization" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(screen.getByTestId("join-team-waiting")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("current-organization"),
+      ).not.toBeInTheDocument();
     });
   });
 });

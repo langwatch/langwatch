@@ -513,6 +513,83 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the existing single sign-on remains active
     And no generic migration action is offered
 
+  # ---------------------------------------------------------------------
+  # Taking over a single sign-on LangWatch set up
+  # ---------------------------------------------------------------------
+  #
+  # The command that registers an organization's own identity provider beside
+  # the one it signs in through today has existed since the cutover was
+  # designed, and no customer screen ever called it: the only way an
+  # organization could take its sign-in over was to ask us to do it for them.
+  # These scenarios are the door, and what the administrator is promised
+  # before they touch it.
+  #
+  # The words matter as much as the door. What the organization is doing is
+  # replacing the sign-in it has with one it owns, and every line it reads
+  # says that; nothing a customer sees calls it a migration.
+
+  @integration
+  Scenario: An organization is offered its own identity provider on the Authentication overview
+    Given an organization signs in through single sign-on LangWatch set up for it
+    When its administrator opens Authentication
+    Then they are told they can connect their own identity provider
+    And one action takes them to the step that does it
+
+  @integration
+  Scenario: Connecting your own identity provider keeps today's sign-in working
+    Given an organization signs in through single sign-on LangWatch set up for it
+    When its administrator opens single sign-on setup
+    Then they are offered the same form the first-time journey asks
+    And they are told everyone keeps signing in as they do today, that nothing
+    changes for members until an administrator switches over, and that they
+    can switch back
+    And submitting it registers their identity provider beside the one in use
+
+  @integration
+  Scenario: A reader who may not manage single sign-on is told who can update it
+    Given an organization signs in through single sign-on LangWatch set up for it
+    And the reader may see single sign-on but not change it
+    When they open single sign-on setup
+    Then they read the status of their sign-in
+    And no form and no disabled action is offered
+
+  @integration
+  Scenario: Once it is under way, the overview says where the update got to
+    Given an organization has registered its own identity provider beside the
+    one in use
+    When its administrator opens Authentication
+    Then the overview says where the update stands, in the same words the
+    single sign-on page uses
+    And it links to that page
+
+  @integration
+  Scenario: The update reports where it stands and what is outstanding
+    Given an organization has registered its own identity provider beside the
+    one in use
+    When its administrator opens single sign-on setup
+    Then they read who is signing people in right now
+    And every outstanding check says what to do about it
+    And the full list of what has to be true before the update can finish is
+    available without leaving the page
+
+  @unit
+  Scenario: An organization not on an Enterprise plan is told the plan is what refuses
+    Given the organization is not on an Enterprise plan
+    When its administrator connects their own identity provider
+    Then the request is refused with "enterprise_plan_required"
+    And the words the administrator reads are the plan's, not a generic failure
+
+  # Starting twice is refused by the one-replacement rule already stated under
+  # "What stops registration being an enumeration rail", so it is not restated
+  # here.
+
+  @integration
+  Scenario: Identity provider details that do not work are reported on the form
+    Given an administrator connecting their own identity provider
+    When the details they give are refused
+    Then the reason is shown with the fields they filled in, not as a
+    notification that disappears
+
   @integration
   Scenario: Registering is acknowledged rather than left to be inferred
     Given an administrator who has filled the registration form in

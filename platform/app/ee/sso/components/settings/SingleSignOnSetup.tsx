@@ -218,6 +218,20 @@ function ConnectedJourney({
   );
 }
 
+/**
+ * An organization signing in through the provider LangWatch set up for it,
+ * and the one thing it can do about that: connect its own.
+ *
+ * THE FORM IS THE FIRST-TIME JOURNEY'S, given the connection it replaces. A
+ * second copy of eight fields and two protocols is a second place for them to
+ * go wrong.
+ *
+ * WHAT DOES NOT HAPPEN COMES FIRST. Somebody about to type their identity
+ * provider's credentials into a page that is signing their whole company in
+ * needs to know, before they touch a field, that their people keep signing in
+ * as they do today until an administrator switches over, and that switching
+ * back is available.
+ */
 function LegacyMigrationStart({
   organizationId,
   canManage,
@@ -233,24 +247,46 @@ function LegacyMigrationStart({
   const current = name ?? "your existing provider";
   return (
     <VStack align="stretch" gap={6} width="full">
-      {view.migration && (
-        <MigrationProgress
-          organizationId={organizationId}
-          canManage={canManage}
-          migration={view.migration}
-          connectionState={connection.state}
-        />
-      )}
       <SettingsCard
         title="Single sign-on is active"
         badge={<IdentityChip label="Active" tone="good" />}
       >
         <Text fontSize="sm">
           {name
-            ? `Your existing ${name} sign-in remains active. A replacement can be prepared when your organization supplies its identity provider configuration.`
-            : "Your existing sign-in remains active. A replacement can be prepared when your organization supplies its identity provider configuration."}
+            ? `Your people sign in through ${name} today. Connect your organization's own identity provider to take that over.`
+            : "Your people sign in through the provider set up for your organization today. Connect your organization's own identity provider to take that over."}
         </Text>
       </SettingsCard>
+
+      <SetupSteps>
+        <SetupStep
+          number={1}
+          title="Update single sign-on"
+          state="current"
+          last
+        >
+          {canManage ? (
+            <VStack align="stretch" gap={4}>
+              <UpdatePromises current={current} />
+              <RegisterConnection
+                organizationId={organizationId}
+                serviceProvider={view.serviceProviderBeforeRegistration}
+                replacesConnectionId={connection.connectionId}
+              />
+            </VStack>
+          ) : (
+            // Never a disabled form. A reader without `sso:manage` is told
+            // who can do this and left with a page that still answers what
+            // they came for, rather than a control that refuses them.
+            <Text color="fg.muted" fontSize="sm">
+              An organization administrator can connect your own identity
+              provider here. Nothing changes for anybody signing in until they
+              do.
+            </Text>
+          )}
+        </SetupStep>
+      </SetupSteps>
+
       <SettingsCard title={`Who can join through ${current}`}>
         <ArrivalsSection
           organizationId={organizationId}
@@ -261,6 +297,26 @@ function LegacyMigrationStart({
           decided={view.goLive?.arrivalsDecided ?? false}
         />
       </SettingsCard>
+    </VStack>
+  );
+}
+
+/** What connecting your own identity provider does, and what it does not. */
+function UpdatePromises({ current }: { current: string }) {
+  return (
+    <VStack align="stretch" gap={1.5}>
+      <Text fontSize="sm" color="fg.muted">
+        Everyone keeps signing in through {current} while you set the new
+        connection up and test it.
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        Nothing changes for your members until an administrator switches sign-in
+        over.
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        You can switch back to {current} at any point until you start finishing
+        the update.
+      </Text>
     </VStack>
   );
 }

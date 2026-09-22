@@ -37,8 +37,10 @@ export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
  * upgrade guidance without a UI. `fault` stays `customer`: the refusal is an
  * account state the customer resolves, not a platform failure.
  *
- * REST-only by design: the tRPC surface keeps `requireEnterprisePlan` below,
- * which answers FORBIDDEN with the same sentences.
+ * Thrown from REST routes and from the tRPC procedures whose refusal the
+ * client presents by code (the single sign-on setup router); the older tRPC
+ * procedures keep `requireEnterprisePlan` below, which answers FORBIDDEN with
+ * the same sentences.
  */
 export class EnterprisePlanRequiredError extends HandledError {
   declare readonly code: "enterprise_plan_required";

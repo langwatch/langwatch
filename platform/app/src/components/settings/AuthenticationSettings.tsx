@@ -72,6 +72,11 @@ export function AuthenticationSettings({
             state={connection?.state ?? null}
             canManage={canManage && refusal === null}
             goLiveBlockedBecause={goLiveBlockedBecause}
+            // A connection registered to replace the one signing people in is
+            // half-built by lifecycle and well under way by the reader's
+            // reckoning, so the card says where the UPDATE got to rather than
+            // where a new connection got to.
+            updatePhase={data?.migration?.phase ?? null}
           />
         )}
         <DirectoryCard
