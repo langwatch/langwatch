@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Renaming a connection in place. Unbound: the two scenarios it answers are
- * in upstream's sso-connection-lifecycle.feature, which this branch's copy
- * does not carry yet (handoff §10).
+ * Renaming a connection in place, over
+ * specs/identity/sso-connection-lifecycle.feature's naming scenarios.
  */
 
 import { cleanup, fireEvent, screen } from "@testing-library/react";
@@ -30,6 +29,7 @@ const startEditing = () => fireEvent.click(screen.getByTestId("connection-name-e
 afterEach(cleanup);
 
 describe("given an administrator on the connection's card", () => {
+  /** @scenario "The name is offered for editing on the connection's card" */
   it("offers the name for editing in place, and saves the new one", () => {
     const { onRename } = renderRow();
 
@@ -61,6 +61,7 @@ describe("given an administrator on the connection's card", () => {
     expect(onRename).toHaveBeenCalledWith({ name: "Acme Okta" });
   });
 
+  /** @scenario "A name is required" */
   it("withholds the save rather than sending a blank one", () => {
     const { onRename } = renderRow();
     startEditing();
@@ -81,6 +82,7 @@ describe("given an administrator on the connection's card", () => {
 });
 
 describe("given a reader who may not manage single sign-on", () => {
+  /** @scenario "The name is offered for editing on the connection's card" */
   it("shows the name and offers no way to change it", () => {
     renderRow({ canManage: false });
 

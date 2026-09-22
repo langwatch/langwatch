@@ -103,3 +103,33 @@ export function testSignInFailureFor({
 export function testSignInFailureIsOurs(code: string): boolean {
   return code in OUR_REFUSALS;
 }
+
+/**
+ * The refusal that came back before the browser ever left: not a handled
+ * payload of ours, so there is no code to key copy off. The one thing the
+ * administrator can act on is what was actually said, so it is quoted rather
+ * than summarised away.
+ */
+export function testSignInStartFailure(refusal: {
+  code?: string | undefined;
+  message?: string | undefined;
+  statusText?: string | undefined;
+  status?: number | undefined;
+}): TestSignInFailure {
+  const detail =
+    [
+      refusal.code,
+      refusal.message ?? refusal.statusText,
+      refusal.status ? `(status ${refusal.status})` : null,
+    ]
+      .filter(Boolean)
+      .join(" — ") || null;
+
+  return {
+    title: "That sign-in didn't complete",
+    detail,
+    advice: detail
+      ? "Your identity provider turned the request away. Check the values you gave us against the application you created there, then try again."
+      : "Your identity provider turned the request away before saying anything. Check the issuer address you gave us, then try again.",
+  };
+}

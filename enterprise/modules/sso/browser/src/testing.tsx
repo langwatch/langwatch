@@ -6,12 +6,31 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
-import { SsoHostApi, SsoHostProvider, type SsoFailureNotice } from "./model/sso-host.ts";
+import {
+  SsoHostApi,
+  SsoHostProvider,
+  type SsoFailureNotice,
+  type SsoRouteReading,
+  type SsoTestSignInResult,
+} from "./model/sso-host.ts";
 
 export class FakeSsoHost extends SsoHostApi {
   readonly failures: SsoFailureNotice[] = [];
+  /** Every test sign-in this host was asked to start, in order. */
+  readonly testSignIns: {
+    connectionId: string;
+    callbackQuery: Record<string, string | undefined>;
+  }[] = [];
 
-  constructor(private readonly options: { organizationId?: string | null } = {}) {
+  constructor(
+    private readonly options: {
+      organizationId?: string | null;
+      currentUserAddress?: string | null;
+      query?: Record<string, string | undefined>;
+      /** What the sign-in answers, or throws when it is an error. */
+      testSignIn?: SsoTestSignInResult | Error;
+    } = {},
+  ) {
     super();
   }
 
@@ -23,6 +42,32 @@ export class FakeSsoHost extends SsoHostApi {
 
   failed(failure: SsoFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  currentUserAddress(): string | undefined {
+    if (this.options.currentUserAddress === null) return void 0;
+
+    return this.options.currentUserAddress ?? "ana@acme.com";
+  }
+
+  route(): SsoRouteReading {
+    return { query: this.options.query ?? {} };
+  }
+
+  async testSignIn(options: {
+    connectionId: string;
+    callbackQuery: Record<string, string | undefined>;
+  }): Promise<SsoTestSignInResult> {
+    this.testSignIns.push(options);
+    const answer = this.options.testSignIn;
+    if (answer instanceof Error) throw answer;
+
+    return Promise.resolve(answer ?? {});
+  }
+
+  /** The one aliasing the engine actually emits, so the hook is exercised. */
+  normalizeSignInErrorCode(code: string): string {
+    return code === "account_not_linked" ? "OAuthAccountNotLinked" : code;
   }
 }
 

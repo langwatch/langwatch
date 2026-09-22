@@ -28,6 +28,7 @@ describe("what removing a connection does", () => {
       });
     });
 
+    /** @scenario "Asking again while a removal waits brings the date forward" */
     it("re-asks rather than waiting out a grace protecting nobody", () => {
       expect(connectionRemovalActFor("TEARDOWN_PENDING")).toEqual({
         verb: "teardown",

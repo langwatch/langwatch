@@ -4,7 +4,7 @@
  * and what it says when the browser will not let it copy anything.
  */
 
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,8 +59,12 @@ describe("given an administrator who wants to test as another person", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /test from another browser/i }));
 
-    expect(toasts.create).toHaveBeenCalledWith(
-      expect.objectContaining({ description: expect.stringContaining("address bar") }),
+    // The refusal is caught a microtask after the press, so the assertion
+    // waits for it rather than racing it.
+    await waitFor(() =>
+      expect(toasts.create).toHaveBeenCalledWith(
+        expect.objectContaining({ description: expect.stringContaining("address bar") }),
+      ),
     );
   });
 });

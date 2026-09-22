@@ -79,6 +79,7 @@ describe("given a live connection", () => {
 });
 
 describe("given a connection already on its way out", () => {
+  /** @scenario "Which removal a press sends is read from where the connection stands" */
   it("names the day it ends and offers to bring that forward", () => {
     const { onRemove } = renderSection({
       state: "TEARDOWN_PENDING",
@@ -101,6 +102,7 @@ describe("given a connection already on its way out", () => {
 });
 
 describe("given a paused connection", () => {
+  /** @scenario "Which removal a press sends is read from where the connection stands" */
   it("schedules the removal rather than discarding it", () => {
     const { onRemove } = renderSection({ state: "SUSPENDED" });
     fireEvent.click(screen.getByTestId("sso-remove-open"));
