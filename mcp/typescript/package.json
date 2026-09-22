@@ -64,7 +64,7 @@
     "node-pty": "^1.0.0",
     "tsup": "^8.1.0",
     "tsx": "^4.20.5",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.55.0",
     "vitest": "^4.1.8",
     "yargs": "^18.0.0",
