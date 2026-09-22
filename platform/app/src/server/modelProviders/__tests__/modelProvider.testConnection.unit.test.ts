@@ -20,6 +20,11 @@ vi.mock("../providerValidation", () => ({
     validateProviderApiKeyMock(...args),
 }));
 
+const pingMock = vi.fn(async () => null as unknown);
+vi.mock("../providerPing", () => ({
+  pingModelProvider: (...args: unknown[]) => pingMock(...(args as [])),
+}));
+
 vi.mock("../../rateLimit", () => ({
   rateLimit: (...args: unknown[]) => rateLimitMock(...args),
 }));
@@ -72,6 +77,8 @@ beforeEach(() => {
   findByIdForOrganizationMock.mockReset();
   findByProviderMock.mockReset();
   validateProviderApiKeyMock.mockReset();
+  pingMock.mockReset();
+  pingMock.mockResolvedValue(null);
   rateLimitMock.mockReset();
   hasOrganizationPermissionMock.mockReset();
   hasTeamPermissionMock.mockReset();
@@ -122,6 +129,46 @@ describe("testConnection", () => {
       const [, keys] = validateProviderApiKeyMock.mock.calls[0]!;
       expect(keys.OPENAI_BASE_URL).toBe("https://saved.example.com/v1");
       expect(JSON.stringify(keys)).not.toContain("attacker.example.com");
+    });
+
+    /** @scenario "A refused credential is not asked twice" */
+    it("stops at a refused credential rather than paying for a generation", async () => {
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+      validateProviderApiKeyMock.mockResolvedValue({
+        outcome: "refused",
+        valid: false,
+        domainError: { code: "provider_key_invalid" },
+      });
+
+      const result = await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        ctx,
+      });
+
+      expect(result).toMatchObject({ outcome: "refused" });
+      expect(pingMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A chat provider is proven by a generation, not by a listing" */
+    it("lets the generation decide when the credential probe was happy", async () => {
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+      pingMock.mockResolvedValue({
+        outcome: "refused",
+        valid: false,
+        domainError: { code: "provider_out_of_credit" },
+      });
+
+      const result = await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        ctx,
+      });
+
+      // A listing that answers proves the key reaches the vendor and nothing
+      // about whether the account can generate, so the ping wins.
+      expect(result).toMatchObject({
+        outcome: "refused",
+        domainError: { code: "provider_out_of_credit" },
+      });
     });
 
     /** @scenario "Testing an organization-scoped provider reaches its credential" */
