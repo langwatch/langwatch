@@ -139,8 +139,8 @@ export function RunsSidebar({
         <ArrowLeft size={13} /> Results
       </Button>
 
-      {/* Only the list scrolls: the announcement and the period picker stay
-          in reach however long the run history grows. */}
+      {/* Only the list scrolls: the period picker stays in reach however
+          long the run history grows. */}
       <VStack align="stretch" gap={1} flex={1} minHeight={0} overflow="auto">
         {isPendingShown ? <PendingEntry /> : null}
 

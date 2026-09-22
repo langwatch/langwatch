@@ -130,7 +130,6 @@ describe("<MainMenuSections showExpanded /> Agent Testing destination", () => {
 
   afterEach(() => {
     cleanup();
-    localStorage.clear();
   });
 
   describe("given the Agent Testing release flag is on", () => {
