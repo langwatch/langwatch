@@ -378,7 +378,15 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.
+  //
+  // `findMany` and `count` are platform-scoped for the operator's
+  // directory-sync list (ADR-122), which reads every customer's sync at once
+  // and so has no organization to name; the router behind it gates on the
+  // staff list and records each read. The row is a state, reason codes, ids
+  // and timestamps, never directory content. Every write still has to name
+  // its organization or its connection.
   ScimSyncState: {
+    platformScopeActions: ["findMany", "count"],
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "connectionId") === "string",
   },

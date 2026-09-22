@@ -34,6 +34,16 @@ var selectorPattern = regexp.MustCompile(`(?:^|[^A-Za-z0-9_])(gateway_[a-z0-9_]+
 // labelNamePattern picks label names out of a selector body.
 var labelNamePattern = regexp.MustCompile(`([a-zA-Z_][a-zA-Z0-9_]*)\s*[=!~]`)
 
+// lwqlViewsBlockPattern matches the generated LangWatchQL catalog table in
+// docs/api-reference/query/overview.mdx (between the lwql-views-start/end
+// MDX comments). That table documents queryable views, not metrics, but
+// several view names share the `gateway_` prefix with real metrics
+// (gateway_realtime_sessions, gateway_budgets, ...) because they name the
+// same subsystem. Scanning it for metric names produces false positives,
+// so it is stripped before either the metric-name or the selector-label
+// pattern runs.
+var lwqlViewsBlockPattern = regexp.MustCompile(`(?s)\{/\* lwql-views-start \*/\}.*?\{/\* lwql-views-end \*/\}`)
+
 // scrapeTimeLabels are attached by Prometheus service discovery, not by
 // the gateway, so a doc may legitimately filter on them.
 var scrapeTimeLabels = map[string]bool{
@@ -184,8 +194,9 @@ func TestDocumentedLabelsExist(t *testing.T) {
 		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
+		text := lwqlViewsBlockPattern.ReplaceAll(body, nil)
 
-		for _, sel := range selectorPattern.FindAllStringSubmatch(string(body), -1) {
+		for _, sel := range selectorPattern.FindAllStringSubmatch(string(text), -1) {
 			name := trimHistogramSuffix(sel[1])
 			declared, ok := labels[name]
 			if !ok {
@@ -217,7 +228,8 @@ func documentedNames(t *testing.T) map[string][]string {
 		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
-		for _, m := range metricNamePattern.FindAllStringSubmatch(string(body), -1) {
+		text := lwqlViewsBlockPattern.ReplaceAll(body, nil)
+		for _, m := range metricNamePattern.FindAllStringSubmatch(string(text), -1) {
 			name := trimHistogramSuffix(m[1])
 			if _, skip := notMetrics[name]; skip {
 				continue

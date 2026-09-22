@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   Table,
@@ -77,7 +76,9 @@ export default function IdentityLookupView() {
         isFetching={lookup.isFetching}
         error={lookup.error}
       >
-        <VStack align="stretch" gap={6} width="full">
+        {/* The shell's card is flush because it usually holds a table. This
+            page holds sections, so it brings its own inset. */}
+        <VStack align="stretch" gap={8} width="full" padding={6}>
           {address.length === 0 && (
             <Text color="fg.muted">
               Type an email address to see how the auth screens would route it,
@@ -165,53 +166,53 @@ interface RoutingAnswer {
 function RoutingPanel({ routing }: { routing: RoutingAnswer }) {
   const guidance = signInRoutingReasonCopy(routing.reasonCode);
   return (
-    <Card.Root>
-      <Card.Body>
-        <VStack align="start" gap={2}>
-          <Heading size="sm">Routing</Heading>
-          <HStack gap={2} wrap="wrap">
-            <Badge colorPalette="blue">
-              {routing.outcome === "redirect_to_connection"
-                ? "Sent to the identity provider"
-                : "Shown the sign-in methods"}
-            </Badge>
+    <Box>
+      <Heading size="sm" paddingBottom={2}>
+        Routing
+      </Heading>
+      <VStack align="start" gap={2}>
+        <HStack gap={2} wrap="wrap">
+          <Badge colorPalette="blue">
+            {routing.outcome === "redirect_to_connection"
+              ? "Sent to the identity provider"
+              : "Shown the sign-in methods"}
+          </Badge>
+          <Text fontSize="sm" color="fg.muted">
+            because
+          </Text>
+          <Badge variant="outline" data-testid="routing-reason">
+            {routing.reasonCode}
+          </Badge>
+        </HStack>
+        {guidance ? (
+          <Box>
+            <Text fontWeight="medium">{guidance.title}</Text>
             <Text fontSize="sm" color="fg.muted">
-              because
+              {guidance.describe}
             </Text>
-            <Badge variant="outline" data-testid="routing-reason">
-              {routing.reasonCode}
-            </Badge>
-          </HStack>
-          {guidance ? (
-            <Box>
-              <Text fontWeight="medium">{guidance.title}</Text>
-              <Text fontSize="sm" color="fg.muted">
-                {guidance.describe}
-              </Text>
-            </Box>
-          ) : (
-            <Text fontSize="sm" color="fg.muted">
-              Nothing is said on screen for this decision — the person sees the
-              ordinary sign-in.
-            </Text>
-          )}
-          {routing.methods.length > 0 && (
-            <Text fontSize="sm" color="fg.muted">
-              Offered: {routing.methods.join(", ")}
-            </Text>
-          )}
-          {routing.connection && (
-            <Text fontSize="sm" data-testid="routing-connection">
-              Connection{" "}
-              {routing.connection.organizationName ??
-                shortenIdentifier(routing.connection.organizationId)}{" "}
-              ({routing.connection.providerId}) is{" "}
-              {routing.connection.state.replace(/_/g, " ").toLowerCase()}.
-            </Text>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          </Box>
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            Nothing is said on screen for this decision — the person sees the
+            ordinary sign-in.
+          </Text>
+        )}
+        {routing.methods.length > 0 && (
+          <Text fontSize="sm" color="fg.muted">
+            Offered: {routing.methods.join(", ")}
+          </Text>
+        )}
+        {routing.connection && (
+          <Text fontSize="sm" data-testid="routing-connection">
+            Connection{" "}
+            {routing.connection.organizationName ??
+              shortenIdentifier(routing.connection.organizationId)}{" "}
+            ({routing.connection.providerId}) is{" "}
+            {routing.connection.state.replace(/_/g, " ").toLowerCase()}.
+          </Text>
+        )}
+      </VStack>
+    </Box>
   );
 }
 

@@ -1,5 +1,5 @@
+import { PrismaScimReconciliationRepository } from "@ee/scim/scim-reconciliation.prisma.repository";
 import { describe, expect, it, vi } from "vitest";
-
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   applySessionCeiling,
@@ -1189,6 +1189,70 @@ describe("guardOrganizationId — the directory log and the credential vault", (
           args: { where: { kind: "oidc-client-secret" } },
         } as GuardParams),
       ).rejects.toThrow();
+    });
+  });
+});
+
+/**
+ * The operator's directory-sync list (specs/identity/
+ * scim-reconciliation-surfaces.feature) reads every customer's sync state at
+ * once, by design. Its service test stubs the repository, so the guard never
+ * met the query the repository really sends — and in production it refused
+ * it, which the back office showed as an unknown error.
+ *
+ * Driven through the repository rather than restated here, so a change to the
+ * query is a change to what this proves.
+ */
+describe("guardOrganizationId — the operator's directory-sync list", () => {
+  function guardedRepository() {
+    const guarded =
+      (action: string, result: unknown) => async (args: unknown) => {
+        await runGuard({ model: "ScimSyncState", action, args } as GuardParams);
+        return result;
+      };
+    return new PrismaScimReconciliationRepository({
+      scimSyncState: {
+        findMany: guarded("findMany", []),
+        count: guarded("count", 0),
+      },
+    } as unknown as PrismaClient);
+  }
+
+  describe("when an operator lists every customer's syncs", () => {
+    /** @scenario "Every customer's connections are one operator list" */
+    it("admits the list and its total", async () => {
+      await expect(
+        guardedRepository().findAllSyncs({ page: 0, pageSize: 25 }),
+      ).resolves.toEqual({ syncs: [], total: 0 });
+    });
+
+    it("admits the searched list", async () => {
+      await expect(
+        guardedRepository().findAllSyncs({
+          page: 0,
+          pageSize: 25,
+          search: "error",
+        }),
+      ).resolves.toEqual({ syncs: [], total: 0 });
+    });
+  });
+
+  describe("when a write names no organization", () => {
+    it("refuses it, since only the reads span customers", async () => {
+      await expect(
+        runGuard({
+          model: "ScimSyncState",
+          action: "deleteMany",
+          args: { where: {} },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
+      await expect(
+        runGuard({
+          model: "ScimSyncState",
+          action: "updateMany",
+          args: { where: { state: "ERROR" }, data: { state: "REVOKED" } },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
     });
   });
 });

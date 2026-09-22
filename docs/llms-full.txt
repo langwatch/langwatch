@@ -69805,9 +69805,9 @@ Two column families are gated rather than freely selectable: free-text carriers 
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
-| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries. | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
-| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind. | `output` | one row per SeriesId | `LastSeenAt` |
-| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
+| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
+| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind | `output` | one row per SeriesId | `LastSeenAt` |
+| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
 | `objects` | Stored file objects: what was captured, its size and hash. | None | one row per id | `created_at` |
 | `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | None | one row per AnnotationId | `CreatedAt` |
 | `langy_conversation_messages` | Langy conversation turns, one row per message. | `output` | one row per (TenantId, ConversationId, MessageId) | `CreatedAt` |
@@ -69839,13 +69839,13 @@ LIMIT 20
 |------|-------------|-------|-------|-------------|
 | `evaluations` | One row per evaluation run, with its score and outcome. | `input`, `output` | one row per (TenantId, EvaluationId), latest version only | `ScheduledAt` |
 | `simulations` | One row per simulation run, with its verdict and criteria. | `input`, `output` | one row per (TenantId, ScenarioRunId), latest version only | `StartedAt` |
-| `simulation_trace_metrics` | Cost and latency metrics per simulated trace. | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
+| `simulation_trace_metrics` | Cost and latency metrics per simulated trace | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
 | `experiments` | One row per experiment, with its display name and kind. | None | one row per ExperimentId | `CreatedAt` |
-| `experiment_items` | Individual item results within an experiment run with evaluations. | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
-| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores. | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
-| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details. | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
+| `experiment_items` | Individual item results within an experiment run with evaluations | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
+| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
+| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
 | `batch_evaluations` | One row per offline batch evaluation of a dataset row, with its score, outcome and cost. | `costs` | one row per BatchEvaluationId | `CreatedAt` |
-| `test_suite_runs` | Test suite execution results with completion and pass counts. | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
+| `test_suite_runs` | Test suite execution results with completion and pass counts | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
 
 Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over). Everything else queryable through LangWatchQL is a view.
 
@@ -69855,23 +69855,23 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figure
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with `uniqExact(TraceId)`. | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
+| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId). | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
 | `trace_metrics_by_minute` | Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average. | `costs` | one row per (TenantId, BucketStart), every measure summed | `BucketStart` |
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
 | `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
-| `session_metrics` | Per-session time-series metrics with aggregate statistics. | None | one row per (SessionId, SeriesId) | `AsOf` |
+| `session_metrics` | Per-session time-series metrics with aggregate statistics | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
 
 #### Gateway & billing
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend. | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
+| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
 | `gateway_budget_totals` | Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window. | `costs` | one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only | `PeriodStart` |
-| `gateway_request_spend` | Individual API request spend and reconciliation details. | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
-| `billing_events` | Billing events for customer invoice generation. | None | one row per DeduplicationKeyHash | `EventTimestamp` |
+| `gateway_request_spend` | Individual API request spend and reconciliation details | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
+| `billing_events` | Billing events for customer invoice generation | None | one row per DeduplicationKeyHash | `EventTimestamp` |
 
 #### Governance & audit
 
@@ -69883,7 +69883,7 @@ Governance views are keyed by the organization's hidden `internal_governance` pr
 | `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
 | `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
 | `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
-| `automation_events` | Audit log of automation trigger executions and actions. | None | one row per EventId | `OccurredAt` |
+| `automation_events` | Audit log of automation trigger executions and actions | None | one row per EventId | `OccurredAt` |
 
 #### Legacy
 
@@ -69891,9 +69891,9 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables. | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
-| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by `logs`; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
-| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
+| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by log_records; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the metric_data_points family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
 
 #### Entities & reference data
 
@@ -69902,6 +69902,94 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 | `projects` | The caller's project, with its display name and slug. | None | one row per TenantId | `CreatedAt` |
 | `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
 | `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
+
+#### Application tables (PostgreSQL)
+
+Every tenant-scoped table of the application database, derived from the schema. Organization- and team-scoped tables appear once per project the caller can reach. Secret material and person identifiers are never exposed; free-text and JSON bodies are gated on the content permissions.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `agents` | Rows of the Agent table, one row per AgentId. | `output` | one row per AgentId | `CreatedAt` |
+| `ai_tool_entries` | Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog. | `output` | one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `ai_tool_entry_departments` | Per-department scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project | None |
+| `ai_tool_entry_teams` | Per-team scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project | None |
+| `analytics` | Rows of the Analytics table, one row per AnalyticsId. | `output` | one row per AnalyticsId | `CreatedAt` |
+| `annotation_queue_items` | Rows of the AnnotationQueueItem table, one row per AnnotationQueueItemId. | None | one row per AnnotationQueueItemId | `CreatedAt` |
+| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project. | None | one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project | None |
+| `annotation_queues` | Rows of the AnnotationQueue table, one row per AnnotationQueueId. | `output` | one row per AnnotationQueueId | `CreatedAt` |
+| `annotation_scores` | Rows of the AnnotationScore table, one row per AnnotationScoreId. | `output` | one row per AnnotationScoreId | `CreatedAt` |
+| `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
+| `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
+| `dashboards` | Rows of the Dashboard table, one row per DashboardId. | None | one row per DashboardId | `CreatedAt` |
+| `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
+| `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |
+| `department_membership_histories` | One dated person → department link. | None | one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `departments` | A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...). | None | one row per (TenantId, DepartmentId); an organization-scoped row appears once per project | `CreatedAt` |
+| `discovered_agents` | A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published. | `output` | one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project | `CreatedAt` |
+| `discovered_persons` | A name-text seen on a provider's cost or audit rows: "the provider told us someone called m.silva exists". | `output`, `costs` | one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project | `CreatedAt` |
+| `email_suppressions` | Rows of the EmailSuppression table, one row per EmailSuppressionId. | `output` | one row per EmailSuppressionId | `CreatedAt` |
+| `erased_identifier_suppressions` | Hashes of erased identifiers - the do-not-reimport list. | None | one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project | `ErasedAt` |
+| `evaluators` | Rows of the Evaluator table, one row per EvaluatorId. | `output` | one row per EvaluatorId | `CreatedAt` |
+| `experiment_versions` | Rows of the ExperimentVersion table, one row per ExperimentVersionId. | `output` | one row per ExperimentVersionId | `CreatedAt` |
+| `gateway_budget_bucket_boundaries` | Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project. | None | one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_budget_ledgers` | Rows of the GatewayBudgetLedger table, one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project. | `costs` | one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project | `OccurredAt` |
+| `gateway_budgets` | Rows of the GatewayBudget table, one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project. | `output`, `costs` | one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_cache_rules` | Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_change_events` | Rows of the GatewayChangeEvent table, one row per Revision. | `output` | one row per Revision | `CreatedAt` |
+| `gateway_guardrails` | Rows of the GatewayGuardrail table, one row per GatewayGuardrailId. | `output` | one row per GatewayGuardrailId | `CreatedAt` |
+| `gateway_realtime_sessions` | Rows of the GatewayRealtimeSession table, one row per GatewayRealtimeSessionId. | `output`, `costs` | one row per GatewayRealtimeSessionId | `CreatedAt` |
+| `github_branch_pull_request_checks` | The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again. | `output` | one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project | `CreatedAt` |
+| `github_installations` | The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization. | `output`, `costs` | one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project | `CreatedAt` |
+| `github_pull_requests` | A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced. | `output`, `input` | one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project | `CreatedAt` |
+| `governance_tenant_histories` | Every tenant id this organization has ever written governance rows under, appended on first use and never pruned. | None | one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project | `FirstUsedAt` |
+| `identity_match_suggestions` | Match candidates a background job computed and a human has yet to confirm. | None | one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project | `ComputedAt` |
+| `identity_matches` | A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true. | None | one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project | `CreatedAt` |
+| `ingestion_pull_run_projections` | Rebuildable per-source pull checkpoint and operator-facing run status. | `output` | one row per IngestionPullRunProjectionId | `CreatedAt` |
+| `ingestion_sources` | Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor. | `output`, `costs` | one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project | `CreatedAt` |
+| `ingestion_templates` | Admin/platform-curated catalog row for upstream OTLP normalization. | `output` | one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project | `CreatedAt` |
+| `langy_active_turns` | Postgres-authoritative one-turn admission for a conversation. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyActiveTurnId | `CreatedAt` |
+| `langy_conversation_projections` | Rebuildable operational state folded from Langy's canonical event stream. Shared Langy conversations only; a member's private conversations are not queryable. | `input`, `output` | one row per LangyConversationProjectionId | `CreatedAt` |
+| `langy_conversation_turn_projections` | Rebuildable per-turn operational render document. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyConversationTurnProjectionId | `CreatedAt` |
+| `langy_message_projections` | Rebuildable operational message fact. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyMessageProjectionId | `CreatedAt` |
+| `langy_turn_requests` | Durable idempotency receipt for one logical Langy send. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyTurnRequestId | `CreatedAt` |
+| `model_default_config_scopes` | Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `model_default_configs` | Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project | `CreatedAt` |
+| `model_provider_scopes` | Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `model_providers` | Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project | `CreatedAt` |
+| `monitors` | Rows of the Monitor table, one row per MonitorId. | `output` | one row per MonitorId | `CreatedAt` |
+| `notifications` | Rows of the Notification table, one row per NotificationId. | `output` | one row per NotificationId | `CreatedAt` |
+| `pinned_traces` | Rows of the PinnedTrace table, one row per PinnedTraceId. | `output` | one row per PinnedTraceId | `CreatedAt` |
+| `process_manager_inboxes` | Idempotency marker for a source event consumed by a process definition. | None | one row per ProcessManagerInboxId | `ConsumedAt` |
+| `process_manager_instances` | Durable state for a long-running event-sourced process. | `output` | one row per ProcessManagerInstanceId | `NextWakeAt` |
+| `process_manager_outbox_attempts` | One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic. | `output` | one row per ProcessManagerOutboxAttemptId | `OccurredAt` |
+| `process_manager_outboxes` | Transactional intents emitted by a durable process transition. | `output` | one row per ProcessManagerOutboxId | `CreatedAt` |
+| `prompt_tag_assignments` | Rows of the PromptTagAssignment table, one row per PromptTagAssignmentId. | None | one row per PromptTagAssignmentId | `CreatedAt` |
+| `prompt_tags` | Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project. | None | one row per (TenantId, PromptTagId); an organization-scoped row appears once per project | `CreatedAt` |
+| `retention_policies` | Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `routing_policies` | Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `routing_policy_scopes` | Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `saved_views` | Rows of the SavedView table, one row per SavedViewId. | `output` | one row per SavedViewId | `CreatedAt` |
+| `scenario_versions` | Rows of the ScenarioVersion table, one row per ScenarioVersionId. | `output` | one row per ScenarioVersionId | `CreatedAt` |
+| `scenarios` | Rows of the Scenario table, one row per ScenarioId. | `output` | one row per ScenarioId | `CreatedAt` |
+| `scheduled_jobs` | Rows of the ScheduledJob table, one row per ScheduledJobId. | `output` | one row per ScheduledJobId | `CreatedAt` |
+| `share_links` | Rows of the ShareLink table, one row per ShareLinkId. | None | one row per ShareLinkId | `CreatedAt` |
+| `simulation_suites` | Rows of the SimulationSuite table, one row per SimulationSuiteId. | `output` | one row per SimulationSuiteId | `CreatedAt` |
+| `topic_clustering_run_history_projections` | Per-project topic clustering run history (audit read model). | `output` | one row per TopicClusteringRunHistoryProjectionId | `CreatedAt` |
+| `topic_clustering_run_projections` | Per-project topic clustering run status: the rebuildable operational read model behind the settings page. | `output` | one row per TopicClusteringRunProjectionId | `CreatedAt` |
+| `topic_model_projections` | Cursor row for the topic-model projection. | None | one row per TopicModelProjectionId | `CreatedAt` |
+| `topics` | One row per topic, with the name a trace's TopicId resolves to. | None | one row per TopicId | `CreatedAt` |
+| `trace_edit_overlays` | Rows of the TraceEditOverlay table, one row per TraceEditOverlayId. | `output` | one row per TraceEditOverlayId | `CreatedAt` |
+| `trigger_sents` | Rows of the TriggerSent table, one row per TriggerSentId. | None | one row per TriggerSentId | `CreatedAt` |
+| `triggers` | Rows of the Trigger table, one row per TriggerId. | `output` | one row per TriggerId | `CreatedAt` |
+| `virtual_key_scopes` | Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `virtual_keys` | Rows of the VirtualKey table, one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `webhook_endpoint_deliveries` | The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires. | `output` | one row per WebhookEndpointDeliveryId | `CreatedAt` |
+| `workflow_versions` | Rows of the WorkflowVersion table, one row per WorkflowVersionId. | `output` | one row per WorkflowVersionId | `CreatedAt` |
+| `workflows` | Rows of the Workflow table, one row per WorkflowId. | `output` | one row per WorkflowId | `CreatedAt` |
 
 {/* lwql-views-end */}
 
