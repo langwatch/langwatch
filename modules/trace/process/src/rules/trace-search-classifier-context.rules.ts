@@ -12,9 +12,6 @@ import {
   type SearchRouteKind,
 } from "@langwatch/trace-contract";
 
-/** The lens whose rows are conversations, so its eval judges threads. */
-export const CONVERSATIONS_LENS_ID = "conversations";
-
 export const ROUTE_QUESTION_ID = "route";
 
 /** One option the classifier may answer the routing question with. */

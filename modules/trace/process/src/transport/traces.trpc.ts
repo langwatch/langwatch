@@ -576,6 +576,36 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     throw new TraceAiQueryUnavailableError();
   })
 
+  /**
+   * The Explorer's Instant Eval. Permissions match the REST family:
+   * `analytics:manage` to spend, `analytics:view` to read a run back.
+   */
+  .procedure("instantEvalEstimate")
+  .withPermission("analytics:manage")
+  .handle(({ app, input, actor }) =>
+    app.estimateExplorerEvalRun({ request: input, userId: actor.id }),
+  )
+
+  .procedure("instantEvalStart")
+  .withPermission("analytics:manage")
+  .handle(({ app, input, actor }) => app.startExplorerEvalRun({ request: input, userId: actor.id }))
+
+  .procedure("instantEvalCancel")
+  .withPermission("analytics:manage")
+  .handle(({ app, input, actor }) =>
+    app.cancelExplorerEvalRun({
+      projectId: input.projectId,
+      runId: input.runId,
+      requestedByUserId: actor.id,
+    }),
+  )
+
+  .procedure("instantEvalGet")
+  .withPermission("analytics:view")
+  .handle(({ app, input }) =>
+    app.getExplorerEvalRun({ projectId: input.projectId, runId: input.runId }),
+  )
+
   .procedure("header")
   .withPermission("traces:view")
   .handle(async ({ app, input, actor }) => {

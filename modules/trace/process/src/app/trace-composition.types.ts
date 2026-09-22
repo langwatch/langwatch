@@ -8,6 +8,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FoldProjectionStore } from "@langwatch/eventing";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
@@ -36,6 +37,7 @@ export const traceDependencies = {
   dataRetention: DataRetentionApi,
   plans: EntitlementApi,
   evaluations: EvaluationApi,
+  instantEvals: InstantEvalApi,
   logs: LogApi,
   modelProviders: ModelProviderApi,
   presence: PresenceApi,

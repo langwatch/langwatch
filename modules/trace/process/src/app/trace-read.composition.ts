@@ -102,6 +102,8 @@ export type TraceReaderCompositionOptions = {
     | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
     | undefined;
   evaluations: TraceAppDependencies["evaluations"];
+  /** The Instant Eval peer the Explorer's judged searches run through. */
+  instantEvals?: TraceAppDependencies["instantEvals"];
   codingAgents: TraceAppDependencies["codingAgents"];
   storedObjects: TraceAppDependencies["storedObjects"];
   presence?: TraceAppDependencies["presence"];
@@ -246,6 +248,7 @@ export function composeTraceAppDependencies(
     topics: options.topics,
     projects: options.projects,
     evaluations: options.evaluations,
+    ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
     codingAgents: options.codingAgents,
     storedObjects: options.storedObjects,
     ...(options.presence ? { presence: options.presence } : {}),

@@ -8,6 +8,7 @@ import type { LiqeQuery } from "liqe";
 
 import { walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
+import { parse } from "./trace-query-parser.ts";
 
 /**
  * Rejects queries liqe parses but the server can't execute — e.g. `field:`
@@ -20,6 +21,30 @@ function missingValueMessage(ast: Extract<LiqeQuery, { type: "Tag" }>): string |
   const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
 
   return fieldName ? `Missing value after \`${fieldName}:\`` : "Missing value after `:`";
+}
+
+/**
+ * Whether the query names `fieldName` as a structured term anywhere, negated
+ * or not, at any depth. Empty and unparsable input names nothing.
+ */
+export function queryNamesField(queryText: string, fieldName: string): boolean {
+  const trimmed = queryText.trim();
+  if (!trimmed) return false;
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return false;
+  }
+
+  let named = false;
+  walkAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type === "ImplicitField") return;
+    if (node.field.name === fieldName) named = true;
+  });
+
+  return named;
 }
 
 /** The ceiling the ClickHouse translator holds: one node per node visited. */

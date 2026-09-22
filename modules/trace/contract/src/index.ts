@@ -15,6 +15,8 @@ export * from "./trace-time-range-presets.ts";
 export * from "./trace-token-budget.ts";
 export * from "./trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
+export * from "./trace-instant-eval-chips.ts";
+export * from "./trace-instant-eval.schemas.ts";
 export * from "./trace-query-analysis.ts";
 export * from "./trace-query-ast.ts";
 export * from "./trace-query-evaluator-group.ts";

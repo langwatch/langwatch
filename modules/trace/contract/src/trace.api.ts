@@ -1,3 +1,7 @@
+import type {
+  InstantEvalEstimateWire,
+  InstantEvalRunProgress,
+} from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
@@ -16,6 +20,7 @@ import type {
   TraceFullRecord,
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
+import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type {
@@ -419,6 +424,28 @@ export interface TraceApi extends TraceOtlpIngestApi {
     payload: unknown;
   }): Promise<void>;
   findProject(projectId: string): Promise<unknown>;
+
+  /**
+   * The Explorer's Instant Eval, priced. The shorthand it sends is turned into
+   * the statement a CLI caller would write, judging nothing.
+   */
+  estimateExplorerEvalRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<InstantEvalEstimateWire>;
+  /** The same shorthand, accepted and queued. Answers the run's counters. */
+  startExplorerEvalRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<InstantEvalRunProgress>;
+  /** Asks a run to stop. A run that already finished is refused by name. */
+  cancelExplorerEvalRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId?: string;
+  }): Promise<InstantEvalRunProgress>;
+  /** One run's counters, which is all a chip and a progress bar read. */
+  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
 
   /** The platform's own address for one trace resource, built from the
    * project's slug and the path the caller already resolved. */

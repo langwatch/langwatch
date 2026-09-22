@@ -19,12 +19,12 @@ import {
   type RouteSearchResult,
   type SearchRouteDecidedBy,
   type SearchRouteKind,
+  CONVERSATIONS_LENS_ID,
 } from "@langwatch/trace-contract";
 
 import {
   buildRouteContext,
   buildRouteQuestion,
-  CONVERSATIONS_LENS_ID,
   isRouteKind,
   ROUTE_QUESTION_ID,
   type TraceSearchRouteQuestion,

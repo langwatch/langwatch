@@ -5,11 +5,17 @@
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { instantEvalEstimateSchema } from "@langwatch/instant-eval-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import { aiActionResultSchema, aiQueryResultSchema } from "./trace-ai-query.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
+import {
+  explorerInstantEvalProgressSchema,
+  explorerInstantEvalRunIdSchema,
+  explorerInstantEvalRunSchema,
+} from "./trace-instant-eval.schemas.ts";
 import {
   discoverResultSchema,
   facetValuesResultSchema,
@@ -386,6 +392,27 @@ export const tracesTrpc = defineTrpcContract("traces")
   .mutation("routeSearch")
   .withInput(routeSearchInputSchema)
   .withOutput(routeSearchResultSchema)
+
+  /**
+   * An Instant Eval as the Explorer drives it: price it, start it, stop it,
+   * read it back. Flattened out of upstream's `instantEval.*` group: a
+   * declaration carries one namespace level. @see specs/traces-v2/instant-eval-search.feature
+   */
+  .mutation("instantEvalEstimate")
+  .withInput(explorerInstantEvalRunSchema)
+  .withOutput(instantEvalEstimateSchema)
+
+  .mutation("instantEvalStart")
+  .withInput(explorerInstantEvalRunSchema)
+  .withOutput(explorerInstantEvalProgressSchema)
+
+  .mutation("instantEvalCancel")
+  .withInput(explorerInstantEvalRunIdSchema)
+  .withOutput(explorerInstantEvalProgressSchema)
+
+  .query("instantEvalGet")
+  .withInput(explorerInstantEvalRunIdSchema)
+  .withOutput(explorerInstantEvalProgressSchema)
 
   .query("header")
   .withInput(

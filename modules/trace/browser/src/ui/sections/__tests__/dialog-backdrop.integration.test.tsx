@@ -21,7 +21,14 @@ const capabilities: UiCapabilities = {
     route: () => ({ params: {}, query: {} }),
     navigate: () => void 0,
   }),
-  deployment: { isDevelopment: true },
+  deployment: {
+    isDevelopment: true,
+    isSaaS: false,
+    appBaseUrl: "https://app.langwatch.test",
+    hasNlpService: false,
+    hasLangevals: false,
+    hasEmailProvider: false,
+  },
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

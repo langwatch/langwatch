@@ -11,6 +11,11 @@ import {
   type EvaluationApi,
   reportEvaluationCommandDataSchema,
 } from "@langwatch/evaluation-contract";
+import type {
+  InstantEvalApi,
+  InstantEvalEstimateWire,
+  InstantEvalRunProgress,
+} from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -91,6 +96,7 @@ import {
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
+  type ExplorerInstantEvalRunInput,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -123,6 +129,7 @@ import { TraceExportDownloadService } from "../services/trace-export-download.se
 import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
+import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
@@ -431,6 +438,12 @@ export interface TraceAppDependencies {
   topics: TopicApi;
   broadcast: TracesTrpcEmitters;
   evaluations: EvaluationApi;
+  /**
+   * The Instant Eval peer the Explorer's judged searches run through. Absent
+   * on a process that composed Trace without it, and then the four Explorer
+   * operations refuse by name rather than answering an empty run.
+   */
+  instantEvals?: InstantEvalApi;
   codingAgents: CodingAgentApi;
   presence?: PresenceApi;
   share: ShareApi;
@@ -581,8 +594,12 @@ export class TraceApp implements TraceApi, CollectorApp {
   #exportDownload: TraceExportDownloadService | null;
   #scenarioEventMedia: TraceScenarioEventMediaService;
   #dependencies: TraceAppDependencies;
+  #explorerEvals: TraceInstantEvalRunService | null;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
+    this.#explorerEvals = dependencies.instantEvals
+      ? TraceInstantEvalRunService.create({ instantEvals: dependencies.instantEvals })
+      : null;
     this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
     this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
     this.#readBounds = TraceReadBoundsService.create({
@@ -598,6 +615,42 @@ export class TraceApp implements TraceApi, CollectorApp {
             presence: dependencies.presence,
           })
         : null;
+  }
+
+  estimateExplorerEvalRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<InstantEvalEstimateWire> {
+    return this.#instantEvals().estimateRun(input);
+  }
+
+  startExplorerEvalRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<InstantEvalRunProgress> {
+    return this.#instantEvals().startRun(input);
+  }
+
+  cancelExplorerEvalRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId?: string;
+  }): Promise<InstantEvalRunProgress> {
+    return this.#instantEvals().cancelRun(input);
+  }
+
+  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
+    return this.#instantEvals().getRun(input);
+  }
+
+  #instantEvals(): TraceInstantEvalRunService {
+    if (!this.#explorerEvals) {
+      throw new Error(
+        "An Explorer Instant Eval asked for the Instant Eval peer, but this process composed Trace without it",
+      );
+    }
+
+    return this.#explorerEvals;
   }
 
   extractInlineMediaFromEvent(input: {
