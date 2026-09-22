@@ -3,6 +3,7 @@ import { isLiveIdentifierState } from "@langwatch/identity";
 import type { IdentityService } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
 import {
   type SsoLegacyIdentityRetirementPort,
@@ -232,16 +233,15 @@ export class PrismaSsoLegacyIdentityRetirement
     userId: string;
     legacyProviderId: string;
   }): Promise<void> {
-    const memberships = await this.deps.prisma.organizationUser.findMany({
-      where: { userId, organizationId: { not: organizationId } },
-      select: { organizationId: true },
+    const otherOrganizationIds = await findOtherOrganizationIds({
+      prisma: this.deps.prisma,
+      organizationId,
+      userIds: [userId],
     });
-    if (memberships.length === 0) return;
+    if (otherOrganizationIds.length === 0) return;
     const connections = await this.deps.prisma.ssoConnection.findMany({
       where: {
-        organizationId: {
-          in: memberships.map(({ organizationId: id }) => id),
-        },
+        organizationId: { in: otherOrganizationIds },
         source: "legacy-grandfathered",
         state: { notIn: ["DISCARDED", "TORN_DOWN"] },
       },

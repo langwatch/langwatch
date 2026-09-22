@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
+import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 import {
   connectionRefOf,
   finalizationBlockers,
@@ -272,8 +273,10 @@ export class PrismaSsoMigrationEvidenceRepository
     );
     const quietComplete =
       this.#now() - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
+    // Tearing the legacy connection down revokes its sync and leaves a REVOKED
+    // row behind; a revoked sync pushes nothing, so it is not a sync to repoint.
     const scimStatus = scimStatusOf({
-      legacySyncs: legacyScim !== null,
+      legacySyncs: legacyScim !== null && legacyScim.state !== "REVOKED",
       replacementSyncState: replacementScim?.state,
     });
     const testSignIn = {
@@ -392,19 +395,16 @@ export class PrismaSsoMigrationEvidenceRepository
     userIds: string[],
   ): Promise<boolean> {
     if (userIds.length === 0) return false;
-    const memberships = await this.#prisma.organizationUser.findMany({
-      where: {
-        userId: { in: userIds },
-        organizationId: { not: organizationId },
-      },
-      distinct: ["organizationId"],
-      select: { organizationId: true },
+    const otherOrganizationIds = await findOtherOrganizationIds({
+      prisma: this.#prisma,
+      organizationId,
+      userIds,
     });
-    if (memberships.length === 0) return false;
+    if (otherOrganizationIds.length === 0) return false;
     return (
       (await this.#prisma.ssoConnection.count({
         where: {
-          organizationId: { in: memberships.map((row) => row.organizationId) },
+          organizationId: { in: otherOrganizationIds },
           source: "legacy-grandfathered",
           state: { notIn: ["DISCARDED", "TORN_DOWN"] },
         },
@@ -516,19 +516,16 @@ export class PrismaSsoMigrationEvidenceRepository
     providerId: string | null,
     userIds: string[],
   ): Promise<boolean> {
-    const memberships = await this.#prisma.organizationUser.findMany({
-      where: {
-        userId: { in: userIds },
-        organizationId: { not: organizationId },
-      },
-      distinct: ["organizationId"],
-      select: { organizationId: true },
+    const otherOrganizationIds = await findOtherOrganizationIds({
+      prisma: this.#prisma,
+      organizationId,
+      userIds,
     });
-    if (memberships.length === 0) return false;
+    if (otherOrganizationIds.length === 0) return false;
 
     const otherConnections = await this.#prisma.ssoConnection.findMany({
       where: {
-        organizationId: { in: memberships.map((row) => row.organizationId) },
+        organizationId: { in: otherOrganizationIds },
         source: "legacy-grandfathered",
         state: { notIn: ["DISCARDED", "TORN_DOWN"] },
       },

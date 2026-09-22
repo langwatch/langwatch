@@ -448,6 +448,20 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And finalization can be retried when its checks pass
     And after finalization no migration action is offered
 
+  @unit @regression
+  Scenario: Finishing is refused by the tenancy guard when a member's memberships are read across organizations
+    Given a member of the organization also belongs to another organization
+    When finishing asks whether that member's legacy identity is shared with another organization's provider
+    Then the other organizations are found through the member, not by reading memberships outside the tenant
+    And a membership read bounded only by "not this organization" is refused before it reaches the database
+
+  @integration @regression
+  Scenario: A revoked legacy directory sync is not one left to repoint
+    Given tearing the previous connection down has revoked its directory sync
+    When finishing re-reads what is outstanding
+    Then directory sync is not among the conditions, since a revoked sync pushes nobody
+    And finishing completes instead of asking for a repoint it has just made impossible
+
   @integration
   Scenario: Reading migration progress does not grant permission to change it
     Given a reader may see single sign-on but may not manage it
