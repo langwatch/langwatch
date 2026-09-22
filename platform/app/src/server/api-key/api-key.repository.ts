@@ -449,6 +449,11 @@ export class ApiKeyRepository {
    * matters, because the CLI re-mints a key the cap retired and leaves a key
    * a person revoked dead. Losing the race returns the row that stands, so
    * the key is dead either way and the first decision is the one recorded.
+   *
+   * The fence is SQL with the condition against the table. Through
+   * `updateMany` it sits in a subquery, and a statement that waited on the row
+   * lock re-checks only the outer id predicate against the committed row, so
+   * the later revoke would land anyway and its cause would be the one kept.
    */
   async revoke({
     id,
@@ -457,10 +462,16 @@ export class ApiKeyRepository {
     id: string;
     cause: ApiKeyRevocationCause;
   }): Promise<ApiKey> {
-    await this.prisma.apiKey.updateMany({
-      where: { id, revokedAt: null },
-      data: { revokedAt: new Date(), revocationCause: cause },
-    });
+    await this.prisma.$executeRaw`
+      -- @tenancy: addressed by the key's own id, which the caller resolved
+      -- inside its organization.
+      UPDATE "ApiKey"
+         SET "revokedAt" = now(),
+             "revocationCause" = ${cause},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "revokedAt" IS NULL
+    `;
     return this.prisma.apiKey.findUniqueOrThrow({ where: { id } });
   }
 

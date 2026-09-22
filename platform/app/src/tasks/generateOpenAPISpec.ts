@@ -51,6 +51,7 @@ import {
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
 // bot, the MCP authorize step) cannot reach a public document merely by living
 // next to something that is published.
+import { app as checkupApp } from "../server/routes/checkup";
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
@@ -79,6 +80,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
+  "/api/checkup",
   "/api/agents",
   "/api/v1/agents",
   "/api/api-keys",
@@ -234,6 +236,8 @@ export default async function execute() {
   const experimentsV3Spec = await generateSpecs(experimentsV3App);
   console.log("Building experiment init spec...");
   const miscSpec = await generateSpecs(miscApp);
+  console.log("Building checkup spec...");
+  const checkupSpec = await generateSpecs(checkupApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -322,6 +326,7 @@ export default async function execute() {
       evaluationsLegacySpec,
       experimentsV3Spec,
       miscSpec,
+      checkupSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,

@@ -53,6 +53,9 @@ describe("InviteService resilience", () => {
         update: vi.fn(),
         updateMany: vi.fn(),
       },
+      // The acceptance claim and the revoke are SQL; the resend and extend
+      // claims still go through `updateMany`.
+      $executeRaw: vi.fn(),
       organizationUser: {
         createMany: vi.fn(),
         findFirst: vi.fn(),
@@ -77,9 +80,7 @@ describe("InviteService resilience", () => {
       it("refuses the loser with a stale-code refusal and writes them no membership", async () => {
         // The loser's conditional claim matches nothing: the winner's
         // transaction already moved the row off (PENDING, code-race-1).
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 0,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(0);
         mockPrisma.organizationInvite.findUnique.mockResolvedValue({
           status: "ACCEPTED",
         });
@@ -99,9 +100,7 @@ describe("InviteService resilience", () => {
       });
 
       it("repairs instead of refusing when the loser is the winner racing itself", async () => {
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 0,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(0);
         mockPrisma.organizationInvite.findUnique.mockResolvedValue({
           status: "ACCEPTED",
         });
@@ -123,30 +122,24 @@ describe("InviteService resilience", () => {
     describe("when the revocation runs", () => {
       /** @scenario "A revoked invitation ends the journey quietly" */
       it("keeps the row as a REVOKED state instead of deleting it", async () => {
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 1,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(1);
 
         await service.revokeInvite({
           organizationId: "org-1",
           inviteId: "inv-race-1",
         });
 
-        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              id: "inv-race-1",
-              organizationId: "org-1",
-            }),
-            data: { status: "REVOKED" },
-          }),
-        );
+        // The revoke is a state change on the row it was asked about, in the
+        // organization it was asked in: the statement binds the invite, then
+        // the organization.
+        expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+        const [statement, ...bound] = mockPrisma.$executeRaw.mock.calls[0];
+        expect(statement.join("?")).toMatch(/SET "status" = 'REVOKED'/);
+        expect(bound).toEqual(["inv-race-1", "org-1"]);
       });
 
       it("refuses to revoke an invitation that was already accepted", async () => {
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 0,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(0);
 
         await expect(
           service.revokeInvite({

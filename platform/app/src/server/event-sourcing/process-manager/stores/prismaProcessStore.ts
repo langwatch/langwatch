@@ -444,26 +444,35 @@ export class PrismaProcessStore implements ProcessStore {
     return rows.map(toLeasedMessage);
   }
 
+  /**
+   * The three acknowledgements below are fenced on the lease token and on
+   * the row still being pending, and the fence is on the UPDATE itself, as
+   * the lease query above states its own. Through `updateMany` the fence sits
+   * in a subquery, and a statement that waited on the row lock re-checks only
+   * the outer key predicate against the committed row, so a late holder's
+   * acknowledgement parked behind a re-lease or behind the other
+   * acknowledgement of the same lease would land on a row it no longer holds.
+   */
   async markDispatched(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: "dispatched",
-        leasedUntil: null,
-        leaseToken: null,
-        dispatchedAt: asDate(params.now),
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    const now = asDate(params.now);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = 'dispatched',
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "dispatchedAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async markFailed(params: {
@@ -473,21 +482,21 @@ export class PrismaProcessStore implements ProcessStore {
     nextAttemptAt: number;
     dead: boolean;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: params.dead ? "dead" : "pending",
-        nextAttemptAt: asDate(params.nextAttemptAt),
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    const status = params.dead ? "dead" : "pending";
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = ${status}::"ProcessManagerOutboxStatus",
+             "nextAttemptAt" = ${asDate(params.nextAttemptAt)},
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async recordFailedAttempt(params: {
@@ -524,22 +533,21 @@ export class PrismaProcessStore implements ProcessStore {
     leaseToken: string;
     now: number;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        // The decrement hands back the attempt the lease charged: the
-        // delivery never started, so it must not burn retirement budget.
-        attempts: { decrement: 1 },
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    // The decrement hands back the attempt the lease charged: the delivery
+    // never started, so it must not burn retirement budget.
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "attempts" = "attempts" - 1,
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async findDueWakes(params: {

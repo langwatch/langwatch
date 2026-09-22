@@ -170,7 +170,7 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
 
 describe("invite.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
-  let inviteUpdateMock: ReturnType<typeof vi.fn>;
+  let claimInviteMock: ReturnType<typeof vi.fn>;
   let createManyMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -178,7 +178,7 @@ describe("invite.acceptInvite", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    inviteUpdateMock = vi.fn().mockResolvedValue({ count: 1 });
+    claimInviteMock = vi.fn().mockResolvedValue(1);
     createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 
@@ -195,13 +195,14 @@ describe("invite.acceptInvite", () => {
       // this stub as the root client it stands in for. The claim runs the
       // callback form of `$transaction`, handing the stub back as `tx`.
       $connect: vi.fn(),
+      $executeRaw: claimInviteMock,
       $transaction: (arg: unknown) =>
         typeof arg === "function"
           ? (arg as (tx: unknown) => unknown)(prismaStub)
           : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
         findUnique: findUniqueMock,
-        updateMany: inviteUpdateMock,
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findFirst: vi.fn().mockResolvedValue(null),
       },
       organizationUser: { createMany: createManyMock },
@@ -232,25 +233,18 @@ describe("invite.acceptInvite", () => {
       );
       // The claim is conditional on the (status, inviteCode) pair the caller
       // read — that is what makes two racers on one PENDING invite unable to
-      // both win — and it records who accepted.
-      expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: "PENDING",
-            inviteCode: "test-code",
-          }),
-          data: {
-            status: "ACCEPTED",
-            acceptedByUserId: "user-1",
-            acceptedViaIdentifierId: null,
-          },
-        }),
-      );
+      // both win — and it records who accepted. The conditions go to the
+      // database as SQL, so an update that matches nothing is the loss.
+      expect(claimInviteMock).toHaveBeenCalledTimes(1);
+      const [statement, ...bound] = claimInviteMock.mock.calls[0]!;
+      expect(statement.join("?")).toMatch(/SET "status" = 'ACCEPTED'/);
+      expect(statement.join("?")).toMatch(/AND "status" = 'PENDING'/);
+      expect(bound).toEqual(["user-1", null, "inv-1", "org-1", "test-code"]);
       // The ACCEPTED claim rides the same transaction as the membership row,
       // and the ledger grant is emitted only once that transaction has
       // committed — so the claim must be ordered before the grant just like
       // the membership row is.
-      expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      expect(claimInviteMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
     });
@@ -280,13 +274,8 @@ describe("invite.acceptInvite", () => {
 
       expect(result.success).toBe(true);
       // The claim records which identifier vouched for the acceptance.
-      expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            acceptedViaIdentifierId: "idf_g",
-          }),
-        }),
-      );
+      const [, , viaIdentifierId] = claimInviteMock.mock.calls[0]!;
+      expect(viaIdentifierId).toBe("idf_g");
     });
 
     it("refuses when no verified identifier holds the invited address", async () => {
@@ -334,7 +323,7 @@ describe("invite.acceptInvite", () => {
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(ledger.attachBindings).not.toHaveBeenCalled();
-      expect(inviteUpdateMock).not.toHaveBeenCalled();
+      expect(claimInviteMock).not.toHaveBeenCalled();
     });
   });
 
@@ -364,7 +353,7 @@ describe("invite.acceptInvite", () => {
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(ledger.attachBindings).not.toHaveBeenCalled();
-      expect(inviteUpdateMock).not.toHaveBeenCalled();
+      expect(claimInviteMock).not.toHaveBeenCalled();
     });
   });
 

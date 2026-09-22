@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { flushConnectSpend } from "../ee/licensing/connect/connectSpend.runtime";
 import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
@@ -553,6 +554,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
           await closeLocalControlRuntime();
         },
       },
+      // Hosted-service spend is summed in memory for a few seconds. Written
+      // after the HTTP drain, so the last calls are in it, and before the App
+      // closes, because the write goes through its event pipeline.
+      { name: "connect-spend", run: async () => await flushConnectSpend() },
       // Drain in-process workers (if any) before closing the shared App below,
       // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
       // away.

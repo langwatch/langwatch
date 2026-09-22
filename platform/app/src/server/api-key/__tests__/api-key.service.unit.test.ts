@@ -97,11 +97,6 @@ function createMockPrisma() {
         const created = await client.apiKey.create.mock.results.at(-1)?.value;
         return { ...(created ?? { id: args.where.id }), ...args.data };
       }),
-      // A revoke writes through the fenced updateMany and reads the row back.
-      updateMany: vi.fn().mockImplementation(async (args: any) => {
-        revokeState.row = { ...(revokeState.row ?? {}), ...args.data };
-        return { count: 1 };
-      }),
       findUniqueOrThrow: vi.fn().mockImplementation(async (args: any) => {
         const created = await client.apiKey.create.mock.results.at(-1)?.value;
         return {
@@ -133,6 +128,25 @@ function createMockPrisma() {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
   };
+
+  /**
+   * A revoke writes through the fenced SQL statement and reads the row back.
+   * The statement binds the cause, then the key id; `revokedAt` is set by the
+   * database, so the fake stamps it itself.
+   */
+  const executeRaw = vi
+    .fn()
+    .mockImplementation(
+      async (_sql: TemplateStringsArray, ...values: unknown[]) => {
+        revokeState.row = {
+          ...(revokeState.row ?? {}),
+          revokedAt: new Date(),
+          revocationCause: values[0],
+        };
+        return 1;
+      },
+    );
+  (client as Record<string, unknown>).$executeRaw = executeRaw;
 
   client.grant.findMany.mockImplementation(
     async (args: GrantFixtureQuery = {}) => {
@@ -457,12 +471,10 @@ describe("ApiKeyService", () => {
 
         // Fenced on the row still being live, so a second revocation cannot
         // restate the cause the first one recorded.
-        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: "ak_1", revokedAt: null },
-            data: expect.objectContaining({ revokedAt: expect.any(Date) }),
-          }),
-        );
+        expect(prisma._mockTx.$executeRaw).toHaveBeenCalledTimes(1);
+        const [statement, ...bound] = prisma._mockTx.$executeRaw.mock.calls[0];
+        expect(statement.join("?")).toMatch(/"revokedAt" IS NULL/);
+        expect(bound).toEqual(["user", "ak_1"]);
       });
 
       /** @scenario "A revoke from the API keys page records a person as its cause" */
@@ -480,11 +492,10 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({ revocationCause: "user" }),
-          }),
-        );
+        expect(prisma._mockTx.$executeRaw.mock.calls[0]?.slice(1)).toEqual([
+          "user",
+          "ak_1",
+        ]);
       });
 
       it("records the cause the platform names", async () => {
@@ -502,11 +513,10 @@ describe("ApiKeyService", () => {
           cause: "cap",
         });
 
-        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({ revocationCause: "cap" }),
-          }),
-        );
+        expect(prisma._mockTx.$executeRaw.mock.calls[0]?.slice(1)).toEqual([
+          "cap",
+          "ak_1",
+        ]);
       });
     });
 
@@ -544,7 +554,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalled();
+        expect(prisma._mockTx.$executeRaw).toHaveBeenCalled();
       });
     });
 

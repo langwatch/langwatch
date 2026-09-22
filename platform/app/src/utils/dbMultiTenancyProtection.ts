@@ -108,6 +108,17 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
+  // The install's own identity (ADR-141, section 10): one row, at the fixed id
+  // "self", naming the deployment rather than anything inside it. It has no
+  // tenant to constrain on, because it is what the whole install is.
+  "InstanceIdentity",
+  // The history of usage reports received from self-hosted installs (ADR-141,
+  // section 10). Written by a public route that holds no tenant at all, and
+  // read by the backoffice for one instance id at a time. Its sibling
+  // `SelfHostedInstance` carries an organizationId and so is classified by the
+  // org guard; this one carries no id of ours. It holds no customer content:
+  // counts, dates, a release and aggregated email domains.
+  "SelfHostedInstanceReport",
 ] as const;
 
 /**
@@ -302,6 +313,139 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         if (!d) return "create requires a data payload";
         if (typeof d.connectionId !== "string") {
           return "create requires a connectionId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // What a mid-term seat change of one connected license owes (ADR-141). It
+  // carries no organizationId: the reissued `IssuedLicense` row names the
+  // customer, and the `ConnectedBillingAccount` row it is invoiced against
+  // does too. The daily tick retries the rows still in `intent`, which is the
+  // one read that names neither; it is bounded by that state.
+  ConnectedSeatChange: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, licenseId, accountId or state in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.licenseId === "string" ||
+          (c.licenseId &&
+            Array.isArray(c.licenseId.in) &&
+            c.licenseId.in.length > 0) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.state === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.licenseId !== "string") {
+          return "create requires a licenseId in the data payload";
+        }
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // A paid credit at the payment provider (ADR-141). Its parent
+  // `ConnectedBillingAccount` row carries the organizationId; a grant is
+  // otherwise addressed by the provider's own id, which names one customer.
+  ConnectedCreditGrant: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeCreditGrantId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeCreditGrantId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // An invoice raised for a connected customer (ADR-141). Scoped like the
+  // grants above; the provider's invoice id is the other bounded way in,
+  // which is how a webhook finds the row for the invoice it was told about.
+  ConnectedInvoice: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeInvoiceId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeInvoiceId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // The monthly statement one connected customer was sent (ADR-141). Its
+  // parent `ConnectedBillingAccount` row carries the organizationId, so every
+  // query here names the account.
+  ConnectedStatement: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or accountId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.accountId_month?.accountId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
         }
       }
       return null;

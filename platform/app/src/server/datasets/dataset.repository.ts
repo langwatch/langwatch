@@ -24,7 +24,9 @@ export type UpdateDatasetInput = {
  * {@link Dataset} represents a collection of data records with associated metadata.
  */
 export class DatasetRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
 
   /**
    * Finds a single dataset by id within a project.
@@ -201,27 +203,35 @@ export class DatasetRepository {
   /**
    * Atomically claim a pending upload for normalization: flip `uploading` →
    * `processing` ONLY if the row is still `uploading` (and non-archived). The
-   * `updateMany` WHERE-clause is the concurrency guard — two finalize calls
-   * racing (double-click / client retry) can't both win, so only one enqueues a
+   * WHERE clause is the concurrency guard — two finalize calls racing
+   * (double-click / client retry) can't both win, so only one enqueues a
    * normalize. A read-then-`update` would let both pass the `status==='uploading'`
    * read and both transition + enqueue, racing two handlers onto the same chunk
    * keys in inline mode. Returns the rows claimed (1 = won, 0 = a concurrent
    * finalize already moved it).
+   *
+   * Stated as SQL rather than through `updateMany`, which does not hold under
+   * concurrency: Prisma puts the conditions in a subquery, and a statement that
+   * waited on the row lock re-checks only the outer `id IN (...)` against the
+   * committed row while the subquery still runs on its own older snapshot, so
+   * both finalize calls are told they won. With the conditions against the
+   * table the re-check sees `processing` and the second updates nothing.
+   * `updatedAt` is set by hand because the statement goes around the client's
+   * `@updatedAt`, and `findStaleProcessing` keys its window on it.
    */
   async claimForProcessing(input: {
     id: string;
     projectId: string;
   }): Promise<number> {
-    const { count } = await this.prisma.dataset.updateMany({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-        status: "uploading",
-        archivedAt: null,
-      },
-      data: { status: "processing" },
-    });
-    return count;
+    return await this.prisma.$executeRaw`
+      UPDATE "Dataset"
+         SET "status" = 'processing',
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "projectId" = ${input.projectId}
+         AND "status" = 'uploading'
+         AND "archivedAt" IS NULL
+    `;
   }
 
   /**

@@ -93,8 +93,8 @@ func seedBudgetEntry(t *testing.T, svc *Service, rawKey string, validUntil time.
 	t.Helper()
 	bundle := freshBundle("vk_budget", time.Now().Add(1*time.Hour))
 	bundle.Config = budgetConfig(5_000_000, validUntil)
-	svc.storeL1(hashKey(rawKey), bundle, etag)
-	e, ok := svc.l1.Peek(hashKey(rawKey))
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, etag)
+	e, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok, "the seeded entry must be in L1")
 
 	fetchedAt := validUntil.Add(-time.Minute)
@@ -130,14 +130,14 @@ func TestResolve_BudgetPeriodRolled_RefreshesUnconditionally(t *testing.T) {
 	// by the block that stopped its last request.
 	e := seedBudgetEntry(t, svc, rawKey, time.Now().Add(-time.Second), "42")
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 
 	assert.Equal(t, []string{""}, fetcher.conditionals(),
 		"the token is built from the key's revision and providers, so offering it here would be answered 304 and pin yesterday's spend")
 
-	live, ok := svc.l1.Peek(hashKey(rawKey))
+	live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
 	assert.Equal(t, int64(0), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
 		"the new period's spend has to replace the old period's, or the key stays blocked on money it did not spend today")
@@ -161,7 +161,7 @@ func TestResolve_BudgetPeriodRunning_DoesNotForceRefresh(t *testing.T) {
 	require.False(t, e.configStale(60*time.Second),
 		"the entry must start fresh, or this proves nothing about the boundary")
 
-	got, err := svc.Resolve(context.Background(), rawKey)
+	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 
 	assert.Empty(t, fetcher.conditionals(),
@@ -183,10 +183,10 @@ func TestResolve_BudgetBoundaryLongPast_RefreshesOnce(t *testing.T) {
 	e := seedBudgetEntry(t, svc, rawKey, past, "42")
 
 	for range 3 {
-		_, err := svc.Resolve(context.Background(), rawKey)
+		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 		require.NoError(t, err)
 		awaitConfigRefresh(t, e)
-		live, ok := svc.l1.Peek(hashKey(rawKey))
+		live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 		require.True(t, ok)
 		e = live
 	}
@@ -209,11 +209,11 @@ func TestResolve_BudgetRollFetchFails_StaysUnconditional(t *testing.T) {
 	rawKey := "vk-lw-budget-fetch-failed"
 	e := seedBudgetEntry(t, svc, rawKey, time.Now().Add(-time.Second), "42")
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err, "a failed config refresh is a background concern; the request still serves from cache")
 	awaitConfigRefresh(t, e)
 
-	live, ok := svc.l1.Peek(hashKey(rawKey))
+	live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
 	require.Same(t, e, live, "a failed refresh swaps nothing in, so the entry is the one we seeded")
 	assert.Equal(t, int64(5_000_000), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
@@ -224,14 +224,14 @@ func TestResolve_BudgetRollFetchFails_StaysUnconditional(t *testing.T) {
 	// The ordinary clock paces the retry rather than firing it on every
 	// request, so move past it the way a real entry would.
 	e = backdateConfig(t, svc, rawKey, 2*time.Minute)
-	_, err = svc.Resolve(context.Background(), rawKey)
+	_, err = svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 
 	assert.Equal(t, []string{"", ""}, fetcher.conditionals(),
 		"the retry after a failure has to go out unconditional too; offering the token would be answered 304 and pin the dead period's spend")
 
-	live, ok = svc.l1.Peek(hashKey(rawKey))
+	live, ok = svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
 	assert.Equal(t, int64(0), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
 		"once the control plane answers, the new period's spend replaces the old")
@@ -255,7 +255,7 @@ func TestResolve_BudgetPeriodRolled_AfterEarlier304_StillRefreshes(t *testing.T)
 	// A staleness refresh inside the period: the token goes out and is
 	// confirmed, so nothing is swapped in.
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 	require.Equal(t, []string{"42"}, fetcher.conditionals(),
@@ -264,16 +264,16 @@ func TestResolve_BudgetPeriodRolled_AfterEarlier304_StillRefreshes(t *testing.T)
 	// Now the period ends underneath it.
 	time.Sleep(400 * time.Millisecond)
 
-	live, ok := svc.l1.Peek(hashKey(rawKey))
+	live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
-	_, err = svc.Resolve(context.Background(), rawKey)
+	_, err = svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, live)
 
 	assert.Equal(t, []string{"42", ""}, fetcher.conditionals(),
 		"the boundary still has to force an unconditional re-read; the earlier 304 was taken inside the period and says nothing about the spend after it")
 
-	live, ok = svc.l1.Peek(hashKey(rawKey))
+	live, ok = svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
 	assert.Equal(t, int64(0), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
 		"and the new period's spend replaces the old")
@@ -286,14 +286,14 @@ func TestResolve_NoBudgetBoundary_KeepsConditionalRefresh(t *testing.T) {
 
 	rawKey := "vk-lw-budget-none"
 	bundle := freshBundle("vk_nobudget", time.Now().Add(1*time.Hour))
-	svc.storeL1(hashKey(rawKey), bundle, "42")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	assert.Empty(t, fetcher.conditionals(), "a fresh config with no boundary is not stale")
 
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
-	_, err = svc.Resolve(context.Background(), rawKey)
+	_, err = svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 
