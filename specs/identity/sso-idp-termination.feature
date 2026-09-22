@@ -473,6 +473,53 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And the update's link policy lets them through although their address was never verified
     But an unverified member no directory of the pair vouches for is still not linked on address alone
 
+  # Finishing used to wait for every member to sign in through the replacement,
+  # although the replacement already recognises most of them by address. The
+  # update now waits only for the people it could not recognise, and for the
+  # people whose only way in is the provider being taken away.
+
+  @unit @integration
+  Scenario: Members the new connection can match do not have to sign in before the update finishes
+    Given the update has switched sign-in over to the replacement
+    And a member has not signed in through the replacement yet
+    And their address is verified, or the directory sync provisioned them, on a domain the replacement proved, and no other account holds it
+    And they keep a way in other than the previous provider
+    When the administrator opens the update
+    Then the member is listed as moving across at their next sign-in
+    And they do not stop the update from finishing
+    And finishing takes their previous identity away without leaving them unable to sign in
+
+  @unit @integration
+  Scenario: A member the new connection cannot match holds the update until it can
+    Given a member has not signed in through the replacement
+    And their address is unverified with no directory vouching for it, is held by another account too, or is on a domain the replacement has not proved
+    When the administrator opens the update
+    Then the member is listed with the reason the new connection cannot match them
+    And finishing is refused with "members-cannot-move-across" until they sign in through the replacement or the reason is cleared
+
+  @unit @integration
+  Scenario: A member whose only way in is the previous provider signs in once before the update finishes
+    Given a member can be matched by address but holds no verified way in other than the previous provider
+    When the administrator opens the update
+    Then the member is listed as having to sign in through the replacement once
+    And finishing is refused with "members-cannot-move-across" rather than taking their only way in away
+
+  @integration @regression
+  Scenario: A deactivated member left on the previous provider is named before finishing rather than halfway through it
+    Given a deactivated member's only way in is the previous provider
+    When the administrator opens the update
+    Then the update asks for them to be removed from the organization before it can finish
+    And a deactivated member who keeps another way in does not hold the update
+
+  @unit @integration
+  Scenario: The quiet period counts from the switch-over and the last sign-in through the previous provider
+    Given the update has switched sign-in over to the replacement
+    When nobody signs in through the previous provider afterwards
+    Then the update can finish two days after the switch-over
+    But a sign-in through the previous provider after the switch-over moves that to seven days after the sign-in
+    And sign-ins through the previous provider before the switch-over do not count
+    And the update shows the time finishing opens
+
   @integration @regression
   Scenario: A revoked legacy directory sync is not one left to repoint
     Given tearing the previous connection down has revoked its directory sync
@@ -661,10 +708,10 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     But a similarly named sibling provider does not count
 
   @integration @regression
-  Scenario: Native legacy retirement requires a usable replacement in the same organization
+  Scenario: Native legacy retirement leaves every member a way in
     Given a legacy identifier was adopted without a connection annotation
     When its legacy access is retired
-    Then retirement requires a verified replacement identifier for that user
+    Then retirement requires a verified replacement identifier, or another verified way in, for that user
     And accounts belonging only to another organization remain untouched
 
   @unit @regression

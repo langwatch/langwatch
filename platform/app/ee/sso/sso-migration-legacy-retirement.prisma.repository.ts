@@ -81,11 +81,13 @@ export class PrismaSsoLegacyIdentityRetirement
         },
       }),
     );
+    const legacyIdentifierIds = identifiers.map(({ id }) => id);
     for (const identifier of identifiers) {
       await this.retireIdentifier({
         organizationId,
         legacyProviderId,
         replacementConnectionId,
+        legacyIdentifierIds,
         actorUserId,
         identifier,
       });
@@ -103,12 +105,14 @@ export class PrismaSsoLegacyIdentityRetirement
     organizationId,
     legacyProviderId,
     replacementConnectionId,
+    legacyIdentifierIds,
     actorUserId,
     identifier,
   }: {
     organizationId: string;
     legacyProviderId: string;
     replacementConnectionId: string;
+    legacyIdentifierIds: string[];
     actorUserId: string;
     identifier: {
       id: string;
@@ -124,9 +128,10 @@ export class PrismaSsoLegacyIdentityRetirement
     });
     const live = isLiveIdentifierState(identifier.state);
     if (live) {
-      await this.ensureReplacementIsWayIn({
+      await this.ensureWayInRemains({
         userId: identifier.userId,
         replacementConnectionId,
+        legacyIdentifierIds,
         legacyIsPrimary: identifier.state === "PRIMARY",
         actorUserId,
       });
@@ -150,18 +155,59 @@ export class PrismaSsoLegacyIdentityRetirement
     }
   }
 
-  private async ensureReplacementIsWayIn({
+  /**
+   * Makes sure the person keeps a way in once this identity is gone, and that
+   * it is their primary one if this was.
+   *
+   * The replacement is the way in of choice. A person who has not signed in
+   * through it yet keeps any other verified way in, typically their verified
+   * address, and the replacement matches them by that address at their next
+   * sign-in. A passkey alone is not enough: it has no address behind it. The
+   * update's own checks name everybody this refuses before finishing starts;
+   * this is the last line, so nobody is ever left without a way in.
+   */
+  private async ensureWayInRemains({
     userId,
     replacementConnectionId,
+    legacyIdentifierIds,
     legacyIsPrimary,
     actorUserId,
   }: {
     userId: string;
     replacementConnectionId: string;
+    legacyIdentifierIds: string[];
     legacyIsPrimary: boolean;
     actorUserId: string;
   }): Promise<void> {
-    const replacement = await this.deps.prisma.identifier.findFirst({
+    const successor =
+      (await this.replacementWayIn({ userId, replacementConnectionId })) ??
+      (await this.otherWayIn({ userId, legacyIdentifierIds }));
+    if (!successor) {
+      throw blocked(
+        "members-cannot-move-across",
+        `User ${userId} can only sign in through the legacy connection.`,
+      );
+    }
+    if (legacyIsPrimary && successor.state !== "PRIMARY") {
+      await this.deps.identity.markPrimary({
+        tenantId: userId,
+        userId,
+        commandId: this.deps.newCommandId(),
+        identifierId: successor.id,
+        occurredAtMs: this.deps.now(),
+        actor: { type: "user", id: actorUserId },
+      });
+    }
+  }
+
+  private replacementWayIn({
+    userId,
+    replacementConnectionId,
+  }: {
+    userId: string;
+    replacementConnectionId: string;
+  }) {
+    return this.deps.prisma.identifier.findFirst({
       where: {
         userId,
         OR: [
@@ -177,22 +223,27 @@ export class PrismaSsoLegacyIdentityRetirement
       orderBy: [{ verifiedAt: "desc" }, { id: "asc" }],
       select: { id: true, state: true },
     });
-    if (!replacement) {
-      throw blocked(
-        "members-not-verified-on-replacement",
-        `User ${userId} has no verified replacement identifier.`,
-      );
-    }
-    if (legacyIsPrimary && replacement.state !== "PRIMARY") {
-      await this.deps.identity.markPrimary({
-        tenantId: userId,
+  }
+
+  /** Any other verified way in, the person's own address first. */
+  private async otherWayIn({
+    userId,
+    legacyIdentifierIds,
+  }: {
+    userId: string;
+    legacyIdentifierIds: string[];
+  }) {
+    const others = await this.deps.prisma.identifier.findMany({
+      where: {
         userId,
-        commandId: this.deps.newCommandId(),
-        identifierId: replacement.id,
-        occurredAtMs: this.deps.now(),
-        actor: { type: "user", id: actorUserId },
-      });
-    }
+        id: { notIn: legacyIdentifierIds },
+        provider: { not: "passkey" },
+        state: { in: ["VERIFIED", "PRIMARY"] },
+      },
+      orderBy: [{ verifiedAt: "desc" }, { id: "asc" }],
+      select: { id: true, state: true, provider: true },
+    });
+    return others.find(({ provider }) => provider === "email") ?? others[0];
   }
 
   private async retireAccount({

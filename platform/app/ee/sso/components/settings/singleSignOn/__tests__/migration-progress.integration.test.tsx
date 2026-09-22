@@ -64,10 +64,17 @@ function migrationWith(
     members: {
       activeCount: 1,
       linkedCount: 0,
+      nextSignInCount: 1,
+      waitingCount: 0,
+      deactivatedOnPreviousCount: 0,
       stragglers: [person(0)],
       nextCursor: null,
     },
-    quietPeriod: { lastLegacyAuthenticationAtMs: null, complete: true },
+    quietPeriod: {
+      lastLegacyAuthenticationAtMs: null,
+      clearsAtMs: null,
+      complete: true,
+    },
     scim: { status: "not-applicable" },
     blockers: [],
     canFinalize: false,
@@ -83,6 +90,7 @@ function person(
     name: `Member ${index}`,
     email: `member${index}@acme.test`,
     lastLegacyAuthenticationAtMs: null,
+    move: "next-sign-in",
   };
 }
 
@@ -228,6 +236,9 @@ describe("given more than one page of members still using the legacy provider", 
   const firstMembers: SelfServeMigrationView["members"] = {
     activeCount: 51,
     linkedCount: 0,
+    nextSignInCount: 51,
+    waitingCount: 0,
+    deactivatedOnPreviousCount: 0,
     stragglers: Array.from({ length: 25 }, (_, index) => person(index)),
     nextCursor: "user_024",
   };
@@ -315,9 +326,7 @@ describe("given more than one page of members still using the legacy provider", 
       fireEvent.click(screen.getByRole("button", { name: "Next members" }));
 
       expect(
-        screen.getByText(
-          /We could not load the members still using the previous provider/,
-        ),
+        screen.getByText(/We could not load the members not moved across yet/),
       ).toBeDefined();
       expect(screen.queryByText("Member 0")).toBeNull();
       expect(
@@ -382,21 +391,29 @@ describe("given an update under way", () => {
         migrationScreen({
           migration: migrationWith({
             members: {
-              activeCount: 3,
+              activeCount: 4,
               linkedCount: 1,
+              nextSignInCount: 1,
+              waitingCount: 2,
+              deactivatedOnPreviousCount: 1,
               stragglers: [],
               nextCursor: null,
             },
             blockers: [
               {
-                code: "members-not-linked",
+                code: "members-cannot-move-across",
                 message:
-                  "2 active members are not linked to the replacement yet.",
+                  "2 active members cannot be moved across by address yet.",
+              },
+              {
+                code: "deactivated-members-on-previous-provider",
+                message:
+                  "1 deactivated member can only sign in through the legacy connection.",
               },
               {
                 code: "legacy-activity-not-quiet",
                 message:
-                  "Wait for seven days without a successful legacy sign-in.",
+                  "Wait two days after the switch-over, and seven after the last legacy sign-in since then.",
               },
             ],
           }),
@@ -404,15 +421,87 @@ describe("given an update under way", () => {
       );
 
       expect(container.textContent).toContain(
-        "2 members have not signed in through the new connection yet.",
+        "2 members cannot be moved across yet. The list above says what each one needs.",
       );
       expect(container.textContent).toContain(
-        "Wait for seven days with nobody signing in through Auth0.",
+        "1 deactivated member can only sign in through Auth0. Remove them from the organization before you finish.",
+      );
+      expect(container.textContent).toContain(
+        "You can finish two days after switching over, or seven days after the last sign-in through Auth0 since then, whichever is later.",
       );
       // The server's own sentences are written in the ledger's vocabulary,
       // and the code-keyed copy is what replaces them.
       expect(container.textContent).not.toContain("the replacement");
       expect(container.textContent).not.toContain("legacy sign-in");
+    });
+
+    /** @scenario "The quiet period counts from the switch-over and the last sign-in through the previous provider" */
+    it("shows the time finishing opens once sign-in is switched over", () => {
+      const clearsAtMs = Date.parse("2026-09-03T09:30:00.000Z");
+      const { container } = render(
+        migrationScreen({
+          migration: migrationWith({
+            phase: "GRACE_DIRECT",
+            selectedRoute: "direct",
+            quietPeriod: {
+              lastLegacyAuthenticationAtMs: null,
+              clearsAtMs,
+              complete: false,
+            },
+            blockers: [{ code: "legacy-activity-not-quiet", message: "x" }],
+          }),
+        }),
+      );
+
+      expect(container.textContent).toContain(
+        `You can finish from ${new Date(clearsAtMs).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. A sign-in through Auth0 before then moves this to seven days after it.`,
+      );
+    });
+
+    /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
+    /** @scenario "A member the new connection cannot match holds the update until it can" */
+    /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
+    it("says beside each member what moving them across still needs", () => {
+      const moves = [
+        "next-sign-in",
+        "sign-in-once",
+        "unverified-address",
+        "shared-address",
+        "unproved-domain",
+      ] as const;
+      render(
+        migrationScreen({
+          migration: migrationWith({
+            members: {
+              activeCount: 6,
+              linkedCount: 1,
+              nextSignInCount: 1,
+              waitingCount: 4,
+              deactivatedOnPreviousCount: 0,
+              stragglers: moves.map((move, index) => ({
+                ...person(index),
+                move,
+              })),
+              nextCursor: null,
+            },
+          }),
+        }),
+      );
+
+      expect(
+        screen
+          .getAllByTestId("sso-update-member")
+          .map((row) => row.textContent),
+      ).toEqual([
+        "Member 0 · Moves across at their next sign-in",
+        "Member 1 · Has to sign in through the new connection once",
+        "Member 2 · Cannot be matched: their address is not confirmed",
+        "Member 3 · Cannot be matched: another account has the same address",
+        "Member 4 · Cannot be matched: their address is not on a domain you proved",
+      ]);
+      expect(
+        screen.getByText("1 of 6, 1 more at their next sign-in"),
+      ).toBeDefined();
     });
 
     /** @scenario "The update reports where it stands and what is outstanding" */
@@ -440,10 +529,9 @@ describe("given an update under way", () => {
           selectedRoute: "legacy",
           testSignInDone: false,
           liveRecoveryCount: 0,
-          linkedCount: 0,
-          activeCount: 2,
+          waitingCount: 2,
+          deactivatedOnPreviousCount: 1,
           quietComplete: false,
-          scimStatus: "moves-with-finish",
           sharedLegacyIdentifiers: true,
         }).map((blocker) => blocker.code),
         ...finalizationBlockers([], {
@@ -454,7 +542,6 @@ describe("given an update under way", () => {
             remaining: 1,
             unassociated: 1,
             ambiguous: true,
-            unverifiedDirectMembers: 1,
           },
         }).map((blocker) => blocker.code),
       ]);

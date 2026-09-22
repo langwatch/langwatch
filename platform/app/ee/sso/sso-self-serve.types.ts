@@ -74,11 +74,24 @@ export interface SelfServeGoLiveView {
   activated: boolean;
 }
 
+/**
+ * What moving one member across still needs. `next-sign-in` needs nothing
+ * from anybody: the replacement matches them by address when they next sign
+ * in, before or after the update finishes. Every other value holds the update.
+ */
+export type SsoMigrationMemberMove =
+  | "next-sign-in"
+  | "sign-in-once"
+  | "unverified-address"
+  | "shared-address"
+  | "unproved-domain";
+
 export interface SsoMigrationStragglerView {
   userId: string;
   name: string | null;
   email: string | null;
   lastLegacyAuthenticationAtMs: number | null;
+  move: SsoMigrationMemberMove;
 }
 
 export interface SsoMigrationBlockerView {
@@ -114,12 +127,21 @@ export interface SelfServeMigrationView {
   testSignIn: { done: boolean; atMs: number | null };
   members: {
     activeCount: number;
+    /** Members holding a verified sign-in on the replacement. */
     linkedCount: number;
+    /** Members the replacement will match at their next sign-in. */
+    nextSignInCount: number;
+    /** Active members holding the update: they must sign in once, or cannot be matched. */
+    waitingCount: number;
+    /** Deactivated members whose only way in is the previous provider. */
+    deactivatedOnPreviousCount: number;
     stragglers: SsoMigrationStragglerView[];
     nextCursor: string | null;
   };
   quietPeriod: {
     lastLegacyAuthenticationAtMs: number | null;
+    /** When finishing opens, or null before sign-in is switched over. */
+    clearsAtMs: number | null;
     complete: boolean;
   };
   scim: {

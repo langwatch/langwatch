@@ -1,6 +1,9 @@
 import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { providerDisplayName } from "@ee/sso/logic/providerDisplayName";
-import type { SelfServeMigrationView } from "@ee/sso/sso-self-serve.types";
+import type {
+  SelfServeMigrationView,
+  SsoMigrationMemberMove,
+} from "@ee/sso/sso-self-serve.types";
 import type {
   SsoConnectionLifecycleState,
   SsoMigrationPhase,
@@ -101,6 +104,24 @@ const PHASE_CHIP: Record<
   },
 };
 
+/** What the outstanding checks count, for the lines that say how many. */
+interface CheckFigures {
+  waiting: number;
+  deactivated: number;
+  clearsAtMs: number | null;
+}
+
+/** A moment the administrator will act at, in their own locale. */
+function formatMoment(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+const peopleCount = (count: number, kind = "") =>
+  `${count} ${kind}${count === 1 ? "member" : "members"}`;
+
 /**
  * What each outstanding check means to the person who has to clear it, and
  * what the same check reads as when it is simply one of the conditions.
@@ -114,7 +135,7 @@ const PHASE_CHIP: Record<
 const UPDATE_CHECKS: Record<
   string,
   {
-    act: (names: UpdateNames & { unlinked: number }) => string;
+    act: (context: UpdateNames & CheckFigures) => string;
     condition: string;
   }
 > = {
@@ -132,16 +153,24 @@ const UPDATE_CHECKS: Record<
     condition:
       "Somebody can still sign in without your identity provider, with a password set.",
   },
-  "members-not-linked": {
-    act: ({ unlinked }) =>
-      `${unlinked} ${unlinked === 1 ? "member has" : "members have"} not signed in through the new connection yet.`,
-    condition: "Every member has signed in through the new connection.",
+  "members-cannot-move-across": {
+    act: ({ waiting }) =>
+      `${peopleCount(waiting)} cannot be moved across yet. The list above says what each one needs.`,
+    condition: "Every member has moved across, or will at their next sign-in.",
+  },
+  "deactivated-members-on-previous-provider": {
+    act: ({ deactivated, previous }) =>
+      `${peopleCount(deactivated, "deactivated ")} can only sign in through ${previous}. Remove them from the organization before you finish.`,
+    condition:
+      "No deactivated member can only sign in through the previous provider.",
   },
   "legacy-activity-not-quiet": {
-    act: ({ previous }) =>
-      `Wait for seven days with nobody signing in through ${previous}.`,
+    act: ({ previous, clearsAtMs }) =>
+      clearsAtMs === null
+        ? `You can finish two days after switching over, or seven days after the last sign-in through ${previous} since then, whichever is later.`
+        : `You can finish from ${formatMoment(clearsAtMs)}. A sign-in through ${previous} before then moves this to seven days after it.`,
     condition:
-      "Nobody has signed in through the previous provider for seven days.",
+      "Two days have passed since switching over, and seven since anybody last signed in through the previous provider.",
   },
   "shared-legacy-identifiers": {
     act: ({ previous }) =>
@@ -167,12 +196,6 @@ const UPDATE_CHECKS: Record<
       "An account cannot be matched to a connection. Contact support to sort it out.",
     condition: "Every account can be matched to a connection.",
   },
-  "members-not-verified-on-replacement": {
-    act: () =>
-      "Every current member needs a verified sign-in on the new connection before access through the previous provider is taken away.",
-    condition:
-      "Every current member has a verified sign-in on the new connection.",
-  },
 };
 
 /** Every condition that has to be true before the update can be finished, in
@@ -193,14 +216,32 @@ export const UPDATE_CHECK_CODES: readonly string[] = Object.keys(UPDATE_CHECKS);
 function checkCopyFor({
   blocker,
   names,
-  unlinked,
+  figures,
 }: {
   blocker: SelfServeMigrationView["blockers"][number];
   names: UpdateNames;
-  unlinked: number;
+  figures: CheckFigures;
 }): string {
   const check = UPDATE_CHECKS[blocker.code];
-  return check ? check.act({ ...names, unlinked }) : blocker.message;
+  return check ? check.act({ ...names, ...figures }) : blocker.message;
+}
+
+/** What moving one member across still needs, beside their name. */
+const MEMBER_MOVE: Record<SsoMigrationMemberMove, string> = {
+  "next-sign-in": "Moves across at their next sign-in",
+  "sign-in-once": "Has to sign in through the new connection once",
+  "unverified-address": "Cannot be matched: their address is not confirmed",
+  "shared-address": "Cannot be matched: another account has the same address",
+  "unproved-domain":
+    "Cannot be matched: their address is not on a domain you proved",
+};
+
+/** How many members have moved across, and how many will without anybody acting. */
+function movedAcrossLine(members: SelfServeMigrationView["members"]): string {
+  const moved = `${members.linkedCount} of ${members.activeCount}`;
+  return members.nextSignInCount > 0
+    ? `${moved}, ${members.nextSignInCount} more at their next sign-in`
+    : moved;
 }
 
 /** What the organization's directory sync still needs, said rather than
@@ -253,10 +294,11 @@ export function MigrationProgress({
     previous: name ?? "your previous provider",
     replacement: replacementName,
   };
-  const unlinked = Math.max(
-    migration.members.activeCount - migration.members.linkedCount,
-    0,
-  );
+  const figures: CheckFigures = {
+    waiting: migration.members.waitingCount,
+    deactivated: migration.members.deactivatedOnPreviousCount,
+    clearsAtMs: migration.quietPeriod.clearsAtMs,
+  };
   return (
     <SettingsCard
       title={name ? `Replacing ${name}` : "Replacing your current sign-in"}
@@ -281,9 +323,7 @@ export function MigrationProgress({
           </Text>
         </SettingRow>
         <SettingRow label="Members moved across">
-          <Text fontSize="sm">
-            {migration.members.linkedCount} of {migration.members.activeCount}
-          </Text>
+          <Text fontSize="sm">{movedAcrossLine(migration.members)}</Text>
         </SettingRow>
         <SettingRow label="Directory sync">
           <Text fontSize="sm">{DIRECTORY_STATUS[migration.scim.status]}</Text>
@@ -299,7 +339,6 @@ export function MigrationProgress({
         organizationId={organizationId}
         connectionId={migration.replacement.connectionId}
         initialMembers={migration.members}
-        previous={names.previous}
       />
       {/* The heading and its help stay once every check passes: that is the
           moment an administrator re-reads the conditions before finishing. */}
@@ -318,7 +357,7 @@ export function MigrationProgress({
           ) : (
             migration.blockers.map((blocker) => (
               <Text key={blocker.code} fontSize="xs" color="fg.muted">
-                {checkCopyFor({ blocker, names, unlinked })}
+                {checkCopyFor({ blocker, names, figures })}
               </Text>
             ))
           )}
@@ -478,12 +517,10 @@ function MigrationStragglers({
   organizationId,
   connectionId,
   initialMembers,
-  previous,
 }: {
   organizationId: string;
   connectionId: string;
   initialMembers: SelfServeMigrationView["members"];
-  previous: string;
 }) {
   const [cursors, setCursors] = useState<string[]>([]);
   const cursor = cursors.at(-1) ?? null;
@@ -501,7 +538,7 @@ function MigrationStragglers({
   return (
     <VStack align="stretch" gap={1}>
       <Text fontSize="sm" fontWeight="semibold">
-        Still using {previous}
+        Not moved across yet
       </Text>
       <MigrationMemberRows error={error} loading={loading} members={members} />
       <HStack gap={2}>
@@ -550,10 +587,7 @@ function MigrationMemberRows({
 }) {
   if (error) {
     return (
-      <LoadFailure
-        error={error}
-        what="the members still using the previous provider"
-      />
+      <LoadFailure error={error} what="the members not moved across yet" />
     );
   }
   if (loading) {
@@ -581,8 +615,16 @@ function MigrationMemberRows({
   return (
     <>
       {members.stragglers.map((person) => (
-        <Text key={person.userId} fontSize="xs" color="fg.muted">
-          {person.name ?? person.email ?? person.userId}
+        <Text
+          key={person.userId}
+          fontSize="xs"
+          color="fg.muted"
+          data-testid="sso-update-member"
+        >
+          <Text as="span" color="fg">
+            {person.name ?? person.email ?? person.userId}
+          </Text>
+          {` · ${MEMBER_MOVE[person.move]}`}
         </Text>
       ))}
     </>

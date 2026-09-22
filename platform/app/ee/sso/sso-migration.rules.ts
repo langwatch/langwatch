@@ -4,17 +4,18 @@ import {
   qualifySsoDomainOwnership,
   type SsoConnectionState,
 } from "@langwatch/identity";
+import type { SsoArrivalMatch } from "./sso-migration-arrival";
 import type { SsoMigrationFinalizationBlocker } from "./sso-migration-finalization.service";
 import type {
   SelfServeMigrationView,
   SsoMigrationBlockerView,
+  SsoMigrationMemberMove,
 } from "./sso-self-serve.types";
 
 export interface LegacyAccountEvidence {
   remaining: number;
   unassociated: number;
   ambiguous: boolean;
-  unverifiedDirectMembers: number;
 }
 
 export interface MigrationIdentifierBinding {
@@ -60,7 +61,62 @@ export function identifierBelongsToMigrationConnection({
   );
 }
 
-export const MIGRATION_QUIET_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** How long after the last sign-in through the previous provider finishing waits. */
+export const MIGRATION_QUIET_PERIOD_MS = 7 * DAY_MS;
+/** How long after the switch-over finishing waits when nobody uses the previous provider. */
+export const MIGRATION_QUIET_FLOOR_MS = 2 * DAY_MS;
+
+/**
+ * When finishing opens: two days after the switch-over, or seven days after
+ * the last sign-in through the previous provider since then, whichever is
+ * later.
+ *
+ * The wait exists to catch people still signing in the old way, so it only
+ * counts sign-ins the switch-over did not already account for. Before the
+ * switch-over everybody signs in the old way by design, and counting those
+ * made every update wait a week however quiet the old route went.
+ */
+export function quietPeriodOf({
+  switchedOverAtMs,
+  lastLegacyAuthenticationAtMs,
+  nowMs,
+}: {
+  switchedOverAtMs: number | null;
+  lastLegacyAuthenticationAtMs: number | null;
+  nowMs: number;
+}): { clearsAtMs: number | null; complete: boolean } {
+  if (switchedOverAtMs === null) return { clearsAtMs: null, complete: false };
+  const straggler =
+    lastLegacyAuthenticationAtMs !== null &&
+    lastLegacyAuthenticationAtMs > switchedOverAtMs
+      ? lastLegacyAuthenticationAtMs + MIGRATION_QUIET_PERIOD_MS
+      : 0;
+  const clearsAtMs = Math.max(
+    switchedOverAtMs + MIGRATION_QUIET_FLOOR_MS,
+    straggler,
+  );
+  return { clearsAtMs, complete: nowMs >= clearsAtMs };
+}
+
+/**
+ * What moving one member across still needs, from whether the replacement
+ * can match them and whether the previous provider is their only way in.
+ *
+ * A person the replacement can match still has to sign in once when the
+ * previous provider is the only verified way in they hold: finishing takes
+ * that away, and nobody may be left with no way in at all.
+ */
+export function memberMoveOf({
+  arrival,
+  previousIsOnlyWayIn,
+}: {
+  arrival: SsoArrivalMatch;
+  previousIsOnlyWayIn: boolean;
+}): SsoMigrationMemberMove {
+  if (arrival !== "matched") return arrival;
+  return previousIsOnlyWayIn ? "sign-in-once" : "next-sign-in";
+}
 
 type ConnectionState = SsoConnectionState;
 
@@ -91,23 +147,24 @@ export function scimStatusOf({
   return "moves-with-finish";
 }
 
+const members = (count: number, kind: string) =>
+  `${count} ${kind} member${count === 1 ? "" : "s"}`;
+
 export function migrationBlockers({
   selectedRoute,
   testSignInDone,
   liveRecoveryCount,
-  linkedCount,
-  activeCount,
+  waitingCount,
+  deactivatedOnPreviousCount,
   quietComplete,
-  scimStatus,
   sharedLegacyIdentifiers,
 }: {
   selectedRoute: SelfServeMigrationView["selectedRoute"];
   testSignInDone: boolean;
   liveRecoveryCount: number;
-  linkedCount: number;
-  activeCount: number;
+  waitingCount: number;
+  deactivatedOnPreviousCount: number;
   quietComplete: boolean;
-  scimStatus: SelfServeMigrationView["scim"]["status"];
   sharedLegacyIdentifiers: boolean;
 }): SsoMigrationBlockerView[] {
   const blockers: SsoMigrationBlockerView[] = [];
@@ -130,17 +187,23 @@ export function migrationBlockers({
         "Keep at least one live way back in before finalizing. Grant it to somebody who has set a password — after the switch the old provider will not be there to sign them in, and a password can only be set while somebody is still signed in.",
     });
   }
-  if (linkedCount < activeCount) {
-    const unlinked = activeCount - linkedCount;
+  if (waitingCount > 0) {
     blockers.push({
-      code: "members-not-linked",
-      message: `${unlinked} active member${unlinked === 1 ? " is" : "s are"} not linked to the replacement yet.`,
+      code: "members-cannot-move-across",
+      message: `${members(waitingCount, "active")} cannot be moved across by address yet.`,
+    });
+  }
+  if (deactivatedOnPreviousCount > 0) {
+    blockers.push({
+      code: "deactivated-members-on-previous-provider",
+      message: `${members(deactivatedOnPreviousCount, "deactivated")} can only sign in through the legacy connection.`,
     });
   }
   if (!quietComplete) {
     blockers.push({
       code: "legacy-activity-not-quiet",
-      message: "Wait for seven days without a successful legacy sign-in.",
+      message:
+        "Wait two days after the switch-over, and seven after the last legacy sign-in since then.",
     });
   }
   if (sharedLegacyIdentifiers) {
@@ -170,6 +233,10 @@ export function membersViewOf({
   evidence: {
     activeCount: number;
     linkedCount: number;
+    nextSignInCount: number;
+    waitingCount: number;
+    deactivatedOnPreviousCount: number;
+    moves: Map<string, SsoMigrationMemberMove>;
     stragglerRows: { userId: string }[];
     pageRows: {
       userId: string;
@@ -180,16 +247,20 @@ export function membersViewOf({
   };
   limit: number;
 }): SelfServeMigrationView["members"] {
-  const { activeCount, linkedCount, stragglerRows, pageRows } = evidence;
+  const { stragglerRows, pageRows } = evidence;
   return {
-    activeCount,
-    linkedCount,
+    activeCount: evidence.activeCount,
+    linkedCount: evidence.linkedCount,
+    nextSignInCount: evidence.nextSignInCount,
+    waitingCount: evidence.waitingCount,
+    deactivatedOnPreviousCount: evidence.deactivatedOnPreviousCount,
     stragglers: pageRows.map((row) => ({
       userId: row.userId,
       name: row.name,
       email: row.email,
       lastLegacyAuthenticationAtMs:
         evidence.legacyActivityByUser.get(row.userId)?.getTime() ?? null,
+      move: evidence.moves.get(row.userId) ?? "unverified-address",
     })),
     nextCursor:
       stragglerRows.length > limit ? (pageRows.at(-1)?.userId ?? null) : null,
@@ -261,13 +332,6 @@ export function finalizationBlockers(
       code: "legacy-account-association-ambiguous",
       message:
         "A legacy account has no connection-scoped identifier and needs review.",
-    });
-  }
-  if (evidence.legacyAccounts.unverifiedDirectMembers > 0) {
-    addBlocker(blockers, {
-      code: "members-not-verified-on-replacement",
-      message:
-        "Every current member must hold a verified replacement identifier before legacy access is removed.",
     });
   }
   return blockers;
