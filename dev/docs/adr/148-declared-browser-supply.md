@@ -10,7 +10,7 @@
 **Related:** [ADR-147: the process supply is checked by the
 compiler](./147-compiler-checked-process-supply.md) (**this ADR is its browser
 half**; ADR-147 scoped `apps/ui` out and said why),
-[ADR-144: declarative process composition](./144-declarative-process-composition.md),
+[declarative process composition (the architecture record, §8; ADR-144 on this branch is trace search)](../ARCHITECTURE.md),
 [ADR-098: product-scoped navigation](./098-product-scoped-navigation.md),
 [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
 [ADR-086: runtime-configurable CDN base](./086-cdn-asset-base.md),

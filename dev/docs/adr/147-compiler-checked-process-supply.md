@@ -7,7 +7,7 @@
 **Behavioural contract:**
 [A process cannot boot without what its modules declared](../../../specs/server/typed-process-supply.feature)
 
-**Related:** [ADR-144: declarative process composition](./144-declarative-process-composition.md)
+**Related:** [declarative process composition (the architecture record, §8; ADR-144 on this branch is trace search)](../ARCHITECTURE.md)
 (**amended by this ADR**; its principle stands), [ADR-132: secrets are not
 config](./132-secrets-are-not-config.md), [ADR-102: runtime composition
 roots](./102-runtime-composition-roots.md)
