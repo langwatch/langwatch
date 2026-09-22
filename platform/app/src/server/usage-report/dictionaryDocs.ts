@@ -58,13 +58,13 @@ const WINDOW_LABEL: Record<UsageWindow, string> = {
   point_in_time: "at the time of the report",
 };
 
-function escapeCell(text: string): string {
-  return text.replace(/\|/g, "\\|");
+export function escapeTableCell(text: string): string {
+  return text.replace(/[\\|]/g, (character) => `\\${character}`);
 }
 
 function fieldRow(field: UsageField): string {
   const name = `\`${field.key}\`${field.ownSwitch ? " (own switch)" : ""}`;
-  return `| ${name} | ${WINDOW_LABEL[field.window]} | ${escapeCell(field.why)} | ${escapeCell(field.source)} |`;
+  return `| ${name} | ${WINDOW_LABEL[field.window]} | ${escapeTableCell(field.why)} | ${escapeTableCell(field.source)} |`;
 }
 
 function categorySection(category: UsageFieldCategory): string[] {

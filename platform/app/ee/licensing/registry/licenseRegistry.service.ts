@@ -24,8 +24,6 @@ import { parseLicenseKey, verifySignature } from "../validation";
 import {
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
-  LicenseAlreadyRegisteredError,
-  LicenseAlreadyReissuedError,
   LicenseSigningNotConfiguredError,
 } from "./errors";
 import {
@@ -38,9 +36,13 @@ import {
   type SeatChangeBillingOutcome,
   statusOfIssuedLicense,
 } from "./issuedLicense";
-import { createIssuedLicenseRow, isUniqueViolation } from "./issuedLicenseRows";
+import { createIssuedLicenseRow } from "./issuedLicenseRows";
 import { issuedLicenseView } from "./issuedLicenseViews";
 import { resolveLicenseCustomer } from "./licenseCustomers";
+import {
+  type LicenseReplacementTerms,
+  signReplacementLicense,
+} from "./licenseReplacements";
 import { retireManagedKeyOf, syncContractBudgetOf } from "./licenseSideEffects";
 import { resolveLicenseTerms } from "./licenseTerms";
 
@@ -263,63 +265,17 @@ export class LicenseRegistryService {
     };
   }
 
-  /**
-   * Signs a replacement for `current` and records it as waiting for delivery.
-   * The replaced license stays valid until the install presents the new one,
-   * because it is what authenticates the sync that delivers it, and the new
-   * license inherits the instance binding so a reissued license that leaks
-   * cannot be bound by another install first.
-   */
-  private async signReplacement(input: {
-    current: IssuedLicenseRecord;
-    maxMembers?: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: Date;
-    operatorId: string;
-  }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
-    const privateKey = this.requireSigningKey();
-    const { current } = input;
-
-    const { licenseKey } = generateLicenseKey({
-      organizationName: current.organizationName,
-      email: current.email,
-      planType: current.planType,
-      maxMembers: input.maxMembers ?? current.maxMembers,
-      maxMembersLite: input.maxMembersLite ?? current.maxMembersLite,
-      maxMessagesPerMonth: input.maxMessagesPerMonth,
-      expiresAt: input.expiresAt,
-      connectServices: current.services,
-      privateKey,
+  /** Signs a replacement for `current` and records it as waiting for delivery. */
+  private signReplacement(
+    input: LicenseReplacementTerms,
+  ): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
+    return signReplacementLicense({
+      ...input,
+      privateKey: this.requireSigningKey(),
       now: this.now(),
+      encrypt: this.deps.encrypt,
+      createRow: (params) => this.createRow(params),
     });
-
-    let row: IssuedLicenseRecord;
-    try {
-      row = await this.createRow({
-        licenseKey,
-        organizationId: current.organizationId,
-        source: "BACKOFFICE",
-        issuedById: input.operatorId,
-        overrides: {
-          replacesId: current.id,
-          pendingDeliveryLicense: this.deps.encrypt(licenseKey),
-          services: current.services,
-          seatRateCents: current.seatRateCents,
-          seatCurrency: current.seatCurrency,
-          commitUsdCents: current.commitUsdCents,
-          overageEnabled: current.overageEnabled,
-          overageMaxUsdCents: current.overageMaxUsdCents,
-          instanceId: current.instanceId,
-          instanceBoundAt: current.instanceBoundAt,
-        },
-      });
-    } catch (error) {
-      if (error instanceof LicenseAlreadyRegisteredError) throw error;
-      if (isUniqueViolation(error)) throw new LicenseAlreadyReissuedError();
-      throw error;
-    }
-    return { licenseKey, row };
   }
 
   async resetInstanceBinding(input: {

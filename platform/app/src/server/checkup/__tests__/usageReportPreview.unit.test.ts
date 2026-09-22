@@ -58,8 +58,9 @@ describe("usageReportPreview", () => {
     /** @scenario "The two switches change the preview" */
     it("asks the collector with the optional switch off", async () => {
       const collect = vi.fn(
-        async (_input: { switches: { optional: boolean; hostname: boolean } }) =>
-          ({ instance_id: "4b1c" }),
+        async (_input: {
+          switches: { optional: boolean; hostname: boolean };
+        }) => ({ instance_id: "4b1c" }),
       );
       const preview = await usageReportPreview({
         prisma,

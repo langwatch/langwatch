@@ -156,7 +156,7 @@ describe("langwatch doctor", () => {
       const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
       expect(url).toBe("http://localhost:5560/api/checkup/run");
       expect(init.method).toBe("POST");
-      expect(JSON.parse(String(init.body))).toEqual({
+      expect(JSON.parse(init.body as string)).toEqual({
         scenarioRunPlanId: "plan_1",
       });
       const merged = (result?.data as DoctorReport).rows.find(

@@ -83,6 +83,9 @@ const UNDOCUMENTED_LANGY_LOCAL_CONTROL =
 const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
+const UNDOCUMENTED_CHECKUP =
+  "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
+
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
 
@@ -97,6 +100,8 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/checkup": UNDOCUMENTED_CHECKUP,
+  "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,

@@ -77,6 +77,19 @@ var notMetrics = map[string]string{
 	// Log fields and JSON keys.
 	"gateway_request_id": "log field and response-header value",
 
+	// Field names in the usage report a self-hosted install sends, listed
+	// on the dictionary page. They are keys in a JSON document, counted on
+	// the control plane from the spend ledger, not series the gateway
+	// exposes.
+	"gateway_configured":    "usage report field",
+	"gateway_request_at":    "usage report field",
+	"gateway_requests":      "usage report field",
+	"gateway_requests_7d":   "usage report field",
+	"gateway_requests_28d":  "usage report field",
+	"gateway_spend_usd":     "usage report field",
+	"gateway_spend_usd_7d":  "usage report field",
+	"gateway_spend_usd_28d": "usage report field",
+
 	// `error.code` values on the REST error envelope. They share the
 	// `gateway_` prefix with the metrics because they name the same
 	// subsystem, but they are values inside a JSON body, not series.

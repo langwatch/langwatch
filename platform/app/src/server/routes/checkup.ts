@@ -12,6 +12,7 @@
  */
 
 import { describeRoute } from "hono-openapi";
+import type { OpenAPIV3_1 } from "openapi-types";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -55,7 +56,7 @@ async function organizationOf(projectId: string): Promise<string | null> {
 
 const CHECKUP_TAG = ["Checkup"];
 
-const rowSchema = {
+const rowSchema: OpenAPIV3_1.SchemaObject = {
   type: "object",
   properties: {
     id: {
@@ -91,13 +92,23 @@ const rowSchema = {
   required: ["id", "name", "group", "cost", "verdict"],
 };
 
-const reportSchema = {
+const reportSchema: OpenAPIV3_1.SchemaObject = {
   type: "object",
   properties: {
     ranAt: { type: "string", format: "date-time" },
     rows: { type: "array", items: rowSchema },
   },
   required: ["ranAt", "rows"],
+};
+
+/** The free checks answer with the report plus the usage report preview. */
+const reportWithUsageSchema: OpenAPIV3_1.SchemaObject = {
+  type: "object",
+  properties: {
+    ...reportSchema.properties,
+    usageReport: { type: "object", additionalProperties: true },
+  },
+  required: ["ranAt", "rows", "usageReport"],
 };
 
 secured.access(readAuth).get(
@@ -111,16 +122,7 @@ secured.access(readAuth).get(
       200: {
         description: "The checkup report and the usage report preview.",
         content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                ...reportSchema.properties,
-                usageReport: { type: "object", additionalProperties: true },
-              },
-              required: ["ranAt", "rows", "usageReport"],
-            },
-          },
+          "application/json": { schema: reportWithUsageSchema },
         },
       },
       404: {

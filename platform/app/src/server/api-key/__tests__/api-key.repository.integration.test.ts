@@ -16,6 +16,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import { ApiKeyRepository } from "../api-key.repository";
 import type { ApiKeyRevocationCause } from "../revocation-cause";
@@ -32,8 +33,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.apiKey.deleteMany({ where: { organizationId } });
-  await prisma.organization.delete({ where: { id: organizationId } });
+  await cleanupTestRows(prisma, [
+    ["apiKey", { organizationId }],
+    ["organization", { id: organizationId }],
+  ]);
 });
 
 async function liveKey() {

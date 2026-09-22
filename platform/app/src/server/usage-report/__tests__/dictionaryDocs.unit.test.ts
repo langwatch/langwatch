@@ -14,6 +14,7 @@ import {
   USAGE_REPORT_SCHEMA_VERSION,
 } from "../dictionary";
 import {
+  escapeTableCell,
   renderUsageReportDictionaryPage,
   USAGE_REPORT_DICTIONARY_DOC_PATH,
 } from "../dictionaryDocs";
@@ -28,7 +29,7 @@ describe("the usage report dictionary page", () => {
 
       for (const field of USAGE_FIELDS) {
         expect(page).toContain(`\`${field.key}\``);
-        expect(page).toContain(field.why.replace(/\|/g, "\\|"));
+        expect(page).toContain(escapeTableCell(field.why));
       }
       for (const item of USAGE_NEVER_COLLECTED) {
         expect(page).toContain(`- ${item}`);
