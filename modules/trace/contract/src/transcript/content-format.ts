@@ -23,12 +23,12 @@ export function asMarkdownBody(content: string): string {
     return "```xml\n" + content + "\n```";
   }
   if (looksLikeJson(content)) {
-    return "```json\n" + tryPrettyJson(content) + "\n```";
+    return "```json\n" + asPrettyJson(content) + "\n```";
   }
   return content;
 }
 
-export function tryPrettyJson(raw: string): string {
+export function asPrettyJson(raw: string): string {
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
@@ -36,15 +36,14 @@ export function tryPrettyJson(raw: string): string {
   }
 }
 
-export function tryParseJSON(s: string): unknown | null {
+/** The JSON document this string holds, or null when it does not hold one. */
+export function parseJSON(s: string): unknown {
+  const trimmed = s.trim();
+  const opensJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  const closesJson = trimmed.endsWith("}") || trimmed.endsWith("]");
+  if (!opensJson || !closesJson) return null;
   try {
-    const trimmed = s.trim();
-    const opensJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-    const closesJson = trimmed.endsWith("}") || trimmed.endsWith("]");
-    if (opensJson && closesJson) {
-      return JSON.parse(trimmed);
-    }
-    return null;
+    return JSON.parse(trimmed);
   } catch {
     return null;
   }

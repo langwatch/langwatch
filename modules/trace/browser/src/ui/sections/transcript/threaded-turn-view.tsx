@@ -1,10 +1,10 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
+import { type ChatLayout, type ConversationTurn } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuUser } from "react-icons/lu";
 
-import { summarizeTurn } from "../../../behavior/transcript/turns.ts";
-import type { ChatLayout, ConversationTurn } from "../../../model/transcript/types.ts";
+import { summarizeTurn } from "../../../model/transcript/turns.ts";
 import { getRolePalette, ROLE_ICONS, ROLE_LABELS } from "../../blocks/transcript/role-chip.tsx";
 import { FlatTurnView } from "./flat-turn-view.tsx";
 import { TurnView } from "./turn-view.tsx";

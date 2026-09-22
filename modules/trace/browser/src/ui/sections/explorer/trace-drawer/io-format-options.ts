@@ -1,6 +1,6 @@
+import type { ChatLayout } from "@langwatch/trace-contract/transcript";
 import { LuCode, LuEye, LuList, LuMessageSquare } from "react-icons/lu";
 
-import type { ChatLayout } from "./transcript/index.ts";
 import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 
 /**

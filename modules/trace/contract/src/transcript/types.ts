@@ -1,20 +1,6 @@
-export type MediaPartData =
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "url"; value: string; mimeType?: string };
-    }
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "data"; value: string; mimeType: string };
-    }
-  | {
-      type: "binary";
-      mimeType: string;
-      id?: string;
-      url?: string;
-      data?: string;
-      filename?: string;
-    };
+import type { MediaPartData } from "../trace-media-part.collector.ts";
+
+export type { MediaPartData };
 
 export interface ChatMessage {
   role: string;

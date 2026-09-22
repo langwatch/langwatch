@@ -1,8 +1,8 @@
 import { Box, Button, Icon, Text } from "@chakra-ui/react";
+import { asMarkdownBody } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuFileText } from "react-icons/lu";
 
-import { asMarkdownBody } from "../../../model/transcript/content-format.ts";
 import { RenderedMarkdown } from "../markdown/rendered-markdown.tsx";
 
 export function ContextDisclosure({ context }: { context: string }) {

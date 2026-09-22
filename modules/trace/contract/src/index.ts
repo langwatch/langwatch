@@ -31,6 +31,8 @@ export {
   TraceApi,
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
+  type TraceMessagesSide,
+  type TraceRenderedSpanMessages,
   type TraceSuggestionTarget,
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
@@ -66,6 +68,7 @@ export * from "./trace-session-group.ts";
 export * from "./trace-share.schemas.ts";
 export * from "./trace-span-io.ts";
 export * from "./trace-span-read-model.ts";
+export * from "./trace-time-format.ts";
 export * from "./trace-ai-query.ts";
 export * from "./trace-edit-overlay.contract.ts";
 export {

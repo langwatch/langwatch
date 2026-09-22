@@ -1,6 +1,6 @@
 import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
+import type { ContentBlock, ConversationTurn } from "@langwatch/trace-contract/transcript";
 
-import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types.ts";
 import { AssistantTurnCard } from "./assistant-turn-card.tsx";
 import { BlockStack } from "./block-stack.tsx";
 import { SystemTurnView } from "./system-turn-view.tsx";

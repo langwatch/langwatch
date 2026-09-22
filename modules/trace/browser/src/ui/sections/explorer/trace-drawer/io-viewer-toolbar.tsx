@@ -1,4 +1,5 @@
 import { Box, Flex, HStack, Icon } from "@chakra-ui/react";
+import type { ChatLayout } from "@langwatch/trace-contract/transcript";
 import { useMemo, useRef } from "react";
 
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
@@ -9,7 +10,6 @@ import type { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { type IOAction, useIOActions } from "./io-actions.tsx";
 import { formatSelectOptions } from "./io-format-options.ts";
 import { CopyButton } from "./io-toolbar-buttons.tsx";
-import type { ChatLayout } from "./transcript/index.ts";
 import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 
 /**

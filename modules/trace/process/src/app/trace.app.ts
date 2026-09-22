@@ -54,6 +54,8 @@ import {
   type TraceCanonicalisationService,
   type TraceExportDownload,
   type TraceExportDownloadInput,
+  type TraceMessagesSide,
+  type TraceRenderedSpanMessages,
   type TraceEditOverlayDto,
   type TraceEventRollup,
   type TraceLegacyFilterInput,
@@ -90,6 +92,10 @@ import {
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
 } from "@langwatch/trace-contract";
+import {
+  buildParsedTurns,
+  renderConversationMarkdown,
+} from "@langwatch/trace-contract/conversation";
 import { z } from "zod";
 
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
@@ -99,7 +105,12 @@ import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
 } from "../rules/trace-legacy-search-body.rules.ts";
+import {
+  extractLlmMessagesForSpan,
+  extractLlmMessagesForTrace,
+} from "../rules/trace-llm-messages.rules.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
@@ -622,6 +633,47 @@ export class TraceApp implements TraceApi, CollectorApp {
       spans: input.trace.spans,
       maxTokens: input.maxTokens,
     }).text;
+  }
+
+  async renderThreadTranscript(input: {
+    threadKey: string;
+    traces: readonly Trace[];
+    maxTokens?: number;
+  }): Promise<string> {
+    // The text alone: the renderer writes its own omitted-turn marker into the
+    // transcript, so a cut leaves no second signal for a caller to read.
+    return renderConversationMarkdown({
+      conversationId: input.threadKey,
+      turns: buildParsedTurns({
+        turns: input.traces.map((trace) => traceToConversationTurn({ trace })),
+      }),
+      ...(input.maxTokens === undefined ? {} : { maxTokens: input.maxTokens }),
+    }).text;
+  }
+
+  async renderTraceMessages(input: {
+    trace: Trace;
+    side: TraceMessagesSide;
+  }): Promise<string | null> {
+    const messages = extractLlmMessagesForTrace({
+      trace: input.trace,
+      spans: input.trace.spans ?? [],
+    });
+    if (!messages) return null;
+    if (input.side === "input") return JSON.stringify(messages.input);
+    if (input.side === "output") return JSON.stringify(messages.output);
+    return JSON.stringify(messages);
+  }
+
+  async renderSpanMessages(input: {
+    trace: Trace;
+    spanId: string;
+  }): Promise<TraceRenderedSpanMessages> {
+    const span = (input.trace.spans ?? []).find((candidate) => candidate.span_id === input.spanId);
+    if (!span) return { isSpanPresent: false, json: null };
+    const messages = extractLlmMessagesForSpan({ span });
+    const isEmpty = messages.input.length === 0 && messages.output.length === 0;
+    return { isSpanPresent: true, json: isEmpty ? null : JSON.stringify(messages) };
   }
 
   async renderTraceJson(input: { trace: Trace }): Promise<string> {

@@ -2,6 +2,7 @@ import { Box, chakra, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { ChatMessage } from "@langwatch/trace-contract/transcript";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuBot,
@@ -27,7 +28,6 @@ import {
 } from "../../../../index.ts";
 import type { AttributeFormat } from "../../../../model/attribute-format.ts";
 import { contentToString } from "../../../../model/explorer/trace-table/chat-content.ts";
-import type { ChatMessage } from "../../../../model/transcript/types.ts";
 import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 

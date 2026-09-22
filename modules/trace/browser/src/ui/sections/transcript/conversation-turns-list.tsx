@@ -1,11 +1,11 @@
-import { useState } from "react";
-
 import {
   type ChatLayout,
   type ConversationTurn,
   LONG_THREAD_THRESHOLD,
   VIRTUALIZE_AT,
-} from "../../../model/transcript/types.ts";
+} from "@langwatch/trace-contract/transcript";
+import { useState } from "react";
+
 import {
   EarlierTurnsExpander,
   CollapseEarlierToggle,

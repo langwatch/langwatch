@@ -1,4 +1,4 @@
-import type { ContentBlock, KeyedContentBlock } from "./types.ts";
+import type { ContentBlock, KeyedContentBlock } from "@langwatch/trace-contract/transcript";
 
 type KeyedBlock<K extends ContentBlock["kind"]> = Extract<KeyedContentBlock, { kind: K }>;
 

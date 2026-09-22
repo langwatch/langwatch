@@ -13,6 +13,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./conversation": {
+      "types": "./dist/conversation/index.d.ts",
+      "default": "./src/conversation/index.ts"
+    },
+    "./transcript": {
+      "types": "./dist/transcript/index.d.ts",
+      "default": "./src/transcript/index.ts"
     }
   },
   "scripts": {

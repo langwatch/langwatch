@@ -2,11 +2,11 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ContentBlock } from "@langwatch/trace-contract/transcript";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { ContentBlock } from "../../../../model/transcript/types.ts";
 import { BlockStack } from "../block-stack.tsx";
 
 afterEach(cleanup);

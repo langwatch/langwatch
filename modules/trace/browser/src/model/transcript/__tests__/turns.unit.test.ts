@@ -1,10 +1,10 @@
+import type { ChatMessage } from "@langwatch/trace-contract/transcript";
 /**
  * @vitest-environment node
  * Grouping chat messages into conversation turns. Media-only messages are user.
  */
 import { describe, expect, it } from "vitest";
 
-import type { ChatMessage } from "../../../model/transcript/types.ts";
 import { groupMessagesIntoTurns } from "../turns.ts";
 
 const kindsOf = (messages: ChatMessage[]) =>

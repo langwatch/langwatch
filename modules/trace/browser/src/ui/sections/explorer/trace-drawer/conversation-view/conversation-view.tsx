@@ -1,6 +1,13 @@
 import { Box, Button, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
 import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
+import {
+  buildConversationMarkdownChunks,
+  buildParsedTurns,
+  type ConversationMarkdownChunk,
+  joinConversationMarkdown,
+} from "@langwatch/trace-contract/conversation";
+import { extractSystemText } from "@langwatch/trace-contract/transcript";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy } from "lucide-react";
 import {
@@ -33,11 +40,6 @@ import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-eve
 import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
 import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
 import type { TraceListItem } from "../../types/trace.ts";
-import {
-  extractReadableText,
-  extractReasoningText,
-  extractSystemText,
-} from "../transcript/index.ts";
 import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
 import { SystemPromptBanner } from "./system-prompt-banner.tsx";
 import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types.ts";
@@ -47,12 +49,6 @@ import {
   threadColumnMaxWidth,
   useRailLayout,
 } from "./use-rail-layout.ts";
-import {
-  buildConversationMarkdownChunks,
-  type ConversationMarkdownChunk,
-  joinConversationMarkdown,
-  turnMediaForSide,
-} from "./utils.ts";
 
 type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
 const EMPTY_ANNOTATION_ITEMS: AnnotationByTrace[] = [];
@@ -141,39 +137,9 @@ export const ConversationView = memo(function ConversationView({
     turnTraceIds,
   });
 
-  // Single pass over `turns`: pre-parse the latest user message and the
-  // wall-clock gap to the previous turn. Without this, every ChatTurnRow
-  // re-render would re-JSON.parse the entire input payload on its own.
-  const parsedTurns = useMemo<ParsedTurn[]>(() => {
-    const out: ParsedTurn[] = [];
-    for (let i = 0; i < turns.length; i++) {
-      const t = turns[i]!;
-      const prev = i > 0 ? turns[i - 1]! : undefined;
-      const gapSecs = prev ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000 : 0;
-      out.push({
-        turn: t,
-        // Use the shared Transcript helper so we handle the same shapes
-        // the I/O viewer does (chat arrays, single message objects,
-        // typed-block content arrays, and the raw-string fallback).
-        userText: extractReadableText(t.input, "user"),
-        assistantText: extractReadableText(t.output, "assistant"),
-        assistantReasoning: extractReasoningText(t.output),
-        userMedia: turnMediaForSide({
-          refs: t.inputMediaRefs,
-          value: t.input,
-          side: "input",
-        }),
-        assistantMedia: turnMediaForSide({
-          refs: t.outputMediaRefs,
-          value: t.output,
-          side: "output",
-        }),
-        gapSecs,
-        showGap: gapSecs > 5,
-      });
-    }
-    return out;
-  }, [turns]);
+  // One pass over `turns` through the shared conversation parse, so the drawer
+  // and a server-side reader build the same turns from the same payloads.
+  const parsedTurns = useMemo<ParsedTurn[]>(() => buildParsedTurns({ turns }), [turns]);
 
   // One notice for the whole conversation rather than one per message: the
   // policy that redacted a turn is the project's, and repeating it above every
@@ -201,7 +167,10 @@ export const ConversationView = memo(function ConversationView({
   }, [mode]);
   const markdownChunks = useMemo<ConversationMarkdownChunk[]>(() => {
     if (!hasViewedMarkdown) return EMPTY_CHUNKS;
-    return buildConversationMarkdownChunks(conversationId ?? "", parsedTurns);
+    return buildConversationMarkdownChunks({
+      conversationId: conversationId ?? "",
+      turns: parsedTurns,
+    });
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
   // Only show the skeleton on the very first load. With keepPreviousData

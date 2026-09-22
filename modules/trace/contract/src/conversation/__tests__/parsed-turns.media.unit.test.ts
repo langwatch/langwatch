@@ -1,4 +1,3 @@
-import type { TraceMediaRef } from "@langwatch/trace-contract";
 /**
  * Which media a turn's user message and its reply each carry: the fold-derived
  * references when the turn has them, the walked payload when it does not, and
@@ -6,7 +5,8 @@ import type { TraceMediaRef } from "@langwatch/trace-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import { turnMediaForSide } from "../utils.ts";
+import type { TraceMediaRef } from "../../trace-media-ref.ts";
+import { turnMediaForSide } from "../parsed-turns.ts";
 
 const CALLER = "/api/files/project-1/caller";
 const REPLY = "/api/files/project-1/reply";

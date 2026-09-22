@@ -107,6 +107,7 @@ export class TraceContentReadService extends TraceContentReadContract {
     threadIds: string[];
     protections: unknown;
     withEditOverlay?: boolean;
+    maxTraces?: number;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpansByThreadIds(
       input.projectId,
@@ -115,6 +116,7 @@ export class TraceContentReadService extends TraceContentReadContract {
       {
         full: true,
         ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
+        ...(input.maxTraces !== undefined ? { maxTraces: input.maxTraces } : {}),
       },
     );
   }

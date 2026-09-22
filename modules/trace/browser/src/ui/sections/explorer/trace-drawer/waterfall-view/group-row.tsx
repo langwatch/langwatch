@@ -4,7 +4,7 @@ import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 
 import { formatDuration } from "../../../../../model/display-formatters.ts";
-import { isSkillSpan } from "../transcript/skill-invocation.ts";
+import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import {
   GROUP_ROW_HEIGHT,
   getSpanBarColor,

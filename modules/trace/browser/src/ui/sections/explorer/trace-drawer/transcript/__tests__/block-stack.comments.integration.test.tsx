@@ -88,10 +88,11 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
+import { withBlockKeys } from "@langwatch/trace-contract/transcript";
+import type { ContentBlock } from "@langwatch/trace-contract/transcript";
+
 import { BlockStack } from "../block-stack.tsx";
 import { MessageCommentScope } from "../message-comments.tsx";
-import { withBlockKeys } from "../parsing.ts";
-import type { ContentBlock } from "../types.ts";
 
 const TRACE_ID = "trace-1";
 const BLOCKS: ContentBlock[] = [

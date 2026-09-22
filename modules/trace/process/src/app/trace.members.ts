@@ -153,7 +153,7 @@ export interface TraceLegacyRead {
     projectId: string,
     threadIds: string[],
     protections: unknown,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number },
   ): Promise<Trace[]>;
 
   /** The evaluator verdicts on a page of traces, keyed by trace id. */

@@ -1,7 +1,6 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
+import { asMarkdownBody, type ContentBlock } from "@langwatch/trace-contract/transcript";
 
-import { asMarkdownBody } from "../../../behavior/transcript/parsing.ts";
-import type { ContentBlock } from "../../../model/transcript/types.ts";
 import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
 import { RoleChip } from "../../blocks/transcript/role-chip.tsx";
 import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";

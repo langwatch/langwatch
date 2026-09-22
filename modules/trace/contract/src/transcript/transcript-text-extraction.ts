@@ -1,8 +1,8 @@
-import { tryParseJSON } from "../../model/transcript/content-format.ts";
-import { isRecord } from "../../model/transcript/record.ts";
-import type { ChatMessage, ContentBlock } from "../../model/transcript/types.ts";
 import { coerceToChatMessages } from "./chat-message-coercion.ts";
+import { parseJSON } from "./content-format.ts";
 import { parseContentBlocks } from "./content-parser.ts";
+import { isRecord } from "./record.ts";
+import type { ChatMessage, ContentBlock } from "./types.ts";
 
 function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks
@@ -33,7 +33,7 @@ export function extractReadableText(
 ): string {
   if (!raw) return "";
 
-  const parsed = tryParseJSON(raw);
+  const parsed = parseJSON(raw);
   const chat = coerceToChatMessages(parsed);
   if (chat) return extractFromChatMessages(chat, prefer);
 
@@ -58,7 +58,7 @@ export function extractReadableText(
 
 export function extractSystemText(raw: string | null | undefined): string {
   if (!raw) return "";
-  const chat = coerceToChatMessages(tryParseJSON(raw));
+  const chat = coerceToChatMessages(parseJSON(raw));
   if (!chat) return "";
   for (const msg of chat) {
     if (msg.role !== "system") continue;
@@ -83,7 +83,7 @@ export function getReasoning(message: ChatMessage, blocks: ContentBlock[]): stri
 
 export function extractReasoningText(raw: string | null | undefined): string {
   if (!raw) return "";
-  const parsed = tryParseJSON(raw);
+  const parsed = parseJSON(raw);
   const chat = coerceToChatMessages(parsed);
   if (chat) {
     for (let i = chat.length - 1; i >= 0; i--) {

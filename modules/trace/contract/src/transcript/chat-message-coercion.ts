@@ -1,7 +1,7 @@
-import { tryParseJSON } from "../../model/transcript/content-format.ts";
-import { isRecord } from "../../model/transcript/record.ts";
-import type { ChatMessage } from "../../model/transcript/types.ts";
+import { parseJSON } from "./content-format.ts";
 import { parseContentBlocks } from "./content-parser.ts";
+import { isRecord } from "./record.ts";
+import type { ChatMessage } from "./types.ts";
 
 const VALID_CHAT_ROLES = new Set(["system", "user", "assistant", "tool", "developer", "function"]);
 
@@ -45,7 +45,7 @@ function findNestedChatMessages(obj: Record<string, unknown>): ChatMessage[] | n
 
 export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
   if (typeof data === "string") {
-    const parsed = tryParseJSON(data);
+    const parsed = parseJSON(data);
     if (parsed !== null && parsed !== data) {
       return coerceToChatMessages(parsed);
     }
@@ -101,7 +101,10 @@ export function collectChatTextLeaves(messages: ChatMessage[]): Record<string, s
   return leaves;
 }
 
-function applyPartText(part: Record<string, unknown> | string, text: string | undefined) {
+function applyPartText(
+  part: Record<string, unknown> | string,
+  text: string | undefined,
+): Record<string, unknown> | string {
   if (text === undefined) return part;
   if (typeof part === "string") return text === part ? part : text;
   const isTextPart = !!part && typeof part === "object" && part.type === "text";

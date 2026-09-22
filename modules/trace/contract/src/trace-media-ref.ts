@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   collectAnnotatedMediaParts,
   type CollectedMediaPart,
+  type MediaPartData,
 } from "./trace-media-part.collector.ts";
 import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role.ts";
 
@@ -52,6 +53,22 @@ export function mediaRoleBelongsToSide(
 /** Whether a ref belongs on the given summary strip. */
 export function mediaRefBelongsToSide(ref: TraceMediaRef, side: TraceMediaSide): boolean {
   return mediaRoleBelongsToSide(ref.role, side);
+}
+
+/**
+ * Expand a compact trace-summary media ref (fold-derived, url-only) back into
+ * the `MediaPartData` shape the media renderers read.
+ */
+export function mediaRefToMediaData(ref: TraceMediaRef): MediaPartData {
+  if (ref.kind === "file") {
+    return {
+      type: "binary",
+      mimeType: ref.mimeType ?? "application/octet-stream",
+      url: ref.url,
+      ...(ref.filename ? { filename: ref.filename } : {}),
+    };
+  }
+  return { type: ref.kind, source: { type: "url", value: ref.url } };
 }
 
 export const MAX_TRACE_MEDIA_REFS = 4;

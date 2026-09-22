@@ -184,6 +184,9 @@ const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
 
+/** Traces one thread read may return when the caller names no ceiling. */
+const DEFAULT_THREAD_TRACES_LIMIT = 1_000;
+
 /**
  * How many spans the traces-with-spans OOM fallback will hold in memory before it
  * gives up on the read.
@@ -652,12 +655,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  /** @param opts.resolveBlobs forwarded to the per-trace fetch. */
+  /**
+   * @param opts.resolveBlobs forwarded to the per-trace fetch.
+   * @param opts.maxTraces traces the read may return across every thread asked
+   *   for; a ceiling below what they hold drops the rest without a word.
+   */
   async findTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { resolveBlobs?: boolean },
+    opts?: { resolveBlobs?: boolean; maxTraces?: number },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpansByThreadIds",
@@ -689,11 +696,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
               WHERE TenantId = {tenantId:String}
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
-              LIMIT 1000
+              LIMIT {maxTraces:UInt32}
             `,
             query_params: {
               tenantId: projectId,
               threadIds,
+              maxTraces: opts?.maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
             },
             format: "JSONEachRow",
           });

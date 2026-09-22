@@ -1,9 +1,22 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { TerminalOutput } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import {
+  applyChatTextLeaves,
+  asMarkdownBody,
+  type ChatMessage,
+  coerceToChatMessages,
+  collectChatTextLeaves,
+  type ConversationTurn,
+  extractInlineBlocks,
+  parseContentBlocks,
+  parseJSON,
+  VIRTUALIZE_AT,
+} from "@langwatch/trace-contract/transcript";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
+import { groupMessagesIntoTurns } from "../../../../model/transcript/turns.ts";
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../traces/trace-media-part.tsx";
@@ -12,19 +25,6 @@ import { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { AnnotationExpectedOutputs } from "./annotation-expected-outputs.tsx";
 import { IOViewerBody } from "./io-viewer-body.tsx";
 import { IOViewerToolbar } from "./io-viewer-toolbar.tsx";
-import {
-  applyChatTextLeaves,
-  asMarkdownBody,
-  type ChatMessage,
-  type ConversationTurn,
-  coerceToChatMessages,
-  collectChatTextLeaves,
-  extractInlineBlocks,
-  groupMessagesIntoTurns,
-  parseContentBlocks,
-  tryParseJSON,
-  VIRTUALIZE_AT,
-} from "./transcript/index.ts";
 import { MessageCommentScope } from "./transcript/message-comments.tsx";
 import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state.ts";
 
@@ -96,7 +96,7 @@ export const IOViewer = memo(function IOViewer({
   // format (pretty/chat/json/markdown) renders the translated variant; Copy follows
   // what's displayed.
   const originalChatMessages = useMemo(
-    () => coerceToChatMessages(tryParseJSON(originalContent)),
+    () => coerceToChatMessages(parseJSON(originalContent)),
     [originalContent],
   );
   const chatLeaves = useMemo(() => {
@@ -135,7 +135,7 @@ export const IOViewer = memo(function IOViewer({
     () => (traceId ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode } : null),
     [traceId, spanId, mode],
   );
-  const parsed = useMemo(() => tryParseJSON(content), [content]);
+  const parsed = useMemo(() => parseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
   // envelopes uniformly. Returns null when the payload genuinely isn't

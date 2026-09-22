@@ -1,8 +1,4 @@
-export {
-  asMarkdownBody,
-  tryParseJSON,
-  tryPrettyJson,
-} from "../../model/transcript/content-format.ts";
+export { asMarkdownBody, parseJSON, asPrettyJson } from "./content-format.ts";
 
 export {
   applyChatTextLeaves,
@@ -12,7 +8,7 @@ export {
 
 export { extractInlineBlocks, parseContentBlocks } from "./content-parser.ts";
 
-export { withBlockKeys } from "../../model/transcript/content-block-keying.ts";
+export { withBlockKeys } from "./content-block-keying.ts";
 
 export {
   extractReadableText,

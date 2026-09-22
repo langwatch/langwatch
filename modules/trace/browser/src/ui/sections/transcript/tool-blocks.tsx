@@ -1,12 +1,14 @@
 import { Box, chakra, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  type ChatMessage,
+  isRecord,
+  toolResultBodyToString,
+  asPrettyJson,
+} from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuSparkles, LuWrench } from "react-icons/lu";
 
-import { tryPrettyJson } from "../../../behavior/transcript/parsing.ts";
-import { isRecord } from "../../../model/transcript/record.ts";
 import { skillInvocationFromToolUse } from "../../../model/transcript/skill-invocation.ts";
-import { toolResultBodyToString } from "../../../model/transcript/tool-result-body.ts";
-import type { ChatMessage } from "../../../model/transcript/types.ts";
 import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports.tsx";
 import { ToolArgRow, ToolPairSection } from "../../elements/transcript/tool-pair-sections.tsx";
 
@@ -67,7 +69,7 @@ export function ToolPairCard({
 
   const fallbackJson = useMemo(() => {
     if (input == null) return "";
-    if (typeof input === "string") return tryPrettyJson(input);
+    if (typeof input === "string") return asPrettyJson(input);
     try {
       return JSON.stringify(input, null, 2);
     } catch {
@@ -100,7 +102,7 @@ export function ToolPairCard({
     () => (result ? toolResultBodyToString(result.content) : ""),
     [result],
   );
-  const prettyResult = useMemo(() => tryPrettyJson(resultBody), [resultBody]);
+  const prettyResult = useMemo(() => asPrettyJson(resultBody), [resultBody]);
   // ANSI escape codes only ever show up in real terminal/tool output (Bash,
   // test runners, build tools). When they do, render the coloured terminal
   // screen instead of dumping raw escape sequences into a <pre>. Plain output

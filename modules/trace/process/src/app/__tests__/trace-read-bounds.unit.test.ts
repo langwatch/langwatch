@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The tier-effective request bounds: page sizes clamp to the plan's bound,
@@ -5,7 +6,6 @@
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -175,6 +175,26 @@ describe("trace read bounds", () => {
         }),
       ).rejects.toBeInstanceOf(TraceIdsTooManyError);
       expect(getTracesWithSpansByThreadIds).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A page of conversations never loses a trace to the read's ceiling" */
+    it("passes the caller's ceiling to the thread read, sized by the threads asked for", async () => {
+      const { app, getTracesWithSpansByThreadIds } = harness("enterprise");
+      const threadIds = ids(200);
+
+      await app.readThreadsTraces({
+        projectId: "project-1",
+        threadIds,
+        protections: PROTECTIONS,
+        maxTraces: threadIds.length * 1_000,
+      });
+
+      expect(getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
+        "project-1",
+        threadIds,
+        PROTECTIONS,
+        { full: true, maxTraces: 200_000 },
+      );
     });
 
     it("refuses the evaluations-multiple read above the tier", async () => {

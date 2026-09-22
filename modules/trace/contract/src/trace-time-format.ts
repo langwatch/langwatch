@@ -1,0 +1,30 @@
+import { nowInstant, Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+
+/**
+ * The formats a rendered transcript prints. They live in the contract because
+ * the same transcript is rendered server-side for a reader that is a model,
+ * and no server graph may reach the design system these came from.
+ */
+
+/** A recorded moment as the ISO 8601 string a transcript preamble prints. */
+export function isoTimestamp(value: TimeInput): string {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value))).toISOString();
+}
+
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+export function formatRelativeTime(timestamp: number): string {
+  const diffMs = nowInstant().epochMilliseconds - timestamp;
+  if (diffMs < MS_PER_MINUTE) return "now";
+  if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
+  if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
+  return `${Math.floor(diffMs / MS_PER_DAY)}d`;
+}
+
+/** A duration in milliseconds as `840ms` under a second, `1.4s` above it. */
+export function formatDuration(ms: number): string {
+  if (ms < 1_000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1_000).toFixed(1)}s`;
+}

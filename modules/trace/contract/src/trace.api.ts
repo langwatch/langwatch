@@ -63,6 +63,15 @@ export type TraceAnnotationCommands = Readonly<{
   remove(input: TraceAnnotationMarker): Promise<void>;
 }>;
 
+/** Which side of a captured call a messages rendering answers with. */
+export type TraceMessagesSide = "both" | "input" | "output";
+
+/** One named span's messages, and whether the trace holds that span at all. */
+export interface TraceRenderedSpanMessages {
+  readonly isSpanPresent: boolean;
+  readonly json: string | null;
+}
+
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi extends TraceOtlpIngestApi {
   extractInlineMediaFromEvent(input: {
@@ -79,6 +88,24 @@ export interface TraceApi extends TraceOtlpIngestApi {
    * reader that is a model gets, where `formatSpansDigest` is unbounded.
    */
   renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string>;
+  /**
+   * A thread as one markdown transcript, the traces already ordered and cut by
+   * the caller. Under `maxTokens` the preamble and both ends survive and a
+   * marker names what was dropped, so a cut never reads as a short thread.
+   */
+  renderThreadTranscript(input: {
+    threadKey: string;
+    traces: readonly Trace[];
+    maxTokens?: number;
+  }): Promise<string>;
+  /**
+   * The trace's chat messages as JSON: `"both"` answers `{input, output}`, a
+   * one-sided ask answers a bare array. Null when the trace carries no
+   * readable conversation at all, which is a different answer from an empty one.
+   */
+  renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
+  /** One named span's chat messages as JSON, and whether the trace holds it. */
+  renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */
   renderTraceJson(input: { trace: Trace }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
@@ -135,11 +162,17 @@ export interface TraceApi extends TraceOtlpIngestApi {
     threadId: string;
     protections: unknown;
   }): Promise<Trace[]>;
+  /**
+   * Every trace of the named threads. `maxTraces` is the ceiling across all of
+   * them together: a caller asking for many threads at once sizes it by the
+   * threads, because a ceiling below what they hold drops the rest silently.
+   */
   readThreadsTraces(input: {
     projectId: string;
     threadIds: string[];
     protections: unknown;
     withEditOverlay?: boolean;
+    maxTraces?: number;
   }): Promise<Trace[]>;
   readSampleTraces(input: {
     query: TraceLegacyListInput;

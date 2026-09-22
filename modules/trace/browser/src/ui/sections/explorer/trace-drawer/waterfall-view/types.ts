@@ -13,8 +13,8 @@ import {
   LuWrench,
 } from "react-icons/lu";
 
+import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import { spanTypeColor } from "../../utils/span-type-color.ts";
-import { isSkillSpan } from "../transcript/skill-invocation.ts";
 
 export interface WaterfallViewProps {
   spans: SpanTreeNode[];

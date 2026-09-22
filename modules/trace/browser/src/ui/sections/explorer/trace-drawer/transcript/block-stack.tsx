@@ -7,7 +7,8 @@ import {
   type BlockStackProps,
 } from "../../../transcript/block-stack.tsx";
 
-export { pairToolBlocks, reparseTextBlock } from "../../../../../index.ts";
+export { pairToolBlocks } from "../../../../../model/transcript/block-stack-items.ts";
+export { reparseTextBlock } from "../../../../../model/transcript/reparse-text-block.ts";
 
 export function BlockStack(props: BlockStackProps) {
   return (

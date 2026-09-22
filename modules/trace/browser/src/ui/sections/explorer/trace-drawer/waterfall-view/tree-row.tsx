@@ -15,11 +15,11 @@ import {
 import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
 import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
 import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
+import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges.tsx";
 import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button.tsx";
-import { isSkillSpan } from "../transcript/skill-invocation.ts";
 import {
   getSpanPalette,
   INDENT_PX,

@@ -1,5 +1,9 @@
-import type { ChatMessage, ContentBlock, ConversationTurn } from "../../model/transcript/types.ts";
-import { getReasoning, parseContentBlocks } from "./parsing.ts";
+import { getReasoning, parseContentBlocks } from "@langwatch/trace-contract/transcript";
+import type {
+  ChatMessage,
+  ContentBlock,
+  ConversationTurn,
+} from "@langwatch/trace-contract/transcript";
 
 // Fold a user-role message into the preceding assistant turn when every block it
 // carries is an assistant operation.

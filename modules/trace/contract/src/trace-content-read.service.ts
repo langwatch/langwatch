@@ -47,11 +47,13 @@ export abstract class TraceContentReadService {
     threadId: string;
     protections: unknown;
   }): Promise<Trace[]>;
+  /** `maxTraces` is the ceiling across every thread asked for, not per thread. */
   abstract readThreadsTraces(input: {
     projectId: string;
     threadIds: string[];
     protections: unknown;
     withEditOverlay?: boolean;
+    maxTraces?: number;
   }): Promise<Trace[]>;
   abstract readSampleTraces(input: {
     query: TraceLegacyListInput;

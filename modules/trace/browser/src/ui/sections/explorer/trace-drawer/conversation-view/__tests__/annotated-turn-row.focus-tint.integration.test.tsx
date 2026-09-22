@@ -61,7 +61,7 @@ function parsedTurn(): ParsedTurn {
     userMedia: [],
     assistantMedia: [],
     gapSecs: 0,
-    showGap: false,
+    shouldShowGap: false,
   };
 }
 

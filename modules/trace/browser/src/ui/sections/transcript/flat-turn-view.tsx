@@ -1,8 +1,8 @@
 import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
+import type { ContentBlock, ConversationTurn } from "@langwatch/trace-contract/transcript";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 
-import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types.ts";
 import {
   getRolePalette,
   ROLE_ICONS,
