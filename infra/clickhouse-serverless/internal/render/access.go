@@ -106,9 +106,9 @@ const serverUserDefinedZooKeeperPath = "/clickhouse/user_defined"
 // how this server is reached):
 //
 //   - access_control_improvements.settings_constraints_replace_previous is what
-//     lets the app's lwql_restricted profile mark custom_api_key_hash
-//     changeable_in_readonly under readonly=1; without it the server rejects
-//     the profile.
+//     lets the app's `<database>_profile` settings profile (`langwatch_profile`
+//     by default) mark custom_api_key_hash changeable_in_readonly under
+//     readonly=1; without it the server rejects the profile.
 //   - user_defined_zookeeper_path, written only in replicated mode: on a
 //     single node there is no Keeper to reach, and declaring the path would
 //     make the function store depend on an ensemble that is not there.

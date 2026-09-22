@@ -1136,6 +1136,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the password and the connection strings are redacted from the logged error
     And an empty or unset secret never matches
 
+  # Self-provisioning is non-fatal by contract, and that must hold for a
+  # misconfigured connection too: a CLICKHOUSE_URL that parses but names an
+  # invalid database identifier makes the migration URL parse throw. It is caught
+  # on the same non-fatal path, so the deploy task returns and the pod boots
+  # (queries stay fail-closed) rather than crashing.
+  @unit
+  Scenario: An unparsable ClickHouse database name does not crash boot
+    Given a CLICKHOUSE_URL that parses but whose database is an invalid identifier
+    When the LangWatchQL provisioning task runs
+    Then the task completes without throwing and the failure is logged
+
   # ---------------------------------------------------------------------------
   # Coding-agent gaps (#8085): scoping, discovery and identity from the caller's
   # point of view, regrouped so every e2e user story leads its own Rule block.

@@ -1991,8 +1991,9 @@ clickhouse:
 # LangWatchQL (LWQL) Configuration
 # =============================================================================
 # The governed analytics SQL API. Its backend is the restricted ClickHouse
-# identity (langwatch_lwql), the lwql_restricted settings profile, the tenant
-# row policies, the lwql_postgres named collection and the caller-facing views.
+# identity (langwatch_lwql), the <database>_profile settings profile
+# (langwatch_profile by default), the tenant row policies, the lwql_postgres
+# named collection and the caller-facing views.
 # The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
 # backend objects exist regardless.
 #

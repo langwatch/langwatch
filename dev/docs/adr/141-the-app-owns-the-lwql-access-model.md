@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-101 kept two owners of the LangWatchQL access model (`langwatch_lwql` user, `lwql_restricted` profile, row policies, grants, `lwql_postgres` named collection): a rendered-config copy for chart-managed/SaaS ClickHouse, and the application's SQL DDL for BYO ClickHouse. The rendered copy lived in `infra/clickhouse-serverless/internal/render/lwql.go` and was deployed by SaaS `render-config.sh` and the chart. The app's DDL lived in `platform/app/src/server/analytics/lwql/provisioning/` and ran on every boot.
+ADR-101 kept two owners of the LangWatchQL access model (`langwatch_lwql` user, `langwatch_profile` settings profile, row policies, grants, `lwql_postgres` named collection): a rendered-config copy for chart-managed/SaaS ClickHouse, and the application's SQL DDL for BYO ClickHouse. The rendered copy lived in `infra/clickhouse-serverless/internal/render/lwql.go` and was deployed by SaaS `render-config.sh` and the chart. The app's DDL lived in `platform/app/src/server/analytics/lwql/provisioning/` and ran on every boot.
 
 Keeping two copies in sync was never stable. The rendered copies drifted from the app's catalog — the hand-vendored SaaS copy left roughly 113 of 129 production views returning 503, and the Go manifest needed parity tests just to stay in step with the app's definitions. Two owners of one model is a defect.
 

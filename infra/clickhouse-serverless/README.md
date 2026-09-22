@@ -30,8 +30,9 @@ For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverle
 ## LangWatchQL (LWQL)
 
 `ch-config` renders NO LangWatchQL access model. The application owns it: it
-provisions the restricted `langwatch_lwql` user, the `lwql_restricted`
-settings profile, row policies, and the `lwql_postgres` named collection
+provisions the restricted `langwatch_lwql` user, the `<database>_profile`
+settings profile (`langwatch_profile` by default), row policies, and the
+`lwql_postgres` named collection
 bridging into PostgreSQL via SQL DDL on every deployment, against whichever
 ClickHouse it is pointed at (chart-managed or BYO/external) — see
 [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).

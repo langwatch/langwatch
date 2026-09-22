@@ -212,17 +212,10 @@ async function appFunctionsProvisionable(
 async function selfProvisionAll({
   selfProvision,
   names,
-  sourceDatabase,
 }: {
   selfProvision: LwqlSelfProvisionEnv;
   names: LangWatchQLNames;
-  sourceDatabase: string;
 }): Promise<void> {
-  logger.info(
-    { database: names.database, sourceDatabase },
-    "provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views",
-  );
-
   // Everything this path can log carries one of these somewhere: the access
   // model DDL embeds the restricted password, the named collection embeds the
   // PostgreSQL reader password, and a connection failure quotes the URL it
@@ -245,6 +238,16 @@ async function selfProvisionAll({
   }
 
   try {
+    // Inside the try so a parseable CLICKHOUSE_URL whose database is an invalid
+    // identifier degrades to the non-fatal log below rather than crashing the
+    // deploy task — the boot-never-crashes contract covers a misconfigured URL
+    // just as it covers a server that refuses the DDL.
+    const { database: sourceDatabase } = parseConnectionUrl();
+    logger.info(
+      { database: names.database, sourceDatabase },
+      "provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views",
+    );
+
     // Serialize the destructive convergence across concurrently-booting pods:
     // the advisory lock is held for the whole transaction, so any other pod
     // running this task blocks until we release, then re-runs the (idempotent)
@@ -351,7 +354,9 @@ export default async function execute() {
   const names = productionLangWatchQLNames({
     connection: selfProvision.connection,
   });
-  const { database: sourceDatabase } = parseConnectionUrl();
 
-  await selfProvisionAll({ selfProvision, names, sourceDatabase });
+  // `sourceDatabase` is parsed inside selfProvisionAll's try, so a CLICKHOUSE_URL
+  // that parses but names an invalid database identifier degrades non-fatally
+  // instead of throwing out of this task.
+  await selfProvisionAll({ selfProvision, names });
 }

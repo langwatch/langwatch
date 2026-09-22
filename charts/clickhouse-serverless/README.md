@@ -57,8 +57,9 @@ See the [Docker image README](../../infra/clickhouse-serverless/README.md) for t
 ### LangWatchQL (LWQL)
 
 This chart renders no LangWatchQL access model. The application owns it: it
-provisions the `langwatch_lwql` restricted user, the `lwql_restricted`
-settings profile (fixed grants, row-level tenant filters), and the
+provisions the `langwatch_lwql` restricted user, the `<database>_profile`
+settings profile (`langwatch_profile` by default; fixed grants, row-level
+tenant filters), and the
 `lwql_postgres` PostgreSQL-bridge named collection via SQL DDL on every
 deployment, against whichever ClickHouse it is pointed at — chart-managed or
 BYO/external, with no distinction between the two paths any more. See

@@ -265,8 +265,10 @@ const CONFIG_STORE_ENTITY_KINDS: ReadonlySet<string> = new Set([
  * the LWQL policies target); their `short_name` is what the CREATE ROW POLICY
  * statements name, so that is the identity returned.
  *
- * Never throws: an inventory that cannot be read is logged and returns empty
- * rather than stopping a provisioning run that is otherwise fine.
+ * A non-identifier name (a quote or any character outside `[A-Za-z0-9_]`)
+ * throws before any query is issued, refusing to interpolate it. A query that
+ * does run and fails is logged (redacted) and returns empty rather than
+ * stopping a provisioning run that is otherwise fine.
  */
 export async function inventoryConfigStoreLwqlEntities({
   client,

@@ -236,7 +236,8 @@ For a complete installation guide, visit the [documentation](https://docs.langwa
 ### LangWatchQL (LWQL) prerequisites
 
 `lwql.enabled` (default `true`) provisions the LangWatchQL backend: a
-restricted `langwatch_lwql` user, an `lwql_restricted` settings profile, row
+restricted `langwatch_lwql` user, the `<database>_profile` settings profile
+(`langwatch_profile` by default), row
 policies, a `lwql_postgres` PostgreSQL-bridge named collection, and the
 caller-facing views. **The application always owns the access model, on
 every path** — see
@@ -255,8 +256,8 @@ prerequisites before enabling `lwql.enabled`:
 
 | Prerequisite | Why | Where it lives on the chart-managed path |
 | --- | --- | --- |
-| `custom_settings_prefixes` includes `custom_` | The `lwql_restricted` profile carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
-| The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, `lwql_restricted`, and the row policies. | The `langwatch/clickhouse-serverless` image grants this to its `default` user out of the box. |
+| `custom_settings_prefixes` includes `custom_` | The `<database>_profile` settings profile (`langwatch_profile` by default) carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
+| The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, the `<database>_profile` settings profile (`langwatch_profile` by default), and the row policies. | The `langwatch/clickhouse-serverless` image grants this to its `default` user out of the box. |
 | `named_collection_control: 1` on that same administrative user | Required specifically to create/drop the `lwql_postgres` named collection via SQL (`CREATE NAMED COLLECTION`), distinct from the general `access_management` grant. | Same as above. |
 
 Grant these on your ClickHouse server before pointing this chart at it with

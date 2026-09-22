@@ -553,9 +553,9 @@ func TestRenderAll_NoLWQLAccessModelRendered(t *testing.T) {
 
 // settings_constraints_replace_previous is not part of the LangWatchQL access
 // model itself — it is a server prerequisite the app's self-provisioned
-// lwql_restricted profile depends on to mark custom_api_key_hash
-// changeable_in_readonly, and it must be rendered unconditionally (no LWQL
-// password gate any more).
+// `<database>_profile` settings profile (`langwatch_profile` by default)
+// depends on to mark custom_api_key_hash changeable_in_readonly, and it must
+// be rendered unconditionally (no LWQL password gate any more).
 func TestRenderAll_SettingsConstraintsReplacePrevious(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
