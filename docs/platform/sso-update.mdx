@@ -209,6 +209,11 @@ provider already presents keeps working, the people and groups it provisioned
 stay provisioned, and the next push lands on the new connection. Nobody is
 deprovisioned by the switch.
 
+People the sync provisioned who have never signed in count as members too, so
+they need to sign in through the new connection once before you can finish.
+They can do that while the update is in progress: the sync's word that they
+belong is enough for the new connection to recognize them.
+
 If you had already issued a token for the new connection yourself under
 **Settings > Authentication > Connectors**, both tokens work after finishing.
 You can revoke the one you no longer use there.

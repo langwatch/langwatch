@@ -465,6 +465,15 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And before finishing, the update says the directory sync moves across when it finishes rather than asking anyone to repoint it
 
   @integration @regression
+  Scenario: A person the previous connection's sync provisioned can sign in through the replacement before the update finishes
+    Given the previous connection's directory sync provisioned a member who has never signed in, so their address was never verified
+    And the update has switched sign-in over to the replacement
+    When they sign in through the replacement
+    Then they are recognised as the person the directory means, on the previous connection's word
+    And the update's link policy lets them through although their address was never verified
+    But an unverified member no directory of the pair vouches for is still not linked on address alone
+
+  @integration @regression
   Scenario: A revoked legacy directory sync is not one left to repoint
     Given tearing the previous connection down has revoked its directory sync
     When finishing re-reads what is outstanding

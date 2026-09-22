@@ -184,6 +184,11 @@ function replacementProvesDomain({
   );
 }
 
+const NOT_MIGRATING = {
+  kind: "not_migrating",
+  decision: { kind: "not_migrating" } as const,
+} as const;
+
 /** Better Auth's migration callback policy, backed only by persisted facts. */
 export class PrismaSsoMigrationCallbackPolicy
   implements DatabaseHookSsoMigrationPort
@@ -456,25 +461,18 @@ export class PrismaSsoMigrationCallbackPolicy
         orgMemberships: { select: { organizationId: true } },
       },
     });
-    if (!user) {
-      return {
-        kind: "not_migrating",
-        decision: { kind: "not_migrating" } as const,
-      } as const;
-    }
+    if (!user) return NOT_MIGRATING;
     const pairs = await this.loadPairs({
       reads,
       organizationIds: user.orgMemberships.map(
         ({ organizationId }) => organizationId,
       ),
     });
-    if (pairs.length === 0) {
-      return {
-        kind: "not_migrating",
-        decision: { kind: "not_migrating" } as const,
-      } as const;
-    }
-    if (!user.email || !user.emailVerified) {
+    if (pairs.length === 0) return NOT_MIGRATING;
+    if (
+      !user.email ||
+      !(await this.addressIsVouchedFor({ reads, user, userId, pairs }))
+    ) {
       return {
         kind: "unverified",
         pairs,
@@ -529,6 +527,46 @@ export class PrismaSsoMigrationCallbackPolicy
       pairs: qualifiedPairs,
       authenticationPairs: pairs,
     } as const;
+  }
+
+  /**
+   * Whether the user's address can be trusted to name them: verified, or
+   * provisioned by a directory sync of one of their migrating pairs.
+   *
+   * A person the identity provider pushed and who has never signed in holds
+   * no verified address: nobody has proved it, because the provider itself
+   * created them. The directory row is the provider's own statement that it
+   * means this person, on either side of the pair, since the previous
+   * connection's sync moves to the replacement when the update finishes.
+   * Refusing them as unverified would leave every provisioned member unable
+   * to sign in through the replacement until it finishes, and the update
+   * unable to finish until they had.
+   */
+  private async addressIsVouchedFor({
+    reads,
+    user,
+    userId,
+    pairs,
+  }: {
+    reads: PrismaClient | Prisma.TransactionClient;
+    user: { emailVerified: boolean };
+    userId: string;
+    pairs: { replacement: { id: string }; legacy: { id: string } }[];
+  }): Promise<boolean> {
+    if (user.emailVerified) return true;
+    const owner = await reads.scimDirectoryUser.findFirst({
+      where: {
+        userId,
+        connectionId: {
+          in: pairs.flatMap(({ replacement, legacy }) => [
+            replacement.id,
+            legacy.id,
+          ]),
+        },
+      },
+      select: { userId: true },
+    });
+    return owner !== null;
   }
 
   private async decideStandaloneLegacyConnection(args: {
