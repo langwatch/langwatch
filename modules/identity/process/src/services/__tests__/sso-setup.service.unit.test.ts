@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { SsoMigrationProgressService } from "../sso-migration-progress.service.ts";
 import { SsoSetupService } from "../sso-setup.service.ts";
 
 const ORG = "org_acme";
@@ -73,6 +74,13 @@ function scenario(rows: SsoConnectionState[], bindings: BreakGlassBinding[] = []
   return SsoSetupService.create({
     connections: repositories.ssoConnections,
     breakGlass: repositories.ssoBreakGlass,
+    migrations: SsoMigrationProgressService.create({
+      connections: repositories.ssoConnections,
+      evidence: repositories.ssoMigrationEvidence,
+      breakGlass: repositories.ssoBreakGlass,
+      memberships: { listActiveMembers: async () => [] },
+      now: () => NOW,
+    }),
     now: () => NOW,
   });
 }
@@ -85,6 +93,7 @@ describe("given an organization that has registered nothing", () => {
       record: null,
       goLive: null,
       legacyRoute: null,
+      migration: null,
     });
   });
 });

@@ -2689,6 +2689,11 @@ const presentations = {
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
   },
+  sso_connection_already_registered: {
+    title: "This organization already has that connection",
+    describe: () =>
+      "Single sign-on is set up once per organization. Refresh to see the connection it already has, and change that one instead of registering another.",
+  },
   sso_connection_not_found: {
     title: "That single sign-on connection is not here any more",
     describe: () =>

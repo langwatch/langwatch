@@ -30,6 +30,21 @@ import {
   type RecordDomainProofPresentCommandData,
   recordDomainProofPresentCommandDataSchema,
   REGISTER_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  type RegisterReplacementConnectionCommandData,
+  registerReplacementConnectionCommandDataSchema,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  type RenameConnectionCommandData,
+  renameConnectionCommandDataSchema,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  type SelectMigrationRouteCommandData,
+  selectMigrationRouteCommandDataSchema,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  type BeginMigrationFinalizationCommandData,
+  beginMigrationFinalizationCommandDataSchema,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
+  type FinalizeMigrationCommandData,
+  finalizeMigrationCommandDataSchema,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -62,7 +77,8 @@ import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.t
 import type { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
 
 /**
- * The SSO connection write surface (D04, ADR-117 §5): fourteen verbs, each
+ * The SSO connection write surface (D04, ADR-117 §5): one verb per command,
+ * each parsing its own data and committing what its guard allowed.
  */
 export class SsoConnectionService {
   static create(
@@ -242,6 +258,59 @@ export class SsoConnectionService {
     return this.commit(
       { type: COMPLETE_TEARDOWN_COMMAND_TYPE, data },
       await this.guards.completeTeardown(data),
+    );
+  }
+
+  /** The word on the card. Nothing routes on it (ADR-117). */
+  async renameConnection(input: RenameConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = renameConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RENAME_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.renameConnection(data),
+    );
+  }
+
+  /** The one direct replacement an organization may run beside its
+   *  grandfathered connection. */
+  registerReplacementConnection = async (
+    input: RegisterReplacementConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> => {
+    const data = registerReplacementConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.registerReplacementConnection(data),
+    );
+  };
+
+  /** Which of the migration pair decides an ordinary sign-in. */
+  async selectMigrationRoute(input: SelectMigrationRouteCommandData): Promise<SsoConnectionFact[]> {
+    const data = selectMigrationRouteCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: SELECT_MIGRATION_ROUTE_COMMAND_TYPE, data },
+      await this.guards.selectMigrationRoute(data),
+    );
+  }
+
+  async beginMigrationFinalization(
+    input: BeginMigrationFinalizationCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = beginMigrationFinalizationCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE, data },
+      await this.guards.beginMigrationFinalization(data),
+    );
+  }
+
+  async finalizeMigration(input: FinalizeMigrationCommandData): Promise<SsoConnectionFact[]> {
+    const data = finalizeMigrationCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: FINALIZE_MIGRATION_COMMAND_TYPE, data },
+      await this.guards.finalizeMigration(data),
     );
   }
 

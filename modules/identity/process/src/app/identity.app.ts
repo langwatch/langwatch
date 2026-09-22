@@ -51,6 +51,10 @@ import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
+import {
+  SsoMigrationProgressService,
+  type SsoMigrationMemberships,
+} from "../services/sso-migration-progress.service.ts";
 import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
 import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
 import { SsoSetupService } from "../services/sso-setup.service.ts";
@@ -120,6 +124,21 @@ function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMembershi
     findOrganization: async ({ organizationId }) => {
       const summary = await organizations.findProvisioningSummary(organizationId);
       return summary ? { id: summary.id, name: summary.name } : null;
+    },
+  };
+}
+
+/** The organization's own member rows, as the migration read asks for them:
+ *  active members only, which is what `getAllMembers` already means. */
+function migrationMemberships(organizations: OrganizationApi): SsoMigrationMemberships {
+  return {
+    listActiveMembers: async ({ organizationId }) => {
+      const members = await organizations.getAllMembers({ organizationId });
+      return members.map((member) => ({
+        userId: member.id,
+        name: member.name ?? null,
+        email: member.email ?? null,
+      }));
     },
   };
 }
@@ -280,9 +299,19 @@ export class IdentityApp implements IdentityApi {
           }),
         })
       : null;
+    // `directory` is unanswered here: whether provisioning has been repointed
+    // is the directory module's to say, and an installation without one
+    // provisions nobody — which is what `not-applicable` means.
+    const ssoMigrationProgress = SsoMigrationProgressService.create({
+      connections: setup.repositories.ssoConnections,
+      evidence: setup.repositories.ssoMigrationEvidence,
+      breakGlass: setup.repositories.ssoBreakGlass,
+      memberships: migrationMemberships(setup.dependencies.organizations),
+    });
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,
       breakGlass: setup.repositories.ssoBreakGlass,
+      migrations: ssoMigrationProgress,
     });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 

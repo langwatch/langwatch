@@ -58,6 +58,13 @@ export class MemoryIdentityStore {
     string,
     { organizationId: string; connectionId: string; kind: SsoCredentialKind; value: string }
   >();
+  /** Every sign-in a connection decided, as the activity table records it. */
+  readonly ssoAuthentications: {
+    organizationId: string;
+    connectionId: string;
+    userId: string;
+    authenticatedAtMs: number;
+  }[] = [];
   readonly organizationNames = new Map<string, string>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */

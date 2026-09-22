@@ -14,13 +14,21 @@ import { nowInstant } from "@langwatch/time";
 
 import type { SsoBreakGlassRepository } from "../repositories/sso-break-glass.repository.ts";
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
+import type {
+  SsoMigrationProgressService,
+  SsoMigrationReading,
+} from "./sso-migration-progress.service.ts";
 
 /** States nobody can carry any further; a setup journey never shows one. */
 const CLOSED_STATES = new Set(["DISCARDED", "REJECTED", "TORN_DOWN"]);
 
+/** How many stragglers the setup read carries; the section pages for more. */
+const MIGRATION_PAGE_SIZE = 25;
+
 export interface SsoSetupServiceDeps {
   connections: SsoConnectionReadRepository;
   breakGlass: SsoBreakGlassRepository;
+  migrations: SsoMigrationProgressService;
   now?: () => number;
 }
 
@@ -41,7 +49,14 @@ export class SsoSetupService {
   }
 
   async getSetup({ organizationId }: { organizationId: string }): Promise<SsoSetupView> {
-    const held = await this.deps.connections.findForOrganization({ organizationId });
+    const [held, { migration }] = await Promise.all([
+      this.deps.connections.findForOrganization({ organizationId }),
+      this.deps.migrations.getProgress({
+        organizationId,
+        cursor: null,
+        limit: MIGRATION_PAGE_SIZE,
+      }),
+    ]);
     const open = held.filter((connection) => !CLOSED_STATES.has(connection.state));
     const legacy = open.find(
       (connection) =>
@@ -51,9 +66,16 @@ export class SsoSetupService {
           providerId: connection.idpMetadata.providerId,
         }),
     );
-    // The one being set up wins over the route it will replace; with only the
-    // legacy route held, that route IS the setup.
-    const connection = open.find((held) => held !== legacy) ?? legacy ?? null;
+    // A migration in flight names its own half: the replacement is what the
+    // journey is about, and the connection it replaces is the legacy route.
+    // Otherwise the one being set up wins over the route it will replace, and
+    // with only the legacy route held, that route IS the setup.
+    const replacement = migration
+      ? (open.find(
+          (connection) => connection.connectionId === migration.replacement.connectionId,
+        ) ?? null)
+      : null;
+    const connection = replacement ?? open.find((held) => held !== legacy) ?? legacy ?? null;
 
     return {
       connection: connection ? connectionView(connection) : null,
@@ -66,7 +88,29 @@ export class SsoSetupService {
             provider: legacy.idpMetadata.providerId,
           }
         : null,
+      migration,
     };
+  }
+
+  /** The cutover, paged. `getSetup` carries the first page; the section
+   *  asks here for the rest. */
+  async getMigrationProgress({
+    organizationId,
+    connectionId,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    connectionId?: string;
+    cursor: string | null;
+    limit: number;
+  }): Promise<SsoMigrationReading> {
+    return this.deps.migrations.getProgress({
+      organizationId,
+      connectionId,
+      cursor,
+      limit,
+    });
   }
 
   private recordView(connection: SsoConnectionState): SsoSetupRecordView | null {

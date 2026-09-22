@@ -22,6 +22,7 @@ import type {
   SsoConnectionFactInput,
   SsoConnectionLifecycleState,
   SsoDomainVerification,
+  SsoMigrationRoute,
 } from "./connection.ts";
 import type {
   AttachIdentifierCommandData,
@@ -71,6 +72,7 @@ import type {
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
 import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
+import type { SsoMigrationView } from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
@@ -354,6 +356,15 @@ export interface SsoDomainReproofApi {
  */
 export interface SsoSetupApi {
   getSetup(args: { organizationId: string }): Promise<SsoSetupView>;
+  /** One organization's cutover, paged: `getSetup` carries the first page of
+   *  stragglers, and this is how the section asks for the rest. `migration`
+   *  is null when the organization is running none. */
+  getMigrationProgress(args: {
+    organizationId: string;
+    connectionId?: string;
+    cursor: string | null;
+    limit: number;
+  }): Promise<{ migration: SsoMigrationView | null }>;
 }
 
 /**
@@ -368,6 +379,19 @@ export interface SsoSetupCommandsApi {
     providerId: string;
     registration: SsoIdpRegistration;
   }): Promise<{ connectionId: string }>;
+  /** The direct replacement for a grandfathered connection, carrying over
+   *  the domains it has already proved. */
+  startLegacyMigration(args: {
+    organizationId: string;
+    actor: SelfServeActor;
+    legacyConnectionId: string;
+    providerId: string;
+    registration: SsoIdpRegistration;
+  }): Promise<{ connectionId: string }>;
+  /** Which of a migration pair decides ordinary sign-ins. */
+  selectMigrationRoute(args: SsoSetupCommand & { route: SsoMigrationRoute }): Promise<void>;
+  /** The word on the card; nothing routes on it. */
+  rename(args: SsoSetupCommand & { name: string }): Promise<void>;
   setArrivals(args: SsoSetupCommand & { arrivalPolicy: SsoArrivalPolicy }): Promise<void>;
   activate(args: SsoSetupCommand & { testLoginAccountId: string }): Promise<void>;
   discardConnection(args: SsoSetupCommand): Promise<void>;

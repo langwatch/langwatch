@@ -30,6 +30,21 @@ import {
   type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
   REGISTER_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  type RegisterReplacementConnectionCommandData,
+  registerReplacementConnectionCommandDataSchema,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  type RenameConnectionCommandData,
+  renameConnectionCommandDataSchema,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  type SelectMigrationRouteCommandData,
+  selectMigrationRouteCommandDataSchema,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  type BeginMigrationFinalizationCommandData,
+  beginMigrationFinalizationCommandDataSchema,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
+  type FinalizeMigrationCommandData,
+  finalizeMigrationCommandDataSchema,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -236,3 +251,43 @@ export const GrandfatherConnectionCommand = connectionCommand({
   verb: "grandfatherConnection",
 });
 export type GrandfatherConnectionPayload = GrandfatherConnectionCommandData;
+
+export const RenameConnectionCommand = connectionCommand({
+  type: RENAME_CONNECTION_COMMAND_TYPE,
+  schema: renameConnectionCommandDataSchema,
+  description: "Change the word an administrator reads on a connection's card",
+  verb: "renameConnection",
+});
+export type RenameConnectionPayload = RenameConnectionCommandData;
+
+export const RegisterReplacementConnectionCommand = connectionCommand({
+  type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  schema: registerReplacementConnectionCommandDataSchema,
+  description: "Register the direct connection that replaces a grandfathered one",
+  verb: "registerReplacementConnection",
+});
+export type RegisterReplacementConnectionPayload = RegisterReplacementConnectionCommandData;
+
+export const SelectMigrationRouteCommand = connectionCommand({
+  type: SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  schema: selectMigrationRouteCommandDataSchema,
+  description: "Choose which connection of a migration pair decides ordinary sign-ins",
+  verb: "selectMigrationRoute",
+});
+export type SelectMigrationRoutePayload = SelectMigrationRouteCommandData;
+
+export const BeginMigrationFinalizationCommand = connectionCommand({
+  type: BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  schema: beginMigrationFinalizationCommandDataSchema,
+  description: "Open the durable gate that retiring the legacy connection runs behind",
+  verb: "beginMigrationFinalization",
+});
+export type BeginMigrationFinalizationPayload = BeginMigrationFinalizationCommandData;
+
+export const FinalizeMigrationCommand = connectionCommand({
+  type: FINALIZE_MIGRATION_COMMAND_TYPE,
+  schema: finalizeMigrationCommandDataSchema,
+  description: "Record that the legacy connection has been retired",
+  verb: "finalizeMigration",
+});
+export type FinalizeMigrationPayload = FinalizeMigrationCommandData;

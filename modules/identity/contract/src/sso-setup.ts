@@ -8,6 +8,7 @@ import type {
 } from "./connection.ts";
 import type { SsoDomainOwnershipQualification } from "./sso-domain-ownership.ts";
 import type { SelfServeActor } from "./sso-domain-proof.ts";
+import type { SsoMigrationView } from "./sso-migration.ts";
 
 /** What one press on the setup journey names, beside the actor behind it. */
 export interface SsoSetupCommand {
@@ -99,4 +100,7 @@ export interface SsoSetupView {
   goLive: SsoSetupGoLiveView | null;
   /** The compatibility route a grandfathered connection stands in for. */
   legacyRoute: { domain: string; provider: string } | null;
+  /** Where the cutover stands, when this connection replaces a
+   *  grandfathered one. Null for every connection outside a pair. */
+  migration: SsoMigrationView | null;
 }

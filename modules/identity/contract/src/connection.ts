@@ -112,6 +112,26 @@ export const ssoConnectionSourceSchema = z.enum(SSO_CONNECTION_SOURCES);
 export type SsoConnectionSource = z.infer<typeof ssoConnectionSourceSchema>;
 
 /**
+ * Where a direct connection replacing a grandfathered one stands. Routing
+ * reads this state; the timestamps beside it are evidence for people and
+ * audit logs, never an implicit routing decision.
+ */
+export const SSO_MIGRATION_PHASES = [
+  "SETUP",
+  "GRACE_LEGACY",
+  "GRACE_DIRECT",
+  "FINALIZING",
+  "FINALIZED",
+] as const;
+export const ssoMigrationPhaseSchema = z.enum(SSO_MIGRATION_PHASES);
+export type SsoMigrationPhase = z.infer<typeof ssoMigrationPhaseSchema>;
+
+/** Which connection decides an ordinary sign-in while the pair stands. */
+export const SSO_MIGRATION_ROUTES = ["legacy", "direct"] as const;
+export const ssoMigrationRouteSchema = z.enum(SSO_MIGRATION_ROUTES);
+export type SsoMigrationRoute = z.infer<typeof ssoMigrationRouteSchema>;
+
+/**
  * The IdP's dialing information as a FACT carries it: endpoints and
  * REFERENCES. `clientIdRef` and `secretRef` name credential records; the
  * values live wherever credentials live and never in the log.
@@ -146,6 +166,17 @@ export const CONNECTION_RESUMED_EVENT_TYPE = "lw.identity.connection_resumed" as
 export const TEARDOWN_REQUESTED_EVENT_TYPE = "lw.identity.teardown_requested" as const;
 export const CONNECTION_TORN_DOWN_EVENT_TYPE = "lw.identity.connection_torn_down" as const;
 /** Who this connection admits, changed after registration stated it. */
+/** The word on a connection's card, changed. A NAME AND NOT AN IDENTIFIER:
+ *  a sign-in reaches a provider by connection id, so two organizations may
+ *  both call theirs `okta`, and no saved link breaks when it changes. */
+export const CONNECTION_RENAMED_EVENT_TYPE = "lw.identity.connection_renamed" as const;
+export const REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE =
+  "lw.identity.replacement_connection_registered" as const;
+export const MIGRATION_ROUTE_SELECTED_EVENT_TYPE = "lw.identity.migration_route_selected" as const;
+export const MIGRATION_FINALIZATION_STARTED_EVENT_TYPE =
+  "lw.identity.migration_finalization_started" as const;
+export const MIGRATION_FINALIZED_EVENT_TYPE = "lw.identity.migration_finalized" as const;
+
 export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
   "lw.identity.connection_arrival_policy_set" as const;
 
@@ -168,6 +199,11 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   TEARDOWN_REQUESTED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
+  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
+  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+  MIGRATION_FINALIZED_EVENT_TYPE,
 ] as const;
 export type SsoConnectionEventType = (typeof SSO_CONNECTION_EVENT_TYPES)[number];
 
@@ -368,6 +404,53 @@ export const connectionArrivalPolicySetPayloadSchema = z.object({
   ...sourced,
 });
 
+/** What proved one domain, as a fact carries it — the replacement inherits
+ *  these whole rather than re-running a ceremony the customer already ran. */
+export const ssoDomainVerificationSchema = z.object({
+  domain: z.string().min(1),
+  method: ssoVerificationMethodSchema,
+  actorId: z.string().nullable(),
+  verifiedAtMs: z.number().int().nonnegative(),
+  proofState: ssoDomainProofStateSchema,
+  firstAbsentAtMs: z.number().int().nonnegative().nullable(),
+  graceEndsAtMs: z.number().int().nonnegative().nullable(),
+  tokenHash: z.string().nullable(),
+});
+
+export const connectionRenamedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  /** Trimmed and non-empty: a connection with a blank name is one whose card
+   *  has nothing on it, and the cards are the only place it is read. */
+  name: z.string().trim().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+export const replacementConnectionRegisteredPayloadSchema = z.object({
+  ...connectionRegisteredPayloadSchema.shape,
+  replacesConnectionId: z.string().min(1),
+  inheritedDomainVerifications: z.array(ssoDomainVerificationSchema).default([]),
+});
+
+export const migrationRouteSelectedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  route: ssoMigrationRouteSchema,
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+export const migrationFinalizationStartedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+export const migrationFinalizedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
@@ -440,6 +523,26 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_TORN_DOWN_EVENT_TYPE),
     data: connectionTornDownPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
+    data: connectionRenamedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
+    data: replacementConnectionRegisteredPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(MIGRATION_ROUTE_SELECTED_EVENT_TYPE),
+    data: migrationRouteSelectedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(MIGRATION_FINALIZATION_STARTED_EVENT_TYPE),
+    data: migrationFinalizationStartedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(MIGRATION_FINALIZED_EVENT_TYPE),
+    data: migrationFinalizedPayloadSchema,
   }),
 ]);
 export type SsoConnectionFactInput = z.infer<typeof ssoConnectionFactInputSchema>;
@@ -522,6 +625,17 @@ export interface SsoConnectionState {
   updatedAtMs: number;
   /** When the grace elapses, while TEARDOWN_PENDING. */
   tearDownAfterMs: number | null;
+  /** The grandfathered connection this direct one replaces. Null for an
+   *  ordinary connection, and for the grandfathered predecessor itself. */
+  replacesConnectionId: string | null;
+  /** Where the cutover stands. Null outside a migration pair. */
+  migrationPhase: SsoMigrationPhase | null;
+  graceStartedAtMs: number | null;
+  /** When an administrator last chose the route. Audit evidence only: the
+   *  route is derived from the phase, never from recency. */
+  routeChangedAtMs: number | null;
+  finalizationRequestedAtMs: number | null;
+  finalizedAtMs: number | null;
 }
 
 const EMPTY_IDP: SsoIdpMetadata = {
@@ -568,6 +682,12 @@ export function emptySsoConnection({ connectionId }: { connectionId: string }): 
     createdAtMs: 0,
     updatedAtMs: 0,
     tearDownAfterMs: null,
+    replacesConnectionId: null,
+    migrationPhase: null,
+    graceStartedAtMs: null,
+    routeChangedAtMs: null,
+    finalizationRequestedAtMs: null,
+    finalizedAtMs: null,
   };
 }
 
@@ -657,6 +777,84 @@ const withProofCondition = (
       : entry,
   );
 
+/** The facts about the legacy-to-direct pair, and the name on the card. */
+type SsoMigrationFact = Extract<
+  SsoConnectionFact,
+  {
+    type:
+      | typeof CONNECTION_RENAMED_EVENT_TYPE
+      | typeof REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE
+      | typeof MIGRATION_ROUTE_SELECTED_EVENT_TYPE
+      | typeof MIGRATION_FINALIZATION_STARTED_EVENT_TYPE
+      | typeof MIGRATION_FINALIZED_EVENT_TYPE;
+  }
+>;
+
+/** The five the cutover states, out of the twenty-two a connection has. */
+const SSO_MIGRATION_FACT_TYPES: readonly SsoConnectionFact["type"][] = [
+  CONNECTION_RENAMED_EVENT_TYPE,
+  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
+  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+  MIGRATION_FINALIZED_EVENT_TYPE,
+];
+
+function isSsoMigrationFact(fact: SsoConnectionFact): fact is SsoMigrationFact {
+  return SSO_MIGRATION_FACT_TYPES.includes(fact.type);
+}
+
+/** The cutover's own arms, folded apart from the lifecycle's. */
+function reduceSsoMigrationFact({
+  state,
+  touched,
+  fact,
+}: {
+  state: SsoConnectionState;
+  touched: SsoConnectionState;
+  fact: SsoMigrationFact;
+}): SsoConnectionState {
+  switch (fact.type) {
+    case CONNECTION_RENAMED_EVENT_TYPE:
+      // Folded onto the metadata the name already lived in, rather than into
+      // a field beside it: one string, one reader, nothing to keep in step.
+      return { ...touched, idpMetadata: { ...touched.idpMetadata, providerId: fact.data.name } };
+    case REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE:
+      return {
+        ...touched,
+        connectionId: fact.data.connectionId,
+        organizationId: fact.data.organizationId,
+        type: fact.data.type,
+        // The proofs come with it, so a replacement starts where the
+        // predecessor stood rather than re-proving a proved domain.
+        state: fact.data.inheritedDomainVerifications.length > 0 ? "VERIFIED" : "DRAFT",
+        idpMetadata: fact.data.idp,
+        arrivalPolicy: fact.data.arrivalPolicy,
+        source: fact.data.source,
+        createdBy: fact.data.actor.id,
+        createdAtMs: fact.occurredAt,
+        replacesConnectionId: fact.data.replacesConnectionId,
+        migrationPhase: "SETUP",
+        verifiedDomains: fact.data.inheritedDomainVerifications.map((proof) => proof.domain),
+        domainVerifications: fact.data.inheritedDomainVerifications,
+      };
+    case MIGRATION_ROUTE_SELECTED_EVENT_TYPE:
+      return {
+        ...touched,
+        migrationPhase: fact.data.route === "legacy" ? "GRACE_LEGACY" : "GRACE_DIRECT",
+        graceStartedAtMs: state.graceStartedAtMs ?? fact.occurredAt,
+        routeChangedAtMs: fact.occurredAt,
+      };
+    case MIGRATION_FINALIZATION_STARTED_EVENT_TYPE:
+      return {
+        ...touched,
+        migrationPhase: "FINALIZING",
+        finalizationRequestedAtMs: fact.occurredAt,
+      };
+    case MIGRATION_FINALIZED_EVENT_TYPE:
+      return { ...touched, migrationPhase: "FINALIZED", finalizedAtMs: fact.occurredAt };
+  }
+}
+
 /**
  * The reducer. Pure and total: the same function runs in the framework's
  * fold, the replay proof, and a browser tab. Guards refuse a forbidden fact
@@ -670,6 +868,23 @@ export function reduceSsoConnection({
   fact: SsoConnectionFact;
 }): SsoConnectionState {
   const touched = { ...state, updatedAtMs: fact.occurredAt };
+
+  return isSsoMigrationFact(fact)
+    ? reduceSsoMigrationFact({ state, touched, fact })
+    : reduceSsoLifecycleFact({ state, touched, fact });
+}
+
+/** Everything the lifecycle states: registration, domains, going live, and
+ *  the way out. */
+function reduceSsoLifecycleFact({
+  state,
+  touched,
+  fact,
+}: {
+  state: SsoConnectionState;
+  touched: SsoConnectionState;
+  fact: Exclude<SsoConnectionFact, SsoMigrationFact>;
+}): SsoConnectionState {
   switch (fact.type) {
     case CONNECTION_REGISTERED_EVENT_TYPE:
       return {
@@ -827,6 +1042,20 @@ export function reduceSsoConnection({
       };
     case CONNECTION_TORN_DOWN_EVENT_TYPE:
       return { ...touched, state: "TORN_DOWN", tearDownAfterMs: null };
+  }
+}
+
+/** Which connection decides an ordinary sign-in, read from the persisted
+ *  phase and never from a timestamp. */
+export function ssoMigrationRouteOf(phase: SsoMigrationPhase): SsoMigrationRoute {
+  switch (phase) {
+    case "SETUP":
+    case "GRACE_LEGACY":
+      return "legacy";
+    case "GRACE_DIRECT":
+    case "FINALIZING":
+    case "FINALIZED":
+      return "direct";
   }
 }
 

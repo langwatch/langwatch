@@ -77,6 +77,12 @@ function activeConnection(): void {
     createdAtMs: 1,
     updatedAtMs: 1,
     tearDownAfterMs: null,
+    replacesConnectionId: null,
+    migrationPhase: null,
+    graceStartedAtMs: null,
+    routeChangedAtMs: null,
+    finalizationRequestedAtMs: null,
+    finalizedAtMs: null,
   } satisfies SsoConnectionState);
 }
 

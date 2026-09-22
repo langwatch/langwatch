@@ -5,27 +5,9 @@ import { isSameOrigin, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
+import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
-
-/**
- * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
- * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow.
- */
-export const normalizeErrorCode = (error: string | null | undefined): string | null => {
-  if (!error) return null;
-  if (error === "email_doesn't_match" || error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED") {
-    return "DIFFERENT_EMAIL_NOT_ALLOWED";
-  }
-  if (
-    error === "account_already_linked_to_different_user" ||
-    error === "account_not_linked" ||
-    error === "OAuthAccountNotLinked"
-  ) {
-    return "OAuthAccountNotLinked";
-  }
-  return error;
-};
 
 /**
  * Auth errors that represent a *stable* failure the user has to act on (wrong sign-in method /
@@ -68,7 +50,7 @@ const errorTitle = (error: string): string => {
 export default function Error() {
   const { data: session } = useSession();
   const query = useSearchParams();
-  const error = normalizeErrorCode(query?.get("error"));
+  const error = normalizeSignInErrorCode(query?.get("error"));
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
@@ -196,7 +178,7 @@ function SignInErrorDescription({
 export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
-  const error = normalizeErrorCode(rawError) ?? rawError;
+  const error = normalizeSignInErrorCode(rawError) ?? rawError;
 
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">

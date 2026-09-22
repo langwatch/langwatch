@@ -9,6 +9,16 @@ import {
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
+  connectionRenamedPayloadSchema,
+  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
+  replacementConnectionRegisteredPayloadSchema,
+  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+  migrationRouteSelectedPayloadSchema,
+  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+  migrationFinalizationStartedPayloadSchema,
+  MIGRATION_FINALIZED_EVENT_TYPE,
+  migrationFinalizedPayloadSchema,
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
@@ -160,6 +170,40 @@ export const connectionArrivalPolicySetEventSchema = EventSchema.safeExtend({
 });
 export type ConnectionArrivalPolicySetEvent = z.infer<typeof connectionArrivalPolicySetEventSchema>;
 
+export const connectionRenamedEventSchema = EventSchema.safeExtend({
+  type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
+  data: connectionRenamedPayloadSchema,
+});
+export type ConnectionRenamedEvent = z.infer<typeof connectionRenamedEventSchema>;
+
+export const replacementConnectionRegisteredEventSchema = EventSchema.safeExtend({
+  type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
+  data: replacementConnectionRegisteredPayloadSchema,
+});
+export type ReplacementConnectionRegisteredEvent = z.infer<
+  typeof replacementConnectionRegisteredEventSchema
+>;
+
+export const migrationRouteSelectedEventSchema = EventSchema.safeExtend({
+  type: z.literal(MIGRATION_ROUTE_SELECTED_EVENT_TYPE),
+  data: migrationRouteSelectedPayloadSchema,
+});
+export type MigrationRouteSelectedEvent = z.infer<typeof migrationRouteSelectedEventSchema>;
+
+export const migrationFinalizationStartedEventSchema = EventSchema.safeExtend({
+  type: z.literal(MIGRATION_FINALIZATION_STARTED_EVENT_TYPE),
+  data: migrationFinalizationStartedPayloadSchema,
+});
+export type MigrationFinalizationStartedEvent = z.infer<
+  typeof migrationFinalizationStartedEventSchema
+>;
+
+export const migrationFinalizedEventSchema = EventSchema.safeExtend({
+  type: z.literal(MIGRATION_FINALIZED_EVENT_TYPE),
+  data: migrationFinalizedPayloadSchema,
+});
+export type MigrationFinalizedEvent = z.infer<typeof migrationFinalizedEventSchema>;
+
 export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   connectionArrivalPolicySetEventSchema,
   connectionRegisteredEventSchema,
@@ -179,6 +223,11 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   connectionResumedEventSchema,
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
+  connectionRenamedEventSchema,
+  replacementConnectionRegisteredEventSchema,
+  migrationRouteSelectedEventSchema,
+  migrationFinalizationStartedEventSchema,
+  migrationFinalizedEventSchema,
 ]);
 export type SsoConnectionEvent = z.infer<typeof ssoConnectionEventSchema>;
 
@@ -205,6 +254,11 @@ const ssoConnectionEvents = [
   connectionResumedEventSchema,
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
+  connectionRenamedEventSchema,
+  replacementConnectionRegisteredEventSchema,
+  migrationRouteSelectedEventSchema,
+  migrationFinalizationStartedEventSchema,
+  migrationFinalizedEventSchema,
 ] as const;
 
 /** The reducer's state plus the base class's bookkeeping stamps — server
@@ -268,6 +322,41 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionRegistered(
     event: ConnectionRegisteredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionRenamed(
+    event: ConnectionRenamedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityReplacementConnectionRegistered(
+    event: ReplacementConnectionRegisteredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationRouteSelected(
+    event: MigrationRouteSelectedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationFinalizationStarted(
+    event: MigrationFinalizationStartedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationFinalized(
+    event: MigrationFinalizedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

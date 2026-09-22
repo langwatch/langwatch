@@ -23,6 +23,7 @@ import {
 } from "./memory.sso-connection.repositories.ts";
 import { MemorySsoCredentialRepository } from "./memory.sso-credential.repository.ts";
 import { MemorySsoDomainReproofTargetRepository } from "./memory.sso-domain-reproof.repository.ts";
+import { MemorySsoMigrationEvidenceRepository } from "./memory.sso-migration-evidence.repository.ts";
 import { MemorySsoRegistrantReadRepository } from "./memory.sso-registrant.repository.ts";
 
 /**
@@ -58,6 +59,7 @@ export class MemoryIdentityRepositories {
       ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
       ssoCredentials: MemorySsoCredentialRepository.create(store),
       ssoRegistrants: MemorySsoRegistrantReadRepository.create(store),
+      ssoMigrationEvidence: MemorySsoMigrationEvidenceRepository.create(store),
     };
   }
 }

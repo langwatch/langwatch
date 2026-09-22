@@ -6,6 +6,11 @@ import {
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
+  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
+  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+  MIGRATION_FINALIZED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
@@ -108,6 +113,18 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
   [CONNECTION_RESUMED_EVENT_TYPE]: () => "The connection was resumed",
   [TEARDOWN_REQUESTED_EVENT_TYPE]: ({ note }) => `Removal was requested${withNote(note)}`,
   [CONNECTION_TORN_DOWN_EVENT_TYPE]: () => "The connection was removed",
+  // The new name and not the old one: the history is read top-down, so the
+  // line above already says what it was called before.
+  [CONNECTION_RENAMED_EVENT_TYPE]: ({ name }) =>
+    `The connection was renamed to "${name ?? "a new name"}"`,
+  [REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE]: () =>
+    "This connection was registered to replace the one set up before self-serve",
+  [MIGRATION_ROUTE_SELECTED_EVENT_TYPE]: ({ route }) =>
+    route === "direct"
+      ? "Ordinary sign-ins were switched to this connection"
+      : "Ordinary sign-ins were left with the connection this one replaces",
+  [MIGRATION_FINALIZATION_STARTED_EVENT_TYPE]: () => "Retiring the old connection began",
+  [MIGRATION_FINALIZED_EVENT_TYPE]: () => "The old connection was retired",
 };
 
 /**

@@ -29,6 +29,9 @@
       "path": "../../audit-log/contract/tsconfig.build.json"
     },
     {
+      "path": "../../auth/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {

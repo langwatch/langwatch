@@ -228,6 +228,19 @@ export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRef
   }
 }
 
+/** The id a registration asked for is held by a connection that is not the
+ *  one being registered. */
+export class SsoConnectionAlreadyRegisteredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_connection_already_registered", "sso_connection_already_registered", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoConnectionAlreadyRegisteredError";
+  }
+}
+
 /**
  * Missing and foreign connections share one refusal, so no caller can use
  * the difference as an oracle for which connections exist.

@@ -101,6 +101,13 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       allowsJit: state.arrivalPolicy === "admit",
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
+      replacesConnectionId: state.replacesConnectionId,
+      migrationPhase: state.migrationPhase,
+      graceStartedAt: state.graceStartedAtMs === null ? null : new Date(state.graceStartedAtMs),
+      routeChangedAt: state.routeChangedAtMs === null ? null : new Date(state.routeChangedAtMs),
+      finalizationRequestedAt:
+        state.finalizationRequestedAtMs === null ? null : new Date(state.finalizationRequestedAtMs),
+      finalizedAt: state.finalizedAtMs === null ? null : new Date(state.finalizedAtMs),
       rejection: state.rejection ?? undefined,
       createdBy: state.createdBy,
       tearDownAfter: state.tearDownAfterMs === null ? null : new Date(state.tearDownAfterMs),
@@ -162,6 +169,12 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       createdAtMs: row.createdAt.getTime(),
       updatedAtMs: row.updatedAt.getTime(),
       tearDownAfterMs: row.tearDownAfter?.getTime() ?? null,
+      replacesConnectionId: row.replacesConnectionId,
+      migrationPhase: row.migrationPhase,
+      graceStartedAtMs: row.graceStartedAt?.getTime() ?? null,
+      routeChangedAtMs: row.routeChangedAt?.getTime() ?? null,
+      finalizationRequestedAtMs: row.finalizationRequestedAt?.getTime() ?? null,
+      finalizedAtMs: row.finalizedAt?.getTime() ?? null,
     };
   }
 }

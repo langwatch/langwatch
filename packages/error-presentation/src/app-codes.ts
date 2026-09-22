@@ -550,6 +550,7 @@ export const APP_ERROR_CODES = [
   "sso_break_glass_last_way_in",
   "sso_certificate_invalid",
   "sso_connection_activation_blocked",
+  "sso_connection_already_registered",
   "sso_connection_domain_taken",
   "sso_connection_invalid_transition",
   "sso_connection_not_found",

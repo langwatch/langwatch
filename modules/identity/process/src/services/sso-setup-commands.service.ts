@@ -1,6 +1,8 @@
 import {
   type SelfServeActor,
   type SsoArrivalPolicy,
+  type SsoMigrationRoute,
+  SsoConnectionAlreadyRegisteredError,
   type SsoConnectionRemoval,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
@@ -77,6 +79,75 @@ export class SsoSetupCommandsService {
     });
 
     return { connectionId };
+  }
+
+  /** Starts the cutover: the one direct replacement an organization may run
+   *  beside its grandfathered connection, carrying the domains it proved.
+   *  Asking twice answers with the replacement that already stands. */
+  async startLegacyMigration({
+    organizationId,
+    actor,
+    legacyConnectionId,
+    providerId,
+    registration,
+  }: {
+    organizationId: string;
+    actor: SelfServeActor;
+    legacyConnectionId: string;
+    providerId: string;
+    registration: SsoIdpRegistration;
+  }): Promise<{ connectionId: string }> {
+    const legacy = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId: legacyConnectionId,
+    });
+    if (legacy.source !== "legacy-grandfathered") {
+      throw new SsoConnectionAlreadyRegisteredError(
+        `connection ${legacyConnectionId} is not a grandfathered provider`,
+      );
+    }
+    const standing = await this.findStandingReplacement({ organizationId, legacyConnectionId });
+    if (standing) return { connectionId: standing };
+
+    const connectionId = newSsoConnectionId();
+    const idp = await this.storeCredentials({ organizationId, connectionId, registration });
+    await this.deps.connections().registerReplacementConnection({
+      ...this.command({ organizationId, connectionId, actor }),
+      type: registration.protocol,
+      idp: { ...idp, providerId },
+      arrivalPolicy: "refuse",
+      replacesConnectionId: legacyConnectionId,
+    });
+
+    return { connectionId };
+  }
+
+  /** Which of the pair decides an ordinary sign-in. */
+  async selectMigrationRoute({
+    organizationId,
+    connectionId,
+    actor,
+    route,
+  }: SsoSetupCommand & { route: SsoMigrationRoute }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.connections().selectMigrationRoute({
+      ...this.command({ organizationId, connectionId, actor }),
+      route,
+    });
+  }
+
+  /** The word on the card. Nothing routes on it (ADR-117). */
+  async rename({
+    organizationId,
+    connectionId,
+    actor,
+    name,
+  }: SsoSetupCommand & { name: string }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.connections().renameConnection({
+      ...this.command({ organizationId, connectionId, actor }),
+      name,
+    });
   }
 
   /** Who this connection admits (ADR-117 §3). */
@@ -189,6 +260,26 @@ export class SsoSetupCommandsService {
     });
 
     return { issuer: config.entityId, clientIdRef: null, secretRef: null, certRefs: [ref] };
+  }
+
+  /** The replacement already registered against this legacy connection and
+   *  not abandoned, if there is one. */
+  private async findStandingReplacement({
+    organizationId,
+    legacyConnectionId,
+  }: {
+    organizationId: string;
+    legacyConnectionId: string;
+  }): Promise<string | null> {
+    const held = await this.deps.reads.findForOrganization({ organizationId });
+    const standing = held.find(
+      (connection) =>
+        connection.replacesConnectionId === legacyConnectionId &&
+        connection.state !== "DISCARDED" &&
+        connection.state !== "TORN_DOWN",
+    );
+
+    return standing?.connectionId ?? null;
   }
 
   /** Missing and foreign connections share one refusal, so a caller cannot

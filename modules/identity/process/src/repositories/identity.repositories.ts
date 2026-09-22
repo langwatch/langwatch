@@ -20,6 +20,7 @@ import type {
 } from "./sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
+import type { SsoMigrationEvidenceRepository } from "./sso-migration-evidence.repository.ts";
 import type { SsoRegistrantReadRepository } from "./sso-registrant.repository.ts";
 
 /**
@@ -51,6 +52,7 @@ export interface IdentityRepositories {
   readonly ssoBreakGlass: SsoBreakGlassRepository;
   /** Who an asserted address and a connection subject belong to (ADR-117 §5). */
   readonly ssoRegistrants: SsoRegistrantReadRepository;
+  readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
   /**
    * Optional until `identity.app.ts` and the two aggregate backends wire a
    * concrete instance in (out of this lane's owned paths - see the

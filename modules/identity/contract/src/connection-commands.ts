@@ -6,6 +6,7 @@ import {
   ssoConnectionTypeSchema,
   ssoDomainClaimAuthoritySchema,
   ssoIdpMetadataSchema,
+  ssoMigrationRouteSchema,
   ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection.ts";
@@ -48,6 +49,18 @@ export const RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE =
   "lw.identity.record_domain_proof_absent" as const;
 /** Somebody decided who this connection admits (ADR-117 §3). */
 export const SET_ARRIVAL_POLICY_COMMAND_TYPE = "lw.identity.set_arrival_policy" as const;
+/** The word on the card, changed. Nothing routes on it (ADR-117). */
+export const RENAME_CONNECTION_COMMAND_TYPE = "lw.identity.rename_connection" as const;
+/** The legacy-to-direct cutover, in four verbs: register the one replacement
+ *  an organization may run beside its grandfathered connection, choose which
+ *  of the pair decides sign-ins, open the durable finalization gate, and
+ *  close it once the legacy identities are retired. */
+export const REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE =
+  "lw.identity.register_replacement_connection" as const;
+export const SELECT_MIGRATION_ROUTE_COMMAND_TYPE = "lw.identity.select_migration_route" as const;
+export const BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE =
+  "lw.identity.begin_migration_finalization" as const;
+export const FINALIZE_MIGRATION_COMMAND_TYPE = "lw.identity.finalize_migration" as const;
 
 export const SSO_CONNECTION_COMMAND_TYPES = [
   REGISTER_CONNECTION_COMMAND_TYPE,
@@ -68,6 +81,11 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType = (typeof SSO_CONNECTION_COMMAND_TYPES)[number];
 
@@ -116,6 +134,36 @@ export const registerConnectionCommandDataSchema = commandDataSchema({
   arrivalPolicy: ssoArrivalPolicySchema,
 });
 export type RegisterConnectionCommandData = z.infer<typeof registerConnectionCommandDataSchema>;
+
+export const registerReplacementConnectionCommandDataSchema = commandDataSchema({
+  type: ssoConnectionTypeSchema,
+  idp: ssoIdpMetadataSchema,
+  arrivalPolicy: ssoArrivalPolicySchema,
+  replacesConnectionId: z.string().min(1),
+});
+export type RegisterReplacementConnectionCommandData = z.infer<
+  typeof registerReplacementConnectionCommandDataSchema
+>;
+
+export const selectMigrationRouteCommandDataSchema = commandDataSchema({
+  route: ssoMigrationRouteSchema,
+});
+export type SelectMigrationRouteCommandData = z.infer<typeof selectMigrationRouteCommandDataSchema>;
+
+export const beginMigrationFinalizationCommandDataSchema = commandDataSchema({});
+export type BeginMigrationFinalizationCommandData = z.infer<
+  typeof beginMigrationFinalizationCommandDataSchema
+>;
+
+export const finalizeMigrationCommandDataSchema = commandDataSchema({});
+export type FinalizeMigrationCommandData = z.infer<typeof finalizeMigrationCommandDataSchema>;
+
+/** The word on the card, and nothing else (ADR-117). Trimmed, non-empty, and
+ *  bounded so a name stays a name rather than a paragraph. */
+export const renameConnectionCommandDataSchema = commandDataSchema({
+  name: z.string().trim().min(1).max(120),
+});
+export type RenameConnectionCommandData = z.infer<typeof renameConnectionCommandDataSchema>;
 
 /** The raw domain as it was typed; the guard normalizes it, and only the
  *  normalized form ever reaches a fact. */
@@ -295,4 +343,24 @@ export type SsoConnectionCommand =
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;
       data: GrandfatherConnectionCommandData;
+    }
+  | {
+      type: typeof RENAME_CONNECTION_COMMAND_TYPE;
+      data: RenameConnectionCommandData;
+    }
+  | {
+      type: typeof REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE;
+      data: RegisterReplacementConnectionCommandData;
+    }
+  | {
+      type: typeof SELECT_MIGRATION_ROUTE_COMMAND_TYPE;
+      data: SelectMigrationRouteCommandData;
+    }
+  | {
+      type: typeof BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE;
+      data: BeginMigrationFinalizationCommandData;
+    }
+  | {
+      type: typeof FINALIZE_MIGRATION_COMMAND_TYPE;
+      data: FinalizeMigrationCommandData;
     };

@@ -46,6 +46,11 @@ import {
   DiscardConnectionCommand,
   GrandfatherConnectionCommand,
   RegisterConnectionCommand,
+  RegisterReplacementConnectionCommand,
+  RenameConnectionCommand,
+  SelectMigrationRouteCommand,
+  BeginMigrationFinalizationCommand,
+  FinalizeMigrationCommand,
   RejectDomainClaimCommand,
   RequestTeardownCommand,
   RequestVerificationCommand,
@@ -89,6 +94,11 @@ const CONNECTION_COMMANDS = [
   ["requestTeardown", RequestTeardownCommand],
   ["completeTeardown", CompleteTeardownCommand],
   ["grandfatherConnection", GrandfatherConnectionCommand],
+  ["renameConnection", RenameConnectionCommand],
+  ["registerReplacementConnection", RegisterReplacementConnectionCommand],
+  ["selectMigrationRoute", SelectMigrationRouteCommand],
+  ["beginMigrationFinalization", BeginMigrationFinalizationCommand],
+  ["finalizeMigration", FinalizeMigrationCommand],
 ] as const;
 
 export interface SsoConnectionPipelineDeps {

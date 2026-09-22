@@ -7619,6 +7619,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../auth/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract

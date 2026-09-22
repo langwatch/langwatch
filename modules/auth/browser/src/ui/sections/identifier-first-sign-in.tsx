@@ -16,6 +16,7 @@ import {
   rememberPendingMethod,
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
+import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
@@ -23,7 +24,7 @@ import Link from "../elements/router-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
-import { normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
+import { SignInError } from "./sign-in-error-screen.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -40,7 +41,7 @@ export function IdentifierFirstSignIn() {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const breakGlass = query?.get("local") === "1";
-  const error = normalizeErrorCode(query?.get("error"));
+  const error = normalizeSignInErrorCode(query?.get("error"));
 
   const { data: session } = useSession();
   const routing = useSignInRouting();

@@ -1,0 +1,33 @@
+import type { MigrationIdentifierBinding } from "../rules/sso-migration.rules.ts";
+
+/** One live identifier, with who holds it. */
+export interface MigrationIdentifierHolding extends MigrationIdentifierBinding {
+  userId: string;
+  /** VERIFIED and PRIMARY are the two that count as proved. */
+  state: string;
+}
+
+/**
+ * What the migration pair is judged on, over identity's own rows: which
+ * identifiers each member holds, and when either connection last signed
+ * somebody in. Membership is the organization module's and is asked there.
+ */
+export abstract class SsoMigrationEvidenceRepository {
+  /** Every live identifier held by any of these users. */
+  abstract findLiveIdentifierHoldings(args: {
+    userIds: string[];
+  }): Promise<MigrationIdentifierHolding[]>;
+
+  /** When this connection last signed anybody in, or null. */
+  abstract findLastAuthenticationAtMs(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<number | null>;
+
+  /** When it last signed each of these people in. Absent means never. */
+  abstract findLastAuthenticationByUser(args: {
+    organizationId: string;
+    connectionId: string;
+    userIds: string[];
+  }): Promise<Map<string, number>>;
+}

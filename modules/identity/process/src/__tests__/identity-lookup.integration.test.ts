@@ -123,6 +123,12 @@ describe("identity lookup, end to end at the read surface", () => {
         createdAtMs: 1,
         updatedAtMs: 1,
         tearDownAfterMs: null,
+        replacesConnectionId: null,
+        migrationPhase: null,
+        graceStartedAtMs: null,
+        routeChangedAtMs: null,
+        finalizationRequestedAtMs: null,
+        finalizedAtMs: null,
       } satisfies SsoConnectionState);
       store.organizationNames.set("org_acme", "Acme");
 

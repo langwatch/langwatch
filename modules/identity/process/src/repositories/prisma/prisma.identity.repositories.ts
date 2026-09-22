@@ -23,6 +23,7 @@ import {
 } from "./prisma.sso-connection-reads.repository.ts";
 import { PrismaSsoCredentialRepository } from "./prisma.sso-credential.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
+import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { PrismaSsoRegistrantReadRepository } from "./prisma.sso-registrant.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */
@@ -53,6 +54,7 @@ export class PostgresIdentityRepositories {
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
       ssoRegistrants: PrismaSsoRegistrantReadRepository.create(database),
+      ssoMigrationEvidence: PrismaSsoMigrationEvidenceRepository.create(database),
     };
   }
 }

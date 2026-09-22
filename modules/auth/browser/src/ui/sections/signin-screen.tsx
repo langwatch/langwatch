@@ -23,11 +23,12 @@ import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts"
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
+import { normalizeSignInErrorCode } from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";
 import { IdentifierFirstSignIn } from "../../ui/sections/identifier-first-sign-in.tsx";
-import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
+import { isStableAuthError, SignInError } from "./sign-in-error-screen.tsx";
 
 /**
  * Which sign-in screen this deployment has (ADR-117 §7). The legacy screen
@@ -62,7 +63,7 @@ function LegacySignIn() {
   const rawError = query?.get("error");
   // Normalize BetterAuth error codes so the auto-redirect gate works.
   // e.g. "account_already_linked_to_different_user" → "OAuthAccountNotLinked"
-  const error = normalizeErrorCode(rawError);
+  const error = normalizeSignInErrorCode(rawError);
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;

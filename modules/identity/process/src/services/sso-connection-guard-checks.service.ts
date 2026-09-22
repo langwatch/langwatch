@@ -15,7 +15,12 @@ import {
   DISCARD_CONNECTION_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
@@ -43,7 +48,14 @@ import type {
  *  in `specs/identity/sso-connection-lifecycle.feature` is executable. */
 const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifecycleState[]> = {
   [REGISTER_CONNECTION_COMMAND_TYPE]: [],
+  [REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE]: [],
   [GRANDFATHER_CONNECTION_COMMAND_TYPE]: [],
+  // The migration verbs are commanded on the REPLACEMENT, which is live by
+  // the time any of them is pressed: the route is chosen between two working
+  // connections, and finalization retires the one nobody uses any more.
+  [SELECT_MIGRATION_ROUTE_COMMAND_TYPE]: ["ACTIVE"],
+  [BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE]: ["ACTIVE"],
+  [FINALIZE_MIGRATION_COMMAND_TYPE]: ["ACTIVE"],
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
@@ -104,6 +116,20 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
     "ACTIVE",
     "SUSPENDED",
   ],
+  // Every state a card is read in, including the way out: a name is what an
+  // administrator reads, nothing routes on it, and no saved link is keyed by
+  // it — so correcting one is safe where no other change is.
+  [RENAME_CONNECTION_COMMAND_TYPE]: [
+    "DRAFT",
+    "CLAIMED",
+    "APPROVED",
+    "REJECTED",
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+    "ACTIVE",
+    "SUSPENDED",
+    "TEARDOWN_PENDING",
+  ],
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -133,6 +159,11 @@ export class SsoConnectionGuardChecksService {
   /** The connection as the fold currently holds it, or nothing. */
   tryFindConnection(input: { connectionId: string }): Promise<SsoConnectionState | null> {
     return this.connections.tryFindConnection(input);
+  }
+
+  /** Every connection the organization holds, newest first. */
+  findForOrganization(input: { organizationId: string }): Promise<SsoConnectionState[]> {
+    return this.connections.findForOrganization(input);
   }
 
   /** Whether the organization has a live break-glass binding. */
