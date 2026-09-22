@@ -166,7 +166,7 @@ function classify({
 function readFailure(error: unknown): {
   status: number | undefined;
   body: string;
-  answered: boolean;
+  hasAnswered: boolean;
 } {
   const carrier = error as { statusCode?: unknown; responseBody?: unknown };
   const status =
@@ -183,7 +183,7 @@ function readFailure(error: unknown): {
   return {
     status,
     body,
-    answered: status !== undefined || responseBody !== "",
+    hasAnswered: status !== undefined || responseBody !== "",
   };
 }
 
@@ -241,8 +241,8 @@ function verdictOf({
   error: unknown;
   hasConfigurableEndpoint: boolean;
 }): ValidationResult {
-  const { status, body, answered } = readFailure(error);
-  const classified = answered
+  const { status, body, hasAnswered } = readFailure(error);
+  const classified = hasAnswered
     ? classify({ status, body })
     : ("unreachable" as const);
   logger.info(
