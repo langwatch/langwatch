@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 import type { AiActionErrorDetails } from "./trace-ai-query.ts";
+import { FILTER_TOO_COMPLEX_MESSAGE } from "./trace-query-analysis.ts";
 
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {
@@ -61,6 +62,25 @@ export class FilterParseError extends HandledError {
       ...remediation("filter_parse_error"),
     });
     this.name = "FilterParseError";
+  }
+}
+
+/**
+ * A filter past the node ceiling. `meta.maxNodes` has a named consumer: an
+ * agent narrowing a filter needs the ceiling to know how far to cut, and the
+ * client checks the same number before sending.
+ */
+export class FilterTooComplexError extends HandledError {
+  declare readonly code: "filter_too_complex";
+
+  constructor({ maxNodes }: { readonly maxNodes: number }) {
+    super("filter_too_complex", FILTER_TOO_COMPLEX_MESSAGE, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { maxNodes },
+      ...remediation("filter_too_complex"),
+    });
+    this.name = "FilterTooComplexError";
   }
 }
 

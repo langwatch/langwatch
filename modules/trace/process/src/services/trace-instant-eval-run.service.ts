@@ -7,12 +7,17 @@ import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
+  InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import type { ExplorerInstantEvalRunInput } from "@langwatch/trace-contract";
+import type {
+  ExplorerInstantEvalRunInput,
+  ResolvedInstantEvalRun,
+} from "@langwatch/trace-contract";
 
 import {
   toExplorerRunInput,
   toExplorerRunProgress,
+  toResolvedInstantEvalRun,
 } from "../rules/trace-instant-eval-run.rules.ts";
 
 /** What this service is composed from: the peer that owns the runs. */
@@ -73,5 +78,20 @@ export class TraceInstantEvalRunService {
 
   async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
     return toExplorerRunProgress(await this.#instantEvals.getRun(input));
+  }
+
+  /**
+   * The runs a query's `eval` chips claim, checked against the project and
+   * dated for the compiler. A claim this project does not own is dropped by
+   * the peer, so the chip behind it stays pending and selects no rows.
+   */
+  async findRegisteredRuns(input: {
+    projectId: string;
+    references: readonly InstantEvalRunReference[];
+  }): Promise<ResolvedInstantEvalRun[]> {
+    if (input.references.length === 0) return [];
+    const windows = await this.#instantEvals.findRunWindows(input);
+
+    return windows.map(toResolvedInstantEvalRun);
   }
 }

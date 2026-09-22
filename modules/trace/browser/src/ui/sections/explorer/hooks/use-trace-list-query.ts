@@ -12,6 +12,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useSamplePreview } from "../onboarding/index.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
+import { type InstantEvalRunsResult, useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 
 export interface TraceListQueryResult {
   data: TraceListItem[];
@@ -42,6 +43,7 @@ function traceListQueryInput({
   pageSize,
   traceCursor,
   queryText,
+  evalRuns,
 }: {
   projectId: string;
   timeRange: { from: number; to: number; label?: string | null };
@@ -50,6 +52,7 @@ function traceListQueryInput({
   pageSize: number;
   traceCursor: TraceListCursor | undefined;
   queryText: string;
+  evalRuns: InstantEvalRunsResult["evalRuns"];
 }) {
   const cursor = page > 1 ? traceCursor : undefined;
   return {
@@ -64,6 +67,7 @@ function traceListQueryInput({
     pageSize,
     ...(cursor ? { cursor } : {}),
     query: queryText || undefined,
+    ...(evalRuns ? { evalRuns } : {}),
   };
 }
 
@@ -77,6 +81,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   const sort = useViewStore((s) => s.sort);
   const grouping = useViewStore((s) => s.grouping);
   const samplePreview = useSamplePreview();
+  const { evalRuns } = useInstantEvalRuns();
 
   // The sessions lens paginates with its own opaque string cursors through
   // the SAME shared page number (see useSessionGroups). While it is active,
@@ -110,6 +115,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       pageSize,
       traceCursor,
       queryText,
+      evalRuns,
     }),
     {
       enabled: !!project?.id && samplePreview === null,

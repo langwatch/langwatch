@@ -15,6 +15,7 @@ import {
   explorerInstantEvalProgressSchema,
   explorerInstantEvalRunIdSchema,
   explorerInstantEvalRunSchema,
+  explorerInstantEvalRunsSchema,
 } from "./trace-instant-eval.schemas.ts";
 import {
   discoverResultSchema,
@@ -251,6 +252,7 @@ export const tracesTrpc = defineTrpcContract("traces")
         })
         .optional(),
       query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
     }),
   )
   .withOutput(tracesListPageSchema)
@@ -264,6 +266,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       pageSize: z.number().int().min(1).max(100).default(50),
       cursor: z.string().optional(),
       query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
     }),
   )
   .withOutput(tracesSessionsPageSchema)
@@ -284,6 +287,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       projectId: z.string(),
       timeRange: timeRangeSchema,
       query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
     }),
   )
   .withOutput(traceListFacetCountsSchema)
@@ -295,6 +299,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       timeRange: timeRangeSchema,
       since: z.number(),
       query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
     }),
   )
   .withOutput(tracesNewCountSchema)

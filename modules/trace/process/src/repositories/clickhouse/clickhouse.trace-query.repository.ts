@@ -1,8 +1,8 @@
 import {
   type FieldHandler,
-  FILTER_TOO_COMPLEX_MESSAGE,
   FilterFieldUnknownError,
   FilterParseError,
+  FilterTooComplexError,
   MAX_FILTER_NODE_COUNT,
   type LiqeQuery,
   type LogicalExpressionToken,
@@ -130,7 +130,7 @@ export class ClickHouseTraceQueryRepository {
   }): string {
     ctx.nodeCount++;
     if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
-      throw new FilterParseError(FILTER_TOO_COMPLEX_MESSAGE);
+      throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
     }
 
     const branch = (side: LiqeQuery, sideNegated: boolean): string =>

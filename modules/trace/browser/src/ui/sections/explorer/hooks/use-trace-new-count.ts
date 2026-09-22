@@ -6,6 +6,7 @@ import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
 
 const FAST_MS = 5_000;
@@ -90,9 +91,12 @@ export function useTraceNewCount(): TraceNewCountResult {
   // count from another — that comparison can spuriously fire or
   // suppress the 0→N pulse.
   const prevCountRef = useRef<number | null>(null);
+  const { evalRuns } = useInstantEvalRuns();
   useEffect(() => {
     prevCountRef.current = null;
-  }, [project?.id, timeRange.from, timeRange.to, timeRange.label, since, queryText]);
+    // A run registering for a chip changes what is counted, so the baseline
+    // belongs to the query identity the same way the search text does.
+  }, [project?.id, timeRange.from, timeRange.to, timeRange.label, since, queryText, evalRuns]);
 
   const query = api.traces.newCount.useQuery(
     {
@@ -104,6 +108,7 @@ export function useTraceNewCount(): TraceNewCountResult {
       },
       since,
       query: queryText || undefined,
+      ...(evalRuns ? { evalRuns } : {}),
     },
     {
       // Honour the store contract: paused = "no updates, no pill, no

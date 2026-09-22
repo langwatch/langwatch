@@ -1,6 +1,7 @@
 import type {
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
+  InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
@@ -470,6 +471,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<InstantEvalRunProgress>;
   /** One run's counters, which is all a chip and a progress bar read. */
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
+  /**
+   * The runs a query's `eval` chips claim, checked against the project and
+   * dated for the compiler. A claim the project does not own is dropped, so
+   * the chip behind it stays pending and selects no rows.
+   */
+  findExplorerEvalRuns(input: {
+    projectId: string;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<readonly ResolvedInstantEvalRun[]>;
 
   /** The platform's own address for one trace resource, built from the
    * project's slug and the path the caller already resolved. */

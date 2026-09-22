@@ -11,6 +11,11 @@ import {
   isOverridesEmpty,
   parseFragment,
 } from "@langwatch/trace-browser-kit";
+import {
+  instantEvalChipsOf,
+  instantEvalRunKey,
+  queryWithoutInstantEvalChips,
+} from "@langwatch/trace-contract";
 /**
  * URL fragment synchronization for traces-v2 bar state.
  */
@@ -27,6 +32,56 @@ interface BarState {
   lensId: string;
   query: string;
   timeRange: TimeRange;
+  /** The Instant Eval runs behind the query's `eval` chips, key to run id. */
+  evalRuns: Record<string, string>;
+}
+
+const NO_RUNS: Record<string, string> = {};
+
+/**
+ * The runs the applied state keeps: those the fragment named, plus any the page
+ * holds whose key a chip of the restored query computes to — the key IS the
+ * scope, and dropping them would pay for the same judgements twice.
+ */
+function runsForRestoredQuery({
+  named,
+  held,
+  query,
+  lensId,
+  timeRange,
+}: {
+  named: Record<string, string>;
+  held: Record<string, string>;
+  query: string;
+  lensId: string;
+  timeRange: TimeRange;
+}): Record<string, string> {
+  if (!query.trim()) return named;
+  const chips = instantEvalChipsOf({ queryText: query, lensId });
+  if (chips.length === 0) return named;
+  const otherQuery = queryWithoutInstantEvalChips(query);
+  const window = {
+    from: timeRange.from,
+    to: timeRange.to,
+    ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+  };
+
+  let restored: Record<string, string> | null = null;
+  for (const chip of chips) {
+    const key = instantEvalRunKey({
+      question: chip.question,
+      target: chip.target,
+      otherQuery,
+      window,
+    });
+    if (named[key] !== undefined) continue;
+    const run = held[key];
+    if (run === undefined) continue;
+    restored ??= { ...named };
+    restored[key] = run;
+  }
+
+  return restored ?? named;
 }
 
 function readFragment(): string {
@@ -52,6 +107,9 @@ function canonicalBody(state: BarState): string {
     query: state.query,
     timeRange: state.timeRange,
     defaultPresetId: DEFAULT_PRESET_ID,
+    // A run is only an address while its query is: with no query there is
+    // no chip for it to stand behind.
+    ...(state.query ? { runs: state.evalRuns } : {}),
   });
   if (state.lensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
     return "";
@@ -66,11 +124,13 @@ function liveBody(state: {
   activeLensId: string;
   queryText: string;
   timeRange: TimeRange;
+  evalRuns?: Record<string, string>;
 }): string {
   return canonicalBody({
     lensId: state.activeLensId,
     query: state.queryText,
     timeRange: state.timeRange,
+    evalRuns: state.evalRuns ?? NO_RUNS,
   });
 }
 
@@ -178,7 +238,9 @@ export function useURLSync(): void {
 
   const queryText = useFilterStore((s) => s.queryText);
   const timeRange = useFilterStore((s) => s.timeRange);
+  const evalRuns = useFilterStore((s) => s.evalRuns);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const setEvalRuns = useFilterStore((s) => s.setEvalRuns);
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const resetPagination = useFilterStore((s) => s.resetPagination);
 
@@ -197,6 +259,7 @@ export function useURLSync(): void {
     draftState,
     queryText,
     timeRange,
+    evalRuns,
   });
   // The same snapshot, one render older. `setUserLenses` restores the
   // last-used lens in the very store write that hydrates the list, so by the
@@ -212,6 +275,7 @@ export function useURLSync(): void {
       draftState,
       queryText,
       timeRange,
+      evalRuns,
     };
   });
 
@@ -263,6 +327,15 @@ export function useURLSync(): void {
       // Null only on the first apply, where the URL carries no time-range
       // statement at all and the window the store holds is the answer.
       timeRange: targetTimeRange ?? live.timeRange,
+      // A run rides with the query it was written for; what the fragment does
+      // not name is recovered by key from the runs the page already holds.
+      evalRuns: runsForRestoredQuery({
+        named: target.overrides.query !== undefined ? (target.overrides.runs ?? NO_RUNS) : NO_RUNS,
+        held: live.evalRuns ?? NO_RUNS,
+        query: target.overrides.query ?? lensQuery,
+        lensId: target.lensId,
+        timeRange: targetTimeRange ?? live.timeRange,
+      }),
     };
 
     // `popstate` fires for every history entry this page owns, and the trace drawer
@@ -279,13 +352,14 @@ export function useURLSync(): void {
     if (target.overrides.query !== undefined) {
       applyQueryText(target.overrides.query);
     }
+    setEvalRuns(applied.evalRuns);
     if (targetTimeRange) setTimeRange(targetTimeRange);
     resetPagination();
 
     pendingLens.current = target.pendingLensId
       ? { lensId: target.pendingLensId, lenses: live.allLenses, applied }
       : null;
-  }, [selectLens, applyQueryText, setTimeRange, resetPagination]);
+  }, [selectLens, applyQueryText, setEvalRuns, setTimeRange, resetPagination]);
 
   // Initialize from fragment on mount
   useEffect(() => {
@@ -358,7 +432,7 @@ export function useURLSync(): void {
       // Same encoder the popstate guard compares against, so the entry this
       // writes now reads back as "nothing left to apply" — and only this
       // entry: older ones keep whatever body they were written with.
-      const body = liveBody({ activeLensId, queryText, timeRange });
+      const body = liveBody({ activeLensId, queryText, timeRange, evalRuns });
 
       // A fragment naming a lens that hasn't hydrated is a live deep link, not stale state.
       // Collapsing it to the default fallback's empty body made a shared `#custom-…` link
@@ -376,5 +450,5 @@ export function useURLSync(): void {
     }, 150);
 
     return () => window.clearTimeout(handle);
-  }, [activeLensId, allLenses, queryText, timeRange]);
+  }, [activeLensId, allLenses, queryText, timeRange, evalRuns]);
 }

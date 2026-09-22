@@ -9,7 +9,15 @@ export interface BarStateOverrides {
   preset?: string;
   timeFrom?: number;
   timeTo?: number;
+  /**
+   * The Instant Eval runs behind the query's `eval` chips, run key to run id,
+   * written as one `run=<key>:<runId>` parameter each. Carried so a refresh
+   * or a shared link reuses the judgements rather than paying for them again.
+   */
+  runs?: Record<string, string>;
 }
+
+const RUN_PARAM = "run";
 
 export interface FragmentState {
   lensId: string;
@@ -32,6 +40,25 @@ export function parseFragment(fragment: string): FragmentState | null {
   return { lensId, overrides: paramString ? parseOverrides(paramString) : {} };
 }
 
+/** `<key>:<runId>` read back, or null for anything else. */
+function parseRunEntry(entry: string): [string, string] | null {
+  const separator = entry.indexOf(":");
+  if (separator <= 0 || separator === entry.length - 1) return null;
+
+  return [entry.slice(0, separator), entry.slice(separator + 1)];
+}
+
+/** The runs the fragment names, or none when it names none readable. */
+function parseRuns(params: URLSearchParams): Record<string, string> | undefined {
+  const runs: Record<string, string> = {};
+  for (const entry of params.getAll(RUN_PARAM)) {
+    const parsed = parseRunEntry(entry);
+    if (parsed) runs[parsed[0]] = parsed[1];
+  }
+
+  return Object.keys(runs).length > 0 ? runs : void 0;
+}
+
 /** The bar-state overrides a fragment's query string carries. */
 function parseOverrides(paramString: string): BarStateOverrides {
   const overrides: BarStateOverrides = {};
@@ -39,6 +66,9 @@ function parseOverrides(paramString: string): BarStateOverrides {
 
   const q = params.get("q");
   if (q !== null) overrides.query = q;
+
+  const runs = parseRuns(params);
+  if (runs) overrides.runs = runs;
 
   const preset = params.get("preset");
   if (preset) {
@@ -63,6 +93,8 @@ interface ComputeOverridesInput {
   query: string;
   timeRange: { from: number; to: number; presetId?: string };
   defaultPresetId: string;
+  /** Only the runs the query still names are worth an address. */
+  runs?: Record<string, string>;
 }
 
 export function computeOverrides(input: ComputeOverridesInput): BarStateOverrides {
@@ -76,6 +108,10 @@ export function computeOverrides(input: ComputeOverridesInput): BarStateOverride
     overrides.timeFrom = input.timeRange.from;
     overrides.timeTo = input.timeRange.to;
   }
+  if (input.runs && Object.keys(input.runs).length > 0) {
+    overrides.runs = input.runs;
+  }
+
   return overrides;
 }
 
@@ -87,6 +123,9 @@ export function buildFragment(lensId: string, overrides: BarStateOverrides): str
   } else if (overrides.timeFrom !== void 0 && overrides.timeTo !== void 0) {
     params.set("from", String(overrides.timeFrom));
     params.set("to", String(overrides.timeTo));
+  }
+  for (const key of Object.keys(overrides.runs ?? {}).toSorted()) {
+    params.append(RUN_PARAM, `${key}:${overrides.runs?.[key] ?? ""}`);
   }
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();

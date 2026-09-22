@@ -11,6 +11,7 @@ import {
   sortConversationGroups,
 } from "../trace-table/conversation-groups.ts";
 import { mapSessionGroupsPayload } from "../utils/map-session-groups-payload.ts";
+import { type InstantEvalRunsResult, useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 
 export interface SessionGroupsResult {
   groups: ConversationGroup[];
@@ -44,6 +45,7 @@ function sessionsQueryInput(args: {
   pageSize: number;
   sessionCursor: string | undefined;
   queryText: string;
+  evalRuns: InstantEvalRunsResult["evalRuns"];
 }) {
   const serverSort = SERVER_SORTABLE.has(args.sort.columnId)
     ? { columnId: args.sort.columnId, direction: args.sort.direction }
@@ -60,6 +62,7 @@ function sessionsQueryInput(args: {
     pageSize: Math.min(args.pageSize, SESSIONS_MAX_PAGE_SIZE),
     ...(cursor ? { cursor } : {}),
     query: args.queryText || undefined,
+    ...(args.evalRuns ? { evalRuns: args.evalRuns } : {}),
   };
 }
 
@@ -111,6 +114,8 @@ export function useSessionGroups(): SessionGroupsResult {
   const setPage = useFilterStore((s) => s.setPage);
   const sampleGroups = useSamplePreviewGroups();
 
+  const { evalRuns } = useInstantEvalRuns();
+
   const isActive = grouping === "by-conversation";
   // Only the sessions lens's own opaque cursors apply here, a structured
   // trace cursor left behind by the flat lens means the page number belongs
@@ -129,6 +134,7 @@ export function useSessionGroups(): SessionGroupsResult {
       pageSize,
       sessionCursor,
       queryText,
+      evalRuns,
     }),
     {
       enabled:

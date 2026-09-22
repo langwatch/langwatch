@@ -127,6 +127,31 @@ Feature: Instant Evals inside the Trace Explorer
       Then it reads the value as an evaluator name, as it did before Instant Evals
 
     @unit
+    Scenario: The run id rides in the URL fragment
+      Given a fragment carrying `run=<key>:<runId>` twice
+      When the fragment is parsed
+      Then both runs are read back keyed by their key
+      And building the fragment from that state writes the same two entries
+
+    # A lens brings its own filter back, and a fragment naming only a lens
+    # carries no query and therefore no run keys. Dropping the runs there left
+    # an identical query offering "Judge these results", and taking it would
+    # have started a second run over rows the first one had already judged.
+    @integration
+    Scenario: A lens round trip keeps the run behind a restored chip
+      Given a lens whose filter carries an eval chip and a run held for its key
+      When the fragment names only that lens
+      Then the restored chip keeps its run, because the question, the target, the other chips and the window all still match its key
+      And a run held under any other key is not carried, so a changed scope is judged again
+
+    @unit
+    Scenario: Every explorer read checks the runs its chips claim
+      Given a table, sessions, facets or new-count read naming a run for its chip
+      When the read compiles its filter
+      Then the claimed run is checked against the project and dated before the compiler binds it
+      And a run the project does not own leaves its chip pending, selecting no rows
+
+    @unit
     Scenario: The eval field cannot be evaluated in memory
       Given a trigger evaluating a saved query with a forcing eval chip
       When the field is evaluated against a trace in memory

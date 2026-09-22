@@ -58,3 +58,28 @@ export const explorerInstantEvalProgressSchema = z.object({
 });
 
 export type ExplorerInstantEvalProgress = z.infer<typeof explorerInstantEvalProgressSchema>;
+
+/** How many runs one query may name: the chip ceiling the search bar holds. */
+const EXPLORER_EVAL_RUNS_MAX = 8;
+
+/**
+ * The runs the Explorer registered for a query's `eval` chips, one entry per
+ * chip key. A read checks each against the project before the compiler binds
+ * it, so a key naming a run this project does not own selects nothing.
+ * @see specs/traces-v2/instant-eval-search.feature
+ */
+export const explorerInstantEvalRunsSchema = z
+  .record(
+    z.string().min(1).max(64),
+    z.object({
+      question: z.string().min(1).max(2_000),
+      target: z.enum(INSTANT_EVAL_TARGETS),
+      runId: z.string().min(1).max(200),
+    }),
+  )
+  .refine((runs) => Object.keys(runs).length <= EXPLORER_EVAL_RUNS_MAX, {
+    message: "At most eight Instant Eval runs may be registered on one query.",
+  })
+  .optional();
+
+export type ExplorerInstantEvalRuns = z.infer<typeof explorerInstantEvalRunsSchema>;

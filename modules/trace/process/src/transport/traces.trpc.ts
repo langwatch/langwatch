@@ -333,6 +333,10 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      evalRuns: await app.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
     });
     const page = traceListPageSchema.parse(
       await app.readTraceList({
@@ -370,6 +374,10 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      evalRuns: await app.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
     });
     const result = sessionGroupsResultSchema.parse(
       await app.readSessionGroups({
@@ -414,15 +422,19 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("facets")
   .withPermission("traces:view")
-  .handle(({ app, input }) => {
+  .handle(async ({ app, input }) => {
     const filterWhere = app.translateTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      evalRuns: await app.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
     });
 
     return traceListFacetCountsSchema.parse(
-      app.readFacets({
+      await app.readFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         filterWhere: filterWhere ?? undefined,
@@ -437,6 +449,10 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      evalRuns: await app.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
     });
     const count = await app.readNewCount({
       tenantId: input.projectId,

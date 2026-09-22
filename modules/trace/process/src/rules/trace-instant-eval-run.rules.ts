@@ -6,6 +6,7 @@
 import type {
   InstantEvalRunInput,
   InstantEvalRunProgress,
+  InstantEvalRunWindow,
   InstantEvalRunWire,
 } from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
@@ -14,6 +15,7 @@ import {
   explorerHiddenOrigins,
   queryWithoutInstantEvalChips,
   type ExplorerInstantEvalRunInput,
+  type ResolvedInstantEvalRun,
 } from "@langwatch/trace-contract";
 
 /** The one question an Explorer run asks, named by the column it writes. */
@@ -53,6 +55,17 @@ export function toExplorerRunInput(input: ExplorerInstantEvalRunInput): InstantE
       ],
     },
     ...(input.limit === undefined ? {} : { limit: input.limit }),
+  };
+}
+
+/** A checked run as the filter compiler binds it: its window in epoch milliseconds. */
+export function toResolvedInstantEvalRun(window: InstantEvalRunWindow): ResolvedInstantEvalRun {
+  return {
+    question: window.question,
+    target: window.target,
+    runId: window.runId,
+    writtenFrom: window.writtenFrom.epochMilliseconds,
+    writtenUntil: window.writtenUntil.epochMilliseconds,
   };
 }
 

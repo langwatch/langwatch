@@ -15,6 +15,7 @@ import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
+  InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
@@ -653,6 +654,24 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
     return this.#instantEvals().getRun(input);
+  }
+
+  /**
+   * The runs a query's `eval` chips claim, checked against the project. A
+   * process composed without the Instant Eval peer can check none, so every
+   * chip stays pending and the read answers what the rest of the query selects.
+   */
+  async findExplorerEvalRuns(input: {
+    projectId: string;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<readonly ResolvedInstantEvalRun[]> {
+    const references = Object.values(input.evalRuns ?? {});
+    if (references.length === 0 || !this.#explorerEvals) return [];
+
+    return this.#explorerEvals.findRegisteredRuns({
+      projectId: input.projectId,
+      references,
+    });
   }
 
   #instantEvals(): TraceInstantEvalRunService {
