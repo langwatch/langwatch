@@ -8,7 +8,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
@@ -220,8 +219,9 @@ function emptyStateActions({
   judgeTheseResults: () => void;
 }): ActionButton[] {
   const actions: ActionButton[] = [];
-  // The question goes back through the search bar as a sentence, so the run
-  // gets the same estimate, cost rule and refusals a typed one gets.
+  // The query goes back through the search bar as it stands, so the chip's
+  // run starts the way Enter on it does: the same estimate, cost rule and
+  // refusals, with the question judged as written.
   if (unjudgedChip) {
     actions.push({
       label: "Judge these results",
@@ -285,10 +285,7 @@ export const EmptyFilterState: React.FC = () => {
     setTimeRange,
     judgeTheseResults: () => {
       if (!unjudgedChip) return;
-      requestSubmit({
-        text: `${queryWithoutInstantEvalChips(queryText)} ${unjudgedChip.question}`.trim(),
-        forceKind: "instant_eval",
-      });
+      requestSubmit({ text: queryText });
     },
   });
 
