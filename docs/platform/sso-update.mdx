@@ -27,7 +27,8 @@ up when you are ready. Nobody is signed out along the way.
   update.
 - **Finishing is the only one-way step.** Finishing takes access through the
   previous provider away. LangWatch refuses to finish while any condition on
-  the page is still outstanding, so nobody is locked out by accident.
+  the page is still outstanding, so your organization always keeps a way in.
+  It never waits for members: each one moves across at their next sign-in.
 - **Data, roles and teams are untouched.** Members keep their accounts, role
   assignments and history. The update changes how they sign in, not who they
   are.
@@ -166,8 +167,11 @@ connection.
 Members do not need to do anything, and you do not need to wait for them.
 The next time each person signs in, they arrive through the new connection and
 are matched to their existing account by their email address, on any domain
-you proved. That works before and after you finish. The **Members moved
-across** row counts who has signed in through the new connection, and how many
+you proved, whether or not they ever confirmed that address. That works before
+and after you finish, including for someone who only ever signed in through
+the previous provider.
+
+The **Members moved across** row counts who has signed in through the new connection, and how many
 more will be moved across at their next sign-in.
 
 Under **Not moved across yet**, each remaining member is listed with whether
@@ -220,9 +224,9 @@ stay provisioned, and the next push lands on the new connection. Nobody is
 deprovisioned by the switch.
 
 People the sync provisioned who have never signed in do not hold the update
-either. The sync's word that they belong is enough for the new connection to
-recognize them, so they are listed as moving across at their next sign-in,
-whenever that is.
+either. The new connection recognizes them by their address like everyone
+else, so they are listed as moving across at their next sign-in, whenever
+that is.
 
 If you had already issued a token for the new connection yourself under
 **Settings > Authentication > Connectors**, both tokens work after finishing.
