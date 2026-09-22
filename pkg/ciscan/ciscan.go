@@ -156,8 +156,8 @@ func (c Concurrency) CancelsInProgress() bool {
 	return false
 }
 
-// Permissions models the workflow's top-level `permissions:` block. GitHub
-// accepts either a per-scope mapping (`contents: write`) or a shorthand
+// Permissions models a `permissions:` block at either workflow or job level.
+// GitHub accepts either a per-scope mapping (`contents: write`) or a shorthand
 // string (`read-all` / `write-all`); modeling only the mapping form turned
 // the shorthand into a decode error that failed LoadAll for every guard —
 // the same failure mode On and Concurrency were fixed for. Scopes holds the

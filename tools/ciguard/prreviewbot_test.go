@@ -13,17 +13,15 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-// goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
-// stands when every invariant holds. Individual tests mutate one clause of
-// it at a time so each failure mode is isolated.
-// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as
-// its own constant so the two tests that strip or replace it (below) and the
-// good-workflow fixture never drift out of sync with each other.
+// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
 const prReviewBotPermissionsBlock = `permissions:
   contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
   pull-requests: write
 `
 
+// goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
+// stands when every invariant holds. Individual tests mutate one clause of
+// it at a time so each failure mode is isolated.
 const goodPRReviewBotWorkflow = `name: PR Review Bot
 
 on:
