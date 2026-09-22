@@ -69,11 +69,21 @@ func renderAccessManagement(usersD string) error {
 	})
 }
 
-// serverSettingsConfig maps to zz-server-settings.yaml: two server-level
-// prerequisites the app's self-provisioned LangWatchQL access model depends
-// on, neither of which is itself part of that access model (so they survived
-// the deletion of the rendered-LWQL path, issue #8258).
-type serverSettingsConfig struct {
+// accessControlConfig maps to access-control.yaml: the two server-level
+// preconditions the app's self-provisioned SQL access model depends on —
+// access_control_improvements.settings_constraints_replace_previous (lets the
+// app's settings profile mark custom_api_key_hash changeable_in_readonly) and,
+// in replicated mode only, user_defined_zookeeper_path (the Keeper-backed
+// store for the app's SQL identity functions, ADR-136). Neither key is itself
+// part of the access model (so both survived the deletion of the
+// rendered-LWQL path, issue #8258).
+//
+// No `zz-` prefix: unlike users.d/zz-access-management.yaml, where the prefix
+// is load-bearing (it must sort after any file declaring access_management: 0
+// for the same user), nothing else in config.d sets access_control_improvements
+// or user_defined_zookeeper_path, so this file's position in config.d's merge
+// order does not matter.
+type accessControlConfig struct {
 	AccessControlImprovements accessControlImprovements `yaml:"access_control_improvements"`
 	// UserDefinedZooKeeperPath is a pointer so it is omitted (rather than
 	// rendered empty) on a standalone server — see the doc on
@@ -101,9 +111,9 @@ type accessControlImprovements struct {
 // this path is set before relying on it.
 const serverUserDefinedZooKeeperPath = "/clickhouse/user_defined"
 
-// renderServerSettings writes zz-server-settings.yaml, unconditionally (no
-// LWQL password gate — the app self-provisions the access model regardless of
-// how this server is reached):
+// renderAccessControl writes access-control.yaml, unconditionally (no LWQL
+// password gate — the app self-provisions the access model regardless of how
+// this server is reached):
 //
 //   - access_control_improvements.settings_constraints_replace_previous is what
 //     lets the app's `<database>_profile` settings profile (`langwatch_profile`
@@ -112,8 +122,8 @@ const serverUserDefinedZooKeeperPath = "/clickhouse/user_defined"
 //   - user_defined_zookeeper_path, written only in replicated mode: on a
 //     single node there is no Keeper to reach, and declaring the path would
 //     make the function store depend on an ensemble that is not there.
-func renderServerSettings(input *config.Input, configD string) error {
-	settings := serverSettingsConfig{
+func renderAccessControl(input *config.Input, configD string) error {
+	settings := accessControlConfig{
 		AccessControlImprovements: accessControlImprovements{
 			SettingsConstraintsReplacePrevious: true,
 		},
@@ -122,5 +132,5 @@ func renderServerSettings(input *config.Input, configD string) error {
 		path := serverUserDefinedZooKeeperPath
 		settings.UserDefinedZooKeeperPath = &path
 	}
-	return writeYAML(filepath.Join(configD, "zz-server-settings.yaml"), settings)
+	return writeYAML(filepath.Join(configD, "access-control.yaml"), settings)
 }

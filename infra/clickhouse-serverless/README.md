@@ -42,7 +42,7 @@ the server itself: `zz-access-management.yaml` grants the `default` user
 `access_management` + `named_collection_control` (the right to create users,
 profiles, row policies and named collections through SQL),
 `custom-settings-prefixes.yaml` declares the `custom_` settings prefix the
-per-query tenant capability rides on, and `zz-server-settings.yaml` sets
+per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
 `CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). See

@@ -79,7 +79,7 @@ func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 		"config.d/logging.yaml",
 		"config.d/network.yaml",
 		"config.d/custom-settings-prefixes.yaml",
-		"config.d/zz-server-settings.yaml",
+		"config.d/access-control.yaml",
 		"users.d/profiles.yaml",
 		"users.d/default-password.yaml",
 		"users.d/zz-access-management.yaml",
@@ -565,12 +565,12 @@ func TestRenderAll_SettingsConstraintsReplacePrevious(t *testing.T) {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "config.d", "zz-server-settings.yaml"))
+	data, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
 	if err != nil {
-		t.Fatalf("read zz-server-settings.yaml: %v", err)
+		t.Fatalf("read access-control.yaml: %v", err)
 	}
 	if !strings.Contains(string(data), "settings_constraints_replace_previous: true") {
-		t.Errorf("zz-server-settings.yaml should contain settings_constraints_replace_previous: true\n--- actual ---\n%s", string(data))
+		t.Errorf("access-control.yaml should contain settings_constraints_replace_previous: true\n--- actual ---\n%s", string(data))
 	}
 }
 
@@ -588,9 +588,9 @@ func TestRenderAll_LWQLUserDefinedStoreInKeeperForReplicated(t *testing.T) {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "zz-server-settings.yaml"))
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
 	if err != nil {
-		t.Fatalf("read config.d/zz-server-settings.yaml: %v", err)
+		t.Fatalf("read config.d/access-control.yaml: %v", err)
 	}
 	server := string(serverData)
 	if !strings.Contains(server, "user_defined_zookeeper_path: /clickhouse/user_defined") {
@@ -612,9 +612,9 @@ func TestRenderAll_LWQLUserDefinedStoreLocalForStandalone(t *testing.T) {
 		t.Fatalf("RenderAll: %v", err)
 	}
 
-	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "zz-server-settings.yaml"))
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
 	if err != nil {
-		t.Fatalf("read config.d/zz-server-settings.yaml: %v", err)
+		t.Fatalf("read config.d/access-control.yaml: %v", err)
 	}
 	if strings.Contains(string(serverData), "user_defined_zookeeper_path") {
 		t.Errorf("standalone mode must leave the SQL function store on local disk\n--- actual ---\n%s", string(serverData))

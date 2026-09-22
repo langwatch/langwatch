@@ -195,7 +195,7 @@ it runs, so a replica built afterwards has no functions and every provisioning
 run has to be re-broadcast.
 
 The chart-managed renderer declares the path in replicated mode only
-(`config.d/zz-server-settings.yaml`, `/clickhouse/user_defined`); on a single
+(`config.d/access-control.yaml`, `/clickhouse/user_defined`); on a single
 node there is no ensemble to point at. The cloud's own rendered config
 (`langwatch-saas`, `config/lwql-server.xml`) needs the same element and the
 same path, and lands as its own change.
