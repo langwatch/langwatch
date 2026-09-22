@@ -13210,6 +13210,51 @@ func (e RegisterConnectedAgentInstanceJSONBodyType) Valid() bool {
 	}
 }
 
+// Defines values for RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind.
+const (
+	Shared RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind = "shared"
+)
+
+// Valid indicates whether the value is a known member of the RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind enum.
+func (e RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind) Valid() bool {
+	switch e {
+	case Shared:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind.
+const (
+	Owner RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind = "owner"
+)
+
+// Valid indicates whether the value is a known member of the RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind enum.
+func (e RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind) Valid() bool {
+	switch e {
+	case Owner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind.
+const (
+	Host RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind = "host"
+)
+
+// Valid indicates whether the value is a known member of the RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind enum.
+func (e RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind) Valid() bool {
+	switch e {
+	case Host:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RegisterConnectedAgentInstance200JSONResponseBodyFrame0Protocol.
 const (
 	RegisterConnectedAgentInstance200JSONResponseBodyFrame0ProtocolN1 RegisterConnectedAgentInstance200JSONResponseBodyFrame0Protocol = 1
@@ -26123,16 +26168,47 @@ type RegisterConnectedAgentInstanceJSONBodyType string
 // RegisterConnectedAgentInstance200JSONResponseBodyFrame0 defines parameters for RegisterConnectedAgentInstance.
 type RegisterConnectedAgentInstance200JSONResponseBodyFrame0 struct {
 	Agents []struct {
-		Environment    string   `json:"environment"`
-		Id             string   `json:"id"`
-		Name           string   `json:"name"`
-		ParameterNotes []string `json:"parameterNotes"`
-		Url            string   `json:"url"`
+		Environment    string                                                                 `json:"environment"`
+		Id             string                                                                 `json:"id"`
+		Name           string                                                                 `json:"name"`
+		ParameterNotes []string                                                               `json:"parameterNotes"`
+		Scope          RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope `json:"scope"`
+		Url            string                                                                 `json:"url"`
 	} `json:"agents"`
 	HeartbeatIntervalMs int                                                             `json:"heartbeatIntervalMs"`
 	InstanceId          string                                                          `json:"instanceId"`
 	Protocol            RegisterConnectedAgentInstance200JSONResponseBodyFrame0Protocol `json:"protocol"`
 	Type                RegisterConnectedAgentInstance200JSONResponseBodyFrame0Type     `json:"type"`
+}
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0 defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0 struct {
+	Kind RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind `json:"kind"`
+}
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0Kind string
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1 defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1 struct {
+	Kind RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind `json:"kind"`
+}
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1Kind string
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2 defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2 struct {
+	HostLabel string                                                                  `json:"hostLabel"`
+	Kind      RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind `json:"kind"`
+}
+
+// RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2Kind string
+
+// RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope struct {
+	union json.RawMessage
 }
 
 // RegisterConnectedAgentInstance200JSONResponseBodyFrame0Protocol defines parameters for RegisterConnectedAgentInstance.
@@ -64887,6 +64963,94 @@ func (t PollConnectedAgentInstance200JSONResponseBody_Frames_Item) MarshalJSON()
 }
 
 func (t *PollConnectedAgentInstance200JSONResponseBody_Frames_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0 returns the union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as a RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0
+func (t RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0() (RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0, error) {
+	var body RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0 overwrites any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0 performs a merge with any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope, using the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1 returns the union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as a RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1
+func (t RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1() (RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1, error) {
+	var body RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1 overwrites any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1 performs a merge with any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope, using the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2 returns the union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as a RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2
+func (t RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) AsRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2() (RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2, error) {
+	var body RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2 overwrites any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope as the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) FromRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2 performs a merge with any union data inside the RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope, using the provided RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) MergeRegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2(v RegisterConnectedAgentInstance200JSONResponseBodyFrame0AgentsScope2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RegisterConnectedAgentInstance200JSONResponseBody_Frame_0_Agents_Scope) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

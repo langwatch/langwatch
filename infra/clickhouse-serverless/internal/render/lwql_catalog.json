@@ -210,6 +210,7 @@
       "BatchRunId",
       "DurationMs",
       "FinishedAt",
+      "InconclusiveCriteria",
       "Messages.Content",
       "Messages.Role",
       "MetCriteria",

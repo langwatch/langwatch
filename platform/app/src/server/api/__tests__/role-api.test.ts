@@ -161,6 +161,14 @@ describe("RoleService Tests", () => {
   describe("getRoleById", () => {
     /** @scenario "Non-enterprise org can view a custom role" */
     it("returns role by ID", async () => {
+      // A read reports the fact's business time as `createdAt`
+      // (`toCustomRoleShape`), so the row's own `createdAt` is not what comes
+      // back. Three fixed and distinct instants say which one does; timing
+      // three `new Date()` calls instead only agreed while the clock held
+      // still between them, and failed whenever it ticked.
+      const occurredAt = new Date("2026-09-21T09:00:00.000Z");
+      const rowCreatedAt = new Date("2026-09-21T10:00:00.000Z");
+      const updatedAt = new Date("2026-09-21T11:00:00.000Z");
       const mockRole = {
         id: "role-1",
         name: "Data Analyst",
@@ -168,9 +176,9 @@ describe("RoleService Tests", () => {
         permissions: ["analytics:view", "datasets:view"],
         organizationId: "org-123",
         kind: "custom",
-        occurredAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        occurredAt,
+        createdAt: rowCreatedAt,
+        updatedAt,
       };
 
       mockPrisma.role.findFirst.mockResolvedValue(mockRole);
@@ -184,8 +192,8 @@ describe("RoleService Tests", () => {
         permissions: ["analytics:view", "datasets:view"],
         organizationId: mockRole.organizationId,
         kind: mockRole.kind,
-        createdAt: mockRole.createdAt,
-        updatedAt: mockRole.updatedAt,
+        createdAt: occurredAt,
+        updatedAt,
       });
     });
 

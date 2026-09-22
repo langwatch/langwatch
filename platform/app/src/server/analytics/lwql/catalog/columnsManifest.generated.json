@@ -4346,6 +4346,11 @@
 					"name": "Evaluations.InputsJson",
 					"type": "Array(String)",
 					"comment": ""
+				},
+				{
+					"name": "InconclusiveCriteria",
+					"type": "Array(String)",
+					"comment": ""
 				}
 			]
 		},

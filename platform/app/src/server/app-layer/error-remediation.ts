@@ -532,6 +532,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -551,6 +552,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],

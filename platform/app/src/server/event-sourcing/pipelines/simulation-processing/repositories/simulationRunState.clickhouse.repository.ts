@@ -54,6 +54,7 @@ interface ClickHouseSimulationRunRecord extends ClickHouseEvaluationColumns {
   Reasoning: string | null;
   MetCriteria: string[];
   UnmetCriteria: string[];
+  InconclusiveCriteria?: string[];
   Error: string | null;
   DurationMs: string | null;
   TotalCost: number | null;
@@ -116,6 +117,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Reasoning: record.Reasoning,
       MetCriteria: record.MetCriteria ?? [],
       UnmetCriteria: record.UnmetCriteria ?? [],
+      InconclusiveCriteria: record.InconclusiveCriteria ?? [],
       Error: record.Error,
       Evaluations: columnsToEvaluations(record),
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
@@ -173,6 +175,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Reasoning: data.Reasoning,
       MetCriteria: data.MetCriteria,
       UnmetCriteria: data.UnmetCriteria,
+      InconclusiveCriteria: data.InconclusiveCriteria,
       Error: data.Error,
       ...evaluationsToColumns(data.Evaluations),
       DurationMs: data.DurationMs?.toString() ?? null,
@@ -254,6 +257,7 @@ export class SimulationRunStateRepositoryClickHouse<
             t.TraceIds AS TraceIds,
             t.Verdict AS Verdict, t.Reasoning AS Reasoning,
             t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
+            t.InconclusiveCriteria AS InconclusiveCriteria,
             t.Error AS Error,
             ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
             toString(t.DurationMs) AS DurationMs,
