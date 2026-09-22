@@ -1,26 +1,114 @@
 ---
-title: Images in datasets
-description: Store image URLs in a dataset column of type image (URL), see them as thumbnails in the grid, and pass them to a vision model in an experiment.
+title: Images and files in datasets
+description: Upload a picture or a document into a dataset cell, or enter a URL, and send it to a prompt or an agent in an experiment.
 ---
 
-Set a column's type to `image (URL)` and put the URL of an image in each cell. The grid renders the image as a thumbnail; click it to see it full size. The cell value stays the URL, so editing the cell edits the URL.
+A dataset column of type `image` holds a picture. A column of type `file` holds any other document, for example a PDF, an audio clip, a CSV or a text file. Both column types accept an uploaded file, a public URL or a data URL.
 
-The grid shows a thumbnail when the value is a `data:image/...;base64,` string, a markdown image (`![alt](url)`), or a URL that ends in `.jpeg`, `.jpg`, `.gif`, `.png`, `.webp`, `.svg` or `.bmp`. A URL without an image extension shows a thumbnail only when its path is longer than 30 characters and contains a word such as `image`, `img`, `photo`, `media` or `upload`. Any other value is shown as text, and the experiment still fetches it as an image.
+Set the type in the **New Dataset** drawer, in **Edit columns** on an existing dataset, or in the columns step of a file upload.
+
+## Upload a file into a cell
+
+The dataset editor and the experiments workbench render these two column types the same way. An empty cell shows an **Upload** button and an **or enter URL** link.
+
+Click **Upload** and pick one file. An `image` column offers image files only. A `file` column offers every file type, except the types a browser can run: HTML, SVG and JavaScript. LangWatch refuses those types because it serves the file back from its own address.
+
+A filled `image` cell shows the picture. A filled `file` cell shows a chip with the file name; click the chip to open the file. Hold the pointer over a filled cell to get **Replace** and **Clear**.
 
 <Frame>
-<img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image (URL) column rendered as thumbnails" />
+<img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column rendered as thumbnails" />
 </Frame>
 
-You set the type in the **New Dataset** drawer, in **Edit columns** on an existing dataset, or in the columns step of a file upload.
+After an upload the cell holds a LangWatch reference:
 
-## How the image reaches the model
+```
+/api/files/{projectId}/{objectId}/{fileName}
+```
 
-A prompt or agent column in the Experiments Workbench fetches the URL on the server and sends the image bytes to the model as image content, so the model sees the picture and not the link. This works for every model provider, whether or not the provider fetches URLs itself. The type of the file comes from the response, so a signed S3 or CDN URL without an extension works too.
+The reference is a plain string, so the SDKs, the CLI and the REST API read and write it like any other cell value.
 
-Audio and PDF URLs in a prompt are delivered the same way: an audio file reaches the model as audio, a PDF as a document.
+## Enter a URL instead
 
-The fetch times out after 30 seconds and a file is limited to 20 MB. A URL that resolves to a private or internal address is refused. When a field is declared as an image and its URL cannot be loaded as an image, the run fails with a message naming the URL and the reason. A link written inside prose is left as text and never fails the run.
+Click **or enter URL**, or double-click the cell, to get the text editor. Type a public URL or a `data:` URL. This is also what an API client writes, so datasets that used image URLs before continue to work with no change.
 
-An evaluator that takes an image passes the URL to its model provider as an `image_url` part without fetching it, so the URL has to be reachable by the provider.
+The grid shows a thumbnail when the value is a `data:image/...;base64,` string, a markdown image (`![alt](url)`), or a URL that ends in `.jpeg`, `.jpg`, `.gif`, `.png`, `.webp`, `.svg` or `.bmp`. A URL without an image extension shows a thumbnail only when its path is longer than 30 characters and contains a word such as `image`, `img`, `photo`, `media` or `upload`. Other values show as text, and the experiment still reads them as an address.
+
+## Limits and permissions
+
+| Limit | Value |
+|---|---|
+| Files per upload | 1 |
+| File size | 20 MB |
+| Fetch timeout for an external URL | 30 seconds |
+| Refused media types | `text/html`, `application/xhtml+xml`, `image/svg+xml`, `application/javascript`, `text/javascript` |
+
+An upload needs the `datasets:manage` permission, the same permission that a dataset row change needs. Reading a stored file needs `datasets:view`. A URL that resolves to a private or internal address is refused.
+
+## What the model receives
+
+A prompt input has one of these types: **Text**, **Image**, **Number**, **Boolean** or **File**. Map an `image` column to an **Image** input, and a `file` column to a **File** input.
+
+LangWatch delivers the file to the model by its media type:
+
+| Media type | What the model gets |
+|---|---|
+| Image | An `image_url` content part |
+| Audio | An `input_audio` content part |
+| Plain text and JSON | The text of the file, with the file name as a heading |
+| Everything else, for example PDF | A `file` content part with the file name and the file data in base64 |
+
+A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30-second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
+
+Provider support for file content parts is not the same everywhere. A provider that refuses the part fails the cell, and the cell shows the message of the provider.
+
+An evaluator reads an uploaded file as base64 data. An external URL goes to the evaluator's model provider as it is, so that address must be reachable by the provider.
+
+## What agents receive
+
+An agent runs outside LangWatch, so it cannot open a LangWatch reference. When an `image` or a `file` column is mapped to an HTTP agent input, to a connected agent parameter, to a code agent input or to a workflow input, LangWatch reads the file first and sends a base64 data URL:
+
+```
+data:<mediaType>;name=<urlencoded file name>;base64,<data>
+```
+
+An image data URL carries no `name` parameter. A cell that holds an external URL is read the same way, so the agent always gets the bytes and never an address it cannot open.
+
+A connected agent column also has an optional **attachment** input. See [Connect your agent](/agent-testing/connect-your-agent) for how the agent reads it.
+
+## Upload from the REST API
+
+`POST /api/dataset/attachments` stores one file and returns the reference a cell holds. Name the project in the `projectId` query parameter, and send the file as multipart form data in the `file` field. The `datasetId` field is optional and records which dataset owns the file. Authenticate with a project API key or with a session. The route accepts 30 uploads a minute per project.
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/dataset/attachments?projectId=$PROJECT_ID" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -F "file=@./report.pdf" \
+  -F "datasetId=$DATASET_ID"
+```
+
+The response holds the value to write into the cell:
+
+```json
+{
+  "url": "/api/files/project_abc/obj_123/report.pdf",
+  "name": "report.pdf",
+  "mediaType": "application/pdf",
+  "sizeBytes": 184320
+}
+```
+
+Write the `url` string into the cell, not the whole object. `name`, `mediaType`
+and `sizeBytes` are there for your own bookkeeping; a cell that holds the object
+does not resolve as an attachment.
+
+See [Create Attachments](/api-reference/datasets/create-attachments) for the full reference, and [Programmatic access](/datasets/programmatic-access) to write the value into a row.
+
+## Error codes
+
+| Code | Status | Cause |
+|---|---|---|
+| `dataset_attachment_too_large` | 413 | The file is over 20 MB. Pick a smaller file. |
+| `dataset_attachment_type_refused` | 415 | The media type is one a browser can run. Convert the file or pick another one. |
+| `dataset_attachment_unavailable` | 400 | A run could not read a file the row points at. The message names the file. Upload the file again. |
 
 **Also check:** [Multimodal evaluation](/evaluations/experiments/multimodal-evaluation) for an experiment that scores image outputs.

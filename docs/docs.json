@@ -1077,6 +1077,7 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-attachments",
               "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",

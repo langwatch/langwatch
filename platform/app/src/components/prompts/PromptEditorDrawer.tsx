@@ -1053,6 +1053,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           boolean: "bool",
           bool: "bool",
           image: "image",
+          file: "file",
           dict: "dict",
           list: "str", // Default list to str for now
         };
