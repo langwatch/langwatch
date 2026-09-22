@@ -31,7 +31,15 @@ export class SsoAuthenticationActivityService {
    * Total and silent: the session already exists, so a trail that cannot be
    * written is reported rather than turned into a refused sign-in.
    */
-  async record({ connectionId, userId }: { connectionId: string; userId: string }): Promise<void> {
+  async record({
+    connectionId,
+    userId,
+    providerAccountId,
+  }: {
+    connectionId: string;
+    userId: string;
+    providerAccountId?: string | null;
+  }): Promise<void> {
     try {
       const connection = await this.deps.connections.tryFindConnection({ connectionId });
       if (!connection) return;
@@ -41,6 +49,7 @@ export class SsoAuthenticationActivityService {
         connectionId,
         userId,
         authenticatedAtMs: this.now(),
+        providerAccountId: providerAccountId ?? null,
       });
     } catch (error) {
       logger.error(

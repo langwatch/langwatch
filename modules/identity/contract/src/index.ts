@@ -144,8 +144,10 @@ export {
   type SsoSetupView,
 } from "./sso-setup.ts";
 export {
+  type SsoMigrationAccountLinkDecision,
   type SsoMigrationBlockerView,
   type SsoMigrationConnectionRef,
+  type SsoMigrationLinkRefusalCode,
   type SsoMigrationScimStatus,
   type SsoMigrationStragglerView,
   type SsoMigrationView,

@@ -72,7 +72,7 @@ import type {
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
 import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
-import type { SsoMigrationView } from "./sso-migration.ts";
+import type { SsoMigrationAccountLinkDecision, SsoMigrationView } from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
@@ -393,7 +393,9 @@ export interface SsoSetupCommandsApi {
   /** The word on the card; nothing routes on it. */
   rename(args: SsoSetupCommand & { name: string }): Promise<void>;
   setArrivals(args: SsoSetupCommand & { arrivalPolicy: SsoArrivalPolicy }): Promise<void>;
-  activate(args: SsoSetupCommand & { testLoginAccountId: string }): Promise<void>;
+  /** Takes the connection live on the strength of the test sign-in it
+   *  recorded: the account is resolved here, never supplied by a caller. */
+  activate(args: SsoSetupCommand): Promise<void>;
   discardConnection(args: SsoSetupCommand): Promise<void>;
   /** Which removal this is comes from where the connection stands. */
   removeConnection(
@@ -415,12 +417,32 @@ export interface SsoAssertionApi {
 }
 
 /**
+ * Which connection a callback belongs to while an organization is cutting
+ * over. Asked before the account row is written, because a pair's two sides
+ * are two providers for one person and the arrival has to name the right one.
+ */
+export interface SsoMigrationCallbackApi {
+  decideAccountLink(args: {
+    userId: string;
+    account: { providerId: string; accountId: string };
+    /** The other federated accounts this person holds, from the module that
+     *  owns them: identity decides, auth supplies its own rows. */
+    otherAccounts: readonly { providerId: string; accountId: string }[];
+  }): Promise<SsoMigrationAccountLinkDecision>;
+}
+
+/**
  * The trail a connection's sign-ins leave. Asked by whoever hosts the
  * sign-in door, which knows the provider and the person and nothing else:
  * a provider naming no connection records nothing.
  */
 export interface SsoAuthenticationActivityApi {
-  record(args: { connectionId: string; userId: string }): Promise<void>;
+  record(args: {
+    connectionId: string;
+    userId: string;
+    /** The subject the provider asserted, when the door knew it. */
+    providerAccountId?: string | null;
+  }): Promise<void>;
 }
 
 /**
@@ -493,6 +515,7 @@ export interface IdentityApi {
   ssoAssertion(): SsoAssertionApi;
   ssoArrival(): SsoArrivalApi;
   ssoActivity(): SsoAuthenticationActivityApi;
+  ssoMigrationCallbacks(): SsoMigrationCallbackApi;
   ssoSetup(): SsoSetupApi;
   ssoSetupCommands(): SsoSetupCommandsApi;
   scimSyncGuards(): ScimSyncGuardsApi;

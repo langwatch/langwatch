@@ -1,5 +1,9 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
 /**
  * What signing in through an identity provider does to a domain-matched
  * organization: who joins it, whose account links, and who is flagged for
@@ -101,6 +105,9 @@ describe("signing in through a domain-matched organization's identity provider",
           ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
             record: async () => undefined,
           }),
+          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+            decideAccountLink: async () => ({ kind: "not_migrating" }),
+          }),
         },
       });
 
@@ -137,6 +144,9 @@ describe("signing in through a domain-matched organization's identity provider",
           ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
             record: async () => undefined,
           }),
+          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+            decideAccountLink: async () => ({ kind: "not_migrating" }),
+          }),
         },
       });
 
@@ -167,6 +177,9 @@ describe("signing in through a domain-matched organization's identity provider",
           arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
           ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
             record: async () => undefined,
+          }),
+          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+            decideAccountLink: async () => ({ kind: "not_migrating" }),
           }),
         },
       });

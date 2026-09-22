@@ -57,6 +57,13 @@ export abstract class TeamRepository {
     activeOnly?: boolean;
   }): Promise<string[]>;
 
+  /** Every organization this person belongs to, for a caller that holds no
+   *  candidate list of its own. */
+  abstract organizationIdsForMember(input: {
+    userId: string;
+    activeOnly?: boolean;
+  }): Promise<string[]>;
+
   abstract fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;

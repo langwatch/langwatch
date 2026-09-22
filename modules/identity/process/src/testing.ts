@@ -11,9 +11,12 @@ import type { IdentityUsersRepository } from "./repositories/identity-users.repo
  */
 export function inMemoryIdentityUsers({
   emails = {},
+  unverified = [],
 }: {
   /** userId → the address as `User.email` stores it. */
   emails?: Record<string, string>;
+  /** The users `User.emailVerified` does NOT stand behind. */
+  unverified?: readonly string[];
 } = {}): IdentityUsersRepository {
   const rows = new Map(Object.entries(emails));
   return {
@@ -28,6 +31,14 @@ export function inMemoryIdentityUsers({
         }
       }
       return null;
+    },
+    async findAddressStanding({ userId }) {
+      const email = rows.get(userId);
+      if (email === undefined) return null;
+      const holders = [...rows.values()].filter(
+        (candidate) => candidate.toLowerCase() === email.toLowerCase(),
+      ).length;
+      return { email, emailVerified: !unverified.includes(userId), holders };
     },
   };
 }

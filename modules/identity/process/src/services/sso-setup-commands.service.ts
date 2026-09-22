@@ -2,6 +2,7 @@ import {
   type SelfServeActor,
   type SsoArrivalPolicy,
   type SsoMigrationRoute,
+  SsoConnectionActivationBlockedError,
   SsoConnectionAlreadyRegisteredError,
   type SsoConnectionRemoval,
   SsoConnectionNotFoundError,
@@ -12,6 +13,7 @@ import {
 
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
+import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migration-evidence.repository.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import type { SsoIdpRegistrationService } from "./sso-idp-registration.service.ts";
@@ -27,9 +29,15 @@ const REMOVABLE_BY_DISCARD = new Set([
   "VERIFIED",
 ]);
 
+/** How far back going live looks for a sign-in that named its subject: the
+ *  trail is per connection, and a test sign-in is among its newest rows. */
+const TEST_SIGN_IN_LOOKBACK = 20;
+
 export interface SsoSetupCommandsServiceDeps {
   connections: () => SsoConnectionService;
   reads: SsoConnectionReadRepository;
+  /** The trail going live reads the test sign-in off. */
+  activity: SsoMigrationEvidenceRepository;
   credentials: SsoCredentialRepository;
   registrations: SsoIdpRegistrationService;
   now?: () => number;
@@ -164,18 +172,36 @@ export class SsoSetupCommandsService {
     });
   }
 
-  /** Takes it live. The account is the one that came all the way back in. */
-  async activate({
-    organizationId,
-    connectionId,
-    actor,
-    testLoginAccountId,
-  }: SsoSetupCommand & { testLoginAccountId: string }): Promise<void> {
-    await this.requireOrganizationConnection({ organizationId, connectionId });
+  /**
+   * Takes it live on the strength of the sign-in it recorded. The account is
+   * RESOLVED here rather than supplied: a caller naming one would assert the
+   * test sign-in it is meant to be evidence of.
+   */
+  async activate({ organizationId, connectionId, actor }: SsoSetupCommand): Promise<void> {
+    const state = await this.requireOrganizationConnection({ organizationId, connectionId });
     await this.deps.connections().activateConnection({
       ...this.command({ organizationId, connectionId, actor }),
-      testLoginAccountId,
+      testLoginAccountId: await this.testSignInAccountOf(state),
     });
+  }
+
+  /** The subject the newest recorded sign-in asserted. A connection nobody
+   *  has signed in through is not one that can go live. */
+  private async testSignInAccountOf(state: SsoConnectionState): Promise<string> {
+    if (state.testLoginAccountId) return state.testLoginAccountId;
+
+    const recent = await this.deps.activity.findRecentAuthentications({
+      organizationId: state.organizationId,
+      connectionId: state.connectionId,
+      limit: TEST_SIGN_IN_LOOKBACK,
+    });
+    const asserted = recent.find((record) => record.providerAccountId !== null);
+    if (!asserted?.providerAccountId) {
+      throw new SsoConnectionActivationBlockedError(
+        `connection ${state.connectionId}: nobody has signed in through it`,
+      );
+    }
+    return asserted.providerAccountId;
   }
 
   /** Abandons a setup nobody finished. */

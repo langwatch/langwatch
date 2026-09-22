@@ -160,6 +160,12 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.memberOrganizationIds(input);
   }
 
+  /** Every organization this person belongs to, for a caller with no list of
+   *  candidates to filter. */
+  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+    return this.teams.organizationIdsForMember(input);
+  }
+
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
     return this.teams.getOrganizationMembers(getOrganizationMembersInputSchema.parse(input));
   }

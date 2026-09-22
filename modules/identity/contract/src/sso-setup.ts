@@ -98,8 +98,9 @@ export interface SsoSetupView {
   record: SsoSetupRecordView | null;
   /** Null until there is a connection to take live. */
   goLive: SsoSetupGoLiveView | null;
-  /** The compatibility route a grandfathered connection stands in for. */
-  legacyRoute: { domain: string; provider: string } | null;
+  /** The compatibility route a grandfathered connection stands in for. It
+   *  names its connection, so a replacement can be offered for it. */
+  legacyRoute: { connectionId: string; domain: string; provider: string } | null;
   /** Where the cutover stands, when this connection replaces a
    *  grandfathered one. Null for every connection outside a pair. */
   migration: SsoMigrationView | null;

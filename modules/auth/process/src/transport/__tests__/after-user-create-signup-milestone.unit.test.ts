@@ -26,7 +26,11 @@ import {
   type AuthzUpdateBindingInput,
   type AuthzUpdateGrantInput,
 } from "@langwatch/authz-contract";
-import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -136,6 +140,9 @@ describe("afterUserCreate", () => {
       arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
       ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
         record: async () => undefined,
+      }),
+      ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+        decideAccountLink: async () => ({ kind: "not_migrating" }),
       }),
     };
   }

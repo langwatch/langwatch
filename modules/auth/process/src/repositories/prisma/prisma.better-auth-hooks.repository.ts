@@ -45,6 +45,21 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     return this.prisma.account.count({ where: { userId } });
   }
 
+  async findFederatedAccountsForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<{ providerId: string; accountId: string }[]> {
+    const accounts = await this.prisma.account.findMany({
+      where: { userId, provider: { not: "credential" } },
+      select: { provider: true, providerAccountId: true },
+    });
+    return accounts.map(({ provider, providerAccountId }) => ({
+      providerId: provider,
+      accountId: providerAccountId,
+    }));
+  }
+
   async flagPendingSsoSetup({ userId }: { userId: string }): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },

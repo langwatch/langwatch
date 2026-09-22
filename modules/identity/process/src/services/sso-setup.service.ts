@@ -88,6 +88,7 @@ export class SsoSetupService {
       goLive: connection ? await this.goLiveView({ organizationId, connection }) : null,
       legacyRoute: legacy
         ? {
+            connectionId: legacy.connectionId,
             domain: legacy.verifiedDomains[0] ?? "",
             provider: legacy.idpMetadata.providerId,
           }

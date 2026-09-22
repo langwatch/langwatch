@@ -6,7 +6,12 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationAccountLinkDecision,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -36,6 +41,7 @@ function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooks
   return createApiFixture<BetterAuthHooksRepository>({
     tryFindUserForHooks: async () => (user === null ? null : { ...WORKER, ...user }),
     tryFindOrganizationBySsoDomain: async () => null,
+    findFederatedAccountsForUser: async () => [],
   });
 }
 
@@ -52,6 +58,9 @@ function collaboratorsFor(
     authzGrants: createApiFixture<AuthzGrantsService>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record }),
+    ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+      decideAccountLink: async () => ({ kind: "not_migrating" }),
+    }),
   };
 }
 
@@ -83,7 +92,11 @@ describe("a sign-in that creates an account through an identity provider", () =>
       collaborators: collaboratorsFor(async () => undefined, record),
     });
 
-    expect(record).toHaveBeenCalledWith({ connectionId: "conn_okta", userId: "user_1" });
+    expect(record).toHaveBeenCalledWith({
+      connectionId: "conn_okta",
+      userId: "user_1",
+      providerAccountId: "okta|dana",
+    });
   });
 
   it("names a person who has no name at all as the empty string", async () => {
@@ -162,6 +175,55 @@ describe("a returning sign-in, which creates no account row", () => {
       repo: repoFor(null),
       account: OKTA_ACCOUNT,
       collaborators: collaboratorsFor(admit),
+    });
+
+    expect(admit).not.toHaveBeenCalled();
+  });
+});
+
+/** The pair's two sides are two providers for one person, so the connection
+ *  the arrival names is the cutover's answer rather than the provider's id. */
+function collaboratorsDeciding({
+  admit,
+  decision,
+}: {
+  admit: SsoArrivalApi["admit"];
+  decision: SsoMigrationAccountLinkDecision;
+}): BetterAuthHookCollaborators {
+  return {
+    ...collaboratorsFor(admit),
+    ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+      decideAccountLink: async () => decision,
+    }),
+  };
+}
+
+describe("a sign-in that arrives while its organization is cutting over", () => {
+  it("admits into the connection the cutover names, not the provider that arrived", async () => {
+    const admit = vi.fn().mockResolvedValue(undefined);
+
+    await afterAccountUpdate({
+      repo: repoFor(),
+      account: OKTA_ACCOUNT,
+      collaborators: collaboratorsDeciding({
+        admit,
+        decision: { kind: "allow_replacement_pair", arrivalConnectionId: "conn_direct" },
+      }),
+    });
+
+    expect(admit).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "conn_direct" }));
+  });
+
+  it("admits nobody through a legacy callback the cutover has retired", async () => {
+    const admit = vi.fn().mockResolvedValue(undefined);
+
+    await afterAccountCreate({
+      repo: repoFor(),
+      account: OKTA_ACCOUNT,
+      collaborators: collaboratorsDeciding({
+        admit,
+        decision: { kind: "reject", code: "SSO_LEGACY_AUTH_RETIRED" },
+      }),
     });
 
     expect(admit).not.toHaveBeenCalled();

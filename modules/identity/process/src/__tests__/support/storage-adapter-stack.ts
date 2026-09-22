@@ -187,6 +187,12 @@ export function identityStack({
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
+    async findAddressStanding({ userId }) {
+      const row = db.user?.find((candidate) => candidate.id === userId);
+      if (!row) return null;
+      const email = typeof row.email === "string" ? row.email : null;
+      return { email, emailVerified: row.emailVerified === true, holders: email ? 1 : 0 };
+    },
     async tryFindUserIdByEmail({ normalizedValue }) {
       const row = db.user?.find(
         (candidate) =>

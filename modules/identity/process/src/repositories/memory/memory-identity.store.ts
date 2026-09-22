@@ -64,6 +64,7 @@ export class MemoryIdentityStore {
     connectionId: string;
     userId: string;
     authenticatedAtMs: number;
+    providerAccountId: string | null;
   }[] = [];
   readonly organizationNames = new Map<string, string>();
   readonly finalizedUsers = new Set<string>();

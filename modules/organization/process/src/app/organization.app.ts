@@ -738,6 +738,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.organizations.memberOrganizationIds(input);
   }
 
+  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+    return this.#dependencies.organizations.organizationIdsForMember(input);
+  }
+
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
     return this.#dependencies.organizations.getOrganizationMembers(input);
   }

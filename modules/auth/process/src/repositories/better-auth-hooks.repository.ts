@@ -28,6 +28,14 @@ export abstract class BetterAuthHooksRepository {
     domain: string;
   }): Promise<BetterAuthHookOrganization | null>;
   abstract countAccountsForUser(input: { userId: string }): Promise<number>;
+  /**
+   * The federated accounts this person holds, credential rows excluded. Read
+   * for a peer that decides something about them and owns no `Account` row
+   * of its own.
+   */
+  abstract findFederatedAccountsForUser(input: {
+    userId: string;
+  }): Promise<{ providerId: string; accountId: string }[]>;
   abstract flagPendingSsoSetup(input: { userId: string }): Promise<void>;
   /**
    * Creates the default MEMBER membership row. Returns `"already-exists"`

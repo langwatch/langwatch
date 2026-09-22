@@ -11,6 +11,8 @@ export class InMemoryUsers implements IdentityUsersRepository {
   /** userId → the address as `User.email` stores it, unnormalized. */
   readonly emails = new Map<string, string>();
   readonly hashKeys = new Map<string, string>();
+  /** Users `User.emailVerified` does not stand behind. */
+  readonly unverified = new Set<string>();
 
   async storeUserHashKeyIfMissing({
     userId,
@@ -37,6 +39,20 @@ export class InMemoryUsers implements IdentityUsersRepository {
       if (email.toLowerCase() === normalizedValue.toLowerCase()) return userId;
     }
     return null;
+  }
+
+  /** The three facts a cutover link is decided on, over the same rows. */
+  async findAddressStanding({ userId }: { userId: string }): Promise<{
+    email: string | null;
+    emailVerified: boolean;
+    holders: number;
+  } | null> {
+    const email = this.emails.get(userId);
+    if (email === undefined) return null;
+    const holders = [...this.emails.values()].filter(
+      (candidate) => candidate.toLowerCase() === email.toLowerCase(),
+    ).length;
+    return { email, emailVerified: !this.unverified.has(userId), holders };
   }
 
   /** Seed a legacy user sitting on an address, the way `User.email` does. */

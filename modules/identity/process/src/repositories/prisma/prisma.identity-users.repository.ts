@@ -38,6 +38,24 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     return user?.email ?? null;
   }
 
+  async findAddressStanding({ userId }: { userId: string }): Promise<{
+    email: string | null;
+    emailVerified: boolean;
+    holders: number;
+  } | null> {
+    const user = await this.database.user.findUnique({
+      where: { id: userId },
+      select: { email: true, emailVerified: true },
+    });
+    if (!user) return null;
+    if (!user.email) return { email: null, emailVerified: !!user.emailVerified, holders: 0 };
+
+    const holders = await this.database.user.count({
+      where: { email: { equals: user.email, mode: "insensitive" } },
+    });
+    return { email: user.email, emailVerified: !!user.emailVerified, holders };
+  }
+
   /**
    * The legacy half of the cross-population collision guard (ADR-116 §6):
    * case-insensitive match on what `User.email @unique` defends. Deactivated

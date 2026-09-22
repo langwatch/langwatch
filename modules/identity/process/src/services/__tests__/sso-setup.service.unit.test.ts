@@ -68,11 +68,20 @@ function binding(over: Partial<BreakGlassBinding> = {}): BreakGlassBinding {
 function scenario(
   rows: SsoConnectionState[],
   bindings: BreakGlassBinding[] = [],
-  authentications: { connectionId: string; userId: string; authenticatedAtMs: number }[] = [],
+  authentications: {
+    connectionId: string;
+    userId: string;
+    authenticatedAtMs: number;
+    providerAccountId?: string | null;
+  }[] = [],
 ) {
   const store = MemoryIdentityStore.create();
   for (const record of authentications) {
-    store.ssoAuthentications.push({ organizationId: ORG, ...record });
+    store.ssoAuthentications.push({
+      organizationId: ORG,
+      providerAccountId: null,
+      ...record,
+    });
   }
   for (const row of rows) store.ssoConnections.set(row.connectionId, row);
   for (const held of bindings) store.breakGlassBindings.set(held.bindingId, held);
@@ -268,7 +277,11 @@ describe("given a legacy route beside a connection being set up", () => {
     const view = await service.getSetup({ organizationId: ORG });
 
     expect(view.connection?.connectionId).toBe(CONNECTION_ID);
-    expect(view.legacyRoute).toEqual({ domain: "acme.com", provider: "okta-legacy" });
+    expect(view.legacyRoute).toEqual({
+      connectionId: legacy.connectionId,
+      domain: "acme.com",
+      provider: "okta-legacy",
+    });
   });
 
   it("shows the legacy route itself when it is all the organization holds", async () => {
@@ -288,7 +301,11 @@ describe("given a legacy route beside a connection being set up", () => {
     const view = await scenario([legacy]).getSetup({ organizationId: ORG });
 
     expect(view.connection?.connectionId).toBe(CONNECTION_ID);
-    expect(view.legacyRoute).toEqual({ domain: "acme.com", provider: "okta-legacy" });
+    expect(view.legacyRoute).toEqual({
+      connectionId: legacy.connectionId,
+      domain: "acme.com",
+      provider: "okta-legacy",
+    });
   });
 });
 

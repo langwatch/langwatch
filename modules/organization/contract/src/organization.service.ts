@@ -88,6 +88,9 @@ export abstract class OrganizationService {
     userId: string;
     organizationIds: string[];
   }): Promise<string[]>;
+  /** Every organization this person belongs to, for a caller deciding
+   *  something about the person rather than about a listed organization. */
+  abstract organizationIdsForMember(input: { userId: string }): Promise<string[]>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   abstract getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
 

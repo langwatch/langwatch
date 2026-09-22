@@ -52,6 +52,7 @@ import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
+import { SsoMigrationCallbackService } from "../services/sso-migration-callback.service.ts";
 import {
   SsoMigrationProgressService,
   type SsoMigrationMemberships,
@@ -106,6 +107,7 @@ type IdentityAppParts = {
   ssoAssertion: SsoAssertionService;
   ssoArrival: SsoArrivalService;
   ssoActivity: SsoAuthenticationActivityService;
+  ssoMigrationCallbacks: SsoMigrationCallbackService;
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
@@ -289,12 +291,18 @@ export class IdentityApp implements IdentityApi {
       connections: setup.repositories.ssoConnections,
       activity: setup.repositories.ssoMigrationEvidence,
     });
+    const ssoMigrationCallbacks = SsoMigrationCallbackService.create({
+      connections: setup.repositories.ssoConnections,
+      users: setup.repositories.users,
+      memberships: setup.dependencies.organizations,
+    });
     // Q3(c) again: without the connection ledger there is nothing to press
     // against, so the journey's verbs refuse by name rather than half-work.
     const ssoSetupCommands = ssoConnections
       ? SsoSetupCommandsService.create({
           connections: () => ssoConnections,
           reads: setup.repositories.ssoConnections,
+          activity: setup.repositories.ssoMigrationEvidence,
           credentials: setup.repositories.ssoCredentials,
           registrations: SsoIdpRegistrationService.create({
             // The same fence the published-proof reads go through: an issuer
@@ -344,6 +352,7 @@ export class IdentityApp implements IdentityApi {
       ssoAssertion,
       ssoArrival,
       ssoActivity,
+      ssoMigrationCallbacks,
       ssoSetup,
       ssoSetupCommands,
       scimSyncGuards,
@@ -484,6 +493,10 @@ export class IdentityApp implements IdentityApi {
 
   ssoActivity(): SsoAuthenticationActivityService {
     return this.#parts.ssoActivity;
+  }
+
+  ssoMigrationCallbacks(): SsoMigrationCallbackService {
+    return this.#parts.ssoMigrationCallbacks;
   }
 
   ssoSetup(): SsoSetupService {

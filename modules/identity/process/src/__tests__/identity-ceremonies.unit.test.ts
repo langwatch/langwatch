@@ -37,6 +37,7 @@ function harness(options?: {
     // The ceremonies never ask it — the collision guard does, one layer
     // down — but the double is the whole port.
     tryFindUserIdByEmail: vi.fn().mockResolvedValue(null),
+    findAddressStanding: vi.fn().mockResolvedValue(null),
   };
   const identity = {
     attachIdentifier: vi.fn(options?.attach ?? (async () => [])),

@@ -13,6 +13,9 @@ export interface SsoAuthenticationRecord {
   connectionId: string;
   userId: string;
   authenticatedAtMs: number;
+  /** The subject the provider asserted, when the door knew it: what going
+   *  live records as the test sign-in's account. */
+  providerAccountId: string | null;
 }
 
 /**
@@ -28,6 +31,14 @@ export abstract class SsoMigrationEvidenceRepository {
   abstract findLiveIdentifierHoldings(args: {
     userIds: string[];
   }): Promise<MigrationIdentifierHolding[]>;
+
+  /** This connection's sign-ins, newest first. The empty list is a
+   *  connection nobody has signed in through. */
+  abstract findRecentAuthentications(args: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<SsoAuthenticationRecord[]>;
 
   /** When this connection last signed anybody in, or null. */
   abstract findLastAuthenticationAtMs(args: {

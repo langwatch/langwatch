@@ -155,6 +155,18 @@ export class MemoryTeamRepository extends TeamRepository {
     return input.userIds;
   };
 
+  async organizationIdsForMember(input: {
+    userId: string;
+    activeOnly?: boolean;
+  }): Promise<string[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.userId === input.userId && (input.activeOnly === false || row.disabledAt === null),
+      )
+      .map((row) => row.organizationId);
+  }
+
   async memberOrganizationIds(input: {
     userId: string;
     organizationIds: string[];

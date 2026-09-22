@@ -65,6 +65,7 @@ describe("recording a sign-in that came through a single sign-on connection", ()
         connectionId: CONNECTION,
         userId: "user_1",
         authenticatedAtMs: 1_700_000_000_000,
+        providerAccountId: null,
       },
     ]);
   });

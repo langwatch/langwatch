@@ -128,6 +128,7 @@ function scenario({
   members?: SsoMigrationMember[];
   bindings?: BreakGlassBinding[];
   authentications?: {
+    providerAccountId?: string | null;
     organizationId: string;
     connectionId: string;
     userId: string;
@@ -139,7 +140,9 @@ function scenario({
     store.ssoConnections.set(connection.connectionId, connection);
   for (const fact of identifiers) store.identifiers.set(fact.identifierId, fact);
   for (const binding of bindings) store.breakGlassBindings.set(binding.bindingId, binding);
-  store.ssoAuthentications.push(...authentications);
+  for (const record of authentications) {
+    store.ssoAuthentications.push({ providerAccountId: null, ...record });
+  }
   const repositories = MemoryIdentityRepositories.over(store);
 
   return SsoMigrationProgressService.create({

@@ -428,6 +428,13 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),
     },
+    ssoAssertions: {
+      decide: (args) => options.identityApi.ssoAssertion().decide(args),
+    },
+    ssoMigration: {
+      decideAccountLink: (args) =>
+        options.identityApi.ssoMigrationCallbacks().decideAccountLink(args),
+    },
     signUpVerification: AbsentSignUpVerification.create(logger),
     sendResetPassword: () => unconfiguredPasswordResetMail(),
   });

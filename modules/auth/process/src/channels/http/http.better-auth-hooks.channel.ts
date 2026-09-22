@@ -5,7 +5,12 @@ import {
   TeamUserRole,
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
-import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationAccountLinkDecision,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -35,6 +40,8 @@ export type BetterAuthHookCollaborators = Readonly<{
   arrivals: SsoArrivalApi;
   /** Where a sign-in through a connection is recorded as having happened. */
   ssoActivity: SsoAuthenticationActivityApi;
+  /** Which of a cutover's two connections this callback belongs to. */
+  ssoMigration: SsoMigrationCallbackApi;
 }>;
 
 const logger = createLogger("langwatch:better-auth:hooks");
@@ -350,27 +357,58 @@ export const tryBeforeAccountCreate = async ({
  */
 const admitArrival = async ({
   collaborators,
+  repo,
   user,
   email,
   account,
   domain,
 }: {
   collaborators: BetterAuthHookCollaborators;
+  repo: BetterAuthHooksRepository;
   user: { id: string; name: string | null };
   email: string;
-  account: { providerId: string };
+  account: { providerId: string; accountId: string };
   domain: string;
-}): Promise<void> => {
+}): Promise<SsoMigrationAccountLinkDecision> => {
+  const migration = await decideMigrationLink({ collaborators, repo, account, userId: user.id });
+  if (migration.kind === "reject") return migration;
+
+  const connectionId =
+    migration.kind === "not_migrating" ? account.providerId : migration.arrivalConnectionId;
   await collaborators.ssoActivity.record({
-    connectionId: account.providerId,
+    connectionId,
     userId: user.id,
+    providerAccountId: account.accountId,
   });
   await collaborators.arrivals.admit({
     user: { id: user.id, email, name: user.name ?? "" },
-    connectionId: account.providerId,
+    connectionId,
     domain,
   });
+  return migration;
 };
+
+/**
+ * What the cutover makes of this callback. Decided from the connection log,
+ * so the account rows it is weighed against travel from here: auth owns them
+ * and identity decides on them.
+ */
+const decideMigrationLink = async ({
+  collaborators,
+  repo,
+  account,
+  userId,
+}: {
+  collaborators: BetterAuthHookCollaborators;
+  repo: BetterAuthHooksRepository;
+  account: { providerId: string; accountId: string };
+  userId: string;
+}): Promise<SsoMigrationAccountLinkDecision> =>
+  collaborators.ssoMigration.decideAccountLink({
+    userId,
+    account: { providerId: account.providerId, accountId: account.accountId },
+    otherAccounts: await repo.findFederatedAccountsForUser({ userId }),
+  });
 
 /**
  * Called after a new Account row is created. Runs the SSO reconciliation that
@@ -396,7 +434,10 @@ export const afterAccountCreate = async ({
     const domain = extractEmailDomain(email);
     if (!domain) return;
 
-    await admitArrival({ collaborators, user, email, account, domain });
+    const migration = await admitArrival({ collaborators, repo, user, email, account, domain });
+    // A pair's own callback is settled by the decision above: the legacy
+    // `ssoDomain` branch below would reconcile away the other side's account.
+    if (migration.kind !== "not_migrating") return;
 
     const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;
@@ -445,7 +486,8 @@ export const afterAccountUpdate = async ({
     // ASKED ON EVERY SIGN-IN. A returning member creates no account row, so
     // this is the only hook a connection that went live after they first
     // signed in ever gets to admit them through.
-    await admitArrival({ collaborators, user, email, account, domain });
+    const migration = await admitArrival({ collaborators, repo, user, email, account, domain });
+    if (migration.kind !== "not_migrating") return;
     if (!user.pendingSsoSetup) return;
 
     const org = await repo.tryFindOrganizationBySsoDomain({ domain });

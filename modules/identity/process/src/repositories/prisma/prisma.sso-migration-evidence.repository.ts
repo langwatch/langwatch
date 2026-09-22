@@ -34,6 +34,7 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
         connectionId: record.connectionId,
         userId: record.userId,
         authenticatedAt: new Date(record.authenticatedAtMs),
+        providerAccountId: record.providerAccountId,
       },
     });
   }
@@ -55,6 +56,31 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
         providerAccountId: true,
       },
     });
+  }
+
+  async findRecentAuthentications({
+    organizationId,
+    connectionId,
+    limit,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<SsoAuthenticationRecord[]> {
+    const rows = await this.database.ssoAuthenticationActivity.findMany({
+      where: { organizationId, connectionId },
+      orderBy: { authenticatedAt: "desc" },
+      take: limit,
+      select: { userId: true, authenticatedAt: true, providerAccountId: true },
+    });
+
+    return rows.map((row) => ({
+      organizationId,
+      connectionId,
+      userId: row.userId,
+      authenticatedAtMs: row.authenticatedAt.getTime(),
+      providerAccountId: row.providerAccountId,
+    }));
   }
 
   async findLastAuthenticationAtMs({

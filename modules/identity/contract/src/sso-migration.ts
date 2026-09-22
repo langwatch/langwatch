@@ -13,6 +13,30 @@ export interface SsoMigrationConnectionRef {
   providerId: string;
 }
 
+/**
+ * Why a callback arriving mid-cutover may not link. Better Auth's own code
+ * spelling, because that is what the refusal travels to the sign-in screen
+ * as (`?error=`) — these are transport codes, not application codes.
+ */
+export type SsoMigrationLinkRefusalCode =
+  | "SSO_MIGRATION_LINK_UNVERIFIED"
+  | "SSO_MIGRATION_LINK_AMBIGUOUS"
+  | "SSO_MIGRATION_LINK_NOT_ALLOWED"
+  | "SSO_LEGACY_AUTH_RETIRED";
+
+/**
+ * What the cutover makes of one account arriving through a callback: which
+ * connection the arrival belongs to, or the refusal. `not_migrating` is the
+ * answer for the overwhelming majority — no pair, nothing to decide.
+ */
+export type SsoMigrationAccountLinkDecision =
+  | { kind: "not_migrating" }
+  /** A standalone grandfathered connection with canonical domain proof. */
+  | { kind: "allow_connection"; arrivalConnectionId: string }
+  /** The exact connection this callback arrived through, of the pair's two. */
+  | { kind: "allow_replacement_pair"; arrivalConnectionId: string }
+  | { kind: "reject"; code: SsoMigrationLinkRefusalCode };
+
 /** A member who still holds no identifier on the replacement. */
 export interface SsoMigrationStragglerView {
   userId: string;

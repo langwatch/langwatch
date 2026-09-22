@@ -37,6 +37,22 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
       }));
   }
 
+  async findRecentAuthentications({
+    organizationId,
+    connectionId,
+    limit,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<SsoAuthenticationRecord[]> {
+    return this.store.ssoAuthentications
+      .filter((row) => row.organizationId === organizationId && row.connectionId === connectionId)
+      .toSorted((left, right) => right.authenticatedAtMs - left.authenticatedAtMs)
+      .slice(0, limit)
+      .map((row) => ({ ...row }));
+  }
+
   async findLastAuthenticationAtMs({
     organizationId,
     connectionId,

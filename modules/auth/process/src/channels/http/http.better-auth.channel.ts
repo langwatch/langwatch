@@ -4,6 +4,8 @@ export type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/server";
 import { passkey } from "@better-auth/passkey";
+import type { SSOUserResolution, SSOUserResolutionInput } from "@better-auth/sso";
+import { sso } from "@better-auth/sso";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
@@ -14,7 +16,7 @@ import {
   requestPathname,
   type AuthApi,
 } from "@langwatch/auth-contract";
-import type { SignInMethodPolicy } from "@langwatch/identity-contract";
+import type { SignInMethodPolicy, SsoAssertionApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
@@ -489,6 +491,67 @@ function genericOAuthPlugins(
 }
 
 /**
+ * The single sign-on plugin: `/sign-in/sso` and the callbacks a customer's
+ * own identity provider answers. Mounted always, because a connection is
+ * refused per organization by the gate below and never by an absent route.
+ */
+function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
+  return sso({
+    /**
+     * Provider rows are a projection of the managed connection log, so the
+     * plugin's own session-authenticated registration route must never become
+     * a second writer for the same configuration.
+     */
+    providersLimit: 0,
+    /**
+     * The provider's word on whether it verified the address, which is what
+     * lets an organization move without minting a second account for
+     * everybody. Warranted only because `resolveUser` asks the proved domain.
+     */
+    trustEmailVerified: true,
+    /** Somebody with no account who signs in through their employer's
+     *  provider gets one; where they land is the arrival policy's business. */
+    disableImplicitSignUp: false,
+    resolveUser: async (input) => resolveSsoUser({ assertions, input }),
+  });
+}
+
+/**
+ * Whether this verified assertion may become a session at all — asked before
+ * anything links it to a person, because deciding membership first was an
+ * account takeover (ADR-117 §5).
+ */
+export async function resolveSsoUser({
+  assertions,
+  input,
+}: {
+  assertions: SsoAssertionApi;
+  input: SSOUserResolutionInput;
+}): Promise<SSOUserResolution> {
+  try {
+    const decision = await assertions.decide({
+      providerId: input.providerId,
+      accountId: input.accountKey.accountId,
+      email: input.providerUser.email,
+    });
+    if (decision.action === "continue") return { action: "continue" };
+
+    /** RETURNED, NEVER THROWN: the plugin catches and answers
+     *  `SSO_USER_RESOLUTION_FAILED`, destroying a thrown handled error.
+     *  Returned, the code reaches the screen that renders its copy. */
+    return { action: "reject", code: decision.error.code };
+  } catch (error) {
+    /** We log our own failure because nobody else will: the plugin discards
+     *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */
+    logger.error(
+      { error, providerId: input.providerId, email: input.providerUser.email },
+      "deciding whether a single sign-on account may be linked threw; the plugin will answer SSO_USER_RESOLUTION_FAILED and discard this error",
+    );
+    throw error;
+  }
+}
+
+/**
  * Everything the deployment's one Better Auth instance is built from.
  */
 export type BetterAuthTransportOptions = Readonly<{
@@ -508,8 +571,12 @@ export type BetterAuthTransportOptions = Readonly<{
   authzGrants: BetterAuthHookCollaborators["authzGrants"];
   /** The connection's arrival door every federated sign-in is asked of. */
   arrivals: BetterAuthHookCollaborators["arrivals"];
+  /** Whether a customer's identity provider may assert this address at all. */
+  ssoAssertions: SsoAssertionApi;
   /** Where a sign-in through a connection is recorded as having happened. */
   ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
+  /** Which of a cutover's two connections a callback belongs to. */
+  ssoMigration: BetterAuthHookCollaborators["ssoMigration"];
   /**
    * Sends the password-reset link.
    */
@@ -540,6 +607,8 @@ export const createBetterAuthTransport = ({
   shadow,
   signUpVerification,
   ssoActivity,
+  ssoAssertions,
+  ssoMigration,
   storage,
   users,
 }: BetterAuthTransportOptions) => {
@@ -550,7 +619,15 @@ export const createBetterAuthTransport = ({
     federation,
     identity,
     shadow,
-    hooks: { federation, invites, announcements, authzGrants, arrivals, ssoActivity },
+    hooks: {
+      federation,
+      invites,
+      announcements,
+      authzGrants,
+      arrivals,
+      ssoActivity,
+      ssoMigration,
+    },
   });
   return betterAuth({
     ...authOptions,
@@ -569,6 +646,7 @@ export const createBetterAuthTransport = ({
             }),
           ]
         : []),
+      ssoPlugin(ssoAssertions),
     ],
     secondaryStorage,
     rateLimit: {

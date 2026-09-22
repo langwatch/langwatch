@@ -115,6 +115,22 @@ export class MemoryIdentityUsersRepository implements IdentityUsersRepository {
     return this.store.findUserRow(args)?.email ?? null;
   }
 
+  async findAddressStanding(args: { userId: string }): Promise<{
+    email: string | null;
+    emailVerified: boolean;
+    holders: number;
+  } | null> {
+    const row = this.store.findUserRow(args);
+    if (!row) return null;
+    const wanted = (row.email ?? "").toLowerCase();
+    const holders = row.email
+      ? [...this.store.users.values()].filter(
+          (candidate) => (candidate.email ?? "").toLowerCase() === wanted,
+        ).length
+      : 0;
+    return { email: row.email ?? null, emailVerified: row.emailVerified, holders };
+  }
+
   async tryFindUserIdByEmail(args: { normalizedValue: string }): Promise<string | null> {
     const wanted = args.normalizedValue.toLowerCase();
     const row = [...this.store.users.values()].find(

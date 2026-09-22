@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AuthzAccessBinding,
   AuthzApi,
@@ -11,7 +12,6 @@ import {
   type OrganizationGroupMember,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -80,6 +80,10 @@ class MemoryTeams extends TeamRepository {
   fenced: unknown[] = [];
 
   memberOrganizationIds(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
+
+  organizationIdsForMember(): Promise<string[]> {
     throw new Error("not used by this test");
   }
 

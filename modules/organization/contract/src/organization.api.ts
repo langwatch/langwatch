@@ -256,6 +256,9 @@ export interface OrganizationApi {
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
   ): Promise<string[]>;
+  /** Every organization this person belongs to. Asked by a peer deciding
+   *  something about the person rather than about a listed organization. */
+  organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
   tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null>;

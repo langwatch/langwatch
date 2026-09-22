@@ -4,7 +4,12 @@
  * it — the plugin list, the account-linking guard, the password verifier.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
+import type {
+  SsoArrivalApi,
+  SsoAssertionApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
 import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
@@ -38,7 +43,8 @@ export function betterAuthTransportFor(
     auth: {} as never,
     database: {} as never,
     storage: {
-      adapter: () => memoryAdapter({ user: [], session: [], account: [], verification: [] }),
+      adapter: () =>
+        memoryAdapter({ user: [], session: [], account: [], verification: [], ssoProvider: [] }),
     } as never,
     deployment: deployment(overrides),
     federation: {
@@ -70,6 +76,12 @@ export function betterAuthTransportFor(
     authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
+    ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+      decideAccountLink: async () => ({ kind: "not_migrating" }),
+    }),
+    ssoAssertions: createApiFixture<SsoAssertionApi>({
+      decide: async () => ({ action: "continue" }),
+    }),
     sendResetPassword: async () => undefined,
     redis: null,
     secondaryStorage: createSecondaryStorage(null),

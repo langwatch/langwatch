@@ -16,4 +16,14 @@ export abstract class IdentityUsersRepository {
    * Without it, a collision surfaces as a raw `User.email` failure.
    */
   abstract tryFindUserIdByEmail(args: { normalizedValue: string }): Promise<string | null>;
+  /**
+   * The address this person signs in on, whether it is proved, and how many
+   * people hold the same one — the three facts a cutover link is decided on.
+   * Null for a user that is gone.
+   */
+  abstract findAddressStanding(args: { userId: string }): Promise<{
+    email: string | null;
+    emailVerified: boolean;
+    holders: number;
+  } | null>;
 }

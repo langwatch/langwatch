@@ -127,6 +127,8 @@ function harness(options?: {
       // asking who holds an address - but the double is the whole port.
       tryFindEmail: async () => user?.email ?? null,
       tryFindUserIdByEmail: async () => null,
+      findAddressStanding: async () =>
+        user ? { email: user.email ?? null, emailVerified: true, holders: 1 } : null,
     },
     { attachIdentifier, verifyIdentifier, detachIdentifier },
     // The latch's secret carry (ADR-116 §4). Recorded rather than performed:
