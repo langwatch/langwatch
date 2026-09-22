@@ -77,7 +77,10 @@ import type { Hono } from "hono";
 import { register } from "prom-client";
 import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
-import { startLwqlReconvergenceWatch } from "./server/analytics/lwql/provisioning";
+import {
+  type LwqlReconvergenceWatch,
+  startLwqlReconvergenceWatch,
+} from "./server/analytics/lwql/provisioning";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import {
@@ -121,7 +124,7 @@ import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 import {
-  configStoreOwnedLwqlEntityCount,
+  lwqlAccessModelOwner,
   lwqlSelfProvisionInputs,
   selfProvisionAll,
 } from "./tasks/provisionLwql";
@@ -187,22 +190,28 @@ function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
   }
 }
 
+// The active watch handle, so the graceful-shutdown handler can cancel a pending
+// poll. Null until the app server arms it (never armed by the worker process).
+let lwqlReconvergenceWatch: LwqlReconvergenceWatch | null = null;
+
 /**
  * Arms the server-side LangWatchQL reconvergence watch. The deploy task
  * (`provisionLwql`) is short-lived — it returns and exits — so it cannot wait out
  * the helm-upgrade window where the previous ClickHouse pod still serves the
- * config-store access model and the app-owned DDL is skipped (495). This watch
- * polls the config store from the long-running app server and re-provisions once
- * that pod's rendered model is gone. Only the app server arms it (never the
- * standalone worker process), and only when LangWatchQL is configured and
- * provisioning is not explicitly skipped. Its timers are unref'd, so a pending
- * poll never holds shutdown open.
+ * config-store access model and the app-owned DDL is skipped (495). From the
+ * long-running app server this watch polls a stateless ownership probe
+ * (`lwqlAccessModelOwner`) and re-provisions once a probe reports the model is
+ * neither config-store-owned nor present in the SQL store — never on a probe
+ * error alone. Only the app server arms it (never the standalone worker
+ * process), and only when LangWatchQL is configured and provisioning is not
+ * explicitly skipped. Its timers are unref'd, so a pending poll never holds
+ * shutdown open, and the handle above lets shutdown cancel it.
  */
 function armLwqlReconvergenceWatch(): void {
   const lwqlInputs = lwqlSelfProvisionInputs();
   if (!lwqlInputs || process.env.SKIP_LWQL_PROVISION === "true") return;
-  startLwqlReconvergenceWatch({
-    probe: configStoreOwnedLwqlEntityCount,
+  lwqlReconvergenceWatch = startLwqlReconvergenceWatch({
+    probe: lwqlAccessModelOwner,
     converge: () => selfProvisionAll(lwqlInputs),
   });
 }
@@ -549,60 +558,66 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // however long the queue was told it had. The http drain grace comes from
   // the same place for the same reason — see createHttpServerClosePhase.
 
-  installShutdownHandlers((signal) => ({
-    signal,
-    logger,
-    phases: [
-      // Politely tell WS clients to reconnect *before* tearing down the
-      // socket — gives them tRPC's staggered reconnect path instead of a
-      // hard TCP RST and a thundering herd on the next pod.
-      {
-        name: "websockets",
-        run: async () => {
-          wsHandle.broadcastReconnectNotification();
-          await wsHandle.close();
+  installShutdownHandlers((signal) => {
+    // Cancel any pending reconvergence poll before draining workers and tearing
+    // down the App its converge would touch. Its timers are unref'd, so this
+    // only keeps a converge from racing shutdown; it never blocks it.
+    lwqlReconvergenceWatch?.stop();
+    return {
+      signal,
+      logger,
+      phases: [
+        // Politely tell WS clients to reconnect *before* tearing down the
+        // socket — gives them tRPC's staggered reconnect path instead of a
+        // hard TCP RST and a thundering herd on the next pod.
+        {
+          name: "websockets",
+          run: async () => {
+            wsHandle.broadcastReconnectNotification();
+            await wsHandle.close();
+          },
         },
-      },
-      createHttpServerClosePhase({
-        server,
-        closeSessions: () => mcpHandler.closeAllSessions(),
-        logger,
-      }),
-      // Connected agent sockets close after the HTTP drain, with 1012 so the
-      // SDKs reconnect at once to the next pod. A call in flight outlives any
-      // drain budget, so this phase comes after the drain, not inside it.
-      {
-        name: "connected-agents",
-        run: async () => {
-          await connectGateway.close();
-          await closeLongPollTransport();
-          await closeConnectedAgentRuntime();
-          // The shared folders close the same way and for the same reason: a
-          // local command in flight outlives any drain budget.
-          await localControlGateway.close();
-          await closeLocalControlRuntime();
+        createHttpServerClosePhase({
+          server,
+          closeSessions: () => mcpHandler.closeAllSessions(),
+          logger,
+        }),
+        // Connected agent sockets close after the HTTP drain, with 1012 so the
+        // SDKs reconnect at once to the next pod. A call in flight outlives any
+        // drain budget, so this phase comes after the drain, not inside it.
+        {
+          name: "connected-agents",
+          run: async () => {
+            await connectGateway.close();
+            await closeLongPollTransport();
+            await closeConnectedAgentRuntime();
+            // The shared folders close the same way and for the same reason: a
+            // local command in flight outlives any drain budget.
+            await localControlGateway.close();
+            await closeLocalControlRuntime();
+          },
         },
-      },
-      // Drain in-process workers (if any) before closing the shared App below,
-      // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
-      // away.
-      {
-        name: "in-process-workers",
-        run: async () => await workerHandle?.shutdown(),
-      },
-      // Carries the queue drain when this process hosts the worker stack, so
-      // it gets the whole budget rather than the default per-phase ceiling;
-      // App.close bounds it from the inside.
-      {
-        name: "app",
-        // See workers.ts: below the watchdog on purpose, so this bound can
-        // actually fire before the process deadline does.
-        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
-        run: async () => await getApp().close({ terminating: true }),
-      },
-      { name: "posthog", run: async () => await shutdownPostHog() },
-    ],
-  }));
+        // Drain in-process workers (if any) before closing the shared App below,
+        // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
+        // away.
+        {
+          name: "in-process-workers",
+          run: async () => await workerHandle?.shutdown(),
+        },
+        // Carries the queue drain when this process hosts the worker stack, so
+        // it gets the whole budget rather than the default per-phase ceiling;
+        // App.close bounds it from the inside.
+        {
+          name: "app",
+          // See workers.ts: below the watchdog on purpose, so this bound can
+          // actually fire before the process deadline does.
+          timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+          run: async () => await getApp().close({ terminating: true }),
+        },
+        { name: "posthog", run: async () => await shutdownPostHog() },
+      ],
+    };
+  });
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");

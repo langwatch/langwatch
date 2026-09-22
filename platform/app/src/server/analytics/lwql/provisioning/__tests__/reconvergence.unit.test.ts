@@ -1,29 +1,34 @@
 /**
  * The server-side reconvergence watch closes the chart-upgrade window: it polls
- * the ClickHouse config store on a backoff and re-provisions the app-owned
- * LangWatchQL model the moment the old pod's rendered model is gone.
+ * a stateless ownership probe on a backoff and re-provisions the app-owned
+ * LangWatchQL model the moment a probe reports the model is owned by neither the
+ * ClickHouse config store nor the SQL store.
  *
- * Fake timers and injected `probe`/`converge` fakes — no real I/O — cover the
- * four behaviours that matter:
- *  - a first probe of 0 means there was no upgrade window, so it stops silently
- *    without re-provisioning;
- *  - a probe that reports owned entities and later reports 0 re-provisions
- *    exactly once;
+ * The decision is taken from each probe's snapshot alone, never inferred from
+ * history, so fake timers and injected `probe`/`converge` fakes — no real I/O —
+ * cover the behaviours that matter:
+ *  - a first probe of "sql_store" means the app-owned model is already live, so
+ *    it stops without re-provisioning;
+ *  - "config_store" (old pod still rendering the model) followed by "none"
+ *    re-provisions exactly once;
  *  - a probe that throws (ClickHouse mid-roll) is treated as "still waiting" and
- *    retried, and — because the failure marks that ClickHouse was rolling — a
- *    clean 0 that follows re-provisions once (the pod rolled to a new config
- *    store that owns nothing), closing the window even though no probe ever read
- *    ownership directly;
+ *    NEVER re-provisions on the failure alone — a subsequent "sql_store" stops
+ *    it cleanly (the regression guard for a transient error re-provisioning
+ *    against a healthy install);
+ *  - a first probe of "none" (a pod that rolled before the first poll)
+ *    re-provisions once;
  *  - a config store that never releases the model gives up at the budget with a
  *    single warning and never re-provisions.
  *
  * @see ../reconvergence.ts
+ * @see ../../../../../tasks/provisionLwql.ts — lwqlAccessModelOwner
  * @see specs/lwql/api.feature
  */
 
 import { createLogger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { LwqlAccessModelOwner } from "../../../../../tasks/provisionLwql";
 import {
   resetLwqlReconvergenceWatchForTests,
   startLwqlReconvergenceWatch,
@@ -50,10 +55,12 @@ describe("startLwqlReconvergenceWatch", () => {
     vi.restoreAllMocks();
   });
 
-  describe("when the first probe finds the config store owns nothing", () => {
+  describe("when the first probe finds the app-owned model already live", () => {
     /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
-    it("stops without re-provisioning — there was no upgrade window", async () => {
-      const probe = vi.fn<() => Promise<number>>().mockResolvedValue(0);
+    it("stops without re-provisioning — the SQL store owns the model", async () => {
+      const probe = vi
+        .fn<() => Promise<LwqlAccessModelOwner>>()
+        .mockResolvedValue("sql_store");
       const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       startLwqlReconvergenceWatch({
@@ -73,12 +80,14 @@ describe("startLwqlReconvergenceWatch", () => {
 
   describe("when the config store owns the model and later releases it", () => {
     /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
-    it("re-provisions exactly once when a probe returns zero", async () => {
-      // Owns 3 entities on the first poll, released by the second.
+    it("re-provisions exactly once when a probe returns none", async () => {
+      // The old pod still renders the model on the first two polls, gone by the
+      // third.
       const probe = vi
-        .fn<() => Promise<number>>()
-        .mockResolvedValueOnce(3)
-        .mockResolvedValue(0);
+        .fn<() => Promise<LwqlAccessModelOwner>>()
+        .mockResolvedValueOnce("config_store")
+        .mockResolvedValueOnce("config_store")
+        .mockResolvedValue("none");
       const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       startLwqlReconvergenceWatch({
@@ -90,11 +99,15 @@ describe("startLwqlReconvergenceWatch", () => {
       });
 
       await vi.advanceTimersByTimeAsync(1_000);
-      expect(probe).toHaveBeenCalledTimes(1); // still owned → keep polling
+      expect(probe).toHaveBeenCalledTimes(1); // still config-owned → keep polling
       expect(converge).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(2_000);
-      expect(probe).toHaveBeenCalledTimes(2); // released → converge, stop
+      expect(probe).toHaveBeenCalledTimes(2); // still config-owned
+      expect(converge).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(probe).toHaveBeenCalledTimes(3); // released → converge, stop
       expect(converge).toHaveBeenCalledTimes(1);
 
       // The watch stopped: further time re-provisions nothing.
@@ -107,14 +120,14 @@ describe("startLwqlReconvergenceWatch", () => {
 
   describe("when a probe throws because ClickHouse is mid-roll", () => {
     /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
-    it("re-provisions once when a clean zero follows a probe failure", async () => {
-      // First poll fails (old pod rolling); the retry reads the new pod's config
-      // store, which owns nothing. The failure marks the window, so the clean 0
-      // is "the pod rolled" — not "no window" — and the app re-provisions once.
+    it("never re-provisions on the failure alone, then stops on sql_store", async () => {
+      // The regression guard: a transient probe error must not trigger a
+      // re-provision against a healthy install. The first poll throws; the retry
+      // reads a live app-owned model, so the watch stops without converging.
       const probe = vi
-        .fn<() => Promise<number>>()
+        .fn<() => Promise<LwqlAccessModelOwner>>()
         .mockRejectedValueOnce(new Error("connect ECONNREFUSED"))
-        .mockResolvedValue(0);
+        .mockResolvedValue("sql_store");
       const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       startLwqlReconvergenceWatch({
@@ -131,11 +144,35 @@ describe("startLwqlReconvergenceWatch", () => {
 
       await vi.advanceTimersByTimeAsync(2_000);
       expect(probe).toHaveBeenCalledTimes(2);
-      // The earlier failure means ClickHouse was rolling: the first clean read
-      // of 0 closes the window and re-provisions exactly once.
+      // The snapshot says the SQL store owns the model: nothing to reconverge,
+      // and the earlier failure never fabricated a re-provision.
+      expect(converge).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe("when the first probe finds neither store owns the model", () => {
+    /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
+    it("re-provisions once — the pod rolled before the first probe", async () => {
+      // A pod that rolled to an empty config store before the watch's first poll
+      // still reads correctly from the snapshot: "none" → provision once.
+      const probe = vi
+        .fn<() => Promise<LwqlAccessModelOwner>>()
+        .mockResolvedValue("none");
+      const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
+
+      startLwqlReconvergenceWatch({
+        probe,
+        converge,
+        initialDelayMs: 1_000,
+        maxDelayMs: 8_000,
+        budgetMs: 600_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(probe).toHaveBeenCalledTimes(1);
       expect(converge).toHaveBeenCalledTimes(1);
 
-      // The watch stopped: further time re-provisions nothing.
       await vi.advanceTimersByTimeAsync(60_000);
       expect(converge).toHaveBeenCalledTimes(1);
       expect(vi.getTimerCount()).toBe(0);
@@ -146,7 +183,9 @@ describe("startLwqlReconvergenceWatch", () => {
   describe("when the config store never releases the model", () => {
     /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
     it("gives up at the budget with one warning and never re-provisions", async () => {
-      const probe = vi.fn<() => Promise<number>>().mockResolvedValue(5);
+      const probe = vi
+        .fn<() => Promise<LwqlAccessModelOwner>>()
+        .mockResolvedValue("config_store");
       const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       startLwqlReconvergenceWatch({

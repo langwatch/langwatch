@@ -5,15 +5,21 @@
  * serves `users.d/lwql.yaml`, so the deploy task (`provisionLwql`) skips the
  * access-model DDL as config-store-owned (495). That task is a short-lived
  * process — it returns and exits, so it cannot wait the window out. Instead the
- * long-running app server arms this watch once it is listening: it polls the
- * ClickHouse config store, and the moment the old pod's rendered model is gone
- * (the config store owns zero LangWatchQL entities) it re-provisions the
- * app-owned model exactly once.
+ * long-running app server arms this watch once it is listening.
+ *
+ * The watch polls a *stateless* ownership probe on an exponential backoff: at
+ * every tick the probe reports which store owns the model right now —
+ * `"config_store"` (old pod still rendering it), `"sql_store"` (the app-owned
+ * model is live), or `"none"`. The decision is taken from that snapshot alone,
+ * never inferred from probe history, so a transient probe error can never
+ * fabricate a re-provision against a healthy install, and a pod that rolled
+ * before the first probe still reads correctly. Only a probe that authoritatively
+ * reports `"none"` re-provisions, and it does so exactly once.
  *
  * Both the probe and the converge are injected — `provisionLwql` exports the
- * real implementations (`configStoreOwnedLwqlEntityCount` and
- * `selfProvisionAll`) so the env/name derivation is not duplicated, and this
- * module stays free of the database graph and unit-testable with fakes.
+ * real implementations (`lwqlAccessModelOwner` and `selfProvisionAll`) so the
+ * env/name derivation is not duplicated, and this module stays free of the
+ * database graph and unit-testable with fakes.
  *
  * @see ../../../../tasks/provisionLwql.ts
  * @see ./clickhouseStatementRunner.ts — inventoryConfigStoreLwqlEntities
@@ -22,9 +28,11 @@
 
 import { createLogger } from "@langwatch/observability";
 
+import type { LwqlAccessModelOwner } from "../../../../tasks/provisionLwql";
+
 const logger = createLogger("langwatch:analytics:lwql:reconvergence");
 
-const DEFAULT_INITIAL_DELAY_MS = 30_000;
+const DEFAULT_INITIAL_DELAY_MS = 5_000;
 const DEFAULT_MAX_DELAY_MS = 5 * 60_000;
 const DEFAULT_BUDGET_MS = 30 * 60_000;
 
@@ -49,32 +57,27 @@ export function resetLwqlReconvergenceWatchForTests(): void {
 }
 
 /**
- * Polls the ClickHouse config store on an exponential backoff and re-provisions
- * the app-owned model once the store releases it. State lives on the instance so
- * each step (`arm`/`tick`/the release handler) stays small; the exported factory
- * below owns the once-per-process guard.
+ * Polls the stateless ownership probe on an exponential backoff and
+ * re-provisions the app-owned model the moment a probe reports `"none"`. State
+ * lives on the instance so each step (`arm`/`tick`/the handlers) stays small;
+ * the exported factory below owns the once-per-process guard.
  */
 class ReconvergenceWatcher {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private elapsedMs = 0;
   private delayMs: number;
-  // Whether any probe has yet seen the config store own the model. Distinguishes
-  // "first probe found nothing, no window" from "the window has now closed".
-  private sawOwnership = false;
-  // Whether any probe has failed. A failure means ClickHouse was mid-roll — the
-  // exact window this watch closes — so a clean 0 that follows a failure is "the
-  // pod rolled and the new one owns nothing", not "no window", even if no probe
-  // ever read ownership directly.
-  private sawFailure = false;
+  // Log-dedupe only: emit the "config store still owns it" info line once, not
+  // on every poll while we wait the window out. Never used for a decision.
+  private announced = false;
   private stopped = false;
 
-  private readonly probe: () => Promise<number>;
+  private readonly probe: () => Promise<LwqlAccessModelOwner>;
   private readonly converge: () => Promise<void>;
   private readonly maxDelayMs: number;
   private readonly budgetMs: number;
 
   constructor(options: {
-    probe: () => Promise<number>;
+    probe: () => Promise<LwqlAccessModelOwner>;
     converge: () => Promise<void>;
     initialDelayMs: number;
     maxDelayMs: number;
@@ -121,11 +124,12 @@ class ReconvergenceWatcher {
     this.elapsedMs += this.delayMs;
     this.delayMs = Math.min(this.delayMs * 2, this.maxDelayMs);
 
-    let owned: number;
+    let owner: LwqlAccessModelOwner;
     try {
-      owned = await this.probe();
+      owner = await this.probe();
     } catch (error) {
-      this.sawFailure = true;
+      // A probe failure is never a decision: the ownership snapshot is unknown,
+      // so keep polling. It never re-provisions on its own.
       logger.debug(
         { error },
         "lwql reconvergence probe failed — the ClickHouse config store is unreadable (pod rolling?), still waiting",
@@ -134,50 +138,41 @@ class ReconvergenceWatcher {
       return;
     }
 
-    if (owned > 0) {
-      this.announceOwnership(owned);
-      this.arm();
-      return;
-    }
-
-    await this.handleReleased();
-  }
-
-  private announceOwnership(owned: number): void {
-    if (this.sawOwnership) return;
-    this.sawOwnership = true;
-    logger.info(
-      { owned },
-      `ClickHouse config store still owns ${owned} LangWatchQL entit${
-        owned === 1 ? "y" : "ies"
-      }, the app will re-provision once it releases them`,
-    );
-  }
-
-  private async handleReleased(): Promise<void> {
-    if (!this.sawOwnership && !this.sawFailure) {
-      // First successful probe found nothing owned and no probe had failed:
-      // there was no upgrade window. Debug only — the steady-state boot path.
+    if (owner === "sql_store") {
+      // The app-owned model is already live — nothing to reconverge.
       logger.debug(
-        "lwql reconvergence watch: the ClickHouse config store owns no LangWatchQL entities, nothing to reconverge",
+        "lwql reconvergence watch: the app-owned LangWatchQL model is present in the ClickHouse SQL store, nothing to reconverge",
       );
       this.stop();
       return;
     }
 
-    // The window has closed — re-provision the app-owned model once. This is
-    // either the config store releasing a model it owned, or a clean read after
-    // a probe failure (ClickHouse rolled while we polled, and the new pod owns
-    // nothing): both mean the app should now own the model. converge() is
-    // fail-closed on its own errors and never throws; the catch is defensive.
-    const afterProbeFailure = !this.sawOwnership;
+    if (owner === "config_store") {
+      this.announceOwnership();
+      this.arm();
+      return;
+    }
+
+    await this.reprovision();
+  }
+
+  private announceOwnership(): void {
+    if (this.announced) return;
+    this.announced = true;
+    logger.info(
+      "the ClickHouse config store still owns the LangWatchQL access model, the app will re-provision once it releases it",
+    );
+  }
+
+  private async reprovision(): Promise<void> {
+    // The probe authoritatively reports neither store owns the model — the
+    // upgrade window has closed (or the pod rolled before the first probe).
+    // Re-provision the app-owned model once. converge() is fail-closed on its
+    // own errors and never throws; the catch is defensive.
     try {
       await this.converge();
       logger.info(
-        { afterProbeFailure },
-        afterProbeFailure
-          ? "lwql reconvergence: the ClickHouse config store is now readable and owns no LangWatchQL entities (the pod finished rolling) — re-provisioned the app-owned model"
-          : "lwql reconvergence: the ClickHouse config store released the LangWatchQL access model — re-provisioned the app-owned model",
+        "lwql reconvergence: the ClickHouse config store no longer owns the LangWatchQL access model and the app-owned model is absent — re-provisioned it",
       );
     } catch (error) {
       logger.error(
@@ -190,23 +185,27 @@ class ReconvergenceWatcher {
 }
 
 /**
- * Polls the ClickHouse config store on an exponential backoff and re-provisions
- * the app-owned LangWatchQL model once the config store releases it.
+ * Polls the stateless LangWatchQL ownership probe on an exponential backoff and
+ * re-provisions the app-owned model once a probe reports the model is neither
+ * config-store-owned nor present in the SQL store.
  *
- * - `probe()` returns the count of LangWatchQL entities the config store
- *   currently owns. A probe that throws (e.g. the ClickHouse pod is mid-roll) is
- *   logged at debug and treated as "still waiting".
- * - If the very first successful probe returns 0 and no probe has failed, there
- *   was no upgrade window: the watch logs nothing beyond debug and stops.
- * - While the count is > 0, the watch logs once at info and keeps polling.
- * - When a probe returns 0 after any probe has reported ownership OR failed
- *   (ClickHouse was mid-roll), it calls `converge()` once (idempotent, under its
- *   own advisory lock), logs at info, and stops.
+ * - `probe()` returns which store owns the model *right now*. A probe that
+ *   throws (e.g. the ClickHouse pod is mid-roll) is logged at debug and treated
+ *   as "still waiting" — a failure alone never re-provisions.
+ * - `"sql_store"`: the app-owned model is already live; log at debug and stop.
+ * - `"config_store"`: the old pod still owns it; log once at info and keep
+ *   polling.
+ * - `"none"`: neither store owns it (window closed, or a pod rolled before the
+ *   first probe); call `converge()` once (idempotent, under its own advisory
+ *   lock), log at info, and stop.
  * - It gives up at `budgetMs` with a single warn.
  *
- * Every timer is `unref`'d, so a pending poll never holds the process open, and
- * {@link LwqlReconvergenceWatch.stop} clears any pending timer for graceful
- * shutdown. Armed at most once per process (see {@link watchArmed}).
+ * The first poll fires after `initialDelayMs` (default 5s) so a pod that rolled
+ * before the server began listening is caught within seconds; the backoff then
+ * doubles to `maxDelayMs`. Every timer is `unref`'d, so a pending poll never
+ * holds the process open, and {@link LwqlReconvergenceWatch.stop} clears any
+ * pending timer for graceful shutdown. Armed at most once per process (see
+ * {@link watchArmed}).
  */
 export function startLwqlReconvergenceWatch({
   probe,
@@ -215,7 +214,7 @@ export function startLwqlReconvergenceWatch({
   maxDelayMs = DEFAULT_MAX_DELAY_MS,
   budgetMs = DEFAULT_BUDGET_MS,
 }: {
-  probe: () => Promise<number>;
+  probe: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
   initialDelayMs?: number;
   maxDelayMs?: number;

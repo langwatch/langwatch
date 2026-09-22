@@ -20,7 +20,7 @@
  * access model. This deploy task is a short-lived process, so it cannot wait out
  * that window itself; instead the long-running app server watches the config
  * store and re-provisions once the old pod's rendered model is gone, using this
- * task's exported {@link configStoreOwnedLwqlEntityCount} probe and
+ * task's exported {@link lwqlAccessModelOwner} probe and
  * {@link selfProvisionAll} converge (see `startLwqlReconvergenceWatch`).
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
@@ -376,7 +376,7 @@ export async function selfProvisionAll({
  * The provisioning inputs derived from the environment, or `null` when
  * LangWatchQL is not configured on this deployment. Shared by {@link execute},
  * the {@link selfProvisionAll} converge, and the
- * {@link configStoreOwnedLwqlEntityCount} probe so the env/name derivation lives
+ * {@link lwqlAccessModelOwner} probe so the env/name derivation lives
  * in exactly one place.
  */
 export function lwqlSelfProvisionInputs(): {
@@ -391,20 +391,29 @@ export function lwqlSelfProvisionInputs(): {
   };
 }
 
+/** Which store currently owns the LangWatchQL access model, if any. */
+export type LwqlAccessModelOwner = "config_store" | "sql_store" | "none";
+
 /**
- * The count of LangWatchQL entities the ClickHouse config store currently owns
- * (its read-only users.xml / config.xml identities), for the server-side
- * reconvergence watch to poll. Zero when LangWatchQL is not configured.
+ * Which store owns the LangWatchQL access model right now, proven fresh at call
+ * time, for the server-side reconvergence watch to poll:
  *
- * Unlike {@link inventoryConfigStoreLwqlEntities}, which swallows read errors
- * and returns `[]`, this probe first proves connectivity with a trivial query so
- * a ClickHouse that is unreachable (say, its pod mid-roll) *throws* rather than
- * reporting a spurious zero — the watch treats a throw as "still waiting", and a
- * genuine zero as "the config store has released the model".
+ * - `"config_store"` — the read-only users.xml identities are still rendered
+ *   (the previous ClickHouse pod, mid-upgrade). The app must keep waiting.
+ * - `"sql_store"` — the app-owned SQL-store user is present: the model is live,
+ *   nothing to do.
+ * - `"none"` — neither is present, so the app must (re-)provision.
+ *
+ * A stateless snapshot rather than an inference over probe history: a transient
+ * error can never fabricate a "none" (it throws instead), and a pod that rolled
+ * before the first probe still reads correctly. {@link inventoryConfigStoreLwqlEntities}
+ * swallows read errors and returns `[]`, so this probe first proves connectivity
+ * with a trivial query — an unreachable ClickHouse *throws* (the watch keeps
+ * polling) instead of reporting a spurious "none".
  */
-export async function configStoreOwnedLwqlEntityCount(): Promise<number> {
+export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
   const inputs = lwqlSelfProvisionInputs();
-  if (!inputs) return 0;
+  if (!inputs) return "none";
   const { selfProvision, names } = inputs;
   const secrets = [
     selfProvision.connection.password,
@@ -414,16 +423,28 @@ export async function configStoreOwnedLwqlEntityCount(): Promise<number> {
   ];
   return withAdminClickHouseClient(async (client) => {
     // Connectivity check: throws on an unreachable server, so the caller can
-    // distinguish "cannot read yet" from "read zero".
+    // distinguish "cannot read yet" from an authoritative ownership answer.
     await (
       await client.query({ query: "SELECT 1", format: "JSONEachRow" })
     ).text();
-    const entities = await inventoryConfigStoreLwqlEntities({
+
+    const configStoreEntities = await inventoryConfigStoreLwqlEntities({
       client,
       names,
       secrets,
     });
-    return entities.length;
+    if (configStoreEntities.length > 0) return "config_store";
+
+    // The config store owns nothing; is the app-owned SQL-store user present?
+    const result = await client.query({
+      query:
+        "SELECT count() AS n FROM system.users " +
+        "WHERE name = {user:String} AND storage = 'local_directory'",
+      query_params: { user: names.restrictedUser },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{ n: number | string }>;
+    return Number(rows[0]?.n ?? 0) > 0 ? "sql_store" : "none";
   });
 }
 
