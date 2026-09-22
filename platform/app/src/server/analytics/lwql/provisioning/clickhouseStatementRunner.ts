@@ -122,8 +122,8 @@ const STATEMENT_TARGET_PATTERNS: ReadonlyArray<{
  */
 function statementTarget(statement: string): ConfigStoreLwqlEntity | null {
   for (const { kind, pattern } of STATEMENT_TARGET_PATTERNS) {
-    const match = pattern.exec(statement);
-    if (match) return { kind, name: match[1] };
+    const name = pattern.exec(statement)?.[1];
+    if (name !== undefined) return { kind, name };
   }
   return null;
 }
@@ -291,7 +291,7 @@ function toleratedConfigStoreSkipCode({
       (entity) => entity.kind === target.kind && entity.name === target.name,
     )
   ) {
-    return code;
+    return CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
   }
   logger.error(
     { error: redactSecrets(errorMessage(error), secrets), statement: position },
