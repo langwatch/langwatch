@@ -94,7 +94,7 @@ it("does X when Y given Z", () => {
 
 ## Stories, acceptance criteria, and feature files
 
-Issues are authored as Scrum stories with acceptance criteria in Given/When/Then form and a separate Definition of Done checklist. When an issue is picked up, the story becomes the `Feature:` title and narrative in the feature file, and each acceptance criterion becomes one `Scenario:` in `specs/**/*.feature`. Tests bind scenarios via `// @scenario` JSDoc annotation directly above `it()`. Enforcement is automatic: unbound tagged scenarios fail CI via `check-feature-parity`. See `specs/README.md`.
+Issues are authored as Scrum stories (As a / I want / so that) with acceptance criteria (Given/When/Then) and a separate Definition of Done. When picked up, the story becomes the Feature narrative and each AC becomes one Scenario in `specs/**/*.feature`, bound to tests via `/** @scenario` JSDoc. See `specs/README.md` for complete binding details.
 
 ## Coverage is Mandatory
 
