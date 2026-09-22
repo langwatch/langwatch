@@ -33,6 +33,8 @@ describe("auth server configuration", () => {
             mfaEnrollmentOpen: false,
             passkeysEnabled: false,
             passkeyHandleSecret: undefined,
+            trustedIdpOrigins: undefined,
+            idpSimulatorUrl: undefined,
           },
           "secret",
         ),

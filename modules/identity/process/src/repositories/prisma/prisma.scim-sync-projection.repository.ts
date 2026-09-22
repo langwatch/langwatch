@@ -111,6 +111,20 @@ export class PrismaScimSyncProjectionRepository
     return row ? PrismaScimSyncProjectionRepository.rowToScimSync(row) : null;
   }
 
+  /** Organization-scoped, so a peer's page can never contain a sync that is
+   *  not the caller's, whatever it asks for. */
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ScimSyncState[]> {
+    const rows = await this.prisma.scimSyncState.findMany({
+      where: { organizationId },
+      orderBy: { updatedAt: "desc" },
+    });
+    return rows.map((row) => PrismaScimSyncProjectionRepository.rowToScimSync(row));
+  }
+
   /**
    * One stored row back into the reducer's state. Exported because the failure
    * surface and the guards' read need the same translation, and two copies of

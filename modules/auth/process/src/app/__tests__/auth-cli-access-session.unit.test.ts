@@ -32,6 +32,8 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       mfaEnrollmentOpen: false,
       passkeysEnabled: false,
       passkeyHandleSecret: undefined,
+      trustedIdpOrigins: undefined,
+      idpSimulatorUrl: undefined,
     },
     repositories,
     dependencies: {
@@ -56,6 +58,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       authProvider: void 0,
       federatedProvider: void 0,
       isSaas: false,
+      nodeEnvironment: undefined,
       processName: "langwatch-api",
     },
     resources: new ResourceScope(),

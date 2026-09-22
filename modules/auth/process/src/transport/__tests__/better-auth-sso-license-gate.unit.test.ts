@@ -81,6 +81,9 @@ const deployment: BetterAuthDeploymentConfiguration = {
   passkeyHandleSecret: "test-passkey-secret",
   socialProviders: {},
   genericOAuthConfigs: [],
+  trustedIdpOrigins: undefined,
+  idpSimulatorUrl: undefined,
+  isProduction: false,
 };
 
 function buildHook(federation: StubFederation) {
@@ -92,6 +95,7 @@ function buildHook(federation: StubFederation) {
     identity: new StubIdentity(),
     shadow: new StubShadow(),
     hooks: {} as never,
+    ssoIssuers: { issuersForRequest: async () => [] },
   });
   const before = authOptions.hooks?.before;
   if (!before) throw new Error("createAuthOptions did not wire a `before` hook");

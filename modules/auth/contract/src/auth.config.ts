@@ -16,6 +16,17 @@ export const authServerConfig = Config.define((c) => ({
   passkeysEnabled: c.env("PASSKEYS_ENABLED", onSwitch),
   /** Absent falls back to the session secret; a passkey handle must stay stable. */
   passkeyHandleSecret: c.env("PASSKEY_HANDLE_SECRET", z.string().optional()),
+  /**
+   * Identity providers this operator trusts outright, beyond the ones their
+   * customers registered: commas or spaces, and the way on for a provider
+   * inside a private network. Honoured in production too.
+   */
+  trustedIdpOrigins: c.env("SSO_TRUSTED_IDP_ORIGINS", z.string().optional()),
+  /**
+   * The identity-provider simulator a development worktree runs, trusted
+   * outside production ONLY — it signs whatever it is asked to sign.
+   */
+  idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
 }));
 
 export type AuthServerConfig = ConfigOf<typeof authServerConfig>;

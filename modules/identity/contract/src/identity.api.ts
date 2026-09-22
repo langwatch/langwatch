@@ -65,7 +65,7 @@ import type {
   RecordScimUserPushCommandData,
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
-import type { ScimSyncFactInput } from "./scim-sync.ts";
+import type { ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
 import type { SsoArrivingUser, SsoAssertionDecision } from "./sso-admission.ts";
 import type {
   OrganizationSsoConnection,
@@ -246,6 +246,33 @@ export interface SsoConnectionReadsApi {
 export interface SsoConnectionProviderReading {
   connectionId: string;
   providerId: string;
+}
+
+/**
+ * Where each of an organization's directory syncs stands. Identity owns the
+ * folded state; the directory module composes its reconciliation view from
+ * this plus the people it pushed itself.
+ */
+export interface ScimSyncReadsApi {
+  findForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
+  /** One connection's sync, or null where that connection has never synced.
+   *  Scoped to the organization, so a caller cannot read another's. */
+  findByConnection(args: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<ScimSyncState | null>;
+}
+
+/**
+ * The issuers registered connections speak to, keyed the two ways a sign-in
+ * request can name one. Registering an issuer IS the declaration that this
+ * installation may talk to that address (ADR-117 §5).
+ */
+export interface SsoIssuerDirectoryApi {
+  findIssuersForConnection(args: { connectionId: string }): Promise<string[]>;
+  /** The issuer of the connection that proved this domain. Empty where the
+   *  domain is unproved, or its connection is not one anybody may dial. */
+  findIssuersForDomain(args: { domain: string }): Promise<string[]>;
 }
 
 /**
@@ -577,6 +604,7 @@ export interface IdentityApi {
   ssoBackoffice(): SsoConnectionBackofficeApi;
   ssoConnectionHistory(): SsoConnectionHistoryApi;
   ssoConnectionReads(): SsoConnectionReadsApi;
+  ssoIssuers(): SsoIssuerDirectoryApi;
   ssoDomainCeremony(): SsoDomainCeremonyApi;
   ssoDomainReproof(): SsoDomainReproofApi;
   ssoAssertion(): SsoAssertionApi;
@@ -587,6 +615,7 @@ export interface IdentityApi {
   ssoSetup(): SsoSetupApi;
   ssoSetupCommands(): SsoSetupCommandsApi;
   scimSyncGuards(): ScimSyncGuardsApi;
+  scimSyncReads(): ScimSyncReadsApi;
 }
 
 export const IdentityApi = moduleApi<IdentityApi>()("identity");

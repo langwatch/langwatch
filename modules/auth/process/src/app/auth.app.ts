@@ -135,6 +135,9 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     /** Whether this is the hosted product: the process's own fact, supplied
      * as a member. The flag itself has a ruling of its own pending. */
     isSaas: boolean;
+    /** The deployment's environment name — the process's own fact (`NODE_ENV`
+     * has one owner). Read for what is trusted outside production only. */
+    nodeEnvironment: string | undefined;
     /** Names this process in every refusal below. */
     processName: string;
     /** Process time, injected so session expiry has deterministic tests. */
@@ -165,7 +168,12 @@ export class AuthApp implements AuthApiContract {
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
    * process's own fact. A process that cannot supply one refuses at boot. */
-  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl", "isSaas"] as const;
+  static readonly reads = [
+    ...AUTH_CLOSED_READS,
+    "publicBaseUrl",
+    "isSaas",
+    "nodeEnvironment",
+  ] as const;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: Secret.load("NEXTAUTH_SECRET", { optional: true }),
@@ -265,6 +273,9 @@ export class AuthApp implements AuthApiContract {
           identityApi: dependencies.identity,
           authProvider: members.federatedProvider,
           isSaas: members.isSaas,
+          trustedIdpOrigins: config.trustedIdpOrigins,
+          idpSimulatorUrl: config.idpSimulatorUrl,
+          isProduction: members.nodeEnvironment === "production",
           logger: members.logger,
         });
       } else {

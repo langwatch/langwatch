@@ -27,6 +27,8 @@ import type {
   AuthzRevokeBindingsInput,
   AuthzRevokeBindingsOutput,
   AuthzRevokeBindingsWhereInput,
+  AuthzDirectoryCausedChangesInput,
+  AuthzDirectoryCausedChangesOutput,
   AuthzRetireDirectoryGrantsInput,
   AuthzRetireDirectoryGrantsOutput,
   AuthzRevokeBindingsWhereOutput,
@@ -80,6 +82,10 @@ export abstract class AuthzGrantsService {
   abstract retireDirectoryGrants(
     args: AuthzRetireDirectoryGrantsInput,
   ): Promise<AuthzRetireDirectoryGrantsOutput>;
+
+  abstract findDirectoryCausedChanges(
+    args: AuthzDirectoryCausedChangesInput,
+  ): Promise<AuthzDirectoryCausedChangesOutput>;
 
   abstract offboardMember(args: AuthzOffboardMemberInput): Promise<AuthzOffboardMemberOutput>;
 

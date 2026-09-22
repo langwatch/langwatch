@@ -72,6 +72,7 @@ function makeRepository(overrides: Partial<RepositoryStub> = {}): RepositoryStub
       return OFFBOARD_COUNTS;
     }),
     findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue([]),
+    findDirectoryCausedChanges: vi.fn().mockResolvedValue([]),
     findOwnedApiKeys: vi.fn().mockResolvedValue([]),
     findPersonalTeams: vi.fn().mockResolvedValue([]),
     ...overrides,

@@ -29,6 +29,14 @@ class MemorySyncs implements ScimSyncReadRepository {
     this.held.set(sync.scimSyncId, sync);
   }
 
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ScimSyncState[]> {
+    return [...this.held.values()].filter((sync) => sync.organizationId === organizationId);
+  }
+
   async tryFindSync({
     scimSyncId,
     organizationId,

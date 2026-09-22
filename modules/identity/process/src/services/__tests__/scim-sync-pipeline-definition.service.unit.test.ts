@@ -18,7 +18,9 @@ const SYNC = scimSyncIdFor({ connectionId: CONNECTION });
 const T0 = 1_690_000_000_000;
 
 function guardsOver(state: ScimSyncState | null) {
-  return ScimSyncGuardsService.create({ syncs: { tryFindSync: async () => state } });
+  return ScimSyncGuardsService.create({
+    syncs: { tryFindSync: async () => state, findForOrganization: async () => [] },
+  });
 }
 
 const syncing: ScimSyncState = {

@@ -27,6 +27,7 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -78,6 +79,14 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   passkeysEnabled: boolean;
   /** Salts the provisional handle a passkey sign-up ceremony is minted with. */
   passkeyHandleSecret: string;
+  /** `SSO_TRUSTED_IDP_ORIGINS`: an operator's own allowlist of identity
+   *  providers, honoured everywhere. See {@link resolveTrustedOrigins}. */
+  trustedIdpOrigins?: string | undefined;
+  /** `LANGWATCH_IDPSIM_URL`: the simulator a worktree runs, trusted outside
+   *  production only. */
+  idpSimulatorUrl?: string | undefined;
+  /** Whether this is a production deployment — the process's own fact. */
+  isProduction: boolean;
   /** Social providers this deployment mounted, already built. */
   socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
   /** Generic-OIDC connections this deployment mounted, already built. */
@@ -187,6 +196,7 @@ export const createAuthOptions = ({
   identity,
   shadow,
   hooks,
+  ssoIssuers,
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
@@ -195,6 +205,7 @@ export const createAuthOptions = ({
   identity: BetterAuthIdentityCeremonies;
   shadow: SignInRouterShadow;
   hooks: BetterAuthHookCollaborators;
+  ssoIssuers: BetterAuthSsoIssuers;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
   // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
@@ -203,16 +214,20 @@ export const createAuthOptions = ({
   emailAndPassword: NonNullable<BetterAuthOptions["emailAndPassword"]>;
 } => ({
   baseURL: deployment.baseUrl,
-  trustedOrigins: [
-    deployment.baseUrl,
-    // Behind a reverse proxy (preview deploys, tunneling services), the
-    // public base URL is the external one while the base URL may be the
-    // internal one. Accept both so sign-in/sign-up don't fail with
-    // "Invalid origin".
-    ...(deployment.publicBaseUrl && deployment.publicBaseUrl !== deployment.baseUrl
-      ? [deployment.publicBaseUrl]
-      : []),
-  ],
+  /**
+   * Our own address, plus the providers our customers registered. A FUNCTION
+   * because the answer is not fixed at boot, and only single sign-on requests
+   * pay for the read. See `rules/trusted-origins.rules.ts`.
+   */
+  trustedOrigins: async (request) =>
+    resolveTrustedOrigins({
+      baseUrl: deployment.baseUrl,
+      publicBaseUrl: deployment.publicBaseUrl,
+      trustedIdpOrigins: deployment.trustedIdpOrigins,
+      idpSimulatorUrl: deployment.idpSimulatorUrl,
+      registeredIssuers: await ssoIssuers.issuersForRequest(request),
+      isProduction: deployment.isProduction,
+    }),
   secret: deployment.secret,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
@@ -554,6 +569,14 @@ export async function resolveSsoUser({
 }
 
 /**
+ * The issuers ONE request may reach. Asked per request rather than resolved
+ * at boot: a connection registered a minute ago has to be dialable now.
+ */
+export interface BetterAuthSsoIssuers {
+  issuersForRequest(request: Request | undefined): Promise<string[]>;
+}
+
+/**
  * Everything the deployment's one Better Auth instance is built from.
  */
 export type BetterAuthTransportOptions = Readonly<{
@@ -575,6 +598,8 @@ export type BetterAuthTransportOptions = Readonly<{
   arrivals: BetterAuthHookCollaborators["arrivals"];
   /** Whether a customer's identity provider may assert this address at all. */
   ssoAssertions: SsoAssertionApi;
+  /** Whose registered issuers this request is allowed to reach. */
+  ssoIssuers: BetterAuthSsoIssuers;
   /** Where a sign-in through a connection is recorded as having happened. */
   ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
   /** Which of a cutover's two connections a callback belongs to. */
@@ -610,6 +635,7 @@ export const createBetterAuthTransport = ({
   signUpVerification,
   ssoActivity,
   ssoAssertions,
+  ssoIssuers,
   ssoMigration,
   storage,
   users,
@@ -621,6 +647,7 @@ export const createBetterAuthTransport = ({
     federation,
     identity,
     shadow,
+    ssoIssuers,
     hooks: {
       federation,
       invites,

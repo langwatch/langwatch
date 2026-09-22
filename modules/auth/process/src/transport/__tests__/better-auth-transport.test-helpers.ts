@@ -30,6 +30,9 @@ export function deployment(
     passkeyHandleSecret: "test-passkey-secret",
     socialProviders: {},
     genericOAuthConfigs: [],
+    trustedIdpOrigins: undefined,
+    idpSimulatorUrl: undefined,
+    isProduction: false,
     ...overrides,
   };
 }
@@ -82,6 +85,8 @@ export function betterAuthTransportFor(
     ssoAssertions: createApiFixture<SsoAssertionApi>({
       decide: async () => ({ action: "continue" }),
     }),
+    /** Nothing registered: a test that needs an origin trusted says so. */
+    ssoIssuers: { issuersForRequest: async () => [] },
     sendResetPassword: async () => undefined,
     redis: null,
     secondaryStorage: createSecondaryStorage(null),

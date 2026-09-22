@@ -108,6 +108,10 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     return 0;
   }
 
+  async findDirectoryCausedChanges(): Promise<[]> {
+    return [];
+  }
+
   async revokeBindingsWhere(
     args: AuthzRevokeBindingsWhereInput,
   ): Promise<AuthzRevokeBindingsWhereOutput> {

@@ -47,6 +47,8 @@ async function appFor(
       mfaEnrollmentOpen: false,
       passkeysEnabled: false,
       passkeyHandleSecret: undefined,
+      trustedIdpOrigins: undefined,
+      idpSimulatorUrl: undefined,
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -78,6 +80,7 @@ async function appFor(
       authProvider: undefined as never,
       federatedProvider: undefined,
       isSaas: false,
+      nodeEnvironment: undefined,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,

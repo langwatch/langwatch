@@ -32,7 +32,7 @@ const commandIdentity = {
 
 function guardsOver(state: ScimSyncState | null) {
   return ScimSyncGuardsService.create({
-    syncs: { tryFindSync: async () => state },
+    syncs: { tryFindSync: async () => state, findForOrganization: async () => [] },
   });
 }
 

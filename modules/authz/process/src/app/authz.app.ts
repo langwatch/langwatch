@@ -282,6 +282,8 @@ export class AuthzApp implements AuthzApi {
   revokeBindingsWhere: AuthzApi["revokeBindingsWhere"] = (a) => this.#grants.revokeBindingsWhere(a);
   retireDirectoryGrants: AuthzApi["retireDirectoryGrants"] = (a) =>
     this.#grants.retireDirectoryGrants(a);
+  findDirectoryCausedChanges: AuthzApi["findDirectoryCausedChanges"] = (a) =>
+    this.#grants.findDirectoryCausedChanges(a);
   offboardMember: AuthzApi["offboardMember"] = (a) => this.#grants.offboardMember(a);
   defineRole: AuthzApi["defineRole"] = (a) => this.#grants.defineRole(a);
   deleteRole: AuthzApi["deleteRole"] = (a) => this.#grants.deleteRole(a);

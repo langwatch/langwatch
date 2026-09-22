@@ -18,6 +18,7 @@ import {
 import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,
+  type DirectoryCausedGrantChange,
   type RoleBindingWrite,
 } from "../authz-grant.repository.ts";
 import type {
@@ -302,6 +303,63 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
       select: { id: true },
     });
     return rows.map((row) => row.id);
+  }
+
+  async findDirectoryCausedChanges({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<DirectoryCausedGrantChange[]> {
+    const directory = {
+      organizationId,
+      principalType: "USER",
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+      source: "scim",
+    } as const;
+    // Two reads because they are two orderings: a grant written last year and
+    // taken back this morning is the most recent REMOVAL and one of the
+    // oldest attachments, and one `orderBy` cannot say both.
+    const [attached, removed] = await Promise.all([
+      this.options.database.grant.findMany({
+        where: directory,
+        select: { id: true, principalId: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      }),
+      this.options.database.grant.findMany({
+        where: { ...directory, revokedAt: { not: null } },
+        select: { id: true, principalId: true, revokedAt: true },
+        orderBy: { revokedAt: "desc" },
+        take: limit,
+      }),
+    ]);
+
+    const changes: DirectoryCausedGrantChange[] = [
+      ...attached.map((row) => ({
+        grantId: row.id,
+        userId: row.principalId,
+        kind: "attached" as const,
+        occurredAtMs: row.createdAt.getTime(),
+      })),
+      ...removed.flatMap((row) =>
+        row.revokedAt
+          ? [
+              {
+                grantId: row.id,
+                userId: row.principalId,
+                kind: "removed" as const,
+                occurredAtMs: row.revokedAt.getTime(),
+              },
+            ]
+          : [],
+      ),
+    ];
+    return changes
+      .toSorted((left, right) => right.occurredAtMs - left.occurredAtMs)
+      .slice(0, limit);
   }
 
   async offboardUser({

@@ -249,6 +249,9 @@ export class TestAuthzApi implements AuthzApi {
   deleteBinding = unsupported<AuthzApi["deleteBinding"]>("deleteBinding");
   applyMemberBindings = unsupported<AuthzApi["applyMemberBindings"]>("applyMemberBindings");
   retireDirectoryGrants = unsupported<AuthzApi["retireDirectoryGrants"]>("retireDirectoryGrants");
+  findDirectoryCausedChanges = unsupported<AuthzApi["findDirectoryCausedChanges"]>(
+    "findDirectoryCausedChanges",
+  );
   readPendingAdmission = unsupported<AuthzApi["readPendingAdmission"]>("readPendingAdmission");
   completeAdmission = unsupported<AuthzApi["completeAdmission"]>("completeAdmission");
   clearPendingAdmission = unsupported<AuthzApi["clearPendingAdmission"]>("clearPendingAdmission");

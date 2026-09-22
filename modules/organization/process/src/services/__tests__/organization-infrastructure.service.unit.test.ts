@@ -246,6 +246,10 @@ class RecordingGrants extends AuthzGrantsService {
   retireDirectoryGrants(): Promise<number> {
     return Promise.resolve(0);
   }
+
+  findDirectoryCausedChanges(): Promise<[]> {
+    return Promise.resolve([]);
+  }
 }
 
 function unsupported<Method>(): Method {

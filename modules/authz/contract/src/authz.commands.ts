@@ -332,6 +332,36 @@ export type AuthzRetireDirectoryGrantsOutput = z.infer<
   typeof authzRetireDirectoryGrantsOutputSchema
 >;
 
+/**
+ * What the directory has changed lately, for the reconciliation panel: the
+ * grants it wrote and the ones it took back, newest first. A read, asked of
+ * the module that owns grants because nobody else queries them.
+ */
+export const authzDirectoryCausedChangesInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    limit: z.number().int().positive(),
+  })
+  .strict();
+export type AuthzDirectoryCausedChangesInput = z.infer<
+  typeof authzDirectoryCausedChangesInputSchema
+>;
+
+export const authzDirectoryCausedChangeSchema = z
+  .object({
+    grantId: z.string().min(1),
+    /** Null where the grant names a principal that is not a person. */
+    userId: z.string().min(1).nullable(),
+    kind: z.enum(["attached", "removed"]),
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .strict();
+export type AuthzDirectoryCausedChange = z.infer<typeof authzDirectoryCausedChangeSchema>;
+export const authzDirectoryCausedChangesOutputSchema = z.array(authzDirectoryCausedChangeSchema);
+export type AuthzDirectoryCausedChangesOutput = z.infer<
+  typeof authzDirectoryCausedChangesOutputSchema
+>;
+
 const authzStringSetFilterSchema = z.object({ in: z.array(z.string().min(1)) }).strict();
 const authzBindingIdFilterSchema = z
   .object({

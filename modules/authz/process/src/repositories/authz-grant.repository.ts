@@ -115,6 +115,15 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     organizationId: string;
     userIds: readonly string[];
   }): Promise<string[]>;
+  /**
+   * What the directory attached and took back lately, newest first. The same
+   * `source` names the writer, so an administrator's own grant never appears
+   * in a view about what the directory did.
+   */
+  abstract findDirectoryCausedChanges(args: {
+    organizationId: string;
+    limit: number;
+  }): Promise<DirectoryCausedGrantChange[]>;
   abstract findOwnedApiKeys(args: {
     userId: string;
     organizationId: string;
@@ -124,3 +133,11 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     organizationId: string;
   }): Promise<{ id: string; name: string }[]>;
 }
+
+/** One thing the directory did to a grant, and when. */
+export type DirectoryCausedGrantChange = Readonly<{
+  grantId: string;
+  userId: string | null;
+  kind: "attached" | "removed";
+  occurredAtMs: number;
+}>;

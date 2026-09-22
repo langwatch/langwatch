@@ -101,6 +101,8 @@ export { EventingSsoConnectionHistoryRepository } from "./repositories/eventing/
 export { ssoConnectionHistoryCopy } from "./rules/sso-connection-history-copy.rules.ts";
 export { SsoConnectionHistoryService } from "./services/sso-connection-history.service.ts";
 export { OrganizationSsoConnectionsService } from "./services/organization-sso-connections.service.ts";
+export { ScimSyncReadsService } from "./services/scim-sync-reads.service.ts";
+export { SsoIssuerDirectoryService } from "./services/sso-issuer-directory.service.ts";
 export {
   RequiresLocalDoorAndBinding,
   SsoBreakGlassService,

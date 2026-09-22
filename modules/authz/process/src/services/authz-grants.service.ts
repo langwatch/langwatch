@@ -25,6 +25,8 @@ import {
   type AuthzOffboardInput,
   type AuthzOffboardOutput,
   type AuthzReplaceGrantInput,
+  type AuthzDirectoryCausedChangesInput,
+  type AuthzDirectoryCausedChangesOutput,
   type AuthzRetireDirectoryGrantsInput,
   type AuthzRetireDirectoryGrantsOutput,
   type AuthzRevokeBindingsInput,
@@ -324,6 +326,15 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       ...(reason ? { reason } : {}),
     });
     return bindingIds.length;
+  }
+
+  /** Newest first, capped by the caller: a reconciliation panel reads a page,
+   *  never the whole history of a directory that has run for years. */
+  async findDirectoryCausedChanges({
+    organizationId,
+    limit,
+  }: AuthzDirectoryCausedChangesInput): Promise<AuthzDirectoryCausedChangesOutput> {
+    return this.options.repository.findDirectoryCausedChanges({ organizationId, limit });
   }
 
   async offboardMember(args: AuthzOffboardMemberInput): Promise<void> {

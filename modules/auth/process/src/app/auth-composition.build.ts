@@ -40,6 +40,7 @@ import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memo
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
+import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
 
 /** The deployment's browser-session identity: present whole, or not at all. */
 export type BetterAuthDeploymentIdentity = Readonly<{
@@ -301,6 +302,9 @@ export class UnavailableBetterAuthGrants extends AuthzGrantsService {
   retireDirectoryGrants(): Promise<never> {
     return this.unavailable();
   }
+  findDirectoryCausedChanges(): Promise<never> {
+    return this.unavailable();
+  }
   offboardMember(): Promise<never> {
     return this.unavailable();
   }
@@ -373,6 +377,13 @@ export type BuildBetterAuthOptions = Readonly<{
   authProvider: string | undefined;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
+  /** `SSO_TRUSTED_IDP_ORIGINS`, and the worktree simulator's URL: the two
+   *  static ways an origin is trusted without a registered connection. */
+  trustedIdpOrigins: string | undefined;
+  idpSimulatorUrl: string | undefined;
+  /** Whether this is a production deployment — the simulator is trusted
+   *  nowhere else, because it signs whatever it is asked to sign. */
+  isProduction: boolean;
   logger: Logger;
 }>;
 
@@ -425,6 +436,9 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
       mfaEnrollmentOpen: identity.mfaEnrollmentOpen,
       passkeysEnabled: identity.passkeysEnabled,
       passkeyHandleSecret: identity.passkeyHandleSecret,
+      trustedIdpOrigins: options.trustedIdpOrigins,
+      idpSimulatorUrl: options.idpSimulatorUrl,
+      isProduction: options.isProduction,
       // No SSO provider is mounted here: building one needs the client
       // credentials and issuer of an identity provider, and this module reads
       // none. An empty pair is the honest answer, and it is the same one the
@@ -449,6 +463,14 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     ssoAssertions: {
       decide: (args) => options.identityApi.ssoAssertion().decide(args),
     },
+    ssoIssuers: SsoRegisteredIssuersService.create({
+      issuers: {
+        findIssuersForConnection: (args) =>
+          options.identityApi.ssoIssuers().findIssuersForConnection(args),
+        findIssuersForDomain: (args) => options.identityApi.ssoIssuers().findIssuersForDomain(args),
+      },
+      logger,
+    }),
     ssoMigration: {
       decideAccountLink: (args) =>
         options.identityApi.ssoMigrationCallbacks().decideAccountLink(args),

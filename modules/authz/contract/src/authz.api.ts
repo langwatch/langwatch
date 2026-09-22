@@ -156,6 +156,13 @@ export interface AuthzApi {
   retireDirectoryGrants(
     args: Commands.AuthzRetireDirectoryGrantsInput,
   ): Promise<Commands.AuthzRetireDirectoryGrantsOutput>;
+  /**
+   * What the directory has attached and removed lately, newest first — the
+   * grant side of a reconciliation view. Authz owns these rows; a peer asks.
+   */
+  findDirectoryCausedChanges(
+    args: Commands.AuthzDirectoryCausedChangesInput,
+  ): Promise<Commands.AuthzDirectoryCausedChangesOutput>;
   offboardMember(
     args: Commands.AuthzOffboardMemberInput,
   ): Promise<Commands.AuthzOffboardMemberOutput>;

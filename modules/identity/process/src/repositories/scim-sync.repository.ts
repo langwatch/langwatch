@@ -10,4 +10,11 @@ export abstract class ScimSyncReadRepository {
     scimSyncId: string;
     organizationId: string;
   }): Promise<ScimSyncState | null>;
+
+  /**
+   * Every sync this organization holds, newest first. The read a peer module
+   * composes a reconciliation view from: the directory module owns the people
+   * it pushed, identity owns where each connection's sync stands.
+   */
+  abstract findForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
 }

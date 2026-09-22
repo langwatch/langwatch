@@ -7,7 +7,7 @@
 import { sealedProviderConfigCipher } from "@langwatch/identity-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import type { BetterAuthOptions } from "better-auth/types";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { openingSsoProviderConfigs } from "../../rules/sso-provider-config.rules.ts";
 import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
@@ -39,7 +39,17 @@ const providerRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-function transportOver({ rows, opening }: { rows: unknown[]; opening: boolean }) {
+function transportOver({
+  rows,
+  opening,
+  registeredIssuers = [],
+}: {
+  rows: unknown[];
+  opening: boolean;
+  /** What identity answers this request — an administrator having registered
+   *  an issuer is what makes its origin one we may fetch from. */
+  registeredIssuers?: string[];
+}) {
   const database = { user: [], session: [], account: [], verification: [], ssoProvider: rows };
   return betterAuthTransportFor(
     {},
@@ -50,9 +60,32 @@ function transportOver({ rows, opening }: { rows: unknown[]; opening: boolean })
           return opening ? openingSsoProviderConfigs({ adapter: engine, cipher }) : engine;
         },
       } as never,
+      ssoIssuers: { issuersForRequest: async () => registeredIssuers },
     },
   );
 }
+
+/** The identity provider's own discovery document, so nothing dials out. */
+function stubDiscovery(): void {
+  vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+    const url = input instanceof Request ? input.url : input.toString();
+    if (!url.startsWith("https://idp.acme.test/")) {
+      throw new Error(`nothing may be fetched from ${url}`);
+    }
+    return Response.json({
+      issuer: "https://idp.acme.test",
+      authorization_endpoint: "https://idp.acme.test/authorize",
+      token_endpoint: "https://idp.acme.test/token",
+      jwks_uri: "https://idp.acme.test/jwks",
+      userinfo_endpoint: "https://idp.acme.test/userinfo",
+      response_types_supported: ["code"],
+    });
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const signInThroughSso = async (
   transport: ReturnType<typeof betterAuthTransportFor>,
@@ -67,7 +100,7 @@ const signInThroughSso = async (
   );
   return {
     status: response.status,
-    body: (await response.json()) as { message?: string; code?: string },
+    body: (await response.json()) as { message?: string; code?: string; url?: string },
   };
 };
 
@@ -83,6 +116,24 @@ describe("given identity folded a provider row for a proved domain", () => {
     expect(status).toBe(400);
     expect(body.code).toBe("discovery_untrusted_origin");
     expect(body.message).toContain("https://idp.acme.test/.well-known/openid-configuration");
+  });
+
+  it("sends the customer to their own provider once its issuer is registered", async () => {
+    stubDiscovery();
+
+    const { status, body } = await signInThroughSso(
+      transportOver({
+        rows: [providerRow()],
+        opening: true,
+        registeredIssuers: ["https://idp.acme.test"],
+      }),
+      { email: "person@acme.test", callbackURL: "/" },
+    );
+
+    // The registration IS the declaration that this installation may talk to
+    // that address: no static list could have contained it.
+    expect(status).toBe(200);
+    expect(body.url).toContain("https://idp.acme.test/authorize");
   });
 
   it("cannot dial a sealed row where nothing opens it", async () => {

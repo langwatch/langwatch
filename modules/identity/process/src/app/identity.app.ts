@@ -46,6 +46,7 @@ import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
+import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
@@ -62,6 +63,7 @@ import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.servic
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
+import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
 import {
   SsoLegacyIdentityRetirementService,
   type SsoLegacyAccessRetirement,
@@ -121,6 +123,7 @@ type IdentityAppParts = {
   ssoBackoffice: SsoConnectionBackofficeService | null;
   ssoConnectionHistory: SsoConnectionHistoryService | null;
   ssoConnectionReads: OrganizationSsoConnectionsService;
+  ssoIssuers: SsoIssuerDirectoryService;
   ssoDomainCeremony: SsoDomainCeremonyService | null;
   ssoDomainReproof: SsoDomainReproofService | null;
   ssoAssertion: SsoAssertionService;
@@ -131,6 +134,7 @@ type IdentityAppParts = {
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
+  scimSyncReads: ScimSyncReadsService;
 };
 
 /**
@@ -308,6 +312,9 @@ export class IdentityApp implements IdentityApi {
     const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
     });
+    const ssoIssuers = SsoIssuerDirectoryService.create({
+      connections: setup.repositories.ssoConnections,
+    });
     // The ceremony and the sweep read the SAME published evidence where it
     // lives, so they share one pair of live channels rather than each
     // deciding for itself where a customer's proof is read from.
@@ -422,6 +429,7 @@ export class IdentityApp implements IdentityApi {
       migrations: ssoMigrationProgress,
     });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
+    const scimSyncReads = ScimSyncReadsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
       emails,
@@ -440,6 +448,7 @@ export class IdentityApp implements IdentityApi {
       ssoBackoffice,
       ssoConnectionHistory,
       ssoConnectionReads,
+      ssoIssuers,
       ssoDomainCeremony,
       ssoDomainReproof,
       ssoAssertion,
@@ -450,6 +459,7 @@ export class IdentityApp implements IdentityApi {
       ssoSetup,
       ssoSetupCommands,
       scimSyncGuards,
+      scimSyncReads,
     });
   }
 
@@ -561,6 +571,10 @@ export class IdentityApp implements IdentityApi {
     return this.#parts.ssoConnectionReads;
   }
 
+  ssoIssuers(): SsoIssuerDirectoryService {
+    return this.#parts.ssoIssuers;
+  }
+
   ssoDomainCeremony(): SsoDomainCeremonyService {
     if (!this.#parts.ssoDomainCeremony) {
       throw new IdentityCapabilityUnavailableError("SSO domain ceremony");
@@ -611,5 +625,9 @@ export class IdentityApp implements IdentityApi {
 
   scimSyncGuards(): ScimSyncGuardsService {
     return this.#parts.scimSyncGuards;
+  }
+
+  scimSyncReads(): ScimSyncReadsService {
+    return this.#parts.scimSyncReads;
   }
 }
