@@ -234,8 +234,9 @@ function UpdateNotice({
     >
       <VStack align="stretch" gap={2}>
         <Text fontSize="13px" color="fg.muted">
-          LangWatch set this single sign-on up for your organization. Connect
-          your own identity provider to run it yourself.
+          {canManage
+            ? "LangWatch set this single sign-on up for your organization. Connect your own identity provider to run it yourself."
+            : "LangWatch set this single sign-on up for your organization. An organization administrator can connect your own identity provider to run it yourselves."}
         </Text>
         {canManage && (
           <Link href="/settings/authentication/provider">

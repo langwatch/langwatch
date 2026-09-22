@@ -313,9 +313,11 @@ export class SsoArrivalService {
     policy: SsoArrivalPolicy;
     organizationId: string;
   } | null> {
-    // Cheap first: most accounts through this seam are not connections at all.
+    // Cheap first: most accounts through this seam are not connections at all,
+    // so this is the expected path and reads at debug, not one line per
+    // ordinary sign-in.
     if (!looksLikeSsoConnectionId(connectionId)) {
-      logger.info(
+      logger.debug(
         { reason: "not_a_connection_id", connectionId },
         "a single sign-on arrival was not considered for admission",
       );

@@ -75,7 +75,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([user]),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(cleared.has(user.id)).toBe(true);
@@ -85,7 +85,7 @@ describe("clearStalePendingSsoSetup", () => {
         stillPending: 0,
         skipped: 0,
         failed: 0,
-        dryRun: false,
+        isDryRun: false,
       });
     });
   });
@@ -103,7 +103,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([user]),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(cleared.size).toBe(0);
@@ -113,7 +113,7 @@ describe("clearStalePendingSsoSetup", () => {
         stillPending: 1,
         skipped: 0,
         failed: 0,
-        dryRun: false,
+        isDryRun: false,
       });
     });
   });
@@ -130,7 +130,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([user]),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(cleared.size).toBe(0);
@@ -156,7 +156,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([matching, nonMatching]),
         writer,
         organizations,
-        dryRun: true,
+        isDryRun: true,
       });
 
       expect(cleared.size).toBe(0);
@@ -166,7 +166,7 @@ describe("clearStalePendingSsoSetup", () => {
         stillPending: 1,
         skipped: 0,
         failed: 0,
-        dryRun: true,
+        isDryRun: true,
       });
     });
   });
@@ -196,7 +196,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers(users),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(calls).toEqual(["acme.com"]);
@@ -228,7 +228,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([failing, okay]),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(cleared.has(okay.id)).toBe(true);
@@ -238,7 +238,7 @@ describe("clearStalePendingSsoSetup", () => {
         stillPending: 0,
         skipped: 0,
         failed: 1,
-        dryRun: false,
+        isDryRun: false,
       });
     });
   });
@@ -255,7 +255,7 @@ describe("clearStalePendingSsoSetup", () => {
         users: makeUsers([]),
         writer,
         organizations,
-        dryRun: false,
+        isDryRun: false,
       });
 
       expect(cleared.size).toBe(0);
@@ -265,7 +265,7 @@ describe("clearStalePendingSsoSetup", () => {
         stillPending: 0,
         skipped: 0,
         failed: 0,
-        dryRun: false,
+        isDryRun: false,
       });
     });
   });

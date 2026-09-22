@@ -609,7 +609,7 @@ secured
       if (droppedUnstorableSpans > 0) {
         logger.warn(
           { projectId: project.id, traceId, droppedUnstorableSpans },
-          "dropped spans whose start time is not a valid timestamp",
+          "dropped spans whose start or end time is not a valid timestamp",
         );
       }
 
@@ -623,7 +623,7 @@ secured
       }
       if (droppedUnstorableSpans > 0) {
         rejectionErrors.push(
-          `${droppedUnstorableSpans} span(s) dropped: span start time is not a valid timestamp`,
+          `${droppedUnstorableSpans} span(s) dropped: started_at or finished_at is not a valid timestamp`,
         );
       }
       try {

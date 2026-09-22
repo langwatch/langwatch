@@ -50,7 +50,21 @@ export interface OrganizationSsoProviderLookup {
  * same question the same way: the hook passes the single account it just saw
  * (`[account]`), the status read passes every account the user holds.
  */
-export const matchesConfiguredSsoProvider = async ({
+export const matchesConfiguredSsoProvider = async (args: {
+  organizations: OrganizationSsoProviderLookup;
+  domain: string;
+  accounts: readonly OAuthAccountLike[];
+}): Promise<boolean> => (await configuredSsoProviderStatus(args)) === "matched";
+
+/**
+ * How the given accounts stand against the provider an organization pins for
+ * the domain, in three answers rather than two: `unconfigured` when no
+ * organization claims the domain or the one that does pins no provider, so a
+ * reader can tell "nothing to satisfy" apart from "not yet satisfied". A
+ * member is only ever asked to link the provider their organization names,
+ * and an organization that has since dropped that pin names nothing.
+ */
+export const configuredSsoProviderStatus = async ({
   organizations,
   domain,
   accounts,
@@ -58,11 +72,12 @@ export const matchesConfiguredSsoProvider = async ({
   organizations: OrganizationSsoProviderLookup;
   domain: string;
   accounts: readonly OAuthAccountLike[];
-}): Promise<boolean> => {
-  if (accounts.length === 0) return false;
+}): Promise<"matched" | "unmatched" | "unconfigured"> => {
   const org = await organizations.findByDomain({ domain });
-  if (!org) return false;
-  return accounts.some((account) => isSsoProviderMatch(org, account));
+  if (!org?.ssoProvider) return "unconfigured";
+  return accounts.some((account) => isSsoProviderMatch(org, account))
+    ? "matched"
+    : "unmatched";
 };
 
 /**

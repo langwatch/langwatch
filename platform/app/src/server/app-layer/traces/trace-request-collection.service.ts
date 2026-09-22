@@ -344,11 +344,35 @@ export class TraceRequestCollectionService {
       };
     }
 
-    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        spanParseResult.data.startTimeUnixNano,
-      ),
-    );
+    // A wire value the nanosecond decoder refuses is one span's problem, not the
+    // batch's: it is dropped here, with its siblings still dispatched, rather
+    // than thrown out of the whole request.
+    let startTimeUnixMs: number;
+    let endTimeUnixMs: number;
+    try {
+      startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+        TraceRequestUtils.normalizeOtlpUnixNano(
+          spanParseResult.data.startTimeUnixNano,
+        ),
+      );
+    } catch {
+      return {
+        status: "dropped",
+        error: "span start time is not a valid timestamp",
+      };
+    }
+    try {
+      endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+        TraceRequestUtils.normalizeOtlpUnixNano(
+          spanParseResult.data.endTimeUnixNano,
+        ),
+      );
+    } catch {
+      return {
+        status: "dropped",
+        error: "span end time is not a valid timestamp",
+      };
+    }
     const now = Date.now();
 
     if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
@@ -363,18 +387,16 @@ export class TraceRequestCollectionService {
     // from it throws once the span is already an appended event — permanently,
     // on a retrying lane. Refuse it at the door instead. The end time is checked
     // with it because it is written to the same kind of column.
-    const endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        spanParseResult.data.endTimeUnixNano,
-      ),
-    );
-    if (
-      !isStorableSpanTimeMs(startTimeUnixMs) ||
-      !isStorableSpanTimeMs(endTimeUnixMs)
-    ) {
+    if (!isStorableSpanTimeMs(startTimeUnixMs)) {
       return {
         status: "dropped",
         error: "span start time is not a valid timestamp",
+      };
+    }
+    if (!isStorableSpanTimeMs(endTimeUnixMs)) {
+      return {
+        status: "dropped",
+        error: "span end time is not a valid timestamp",
       };
     }
 

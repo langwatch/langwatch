@@ -4,6 +4,7 @@ import { createIdentityMigrationFixture } from "~/server/app-layer/system-migrat
 // The routine-versus-incident split below is a LOG LEVEL, so the logger is
 // the seam it has to be observed at.
 const log = vi.hoisted(() => ({
+  debug: vi.fn(),
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
@@ -325,7 +326,7 @@ describe("given an arrival this connection was never going to admit", () => {
     "a single sign-on arrival was not considered for admission";
 
   describe("when the account id is not connection-shaped at all", () => {
-    it("logs once with reason not_a_connection_id and admits nobody", async () => {
+    it("logs once at debug with reason not_a_connection_id and admits nobody", async () => {
       const parts = serviceOver({ row: null });
 
       await parts.service.admit({
@@ -334,7 +335,9 @@ describe("given an arrival this connection was never going to admit", () => {
         domain: "acme.com",
       });
 
-      expect(log.info).toHaveBeenCalledWith(
+      // The ordinary sign-in path: a line per arrival at info would be noise.
+      expect(log.info).not.toHaveBeenCalled();
+      expect(log.debug).toHaveBeenCalledWith(
         expect.objectContaining({
           reason: "not_a_connection_id",
           connectionId: "google",

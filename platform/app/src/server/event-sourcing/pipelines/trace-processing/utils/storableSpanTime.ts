@@ -84,11 +84,15 @@ function unstorableSpanTimeOf(
         event.data.span.startTimeUnixNano,
       ),
     );
+  } catch {
+    return { field: "startTimeUnixMs", valueMs: null };
+  }
+  try {
     endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
       TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.endTimeUnixNano),
     );
   } catch {
-    return { field: "startTimeUnixMs", valueMs: null };
+    return { field: "endTimeUnixMs", valueMs: null };
   }
 
   if (!isStorableSpanTimeMs(startTimeUnixMs)) {
@@ -116,9 +120,11 @@ interface SkipLogger {
  * the same job until the group is blocked, which takes down every other span in
  * the project with it.
  *
- * Logs exactly once per refusal, here rather than at each call site, so the
- * fields a reader needs to find the producer are the same wherever the span was
- * refused.
+ * Logs once per consumer that refuses the span, here rather than at each call
+ * site, so the fields a reader needs to find the producer are the same wherever
+ * it was refused. The consumers run as separate jobs, on separate workers, so
+ * one line each is the honest count; `consumer` is what tells them apart and
+ * the static message is what groups them under one signature.
  */
 export function isStorableSpanReceived({
   event,

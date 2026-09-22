@@ -129,6 +129,28 @@ describe("isStorableSpanReceived", () => {
     });
   });
 
+  describe("given a span whose end time the decoder refuses outright", () => {
+    it("names the end time, not the start time that decoded fine", () => {
+      const logger = makeLogger();
+
+      const accepted = isStorableSpanReceived({
+        event: createSpanReceivedEvent({
+          // Neither a string, a number nor a high/low pair: the one shape the
+          // nanosecond decoder throws on.
+          endTimeUnixNano: {} as unknown as string,
+        }),
+        logger,
+        consumer: "test",
+      });
+
+      expect(accepted).toBe(false);
+      expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
+        field: "endTimeUnixMs",
+        valueMs: null,
+      });
+    });
+  });
+
   describe("given a span whose start time is a far-future but storable instant", () => {
     it("accepts it, because storage can hold it", () => {
       const logger = makeLogger();

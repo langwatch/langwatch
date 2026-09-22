@@ -66,13 +66,13 @@ function makeService(opts: { dedupAcquire?: boolean | null } = {}) {
 const tenantId = "project_test";
 const piiRedactionLevel: PIIRedactionLevel = "ESSENTIAL";
 
-/** One span on the wire, in the envelope `handleOtlpTraceRequest` unwraps. */
-function makeTraceRequest(span: OtlpSpan): IExportTraceServiceRequest {
+/** Spans on the wire, in the envelope `handleOtlpTraceRequest` unwraps. */
+function makeTraceRequest(...spans: OtlpSpan[]): IExportTraceServiceRequest {
   return {
     resourceSpans: [
       {
         resource: { attributes: [], droppedAttributesCount: 0 },
-        scopeSpans: [{ scope: { name: "test" }, spans: [span] }],
+        scopeSpans: [{ scope: { name: "test" }, spans }],
       },
     ],
   } as unknown as IExportTraceServiceRequest;
@@ -204,6 +204,59 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
           "span start time is not a valid timestamp",
         );
         expect(recordSpan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when only its end time is past what storage can hold", () => {
+      /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+      it("names the end time, so the producer is pointed at the right field", async () => {
+        const { service, recordSpan } = makeService();
+        const nowMs = BigInt(Date.now());
+
+        const result = await service.handleOtlpTraceRequest(
+          tenantId,
+          makeTraceRequest(
+            makeOtlpSpan({
+              startTimeUnixNano: String(nowMs * 1_000_000n),
+              endTimeUnixNano: String(nowMs * 1_000_000n * 1_000_000n),
+            }),
+          ),
+          piiRedactionLevel,
+        );
+
+        expect(result.rejectedSpans).toBe(1);
+        expect(result.errorMessage).toBe(
+          "span end time is not a valid timestamp",
+        );
+        expect(recordSpan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when its end time is not a number and a valid sibling arrives with it", () => {
+      /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+      it("drops only that span and still dispatches the sibling", async () => {
+        const { service, recordSpan } = makeService();
+        const nowMs = BigInt(Date.now());
+
+        const result = await service.handleOtlpTraceRequest(
+          tenantId,
+          makeTraceRequest(
+            makeOtlpSpan({
+              spanId: "span_bad",
+              startTimeUnixNano: String(nowMs * 1_000_000n),
+              endTimeUnixNano: "not-a-number",
+            }),
+            makeOtlpSpan({ spanId: "span_good" }),
+          ),
+          piiRedactionLevel,
+        );
+
+        expect(result.rejectedSpans).toBe(1);
+        expect(result.ingestionFailures).toBe(0);
+        expect(result.errorMessage).toBe(
+          "span end time is not a valid timestamp",
+        );
+        expect(recordSpan).toHaveBeenCalledTimes(1);
       });
     });
   });

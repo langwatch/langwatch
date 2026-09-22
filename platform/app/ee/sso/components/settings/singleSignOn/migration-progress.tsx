@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { providerDisplayName } from "@ee/sso/logic/providerDisplayName";
 import type { SelfServeMigrationView } from "@ee/sso/sso-self-serve.types";
 import type {
@@ -47,7 +47,7 @@ const PHASE_STATUS: Record<SsoMigrationPhase, (names: UpdateNames) => string> =
     GRACE_LEGACY: ({ previous }) =>
       `Everyone still signs in through ${previous}. Switch sign-in over when the new connection is ready.`,
     GRACE_DIRECT: ({ previous, replacement }) =>
-      `Everyone signs in through ${replacement}. You can switch back to ${previous} until you finish the update.`,
+      `Everyone signs in through ${replacement}. You can switch back to ${previous} until you start finishing the update.`,
     FINALIZING: ({ previous }) =>
       `Finishing the update. Access through ${previous} is being taken away.`,
     FINALIZED: ({ previous, replacement }) =>
@@ -247,9 +247,15 @@ export function MigrationProgress({
   connectionState: SsoConnectionLifecycleState;
 }) {
   const name = providerDisplayName(migration.legacy.providerId);
+  // The stored identifier is never rendered; the replacement is a connection
+  // the administrator just registered, so "your new connection" is what they
+  // called it a moment ago when we cannot spell the vendor.
+  const replacementName =
+    providerDisplayName(migration.replacement.providerId) ??
+    "your new connection";
   const names: UpdateNames = {
     previous: name ?? "your previous provider",
-    replacement: migration.replacement.providerId,
+    replacement: replacementName,
   };
   const unlinked = Math.max(
     migration.members.activeCount - migration.members.linkedCount,
@@ -274,7 +280,8 @@ export function MigrationProgress({
                 tense. */}
             {migration.selectedRoute === "legacy"
               ? (name ?? "Your existing provider")
-              : migration.replacement.providerId}
+              : (providerDisplayName(migration.replacement.providerId) ??
+                "Your new connection")}
           </Text>
         </SettingRow>
         <SettingRow label="Members moved across">
@@ -298,7 +305,9 @@ export function MigrationProgress({
         initialMembers={migration.members}
         previous={names.previous}
       />
-      {migration.blockers.length > 0 && (
+      {/* The heading and its help stay once every check passes: that is the
+          moment an administrator re-reads the conditions before finishing. */}
+      {migration.phase !== "FINALIZED" && (
         <VStack align="stretch" gap={1}>
           <HStack gap={1}>
             <Text fontSize="xs" fontWeight="semibold">
@@ -306,11 +315,17 @@ export function MigrationProgress({
             </Text>
             <FinishConditionsHelp />
           </HStack>
-          {migration.blockers.map((blocker) => (
-            <Text key={blocker.code} fontSize="xs" color="fg.muted">
-              {checkCopyFor({ blocker, names, unlinked })}
+          {migration.blockers.length === 0 ? (
+            <Text fontSize="xs" color="fg.muted">
+              Every check has passed.
             </Text>
-          ))}
+          ) : (
+            migration.blockers.map((blocker) => (
+              <Text key={blocker.code} fontSize="xs" color="fg.muted">
+                {checkCopyFor({ blocker, names, unlinked })}
+              </Text>
+            ))
+          )}
         </VStack>
       )}
       {canManage && migration.phase !== "FINALIZED" && (
@@ -359,15 +374,19 @@ function FinishConditionsHelp() {
         </VStack>
       }
     >
-      <Box
-        as="span"
+      {/* A button, not a span, so the keyboard can reach the tooltip. */}
+      <IconButton
+        size="2xs"
+        variant="plain"
         color="fg.subtle"
-        display="inline-flex"
+        minWidth="auto"
+        height="auto"
+        cursor="help"
         aria-label="Everything that has to be true before you can finish"
         data-testid="sso-update-conditions-help"
       >
         <HelpCircle size={12} />
-      </Box>
+      </IconButton>
     </Tooltip>
   );
 }

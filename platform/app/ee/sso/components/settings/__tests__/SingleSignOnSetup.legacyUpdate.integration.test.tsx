@@ -196,7 +196,7 @@ describe("given an organization signing in through a provider LangWatch set up",
         "Nothing changes for your members until an administrator switches sign-in over.",
       );
       expect(container.textContent).toContain(
-        "You can switch back to Auth0 at any point before you finish the update.",
+        "You can switch back to Auth0 at any point until you start finishing the update.",
       );
     });
 

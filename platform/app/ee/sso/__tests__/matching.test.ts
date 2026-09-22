@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describe, expect, it, vi } from "vitest";
 import {
+  configuredSsoProviderStatus,
   extractEmailDomain,
   isSsoProviderMatch,
   matchesConfiguredSsoProvider,
@@ -141,7 +142,7 @@ describe("matchesConfiguredSsoProvider", () => {
   });
 
   describe("when there are no accounts to check", () => {
-    it("returns false without asking for the organization", async () => {
+    it("returns false", async () => {
       const organizations = orgWith("auth0");
 
       const result = await matchesConfiguredSsoProvider({
@@ -151,7 +152,6 @@ describe("matchesConfiguredSsoProvider", () => {
       });
 
       expect(result).toBe(false);
-      expect(organizations.findByDomain).not.toHaveBeenCalled();
     });
   });
 
@@ -256,6 +256,65 @@ describe("matchesConfiguredSsoProvider", () => {
 
       expect(hookAnswer).toBe(statusReadAnswer);
       expect(hookAnswer).toBe(true);
+    });
+  });
+});
+
+describe("configuredSsoProviderStatus", () => {
+  const orgWith = (ssoProvider: string | null) => ({
+    findByDomain: vi
+      .fn()
+      .mockResolvedValue({ id: "org_1", name: "Acme", ssoProvider }),
+  });
+  const googleAccount = { providerId: "google", accountId: "sub-1" };
+
+  describe("when no organization claims the domain", () => {
+    it("answers unconfigured, since there is nothing to satisfy", async () => {
+      const organizations = { findByDomain: vi.fn().mockResolvedValue(null) };
+
+      await expect(
+        configuredSsoProviderStatus({
+          organizations,
+          domain: "acme.com",
+          accounts: [googleAccount],
+        }),
+      ).resolves.toBe("unconfigured");
+    });
+  });
+
+  describe("when the organization claims the domain but pins no provider", () => {
+    it("answers unconfigured, since a dropped pin names nothing", async () => {
+      await expect(
+        configuredSsoProviderStatus({
+          organizations: orgWith(null),
+          domain: "acme.com",
+          accounts: [googleAccount],
+        }),
+      ).resolves.toBe("unconfigured");
+    });
+  });
+
+  describe("when the organization pins a provider none of the accounts satisfy", () => {
+    it("answers unmatched", async () => {
+      await expect(
+        configuredSsoProviderStatus({
+          organizations: orgWith("okta"),
+          domain: "acme.com",
+          accounts: [googleAccount],
+        }),
+      ).resolves.toBe("unmatched");
+    });
+  });
+
+  describe("when one of the accounts satisfies the pin", () => {
+    it("answers matched", async () => {
+      await expect(
+        configuredSsoProviderStatus({
+          organizations: orgWith("google"),
+          domain: "acme.com",
+          accounts: [googleAccount],
+        }),
+      ).resolves.toBe("matched");
     });
   });
 });

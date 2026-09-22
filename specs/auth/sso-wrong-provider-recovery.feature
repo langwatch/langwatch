@@ -77,6 +77,13 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And the banner offers a sign-out action
     And the banner does not link to the settings page
 
+  @unit
+  Scenario: A member is not asked to link a sign-in method their organization no longer requires
+    Given a member whose account still carries a stale "needs to link SSO" flag
+    And their organization has since stopped requiring a sign-in method
+    When their sign-in status is read
+    Then it reports nothing left to link
+
   # A stale flag can also be cleared in bulk, ahead of the member's next
   # sign-in, so nobody has to wait on a sign-in that may never happen to fire
   # the clearing branch above.

@@ -1,7 +1,7 @@
 import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
 import {
+  configuredSsoProviderStatus,
   extractEmailDomain,
-  matchesConfiguredSsoProvider,
   type OrganizationSsoProviderLookup,
 } from "@ee/sso/matching";
 import { createLogger } from "@langwatch/observability";
@@ -60,7 +60,7 @@ export interface ClearStalePendingSsoSetupResult {
   stillPending: number;
   skipped: number;
   failed: number;
-  dryRun: boolean;
+  isDryRun: boolean;
 }
 
 /**
@@ -91,25 +91,26 @@ function cachedOrganizationLookup(
 type Outcome = "cleared" | "stillPending" | "skipped";
 
 /**
- * Decides and, unless `dryRun`, applies the outcome for a single user: skip
- * (no usable email domain), clear (an account already satisfies the pin), or
- * leave as still pending (no account satisfies it yet).
+ * Decides and, unless `isDryRun`, applies the outcome for a single user: skip
+ * (no usable email domain), clear (an account already satisfies the pin, or
+ * the organization no longer pins one), or leave as still pending (a pin
+ * exists and no account satisfies it yet).
  */
 async function resolveUser({
   user,
   writer,
   organizations,
-  dryRun,
+  isDryRun,
 }: {
   user: CandidateUser;
   writer: PendingSsoSetupWriter;
   organizations: OrganizationSsoProviderLookup;
-  dryRun: boolean;
+  isDryRun: boolean;
 }): Promise<Outcome> {
   const domain = extractEmailDomain(user.email);
   if (!domain) return "skipped";
 
-  const matched = await matchesConfiguredSsoProvider({
+  const status = await configuredSsoProviderStatus({
     organizations,
     domain,
     accounts: user.accounts.map((account) => ({
@@ -117,9 +118,9 @@ async function resolveUser({
       accountId: account.providerAccountId,
     })),
   });
-  if (!matched) return "stillPending";
+  if (status === "unmatched") return "stillPending";
 
-  if (!dryRun) {
+  if (!isDryRun) {
     await writer.clearPendingSsoSetup({ id: user.id });
   }
   return "cleared";
@@ -133,13 +134,13 @@ async function resolvePage({
   page,
   writer,
   organizations,
-  dryRun,
+  isDryRun,
   result,
 }: {
   page: CandidateUser[];
   writer: PendingSsoSetupWriter;
   organizations: OrganizationSsoProviderLookup;
-  dryRun: boolean;
+  isDryRun: boolean;
   result: ClearStalePendingSsoSetupResult;
 }): Promise<void> {
   for (const user of page) {
@@ -149,7 +150,7 @@ async function resolvePage({
         user,
         writer,
         organizations,
-        dryRun,
+        isDryRun,
       });
       result[outcome] += 1;
     } catch (error) {
@@ -168,13 +169,13 @@ export async function clearStalePendingSsoSetup({
   users,
   writer,
   organizations,
-  dryRun,
+  isDryRun,
   batchSize = BATCH_SIZE,
 }: {
   users: CandidateUserPage;
   writer: PendingSsoSetupWriter;
   organizations: OrganizationSsoProviderLookup;
-  dryRun: boolean;
+  isDryRun: boolean;
   batchSize?: number;
 }): Promise<ClearStalePendingSsoSetupResult> {
   const cachedOrganizations = cachedOrganizationLookup(organizations);
@@ -185,7 +186,7 @@ export async function clearStalePendingSsoSetup({
     stillPending: 0,
     skipped: 0,
     failed: 0,
-    dryRun,
+    isDryRun,
   };
 
   let cursorId: string | null = null;
@@ -200,7 +201,7 @@ export async function clearStalePendingSsoSetup({
       page,
       writer,
       organizations: cachedOrganizations,
-      dryRun,
+      isDryRun,
       result,
     });
 
@@ -247,13 +248,13 @@ class PrismaPendingSsoSetupWriter implements PendingSsoSetupWriter {
 }
 
 export default async function main(...args: string[]) {
-  const dryRun = args.includes("--dry-run") || process.env.DRY_RUN === "1";
+  const isDryRun = args.includes("--dry-run") || process.env.DRY_RUN === "1";
 
   const result = await clearStalePendingSsoSetup({
     users: new PrismaCandidateUserPage(),
     writer: new PrismaPendingSsoSetupWriter(),
     organizations: new PrismaLegacySsoOrganizationRepository(prisma),
-    dryRun,
+    isDryRun,
   });
 
   logger.info(result, "finished clearing stale pending SSO setup flags");

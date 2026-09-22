@@ -53,7 +53,9 @@ function migrationWith(
     replacement: {
       connectionId: "ssoc_direct",
       source: "self-serve",
-      providerId: "Acme",
+      // A stored identifier, never what the screen shows: the copy below
+      // expects the vendor's own spelling.
+      providerId: "okta",
     },
     phase: "GRACE_LEGACY",
     selectedRoute: "legacy",
@@ -365,7 +367,7 @@ describe("given an update under way", () => {
       );
 
       expect(screen.getByTestId("sso-update-status").textContent).toBe(
-        "Everyone signs in through Acme. You can switch back to Auth0 until you finish the update.",
+        "Everyone signs in through Okta. You can switch back to Auth0 until you start finishing the update.",
       );
       expect(screen.getByTestId("sso-update-chip").textContent).toContain(
         "Switched over",

@@ -1,8 +1,8 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
 import {
+  configuredSsoProviderStatus,
   extractEmailDomain,
-  matchesConfiguredSsoProvider,
   type OrganizationSsoProviderLookup,
 } from "@ee/sso/matching";
 
@@ -144,11 +144,11 @@ export class UserService {
    * organization's SSO requirement.
    *
    * This read re-asks the identical question the hook asks
-   * (`matchesConfiguredSsoProvider`, shared so the two can never disagree)
-   * against every account the user already holds, rather than trusting the
-   * stored flag once it is true. It never writes: the flag itself is left
-   * alone here, and the hooks still clear it in the database on the next
-   * sign-in.
+   * (`configuredSsoProviderStatus`, shared so the two can never disagree on
+   * what a match is) against every account the user already holds, rather
+   * than trusting the stored flag once it is true. It never writes: the flag
+   * itself is left alone here, and the hooks still clear it in the database
+   * on the next sign-in.
    *
    * Known gap: this only re-checks the legacy `ssoDomain`/`ssoProvider`
    * pin. A member admitted through the newer `SsoConnection` path (the
@@ -175,7 +175,9 @@ export class UserService {
       select: { provider: true, providerAccountId: true },
     });
 
-    const matched = await matchesConfiguredSsoProvider({
+    // Only a pin that still exists can still be pending: an organization that
+    // has dropped its provider since the flag was set leaves nothing to link.
+    const status = await configuredSsoProviderStatus({
       organizations: this.legacySsoOrganizations,
       domain,
       accounts: accounts.map((account) => ({
@@ -184,7 +186,7 @@ export class UserService {
       })),
     });
 
-    return { pendingSsoSetup: !matched };
+    return { pendingSsoSetup: status === "unmatched" };
   }
 
   /**

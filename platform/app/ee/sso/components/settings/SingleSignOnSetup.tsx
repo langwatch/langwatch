@@ -314,8 +314,8 @@ function UpdatePromises({ current }: { current: string }) {
         over.
       </Text>
       <Text fontSize="sm" color="fg.muted">
-        You can switch back to {current} at any point before you finish the
-        update.
+        You can switch back to {current} at any point until you start finishing
+        the update.
       </Text>
     </VStack>
   );

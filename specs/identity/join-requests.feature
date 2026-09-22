@@ -149,7 +149,8 @@ Feature: Join requests - asking to join the organization your colleagues already
     And "sam" opens "acme", whose own organization read has not answered yet
     When the dashboard renders
     Then the waiting screen for "ana" is not shown
-    And the waiting screen appears once "acme" resolves and the request is still for another organization
+    And no offer to ask to join is shown either
+    And the "acme" dashboard renders as it normally would
 
   # ── Anti-abuse ─────────────────────────────────────────────────────────
 
