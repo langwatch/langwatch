@@ -11,18 +11,61 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import type {
-  Evaluation,
-  TraceApi,
-  TracesForProjectResult,
-  TraceWithGuardrail,
+import {
+  explorerHiddenOrigins,
+  FilterParseError,
+  type Evaluation,
+  type TraceApi,
+  type TracesForProjectResult,
+  type TraceWithGuardrail,
 } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
+import { ClickHouseTraceQueryRepository } from "#repositories/clickhouse/clickhouse.trace-query.repository";
+import {
+  andFilterConditions,
+  findHiddenOriginConditions,
+} from "#rules/trace-filter-hidden-origins.rules";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
 
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
+
+const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
+
+/**
+ * The real `TraceApi.compileExplorerTraceFilter` (`trace.app.ts`), rebuilt
+ * here over the same production translator and rules so this door's filter
+ * behavior is exercised for real — only `TraceApi` itself is a double.
+ */
+function compileExplorerTraceFilter(input: {
+  query: string;
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  originNamed?: boolean;
+  dateField?: "occurred" | "updated";
+}): { sql: string; params: Record<string, unknown> } {
+  const compiled = traceQueryTranslator.translateFilter({
+    queryText: input.query,
+    tenantId: input.tenantId,
+    timeRange: input.timeRange,
+  });
+
+  if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
+    throw new FilterParseError(
+      "A span, event or free-text clause matches spans by when they started, and dateField " +
+        '"updated" selects traces by when they were last modified — the two together would ' +
+        "drop traces silently. Filter on trace-level fields instead, or pull on the occurred axis.",
+    );
+  }
+
+  const hiddenOrigins = input.originNamed ? [] : explorerHiddenOrigins(input.query);
+
+  return andFilterConditions([
+    ...(compiled ? [compiled] : []),
+    ...findHiddenOriginConditions({ hiddenOrigins }),
+  ]);
+}
 
 const PROTECTIONS = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
@@ -105,7 +148,12 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
   const platformUrl: TraceApi["platformUrl"] = ({ projectSlug, path }) =>
     `https://app.langwatch.test/${projectSlug}${path}`;
 
-  const stub = createApiFixture<TraceApi>({ listTraces, resolveApiKeyProtections, platformUrl });
+  const stub = createApiFixture<TraceApi>({
+    listTraces,
+    resolveApiKeyProtections,
+    platformUrl,
+    compileExplorerTraceFilter,
+  });
 
   const runtime = createRestRuntime({
     identity: {
@@ -521,54 +569,157 @@ describe("POST /search", () => {
 });
 
 /**
- * FINDING search-filter-door-missing (handoff §11): `traceSearchBodySchema`
- * has no `filter` field, so upstream's compiled query-language filter never
- * reaches this route. `it.todo` pending that door - do not edit the route.
+ * `filter` compiles over the same `TraceApi.compileExplorerTraceFilter` path
+ * `traces.discover` uses. Fold: error shapes are this tree's own codes
+ * (`filter_parse_error`, `filter_field_unknown`), not upstream's `validation_error`.
  */
-
-/* oxlint-disable vitest/warn-todo -- the finding above names why these stay todo */
 describe("POST /search with a trace filter", () => {
+  const filterWhereOf = (listTraces: TraceApi["listTraces"]) =>
+    vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.filterWhere;
+
   describe("when the filter is well formed", () => {
-    it.todo("passes a compiled condition down, not the string");
-    it.todo("bounds the translation to the window the search asked for");
-    it.todo("does not forward the raw string as a search field");
+    it("passes a compiled condition down, not the string", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+      const filterWhere = filterWhereOf(listTraces);
+      expect(filterWhere?.sql).toContain("ContainsErrorStatus");
+      expect(filterWhere?.params.tenantId).toBe("project-123");
+    });
+
+    it("bounds the translation to the window the search asked for", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+      const filterWhere = filterWhereOf(listTraces);
+      expect(filterWhere?.params.timeFrom).toBe(1000);
+      expect(filterWhere?.params.timeTo).toBe(5000);
+    });
+
+    it("does not forward the raw string as a search field", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+      expect(vi.mocked(listTraces).mock.calls[0]?.[0]?.query).not.toHaveProperty("filter");
+    });
   });
 
   describe("when no filter is sent", () => {
-    it.todo("sends no condition of the filter's own");
+    it("sends no condition of the filter's own", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000 });
+      expect(Object.keys(filterWhereOf(listTraces)?.params ?? {})).toEqual(["hiddenOrigins"]);
+    });
   });
 
   describe("when the filter is whitespace", () => {
-    it.todo("is the same request as no filter");
+    it("is the same request as no filter", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, filter: "   " });
+      expect(Object.keys(filterWhereOf(listTraces)?.params ?? {})).toEqual(["hiddenOrigins"]);
+    });
   });
 
-  // specs/langy/langy-trace-explorer-actions.feature has these three scenario
-  // titles already, unbound - the capability they need is this same missing door.
   describe("given the origins the Trace Explorer leaves out", () => {
     describe("when the search names no origin", () => {
-      it.todo("excludes the Langy origin, after the filter's own terms");
+      /** @scenario "A trace search that names no origin leaves out Langy's own traces" */
+      it("excludes the Langy origin, after the filter's own terms", async () => {
+        const { send, listTraces } = mount();
+        await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+        const filterWhere = filterWhereOf(listTraces);
+        expect(filterWhere?.params.hiddenOrigins).toEqual(["langy"]);
+        expect(filterWhere?.sql).toContain("ContainsErrorStatus");
+        expect(filterWhere?.sql).toContain("NOT IN ({hiddenOrigins:Array(String)})");
+      });
     });
 
     describe("when the filter names an origin", () => {
-      it.todo("excludes no origin");
+      /** @scenario "A trace search whose filter names an origin is left as asked" */
+      it("excludes no origin", async () => {
+        const { send, listTraces } = mount();
+        await send({ startDate: 1000, endDate: 5000, filter: "origin:langy" });
+        const filterWhere = filterWhereOf(listTraces);
+        expect(filterWhere?.params.hiddenOrigins).toBeUndefined();
+        expect(filterWhere?.sql).not.toContain("NOT IN ({hiddenOrigins");
+      });
     });
 
     describe("when the origin filter names an origin", () => {
-      it.todo("excludes no origin");
+      /**
+       * @scenario "A trace search whose origin flag names an origin is left as asked"
+       * Fold: `compileExplorerTraceFilter` never returns `undefined` (unlike
+       * upstream) — with nothing left to filter on, it answers the no-op
+       * condition rather than omitting the field.
+       */
+      it("excludes no origin", async () => {
+        const { send, listTraces } = mount();
+        await send({
+          startDate: 1000,
+          endDate: 5000,
+          filters: { "traces.origin": ["evaluation"] },
+        });
+        expect(filterWhereOf(listTraces)).toEqual({ sql: "1 = 1", params: {} });
+      });
     });
   });
 
   describe("when the filter cannot be parsed", () => {
-    it.todo("answers 422 naming the filter field");
+    it("answers 422 naming the filter field", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, filter: "status:" });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("filter_parse_error");
+      expect(listTraces).not.toHaveBeenCalled();
+    });
   });
 
   describe("when a span clause rides the updated axis", () => {
-    it.todo("answers 422 rather than a result set missing rows");
-    it.todo("allows a trace-level clause on the same axis");
-    it.todo("allows the same span clause on the occurred axis");
+    it("answers 422 rather than a result set missing rows", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("filter_parse_error");
+      expect(listTraces).not.toHaveBeenCalled();
+    });
+
+    it("allows a trace-level clause on the same axis", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "status:error",
+      });
+      expect(res.status).toBe(200);
+      expect(filterWhereOf(listTraces)?.sql).toContain("ContainsErrorStatus");
+    });
+
+    it("allows the same span clause on the occurred axis", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(200);
+      expect(filterWhereOf(listTraces)?.sql).toContain("stored_spans");
+    });
   });
 
   describe("when the filter names a field the language does not have", () => {
-    it.todo("answers 422 and names the fields that exist");
+    it("answers 422 and names the fields that exist", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, filter: "statuz:error" });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: string; field?: string; knownFields?: string[] };
+      expect(body.error).toBe("filter_field_unknown");
+      expect(body.field).toBe("statuz");
+      expect(body.knownFields).toContain("status");
+      expect(listTraces).not.toHaveBeenCalled();
+    });
   });
 });

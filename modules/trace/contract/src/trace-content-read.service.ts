@@ -16,6 +16,8 @@ export abstract class TraceContentReadService {
       dateField?: TraceDateField;
       /** A compiled `select` projection, applied by the read rather than reshaped after it. */
       projection?: CompiledProjection["plan"];
+      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
+      filterWhere?: { sql: string; params: Record<string, unknown> };
     };
   }): Promise<TracesForProjectResult>;
   abstract findTrace(input: {

@@ -139,6 +139,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
+      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
+      filterWhere?: { sql: string; params: Record<string, unknown> };
     };
   }): Promise<TracesForProjectResult>;
   findTrace(input: {
@@ -357,14 +359,17 @@ export interface TraceApi extends TraceOtlpIngestApi {
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null;
   /**
-   * The Explorer's own filter: the query compiled, the origins it hides left
-   * out. The facet counts compile without it, so origin keeps offering them.
+   * The Explorer's own filter: the query compiled, hidden origins left out
+   * unless the query (or `originNamed`) names one; `dateField` refuses a
+   * span/event clause on the `updated` axis.
    */
   compileExplorerTraceFilter(input: {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    originNamed?: boolean;
+    dateField?: TraceDateField;
   }): { sql: string; params: Record<string, unknown> };
   /**
    * The trace ids a filter selects, newest first and capped: the predicate the

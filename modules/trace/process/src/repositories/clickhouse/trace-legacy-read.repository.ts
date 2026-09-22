@@ -851,8 +851,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Pass the dashboard time window so span/event filters bound their stored_spans
           // EXISTS subqueries to the same window, pruning partitions instead of cold-scanning.
           const {
-            conditions: filterConditions,
-            params: filterParams,
+            conditions: legacyFilterConditions,
+            params: legacyFilterParams,
             hasUnsupportedFilters,
           } = this.translateFilters(input.filters ?? {}, {
             startDate: input.startDate,
@@ -862,6 +862,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           if (hasUnsupportedFilters) {
             throw new Error("Filters contain unsupported fields for ClickHouse");
           }
+
+          // The v1 REST search door's compiled query-language filter (already
+          // parameterized by `TraceApi.compileExplorerTraceFilter`), ANDed
+          // alongside the legacy filter map's own conditions.
+          const filterConditions = options.filterWhere
+            ? [...legacyFilterConditions, `(${options.filterWhere.sql})`]
+            : legacyFilterConditions;
+          const filterParams = options.filterWhere
+            ? { ...legacyFilterParams, ...options.filterWhere.params }
+            : legacyFilterParams;
 
           // Pinned once on the first page and carried by the cursor so every later page
           // resolves the same versions. Only the updated axis needs it — OccurredAt is immutable.

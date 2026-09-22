@@ -39,6 +39,7 @@ import {
   type Trace,
   type TraceFacetsQuery,
   type TraceSearchBody,
+  type TraceSharedFiltersInput,
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
@@ -263,6 +264,15 @@ function compileRequestedProjection({
   }
 }
 
+/** Whether the legacy `filters["traces.origin"]` map already names an origin. */
+function namesOriginFilter(filters: TraceSharedFiltersInput["filters"]): boolean {
+  const originFilter = filters?.["traces.origin"];
+  if (originFilter === undefined) return false;
+  return Array.isArray(originFilter)
+    ? originFilter.length > 0
+    : Object.keys(originFilter).length > 0;
+}
+
 function resolveTraceFormat({
   format,
   llmMode,
@@ -330,6 +340,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
         from,
         select,
         dateField,
+        filter,
         format: formatParam,
         includeSpans,
         llmMode,
@@ -352,12 +363,22 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
 
       const { projection } = compileRequestedProjection({ from, select, protections });
 
+      const startEpoch = coerceToEpochOrThrow(startDate, "startDate");
+      const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
+      const filterWhere = app.compileExplorerTraceFilter({
+        query: filter ?? "",
+        tenantId: scope.id,
+        timeRange: { from: startEpoch, to: endEpoch },
+        originNamed: namesOriginFilter(searchFields.filters),
+        dateField,
+      });
+
       const results = await app.listTraces({
         query: {
           ...searchFields,
           projectId: scope.id,
-          startDate: coerceToEpochOrThrow(startDate, "startDate"),
-          endDate: coerceToEpochOrThrow(endDate, "endDate"),
+          startDate: startEpoch,
+          endDate: endEpoch,
           pageSize,
         } as never,
         protections,
@@ -366,6 +387,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
           includeSpans: includeSpans ?? false,
           scrollId: scrollId ?? undefined,
           dateField,
+          filterWhere,
           ...(projection ? { projection: projection.plan } : {}),
         },
       });

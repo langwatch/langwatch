@@ -51,6 +51,12 @@ export interface GetAllTracesForProjectOptions {
    * Opaque to callers — produced by `compileProjection`.
    */
   projection?: ProjectionPlan;
+  /**
+   * A pre-compiled ClickHouse WHERE fragment, ANDed into the read — the v1
+   * REST search door's query-language `filter`, already compiled by
+   * `TraceApi.compileExplorerTraceFilter` before it reaches here.
+   */
+  filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
 /**

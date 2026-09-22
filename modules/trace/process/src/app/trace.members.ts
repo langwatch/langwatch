@@ -124,6 +124,8 @@ export interface TraceLegacyRead {
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
+      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
+      filterWhere?: { sql: string; params: Record<string, unknown> };
     },
   ): Promise<TracesForProjectResult>;
 

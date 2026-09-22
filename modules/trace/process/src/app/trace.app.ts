@@ -99,7 +99,9 @@ import {
   DEFAULT_PII_REDACTION_LEVEL,
   type ExplorerInstantEvalRunInput,
   explorerHiddenOrigins,
+  FilterParseError,
   type ResolvedInstantEvalRun,
+  type TraceDateField,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -1101,20 +1103,33 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /**
-   * The Explorer's own filter: the query compiled, with the origins the
-   * Explorer hides left out unless the query names `origin` itself.
+   * The Explorer's own filter: the query compiled, hidden origins left out
+   * unless the query (or `originNamed`) names one. `dateField` refuses a
+   * span/event clause on the `updated` axis rather than dropping rows silently.
    */
   compileExplorerTraceFilter(input: {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    originNamed?: boolean;
+    dateField?: TraceDateField;
   }): { sql: string; params: Record<string, unknown> } {
     const compiled = this.translateTraceFilter(input);
 
+    if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
+      throw new FilterParseError(
+        "A span, event or free-text clause matches spans by when they started, and dateField " +
+          '"updated" selects traces by when they were last modified — the two together would ' +
+          "drop traces silently. Filter on trace-level fields instead, or pull on the occurred axis.",
+      );
+    }
+
+    const hiddenOrigins = input.originNamed ? [] : explorerHiddenOrigins(input.query);
+
     return andFilterConditions([
       ...(compiled ? [compiled] : []),
-      ...findHiddenOriginConditions({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
+      ...findHiddenOriginConditions({ hiddenOrigins }),
     ]);
   }
 

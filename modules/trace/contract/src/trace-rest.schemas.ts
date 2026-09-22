@@ -11,6 +11,9 @@ import { z } from "zod";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 
+/** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
+export const MAX_TRACE_FILTER_LENGTH = 4_000;
+
 /**
  * The additive half of the search body; the other half is the deployment's
  * shared analytics filter vocabulary. A mount merges the two. The describe()
@@ -18,6 +21,17 @@ import { projectionRequestSchema, type ProjectionRequest } from "./trace-project
  */
 export const traceSearchBodyExtensions = {
   scrollId: z.string().optional().nullable(),
+  filter: z
+    .string()
+    .max(MAX_TRACE_FILTER_LENGTH)
+    .optional()
+    .describe(
+      "A trace filter string in the same language the Trace Explorer's search bar speaks — " +
+        "`status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted " +
+        "phrase for free text. Combined with `filters`/`query`/`traceIds` rather than replacing " +
+        "them, so every condition sent must hold. A malformed filter, or one naming a field the " +
+        "language does not have, is a 422 that names the `filter` field.",
+    ),
   format: z
     .enum(["digest", "json"])
     .optional()
@@ -101,6 +115,7 @@ export type TraceSearchBody = ProjectionRequest &
     includeSpans?: boolean | undefined;
     llmMode?: boolean | undefined;
     dateField: TraceDateField;
+    filter?: string | undefined;
   }>;
 
 /**
