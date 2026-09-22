@@ -65,8 +65,9 @@ import {
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Keys the product provisions and owns rather than the customer — today only
- * the Langy VK (`purpose: LANGY`). They remain addressable internally (the
+ * Keys the product provisions and owns rather than the customer: the Langy VK
+ * (`purpose: LANGY`) and the key a self-hosted license resolves to
+ * (`purpose: CONNECT`). They remain addressable internally (the
  * gateway authenticates against them by hashed secret; Langy re-reads its own
  * config by column) but are absent from every customer-facing read and refuse
  * every customer-facing mutation.
@@ -155,11 +156,12 @@ export type CreateVirtualKeyInput = {
   config?: Partial<VirtualKeyConfig>;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
-   * auto-provisioned by the Langy services. Anything other than USER marks the
-   * key product-managed, which hides it from customer-facing reads and makes
-   * it refuse customer-facing mutations (see `isProductManaged`).
+   * auto-provisioned by the Langy services; CONNECT for the key a self-hosted
+   * license resolves to. Anything other than USER marks the key
+   * product-managed, which hides it from customer-facing reads and makes it
+   * refuse customer-facing mutations (see `isProductManaged`).
    */
-  purpose?: "USER" | "LANGY";
+  purpose?: "USER" | "LANGY" | "CONNECT";
 };
 
 export type UpdateVirtualKeyInput = {
@@ -617,6 +619,56 @@ export class VirtualKeyService {
 
   async revoke(input: RevokeVirtualKeyInput): Promise<VirtualKeyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
+    return this.revokeExisting(existing, input);
+  }
+
+  /**
+   * A product-managed key, read for the feature that owns it. Customer-facing
+   * reads go through `getById`, which reports these keys as absent.
+   */
+  async getManagedByIdInternal(
+    id: string,
+    organizationId: string,
+  ): Promise<VirtualKeyWithScopes | null> {
+    const vk = await this.repository.findById(id, organizationId);
+    return vk && isProductManaged(vk) ? vk : null;
+  }
+
+  /**
+   * Ends a product-managed key on behalf of the feature that owns it.
+   * `revoke` refuses these keys to every customer-facing caller; the owner
+   * still has to be able to end one. A key that is already gone is left alone,
+   * so the call is safe to repeat.
+   */
+  async revokeManagedInternal(input: RevokeVirtualKeyInput): Promise<void> {
+    const existing = await this.getManagedByIdInternal(
+      input.id,
+      input.organizationId,
+    );
+    if (!existing) return;
+    await this.revokeExisting(existing, input);
+  }
+
+  /**
+   * Tells every gateway to resolve a product-managed key again, without
+   * changing the key. For state the gateway caches that lives outside the key
+   * row, such as the install a license is bound to.
+   */
+  async invalidateManagedInternal(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.changeEvents.append({
+      organizationId: input.organizationId,
+      kind: "VK_CONFIG_UPDATED",
+      virtualKeyId: input.id,
+    });
+  }
+
+  private async revokeExisting(
+    existing: VirtualKeyWithScopes,
+    input: RevokeVirtualKeyInput,
+  ): Promise<VirtualKeyWithScopes> {
     if (existing.status === "REVOKED") return existing;
     const before = serialiseForAudit(existing);
 

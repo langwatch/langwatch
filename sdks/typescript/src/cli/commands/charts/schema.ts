@@ -4,6 +4,7 @@ import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.servic
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -22,6 +23,23 @@ export const chartSchemaCommand = async (options?: {
 
   try {
     const schema = await service.schema();
+
+    // The payload is read straight into `.views.length` below, so a server
+    // that answers with a different shape used to crash here and be reported
+    // as a network failure. Name the mismatch instead: an older CLI against a
+    // newer platform is the case this actually happens in, and "update the
+    // CLI" is something the reader can act on.
+    if (!Array.isArray(schema?.views)) {
+      failSpinner({
+        spinner,
+        error: commandValidationError(
+          "The analytics schema came back in a shape this CLI does not recognise. Update it with `npm install -g langwatch@latest`, which is usually an older CLI against a newer LangWatch.",
+          { received: typeof schema },
+        ),
+        action: "fetch analytics schema",
+      });
+      process.exit(1);
+    }
 
     spinner.succeed(
       `Found ${schema.views.length} view${schema.views.length !== 1 ? "s" : ""} in ${schema.database}`,

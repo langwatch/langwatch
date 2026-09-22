@@ -27,7 +27,10 @@ import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
+import { checkupRouter } from "./routers/checkup";
 import { codingAgentsRouter } from "./routers/codingAgents";
+import { connectRouter } from "./routers/connect";
+import { connectedBillingRouter } from "./routers/connectedBilling";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -61,6 +64,7 @@ import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
+import { licenseRegistryRouter } from "./routers/licenseRegistry";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
@@ -84,6 +88,7 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { secretsRouter } from "./routers/secrets";
+import { selfHostedInstancesRouter } from "./routers/selfHostedInstances";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
@@ -172,7 +177,12 @@ const coreRouters = {
   savedViews: savedViewsRouter,
   secrets: secretsRouter,
   license: licenseRouter,
+  licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  selfHostedInstances: selfHostedInstancesRouter,
+  connect: connectRouter,
+  checkup: checkupRouter,
+  connectedBilling: connectedBillingRouter,
   scimOversight: scimOversightRouter,
   scimReconciliation: scimReconciliationRouter,
   scimToken: scimTokenRouter,

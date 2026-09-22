@@ -181,6 +181,9 @@ vi.mock("~/utils/crispBubblePolicy", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    checkup: {
+      startupNotice: { useQuery: () => ({ data: undefined }) },
+    },
     limits: {
       getUsage: { useQuery: () => ({ data: undefined }) },
     },

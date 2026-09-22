@@ -2,7 +2,6 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { describe, expect, it, vi } from "vitest";
 import { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { PrismaPasskeyRemovalRepository } from "../passkey-removal.prisma.repository";
-import { serializationRetryDelayMs } from "../serializable-retry";
 
 function driverConflict() {
   return Object.assign(new Error("TransactionWriteConflict"), {
@@ -46,7 +45,7 @@ describe("passkey removal serialization retries", () => {
     });
   });
 
-  it("propagates an exhausted conflict after five attempts", async () => {
+  it("propagates an exhausted conflict after four attempts", async () => {
     const { removal, transaction } = repository();
     const conflict = driverConflict();
     transaction.mockRejectedValue(conflict);
@@ -54,24 +53,7 @@ describe("passkey removal serialization retries", () => {
     await expect(
       removal.deleteIfAnotherWayInRemains({ passkeyId: "passkey_1" }),
     ).rejects.toBe(conflict);
-    expect(transaction).toHaveBeenCalledTimes(5);
-  });
-
-  it("waits a random slice of a growing window between attempts", () => {
-    // The loser is told before the winner commits, so the window has to be
-    // long enough for that transaction to finish and random enough that two
-    // requests told at the same moment do not come back together.
-    for (const attempt of [0, 1, 2, 3]) {
-      const ceiling = 50 * 2 ** attempt;
-      const draws = Array.from({ length: 50 }, () =>
-        serializationRetryDelayMs(attempt),
-      );
-      for (const delay of draws) {
-        expect(delay).toBeGreaterThanOrEqual(0);
-        expect(delay).toBeLessThan(ceiling);
-      }
-      expect(new Set(draws).size).toBeGreaterThan(1);
-    }
+    expect(transaction).toHaveBeenCalledTimes(4);
   });
 
   it("does not retry unrelated driver failures", async () => {

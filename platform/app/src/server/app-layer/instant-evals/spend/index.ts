@@ -103,6 +103,29 @@ export function createInstantEvalSpendRecorderFromEnv(): InstantEvalSpendRecorde
   };
 }
 
+/**
+ * The recorder for judgements made for a self-hosted license over the hosted
+ * route. Always the spend spine: a hosted call that is not metered is usage
+ * given away, so there is no logging fallback, and a missing pipeline throws
+ * for the caller to keep the spend and try again.
+ *
+ * It does not nudge the monthly billing report. A connected customer is
+ * invoiced quarterly from the ledger, and a nudge per write would dispatch a
+ * billing command every few seconds for every active install.
+ */
+export function createInstantEvalSpendRecorderForHostedCalls(): InstantEvalSpendRecorder {
+  return new SpendPipelineInstantEvalSpendRecorder({
+    attribution: attributionFor,
+    dispatch: async (data) => {
+      const commands = pipelineCommands(GATEWAY_SPEND_PIPELINE_NAME);
+      if (!commands?.confirmSpend) {
+        throw new Error("gateway spend pipeline is not registered");
+      }
+      return await commands.confirmSpend.send(data);
+    },
+  });
+}
+
 /** The organization a project belongs to, or null when it has none. */
 async function organizationOf(projectId: string): Promise<string | null> {
   const project = await prisma.project.findUnique({

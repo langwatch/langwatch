@@ -621,6 +621,33 @@ app:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # LangWatch-hosted services this install may call with the license it holds.
+  #
+  # There is no switch that turns these on. The license decides: one that names
+  # a hosted service can reach it, one that names none reaches nothing. So a
+  # default render carries no LANGWATCH_CONNECT_ variable and an install on an
+  # offline license calls nothing, which an operator checks against the license
+  # blob rather than against this file.
+  #
+  # `disabled` is the escape hatch an audit asks for: set it and this install
+  # calls LangWatch for nothing at all, hosted services and usage reporting
+  # alike, whatever its license says.
+  # See https://docs.langwatch.ai/self-hosting/connect
+  ## @extra app.connect Connected hosted services configuration.
+  ## @param app.connect.disabled [boolean] Switches hosted services and usage reporting off entirely.
+  ## @param app.connect.gatewayEndpoint [string] Where hosted services are called. Empty uses the published endpoint.
+  ## @param app.connect.licenseEndpoint [string] Where the license registers itself. Empty uses the published endpoint.
+  ## @param app.connect.instanceId [string] Identity this install presents. Empty uses the id minted into its own database.
+  connect:
+    disabled: false
+    gatewayEndpoint: ""
+    licenseEndpoint: ""
+    # Set this only when an operator has a reason to name the identity. The
+    # default is minted once into this install's own database, so it survives
+    # restarts, backups and hostname changes; a second install with a database
+    # of its own presents another id and is refused as the wrong instance.
+    instanceId: ""
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl

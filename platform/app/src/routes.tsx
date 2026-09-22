@@ -175,6 +175,14 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/license")),
       },
       {
+        path: "/settings/connect",
+        ...page(() => import("./pages/settings/connect")),
+      },
+      {
+        path: "/settings/checkup",
+        ...page(() => import("./pages/settings/checkup")),
+      },
+      {
         path: "/settings/members",
         ...page(() => import("./pages/settings/members")),
       },
@@ -767,6 +775,14 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/sso-connections",
     ...page(() => import("./pages/ops/backoffice/sso-connections")),
+  },
+  {
+    path: "/ops/backoffice/licenses",
+    ...page(() => import("./pages/ops/backoffice/licenses")),
+  },
+  {
+    path: "/ops/backoffice/self-hosted-instances",
+    ...page(() => import("./pages/ops/backoffice/self-hosted-instances")),
   },
   {
     path: "/ops/backoffice/identity-lookup",

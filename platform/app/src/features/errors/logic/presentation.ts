@@ -621,6 +621,94 @@ const presentations = {
     describe: () =>
       "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
+  checkup_clickhouse_migrations_pending: {
+    title: "ClickHouse migrations are pending",
+    describe: () =>
+      "Run the ClickHouse migrations, then run the checkup again.",
+  },
+  checkup_clickhouse_not_configured: {
+    title: "ClickHouse is not configured",
+    describe: () => "Set CLICKHOUSE_URL on the app and worker deployments.",
+  },
+  checkup_clickhouse_unreachable: {
+    title: "ClickHouse did not answer",
+    describe: () =>
+      "Check CLICKHOUSE_URL and that ClickHouse accepts connections from the app.",
+  },
+  checkup_email_not_configured: {
+    title: "Email is not configured",
+    describe: () =>
+      "Set EMAIL_PROVIDER to smtp, ses, sendgrid or resend with its credentials, and restart.",
+  },
+  checkup_gateway_control_plane_mismatch: {
+    title: "The AI Gateway reports another control plane",
+    describe: () => "Point the gateway's control plane URL at this app.",
+  },
+  checkup_gateway_unreachable: {
+    title: "The AI Gateway did not answer",
+    describe: () =>
+      "Check that the gateway is running and that the app can reach it.",
+  },
+  checkup_license_corrupted: {
+    title: "The license could not be read",
+    describe: () => "Enter the activation code or license key again.",
+  },
+  checkup_license_expired: {
+    title: "The license has expired",
+    describe: () =>
+      "Renew it, then enter the new activation code on the License page.",
+  },
+  checkup_license_invalid: {
+    title: "The license does not verify",
+    describe: () =>
+      "Enter the activation code or license key again, or contact support.",
+  },
+  checkup_lwql_not_provisionable: {
+    title: "LWQL functions cannot be provisioned",
+    describe: () =>
+      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+  },
+  checkup_model_provider_refused: {
+    title: "A model provider refused the test call",
+    describe: () =>
+      "Check the provider's key and quota on the Model Providers page.",
+  },
+  checkup_no_model_provider: {
+    title: "No model provider is configured",
+    describe: () => "Add a model provider on the Model Providers page.",
+  },
+  checkup_postgres_migration_failed: {
+    title: "A Postgres migration failed",
+    describe: () =>
+      "Resolve the failed migration, then run the migrations again.",
+  },
+  checkup_postgres_migrations_pending: {
+    title: "Postgres migrations are pending",
+    describe: () => "Run the Postgres migrations, then run the checkup again.",
+  },
+  checkup_postgres_unreachable: {
+    title: "Postgres did not answer",
+    describe: () =>
+      "Check DATABASE_URL and that the database accepts connections from the app.",
+  },
+  checkup_redis_not_configured: {
+    title: "Redis is not configured",
+    describe: () => "Set REDIS_URL on the app and worker deployments.",
+  },
+  checkup_redis_unreachable: {
+    title: "Redis did not answer",
+    describe: () =>
+      "Check REDIS_URL and that Redis accepts connections from the app.",
+  },
+  checkup_smtp_refused: {
+    title: "The SMTP server refused the connection",
+    describe: () => "Check the SMTP host, port and credentials.",
+  },
+  checkup_storage_write_failed: {
+    title: "Writing to storage failed",
+    describe: () =>
+      "Check the bucket or path exists and that the app's credentials allow put and delete.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {
@@ -1287,18 +1375,62 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_sync_failed: {
+    // The reader is the administrator of a self-hosted install, in Settings,
+    // Connect or on the License page. The daily sync runs on its own and the
+    // License page can run it now; what they need to know is that the license
+    // they hold keeps working meanwhile.
+    title: "The license sync did not complete",
+    describe: () =>
+      "It runs again in a day, or now from the License page. Your license and its seats are unchanged.",
+  },
   license_signing_key_not_pem: {
-    title: "That doesn't look like a private key",
-    describe: () => "Paste the whole key, including its BEGIN and END lines.",
+    title: "The signing key on the server isn't a private key",
+    describe: () =>
+      "The license signing secret must hold the whole key, including its BEGIN and END lines.",
   },
   license_signing_key_encrypted: {
-    title: "That private key is passphrase-protected",
-    describe: () => "Use an unencrypted private key to sign licenses.",
+    title: "The signing key on the server is passphrase-protected",
+    describe: () =>
+      "Store an unencrypted private key in the license signing secret.",
   },
   license_signing_failed: {
-    title: "That private key couldn't sign the license",
+    title: "The signing key on the server couldn't sign the license",
     describe: () =>
-      "Check it is the license signing key and was copied in full.",
+      "Check the license signing secret holds the license signing key, stored in full.",
+  },
+  license_signing_not_configured: {
+    title: "License signing isn't set up",
+    describe: () =>
+      "Add the license signing key as a server secret, then issue the license again.",
+  },
+  license_already_registered: {
+    title: "This license is already in the registry",
+    describe: () => "Search for it in the list. Nothing was changed.",
+  },
+  license_already_reissued: {
+    title: "This license was already reissued",
+    describe: () => "Open its replacement and reissue that one instead.",
+  },
+  license_overage_max_requires_overage: {
+    title: "An overage maximum needs overage switched on",
+    describe: () =>
+      "Switch on-demand overage on to set a maximum, or clear the maximum.",
+  },
+  issued_license_not_found: {
+    title: "That license isn't in the registry",
+    describe: () => "It may have been registered under another customer.",
+  },
+  issued_license_not_active: {
+    title: "This license can't be changed this way",
+    describe: (error) => {
+      const status = str(error, "status", "");
+      if (status === "revoked") return "It was revoked. Issue a new license.";
+      if (status === "superseded") {
+        return "It was replaced. Open the license that replaced it.";
+      }
+      return "Its term has ended. Reissue it to renew.";
+    },
   },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
@@ -3631,6 +3763,105 @@ const presentations = {
     title: "This key has expired",
     describe: () =>
       "Extend its expiration date in settings, or create a new key.",
+  },
+  // Refusals of a self-hosted license on LangWatch-hosted services. The reader
+  // is the administrator of the install, in its own Settings.
+  connect_instance_required: {
+    title: "This install did not identify itself",
+    describe: () =>
+      "Hosted services need the install's instance id with every call. Upgrade LangWatch, then try again.",
+  },
+  connect_license_not_registered: {
+    title: "This license is not set up for hosted services",
+    describe: () =>
+      "Contact LangWatch to have hosted services enabled for your license.",
+  },
+  connect_license_revoked: {
+    title: "This license is no longer active",
+    describe: () =>
+      "Hosted services are closed to it. Contact LangWatch for a new license.",
+  },
+  connect_license_expired: {
+    title: "This license has expired",
+    describe: () => "Renew the license to use hosted services again.",
+  },
+  connect_wrong_instance: {
+    title: "This license is in use by another install",
+    describe: () =>
+      "A license works with one install. If you rebuilt or moved this one, ask LangWatch to reset the license binding.",
+  },
+  connect_service_not_entitled: {
+    title: "This hosted service is not part of your license",
+    describe: () => "Contact LangWatch to add it to your license.",
+  },
+  connect_license_required: {
+    title: "Only a self-hosted license can change this cap",
+    describe: () =>
+      "This cap belongs to a self-hosted license. Budgets of a virtual key are managed in the AI Gateway settings.",
+  },
+  connect_budget_not_set: {
+    title: "No hosted usage budget is set up yet",
+    describe: () =>
+      "Contact LangWatch to agree a usage commit for hosted services. There is no cap to change until then.",
+  },
+  connect_budget_above_contract_maximum: {
+    title: "That cap is above what your license allows",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
+  },
+  connect_budget_exhausted: {
+    title: "The hosted usage budget is spent",
+    describe: (error) => {
+      const cap = num(error, "capUsd", 0);
+      const raise =
+        "An organization admin can raise the cap in Settings, Connect.";
+      return cap > 0
+        ? `The cap is ${cap.toFixed(2)} USD and it has been reached. ${raise}`
+        : `The cap for hosted services has been reached. ${raise}`;
+    },
+  },
+  connect_disabled: {
+    title: "Connect is switched off for this deployment",
+    describe: () =>
+      "An operator turns it on in the deployment configuration. Until then this install calls no hosted service.",
+  },
+  // Invoice billing for a connected customer. The reader is an operator in
+  // the backoffice, never the customer.
+  connected_billing_commit_mismatch: {
+    title: "The commit does not match the license",
+    describe: () =>
+      "Billing follows the commit agreed on the license. Set the license terms first, then run this with the same amount.",
+  },
+  connected_billing_not_onboarded: {
+    title: "This customer has no billing account yet",
+    describe: () =>
+      "Onboard the customer first: that creates the billing customer, the usage subscription and the commit.",
+  },
+  connected_billing_unavailable: {
+    title: "Billing is only available on LangWatch Cloud",
+    describe: () =>
+      "This deployment has no payment provider. Connected customers are billed from LangWatch Cloud.",
+  },
+  connect_unreachable: {
+    // The reader runs the network this install sits in, so the sentence names
+    // what an outbound rule has to allow rather than describing the failure.
+    title: "LangWatch could not be reached",
+    describe: (error) => {
+      const host = str(error, "host", "");
+      const port = num(error, "port", 0);
+      return host && port > 0
+        ? `Allow outbound traffic to ${host} on port ${port}, then try again.`
+        : "Allow outbound traffic to LangWatch from this install, then try again.";
+    },
+  },
+  hosted_service_unavailable: {
+    title: "The hosted service did not answer",
+    describe: () =>
+      "Nothing was judged and nothing was charged. Try again in a moment.",
   },
   rate_limited: {
     title: "Too many requests",

@@ -34,6 +34,7 @@ import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
 import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
+import { StartupNotice } from "./StartupNotice";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -296,6 +297,7 @@ export const DashboardPageBody = ({
           )}
 
         <AnnouncementBanner />
+        {publicPage ? null : <StartupNotice />}
 
         <JoinYourTeamTakeover
           currentOrganizationId={organization?.id}

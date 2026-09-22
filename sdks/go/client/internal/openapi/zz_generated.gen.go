@@ -1234,6 +1234,138 @@ func (e UpdateApiKey200JSONResponseBodyRoleBindingsScopeType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiCheckup200JSONResponseBodyRowsCost.
+const (
+	GetApiCheckup200JSONResponseBodyRowsCostEgress GetApiCheckup200JSONResponseBodyRowsCost = "egress"
+	GetApiCheckup200JSONResponseBodyRowsCostFree   GetApiCheckup200JSONResponseBodyRowsCost = "free"
+	GetApiCheckup200JSONResponseBodyRowsCostPaid   GetApiCheckup200JSONResponseBodyRowsCost = "paid"
+)
+
+// Valid indicates whether the value is a known member of the GetApiCheckup200JSONResponseBodyRowsCost enum.
+func (e GetApiCheckup200JSONResponseBodyRowsCost) Valid() bool {
+	switch e {
+	case GetApiCheckup200JSONResponseBodyRowsCostEgress:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsCostFree:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsCostPaid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiCheckup200JSONResponseBodyRowsGroup.
+const (
+	GetApiCheckup200JSONResponseBodyRowsGroupInstall      GetApiCheckup200JSONResponseBodyRowsGroup = "install"
+	GetApiCheckup200JSONResponseBodyRowsGroupIntegrations GetApiCheckup200JSONResponseBodyRowsGroup = "integrations"
+	GetApiCheckup200JSONResponseBodyRowsGroupLangwatch    GetApiCheckup200JSONResponseBodyRowsGroup = "langwatch"
+	GetApiCheckup200JSONResponseBodyRowsGroupPipelines    GetApiCheckup200JSONResponseBodyRowsGroup = "pipelines"
+)
+
+// Valid indicates whether the value is a known member of the GetApiCheckup200JSONResponseBodyRowsGroup enum.
+func (e GetApiCheckup200JSONResponseBodyRowsGroup) Valid() bool {
+	switch e {
+	case GetApiCheckup200JSONResponseBodyRowsGroupInstall:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsGroupIntegrations:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsGroupLangwatch:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsGroupPipelines:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiCheckup200JSONResponseBodyRowsVerdictOutcome.
+const (
+	GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeRefused   GetApiCheckup200JSONResponseBodyRowsVerdictOutcome = "refused"
+	GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeUnchecked GetApiCheckup200JSONResponseBodyRowsVerdictOutcome = "unchecked"
+	GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeVerified  GetApiCheckup200JSONResponseBodyRowsVerdictOutcome = "verified"
+)
+
+// Valid indicates whether the value is a known member of the GetApiCheckup200JSONResponseBodyRowsVerdictOutcome enum.
+func (e GetApiCheckup200JSONResponseBodyRowsVerdictOutcome) Valid() bool {
+	switch e {
+	case GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeRefused:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeUnchecked:
+		return true
+	case GetApiCheckup200JSONResponseBodyRowsVerdictOutcomeVerified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiCheckupRun200JSONResponseBodyRowsCost.
+const (
+	PostApiCheckupRun200JSONResponseBodyRowsCostEgress PostApiCheckupRun200JSONResponseBodyRowsCost = "egress"
+	PostApiCheckupRun200JSONResponseBodyRowsCostFree   PostApiCheckupRun200JSONResponseBodyRowsCost = "free"
+	PostApiCheckupRun200JSONResponseBodyRowsCostPaid   PostApiCheckupRun200JSONResponseBodyRowsCost = "paid"
+)
+
+// Valid indicates whether the value is a known member of the PostApiCheckupRun200JSONResponseBodyRowsCost enum.
+func (e PostApiCheckupRun200JSONResponseBodyRowsCost) Valid() bool {
+	switch e {
+	case PostApiCheckupRun200JSONResponseBodyRowsCostEgress:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsCostFree:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsCostPaid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiCheckupRun200JSONResponseBodyRowsGroup.
+const (
+	PostApiCheckupRun200JSONResponseBodyRowsGroupInstall      PostApiCheckupRun200JSONResponseBodyRowsGroup = "install"
+	PostApiCheckupRun200JSONResponseBodyRowsGroupIntegrations PostApiCheckupRun200JSONResponseBodyRowsGroup = "integrations"
+	PostApiCheckupRun200JSONResponseBodyRowsGroupLangwatch    PostApiCheckupRun200JSONResponseBodyRowsGroup = "langwatch"
+	PostApiCheckupRun200JSONResponseBodyRowsGroupPipelines    PostApiCheckupRun200JSONResponseBodyRowsGroup = "pipelines"
+)
+
+// Valid indicates whether the value is a known member of the PostApiCheckupRun200JSONResponseBodyRowsGroup enum.
+func (e PostApiCheckupRun200JSONResponseBodyRowsGroup) Valid() bool {
+	switch e {
+	case PostApiCheckupRun200JSONResponseBodyRowsGroupInstall:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsGroupIntegrations:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsGroupLangwatch:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsGroupPipelines:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome.
+const (
+	PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeRefused   PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome = "refused"
+	PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeUnchecked PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome = "unchecked"
+	PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeVerified  PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome = "verified"
+)
+
+// Valid indicates whether the value is a known member of the PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome enum.
+func (e PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome) Valid() bool {
+	switch e {
+	case PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeRefused:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeUnchecked:
+		return true
+	case PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcomeVerified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetJSONBodyColumnTypesType0.
 const (
 	PostApiDatasetJSONBodyColumnTypesType0String PostApiDatasetJSONBodyColumnTypesType0 = "string"
@@ -19183,6 +19315,33 @@ type UpdateApiKey200JSONResponseBodyRoleBindingsRole string
 // UpdateApiKey200JSONResponseBodyRoleBindingsScopeType defines parameters for UpdateApiKey.
 type UpdateApiKey200JSONResponseBodyRoleBindingsScopeType string
 
+// GetApiCheckup200JSONResponseBodyRowsCost defines parameters for GetApiCheckup.
+type GetApiCheckup200JSONResponseBodyRowsCost string
+
+// GetApiCheckup200JSONResponseBodyRowsGroup defines parameters for GetApiCheckup.
+type GetApiCheckup200JSONResponseBodyRowsGroup string
+
+// GetApiCheckup200JSONResponseBodyRowsVerdictOutcome defines parameters for GetApiCheckup.
+type GetApiCheckup200JSONResponseBodyRowsVerdictOutcome string
+
+// PostApiCheckupRunJSONBody defines parameters for PostApiCheckupRun.
+type PostApiCheckupRunJSONBody struct {
+	// Checks The check ids to run. Omit to run every explicit check.
+	Checks *[]string `json:"checks,omitempty"`
+
+	// ScenarioRunPlanId The run plan the scenario canary launches.
+	ScenarioRunPlanId *string `json:"scenarioRunPlanId,omitempty"`
+}
+
+// PostApiCheckupRun200JSONResponseBodyRowsCost defines parameters for PostApiCheckupRun.
+type PostApiCheckupRun200JSONResponseBodyRowsCost string
+
+// PostApiCheckupRun200JSONResponseBodyRowsGroup defines parameters for PostApiCheckupRun.
+type PostApiCheckupRun200JSONResponseBodyRowsGroup string
+
+// PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome defines parameters for PostApiCheckupRun.
+type PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome string
+
 // GetApiCodingAgentPullRequestUsageParams defines parameters for GetApiCodingAgentPullRequestUsage.
 type GetApiCodingAgentPullRequestUsageParams struct {
 	// Repository The repository as "owner/name".
@@ -26332,13 +26491,21 @@ type ListInstantEvalRunsParams struct {
 }
 
 // ListInstantEvalRuns200JSONResponseBodyRunsParameters0 defines parameters for ListInstantEvalRuns.
-type ListInstantEvalRuns200JSONResponseBodyRunsParameters0 = string
+type ListInstantEvalRuns200JSONResponseBodyRunsParameters0 struct {
+	union json.RawMessage
+}
+
+// ListInstantEvalRuns200JSONResponseBodyRunsParameters00 defines parameters for ListInstantEvalRuns.
+type ListInstantEvalRuns200JSONResponseBodyRunsParameters00 = string
+
+// ListInstantEvalRuns200JSONResponseBodyRunsParameters01 defines parameters for ListInstantEvalRuns.
+type ListInstantEvalRuns200JSONResponseBodyRunsParameters01 = float32
+
+// ListInstantEvalRuns200JSONResponseBodyRunsParameters02 defines parameters for ListInstantEvalRuns.
+type ListInstantEvalRuns200JSONResponseBodyRunsParameters02 = bool
 
 // ListInstantEvalRuns200JSONResponseBodyRunsParameters1 defines parameters for ListInstantEvalRuns.
-type ListInstantEvalRuns200JSONResponseBodyRunsParameters1 = float32
-
-// ListInstantEvalRuns200JSONResponseBodyRunsParameters2 defines parameters for ListInstantEvalRuns.
-type ListInstantEvalRuns200JSONResponseBodyRunsParameters2 = bool
+type ListInstantEvalRuns200JSONResponseBodyRunsParameters1 = []string
 
 // ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties defines parameters for ListInstantEvalRuns.
 type ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties struct {
@@ -26435,13 +26602,21 @@ type CreateInstantEvalRunJSONBodyQuestionsKind string
 type CreateInstantEvalRunJSONBodyTarget string
 
 // CreateInstantEvalRun202JSONResponseBodyParameters0 defines parameters for CreateInstantEvalRun.
-type CreateInstantEvalRun202JSONResponseBodyParameters0 = string
+type CreateInstantEvalRun202JSONResponseBodyParameters0 struct {
+	union json.RawMessage
+}
+
+// CreateInstantEvalRun202JSONResponseBodyParameters00 defines parameters for CreateInstantEvalRun.
+type CreateInstantEvalRun202JSONResponseBodyParameters00 = string
+
+// CreateInstantEvalRun202JSONResponseBodyParameters01 defines parameters for CreateInstantEvalRun.
+type CreateInstantEvalRun202JSONResponseBodyParameters01 = float32
+
+// CreateInstantEvalRun202JSONResponseBodyParameters02 defines parameters for CreateInstantEvalRun.
+type CreateInstantEvalRun202JSONResponseBodyParameters02 = bool
 
 // CreateInstantEvalRun202JSONResponseBodyParameters1 defines parameters for CreateInstantEvalRun.
-type CreateInstantEvalRun202JSONResponseBodyParameters1 = float32
-
-// CreateInstantEvalRun202JSONResponseBodyParameters2 defines parameters for CreateInstantEvalRun.
-type CreateInstantEvalRun202JSONResponseBodyParameters2 = bool
+type CreateInstantEvalRun202JSONResponseBodyParameters1 = []string
 
 // CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties defines parameters for CreateInstantEvalRun.
 type CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties struct {
@@ -26538,13 +26713,21 @@ type EstimateInstantEvalRunJSONBodyQuestionsKind string
 type EstimateInstantEvalRunJSONBodyTarget string
 
 // GetInstantEvalRun200JSONResponseBodyParameters0 defines parameters for GetInstantEvalRun.
-type GetInstantEvalRun200JSONResponseBodyParameters0 = string
+type GetInstantEvalRun200JSONResponseBodyParameters0 struct {
+	union json.RawMessage
+}
+
+// GetInstantEvalRun200JSONResponseBodyParameters00 defines parameters for GetInstantEvalRun.
+type GetInstantEvalRun200JSONResponseBodyParameters00 = string
+
+// GetInstantEvalRun200JSONResponseBodyParameters01 defines parameters for GetInstantEvalRun.
+type GetInstantEvalRun200JSONResponseBodyParameters01 = float32
+
+// GetInstantEvalRun200JSONResponseBodyParameters02 defines parameters for GetInstantEvalRun.
+type GetInstantEvalRun200JSONResponseBodyParameters02 = bool
 
 // GetInstantEvalRun200JSONResponseBodyParameters1 defines parameters for GetInstantEvalRun.
-type GetInstantEvalRun200JSONResponseBodyParameters1 = float32
-
-// GetInstantEvalRun200JSONResponseBodyParameters2 defines parameters for GetInstantEvalRun.
-type GetInstantEvalRun200JSONResponseBodyParameters2 = bool
+type GetInstantEvalRun200JSONResponseBodyParameters1 = []string
 
 // GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties defines parameters for GetInstantEvalRun.
 type GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties struct {
@@ -26558,13 +26741,21 @@ type GetInstantEvalRun200JSONResponseBodyQuestionsKind string
 type GetInstantEvalRun200JSONResponseBodyStatus string
 
 // CancelInstantEvalRun200JSONResponseBodyParameters0 defines parameters for CancelInstantEvalRun.
-type CancelInstantEvalRun200JSONResponseBodyParameters0 = string
+type CancelInstantEvalRun200JSONResponseBodyParameters0 struct {
+	union json.RawMessage
+}
+
+// CancelInstantEvalRun200JSONResponseBodyParameters00 defines parameters for CancelInstantEvalRun.
+type CancelInstantEvalRun200JSONResponseBodyParameters00 = string
+
+// CancelInstantEvalRun200JSONResponseBodyParameters01 defines parameters for CancelInstantEvalRun.
+type CancelInstantEvalRun200JSONResponseBodyParameters01 = float32
+
+// CancelInstantEvalRun200JSONResponseBodyParameters02 defines parameters for CancelInstantEvalRun.
+type CancelInstantEvalRun200JSONResponseBodyParameters02 = bool
 
 // CancelInstantEvalRun200JSONResponseBodyParameters1 defines parameters for CancelInstantEvalRun.
-type CancelInstantEvalRun200JSONResponseBodyParameters1 = float32
-
-// CancelInstantEvalRun200JSONResponseBodyParameters2 defines parameters for CancelInstantEvalRun.
-type CancelInstantEvalRun200JSONResponseBodyParameters2 = bool
+type CancelInstantEvalRun200JSONResponseBodyParameters1 = []string
 
 // CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties defines parameters for CancelInstantEvalRun.
 type CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties struct {
@@ -28659,6 +28850,9 @@ type CreateApiKeyJSONRequestBody CreateApiKeyJSONBody
 
 // UpdateApiKeyJSONRequestBody defines body for UpdateApiKey for application/json ContentType.
 type UpdateApiKeyJSONRequestBody UpdateApiKeyJSONBody
+
+// PostApiCheckupRunJSONRequestBody defines body for PostApiCheckupRun for application/json ContentType.
+type PostApiCheckupRunJSONRequestBody PostApiCheckupRunJSONBody
 
 // PostApiDashboardsJSONRequestBody defines body for PostApiDashboards for application/json ContentType.
 type PostApiDashboardsJSONRequestBody PostApiDashboardsJSONBody
@@ -65627,6 +65821,94 @@ func (t *CallConnectedAgent200JSONResponseBody_Output) UnmarshalJSON(b []byte) e
 	return err
 }
 
+// AsListInstantEvalRuns200JSONResponseBodyRunsParameters00 returns the union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as a ListInstantEvalRuns200JSONResponseBodyRunsParameters00
+func (t ListInstantEvalRuns200JSONResponseBodyRunsParameters0) AsListInstantEvalRuns200JSONResponseBodyRunsParameters00() (ListInstantEvalRuns200JSONResponseBodyRunsParameters00, error) {
+	var body ListInstantEvalRuns200JSONResponseBodyRunsParameters00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListInstantEvalRuns200JSONResponseBodyRunsParameters00 overwrites any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters00
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) FromListInstantEvalRuns200JSONResponseBodyRunsParameters00(v ListInstantEvalRuns200JSONResponseBodyRunsParameters00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListInstantEvalRuns200JSONResponseBodyRunsParameters00 performs a merge with any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0, using the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters00
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) MergeListInstantEvalRuns200JSONResponseBodyRunsParameters00(v ListInstantEvalRuns200JSONResponseBodyRunsParameters00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsListInstantEvalRuns200JSONResponseBodyRunsParameters01 returns the union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as a ListInstantEvalRuns200JSONResponseBodyRunsParameters01
+func (t ListInstantEvalRuns200JSONResponseBodyRunsParameters0) AsListInstantEvalRuns200JSONResponseBodyRunsParameters01() (ListInstantEvalRuns200JSONResponseBodyRunsParameters01, error) {
+	var body ListInstantEvalRuns200JSONResponseBodyRunsParameters01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListInstantEvalRuns200JSONResponseBodyRunsParameters01 overwrites any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters01
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) FromListInstantEvalRuns200JSONResponseBodyRunsParameters01(v ListInstantEvalRuns200JSONResponseBodyRunsParameters01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListInstantEvalRuns200JSONResponseBodyRunsParameters01 performs a merge with any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0, using the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters01
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) MergeListInstantEvalRuns200JSONResponseBodyRunsParameters01(v ListInstantEvalRuns200JSONResponseBodyRunsParameters01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsListInstantEvalRuns200JSONResponseBodyRunsParameters02 returns the union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as a ListInstantEvalRuns200JSONResponseBodyRunsParameters02
+func (t ListInstantEvalRuns200JSONResponseBodyRunsParameters0) AsListInstantEvalRuns200JSONResponseBodyRunsParameters02() (ListInstantEvalRuns200JSONResponseBodyRunsParameters02, error) {
+	var body ListInstantEvalRuns200JSONResponseBodyRunsParameters02
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListInstantEvalRuns200JSONResponseBodyRunsParameters02 overwrites any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0 as the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters02
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) FromListInstantEvalRuns200JSONResponseBodyRunsParameters02(v ListInstantEvalRuns200JSONResponseBodyRunsParameters02) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListInstantEvalRuns200JSONResponseBodyRunsParameters02 performs a merge with any union data inside the ListInstantEvalRuns200JSONResponseBodyRunsParameters0, using the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters02
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) MergeListInstantEvalRuns200JSONResponseBodyRunsParameters02(v ListInstantEvalRuns200JSONResponseBodyRunsParameters02) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListInstantEvalRuns200JSONResponseBodyRunsParameters0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListInstantEvalRuns200JSONResponseBodyRunsParameters0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsListInstantEvalRuns200JSONResponseBodyRunsParameters0 returns the union data inside the ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties as a ListInstantEvalRuns200JSONResponseBodyRunsParameters0
 func (t ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties) AsListInstantEvalRuns200JSONResponseBodyRunsParameters0() (ListInstantEvalRuns200JSONResponseBodyRunsParameters0, error) {
 	var body ListInstantEvalRuns200JSONResponseBodyRunsParameters0
@@ -65669,32 +65951,6 @@ func (t *ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProper
 
 // MergeListInstantEvalRuns200JSONResponseBodyRunsParameters1 performs a merge with any union data inside the ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties, using the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters1
 func (t *ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties) MergeListInstantEvalRuns200JSONResponseBodyRunsParameters1(v ListInstantEvalRuns200JSONResponseBodyRunsParameters1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsListInstantEvalRuns200JSONResponseBodyRunsParameters2 returns the union data inside the ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties as a ListInstantEvalRuns200JSONResponseBodyRunsParameters2
-func (t ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties) AsListInstantEvalRuns200JSONResponseBodyRunsParameters2() (ListInstantEvalRuns200JSONResponseBodyRunsParameters2, error) {
-	var body ListInstantEvalRuns200JSONResponseBodyRunsParameters2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromListInstantEvalRuns200JSONResponseBodyRunsParameters2 overwrites any union data inside the ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties as the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters2
-func (t *ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties) FromListInstantEvalRuns200JSONResponseBodyRunsParameters2(v ListInstantEvalRuns200JSONResponseBodyRunsParameters2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeListInstantEvalRuns200JSONResponseBodyRunsParameters2 performs a merge with any union data inside the ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties, using the provided ListInstantEvalRuns200JSONResponseBodyRunsParameters2
-func (t *ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties) MergeListInstantEvalRuns200JSONResponseBodyRunsParameters2(v ListInstantEvalRuns200JSONResponseBodyRunsParameters2) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -65803,6 +66059,94 @@ func (t *CreateInstantEvalRunJSONBody_Parameters_AdditionalProperties) Unmarshal
 	return err
 }
 
+// AsCreateInstantEvalRun202JSONResponseBodyParameters00 returns the union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as a CreateInstantEvalRun202JSONResponseBodyParameters00
+func (t CreateInstantEvalRun202JSONResponseBodyParameters0) AsCreateInstantEvalRun202JSONResponseBodyParameters00() (CreateInstantEvalRun202JSONResponseBodyParameters00, error) {
+	var body CreateInstantEvalRun202JSONResponseBodyParameters00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateInstantEvalRun202JSONResponseBodyParameters00 overwrites any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as the provided CreateInstantEvalRun202JSONResponseBodyParameters00
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) FromCreateInstantEvalRun202JSONResponseBodyParameters00(v CreateInstantEvalRun202JSONResponseBodyParameters00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateInstantEvalRun202JSONResponseBodyParameters00 performs a merge with any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0, using the provided CreateInstantEvalRun202JSONResponseBodyParameters00
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) MergeCreateInstantEvalRun202JSONResponseBodyParameters00(v CreateInstantEvalRun202JSONResponseBodyParameters00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCreateInstantEvalRun202JSONResponseBodyParameters01 returns the union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as a CreateInstantEvalRun202JSONResponseBodyParameters01
+func (t CreateInstantEvalRun202JSONResponseBodyParameters0) AsCreateInstantEvalRun202JSONResponseBodyParameters01() (CreateInstantEvalRun202JSONResponseBodyParameters01, error) {
+	var body CreateInstantEvalRun202JSONResponseBodyParameters01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateInstantEvalRun202JSONResponseBodyParameters01 overwrites any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as the provided CreateInstantEvalRun202JSONResponseBodyParameters01
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) FromCreateInstantEvalRun202JSONResponseBodyParameters01(v CreateInstantEvalRun202JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateInstantEvalRun202JSONResponseBodyParameters01 performs a merge with any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0, using the provided CreateInstantEvalRun202JSONResponseBodyParameters01
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) MergeCreateInstantEvalRun202JSONResponseBodyParameters01(v CreateInstantEvalRun202JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCreateInstantEvalRun202JSONResponseBodyParameters02 returns the union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as a CreateInstantEvalRun202JSONResponseBodyParameters02
+func (t CreateInstantEvalRun202JSONResponseBodyParameters0) AsCreateInstantEvalRun202JSONResponseBodyParameters02() (CreateInstantEvalRun202JSONResponseBodyParameters02, error) {
+	var body CreateInstantEvalRun202JSONResponseBodyParameters02
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateInstantEvalRun202JSONResponseBodyParameters02 overwrites any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0 as the provided CreateInstantEvalRun202JSONResponseBodyParameters02
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) FromCreateInstantEvalRun202JSONResponseBodyParameters02(v CreateInstantEvalRun202JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateInstantEvalRun202JSONResponseBodyParameters02 performs a merge with any union data inside the CreateInstantEvalRun202JSONResponseBodyParameters0, using the provided CreateInstantEvalRun202JSONResponseBodyParameters02
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) MergeCreateInstantEvalRun202JSONResponseBodyParameters02(v CreateInstantEvalRun202JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CreateInstantEvalRun202JSONResponseBodyParameters0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CreateInstantEvalRun202JSONResponseBodyParameters0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsCreateInstantEvalRun202JSONResponseBodyParameters0 returns the union data inside the CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties as a CreateInstantEvalRun202JSONResponseBodyParameters0
 func (t CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties) AsCreateInstantEvalRun202JSONResponseBodyParameters0() (CreateInstantEvalRun202JSONResponseBodyParameters0, error) {
 	var body CreateInstantEvalRun202JSONResponseBodyParameters0
@@ -65845,32 +66189,6 @@ func (t *CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties
 
 // MergeCreateInstantEvalRun202JSONResponseBodyParameters1 performs a merge with any union data inside the CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties, using the provided CreateInstantEvalRun202JSONResponseBodyParameters1
 func (t *CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties) MergeCreateInstantEvalRun202JSONResponseBodyParameters1(v CreateInstantEvalRun202JSONResponseBodyParameters1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsCreateInstantEvalRun202JSONResponseBodyParameters2 returns the union data inside the CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties as a CreateInstantEvalRun202JSONResponseBodyParameters2
-func (t CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties) AsCreateInstantEvalRun202JSONResponseBodyParameters2() (CreateInstantEvalRun202JSONResponseBodyParameters2, error) {
-	var body CreateInstantEvalRun202JSONResponseBodyParameters2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromCreateInstantEvalRun202JSONResponseBodyParameters2 overwrites any union data inside the CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties as the provided CreateInstantEvalRun202JSONResponseBodyParameters2
-func (t *CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties) FromCreateInstantEvalRun202JSONResponseBodyParameters2(v CreateInstantEvalRun202JSONResponseBodyParameters2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeCreateInstantEvalRun202JSONResponseBodyParameters2 performs a merge with any union data inside the CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties, using the provided CreateInstantEvalRun202JSONResponseBodyParameters2
-func (t *CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties) MergeCreateInstantEvalRun202JSONResponseBodyParameters2(v CreateInstantEvalRun202JSONResponseBodyParameters2) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -65979,6 +66297,94 @@ func (t *EstimateInstantEvalRunJSONBody_Parameters_AdditionalProperties) Unmarsh
 	return err
 }
 
+// AsGetInstantEvalRun200JSONResponseBodyParameters00 returns the union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as a GetInstantEvalRun200JSONResponseBodyParameters00
+func (t GetInstantEvalRun200JSONResponseBodyParameters0) AsGetInstantEvalRun200JSONResponseBodyParameters00() (GetInstantEvalRun200JSONResponseBodyParameters00, error) {
+	var body GetInstantEvalRun200JSONResponseBodyParameters00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetInstantEvalRun200JSONResponseBodyParameters00 overwrites any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as the provided GetInstantEvalRun200JSONResponseBodyParameters00
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) FromGetInstantEvalRun200JSONResponseBodyParameters00(v GetInstantEvalRun200JSONResponseBodyParameters00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetInstantEvalRun200JSONResponseBodyParameters00 performs a merge with any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0, using the provided GetInstantEvalRun200JSONResponseBodyParameters00
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) MergeGetInstantEvalRun200JSONResponseBodyParameters00(v GetInstantEvalRun200JSONResponseBodyParameters00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetInstantEvalRun200JSONResponseBodyParameters01 returns the union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as a GetInstantEvalRun200JSONResponseBodyParameters01
+func (t GetInstantEvalRun200JSONResponseBodyParameters0) AsGetInstantEvalRun200JSONResponseBodyParameters01() (GetInstantEvalRun200JSONResponseBodyParameters01, error) {
+	var body GetInstantEvalRun200JSONResponseBodyParameters01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetInstantEvalRun200JSONResponseBodyParameters01 overwrites any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as the provided GetInstantEvalRun200JSONResponseBodyParameters01
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) FromGetInstantEvalRun200JSONResponseBodyParameters01(v GetInstantEvalRun200JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetInstantEvalRun200JSONResponseBodyParameters01 performs a merge with any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0, using the provided GetInstantEvalRun200JSONResponseBodyParameters01
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) MergeGetInstantEvalRun200JSONResponseBodyParameters01(v GetInstantEvalRun200JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetInstantEvalRun200JSONResponseBodyParameters02 returns the union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as a GetInstantEvalRun200JSONResponseBodyParameters02
+func (t GetInstantEvalRun200JSONResponseBodyParameters0) AsGetInstantEvalRun200JSONResponseBodyParameters02() (GetInstantEvalRun200JSONResponseBodyParameters02, error) {
+	var body GetInstantEvalRun200JSONResponseBodyParameters02
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetInstantEvalRun200JSONResponseBodyParameters02 overwrites any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0 as the provided GetInstantEvalRun200JSONResponseBodyParameters02
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) FromGetInstantEvalRun200JSONResponseBodyParameters02(v GetInstantEvalRun200JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetInstantEvalRun200JSONResponseBodyParameters02 performs a merge with any union data inside the GetInstantEvalRun200JSONResponseBodyParameters0, using the provided GetInstantEvalRun200JSONResponseBodyParameters02
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) MergeGetInstantEvalRun200JSONResponseBodyParameters02(v GetInstantEvalRun200JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetInstantEvalRun200JSONResponseBodyParameters0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetInstantEvalRun200JSONResponseBodyParameters0) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetInstantEvalRun200JSONResponseBodyParameters0 returns the union data inside the GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties as a GetInstantEvalRun200JSONResponseBodyParameters0
 func (t GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) AsGetInstantEvalRun200JSONResponseBodyParameters0() (GetInstantEvalRun200JSONResponseBodyParameters0, error) {
 	var body GetInstantEvalRun200JSONResponseBodyParameters0
@@ -66031,22 +66437,32 @@ func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) M
 	return err
 }
 
-// AsGetInstantEvalRun200JSONResponseBodyParameters2 returns the union data inside the GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties as a GetInstantEvalRun200JSONResponseBodyParameters2
-func (t GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) AsGetInstantEvalRun200JSONResponseBodyParameters2() (GetInstantEvalRun200JSONResponseBodyParameters2, error) {
-	var body GetInstantEvalRun200JSONResponseBodyParameters2
+func (t GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCancelInstantEvalRun200JSONResponseBodyParameters00 returns the union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as a CancelInstantEvalRun200JSONResponseBodyParameters00
+func (t CancelInstantEvalRun200JSONResponseBodyParameters0) AsCancelInstantEvalRun200JSONResponseBodyParameters00() (CancelInstantEvalRun200JSONResponseBodyParameters00, error) {
+	var body CancelInstantEvalRun200JSONResponseBodyParameters00
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromGetInstantEvalRun200JSONResponseBodyParameters2 overwrites any union data inside the GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties as the provided GetInstantEvalRun200JSONResponseBodyParameters2
-func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) FromGetInstantEvalRun200JSONResponseBodyParameters2(v GetInstantEvalRun200JSONResponseBodyParameters2) error {
+// FromCancelInstantEvalRun200JSONResponseBodyParameters00 overwrites any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as the provided CancelInstantEvalRun200JSONResponseBodyParameters00
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) FromCancelInstantEvalRun200JSONResponseBodyParameters00(v CancelInstantEvalRun200JSONResponseBodyParameters00) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeGetInstantEvalRun200JSONResponseBodyParameters2 performs a merge with any union data inside the GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties, using the provided GetInstantEvalRun200JSONResponseBodyParameters2
-func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) MergeGetInstantEvalRun200JSONResponseBodyParameters2(v GetInstantEvalRun200JSONResponseBodyParameters2) error {
+// MergeCancelInstantEvalRun200JSONResponseBodyParameters00 performs a merge with any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0, using the provided CancelInstantEvalRun200JSONResponseBodyParameters00
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) MergeCancelInstantEvalRun200JSONResponseBodyParameters00(v CancelInstantEvalRun200JSONResponseBodyParameters00) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -66057,12 +66473,64 @@ func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) M
 	return err
 }
 
-func (t GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+// AsCancelInstantEvalRun200JSONResponseBodyParameters01 returns the union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as a CancelInstantEvalRun200JSONResponseBodyParameters01
+func (t CancelInstantEvalRun200JSONResponseBodyParameters0) AsCancelInstantEvalRun200JSONResponseBodyParameters01() (CancelInstantEvalRun200JSONResponseBodyParameters01, error) {
+	var body CancelInstantEvalRun200JSONResponseBodyParameters01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCancelInstantEvalRun200JSONResponseBodyParameters01 overwrites any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as the provided CancelInstantEvalRun200JSONResponseBodyParameters01
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) FromCancelInstantEvalRun200JSONResponseBodyParameters01(v CancelInstantEvalRun200JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCancelInstantEvalRun200JSONResponseBodyParameters01 performs a merge with any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0, using the provided CancelInstantEvalRun200JSONResponseBodyParameters01
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) MergeCancelInstantEvalRun200JSONResponseBodyParameters01(v CancelInstantEvalRun200JSONResponseBodyParameters01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCancelInstantEvalRun200JSONResponseBodyParameters02 returns the union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as a CancelInstantEvalRun200JSONResponseBodyParameters02
+func (t CancelInstantEvalRun200JSONResponseBodyParameters0) AsCancelInstantEvalRun200JSONResponseBodyParameters02() (CancelInstantEvalRun200JSONResponseBodyParameters02, error) {
+	var body CancelInstantEvalRun200JSONResponseBodyParameters02
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCancelInstantEvalRun200JSONResponseBodyParameters02 overwrites any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0 as the provided CancelInstantEvalRun200JSONResponseBodyParameters02
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) FromCancelInstantEvalRun200JSONResponseBodyParameters02(v CancelInstantEvalRun200JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCancelInstantEvalRun200JSONResponseBodyParameters02 performs a merge with any union data inside the CancelInstantEvalRun200JSONResponseBodyParameters0, using the provided CancelInstantEvalRun200JSONResponseBodyParameters02
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) MergeCancelInstantEvalRun200JSONResponseBodyParameters02(v CancelInstantEvalRun200JSONResponseBodyParameters02) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CancelInstantEvalRun200JSONResponseBodyParameters0) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
 }
 
-func (t *GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+func (t *CancelInstantEvalRun200JSONResponseBodyParameters0) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -66109,32 +66577,6 @@ func (t *CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties
 
 // MergeCancelInstantEvalRun200JSONResponseBodyParameters1 performs a merge with any union data inside the CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties, using the provided CancelInstantEvalRun200JSONResponseBodyParameters1
 func (t *CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) MergeCancelInstantEvalRun200JSONResponseBodyParameters1(v CancelInstantEvalRun200JSONResponseBodyParameters1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsCancelInstantEvalRun200JSONResponseBodyParameters2 returns the union data inside the CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties as a CancelInstantEvalRun200JSONResponseBodyParameters2
-func (t CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) AsCancelInstantEvalRun200JSONResponseBodyParameters2() (CancelInstantEvalRun200JSONResponseBodyParameters2, error) {
-	var body CancelInstantEvalRun200JSONResponseBodyParameters2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromCancelInstantEvalRun200JSONResponseBodyParameters2 overwrites any union data inside the CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties as the provided CancelInstantEvalRun200JSONResponseBodyParameters2
-func (t *CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) FromCancelInstantEvalRun200JSONResponseBodyParameters2(v CancelInstantEvalRun200JSONResponseBodyParameters2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeCancelInstantEvalRun200JSONResponseBodyParameters2 performs a merge with any union data inside the CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties, using the provided CancelInstantEvalRun200JSONResponseBodyParameters2
-func (t *CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties) MergeCancelInstantEvalRun200JSONResponseBodyParameters2(v CancelInstantEvalRun200JSONResponseBodyParameters2) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -70218,6 +70660,14 @@ type ClientInterface interface {
 
 	UpdateApiKey(ctx context.Context, id string, body UpdateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiCheckup request
+	GetApiCheckup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiCheckupRunWithBody request with any body
+	PostApiCheckupRunWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiCheckupRun(ctx context.Context, body PostApiCheckupRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiCodingAgentPullRequestUsage request
 	GetApiCodingAgentPullRequestUsage(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -71663,6 +72113,42 @@ func (c *Client) UpdateApiKeyWithBody(ctx context.Context, id string, contentTyp
 
 func (c *Client) UpdateApiKey(ctx context.Context, id string, body UpdateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateApiKeyRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiCheckup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiCheckupRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiCheckupRunWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiCheckupRunRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiCheckupRun(ctx context.Context, body PostApiCheckupRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiCheckupRunRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -77340,6 +77826,73 @@ func NewUpdateApiKeyRequestWithBody(server string, id string, contentType string
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiCheckupRequest generates requests for GetApiCheckup
+func NewGetApiCheckupRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/checkup")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiCheckupRunRequest calls the generic PostApiCheckupRun builder with application/json body
+func NewPostApiCheckupRunRequest(server string, body PostApiCheckupRunJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiCheckupRunRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiCheckupRunRequestWithBody generates requests for PostApiCheckupRun with any type of body
+func NewPostApiCheckupRunRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/checkup/run")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -90825,6 +91378,14 @@ type ClientWithResponsesInterface interface {
 
 	UpdateApiKeyWithResponse(ctx context.Context, id string, body UpdateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateApiKeyResponse, error)
 
+	// GetApiCheckupWithResponse request
+	GetApiCheckupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiCheckupResponse, error)
+
+	// PostApiCheckupRunWithBodyWithResponse request with any body
+	PostApiCheckupRunWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiCheckupRunResponse, error)
+
+	PostApiCheckupRunWithResponse(ctx context.Context, body PostApiCheckupRunJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiCheckupRunResponse, error)
+
 	// GetApiCodingAgentPullRequestUsageWithResponse request
 	GetApiCodingAgentPullRequestUsageWithResponse(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*GetApiCodingAgentPullRequestUsageResponse, error)
 
@@ -92879,6 +93440,105 @@ func (r UpdateApiKeyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateApiKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiCheckupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		RanAt time.Time `json:"ranAt"`
+		Rows  []struct {
+			// Cost Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+			Cost  GetApiCheckup200JSONResponseBodyRowsCost  `json:"cost"`
+			Group GetApiCheckup200JSONResponseBodyRowsGroup `json:"group"`
+
+			// Id The check, one of the ids `POST /api/checkup/run` accepts.
+			Id      string `json:"id"`
+			Name    string `json:"name"`
+			Verdict struct {
+				// Code Present on a refused verdict: the stable error code.
+				Code     *string                                            `json:"code,omitempty"`
+				Detail   string                                             `json:"detail"`
+				DocsPath *string                                            `json:"docsPath,omitempty"`
+				Fix      *string                                            `json:"fix,omitempty"`
+				Outcome  GetApiCheckup200JSONResponseBodyRowsVerdictOutcome `json:"outcome"`
+			} `json:"verdict"`
+		} `json:"rows"`
+		UsageReport map[string]interface{} `json:"usageReport"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiCheckupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiCheckupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiCheckupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiCheckupRunResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		RanAt time.Time `json:"ranAt"`
+		Rows  []struct {
+			// Cost Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+			Cost  PostApiCheckupRun200JSONResponseBodyRowsCost  `json:"cost"`
+			Group PostApiCheckupRun200JSONResponseBodyRowsGroup `json:"group"`
+
+			// Id The check, one of the ids `POST /api/checkup/run` accepts.
+			Id      string `json:"id"`
+			Name    string `json:"name"`
+			Verdict struct {
+				// Code Present on a refused verdict: the stable error code.
+				Code     *string                                                `json:"code,omitempty"`
+				Detail   string                                                 `json:"detail"`
+				DocsPath *string                                                `json:"docsPath,omitempty"`
+				Fix      *string                                                `json:"fix,omitempty"`
+				Outcome  PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome `json:"outcome"`
+			} `json:"verdict"`
+		} `json:"rows"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiCheckupRunResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiCheckupRunResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiCheckupRunResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -102212,12 +102872,11 @@ type CreateRoleBindingResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		CreatedAt             string  `json:"createdAt"`
-		CustomRoleId          *string `json:"customRoleId"`
-		CustomRoleName        *string `json:"customRoleName"`
-		HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
-		Id                    string  `json:"id"`
-		Principal             struct {
+		CreatedAt      string  `json:"createdAt"`
+		CustomRoleId   *string `json:"customRoleId"`
+		CustomRoleName *string `json:"customRoleName"`
+		Id             string  `json:"id"`
+		Principal      struct {
 			Id   string                                            `json:"id"`
 			Name *string                                           `json:"name"`
 			Type CreateRoleBinding201JSONResponseBodyPrincipalType `json:"type"`
@@ -107668,7 +108327,7 @@ type ListInstantEvalRunsResponse struct {
 			Name *string `json:"name"`
 
 			// Parameters The values the statement's parameters were filled with.
-			Parameters map[string]*ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties `json:"parameters"`
+			Parameters map[string]ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties `json:"parameters"`
 
 			// PriceUsd What the judging costs you, in United States dollars.
 			PriceUsd float32 `json:"priceUsd"`
@@ -107774,7 +108433,7 @@ type CreateInstantEvalRunResponse struct {
 		Name *string `json:"name"`
 
 		// Parameters The values the statement's parameters were filled with.
-		Parameters map[string]*CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+		Parameters map[string]CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 		// PriceUsd What the judging costs you, in United States dollars.
 		PriceUsd float32 `json:"priceUsd"`
@@ -107930,7 +108589,7 @@ type GetInstantEvalRunResponse struct {
 		Name *string `json:"name"`
 
 		// Parameters The values the statement's parameters were filled with.
-		Parameters map[string]*GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+		Parameters map[string]GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 		// PriceUsd What the judging costs you, in United States dollars.
 		PriceUsd float32 `json:"priceUsd"`
@@ -108045,7 +108704,7 @@ type CancelInstantEvalRunResponse struct {
 		Name *string `json:"name"`
 
 		// Parameters The values the statement's parameters were filled with.
-		Parameters map[string]*CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+		Parameters map[string]CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 		// PriceUsd What the judging costs you, in United States dollars.
 		PriceUsd float32 `json:"priceUsd"`
@@ -112517,6 +113176,32 @@ func (c *ClientWithResponses) UpdateApiKeyWithResponse(ctx context.Context, id s
 		return nil, err
 	}
 	return ParseUpdateApiKeyResponse(rsp)
+}
+
+// GetApiCheckupWithResponse request returning *GetApiCheckupResponse
+func (c *ClientWithResponses) GetApiCheckupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiCheckupResponse, error) {
+	rsp, err := c.GetApiCheckup(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiCheckupResponse(rsp)
+}
+
+// PostApiCheckupRunWithBodyWithResponse request with arbitrary body returning *PostApiCheckupRunResponse
+func (c *ClientWithResponses) PostApiCheckupRunWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiCheckupRunResponse, error) {
+	rsp, err := c.PostApiCheckupRunWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiCheckupRunResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiCheckupRunWithResponse(ctx context.Context, body PostApiCheckupRunJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiCheckupRunResponse, error) {
+	rsp, err := c.PostApiCheckupRun(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiCheckupRunResponse(rsp)
 }
 
 // GetApiCodingAgentPullRequestUsageWithResponse request returning *GetApiCodingAgentPullRequestUsageResponse
@@ -117161,6 +117846,97 @@ func ParseUpdateApiKeyResponse(rsp *http.Response) (*UpdateApiKeyResponse, error
 				ScopeId   *string                                               `json:"scopeId,omitempty"`
 				ScopeType *UpdateApiKey200JSONResponseBodyRoleBindingsScopeType `json:"scopeType,omitempty"`
 			} `json:"roleBindings,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiCheckupResponse parses an HTTP response from a GetApiCheckupWithResponse call
+func ParseGetApiCheckupResponse(rsp *http.Response) (*GetApiCheckupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiCheckupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			RanAt time.Time `json:"ranAt"`
+			Rows  []struct {
+				// Cost Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+				Cost  GetApiCheckup200JSONResponseBodyRowsCost  `json:"cost"`
+				Group GetApiCheckup200JSONResponseBodyRowsGroup `json:"group"`
+
+				// Id The check, one of the ids `POST /api/checkup/run` accepts.
+				Id      string `json:"id"`
+				Name    string `json:"name"`
+				Verdict struct {
+					// Code Present on a refused verdict: the stable error code.
+					Code     *string                                            `json:"code,omitempty"`
+					Detail   string                                             `json:"detail"`
+					DocsPath *string                                            `json:"docsPath,omitempty"`
+					Fix      *string                                            `json:"fix,omitempty"`
+					Outcome  GetApiCheckup200JSONResponseBodyRowsVerdictOutcome `json:"outcome"`
+				} `json:"verdict"`
+			} `json:"rows"`
+			UsageReport map[string]interface{} `json:"usageReport"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiCheckupRunResponse parses an HTTP response from a PostApiCheckupRunWithResponse call
+func ParsePostApiCheckupRunResponse(rsp *http.Response) (*PostApiCheckupRunResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiCheckupRunResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			RanAt time.Time `json:"ranAt"`
+			Rows  []struct {
+				// Cost Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+				Cost  PostApiCheckupRun200JSONResponseBodyRowsCost  `json:"cost"`
+				Group PostApiCheckupRun200JSONResponseBodyRowsGroup `json:"group"`
+
+				// Id The check, one of the ids `POST /api/checkup/run` accepts.
+				Id      string `json:"id"`
+				Name    string `json:"name"`
+				Verdict struct {
+					// Code Present on a refused verdict: the stable error code.
+					Code     *string                                                `json:"code,omitempty"`
+					Detail   string                                                 `json:"detail"`
+					DocsPath *string                                                `json:"docsPath,omitempty"`
+					Fix      *string                                                `json:"fix,omitempty"`
+					Outcome  PostApiCheckupRun200JSONResponseBodyRowsVerdictOutcome `json:"outcome"`
+				} `json:"verdict"`
+			} `json:"rows"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -128047,12 +128823,11 @@ func ParseCreateRoleBindingResponse(rsp *http.Response) (*CreateRoleBindingRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			CreatedAt             string  `json:"createdAt"`
-			CustomRoleId          *string `json:"customRoleId"`
-			CustomRoleName        *string `json:"customRoleName"`
-			HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
-			Id                    string  `json:"id"`
-			Principal             struct {
+			CreatedAt      string  `json:"createdAt"`
+			CustomRoleId   *string `json:"customRoleId"`
+			CustomRoleName *string `json:"customRoleName"`
+			Id             string  `json:"id"`
+			Principal      struct {
 				Id   string                                            `json:"id"`
 				Name *string                                           `json:"name"`
 				Type CreateRoleBinding201JSONResponseBodyPrincipalType `json:"type"`
@@ -134384,7 +135159,7 @@ func ParseListInstantEvalRunsResponse(rsp *http.Response) (*ListInstantEvalRunsR
 				Name *string `json:"name"`
 
 				// Parameters The values the statement's parameters were filled with.
-				Parameters map[string]*ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties `json:"parameters"`
+				Parameters map[string]ListInstantEvalRuns200JSONResponseBody_Runs_Parameters_AdditionalProperties `json:"parameters"`
 
 				// PriceUsd What the judging costs you, in United States dollars.
 				PriceUsd float32 `json:"priceUsd"`
@@ -134486,7 +135261,7 @@ func ParseCreateInstantEvalRunResponse(rsp *http.Response) (*CreateInstantEvalRu
 			Name *string `json:"name"`
 
 			// Parameters The values the statement's parameters were filled with.
-			Parameters map[string]*CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+			Parameters map[string]CreateInstantEvalRun202JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 			// PriceUsd What the judging costs you, in United States dollars.
 			PriceUsd float32 `json:"priceUsd"`
@@ -134634,7 +135409,7 @@ func ParseGetInstantEvalRunResponse(rsp *http.Response) (*GetInstantEvalRunRespo
 			Name *string `json:"name"`
 
 			// Parameters The values the statement's parameters were filled with.
-			Parameters map[string]*GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+			Parameters map[string]GetInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 			// PriceUsd What the judging costs you, in United States dollars.
 			PriceUsd float32 `json:"priceUsd"`
@@ -134751,7 +135526,7 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 			Name *string `json:"name"`
 
 			// Parameters The values the statement's parameters were filled with.
-			Parameters map[string]*CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
+			Parameters map[string]CancelInstantEvalRun200JSONResponseBody_Parameters_AdditionalProperties `json:"parameters"`
 
 			// PriceUsd What the judging costs you, in United States dollars.
 			PriceUsd float32 `json:"priceUsd"`

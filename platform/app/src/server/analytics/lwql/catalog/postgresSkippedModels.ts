@@ -145,6 +145,35 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
   InvoiceItem:
     "permission-gated: organization invoice line items, admin/billing-tier only, never analytics:view",
 
+  // Permission-gated — the licensing and connected-services record of what a
+  // customer bought and what their self-hosted install reports back. The
+  // backoffice and the organization's billing pages are the only readers, all
+  // behind organization management rights.
+  IssuedLicense:
+    "permission-gated: the license LangWatch issued to a customer, including its signed key hash, backoffice and organization-management only, never analytics:view",
+  ActivationCode:
+    "permission-gated: single-use activation codes for a fresh self-hosted install, a credential, backoffice and organization-management only, never analytics:view",
+  ConnectedBillingAccount:
+    "permission-gated: the connected-services billing account of an organization, admin/billing-tier only, never analytics:view",
+  SelfHostedInstance:
+    "permission-gated: the self-hosted installs reporting under a license, read on the organization's own pages behind organization management, never analytics:view",
+
+  // No tenant column — connected-services billing rows and install reports,
+  // each owned by its billing account, license or instance rather than by a
+  // tenant of its own.
+  ConnectedCreditGrant:
+    "no tenant column: a credit grant on a connected billing account, reached through that account",
+  ConnectedInvoice:
+    "no tenant column: an invoice on a connected billing account, reached through that account",
+  ConnectedSeatChange:
+    "no tenant column: a mid-term seat change on an issued license, reached through that license",
+  ConnectedStatement:
+    "no tenant column: a billing statement on a connected billing account, reached through that account",
+  InstanceIdentity:
+    "no tenant column: the identity a self-hosted install presents, keyed to the install rather than to a tenant",
+  SelfHostedInstanceReport:
+    "no tenant column: a usage report an install sent, reached through the install that sent it",
+
   // No tenant column — global config and inbound queues owned by no project.
   FeatureFlag: "no tenant column: global feature flags, engine/config state",
   BugReport:

@@ -75,10 +75,13 @@ func usesLineComment(mapping *yaml.Node) string {
 // Job is one entry under `jobs:`. If is the job-level `if:` condition, read as
 // literal text rather than evaluated — a guard's job is to notice a gate
 // clause disappearing, not to re-implement GitHub's expression language.
+// Permissions is the job's own `permissions:` block, which GitHub uses to
+// replace (not merge with) the workflow-level block when present.
 type Job struct {
-	Name  string `yaml:"name"`
-	If    string `yaml:"if"`
-	Steps []Step `yaml:"steps"`
+	Name        string      `yaml:"name"`
+	If          string      `yaml:"if"`
+	Permissions Permissions `yaml:"permissions"`
+	Steps       []Step      `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire
@@ -153,11 +156,39 @@ func (c Concurrency) CancelsInProgress() bool {
 	return false
 }
 
+// Permissions models a `permissions:` block at either workflow or job level.
+// GitHub accepts either a per-scope mapping (`contents: write`) or a shorthand
+// string (`read-all` / `write-all`); modeling only the mapping form turned
+// the shorthand into a decode error that failed LoadAll for every guard —
+// the same failure mode On and Concurrency were fixed for. Scopes holds the
+// mapping form, keyed by scope with its grant. Shorthand holds the string
+// form. Both are zero when the workflow declares no permissions block.
+type Permissions struct {
+	Scopes    map[string]string
+	Shorthand string
+}
+
+// UnmarshalYAML decodes the mapping form of `permissions:` into Scopes and
+// the scalar shorthand form into Shorthand, tolerating either so a workflow
+// written with the shorthand does not fail a LoadAll that only needs some
+// other file.
+func (p *Permissions) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.MappingNode:
+		return node.Decode(&p.Scopes)
+	case yaml.ScalarNode:
+		return node.Decode(&p.Shorthand)
+	default:
+		return nil
+	}
+}
+
 // Workflow is a single .yml file under .github/workflows.
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
 	Path        string
 	On          On             `yaml:"on"`
+	Permissions Permissions    `yaml:"permissions"`
 	Concurrency Concurrency    `yaml:"concurrency"`
 	Jobs        map[string]Job `yaml:"jobs"`
 }

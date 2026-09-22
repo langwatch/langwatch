@@ -26031,6 +26031,254 @@
         ]
       }
     },
+    "/api/checkup": {
+      "get": {
+        "operationId": "getApiCheckup",
+        "summary": "Run the free checks of a self-hosted install",
+        "description": "The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage report this install would send next. Answers 404 on LangWatch Cloud.",
+        "tags": [
+          "Checkup"
+        ],
+        "responses": {
+          "200": {
+            "description": "The checkup report and the usage report preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ranAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The check, one of the ids `POST /api/checkup/run` accepts."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "install",
+                              "langwatch",
+                              "integrations",
+                              "pipelines"
+                            ]
+                          },
+                          "cost": {
+                            "type": "string",
+                            "enum": [
+                              "free",
+                              "egress",
+                              "paid"
+                            ],
+                            "description": "Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`."
+                          },
+                          "verdict": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "verified",
+                                  "refused",
+                                  "unchecked"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "description": "Present on a refused verdict: the stable error code."
+                              },
+                              "fix": {
+                                "type": "string"
+                              },
+                              "docsPath": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "detail"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "cost",
+                          "verdict"
+                        ]
+                      }
+                    },
+                    "usageReport": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ranAt",
+                    "rows",
+                    "usageReport"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The install is LangWatch Cloud, or the key's project has no organization."
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/checkup/run": {
+      "post": {
+        "operationId": "postApiCheckupRun",
+        "summary": "Run the checks that open a connection or spend money",
+        "description": "Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.",
+        "tags": [
+          "Checkup"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checks": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The check ids to run. Omit to run every explicit check."
+                  },
+                  "scenarioRunPlanId": {
+                    "type": "string",
+                    "description": "The run plan the scenario canary launches."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rows of the checks that ran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ranAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The check, one of the ids `POST /api/checkup/run` accepts."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "install",
+                              "langwatch",
+                              "integrations",
+                              "pipelines"
+                            ]
+                          },
+                          "cost": {
+                            "type": "string",
+                            "enum": [
+                              "free",
+                              "egress",
+                              "paid"
+                            ],
+                            "description": "Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`."
+                          },
+                          "verdict": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "verified",
+                                  "refused",
+                                  "unchecked"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "description": "Present on a refused verdict: the stable error code."
+                              },
+                              "fix": {
+                                "type": "string"
+                              },
+                              "docsPath": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "detail"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "cost",
+                          "verdict"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ranAt",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The install is LangWatch Cloud, or the key's project has no organization."
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/gateway/v1/virtual-keys": {
       "get": {
         "operationId": "getApiGatewayV1VirtualKeys",
@@ -51119,9 +51367,6 @@
                     },
                     "createdAt": {
                       "type": "string"
-                    },
-                    "hasLegacyAccessNotice": {
-                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -64329,16 +64574,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },
@@ -64717,16 +64972,26 @@
                             "additionalProperties": {
                               "anyOf": [
                                 {
-                                  "type": "string"
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 },
                                 {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               ]
                             },
@@ -65206,16 +65471,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },
@@ -65477,16 +65752,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },

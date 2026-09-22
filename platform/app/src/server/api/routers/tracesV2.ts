@@ -50,7 +50,6 @@ import type {
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { routeSearch } from "~/server/app-layer/traces/search-router";
-import { SEARCH_ROUTE_KINDS } from "~/server/app-layer/traces/search-router/contracts";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
@@ -1557,9 +1556,6 @@ export const tracesV2Router = createTRPCRouter({
         activeQuery: z.string().max(2000).default(""),
         lensId: z.string().max(200).optional(),
         isLangyAvailable: z.boolean().optional(),
-        // The page re-running a search it already routed once names the
-        // route, so the answer cannot land somewhere else this time.
-        forceKind: z.enum(SEARCH_ROUTE_KINDS).optional(),
       }),
     )
     .permission("traces:view")
@@ -1571,7 +1567,6 @@ export const tracesV2Router = createTRPCRouter({
         activeQuery: input.activeQuery,
         lensId: input.lensId,
         isLangyAvailable: input.isLangyAvailable,
-        forceKind: input.forceKind,
       });
     }),
 

@@ -9,6 +9,7 @@ import {
   Brain,
   Bug,
   Building2,
+  Cloud,
   Coins,
   CreditCard,
   DatabaseZap,
@@ -24,9 +25,11 @@ import {
   Network,
   RefreshCw,
   ScrollText,
+  Server,
   Settings2,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   UserCog,
   UserRound,
   UserSearch,
@@ -187,9 +190,7 @@ function organizationGroup({
             },
           ]
         : []),
-      ...(!isLiteMember && !isSaaS
-        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
-        : []),
+      ...installItems({ isSaaS, isLiteMember }),
     ],
   };
 }
@@ -328,6 +329,27 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
  *
  * Spec: specs/navigation/ops-navigation-v2.feature
  */
+/**
+ * The pages that exist only where LangWatch runs on the customer's own
+ * infrastructure: the license, the connection to LangWatch, and the checkup
+ * that says whether the install is wired. None of them has a meaning on
+ * LangWatch Cloud, and a lite member manages none of them.
+ */
+export function installItems({
+  isSaaS,
+  isLiteMember,
+}: {
+  isSaaS: boolean;
+  isLiteMember: boolean;
+}): SettingsMenuItem[] {
+  if (isSaaS || isLiteMember) return [];
+  return [
+    { label: "License", href: "/settings/license", icon: BadgeCheck },
+    { label: "Connect", href: "/settings/connect", icon: Cloud },
+    { label: "Checkup", href: "/settings/checkup", icon: Stethoscope },
+  ];
+}
+
 export function opsGroup(): SettingsMenuGroup {
   return {
     id: "settings-ops",
@@ -399,6 +421,12 @@ export function backofficeGroup(): SettingsMenuGroup {
         label: "Single Sign-On",
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
+      },
+      { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
+      {
+        label: "Self-hosted installs",
+        href: "/ops/backoffice/self-hosted-instances",
+        icon: Server,
       },
       {
         label: "Identity Lookup",

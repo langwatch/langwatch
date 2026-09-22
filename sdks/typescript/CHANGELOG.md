@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.16.0...typescript-sdk@v1.17.0) (2026-09-22)
+
+
+### Features
+
+* **self-hosting:** connected self-hosted, hosted services metered against the license ([#8232](https://github.com/langwatch/langwatch/issues/8232)) ([8cfb4c3](https://github.com/langwatch/langwatch/commit/8cfb4c379c2f7b95486d9b0e02017f81f1ad14d9))
+
+
+### Bug Fixes
+
+* **cli:** --project everywhere, and six refusals that did not say what they meant ([#8259](https://github.com/langwatch/langwatch/issues/8259)) ([c8e06ed](https://github.com/langwatch/langwatch/commit/c8e06ede8c7fbdf886f615e81ba66b181745d2aa))
+
 ## [1.16.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.15.0...typescript-sdk@v1.16.0) (2026-09-22)
 
 

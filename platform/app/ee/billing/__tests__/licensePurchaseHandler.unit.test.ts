@@ -19,6 +19,14 @@ vi.mock("../../../src/server/mailer/licenseEmail", () => ({
   sendLicenseEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+const mockCaptureException = vi.fn();
+
+vi.mock("../../../src/utils/posthogErrorCapture", () => ({
+  captureException: (error: unknown) => mockCaptureException(error),
+  toError: (error: unknown) =>
+    error instanceof Error ? error : new Error(String(error)),
+}));
+
 const mockSendSlackLicensePurchase = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
@@ -62,13 +70,54 @@ const createMockCheckoutSession = (overrides: Record<string, unknown> = {}) =>
 
 describe("licensePurchaseHandler", () => {
   let mockStripe: ReturnType<typeof createMockStripe>;
+  const recordLicense = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockStripe = createMockStripe();
+    recordLicense.mockResolvedValue(undefined);
   });
 
   describe("handleLicensePurchase()", () => {
+    describe("when a checkout completes", () => {
+      /** @scenario A license bought through the payment link is recorded */
+      it("records the same license that is emailed to the buyer", async () => {
+        await handleLicensePurchase({
+          checkoutSession: createMockCheckoutSession(),
+          stripe: mockStripe as any,
+          privateKey: "test-private-key",
+          recordLicense,
+        });
+
+        expect(recordLicense).toHaveBeenCalledTimes(1);
+        expect(recordLicense).toHaveBeenCalledWith({
+          licenseKey: "test-license-key-base64",
+        });
+        expect(mockSendLicenseEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ licenseKey: "test-license-key-base64" }),
+        );
+      });
+    });
+
+    describe("when the registry cannot be written", () => {
+      /** @scenario A purchase still delivers its license when the registry cannot be written */
+      it("still emails the license and reports the failure", async () => {
+        recordLicense.mockRejectedValue(new Error("registry unavailable"));
+
+        await expect(
+          handleLicensePurchase({
+            checkoutSession: createMockCheckoutSession(),
+            stripe: mockStripe as any,
+            privateKey: "test-private-key",
+            recordLicense,
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(mockSendLicenseEmail).toHaveBeenCalledTimes(1);
+        expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("when checkout session has valid buyer details", () => {
       /** @scenario Use business name as organization name in license */
       it("generates a GROWTH license with the correct seat count", async () => {
@@ -78,6 +127,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockGenerateLicenseKey).toHaveBeenCalledWith({
@@ -96,6 +146,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockSendLicenseEmail).toHaveBeenCalledWith({
@@ -115,6 +166,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith({
@@ -138,6 +190,7 @@ describe("licensePurchaseHandler", () => {
             checkoutSession: session,
             stripe: mockStripe as any,
             privateKey: "test-private-key",
+            recordLicense,
           }),
         ).rejects.toThrow(
           "No email found in checkout session customer_details",
@@ -156,6 +209,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockGenerateLicenseKey).toHaveBeenCalledWith(
@@ -175,6 +229,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockGenerateLicenseKey).toHaveBeenCalledWith(
@@ -193,6 +248,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockGenerateLicenseKey).toHaveBeenCalledWith(
@@ -212,6 +268,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith(
@@ -228,6 +285,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith(
@@ -244,6 +302,7 @@ describe("licensePurchaseHandler", () => {
           checkoutSession: session,
           stripe: mockStripe as any,
           privateKey: "test-private-key",
+          recordLicense,
         });
 
         expect(mockStripe.checkout.sessions.listLineItems).toHaveBeenCalledWith(

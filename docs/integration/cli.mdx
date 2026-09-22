@@ -824,6 +824,22 @@ langwatch organizations get organization_01HZ...
 
 Creating an organization returns an organization admin API key alongside it, printed once. That key is what every command above takes, so an infrastructure-as-code run can go from an empty deployment to a configured organization without opening a browser. Pass the instance credential with `--instance-key` if you would rather not export it.
 
+### Checkup (self-hosted)
+
+`langwatch doctor` runs the same checks as **Settings, Checkup** on the install the CLI is pointed at, and prints one line per row with `PASS`, `FAIL` or `NOT CHECKED`, the fix under a fail, and then the exact usage report the install sends to LangWatch.
+
+```bash
+export LANGWATCH_ENDPOINT=https://langwatch.acme.internal
+export LANGWATCH_API_KEY=...        # a project API key of the install
+
+langwatch doctor                    # the free checks and the usage report
+langwatch doctor --run              # also reach the LangWatch hosts, write to storage, verify SMTP, test a model provider, run the canaries
+langwatch doctor --run --scenario-run-plan-id smoke-suite
+langwatch doctor --format json      # the rows and the report as one document
+```
+
+The checks live on the install, behind `GET /api/checkup` and `POST /api/checkup/run`; the command asks and prints, so the page and the terminal cannot disagree. `--run` opens connections and can spend money on a judge or a model, which is why it is a flag. See [Data and telemetry](/self-hosting/data-and-telemetry) for what the report carries.
+
 ## Trigger experiments
 
 Experiments batch-run an agent or prompt against a dataset and produce an evaluation report:

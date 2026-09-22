@@ -1,33 +1,28 @@
 import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
 
-const MAX_SERIALIZATION_ATTEMPTS = 5;
-
-/** The first retry window. Attempt N waits a random slice of this doubled N
- *  times, so the whole budget is under a second at worst. */
-const RETRY_BASE_DELAY_MS = 50;
+const MAX_SERIALIZATION_ATTEMPTS = 4;
 
 /**
- * How long to wait before trying again, as a random point inside a window
- * that doubles each attempt.
- *
- * Two things set the size of the window. Postgres tells the loser it lost
- * before the winner has committed, so a retry that starts a millisecond later
- * reads the same state the first attempt read, writes the same row and loses
- * again: the wait has to outlast a whole transaction, not a scheduler tick.
- * And both sides are told at the same moment, so the wait has to be random,
- * or two racing requests keep landing in the same instant together.
- *
- * A removal that hits no conflict waits for none of this. One that does pays
- * a few hundred milliseconds at most, which no person notices, and the growth
- * keeps a genuinely busy row from starving.
+ * The window the first retry's wait is drawn from, in milliseconds. Doubles
+ * each round, so the three waits a run can make are drawn from 10, 20 and
+ * 40 ms — a click that lost one race waits at most ten milliseconds more,
+ * and one that lost all three waited at most seventy.
  */
-export function serializationRetryDelayMs(attempt: number): number {
-  return Math.random() * RETRY_BASE_DELAY_MS * 2 ** attempt;
+const RETRY_WAIT_BASE_MS = 10;
+
+/** What the retry needs from the outside world, so a test can hold it still. */
+export interface SerializationRetryDeps {
+  /** Resolves after `ms` milliseconds. */
+  wait: (ms: number) => Promise<void>;
+  /** A draw in `[0, 1)`. */
+  random: () => number;
 }
 
-const wait = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const REAL_DEPS: SerializationRetryDeps = {
+  wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  random: Math.random,
+};
 
 /**
  * Postgres reports a serialization failure two different ways depending on
@@ -68,13 +63,24 @@ export function isSerializationConflict(error: unknown): boolean {
  * attempt reads the state the winner left and decides again from it, which is
  * the answer the person would have got had they clicked a moment later.
  *
- * Bounded at five attempts, each after a random pause
- * (`serializationRetryDelayMs`). A conflict that survives all five is not a
+ * Bounded at four attempts. A conflict that survives four rounds is not a
  * race between two clicks any more, and burying it under further retries
  * would hide a real problem rather than smooth one over.
+ *
+ * Waits between attempts, briefly and at random. Two transactions that lose
+ * to EACH OTHER restart at the same instant when nothing separates them, so
+ * they conflict again at the same instant, and again, until the budget is
+ * spent with neither having committed — and the raw conflict reaches the
+ * person after all. CI showed exactly that shape: four conflicts, three
+ * milliseconds apart, from one pair of overlapping deletes (#8200). A wait
+ * drawn at random from a window that doubles each round pulls the pair apart
+ * so that one of them runs alone. Nothing about the decision changes: only
+ * conflicts are retried, four attempts is still the limit, and what was
+ * thrown is what the caller gets.
  */
 export async function withSerializationRetry<T>(
   run: () => Promise<T>,
+  { wait, random }: SerializationRetryDeps = REAL_DEPS,
 ): Promise<T> {
   for (let attempt = 0; attempt < MAX_SERIALIZATION_ATTEMPTS; attempt++) {
     try {
@@ -84,7 +90,7 @@ export async function withSerializationRetry<T>(
         attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
         isSerializationConflict(error)
       ) {
-        await wait(serializationRetryDelayMs(attempt));
+        await wait(retryWaitMs({ attempt, random }));
         continue;
       }
       throw error;
@@ -92,4 +98,21 @@ export async function withSerializationRetry<T>(
   }
   /* v8 ignore next 2 -- the loop either returns or throws on the last attempt */
   throw new Error("unreachable: serialization retries exhausted");
+}
+
+/**
+ * How long to wait after losing `attempt`: a uniform draw from a window that
+ * starts at {@link RETRY_WAIT_BASE_MS} and doubles each round. Uniform rather
+ * than fixed because a fixed wait separates nobody — two callers that lost
+ * together would simply wait together — and drawn over a growing window so
+ * that a pair the first draw failed to separate gets more room next time.
+ */
+function retryWaitMs({
+  attempt,
+  random,
+}: {
+  attempt: number;
+  random: () => number;
+}): number {
+  return random() * RETRY_WAIT_BASE_MS * 2 ** attempt;
 }
