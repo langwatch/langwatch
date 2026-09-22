@@ -111,7 +111,7 @@ const SCIM_SYNC_COMMAND_NAMES = [
   "revokeScimSync",
 ] as const;
 
-/** The fourteen a connection has. */
+/** The fifteen a connection has. */
 const SSO_CONNECTION_COMMAND_NAMES = [
   "registerConnection",
   "claimDomain",
@@ -120,6 +120,7 @@ const SSO_CONNECTION_COMMAND_NAMES = [
   "discardConnection",
   "requestVerification",
   "attestDomain",
+  "withdrawDomain",
   "verifyDomain",
   "activateConnection",
   "suspendConnection",

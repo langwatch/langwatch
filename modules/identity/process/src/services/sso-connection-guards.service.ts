@@ -4,8 +4,10 @@ import {
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   type AttestDomainCommandData,
+  type WithdrawDomainCommandData,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
@@ -19,6 +21,7 @@ import {
   DISCARD_CONNECTION_COMMAND_TYPE,
   type DiscardConnectionCommandData,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
@@ -295,6 +298,45 @@ export class SsoConnectionGuardsService {
     return [
       {
         type: DOMAIN_ATTESTED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * A domain taken back out — a mistyped claim, a domain the company let go.
+   * Refused for a VERIFIED domain on a connection that is deciding sign-in:
+   * that is a connection to remove, not a domain to tidy.
+   */
+  async withdrawDomain(data: WithdrawDomainCommandData): Promise<SsoConnectionFactInput[]> {
+    const state = await this.checks.require(data, WITHDRAW_DOMAIN_COMMAND_TYPE);
+    const domain = normalizeDomain(data.domain);
+    const known =
+      state.claimedDomains.includes(domain) ||
+      state.approvedDomains.includes(domain) ||
+      state.verifiedDomains.includes(domain) ||
+      state.pendingVerification?.domain === domain;
+    if (!known) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: domain ${domain} is not on this connection`,
+      );
+    }
+
+    const routing = state.state === "ACTIVE" || state.state === "SUSPENDED";
+    if (routing && state.verifiedDomains.includes(domain)) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: ${domain} is verified on a live connection; remove the connection instead`,
+      );
+    }
+
+    return [
+      {
+        type: DOMAIN_WITHDRAWN_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
           domain,

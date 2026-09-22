@@ -81,6 +81,7 @@ describe("the domain-proof notification process", () => {
       expect(evolution.nextWakeAt).toBeUndefined();
     });
 
+    /** @scenario "The same absence is one notice however many times it arrives" */
     it("keys the same absence the same way, so a redelivery is one mail and not two", () => {
       const first = onDomainProofWavered(
         SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE,

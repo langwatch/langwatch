@@ -9,6 +9,7 @@ import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   CLAIM_DOMAIN_COMMAND_TYPE,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   DISCARD_CONNECTION_COMMAND_TYPE,
@@ -58,6 +59,17 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   // against an unapproved claim a refusal rather than a shortcut.
   [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED"],
   [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING"],
+  // Any state a domain can be in. The verb's own guard narrows it further:
+  // a VERIFIED domain on a routing connection is refused there.
+  [WITHDRAW_DOMAIN_COMMAND_TYPE]: [
+    "CLAIMED",
+    "APPROVED",
+    "VERIFICATION_PENDING",
+    "REJECTED",
+    "VERIFIED",
+    "ACTIVE",
+    "SUSPENDED",
+  ],
   // Re-checking is for a connection whose domains are actually doing
   // something: one that reached VERIFIED and one serving traffic. A SUSPENDED
   // connection routes nothing and a TEARDOWN_PENDING one is on its way out.

@@ -18,6 +18,7 @@ import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
 } from "./sso-connection.repository.ts";
+import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
 
 /**
@@ -43,6 +44,8 @@ export interface IdentityRepositories {
   readonly ssoBackoffice: SsoConnectionBackofficeRepository;
   /** Which proved domains are due a re-read, and the look itself (ADR-123). */
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
+  /** Where a connection's identity-provider credentials are kept (D09). */
+  readonly ssoCredentials: SsoCredentialRepository;
   /** The ways back in a connection's activation depends on (D05). */
   readonly ssoBreakGlass: SsoBreakGlassRepository;
   /**

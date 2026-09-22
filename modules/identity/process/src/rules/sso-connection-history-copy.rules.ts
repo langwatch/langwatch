@@ -7,6 +7,7 @@ import {
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
@@ -92,6 +93,8 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
     `${domain ?? "The domain"} was verified by a LangWatch operator${
       note ? `, noting: ${note}` : ""
     }`,
+  [DOMAIN_WITHDRAWN_EVENT_TYPE]: ({ domain }) =>
+    `${domain ?? "A domain"} was removed from the connection`,
   [DOMAIN_VERIFIED_EVENT_TYPE]: ({ domain, method }) =>
     `${domain ?? "A domain"} was verified using ${selfProvedMethodWords(method)}`,
   [DOMAIN_PROOF_WAVERED_EVENT_TYPE]: ({ domain }) =>

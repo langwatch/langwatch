@@ -41,6 +41,7 @@ import { SsoConnectionBackofficeService } from "../services/sso-connection-backo
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
+import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
@@ -80,6 +81,7 @@ type IdentityAppParts = {
   ssoBackoffice: SsoConnectionBackofficeService | null;
   ssoConnectionHistory: SsoConnectionHistoryService | null;
   ssoConnectionReads: OrganizationSsoConnectionsService;
+  ssoDomainCeremony: SsoDomainCeremonyService | null;
   ssoDomainReproof: SsoDomainReproofService | null;
   scimSyncGuards: ScimSyncGuardsService;
 };
@@ -173,20 +175,35 @@ export class IdentityApp implements IdentityApi {
     const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
     });
-    // The sweep re-reads published evidence where it lives, so both channels
-    // are the live ones; only the worker's schedule ever calls it.
-    const ssoDomainReproof = ssoConnections
-      ? SsoDomainReproofService.create({
-          connections: () => ssoConnections,
-          targets: setup.repositories.ssoReproofTargets,
+    // The ceremony and the sweep read the SAME published evidence where it
+    // lives, so they share one pair of live channels rather than each
+    // deciding for itself where a customer's proof is read from.
+    const domainProofChannels = ssoConnections
+      ? {
           proofs: ssoDomainProofChannels.live.create({
             nameservers: setup.config.ssoDomainProofDnsServers,
           }),
           files: ssoDomainProofFileChannels.live.create({
             policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
           }),
-        })
+        }
       : null;
+    const ssoDomainCeremony =
+      ssoConnections && domainProofChannels
+        ? SsoDomainCeremonyService.create({
+            connections: () => ssoConnections,
+            reads: setup.repositories.ssoConnections,
+            ...domainProofChannels,
+          })
+        : null;
+    const ssoDomainReproof =
+      ssoConnections && domainProofChannels
+        ? SsoDomainReproofService.create({
+            connections: () => ssoConnections,
+            targets: setup.repositories.ssoReproofTargets,
+            ...domainProofChannels,
+          })
+        : null;
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
@@ -206,6 +223,7 @@ export class IdentityApp implements IdentityApi {
       ssoBackoffice,
       ssoConnectionHistory,
       ssoConnectionReads,
+      ssoDomainCeremony,
       ssoDomainReproof,
       scimSyncGuards,
     });
@@ -317,6 +335,14 @@ export class IdentityApp implements IdentityApi {
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {
     return this.#parts.ssoConnectionReads;
+  }
+
+  ssoDomainCeremony(): SsoDomainCeremonyService {
+    if (!this.#parts.ssoDomainCeremony) {
+      throw new IdentityCapabilityUnavailableError("SSO domain ceremony");
+    }
+
+    return this.#parts.ssoDomainCeremony;
   }
 
   ssoDomainReproof(): SsoDomainReproofService {

@@ -64,7 +64,11 @@ import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
 } from "./sso-connection-history.ts";
-import type { SsoDomainReproofOutcome } from "./sso-domain-proof.ts";
+import type {
+  SelfServeActor,
+  SelfServeIssuedDnsRecord,
+  SsoDomainReproofOutcome,
+} from "./sso-domain-proof.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
 export interface IdentityNewbornSweepSummary {
@@ -106,6 +110,9 @@ export interface IdentityBackofficeSsoConnection {
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
   pendingVerificationDomain: string | null;
+  /** When the ceremony in flight stops proving anything; null when none is
+   *  in flight, or when it does not expire. */
+  pendingVerificationExpiresAtMs: number | null;
   createdAtMs: number;
   updatedAtMs: number;
 }
@@ -302,6 +309,34 @@ export interface SsoConnectionBackofficeApi {
   }): Promise<void>;
 }
 
+/** One domain, on one connection, at one administrator's hand. */
+export interface SsoDomainCeremonyCommand {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+  actor: SelfServeActor;
+}
+
+/**
+ * The domain ceremony an administrator runs themselves (ADR-123, D05 tier 3).
+ * A claim somebody else already proved waits for a person; everything else is
+ * decided by what the domain publishes.
+ */
+export interface SsoDomainCeremonyApi {
+  claimDomain(
+    command: SsoDomainCeremonyCommand,
+  ): Promise<{ waitsForReview: boolean; disputed: boolean }>;
+  /** The record to publish, with its value answered once. */
+  proveDomain(
+    command: SsoDomainCeremonyCommand,
+  ): Promise<{ proved: true } | { proved: false; record: SelfServeIssuedDnsRecord }>;
+  checkDomainRecord(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
+  checkDomainFile(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
+  /** Takes a domain back out. Refused for a VERIFIED domain on a connection
+   *  that is deciding sign-in — that connection is removed, not tidied. */
+  removeDomain(command: SsoDomainCeremonyCommand): Promise<void>;
+}
+
 /**
  * The re-proof sweep (ADR-123): one pass over the domains proved by a
  * published record or file, re-read where that evidence lives.
@@ -366,6 +401,7 @@ export interface IdentityApi {
   ssoBackoffice(): SsoConnectionBackofficeApi;
   ssoConnectionHistory(): SsoConnectionHistoryApi;
   ssoConnectionReads(): SsoConnectionReadsApi;
+  ssoDomainCeremony(): SsoDomainCeremonyApi;
   ssoDomainReproof(): SsoDomainReproofApi;
   scimSyncGuards(): ScimSyncGuardsApi;
 }

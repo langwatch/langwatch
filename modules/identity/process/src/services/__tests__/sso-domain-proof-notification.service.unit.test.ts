@@ -84,6 +84,7 @@ describe("who is told a domain's proof went missing", () => {
       ]);
     });
 
+    /** @scenario "Every administrator who can still sign in is told, and one bad address stops nobody" */
     it("keeps telling the rest when one address bounces", async () => {
       const sent = mail();
       sent.sendProofWavering.mockRejectedValueOnce(new Error("mailbox full"));

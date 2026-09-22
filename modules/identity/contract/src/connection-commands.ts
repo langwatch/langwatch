@@ -23,6 +23,8 @@ export const REJECT_DOMAIN_CLAIM_COMMAND_TYPE = "lw.identity.reject_domain_claim
 export const DISCARD_CONNECTION_COMMAND_TYPE = "lw.identity.discard_connection" as const;
 export const REQUEST_VERIFICATION_COMMAND_TYPE = "lw.identity.request_verification" as const;
 export const ATTEST_DOMAIN_COMMAND_TYPE = "lw.identity.attest_domain" as const;
+/** A domain taken back out of the connection by whoever manages it. */
+export const WITHDRAW_DOMAIN_COMMAND_TYPE = "lw.identity.withdraw_domain" as const;
 export const VERIFY_DOMAIN_COMMAND_TYPE = "lw.identity.verify_domain" as const;
 export const ACTIVATE_CONNECTION_COMMAND_TYPE = "lw.identity.activate_connection" as const;
 export const SUSPEND_CONNECTION_COMMAND_TYPE = "lw.identity.suspend_connection" as const;
@@ -55,6 +57,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   DISCARD_CONNECTION_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   SUSPEND_CONNECTION_COMMAND_TYPE,
@@ -157,6 +160,9 @@ export type RequestVerificationCommandData = z.infer<typeof requestVerificationC
 export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
 
+export const withdrawDomainCommandDataSchema = commandDataSchema(domainShape);
+export type WithdrawDomainCommandData = z.infer<typeof withdrawDomainCommandDataSchema>;
+
 export const verifyDomainCommandDataSchema = commandDataSchema({
   ...domainShape,
   /** Which channel the caller read the token from. One minted token is
@@ -252,6 +258,7 @@ export type SsoConnectionCommand =
       data: RequestVerificationCommandData;
     }
   | { type: typeof ATTEST_DOMAIN_COMMAND_TYPE; data: AttestDomainCommandData }
+  | { type: typeof WITHDRAW_DOMAIN_COMMAND_TYPE; data: WithdrawDomainCommandData }
   | { type: typeof VERIFY_DOMAIN_COMMAND_TYPE; data: VerifyDomainCommandData }
   | {
       type: typeof RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE;

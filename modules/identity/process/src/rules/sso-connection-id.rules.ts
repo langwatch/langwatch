@@ -16,6 +16,12 @@ export function newSsoConnectionCommandId(): string {
   return generate("ssocmd").toString();
 }
 
+/** One stored credential. Minted per WRITE, never reused: rotating a
+ *  secret mints a new reference rather than overwriting a value. */
+export function newSsoCredentialId(): string {
+  return generate("ssocred").toString();
+}
+
 /**
  * The connection the grandfather migration creates for an organization,
  * derived from it so every pass names the same aggregate — letting the

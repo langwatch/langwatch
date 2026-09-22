@@ -60,3 +60,43 @@ export interface SsoDomainReproofOutcome {
   /** Domains whose re-read threw, carried out so the worker says it once. */
   failed: { domain: string; error: unknown }[];
 }
+
+/** The administrator running the ceremony, as the surface knows them. */
+export interface SelfServeActor {
+  userId: string;
+}
+
+/**
+ * Where one domain's proof goes, in every spelling a control panel asks for.
+ * Composed from the vocabulary above, so the name shown to a customer and the
+ * name the lookup asks for cannot drift apart.
+ */
+export interface SelfServeDnsRecordLocation {
+  domain: string;
+  label: string;
+  name: string;
+  type: typeof SSO_DNS_RECORD_TYPE;
+  file: { path: string; url: string };
+}
+
+/** A location plus the token to publish there. Answered ONCE: the fact keeps
+ *  only the hash, so a lost value is replaced, never read back out of us. */
+export interface SelfServeIssuedDnsRecord extends SelfServeDnsRecordLocation {
+  value: string;
+  expiresAtMs: number;
+}
+
+/** Every location one domain's proof can take. */
+export function ssoDomainRecordLocation({
+  domain,
+}: {
+  domain: string;
+}): SelfServeDnsRecordLocation {
+  return {
+    domain,
+    label: SSO_DNS_RECORD_NAME,
+    name: ssoDnsRecordName({ domain }),
+    type: SSO_DNS_RECORD_TYPE,
+    file: { path: SSO_VERIFICATION_FILE_PATH, url: ssoVerificationFileUrl({ domain }) },
+  };
+}

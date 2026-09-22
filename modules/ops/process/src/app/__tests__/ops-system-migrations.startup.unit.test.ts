@@ -50,12 +50,19 @@ function harness({
     ),
   });
   clients.push(database);
+  const walk = async ({ cursor }: { cursor: string | null; limit: number }) => {
+    const start = cursor === null ? 0 : tenants.findIndex((tenant) => tenant > cursor);
+
+    return start < 0 ? [] : tenants.slice(start, start + 100);
+  };
   vi.spyOn(
     PrismaOrganizationTenantSourceRepository.prototype,
     "findTenantIdsAfter",
-  ).mockImplementation(async ({ cursor }) => {
-    const start = cursor === null ? 0 : tenants.findIndex((tenant) => tenant > cursor);
-    return start < 0 ? [] : tenants.slice(start, start + 100);
+  ).mockImplementation(walk);
+  // The pass drives the NARROWED walk — the organizations still holding work
+  // for its migrations — so that is the seam a startup harness answers.
+  vi.spyOn(PrismaOrganizationTenantSourceRepository.prototype, "pendingFor").mockReturnValue({
+    findTenantIdsAfter: walk,
   });
   vi.spyOn(
     PrismaSystemMigrationEnrollmentRepository.prototype,

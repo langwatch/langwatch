@@ -5,6 +5,7 @@ import {
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
+  groupByTenantSource,
   runSystemMigrationsAtStartup,
 } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
@@ -152,18 +153,63 @@ export class OpsSystemMigrations {
     const merged =
       userCohort === null
         ? summary
-        : mergeSummaries(
+        : await this.runUserLeg({
+            signal,
             summary,
-            await new SystemMigrationRunnerService({
-              state: organization.state,
-              lease: organization.lease,
-              tenants: PrismaUserTenantSourceRepository.create({ prisma: this.options.database }),
-              cohort: userCohort,
-              migrations: userMigrations,
-            }).runPass({ signal }),
-          );
+            cohort: userCohort,
+            migrations: userMigrations,
+            state: organization.state,
+            lease: organization.lease,
+          });
 
     await this.sweepAbandonedNewborns();
+    return merged;
+  }
+
+  /**
+   * The USER-rooted leg, one runner per tenant source. A migration that
+   * declares its own candidates keeps them; a bucket driven over every user
+   * is cut to the users with work left for exactly that bucket's migrations.
+   */
+  private async runUserLeg({
+    signal,
+    summary,
+    cohort,
+    migrations,
+    state,
+    lease,
+  }: {
+    signal?: AbortSignal;
+    summary: MigrationPassSummary;
+    cohort: MigrationCohort;
+    migrations: readonly SystemMigration[];
+    state: PrismaSystemMigrationStateRepository;
+    lease: RedisMigrationLeaseRepository;
+  }): Promise<MigrationPassSummary> {
+    const everyUser = PrismaUserTenantSourceRepository.create({ prisma: this.options.database });
+    let merged = summary;
+    // Narrowed AFTER grouping, never before: buckets are formed by comparing
+    // sources by identity, so a fresh narrowed object per migration would
+    // split one bucket into several.
+    for (const bucket of groupByTenantSource({ migrations, everyTenant: everyUser })) {
+      const tenants =
+        bucket.tenants === everyUser
+          ? everyUser.pendingFor({
+              migrationNames: bucket.migrations.map((migration) => migration.name),
+            })
+          : bucket.tenants;
+      merged = mergeSummaries(
+        merged,
+        await new SystemMigrationRunnerService({
+          state,
+          lease,
+          tenants,
+          cohort,
+          migrations: bucket.migrations,
+        }).runPass({ signal }),
+      );
+    }
+
     return merged;
   }
 
@@ -197,11 +243,16 @@ export class OpsSystemMigrations {
               migrationName,
             })
         : organizationCohort;
+    // Only the organizations with something left to do: one that has latched
+    // every migration in this list will never move again, and enumerating it
+    // costs a claim, a state read per migration and a release — per pass, per
+    // replica, forever. A project-axis source declares its own tenants and is
+    // left exactly as it is.
     const tenants =
       projectTenants ??
       PrismaOrganizationTenantSourceRepository.create({
         prisma: this.options.database,
-      });
+      }).pendingFor({ migrationNames: migrations.map((migration) => migration.name) });
     return {
       state,
       lease,

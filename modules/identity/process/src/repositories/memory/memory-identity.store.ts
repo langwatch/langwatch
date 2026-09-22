@@ -6,6 +6,7 @@ import type {
   JoinRequestAggregateState,
   MfaEnrollmentState,
   SsoConnectionState,
+  SsoCredentialKind,
 } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -52,6 +53,11 @@ export class MemoryIdentityStore {
   readonly ssoConnections = new Map<string, SsoConnectionState>();
   /** When the re-proof sweep last LOOKED at a connection, by its id. */
   readonly ssoReproofCursors = new Map<string, number>();
+  /** The credential vault's twin, keyed by the reference a write minted. */
+  readonly ssoCredentials = new Map<
+    string,
+    { organizationId: string; connectionId: string; kind: SsoCredentialKind; value: string }
+  >();
   readonly organizationNames = new Map<string, string>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */

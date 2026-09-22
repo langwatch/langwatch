@@ -10,10 +10,13 @@ import {
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   type AttestDomainCommandData,
+  type WithdrawDomainCommandData,
   activateConnectionCommandDataSchema,
   approveDomainClaimCommandDataSchema,
   attestDomainCommandDataSchema,
+  withdrawDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
@@ -169,6 +172,14 @@ export const AttestDomainCommand = connectionCommand({
   verb: "attestDomain",
 });
 export type AttestDomainPayload = AttestDomainCommandData;
+
+export const WithdrawDomainCommand = connectionCommand({
+  type: WITHDRAW_DOMAIN_COMMAND_TYPE,
+  schema: withdrawDomainCommandDataSchema,
+  description: "Take a domain back out of the connection",
+  verb: "withdrawDomain",
+});
+export type WithdrawDomainPayload = WithdrawDomainCommandData;
 
 export const VerifyDomainCommand = connectionCommand({
   type: VERIFY_DOMAIN_COMMAND_TYPE,

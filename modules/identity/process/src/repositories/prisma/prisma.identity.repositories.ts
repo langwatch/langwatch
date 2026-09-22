@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores/members";
 
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
@@ -20,13 +21,16 @@ import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "./prisma.sso-connection-reads.repository.ts";
+import { PrismaSsoCredentialRepository } from "./prisma.sso-credential.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma"] as const;
+  static readonly requires = ["prisma", "encryption"] as const;
 
-  static create(members: Readonly<{ prisma: PrismaClient }>): IdentityRepositories {
+  static create(
+    members: Readonly<{ prisma: PrismaClient; encryption: Encryption }>,
+  ): IdentityRepositories {
     const database = members.prisma;
 
     return {
@@ -46,6 +50,7 @@ export class PostgresIdentityRepositories {
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
+      ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
     };
   }
 }

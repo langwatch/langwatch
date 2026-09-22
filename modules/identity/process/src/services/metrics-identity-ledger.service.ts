@@ -11,16 +11,6 @@ for (const name of metricNames) {
 }
 
 /**
- * The write gate's migration-state read failed (`write-gate.ts`): for up to the negative-cache TTL
- * this user's ceremonies emit no identity events regardless of their true backfill status. Protocol
- * behavior is unaffected — the gap is event history, which the backfill's next pass adopts.
- */
-export const identityWriteGateReadFailuresTotal = new Counter({
-  name: "identity_write_gate_read_failures_total",
-  help: "Failed reads of a user's identifier-backfill migration state; ceremonies emit no events for the negative-cache TTL.",
-});
-
-/**
  * A ceremony's read-your-writes wait expired before the fold landed its events in the `Identifier`
  * projection (the grants ledger's `awaitProjection` shape).
  */

@@ -69,8 +69,10 @@ function stubDatabase({
     projectOrganization,
     database: {
       systemMigrationEnrollment: { findMany: vi.fn().mockResolvedValue(enrollments) },
-      // Both legs page their tenants before claiming any; an empty page ends
-      // the leg without touching Redis.
+      // Both legs page their tenants before claiming any, through the walk
+      // that skips tenants already terminal for every migration the pass
+      // drives; an empty page ends the leg without touching Redis.
+      $queryRaw: vi.fn().mockResolvedValue([]),
       organization: { findMany: vi.fn().mockResolvedValue([]) },
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
       user: { findMany: vi.fn().mockResolvedValue([]) },
@@ -200,6 +202,7 @@ describe("OpsSystemMigrations", () => {
       const enrollmentReads = vi.fn().mockResolvedValue([]);
       const database = {
         systemMigrationEnrollment: { findMany: enrollmentReads },
+        $queryRaw: vi.fn().mockResolvedValue([]),
         organization: { findMany: vi.fn().mockResolvedValue([]) },
         user: { findMany: vi.fn().mockResolvedValue([]) },
         organizationUser: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },

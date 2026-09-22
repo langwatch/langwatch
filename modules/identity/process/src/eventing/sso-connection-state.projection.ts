@@ -20,6 +20,7 @@ import {
   connectionSuspendedPayloadSchema,
   connectionTornDownPayloadSchema,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
@@ -28,6 +29,7 @@ import {
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   domainAttestedPayloadSchema,
+  domainWithdrawnPayloadSchema,
   domainClaimApprovedPayloadSchema,
   domainClaimedPayloadSchema,
   domainClaimRejectedPayloadSchema,
@@ -91,6 +93,12 @@ export const domainAttestedEventSchema = EventSchema.extend({
   data: domainAttestedPayloadSchema,
 });
 export type DomainAttestedEvent = z.infer<typeof domainAttestedEventSchema>;
+
+export const domainWithdrawnEventSchema = EventSchema.extend({
+  type: z.literal(DOMAIN_WITHDRAWN_EVENT_TYPE),
+  data: domainWithdrawnPayloadSchema,
+});
+export type DomainWithdrawnEvent = z.infer<typeof domainWithdrawnEventSchema>;
 
 export const domainVerifiedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
@@ -161,6 +169,7 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   connectionDiscardedEventSchema,
   verificationRequestedEventSchema,
   domainAttestedEventSchema,
+  domainWithdrawnEventSchema,
   domainVerifiedEventSchema,
   domainProofWaveredEventSchema,
   domainProofLapsedEventSchema,
@@ -186,6 +195,7 @@ const ssoConnectionEvents = [
   connectionDiscardedEventSchema,
   verificationRequestedEventSchema,
   domainAttestedEventSchema,
+  domainWithdrawnEventSchema,
   domainVerifiedEventSchema,
   domainProofWaveredEventSchema,
   domainProofLapsedEventSchema,
@@ -307,6 +317,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityDomainAttested(
     event: DomainAttestedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainWithdrawn(
+    event: DomainWithdrawnEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

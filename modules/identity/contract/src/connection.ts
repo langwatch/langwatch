@@ -135,6 +135,7 @@ export const DOMAIN_CLAIM_REJECTED_EVENT_TYPE = "lw.identity.domain_claim_reject
 export const CONNECTION_DISCARDED_EVENT_TYPE = "lw.identity.connection_discarded" as const;
 export const VERIFICATION_REQUESTED_EVENT_TYPE = "lw.identity.verification_requested" as const;
 export const DOMAIN_ATTESTED_EVENT_TYPE = "lw.identity.domain_attested" as const;
+export const DOMAIN_WITHDRAWN_EVENT_TYPE = "lw.identity.domain_withdrawn" as const;
 export const DOMAIN_VERIFIED_EVENT_TYPE = "lw.identity.domain_verified" as const;
 export const DOMAIN_PROOF_WAVERED_EVENT_TYPE = "lw.identity.domain_proof_wavered" as const;
 export const DOMAIN_PROOF_LAPSED_EVENT_TYPE = "lw.identity.domain_proof_lapsed" as const;
@@ -156,6 +157,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_DISCARDED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_PROOF_LAPSED_EVENT_TYPE,
@@ -210,6 +212,18 @@ export const domainClaimRejectedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** Why ops said no, in the operator's words. Read back on re-claim. */
   note: z.string().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * A domain taken back out, by whoever manages the connection. It carries
+ * only the domain and the actor: everything that domain had is derived
+ * state the fold recomputes without it, and the history keeps every step.
+ */
+export const domainWithdrawnPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -388,6 +402,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: domainAttestedPayloadSchema,
   }),
   z.object({
+    type: z.literal(DOMAIN_WITHDRAWN_EVENT_TYPE),
+    data: domainWithdrawnPayloadSchema,
+  }),
+  z.object({
     type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
     data: domainVerifiedPayloadSchema,
   }),
@@ -556,6 +574,50 @@ export function emptySsoConnection({ connectionId }: { connectionId: string }): 
 const without = (domains: string[], domain: string): string[] =>
   domains.filter((held) => held !== domain);
 
+/** Past these, a domain fact never moves the lifecycle. */
+const LIFECYCLE_BEYOND_VERIFIED: readonly SsoConnectionLifecycleState[] = [
+  "ACTIVE",
+  "SUSPENDED",
+  "TEARDOWN_PENDING",
+  "TORN_DOWN",
+  "DISCARDED",
+];
+
+/**
+ * Every trace of one domain out of the derived state, leaving the connection
+ * on whatever its remaining domains earned. The history keeps every step the
+ * domain took; only the state stops saying it is here.
+ */
+const withoutDomain = (state: SsoConnectionState, domain: string): SsoConnectionState => {
+  const remaining = {
+    ...state,
+    claimedDomains: without(state.claimedDomains, domain),
+    approvedDomains: without(state.approvedDomains, domain),
+    verifiedDomains: without(state.verifiedDomains, domain),
+    domainVerifications: state.domainVerifications.filter(
+      (verification) => verification.domain !== domain,
+    ),
+    pendingVerification:
+      state.pendingVerification?.domain === domain ? null : state.pendingVerification,
+    rejection: state.rejection?.domain === domain ? null : state.rejection,
+  };
+
+  return { ...remaining, state: stateAfterWithdrawal(remaining) };
+};
+
+/** Where a connection stands once a domain has left it: whatever the
+ *  REMAINING domains have earned, and nothing the departed one did. */
+const stateAfterWithdrawal = (state: SsoConnectionState): SsoConnectionLifecycleState => {
+  if (LIFECYCLE_BEYOND_VERIFIED.includes(state.state)) return state.state;
+  if (state.verifiedDomains.length > 0) return "VERIFIED";
+  if (state.pendingVerification !== null) return "VERIFICATION_PENDING";
+  if (state.approvedDomains.length > 0) return "APPROVED";
+  if (state.claimedDomains.length > 0) return "CLAIMED";
+  if (state.rejection !== null) return "REJECTED";
+
+  return "DRAFT";
+};
+
 const withDomain = (domains: string[], domain: string): string[] =>
   domains.includes(domain) ? domains : [...domains, domain];
 
@@ -687,6 +749,8 @@ export function reduceSsoConnection({
         }),
         pendingVerification: null,
       };
+    case DOMAIN_WITHDRAWN_EVENT_TYPE:
+      return withoutDomain(touched, fact.data.domain);
     case DOMAIN_VERIFIED_EVENT_TYPE:
       return {
         ...touched,

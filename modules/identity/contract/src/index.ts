@@ -32,6 +32,7 @@ export {
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_PROOF_LAPSED_EVENT_TYPE,
   DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
@@ -44,6 +45,7 @@ export {
   domainProofRecoveredPayloadSchema,
   domainProofWaveredPayloadSchema,
   domainVerifiedPayloadSchema,
+  domainWithdrawnPayloadSchema,
   emptySsoConnection,
   isSsoArrivalPolicy,
   isSsoPublishedProofChannel,
@@ -95,14 +97,19 @@ export {
   VERIFICATION_REQUESTED_EVENT_TYPE,
   verificationRequestedPayloadSchema,
 } from "./connection.ts";
+export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
   SSO_DNS_REPROOF_GRACE_MS,
   SSO_VERIFICATION_FILE_PATH,
+  type SelfServeActor,
+  type SelfServeDnsRecordLocation,
+  type SelfServeIssuedDnsRecord,
   type SsoDomainReproofOutcome,
   ssoDnsRecordName,
+  ssoDomainRecordLocation,
   ssoVerificationFileUrl,
 } from "./sso-domain-proof.ts";
 export {
@@ -160,6 +167,9 @@ export {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
 } from "./connection-commands.ts";
 export {
   IdentityCapabilityUnavailableError,

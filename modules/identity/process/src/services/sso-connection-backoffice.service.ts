@@ -40,14 +40,18 @@ export interface BackofficeSsoConnection {
   >[];
   providerId: string;
   issuer: string | null;
-  /** DERIVED from the connection's arrival policy: `admit` and nothing else.
-   *  The policy itself joins this row when the enterprise output schema that
-   *  parses it is widened — it is `.strict()` (see the handoff §10). */
+  /** Who the connection admits, as the aggregate holds it. */
+  arrivalPolicy: SsoArrivalPolicy;
+  /** DERIVED from the arrival policy: `admit` and nothing else. Kept beside
+   *  it for one release, for readers written before the policy existed. */
   allowsJit: boolean;
   source: string;
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
   pendingVerificationDomain: string | null;
+  /** When the ceremony in flight stops proving anything; null when none is
+   *  in flight, or when it does not expire. */
+  pendingVerificationExpiresAtMs: number | null;
   createdAtMs: number;
   updatedAtMs: number;
 }
@@ -306,6 +310,7 @@ export class SsoConnectionBackofficeService {
       // The ceremony's domain, never its token hash: a hash is a proof
       // artifact, and no operator reading a list has anything to do with one.
       pendingVerificationDomain: state.pendingVerification?.domain ?? null,
+      pendingVerificationExpiresAtMs: state.pendingVerification?.expiresAtMs ?? null,
       createdAtMs: state.createdAtMs,
       updatedAtMs: state.updatedAtMs,
     };

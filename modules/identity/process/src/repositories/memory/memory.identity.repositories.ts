@@ -21,6 +21,7 @@ import {
   MemorySsoConnectionReadRepository,
   MemorySsoConnectionStrandingRepository,
 } from "./memory.sso-connection.repositories.ts";
+import { MemorySsoCredentialRepository } from "./memory.sso-credential.repository.ts";
 import { MemorySsoDomainReproofTargetRepository } from "./memory.sso-domain-reproof.repository.ts";
 
 /**
@@ -54,6 +55,7 @@ export class MemoryIdentityRepositories {
       ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),
       ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
       ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
+      ssoCredentials: MemorySsoCredentialRepository.create(store),
     };
   }
 }
