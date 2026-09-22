@@ -206,6 +206,36 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the route refuses it with the code "LAST_WAY_IN"
     And the passkey still signs "sam" in
 
+  # Both last-way-in repositories decide inside a SERIALIZABLE transaction,
+  # which refuses to commit the loser of a race, and both run that transaction
+  # again when it lost (`serializable-retry.ts`), so the loser answers with the
+  # refusal the guard computed rather than a raw write conflict. Two
+  # transactions that lose to EACH OTHER restart together and lose together,
+  # though, until the four attempts are gone and the conflict reaches the
+  # person after all — seen in CI as four conflicts three milliseconds apart
+  # (#8200). A short wait drawn at random from a window that doubles each
+  # round pulls the pair apart. The race is not reproduced here; the waits are
+  # pinned directly.
+  @unit
+  Scenario: A transaction that lost a race is run again after a short random wait
+    Given a serializable transaction that loses three races before it commits
+    When it is run with retries
+    Then it is run four times and its answer is returned
+    And before each retry it waits a random draw from a window that doubles each round
+    And nothing waits after the last attempt
+
+  @unit
+  Scenario: A conflict that outlives the retry budget is thrown as it was
+    Given a serializable transaction that loses every race
+    When it is run with retries
+    Then it is run four times and the fourth conflict is thrown
+
+  @unit
+  Scenario: A failure that is not a lost race is thrown at once
+    Given a serializable transaction that fails for a reason other than a lost race
+    When it is run with retries
+    Then it is run once and the failure is thrown, with no wait
+
   # ── The password, on its own ───────────────────────────────────────────
 
   # The password and the identity providers shared one section for as long as
