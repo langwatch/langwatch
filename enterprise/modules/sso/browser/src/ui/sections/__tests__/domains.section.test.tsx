@@ -1,0 +1,217 @@
+/**
+ * @vitest-environment jsdom
+ * The domain ceremony as an administrator drives it: claim, prove, check and
+ * remove, the value shown once, lapsed evidence never reading as proved.
+ */
+
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+type Call = { input: { domain: string }; options?: { onSuccess?: (result: unknown) => void } };
+
+const { state } = vi.hoisted(() => {
+  const operation = () => ({ calls: [] as Call[], answer: void 0 as unknown });
+
+  return {
+    state: {
+      claimDomain: operation(),
+      proveDomain: operation(),
+      removeDomain: operation(),
+      checkDomainRecord: operation(),
+      checkDomainFile: operation(),
+    },
+  };
+});
+
+vi.mock("../../../behavior/sso-api.ts", () => {
+  const recorder = (name: keyof typeof state) => ({
+    useMutation: () => ({
+      isPending: false,
+      mutate: (input: Call["input"], options?: Call["options"]) => {
+        state[name].calls.push({ input, options });
+        options?.onSuccess?.(state[name].answer);
+      },
+    }),
+  });
+
+  return {
+    ssoApi: {
+      ssoSetup: {
+        claimDomain: recorder("claimDomain"),
+        proveDomain: recorder("proveDomain"),
+        removeDomain: recorder("removeDomain"),
+        checkDomainRecord: recorder("checkDomainRecord"),
+        checkDomainFile: recorder("checkDomainFile"),
+      },
+    },
+  };
+});
+
+import type { DomainClaimView, DomainEvidenceView } from "../../../model/domain-rows.ts";
+import { renderWithSsoHost } from "../../../testing.tsx";
+import { DomainsSection } from "../domains.section.tsx";
+
+const TARGET = { organizationId: "org-1", connectionId: "ssoc_1" };
+
+const RECORD = {
+  domain: "acme.com",
+  label: "_langwatch",
+  name: "_langwatch.acme.com",
+  type: "TXT",
+  file: { path: "/.well-known/langwatch-domain.txt", url: "https://acme.com/.well-known/x.txt" },
+  value: "lw-proof-abc123",
+  expiresAtMs: Date.UTC(2026, 0, 9),
+};
+
+const claimed: DomainClaimView = {
+  domain: "acme.com",
+  state: "APPROVED",
+  waitsForReview: false,
+};
+
+function renderSection(
+  overrides: {
+    evidence?: DomainEvidenceView[];
+    claims?: DomainClaimView[];
+    canManage?: boolean;
+    provesWithLicense?: boolean;
+  } = {},
+) {
+  return renderWithSsoHost(
+    <DomainsSection
+      {...TARGET}
+      canManage={overrides.canManage ?? true}
+      provesWithLicense={overrides.provesWithLicense ?? false}
+      evidence={overrides.evidence ?? []}
+      claims={overrides.claims ?? [claimed]}
+    />,
+  );
+}
+
+beforeEach(() => {
+  for (const operation of Object.values(state)) {
+    operation.calls.length = 0;
+    operation.answer = void 0;
+  }
+});
+
+afterEach(cleanup);
+
+describe("given a domain that has been claimed and not proved", () => {
+  beforeEach(() => {
+    state.proveDomain.answer = { proved: false, record: RECORD };
+
+    renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Prove this domain" }));
+  });
+
+  it("asks the server to prove the domain the row names", () => {
+    expect(state.proveDomain.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
+  });
+
+  it("shows the value it was handed, which is answered once and never again", () => {
+    expect(screen.getByText("lw-proof-abc123")).toBeTruthy();
+    expect(screen.getByText("_langwatch.acme.com")).toBeTruthy();
+  });
+
+  it("stops offering to prove it once a value is out, so a second press cannot replace it", () => {
+    expect(screen.queryByRole("button", { name: "Prove this domain" })).toBeNull();
+  });
+
+  it("asks about the published record for that domain", () => {
+    fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
+
+    expect(state.checkDomainRecord.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
+  });
+
+  it("asks about the file instead, for a reader whose DNS is a ticket away", () => {
+    fireEvent.click(screen.getByRole("button", { name: "Check the file instead" }));
+
+    expect(state.checkDomainFile.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
+  });
+
+  it("puts the evidence away once it has been found", () => {
+    fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
+
+    expect(screen.queryByTestId("connection-domain-record")).toBeNull();
+  });
+});
+
+describe("given a domain this installation proves with its licence", () => {
+  it("says there is nothing to publish and offers that press instead", () => {
+    renderSection({ provesWithLicense: true });
+
+    expect(screen.getByRole("button", { name: "Prove with our licence" })).toBeTruthy();
+    expect(screen.getByText(/enterprise licence is that proof/i)).toBeTruthy();
+  });
+});
+
+describe("given a proved domain whose record has gone", () => {
+  it("never reads as proved, because it is still letting people in", () => {
+    renderSection({
+      evidence: [{ domain: "acme.com", proved: true, proofState: "LAPSED", graceEndsAtMs: null }],
+    });
+
+    expect(screen.getByText("Record missing")).toBeTruthy();
+    expect(screen.queryByText("Proved")).toBeNull();
+  });
+});
+
+describe("given a domain that is proved and still has its evidence", () => {
+  it("offers nothing to do about it", () => {
+    renderSection({
+      evidence: [{ domain: "acme.com", proved: true, proofState: "VERIFIED", graceEndsAtMs: null }],
+      claims: [],
+    });
+
+    expect(screen.getByText("Proved")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Prove this domain" })).toBeNull();
+  });
+});
+
+describe("when an administrator claims a domain", () => {
+  it("sends the domain they typed and empties the field", () => {
+    renderSection({ claims: [] });
+
+    const field = screen.getByLabelText("Domain");
+    fireEvent.change(field, { target: { value: "acme.co.uk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Claim domain" }));
+
+    expect(state.claimDomain.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.co.uk" });
+    expect(screen.getByLabelText("Domain")).toHaveProperty("value", "");
+  });
+
+  it("does not ask the server about an empty box", () => {
+    renderSection({ claims: [] });
+
+    expect(screen.getByRole("button", { name: "Claim domain" })).toHaveProperty("disabled", true);
+  });
+});
+
+describe("when an administrator takes a domain back out", () => {
+  it("names the domain it is removing", () => {
+    renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(state.removeDomain.calls[0]?.input).toEqual({ ...TARGET, domain: "acme.com" });
+  });
+});
+
+describe("given a reader who may not manage single sign-on", () => {
+  it("shows them where the domain stands and offers them no controls", () => {
+    renderSection({ canManage: false });
+
+    expect(screen.getByText("acme.com")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Prove this domain" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.queryByLabelText("Domain")).toBeNull();
+  });
+});
+
+describe("given a connection with no domains at all", () => {
+  it("says so, with an example of what one looks like", () => {
+    renderSection({ claims: [] });
+
+    expect(screen.getByText(/no domain has been claimed yet/i)).toBeTruthy();
+  });
+});
