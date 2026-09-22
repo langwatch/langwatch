@@ -75,10 +75,13 @@ func usesLineComment(mapping *yaml.Node) string {
 // Job is one entry under `jobs:`. If is the job-level `if:` condition, read as
 // literal text rather than evaluated — a guard's job is to notice a gate
 // clause disappearing, not to re-implement GitHub's expression language.
+// Permissions is the job's own `permissions:` block, which GitHub uses to
+// replace (not merge with) the workflow-level block when present.
 type Job struct {
-	Name  string `yaml:"name"`
-	If    string `yaml:"if"`
-	Steps []Step `yaml:"steps"`
+	Name        string      `yaml:"name"`
+	If          string      `yaml:"if"`
+	Permissions Permissions `yaml:"permissions"`
+	Steps       []Step      `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire

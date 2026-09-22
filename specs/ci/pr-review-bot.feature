@@ -113,12 +113,13 @@ Feature: PR Review Bot workflow
   # Permissions
   # ============================================================================
 
+  # contents: write is required so the default GITHUB_TOKEN can call
+  # resolveReviewThread; anything less only loses thread auto-resolution.
   @unit
   Scenario: The review workflow grants exactly contents write and pull-requests write
     When the workflow runs
     Then the workflow grants permissions: contents: write, pull-requests: write
     And the workflow does not grant any extra permissions
-    And the contents: write permission enables resolveReviewThread on the default token
 
   # ============================================================================
   # Action Pinning

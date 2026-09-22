@@ -137,26 +137,36 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// prReviewBotPermissions checks the workflow's top-level permissions block
+// prReviewBotPermissions checks the review job's effective permissions block
 // grants exactly contents: write and pull-requests: write, with no extra
-// permissions. contents: write is required for resolveReviewThread.
+// permissions. contents: write is required for resolveReviewThread. GitHub
+// permissions blocks do not merge: a job-level `permissions:` completely
+// replaces the workflow-level one when present, so the effective set is the
+// job's block if it declares one, else the workflow's.
 func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
-	if workflow.Permissions.Shorthand != "" {
+	perms := effectivePRReviewBotPermissions(workflow)
+
+	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
 			"%s permissions block uses shorthand %q, want an explicit contents/pull-requests mapping",
-			PRReviewBotWorkflow, workflow.Permissions.Shorthand)}
+			PRReviewBotWorkflow, perms.Shorthand)}
 	}
 
-	perms := workflow.Permissions.Scopes
-	if perms == nil {
+	scopes := perms.Scopes
+	if scopes == nil {
 		return []string{fmt.Sprintf("%s declares no top-level permissions block", PRReviewBotWorkflow)}
 	}
 
-	var problems []string
+	requiredKeys := make([]string, 0, len(prReviewBotRequiredPermissions))
+	for key := range prReviewBotRequiredPermissions {
+		requiredKeys = append(requiredKeys, key)
+	}
+	sort.Strings(requiredKeys)
 
-	// Check that required permissions exist with correct values
-	for key, expectedValue := range prReviewBotRequiredPermissions {
-		actualValue, exists := perms[key]
+	var problems []string
+	for _, key := range requiredKeys {
+		expectedValue := prReviewBotRequiredPermissions[key]
+		actualValue, exists := scopes[key]
 		if !exists {
 			problems = append(problems, fmt.Sprintf(
 				"%s permissions block missing %q (required for PR reviews)", PRReviewBotWorkflow, key))
@@ -166,8 +176,13 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 		}
 	}
 
-	// Check that no extra permissions are granted
-	for key := range perms {
+	grantedKeys := make([]string, 0, len(scopes))
+	for key := range scopes {
+		grantedKeys = append(grantedKeys, key)
+	}
+	sort.Strings(grantedKeys)
+
+	for _, key := range grantedKeys {
 		if _, required := prReviewBotRequiredPermissions[key]; !required {
 			problems = append(problems, fmt.Sprintf(
 				"%s permissions block has extra key %q (only contents and pull-requests are needed)", PRReviewBotWorkflow, key))
@@ -175,6 +190,18 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 	}
 
 	return problems
+}
+
+// effectivePRReviewBotPermissions returns the review job's own permissions
+// block when it declares one, else the workflow-level block — mirroring
+// GitHub's replace-not-merge semantics for job-level permissions.
+func effectivePRReviewBotPermissions(workflow *ciscan.Workflow) ciscan.Permissions {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if ok && (job.Permissions.Scopes != nil || job.Permissions.Shorthand != "") {
+		return job.Permissions
+	}
+
+	return workflow.Permissions
 }
 
 // prReviewBotPinning enforces the pinning invariant every `uses:` step in this

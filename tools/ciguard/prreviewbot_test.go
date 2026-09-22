@@ -16,16 +16,21 @@ import (
 // goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
 // stands when every invariant holds. Individual tests mutate one clause of
 // it at a time so each failure mode is isolated.
+// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as
+// its own constant so the two tests that strip or replace it (below) and the
+// good-workflow fixture never drift out of sync with each other.
+const prReviewBotPermissionsBlock = `permissions:
+  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+  pull-requests: write
+`
+
 const goodPRReviewBotWorkflow = `name: PR Review Bot
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
-permissions:
-  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
-  pull-requests: write
-
+` + prReviewBotPermissionsBlock + `
 concurrency:
   group: pr-review-bot-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -208,14 +213,11 @@ func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "contents")
-	assert.Contains(t, strings.Join(problems, "\n"), "write")
+	assert.Contains(t, strings.Join(problems, "\n"), `permissions block grants contents: "read", want "write"`)
 }
 
 func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow,
-		"permissions:\n  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution\n  pull-requests: write\n",
-		"", 1)
+	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -238,9 +240,7 @@ func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
 }
 
 func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
-	shorthand := strings.Replace(goodPRReviewBotWorkflow,
-		"permissions:\n  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution\n  pull-requests: write\n",
-		"permissions: write-all\n", 1)
+	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "permissions: write-all\n", 1)
 	root := writePRReviewBotWorkflow(t, shorthand)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -264,8 +264,35 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "extra")
 }
 
+// @scenario "The review workflow grants exactly contents write and pull-requests write"
+func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
+	overridden := strings.Replace(goodPRReviewBotWorkflow,
+		"  review:\n    if:",
+		"  review:\n    permissions:\n      contents: read\n      pull-requests: write\n    if:", 1)
+	root := writePRReviewBotWorkflow(t, overridden)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `permissions block grants contents: "read", want "write"`)
+}
+
 // @scenario "Every action the workflow uses is pinned to a full commit SHA"
-func TestPRReviewBotRejectsAFloatingRef(t *testing.T) {
+func TestPRReviewBotRejectsAFloatingTag(t *testing.T) {
+	floating := strings.Replace(goodPRReviewBotWorkflow,
+		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+		"actions/checkout@v7", 1)
+	root := writePRReviewBotWorkflow(t, floating)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "not a full 40-character commit SHA")
+}
+
+func TestPRReviewBotRejectsAFloatingBranchRef(t *testing.T) {
 	floating := strings.Replace(goodPRReviewBotWorkflow,
 		"langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521",
 		"langwatch/langwatch-pr-review-bot@main", 1)
