@@ -30,10 +30,16 @@ import type { GovernanceConfig } from "./governance/config";
  * a credential that cannot view a project does not get it in the listing.
  * `project_lookup_failed` is the different case, where the listing itself did
  * not come back and we know nothing about the project either way.
+ * `project_scope_not_supported` is the third: the project was named fine, but
+ * the credential in hand carries its own project and cannot be pointed at
+ * another, so honouring the name is not something a lookup could fix.
  */
 export class ProjectScopeError extends Error {
   constructor(
-    public readonly code: "project_not_accessible" | "project_lookup_failed",
+    public readonly code:
+      | "project_not_accessible"
+      | "project_lookup_failed"
+      | "project_scope_not_supported",
     message: string,
     /** The `--project` value the user typed, echoed back for the message. */
     public readonly project: string,
@@ -153,10 +159,52 @@ export const resolveProjectSelector = async ({
   );
 };
 
+/**
+ * Where the key in hand came from, which decides what to tell someone whose
+ * key cannot be pointed at the project they named.
+ */
+export type BoundKeySource = "supplied-key" | "personal-project-login";
+
+/**
+ * The refusal for a project named against a key that carries its own project.
+ *
+ * A legacy project key (`sk-lw-` with no lookup id) encodes its project in the
+ * token, so the server reads the project off the key and ignores any the
+ * request names. Running anyway answers from the key's own project, which is
+ * the silence this replaces: the rows come back, they are from somewhere else,
+ * and nothing on screen says so.
+ */
+export const projectScopeNotSupported = ({
+  selector,
+  keySource,
+}: {
+  selector: string;
+  keySource: BoundKeySource;
+}): ProjectScopeError =>
+  new ProjectScopeError(
+    "project_scope_not_supported",
+    keySource === "supplied-key"
+      ? `LANGWATCH_API_KEY is a project key, which carries its own project, so it cannot be pointed at "${selector}".`
+      : `this login reaches only your personal project, so it cannot be pointed at "${selector}".`,
+    selector,
+  );
+
 /** The human error block for a `--project` that did not resolve. */
-export const projectScopeErrorLines = (error: ProjectScopeError): string[] => [
-  `Error: ${error.message}`,
-  "",
-  "List the projects your login reaches:",
-  "  langwatch projects list",
-];
+export const projectScopeErrorLines = (error: ProjectScopeError): string[] => {
+  if (error.code === "project_scope_not_supported") {
+    return [
+      `Error: ${error.message}`,
+      "",
+      "Log in with a key that reaches more than one project:",
+      "  langwatch login",
+      "",
+      "A key in LANGWATCH_API_KEY or .env is used ahead of that login, so unset it first.",
+    ];
+  }
+  return [
+    `Error: ${error.message}`,
+    "",
+    "List the projects your login reaches:",
+    "  langwatch projects list",
+  ];
+};

@@ -16,6 +16,12 @@
  */
 
 import { Command, Option } from "commander";
+import { setRequestedProject } from "../internal/credentialContext";
+import {
+  applyProjectOption,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
@@ -361,6 +367,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+    // The project the command line pointed this request at, published before
+    // the action runs so `resolveCredentials` reads it without the action
+    // having to accept the value and pass it on.
+    setRequestedProject(projectSelectorOf(actionCommand));
   });
 
   // Top-level commands
@@ -3114,14 +3124,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("trace")
     .description("Search and inspect traces");
 
-  /**
-   * Help for `--project`, shared by every command that reads across projects.
-   * The default is the personal project, which is where these commands pointed
-   * before the flag existed, so an existing script keeps its meaning.
-   */
-  const PROJECT_FLAG_HELP =
-    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
-
   rendersOwnResult(
     traceCmd
       .command("search")
@@ -5492,6 +5494,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // command. Registered on the built tree so buildProgram() stays a pure
   // factory: no module-level state, nothing leaks between daemon requests.
   registerOutputOptions(program);
+
+  // `--project` on every command that runs inside a project, added the same
+  // way and for the same reason: a family that adopts it one at a time is a
+  // family that forgets it, which is how the whole instant-eval family shipped
+  // with no way to name a project. The two exemption lists live with the
+  // helper (utils/projectOption.ts).
+  applyProjectOption(program);
 
   return program;
 }

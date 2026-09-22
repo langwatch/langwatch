@@ -75,3 +75,41 @@ Feature: CLI error handling
       | langwatch dataset get missing  |    404 |
       | langwatch monitor create m     |    422 |
       | langwatch secret create FOO    |    409 |
+
+  Rule: a fault in the CLI's own code is not reported as a network failure
+
+    A failure with no HTTP status was read as `network_error`, which is right
+    for a request that never landed and wrong for a crash while rendering a
+    response that already arrived. `langwatch chart schema` crashed on a
+    payload shape it did not expect and the user was told to check their
+    network connection, for a bug they could not fix.
+
+    @unit
+    Scenario: a TypeError with no status is an internal error, not a network one
+      Given a TypeError is thrown while a command renders a response
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And it is not network_error
+      And it is still marked as a failure the platform did not name
+
+    @unit
+    Scenario: a request that never landed is still a network failure
+      Given a plain Error is thrown with no HTTP status
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+
+    @unit
+    Scenario: a TLS failure is a network failure, not a code the platform chose
+      Given fetch fails with an expired certificate, which carries no errno
+        or syscall the way a refused socket does
+      When the failure is read into the CLI's error structure
+      Then the code is network_error
+      And the certificate code is not presented as the platform's own
+
+    @unit
+    Scenario: chart schema names a payload it does not recognise
+      Given the analytics schema comes back without its list of views
+      When the user runs `langwatch chart schema`
+      Then the command exits non-zero with a validation error
+      And the message says to update the CLI
+      And no TypeError reaches the user

@@ -479,6 +479,52 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
 export const isTerminalFailure = (error: CliHandledError): boolean =>
   error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
 
+/**
+ * The error constructors JavaScript raises for a fault in the PROGRAM, never
+ * for a network that did not answer.
+ *
+ * `codeForStatus` calls anything with no HTTP status `network_error`, which is
+ * right for a socket that never connected and wrong for a TypeError thrown
+ * while rendering a response that had already arrived. `langwatch chart
+ * schema` did exactly that against a payload shape it did not expect, and the
+ * user was told "Cannot read properties of undefined (reading 'length')" under
+ * the code `network_error` with the advice to check their connection: a fix
+ * they cannot make, for a failure that was not theirs, and a crash filed as
+ * something transient that a retry would clear.
+ */
+const PROGRAM_FAULT_NAMES = new Set([
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+]);
+
+/**
+ * Evidence that the throw came from the TRANSPORT rather than from our code.
+ *
+ * `fetch` reports a dead socket as `TypeError("fetch failed")` whose `cause` is
+ * the libuv system error, so the constructor alone cannot tell a refused
+ * connection from a bug: both are a TypeError with no HTTP status. The system
+ * error is what distinguishes them — it carries `syscall`/`errno`, and undici
+ * always attaches it as the cause under that exact message.
+ */
+const hasTransportEvidence = (error: unknown): boolean => {
+  if (error instanceof Error && error.message === "fetch failed") return true;
+  const outer = asRecord(error);
+  const cause = asRecord(outer?.cause);
+  return [outer, cause].some(
+    (candidate) =>
+      typeof candidate?.syscall === "string" ||
+      typeof candidate?.errno === "number",
+  );
+};
+
+/** True when the throw is a fault in our own code rather than a failed request. */
+const isProgramFault = (error: unknown): boolean =>
+  error instanceof Error &&
+  PROGRAM_FAULT_NAMES.has(error.name) &&
+  !hasTransportEvidence(error);
+
 /** A stable code for a failure the platform did not name itself. */
 const codeForStatus = (status: number): string => {
   if (status === 401 || status === 403) return "unauthorized";
@@ -732,11 +778,34 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
   const status = statusOf(cause) || statusOf(outer);
   const parsed = parseHandledError({ status, body: cause });
 
+  const message =
+    error instanceof Error && error.message ? error.message : parsed.message;
+
+  // A transport failure is infrastructure whatever its system error happens to
+  // carry. `isSystemError` disqualifies the record by `errno`/`syscall`, which
+  // catches the socket cases but not a TLS failure: that one carries neither,
+  // so its `code` (CERT_HAS_EXPIRED, UNABLE_TO_VERIFY_LEAF_SIGNATURE) was read
+  // as a discriminant the platform had chosen and rendered as the user's
+  // fault. The throw fetch makes is the tell, and it is enough on its own.
+  if (status === 0 && hasTransportEvidence(error)) {
+    return {
+      code: "network_error",
+      kind: "network_error",
+      message,
+      httpStatus: 0,
+      meta: {},
+      isHandled: false,
+    };
+  }
+
   if (parsed.isHandled) return parsed;
 
-  return {
-    ...parsed,
-    message:
-      error instanceof Error && error.message ? error.message : parsed.message,
-  };
+  // No status and a program fault: the request is not what failed, so do not
+  // send the reader to their network. Still `isHandled: false`, because the
+  // code is ours and the platform named nothing.
+  if (status === 0 && isProgramFault(error)) {
+    return { ...parsed, code: "internal_error", kind: "internal_error", message };
+  }
+
+  return { ...parsed, message };
 };
