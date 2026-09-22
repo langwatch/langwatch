@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import { listDatasets, resetEvaluationResources, traceExists } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
@@ -352,14 +353,6 @@ describe("Langy dogfood: named flows", () => {
       expect(langy.state.toolCommands.some((command) => /\b(gh|git)\b/.test(command))).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
-    });
-
-    /**
-     * The connected-project pair of the scenario above: with a GitHub App installed,
-     * the flow must end with a real PR URL.
-     */
-    it.skip("opens a real PR and reports its URL on a connected project", () => {
-      throw new Error("needs a project with the GitHub App installed");
     });
   });
 

@@ -9,7 +9,7 @@ import {
   type LangyUiActionHandlers,
 } from "@langwatch/langy-browser/langy-ui-actions";
 
-import { PROJECT_ID } from "./config";
+import { CONFIG } from "./config";
 import type { LangyAdapter, UiActionEntry } from "./langy-agent";
 import { trpcMutate } from "./trpc";
 
@@ -49,7 +49,7 @@ function actionTransport({
       trpcMutate<{ isClaimed: boolean }>({
         cookie,
         path: "langy.claimUiAction",
-        input: { projectId: PROJECT_ID, conversationId, actionId },
+        input: { projectId: CONFIG.PROJECT_ID, conversationId, actionId },
         timeoutMs: 15_000,
       }),
     complete: async (args: {
@@ -64,7 +64,7 @@ function actionTransport({
       return trpcMutate<{ isAccepted: boolean }>({
         cookie,
         path: "langy.completeUiAction",
-        input: { projectId: PROJECT_ID, conversationId, ...args },
+        input: { projectId: CONFIG.PROJECT_ID, conversationId, ...args },
         timeoutMs: 30_000,
       });
     },

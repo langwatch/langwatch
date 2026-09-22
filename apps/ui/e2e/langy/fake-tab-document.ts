@@ -9,7 +9,8 @@ import {
   LangyUiPageOutOfDateError,
   LangyUiSaveFailedError,
 } from "@langwatch/langy-browser/langy-ui-actions";
-import { PROJECT_ID } from "./config";
+
+import { CONFIG } from "./config";
 import { trpcMutate, trpcQuery } from "./trpc";
 
 /** What one save did, in the page's own vocabulary. */
@@ -59,6 +60,19 @@ function saveFailureOutcome(error: unknown, workbenchVersion: number | null): Sa
   return "failed";
 }
 
+/** Whether `saveNow` can skip the write outright, and why (README.md "fake-tab-document.ts"). */
+function saveNowSkipReason(state: {
+  experimentId: string | null;
+  name: string;
+  staleWorkbench: boolean;
+}): SaveOutcome | null {
+  if (lacksSavableExperiment(state.experimentId, state.name)) return "unchanged";
+  // Out of date against the server: saving now would clobber the newer
+  // version, so this waits for a reload exactly as autosave does.
+  if (state.staleWorkbench) return "refused";
+  return null;
+}
+
 export function createFakeTabDocument({
   cookie,
   experimentSlug,
@@ -77,7 +91,7 @@ export function createFakeTabDocument({
     }>({
       cookie,
       path: "experiments.getEvaluationsV3BySlug",
-      input: { projectId: PROJECT_ID, experimentSlug },
+      input: { projectId: CONFIG.PROJECT_ID, experimentSlug },
     });
     const store = useEvaluationsV3Store.getState();
     store.reset();
@@ -99,10 +113,8 @@ export function createFakeTabDocument({
    */
   const saveNow = async (): Promise<SaveOutcome> => {
     const state = useEvaluationsV3Store.getState();
-    if (lacksSavableExperiment(state.experimentId, state.name)) return "unchanged";
-    // Out of date against the server: saving now would clobber the newer
-    // version, so this waits for a reload exactly as autosave does.
-    if (state.staleWorkbench) return "refused";
+    const skip = saveNowSkipReason(state);
+    if (skip) return skip;
 
     const body = extractPersistedState(state);
     const snapshot = JSON.stringify(body);
@@ -113,7 +125,7 @@ export function createFakeTabDocument({
         cookie,
         path: "experiments.saveEvaluationsV3",
         input: {
-          projectId: PROJECT_ID,
+          projectId: CONFIG.PROJECT_ID,
           experimentId: state.experimentId,
           expectedVersion: state.workbenchVersion,
           state: body,

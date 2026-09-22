@@ -109,6 +109,7 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
+    "@ai-sdk/openai-compatible": "catalog:",
     "@elevenlabs/client": "catalog:",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

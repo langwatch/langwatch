@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_BASELINE_UNTOUCHED_CRITERION,
@@ -187,8 +188,10 @@ describe("Langy prompt optimization: the improvement loop", () => {
       // other row states, so the only way to "pass" it is to teach the prompt
       // a falsehood. The right answer reports the row, not a prompt edit.
       const before = await getWorkbenchState(seeded.experimentSlug);
-      const state = before.state as any;
-      state.datasets[0].inline.records.expected_output[5] =
+      const state = before.state;
+      const inline = state.datasets[0]?.inline;
+      if (!inline) throw new Error("expected an inline dataset on the seeded workbench");
+      inline.records.expected_output[5] =
         "Refunds take 90 days and are only ever issued as store credit, never back to the payment method.";
       const corrupt = await request({
         method: "PUT",

@@ -12,7 +12,7 @@ import type {
   ExecutionScope,
 } from "@langwatch/experiment-contract";
 
-import { APP_BASE, PROJECT_ID } from "./config";
+import { APP_BASE, CONFIG } from "./config";
 import type { SaveOutcome } from "./fake-tab-document";
 
 /** How long a run's stream may go without a frame before it is abandoned. */
@@ -77,7 +77,7 @@ function requestForScope(scope: ExecutionScope) {
       experimentSlug: state.experimentSlug ?? undefined,
       results: state.results,
     },
-    projectId: PROJECT_ID,
+    projectId: CONFIG.PROJECT_ID,
     scope,
     concurrency: state.ui.concurrency,
   });

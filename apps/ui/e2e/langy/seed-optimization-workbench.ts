@@ -4,7 +4,7 @@
  * surface any integration uses, so a passing seed also proves the workbench-state endpoints work.
  */
 
-import { PROJECT_ID } from "./config";
+import { CONFIG } from "./config";
 import {
   CLASSIFIER_PROMPT,
   FREE_TEXT_ROWS,
@@ -269,7 +269,7 @@ async function createSavedComparisonJudge({
     cookie: await getSessionCookie(),
     path: "evaluators.create",
     input: {
-      projectId: PROJECT_ID,
+      projectId: CONFIG.PROJECT_ID,
       name: `${stampedName} comparison`,
       type: "evaluator",
       config: {

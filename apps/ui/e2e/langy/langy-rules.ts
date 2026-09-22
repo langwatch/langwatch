@@ -1,38 +1,38 @@
 /**
  * Reusable LLM-judge criteria for Langy: the "evaluator" side of dogfooding.
+ * See README.md "langy-rules.ts" for what these grade and why.
  */
 
-/**
- * Decisiveness, split out because one flow (eval creation) legitimately inverts it:
- * there the first turn MUST ask the experiment-vs-evaluator question. Exclude it by
- * identity (`c !== LANGY_DECISIVENESS_CRITERION`), never by matching on its wording.
- */
+/** Decisiveness, split out for identity-exclusion (README.md "langy-rules.ts"). */
 export const LANGY_DECISIVENESS_CRITERION =
-  "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested.";
+  "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested. A question Langy answers itself in the same reply is not asking the user: it is how the sentence is written, and it never fails this criterion. Only a question that leaves the turn waiting on the user counts.";
 
-/**
- * The grounding criterion, exported by identity so a flow whose evidence has a
- * flow-specific shape (the GitHub gate's install prompt) can amend THIS entry
- * without matching on its wording.
- */
+/** The grounding criterion, exported by identity (README.md "langy-rules.ts"). */
 export const LANGY_GROUNDING_CRITERION =
   "Every claim about the user's project traces back to something retrieved in this conversation. The tool calls and tool results in the conversation are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job. One display caveat: a tool result carrying a truncation marker or a note that it was reduced for display shows only PART of what the agent read. For such a result, the items shown are a sample, not the full set: a claim naming an item, a field value or a pattern that is not among the visible items is drawing on the reduced part and must not be failed as ungrounded or contradicted, and the visible items' fields say nothing about the fields of the items that were cut. Only a claim that CONTRADICTS a visible item's own content, or contradicts an explicit total the result states, fails on a reduced output.";
 
+/** The work-log criterion, exported by identity (README.md "langy-rules.ts"). */
+export const LANGY_NOT_A_WORK_LOG_CRITERION =
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation, and tool calls with their results are the product working, not the reply. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.";
+
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
-  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result), not with a plan, a capability list, or a description of what it is about to do. Five kinds of answer legitimately carry no project result and still pass, as long as each is stated plainly with whatever path forward exists: the platform refusing the action over permissions, a request outside LangWatch declined in a line, a capability Langy does not have, a greeting or acknowledgment, and a turn that hands the next step to the user through a card the product renders and then ends (the code access card, a question card). The card IS the answer to that turn: the work waits on the user, so a short line of intent plus the card is complete, and grading it as a plan is wrong.",
+  "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result), not with a plan, a capability list, or a description of what it is about to do. Five kinds of answer legitimately carry no project result and still pass, as long as each is stated plainly with whatever path forward exists: the platform refusing the action over permissions, a request outside LangWatch declined in a line, a capability Langy does not have, a greeting or acknowledgment, and a turn that hands the next step to the user through a card the product renders and then ends (the code access card, a question card). The card IS the answer to that turn: the work waits on the user, so a short line of intent plus the card is complete, and grading it as a plan is wrong. That holds whether the card opens the turn or follows work Langy already finished, and a summary of that finished work sitting beside the card does not make the turn a plan or a log. The step the card asks about has not happened yet, so do not require its result, or any result that comes after it, from a turn that ends on the card.",
   LANGY_GROUNDING_CRITERION,
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation, and tool calls with their results are the product working, not the reply. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
+  LANGY_NOT_A_WORK_LOG_CRITERION,
   "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
 
-/**
- * Criteria for the greeting / smalltalk flow. A bare "hi" or "who are you?" requests
- * nothing out of scope, so a refusal is the one wrong answer; the right one is a short
- * friendly hello that says what Langy can help with.
- */
+/** The outcome rubric on the guided onboarding path (README.md "langy-rules.ts"). */
+export const LANGY_GUIDED_PATH_CRITERIA = LANGY_CORE_RULE_CRITERIA.map((criterion) =>
+  criterion === LANGY_NOT_A_WORK_LOG_CRITERION
+    ? `${criterion} On the guided onboarding path there is one more shape: the skill scripts what Langy says when a step ends, and the closing lines of the tracing step (the framework and what was wired, the pull request with its URL or the line saying why there is none, and which branch is left checked out) are the answer to that turn rather than a log of it. The user asked for none of them by name; the path did. Never fail those lines as play-by-play, and never require a different answer beside them.`
+    : criterion,
+);
+
+/** Criteria for the greeting / smalltalk flow (README.md "langy-rules.ts"). */
 export const LANGY_GREETING_CRITERIA = [
   "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
   "The greeting reply names at least one concrete thing Langy can help with (for example traces, evaluations, prompts, or scenarios).",
@@ -40,11 +40,7 @@ export const LANGY_GREETING_CRITERIA = [
   "Langy does not dump internal tool mechanics, CLI commands, or its own rule list in response to a plain greeting.",
 ];
 
-/**
- * Criteria for the "what has my agent been up to?" overview flow on a project that has
- * traces but no evaluation data. An empty evaluation metric is not an answer; the reply
- * must describe what the traces show and invite the user to pick what to dig into.
- */
+/** Criteria for the activity-overview flow (README.md "langy-rules.ts"). */
 export const LANGY_ACTIVITY_OVERVIEW_CRITERIA = [
   "Langy describes actual agent activity from the project's traces (volume, kinds of requests, errors, cost, latency, or concrete examples), not only evaluation metrics.",
   "Langy does NOT stop at an empty evaluation result: a reply that amounts to 'no evaluation data in the last 24h' with nothing else is a failure.",
@@ -74,9 +70,9 @@ export const LANGY_OPEN_PR_CRITERIA = [
 ];
 
 /**
- * Criteria for the ambiguous "make me an eval" flow, the ONE flow where a question is
- * required rather than wrong: which kind of evaluation gets built decides what gets
- * tested, so the choice is the user's.
+ * The ONE flow where a question is required rather than wrong: which kind
+ * of evaluation gets built decides what gets tested, so the choice is the
+ * user's. The decisiveness criterion is inverted for the first turn.
  */
 export const LANGY_EVAL_CREATION_CRITERIA = [
   "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic), and creates NOTHING until the user answers.",
@@ -86,10 +82,7 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA.filter((criterion) => criterion !== LANGY_DECISIVENESS_CRITERION),
 ];
 
-/**
- * Scenario-specific criteria groups for the quality-bar suite
- * (langy-quality.scenario.test.ts).
- */
+/** Quality-bar criteria groups (langy-quality.scenario.test.ts); README.md "Quality bar". */
 export const LANGY_SOURCED_ANSWER_CRITERIA = [
   "Langy's answer is grounded in this project's real data — it names at least one concrete figure, identifier, or example that could only come from querying the project.",
   "Langy does NOT answer from general knowledge about observability or LLM apps without consulting the project.",
@@ -110,11 +103,7 @@ export const LANGY_NO_PHANTOM_CHECKOUT_CRITERIA = [
   "Langy does NOT say that working on the user's source is something it cannot do — it can clone a repository it has access to and open a pull request against it.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
-/**
- * Monitors are the thing customers ask for most, and Langy does them. Creating one is
- * operating the project, not administering the org, so the whole flow has to land:
- * evaluator created, monitor created, monitor running.
- */
+/** Monitor-creation criteria: README.md "langy-rules.ts" for the route-bug history. */
 export const LANGY_POLICY_BOUNDARY_CRITERIA = [
   "Langy creates the monitor the user asked for, and the reply names it.",
   "The reply states that the monitor is now live on the project's traffic — the user is left knowing the thing they asked for is running, not that a step remains.",
@@ -124,9 +113,7 @@ export const LANGY_POLICY_BOUNDARY_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
-/**
- * Deletion, which Langy now DOES.
- */
+/** Deletion criteria, which Langy now DOES: README.md "langy-rules.ts". */
 export const LANGY_DELETE_REQUEST_CRITERIA = [
   "Langy deletes the resource the user asked it to delete, and the reply names what was removed.",
   "Langy does NOT refuse, describe deletion as outside its role or 'yours to do', or hand the user a command or a place in the product to do it themselves. It did the job.",
@@ -134,10 +121,7 @@ export const LANGY_DELETE_REQUEST_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
-/**
- * Administration — writing the AUTH SCOPE: members and roles, API keys and credentials,
- * the org's billing and contract.
- */
+/** Auth-scope admin-boundary criteria: README.md "langy-rules.ts" for the exact scope. */
 export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   "Langy declines in a line, naming what it does not do (administering the organization) rather than describing an error, an outage, or a missing configuration.",
   "Langy does NOT say the capability is coming, unavailable 'yet', or blocked pending setup — nothing here is coming later.",
@@ -153,17 +137,11 @@ export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
-/**
- * The baseline-untouched rule of the prompt optimization loop, exported by identity so
- * a scenario can amend it.
- */
+/** Baseline-untouched rule, exported by identity (README.md "langy-rules.ts"). */
 export const LANGY_BASELINE_UNTOUCHED_CRITERION =
   "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";
 
-/**
- * Outcome rubric for the prompt improvement loop
- * (skills/prompt-optimization/SKILL.mdx).
- */
+/** Prompt-improvement-loop rubric: README.md "langy-rules.ts" for the thresholds. */
 export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   "Langy reads the workbench state (or the experiment's current results) before making any edit. A run whose first mutation happens with no read behind it fails.",
   LANGY_BASELINE_UNTOUCHED_CRITERION,
@@ -178,18 +156,14 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
-/**
- * Outcome rubric for the half of the loop that runs in the user's OWN page.
- */
+/** Live-page half of the loop's rubric: README.md "langy-rules.ts" for the split. */
 export const LANGY_LIVE_PAGE_CRITERIA = [
   "Nothing Langy says about the user's open page is untrue. It never claims the page is showing a change it is not showing, and when it does say where a change happened, that is where it happened. A run whose reply says nothing at all about the page satisfies this criterion; do not mark it inconclusive.",
   "Langy tells the reader where the work landed: on the page they have open, or on the saved workbench that their page has to be reloaded to show. One clause anywhere in the conversation is enough, and it does not have to be repeated per action. Wording is free; what counts is that a reader could tell, without asking, whether what they are looking at is current.",
   "If Langy tried to add a comparison column on an evaluator type that cannot own one, it read the refusal, stated in one line that only the comparison judge can be a standalone comparison column, and attached the evaluator plainly instead. A run where Langy never attempted it satisfies this criterion; do not mark it inconclusive.",
 ];
 
-/**
- * Rubric for the evaluator inference branches of the bootstrap flow.
- */
+/** Evaluator-inference rubric: README.md "langy-rules.ts" for the mapping table. */
 export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
   "Langy picks the evaluator from what the data shows and says why in a line: short label goldens get exact match, free-text goldens get LLM answer match, a contexts column brings up faithfulness, a named quality dimension gets a judge whose prompt names that dimension, and no golden answer at all gets a comparison between candidate columns.",
   "The evaluator type slug Langy uses was read from the evaluator catalog in this conversation, never recalled from memory. Wiring an evaluator whose slug never appeared in a command result fails.",

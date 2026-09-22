@@ -237,10 +237,8 @@ describe("Langy on a workbench the user is watching", () => {
 
       // The save boundary. `exact_match` grades one column against a golden; it can
       // never be a column that judges other columns against each other.
-      const state = before.state as unknown as {
-        evaluators: Record<string, unknown>[];
-      };
-      state.evaluators.push({
+      const state = before.state;
+      const evaluatorWithComparisonOnExactMatch = {
         id: "evaluator-wrong-comparison",
         evaluatorType: "langevals/exact_match",
         inputs: [
@@ -254,7 +252,8 @@ describe("Langy on a workbench the user is watching", () => {
           includeMetrics: [],
           randomizeOrder: true,
         },
-      });
+      };
+      state.evaluators.push(evaluatorWithComparisonOnExactMatch);
       const refused = await request({
         method: "PUT",
         path: `/api/experiments/${seeded.experimentSlug}/workbench-state`,

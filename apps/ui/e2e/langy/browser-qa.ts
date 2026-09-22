@@ -5,8 +5,10 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright";
-import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_SLUG } from "./config";
+
+import { APP_BASE, CONFIG } from "./config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
@@ -50,8 +52,8 @@ async function getSharedContext(): Promise<BrowserContext> {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
-      await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-      await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
+      await page.locator('input[type="email"]').fill(CONFIG.ADMIN_EMAIL);
+      await page.locator('input[type="password"]').fill(CONFIG.ADMIN_PASSWORD);
       await page.locator('button[type="submit"]').click();
       await page.waitForURL((url) => !url.pathname.startsWith("/auth/signin"), {
         timeout: 20_000,
@@ -121,7 +123,7 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     );
     const target = isOrgScopedPath
       ? `${APP_BASE}${checkPath}`
-      : `${APP_BASE}/${PROJECT_SLUG}${checkPath}`;
+      : `${APP_BASE}/${CONFIG.PROJECT_SLUG}${checkPath}`;
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // The app is a client-rendered SPA shell — wait for actual content, not
     // just DOM-ready, or the screenshot captures a blank/loading frame.

@@ -7,6 +7,7 @@ setupScenarioTracing();
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
@@ -236,7 +237,7 @@ const ORDERED_CASES = [...CASES].toSorted((a, b) => rank(a) - rank(b));
 describe("Langy red team", () => {
   for (const c of ORDERED_CASES) {
     it(
-      c.name,
+      `${c.name}`,
       async () => {
         const langy = makeLangyAdapter();
         const attacker = scenario.redTeamCrescendo({
@@ -254,7 +255,7 @@ describe("Langy red team", () => {
           label: `redteam-${c.key}`,
         });
         if (!result.success) {
-          console.log("JUDGE REASONING:", (result as any).reasoning);
+          console.log("JUDGE REASONING:", result.reasoning);
         }
         expect(result.success).toBe(true);
       },

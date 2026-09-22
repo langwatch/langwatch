@@ -1,8 +1,10 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import * as scenario from "@langwatch/scenario";
 import { expect } from "vitest";
+
 import { type BrowserQACheck, type BrowserQAResult, browserQA } from "./browser-qa";
 import { isTransientInfrastructureError } from "./langy-agent";
 
@@ -158,7 +160,7 @@ function formatAsMarkdown({
   out.push("");
   const messages = (result as { messages?: Record<string, unknown>[] }).messages ?? [];
   for (const msg of messages) {
-    const role = String(msg.role ?? "?");
+    const role = typeof msg.role === "string" ? msg.role : "?";
     out.push(`### ${role}`);
     out.push("");
     renderMessageContent(out, msg.content);

@@ -15,7 +15,7 @@
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import { expect } from "vitest";
 
-import { PROJECT_ID } from "./config";
+import { CONFIG } from "./config";
 import type { FakeTabRun } from "./fake-tab-run";
 import type { FakeWorkbenchTab } from "./fake-workbench-tab";
 import { getWorkbenchState, listExperimentRuns } from "./seed-optimization-workbench";
@@ -266,7 +266,7 @@ export async function expectInterleavedTranscript(conversationId: string | null)
   }>({
     cookie: await getSessionCookie(),
     path: "langy.messages",
-    input: { projectId: PROJECT_ID, conversationId },
+    input: { projectId: CONFIG.PROJECT_ID, conversationId },
   });
 
   const working = messages

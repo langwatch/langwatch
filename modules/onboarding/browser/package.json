@@ -92,6 +92,16 @@
       "langwatch-declaration-source": "./src/ui/sections/observability/ui-options.ts",
       "types": "./dist/ui/sections/observability/ui-options.d.ts",
       "default": "./src/ui/sections/observability/ui-options.ts"
+    },
+    "./surfaces/guided-kickoff": {
+      "langwatch-declaration-source": "./src/features/guided-onboarding/model/kickoff.ts",
+      "types": "./dist/features/guided-onboarding/model/kickoff.d.ts",
+      "default": "./src/features/guided-onboarding/model/kickoff.ts"
+    },
+    "./surfaces/guided-providers": {
+      "langwatch-declaration-source": "./src/features/guided-onboarding/model/guided-providers.ts",
+      "types": "./dist/features/guided-onboarding/model/guided-providers.d.ts",
+      "default": "./src/features/guided-onboarding/model/guided-providers.ts"
     }
   },
   "scripts": {
