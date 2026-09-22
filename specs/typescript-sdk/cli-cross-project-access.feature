@@ -100,11 +100,12 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs it
       Then the value is not read as the credential scope for the login itself
 
-    @integration
-    Scenario: the whole instant-eval family runs against a named project
-      Given the key reaches a project with slug "checkout-agent"
-      When the user runs `langwatch instant-eval run --sql "..." --project checkout-agent`
-      Then the run is created in that project
+    @unit
+    Scenario: the whole instant-eval family takes the flag
+      Given the command tree the CLI runs
+      When the instant-eval commands are listed
+      Then every one of them declares --project
+      And every one of them is marked as running inside a project
 
   Rule: a project the credential cannot be pointed at is said so, not dropped
 

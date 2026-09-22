@@ -392,3 +392,20 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     When the user runs `langwatch logout`
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched
+
+  # A login overwrites the session on this machine in place. Logging in as a
+  # second account left every command answering from the first account's
+  # organization with nothing on screen saying the account had changed, and a
+  # CLI sat on a throwaway test organization for a morning because of it.
+  @unit
+  Scenario: Logging in as another organization says whose login it replaced
+    Given the machine holds a device session for one organization
+    When the user completes a login for a different organization
+    Then the output names the account and organization being signed out
+    And names the account and organization every command now runs as
+
+  @unit
+  Scenario: Logging in again as the same organization says nothing extra
+    Given the machine holds a device session for one organization
+    When the user completes a login for that same organization
+    Then no replacement notice is printed

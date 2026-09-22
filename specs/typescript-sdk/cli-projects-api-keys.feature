@@ -109,3 +109,30 @@ Feature: CLI Projects and API Keys management
     When I run `langwatch projects list`
     Then the output includes "LANGWATCH_API_KEY not found"
     And the CLI exits with status 1
+
+  Rule: an authorization refusal says what the login on this machine carries
+
+    `langwatch api-keys create` answers 403 to an organization admin, because a
+    CLI login key is minted without `organization:manage` on purpose. The
+    refusal read as though the person lacked the role, so the way out looked
+    like an escalation rather than a re-login, and an agent holding a device
+    login could not tell the two apart at all.
+
+    @unit
+    Scenario: the refusal lists the permissions the login was minted with
+      Given the login recorded the permission slugs its key carries
+      When a command is refused as unauthorized
+      Then the refusal lists those slugs
+      And says a permission not listed there is refused whatever the role is
+
+    @unit
+    Scenario: a login that recorded no permissions adds nothing
+      Given the login predates the permissions field
+      When a command is refused as unauthorized
+      Then no permissions line is added, rather than a guess
+
+    @unit
+    Scenario: a failure that is not an authorization one is left alone
+      Given a command fails as not_found
+      When the refusal is rendered
+      Then no permissions line is added

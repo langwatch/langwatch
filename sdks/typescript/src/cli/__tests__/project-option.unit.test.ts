@@ -52,6 +52,7 @@ describe("given the command tree the CLI runs", () => {
     expect(missing).toEqual([]);
   });
 
+  /** @scenario "the whole instant-eval family takes the flag" */
   it("covers the whole instant-eval family, the one this was written for", () => {
     const program = tree();
     const family = leafCommands(program)
