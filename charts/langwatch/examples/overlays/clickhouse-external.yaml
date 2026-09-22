@@ -19,6 +19,6 @@ clickhouse:
 # via app SQL DDL, the same as on every other ClickHouse posture. Your
 # ClickHouse must already have: custom_settings_prefixes including "custom_",
 # and the app's administrative user granted access_management +
-# named_collection_control. See "LangWatchQL (LWQL) — BYO ClickHouse
-# prerequisites" in ../../README.md, and ADR-141
+# named_collection_control. See "LangWatchQL (LWQL) prerequisites"
+# (../../README.md#langwatchql-lwql-prerequisites), and ADR-141
 # (../../../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).

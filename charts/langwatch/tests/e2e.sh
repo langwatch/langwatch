@@ -419,7 +419,7 @@ test_app() {
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
 test_lwql() {
-  sep; info "Suite: LangWatchQL access model (chart-managed render)"
+  sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 
   local app_pod
   app_pod=$(kc get pod \
@@ -436,8 +436,13 @@ test_lwql() {
   # ClickHouse access model
   assert_eq "restricted user langwatch_lwql exists" \
     "$(ch_query "$pod" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
-  assert_eq "settings profile lwql_restricted exists" \
-    "$(ch_query "$pod" "SELECT count() FROM system.settings_profiles WHERE name='lwql_restricted'")" "1"
+  # The app derives the profile name as `<database>_profile`
+  # (productionProvisioning.ts) — "langwatch_profile" for the e2e values'
+  # ClickHouse database "langwatch".
+  assert_eq "settings profile langwatch_profile exists" \
+    "$(ch_query "$pod" "SELECT count() FROM system.settings_profiles WHERE name='langwatch_profile'")" "1"
+  assert_eq "langwatch_profile lives in the SQL store" \
+    "$(ch_query "$pod" "SELECT storage FROM system.settings_profiles WHERE name='langwatch_profile'")" "local_directory"
   local policies
   policies=$(ch_query "$pod" "SELECT count() FROM system.row_policies WHERE database='langwatch'")
   if [ "${policies:-0}" -ge 1 ]; then

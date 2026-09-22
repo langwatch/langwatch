@@ -9,16 +9,15 @@
  * `src/tasks/provisionLwql.ts` is the only caller and the only place that
  * touches a client, an env var beyond what it hands in here, or Postgres.
  *
- * ## What this deploy provisions, and what it does not
+ * ## What this module composes
  *
- * The ClickHouse access model — restricted user, settings profile, grants,
- * row policies — and the PostgreSQL-mapped views are infra's job: terraform
- * provisions both out of band, against a server-managed identity a
- * `CREATE USER`/`GRANT` issued here would be rejected against. This module
- * therefore composes only three things: the ClickHouse-native views
- * ({@link productionClickHouseObjectStatements}), the PostgreSQL-side
- * approved views ({@link productionPostgresApprovedViewStatements}), and the
- * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
+ * The application owns the LangWatchQL access model on every deployment and
+ * converges the ClickHouse side — restricted user, settings profile, grants,
+ * row policies, views — through `selfProvisioning.ts` at boot (ADR-141). What
+ * remains here is the PostgreSQL half and the key map: this module composes
+ * the PostgreSQL-side approved views
+ * ({@link productionPostgresApprovedViewStatements}) and the key-map backfill
+ * plan ({@link planLwqlKeyMapBackfill}) that `src/tasks/provisionLwql.ts` runs.
  *
  * @see specs/lwql/api.feature
  */
@@ -26,20 +25,13 @@
 import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import { isPostgresResident } from "../catalog/types";
 import type { LangWatchQLConnection } from "../connection";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
 } from "./accessModel";
-import { lwqlAppFunctionStatements } from "./appFunctionStatements";
-import {
-  lwqlApprovedPostgresViewNames,
-  lwqlPostgresApprovedViewStatements,
-  lwqlViewStatement,
-  SHIPPED_LWQL_DEDUP,
-} from "./catalogStatements";
+import { lwqlPostgresApprovedViewStatements } from "./catalogStatements";
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries
@@ -109,9 +101,8 @@ export function productionLangWatchQLNames({
  *
  * Always migration 00084's table, created under the app's own ClickHouse
  * database (`sourceDatabase`, matching goose's `${CLICKHOUSE_DATABASE}`) —
- * the same database infra's row filters already reference. Never
- * `names.database`: this deploy provisions no key-map table of its own (see
- * {@link productionClickHouseObjectStatements}'s doc comment).
+ * the same database the row filters already reference. Never `names.database`:
+ * this deploy provisions no key-map table of its own; migration 00084 owns it.
  */
 export function lwqlKeyMapTableQualifiedName({
   names,
@@ -121,43 +112,6 @@ export function lwqlKeyMapTableQualifiedName({
   sourceDatabase: string;
 }): string {
   return qualified(names, names.keyMapTable, sourceDatabase);
-}
-
-/**
- * ClickHouse-native views, and the app functions' projection UDFs. Never
- * grants, policies, a user, a profile, or the key-map table (migration 00084
- * already created it) — the ClickHouse access model and the PostgreSQL-mapped
- * views are infra's job, provisioned out of band (see the module doc comment).
- *
- * The app functions are here rather than left to infra because they are not
- * part of the access model: they are catalog objects, like the views beside
- * them, generated from the same application catalog and applied by the same
- * administrative connection. There is also no config form for a SQL UDF for
- * terraform to render — see `./appFunctionStatements.ts`.
- */
-export function productionClickHouseObjectStatements({
-  names,
-  sourceDatabase,
-  views = LWQL_VIEW_CATALOG,
-}: {
-  names: LangWatchQLNames;
-  sourceDatabase: string;
-  views?: readonly LangWatchQLViewDefinition[];
-}): string[] {
-  return [
-    `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-    ...lwqlAppFunctionStatements(),
-    ...views
-      .filter((view) => !isPostgresResident(view))
-      .map((view) =>
-        lwqlViewStatement({
-          names,
-          sourceDatabase,
-          view,
-          dedup: SHIPPED_LWQL_DEDUP,
-        }),
-      ),
-  ];
 }
 
 /**

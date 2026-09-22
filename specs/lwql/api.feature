@@ -883,6 +883,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then that statement is skipped and reported while the remaining statements still run
     And a statement rejected for any other reason still aborts the run
 
+  # Issue #8258: a 495 ACCESS_STORAGE_READONLY is tolerated only when the failing
+  # statement targets an entity the config store actually owns (present in the
+  # inventory). A BYO server whose whole access storage is read-only owns none of
+  # the LWQL model, so its 495s must abort — not boot "ok" with an unprovisioned
+  # access model.
+  @unit
+  Scenario: A read-only access storage for an entity the config store does not own fails provisioning
+    Given a statement rejected with a config-store read-only error whose target entity is not in the config-store inventory
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the statement
+    And a read-only error whose target entity is in the inventory is skipped and the run continues
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the

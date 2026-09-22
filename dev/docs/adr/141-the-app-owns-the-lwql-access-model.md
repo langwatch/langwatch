@@ -32,6 +32,10 @@ The chart's `clickhouse.lwqlAccessModel` values block and the `clickhouse-server
 
 The sibling SaaS change (langwatch-saas#1255) deletes the SaaS rendered copy independently. The two changes are order-independent and can ship together.
 
+### Residual risk
+
+A config-store-owned LangWatchQL entity (user, settings profile, row policy, named collection) is trusted as-is — the app skips it by name and does not verify its substance (readonly setting, profile constraints, row-policy predicate, collection target). A wrongly defined config-owned entity can therefore widen or break tenant isolation, and the operator owns removing or correcting it. The app's boot-time WARN log names each such entity. A 495 (ACCESS_STORAGE_READONLY) error on an entity NOT found in the config-store inventory is treated as a failure, not a skip.
+
 ## References
 
 - Issue: https://github.com/langwatch/langwatch/issues/8258

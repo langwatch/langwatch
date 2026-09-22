@@ -277,12 +277,17 @@ async function selfProvisionAll({
         // Named first at WARN so the operator sees by name any LWQL identity
         // the ClickHouse server already owns in its read-only config store,
         // before the statements that will skip it run.
-        await inventoryConfigStoreLwqlEntities({ client, names });
+        const configStoreEntities = await inventoryConfigStoreLwqlEntities({
+          client,
+          names,
+          secrets,
+        });
 
         const includeAppFunctions = await appFunctionsProvisionable(client);
         const { skipped } = await runClickHouseStatements({
           client,
           secrets,
+          configStoreEntities,
           statements: selfHostedClickHouseProvisioningStatements({
             names,
             restrictedPassword: selfProvision.connection.password,

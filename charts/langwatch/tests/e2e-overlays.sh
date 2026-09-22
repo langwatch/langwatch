@@ -66,46 +66,6 @@ assert_not_contains() {
   fi
 }
 
-# Assert a projected-Secret volume actually resolves: extract the secretName and
-# the first item key the named volume references, then prove the Secret of that
-# name in the SAME render carries that key under data. This is the check env-var
-# assertions cannot make — an optional:true volume silently drops an unresolved
-# key, so "the env var is wired" is not "the mount resolves".
-assert_secret_key_resolves() {
-  local label="$1" haystack="$2" volume="$3"
-  local sname skey pair
-  # Anchor to the VOLUME definition, not the volumeMount of the same name: the
-  # `- name: <volume>` we want is the one followed by `secret:` (the mount is
-  # followed by mountPath). Reset on every list item so the mount block cannot
-  # bleed into the unrelated `secrets` volume's secretName that follows it.
-  # Emit "secretName firstItemKey" (the subchart lists key before path).
-  pair=$(awk -v v="$volume" '
-      $1=="-" && $2=="name:" && $3==v {inblk=1; sawsec=0; sname=""; next}
-      $1=="-" && $2=="name:" {inblk=0}
-      inblk && $1=="secret:" {sawsec=1}
-      inblk && sawsec && $1=="secretName:" {sname=$2; next}
-      inblk && sname!="" && $1=="-" && $2=="key:" {print sname, $3; exit}
-    ' <<< "$haystack")
-  sname="${pair%% *}"; skey="${pair##* }"
-  if [[ -z "$sname" || -z "$skey" || "$sname" == "$skey" ]]; then
-    fail "$label: could not locate secretName/key for volume '$volume' in render"
-    return
-  fi
-  # Walk the multi-doc render: within the Secret whose metadata.name == sname,
-  # look for a data key == skey. metadata precedes data in helm output, so name
-  # is set before the data line is seen.
-  if awk -v want="$sname" -v key="${skey}:" '
-      /^---/ {kind=""; name=""}
-      /^kind: / {kind=$2}
-      kind=="Secret" && /^  name: / {name=$2}
-      kind=="Secret" && name==want && $1==key {print "yes"; exit}
-    ' <<< "$haystack" | grep -q yes; then
-    pass "$label (Secret '$sname' carries key '$skey')"
-  else
-    fail "$label: volume '$volume' references Secret '$sname' key '$skey', but no such key in the rendered Secret"
-  fi
-}
-
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"

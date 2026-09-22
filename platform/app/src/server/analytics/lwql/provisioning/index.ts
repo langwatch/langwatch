@@ -34,8 +34,8 @@ export {
   CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
   type ConfigStoreLwqlEntity,
   inventoryConfigStoreLwqlEntities,
-  redactSecrets,
   type RunClickHouseStatementsResult,
+  redactSecrets,
   runClickHouseStatements,
   type SkippedProvisioningStatement,
 } from "./clickhouseStatementRunner";
@@ -46,7 +46,6 @@ export {
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresSchemaFromDatabaseUrl,
   planLwqlKeyMapBackfill,
-  productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   withTenancyOptOut,

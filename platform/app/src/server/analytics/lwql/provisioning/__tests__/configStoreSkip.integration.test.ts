@@ -19,8 +19,6 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
 import {
   CLICKHOUSE_ERROR_CODE,
   type LangWatchQLClickHouseHarness,
@@ -29,13 +27,14 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../__tests__/lwqlClickHouseHarness";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
 import {
   type LangWatchQLNames,
   lwqlClickHouseSetupStatements,
 } from "../accessModel";
 import {
-  SHIPPED_LWQL_DEDUP,
   lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
 } from "../catalogStatements";
 import {
   inventoryConfigStoreLwqlEntities,
@@ -191,6 +190,11 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         client: harness.admin,
         statements,
         secrets: [RESTRICTED_PASSWORD, READER_PASSWORD],
+        // The real inventory: a 495 is tolerated only against a statement that
+        // names the config-store user or profile it found. Every 495-failing
+        // statement here (the CREATE USER, its grants and row policies) names
+        // langwatch_lwql or lwql_restricted, so all are tolerated.
+        configStoreEntities: preflight,
       });
 
       // Both kinds of config-store rejection were tolerated and named.
@@ -245,9 +249,10 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       ).json()) as Array<{ name: string }>;
       const viewNames = new Set(viewRows.map((row) => row.name));
       for (const view of LWQL_VIEW_CATALOG) {
-        expect(viewNames.has(view.name), `view ${view.name} was provisioned`).toBe(
-          true,
-        );
+        expect(
+          viewNames.has(view.name),
+          `view ${view.name} was provisioned`,
+        ).toBe(true);
       }
 
       // The config-store identity is still the one that exists, untouched.

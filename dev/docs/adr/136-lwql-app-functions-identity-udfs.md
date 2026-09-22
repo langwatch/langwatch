@@ -10,9 +10,9 @@ values the database cannot compute.
 [ADR-083](083-lwql-diagnostics-read-the-single-parse.md): the validator's one
 walk is where facts about a statement are recorded; the hydration plan is
 recorded the same way, for the same reason.
-[ADR-101](101-lwql-clickhouse-access-model-ownership.md): the access model is
-static config the server re-reads at boot. App functions are the one LangWatchQL
-object that cannot follow that pattern, and §4 says why.
+[ADR-141](141-the-app-owns-the-lwql-access-model.md): the app self-provisions
+the LangWatchQL access model on every deployment. App functions are the one
+LangWatchQL object that cannot follow that pattern, and §4 says why.
 
 **Related:** [ADR-082](082-lwql-analytics-views-invoker-column-grants-final-dedup.md)
 (the `INVOKER` views and column grants these run beside),
@@ -168,14 +168,14 @@ refused `CREATE`, `DROP` and `SYSTEM RELOAD FUNCTION` with `ACCESS_DENIED`
 relaxed. A third audit query beside the policy-coverage and definer-view ones
 pins that no such grant appears.
 
-## 4. They are SQL, next to an access model that is config
+## 4. They are SQL, next to an access model the app self-provisions
 
-ADR-101 records that the whole LangWatchQL access model is static config,
-because it is static: one user, one profile, a fixed grant and filter set, and
-config is what a server re-reads at every boot. App functions cannot follow it.
-There is no XML form of `CREATE FUNCTION` for a SQL UDF; the only config-time
-UDF form, `user_defined_executable_functions_config`, is for *executable* UDFs
-that fork a process per call, which is not what this is.
+ADR-141 records that the app self-provisions the whole LangWatchQL access model
+on every deployment. App functions run under that same app-owned path: they are
+SQL provisioned by the application at boot, not config. There is no XML form of
+`CREATE FUNCTION` for a SQL UDF; the only config-time UDF form,
+`user_defined_executable_functions_config`, is for *executable* UDFs that fork
+a process per call, which is not what this is.
 
 So they are the one SQL-provisioned LangWatchQL object, applied by the same
 administrative connection and generated from the same application catalog as the
@@ -196,11 +196,10 @@ it runs, so a replica built afterwards has no functions and every provisioning
 run has to be re-broadcast.
 
 The chart-managed renderer declares the path in replicated mode only
-(`infra/clickhouse-serverless/internal/render/lwql.go`, `config.d/lwql-server.yaml`,
-`/clickhouse/user_defined`); on a single node there is no ensemble to point at.
-The cloud's own rendered config (`langwatch-saas`,
-`config/lwql-server.xml`) needs the same element and the same path, and lands as
-its own change.
+(`config.d/zz-server-settings.yaml`, `/clickhouse/user_defined`); on a single
+node there is no ensemble to point at. The cloud's own rendered config
+(`langwatch-saas`, `config/lwql-server.xml`) needs the same element and the
+same path, and lands as its own change.
 
 ## 5. Caps are refusals, and truncation is never silent
 

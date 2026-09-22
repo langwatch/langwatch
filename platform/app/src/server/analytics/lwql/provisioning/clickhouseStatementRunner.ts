@@ -46,9 +46,44 @@ export const CLICKHOUSE_CONFIG_STORE_ERROR_CODE = {
   NAMED_COLLECTION_IS_IMMUTABLE: 671,
 } as const;
 
-const TOLERATED_CONFIG_STORE_CODES: ReadonlySet<number> = new Set(
-  Object.values(CLICKHOUSE_CONFIG_STORE_ERROR_CODE),
-);
+/**
+ * The named-collection codes are tolerated unconditionally: each is specific to
+ * a `NAMED COLLECTION` statement whose collection is config-XML-defined, so the
+ * failure itself proves the entity is config-owned. A 495 is not so specific —
+ * it fires for any access entity in a read-only store — so it is tolerated only
+ * against an inventoried entity (see {@link runClickHouseStatements}).
+ */
+const NAMED_COLLECTION_CODES: ReadonlySet<number> = new Set([
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+]);
+
+/**
+ * Whether `statement` names `identifier` as a whole token — bounded by any
+ * non-identifier character, so a backticked, quoted, or bare occurrence all
+ * match, but a longer name that merely contains it does not. Used to decide
+ * whether a 495 failure targets an inventoried config-store entity.
+ */
+function statementNamesIdentifier(
+  statement: string,
+  identifier: string,
+): boolean {
+  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(
+    statement,
+  );
+}
+
+/** Throws unless `name` is a bare identifier safe to interpolate into a query. */
+function assertPlainIdentifier(name: string): string {
+  if (!/^[A-Za-z0-9_]+$/.test(name)) {
+    throw new Error(
+      `lwql provisioning: refusing to interpolate a non-identifier name into the config-store inventory query: ${JSON.stringify(name)}`,
+    );
+  }
+  return name;
+}
 
 /**
  * The numeric ClickHouse error code carried by a thrown error, or `null`.
@@ -114,22 +149,32 @@ export interface RunClickHouseStatementsResult {
  * one, which is the difference between an actionable error and "provisioning
  * failed".
  *
- * A statement rejected because its target entity is defined in the read-only
- * config store (codes in {@link CLICKHOUSE_CONFIG_STORE_ERROR_CODE}: 495, 669,
- * 670, 671) is logged at WARN, collected into the returned `skipped` list, and
- * stepped over — the
- * app yields to the entity the server owns and keeps provisioning the rest.
- * Every other error still throws.
+ * A `NAMED COLLECTION` statement rejected with 669/670/671 is always tolerated
+ * (the code itself proves the collection is config-XML-owned). A 495
+ * ACCESS_STORAGE_READONLY is tolerated only when the failing statement targets
+ * an entity in `configStoreEntities` — the inventory of what the server owns in
+ * its read-only store — by name: the restricted user, its settings profile, or
+ * one of the LWQL row policies. A 495 whose target is *not* inventoried means
+ * the whole access storage is read-only for an entity nobody owns as config, so
+ * the model would silently go unprovisioned; that goes through the error+throw
+ * path. A tolerated statement is logged at WARN, collected into `skipped`, and
+ * stepped over. Every other error still throws.
  */
 export async function runClickHouseStatements({
   client,
   statements,
   secrets = [],
+  configStoreEntities = [],
 }: {
   client: ClickHouseClient;
   statements: string[];
   /** Values to strip from the logged error/statement — see {@link redactSecrets}. */
   secrets?: readonly (string | undefined)[];
+  /**
+   * The config-store entities {@link inventoryConfigStoreLwqlEntities} found.
+   * A 495 is tolerated only against a statement that names one of these.
+   */
+  configStoreEntities?: readonly ConfigStoreLwqlEntity[];
 }): Promise<RunClickHouseStatementsResult> {
   const skipped: SkippedProvisioningStatement[] = [];
   for (const [index, statement] of statements.entries()) {
@@ -137,40 +182,88 @@ export async function runClickHouseStatements({
     try {
       await client.command({ query: statement });
     } catch (error) {
-      const code = clickHouseErrorCode(error);
-      if (code !== null && TOLERATED_CONFIG_STORE_CODES.has(code)) {
-        const redactedStatement = redactSecrets(statement, secrets);
-        skipped.push({ index: index + 1, code, statement: redactedStatement });
-        logger.warn(
-          { code, statement: position, skipped: redactedStatement },
-          "lwql provisioning skipped a statement whose entity is defined in the ClickHouse config store (read-only) and continued",
-        );
-        continue;
-      }
-      logger.error(
-        {
-          error: redactSecrets(errorMessage(error), secrets),
-          statement: position,
-        },
-        "lwql provisioning failed creating ClickHouse objects",
+      // Throws for every non-tolerable failure (logging it first); otherwise
+      // returns the tolerated code to skip.
+      const code = toleratedConfigStoreSkipCode({
+        error,
+        statement,
+        position,
+        secrets,
+        configStoreEntities,
+      });
+      const redactedStatement = redactSecrets(statement, secrets);
+      skipped.push({ index: index + 1, code, statement: redactedStatement });
+      logger.warn(
+        { code, statement: position, skipped: redactedStatement },
+        "lwql provisioning skipped a statement whose entity is defined in the ClickHouse config store (read-only) and continued",
       );
-      throw error;
     }
   }
   return { skipped };
 }
 
+/**
+ * Classifies a failed statement: returns the tolerated config-store code to skip
+ * it under, or logs the failure at ERROR and rethrows. Keeps the abort/skip
+ * decision — and its ERROR logging — out of {@link runClickHouseStatements}'s
+ * loop.
+ */
+function toleratedConfigStoreSkipCode({
+  error,
+  statement,
+  position,
+  secrets,
+  configStoreEntities,
+}: {
+  error: unknown;
+  statement: string;
+  position: string;
+  secrets: readonly (string | undefined)[];
+  configStoreEntities: readonly ConfigStoreLwqlEntity[];
+}): number {
+  const code = clickHouseErrorCode(error);
+  if (code !== null && NAMED_COLLECTION_CODES.has(code)) return code;
+  const isReadonly =
+    code === CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
+  if (
+    isReadonly &&
+    configStoreEntities.some((entity) =>
+      statementNamesIdentifier(statement, entity.name),
+    )
+  ) {
+    return code;
+  }
+  logger.error(
+    { error: redactSecrets(errorMessage(error), secrets), statement: position },
+    isReadonly
+      ? "lwql provisioning: ClickHouse access storage is read-only for a statement whose target entity is not in the config-store inventory — the access model would go unprovisioned, so provisioning is failing rather than booting with an incomplete model"
+      : "lwql provisioning failed creating ClickHouse objects",
+  );
+  throw error;
+}
+
 /** An LWQL access entity found pre-defined in the ClickHouse config store. */
 export interface ConfigStoreLwqlEntity {
-  readonly kind: "user" | "settings_profile";
+  readonly kind: "user" | "settings_profile" | "row_policy";
   readonly name: string;
 }
 
+const CONFIG_STORE_ENTITY_KINDS: ReadonlySet<string> = new Set([
+  "user",
+  "settings_profile",
+  "row_policy",
+]);
+
 /**
- * Reads `system.users` and `system.settings_profiles` for the LangWatchQL
- * identity and profile when they are defined in the read-only `users_xml`
- * store, logs any found once at WARN, and returns them — so the operator sees
- * by name what {@link runClickHouseStatements} is about to skip.
+ * Reads `system.users`, `system.settings_profiles` and `system.row_policies`
+ * for the LangWatchQL identity, profile and row policies when they are defined
+ * in the read-only `users_xml` store, logs any found once at WARN, and returns
+ * them — so the operator sees by name what {@link runClickHouseStatements} is
+ * about to skip, and so a 495 is tolerated only against one of these names.
+ *
+ * Row policies are matched by the restricted user they apply to (the only user
+ * the LWQL policies target); their `short_name` is what the CREATE ROW POLICY
+ * statements name, so that is the identity returned.
  *
  * Never throws: an inventory that cannot be read is logged and returns empty
  * rather than stopping a provisioning run that is otherwise fine.
@@ -178,26 +271,33 @@ export interface ConfigStoreLwqlEntity {
 export async function inventoryConfigStoreLwqlEntities({
   client,
   names,
+  secrets = [],
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
+  /** Values to strip from a logged inventory error — see {@link redactSecrets}. */
+  secrets?: readonly (string | undefined)[];
 }): Promise<ConfigStoreLwqlEntity[]> {
-  // `restrictedUser` and `settingsProfile` are validated identifiers
-  // (`assertNames`, `[A-Za-z0-9_]` only), so interpolating them as string
-  // literals here cannot inject — a quote can never appear in the value.
+  // `productionLangWatchQLNames` does not validate its inputs, so these names
+  // are validated here before interpolation: a quote in any of them is rejected
+  // rather than closing the string literal it is spliced into.
+  const restrictedUser = assertPlainIdentifier(names.restrictedUser);
+  const settingsProfile = assertPlainIdentifier(names.settingsProfile);
   const query =
     `SELECT 'user' AS kind, name FROM system.users ` +
-    `WHERE storage = 'users_xml' AND name = '${names.restrictedUser}'\n` +
+    `WHERE storage = 'users_xml' AND name = '${restrictedUser}'\n` +
     `UNION ALL\n` +
     `SELECT 'settings_profile' AS kind, name FROM system.settings_profiles ` +
-    `WHERE storage = 'users_xml' AND name = '${names.settingsProfile}'`;
+    `WHERE storage = 'users_xml' AND name = '${settingsProfile}'\n` +
+    `UNION ALL\n` +
+    `SELECT 'row_policy' AS kind, short_name AS name FROM system.row_policies ` +
+    `WHERE storage = 'users_xml' AND has(apply_to_list, '${restrictedUser}')`;
   try {
     const result = await client.query({ query, format: "JSONEachRow" });
     const rows = (await result.json()) as Array<{ kind: string; name: string }>;
     const entities = rows
-      .filter(
-        (row): row is ConfigStoreLwqlEntity =>
-          row.kind === "user" || row.kind === "settings_profile",
+      .filter((row): row is ConfigStoreLwqlEntity =>
+        CONFIG_STORE_ENTITY_KINDS.has(row.kind),
       )
       .map((row) => ({ kind: row.kind, name: row.name }));
     if (entities.length > 0) {
@@ -209,7 +309,7 @@ export async function inventoryConfigStoreLwqlEntities({
     return entities;
   } catch (error) {
     logger.warn(
-      { error: errorMessage(error) },
+      { error: redactSecrets(errorMessage(error), secrets) },
       "lwql provisioning could not inventory the ClickHouse config store for pre-defined LangWatchQL entities — continuing",
     );
     return [];
