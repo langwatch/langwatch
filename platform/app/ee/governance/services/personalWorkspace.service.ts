@@ -38,6 +38,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:governance:personal-workspace");
@@ -293,16 +294,18 @@ export class PersonalWorkspaceService {
       teamId,
     }: { userId: string; organizationId: string; teamId: string },
   ): Promise<boolean> {
-    const grant = await client.roleBinding.findFirst({
+    const bindings = await new GrantsAccessListingRepository(
+      client,
+    ).findBindingRows({
+      organizationId,
       where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
+        principalType: "USER",
+        principalId: userId,
+        scopeType: "TEAM",
         scopeId: teamId,
       },
-      select: { id: true },
     });
-    return grant !== null;
+    return bindings.length > 0;
   }
 
   /**

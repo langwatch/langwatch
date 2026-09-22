@@ -87,6 +87,11 @@ export interface IntentContext {
   tenantId: string;
   messageKey: string;
   attempt: number;
+  /**
+   * When the delivery's outbox lease lapses, for a handler that must finish
+   * its effect inside it. Absent where no dispatcher leased the message.
+   */
+  leaseExpiresAt?: number;
 }
 
 export type IntentExecutor<Payload> = (
@@ -164,6 +169,17 @@ export interface ProcessManagerConfig<
    * prompts, parts, tool output, titles, or tokens at all.
    */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
+  /**
+   * The process instance an event belongs to. Defaults to the event's
+   * aggregate id — one instance per aggregate, which maximizes parallelism.
+   *
+   * A process that accumulates across aggregates (one instance per tenant,
+   * say) keys by that instead. Deriving the key from the event alone is what
+   * lets the generated subscriber reuse it as its `groupKeyFn`, so every
+   * event landing on one instance drains in one FIFO lane — without that,
+   * concurrent deliveries to the same instance fight over its revision.
+   */
+  keyBy?: (event: E) => string;
   intents: Intents;
   /**
    * Opt in to the transient path: an event whose evolution keeps the initial
@@ -228,6 +244,11 @@ export function defineProcessManager<
   if (config.schedule && !config.onWake) {
     throw new Error(
       `Process manager "${config.name}" declares a schedule but no onWake handler`,
+    );
+  }
+  if (config.schedule && config.keyBy) {
+    throw new Error(
+      `Process manager "${config.name}" cannot be keyed and scheduled: a schedule is armed on the singleton instance, which keyBy would move`,
     );
   }
   if (config.eventTypes.length === 0 && !config.schedule) {

@@ -66,6 +66,17 @@ export type SpendEventRow = {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
+  /** Image tokens billed on the input side, 0 on a request with no image.
+   *  Priced at its own rate and disjoint from tokensInput, which never
+   *  includes it. */
+  tokensInputImage: number;
+  /** Image tokens the answer was billed for, 0 when it held no image.
+   *  Priced at its own rate and disjoint from tokensOutput, which is 0 on an
+   *  image generation. */
+  tokensOutputImage: number;
+  /** Images the request carried. Display only: no rate prices it, so it
+   *  never enters a cost. */
+  imageCount: number;
   /** Integer nano-USD, the authoritative figure. */
   costNanoUsd: number;
   /** Decimal USD string derived from costNanoUsd, up to 9 fractional digits. */
@@ -99,7 +110,8 @@ export function parseSummedNanoUsd(value: unknown): number {
 export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
+          TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,
+          CostNanoUSD, RateVersion, Status, ErrorClass,
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
@@ -123,6 +135,9 @@ export function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
     tokensCacheRead: Number(r.TokensCacheRead),
     tokensCacheWrite: Number(r.TokensCacheWrite),
     tokensReasoning: Number(r.TokensReasoning),
+    tokensInputImage: Number(r.TokensInputImage ?? 0),
+    tokensOutputImage: Number(r.TokensOutputImage ?? 0),
+    imageCount: Number(r.ImageCount ?? 0),
     costNanoUsd: nano,
     costUsd: nanoUsdToDecimalString(nano),
     rateVersion: String(r.RateVersion ?? ""),
@@ -276,6 +291,9 @@ export interface SpendSummaryRow {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
+  tokensInputImage: number;
+  tokensOutputImage: number;
+  imageCount: number;
   costNanoUsd: number;
   costUsd: string;
 }
@@ -319,6 +337,9 @@ function mapSummaryRow({
     tokensCacheRead: summed(raw, "TokensCacheRead"),
     tokensCacheWrite: summed(raw, "TokensCacheWrite"),
     tokensReasoning: summed(raw, "TokensReasoning"),
+    tokensInputImage: summed(raw, "TokensInputImage"),
+    tokensOutputImage: summed(raw, "TokensOutputImage"),
+    imageCount: summed(raw, "ImageCount"),
     costNanoUsd: nano,
     costUsd: nanoUsdToDecimalString(nano),
   };
@@ -349,13 +370,12 @@ function usageColumns(usage: SpendUsage | null): Record<string, number> {
 /**
  * The quantities a spend row carries, or null when it measured nothing.
  *
- * The quantity columns beyond the five token classes are read straight off
- * the raw row rather than through {@link mapSpendEventRow}: the mapped row
- * shapes the REST and UI surfaces, and widening it would change those
- * response bodies. The fold needs them regardless, because a late admission
- * folding over a confirmed request rewrites the whole row from this state,
- * so a quantity that does not decode here is a quantity zeroed on the next
- * write.
+ * The audio and character quantities are read straight off the raw row
+ * rather than through {@link mapSpendEventRow}, which carries only what the
+ * REST and UI surfaces publish. The fold needs every quantity regardless,
+ * because a late admission folding over a confirmed request rewrites the
+ * whole row from this state, so a quantity that does not decode here is a
+ * quantity zeroed on the next write.
  *
  * Any measured quantity counts as usage, not the token classes alone: a
  * character-priced call has zero tokens and 4000 characters, and reading it
@@ -374,9 +394,9 @@ function foldUsage(
     quantity("TokensInputAudio"),
     quantity("TokensOutputAudio"),
     quantity("TokensCacheWrite1h"),
-    quantity("TokensInputImage"),
-    quantity("TokensOutputImage"),
-    quantity("ImageCount"),
+    row.tokensInputImage,
+    row.tokensOutputImage,
+    row.imageCount,
   ];
   const outcome = row.status === "confirmed" || row.status === "failed";
   if (!outcome && !measured.some((value) => value > 0)) return null;
@@ -391,9 +411,9 @@ function foldUsage(
     output_audio_tokens: quantity("TokensOutputAudio"),
     input_chars: quantity("CharsInput"),
     audio_ms: quantity("AudioMS"),
-    input_image_tokens: quantity("TokensInputImage"),
-    output_image_tokens: quantity("TokensOutputImage"),
-    image_count: quantity("ImageCount"),
+    input_image_tokens: row.tokensInputImage,
+    output_image_tokens: row.tokensOutputImage,
+    image_count: row.imageCount,
   };
 }
 
@@ -487,7 +507,6 @@ export class GatewaySpendEventsRepository {
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
                CharsInput, AudioMS,
-               TokensInputImage, TokensOutputImage, ImageCount,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -791,6 +810,9 @@ export class GatewaySpendEventsRepository {
           sumIf(TokensCacheRead, Status IN ('confirmed', 'failed')) AS TokensCacheRead,
           sumIf(TokensCacheWrite, Status IN ('confirmed', 'failed')) AS TokensCacheWrite,
           sumIf(TokensReasoning, Status IN ('confirmed', 'failed')) AS TokensReasoning,
+          sumIf(TokensInputImage, Status IN ('confirmed', 'failed')) AS TokensInputImage,
+          sumIf(TokensOutputImage, Status IN ('confirmed', 'failed')) AS TokensOutputImage,
+          sumIf(ImageCount, Status IN ('confirmed', 'failed')) AS ImageCount,
           sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
@@ -830,6 +852,57 @@ export class GatewaySpendEventsRepository {
     return { rows, nextCursor };
   }
 
+  /**
+   * The charged cost of every request of one request type across the given
+   * tenants, as integer nano-USD.
+   *
+   * Confirmed rows only: a settled row's cost is unknown rather than zero, and
+   * a failed row of this kind does not exist, because a judgement that failed
+   * is never recorded as spend. The window is optional, and absent it is the
+   * whole ledger, which is what a lifetime budget reads. When given, it bounds
+   * `OccurredAt` so the month partitions prune.
+   */
+  async sumCostNanoUsdByRequestType({
+    tenantIds,
+    requestType,
+    fromMs,
+    toMs,
+  }: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    if (tenantIds.length === 0) return 0;
+    const client = await this.resolveClient(tenantIds[0]!);
+    const params: Record<string, unknown> = { tenantIds, requestType };
+    const clauses: string[] = [];
+    if (fromMs !== undefined) {
+      clauses.push(
+        "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
+      params.fromMs = fromMs;
+    }
+    if (toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = toMs;
+    }
+    const result = await client.query({
+      query: `
+        SELECT sum(CostNanoUSD) AS CostNanoUSD
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND RequestType = {requestType:String}
+          AND Status = 'confirmed'
+          ${clauses.join("\n          ")}
+      `,
+      query_params: params,
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<Record<string, unknown>>;
+    return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
+  }
+
   async readEndUserSpend({
     tenantIds,
     endUserId,
@@ -851,6 +924,9 @@ export class GatewaySpendEventsRepository {
     tokensCacheRead: number;
     tokensCacheWrite: number;
     tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
   }> {
     const empty = {
       spendUsd: nanoUsdToDecimalString(0),
@@ -861,6 +937,9 @@ export class GatewaySpendEventsRepository {
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
       tokensReasoning: 0,
+      tokensInputImage: 0,
+      tokensOutputImage: 0,
+      imageCount: 0,
     };
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
@@ -877,7 +956,10 @@ export class GatewaySpendEventsRepository {
           sum(TokensOutput) AS TokensOutput,
           sum(TokensCacheRead) AS TokensCacheRead,
           sum(TokensCacheWrite) AS TokensCacheWrite,
-          sum(TokensReasoning) AS TokensReasoning
+          sum(TokensReasoning) AS TokensReasoning,
+          sum(TokensInputImage) AS TokensInputImage,
+          sum(TokensOutputImage) AS TokensOutputImage,
+          sum(ImageCount) AS ImageCount
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
           AND EndUserId = {endUserId:String}
@@ -901,12 +983,15 @@ export class GatewaySpendEventsRepository {
     return {
       spendUsd: nanoUsdToDecimalString(nano),
       spendNanoUsd: nano,
-      requestCount: Number(row.RequestCount ?? 0),
-      tokensInput: Number(row.TokensInput ?? 0),
-      tokensOutput: Number(row.TokensOutput ?? 0),
-      tokensCacheRead: Number(row.TokensCacheRead ?? 0),
-      tokensCacheWrite: Number(row.TokensCacheWrite ?? 0),
-      tokensReasoning: Number(row.TokensReasoning ?? 0),
+      requestCount: summed(row, "RequestCount"),
+      tokensInput: summed(row, "TokensInput"),
+      tokensOutput: summed(row, "TokensOutput"),
+      tokensCacheRead: summed(row, "TokensCacheRead"),
+      tokensCacheWrite: summed(row, "TokensCacheWrite"),
+      tokensReasoning: summed(row, "TokensReasoning"),
+      tokensInputImage: summed(row, "TokensInputImage"),
+      tokensOutputImage: summed(row, "TokensOutputImage"),
+      imageCount: summed(row, "ImageCount"),
     };
   }
 }

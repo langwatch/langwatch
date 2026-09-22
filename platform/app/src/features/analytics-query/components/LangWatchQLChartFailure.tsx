@@ -9,7 +9,7 @@
  * The copy map is exhaustive over the refusal codes at the type level, so a new
  * code cannot reach a member as an unexplained blank.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { Badge, Box, Stack, Text, VStack } from "@chakra-ui/react";

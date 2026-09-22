@@ -144,6 +144,18 @@ describe("Pre-compiled Scenario Child Process", () => {
       // remote-trace-run-config.ts produces.
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       expect(content).toContain("wait_for_traces");
+
+      // The same blindness, one capability later. `traceQuietPeriodMs` is a
+      // run-config key, so a vendored SDK from before the quiet period accepts
+      // it and settles a trace the moment its parents resolve, which is what
+      // let a judge read a trace whose tool spans had not landed yet.
+      // `inconclusiveCriteria` is the field that carries a criterion the judge
+      // could not decide; without it those criteria arrive folded into the
+      // unmet ones and the run reads as a plain failure. Both are identifiers
+      // rather than tool names, and the bundler keeps property names, so their
+      // presence is the same cheap end-to-end proof.
+      expect(content).toContain("traceQuietPeriodMs");
+      expect(content).toContain("inconclusiveCriteria");
     });
 
     /** @scenario 'Configuring log output does not stop a simulation starting' */

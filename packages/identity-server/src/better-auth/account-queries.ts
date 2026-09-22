@@ -48,7 +48,19 @@ export type AccountQuery =
    *  `deleteMany` a user delete fans out from. */
   | { kind: "byUser"; userId: string }
   /** updatePassword — every credential account of one user. */
-  | { kind: "byUserAndProvider"; userId: string; providerId: string };
+  | { kind: "byUserAndProvider"; userId: string; providerId: string }
+  /**
+   * The SAME callback lookup as `byProviderSubject`, for a provider whose
+   * issuer is its own rather than one we minted.
+   *
+   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
+   * issuer the provider itself asserts, and no rule of ours derives a
+   * provider id from one. The identifier stores that issuer verbatim - the
+   * backfill copies the legacy column and the attach ceremony records what
+   * better-auth was about to write - so the pair (issuer, providerAccountId)
+   * is a key this branch can answer on, and the index for it already exists.
+   */
+  | { kind: "byIssuerSubject"; issuer: string; accountId: string };
 
 /**
  * An `account` storage operation the identity branch does not serve.
@@ -125,16 +137,39 @@ const LOCAL_ISSUER_PREFIX = "local:";
 /**
  * The issuer better-auth 1.7 expects to see ON a row it is given back.
  *
- * `Identifier` stores no issuer — the provider id is its truth — so the
- * branch mints the synthetic one 1.7 would have minted itself. Without it a
- * credential row comes back failing 1.7's own `issuer = local:credential`
+ * For a provider whose issuer we mint, the provider id is the truth and this
+ * reconstructs the synthetic issuer 1.7 would have minted itself. Without it
+ * a credential row comes back failing 1.7's own `issuer = local:credential`
  * filter, which reads to the customer as a wrong password rather than as a
  * missing column.
+ *
+ * It is NOT the only issuer a row can carry. `Identifier.issuer` holds
+ * whatever better-auth keyed the account by, which for a real OIDC provider
+ * is the provider's own URL; `withIssuer` therefore prefers the stored value
+ * and falls back to this. Reading this helper as "the branch has no issuer"
+ * is what left the real-issuer callback unanswerable - see `byIssuerSubject`.
  */
 export const issuerForProviderId = (providerId: string): string =>
   providerId === "credential"
     ? `${LOCAL_ISSUER_PREFIX}${encodeURIComponent(providerId)}`
     : `${OAUTH_ISSUER_PREFIX}${encodeURIComponent(providerId)}`;
+
+/**
+ * The issuer better-auth 1.7 keys a BUILT-IN social provider's account by —
+ * what a row must carry to answer that provider's own callback lookup.
+ *
+ * Google is the one built-in that declares a real issuer, hardcoded in the
+ * provider itself and not overridable from config; everything else gets the
+ * synthetic namespace. The mirror of the `account_issuer` migration's
+ * backfill rule, stated here so a row written ahead of a native sign-in — the
+ * backfill's derived identifiers — is keyed the way the callback will ask.
+ * Microsoft is deliberately unanswerable: its issuer is the per-tenant `iss`
+ * of a token that has not been seen yet, which is why nothing derives it.
+ */
+export const nativeSocialIssuerFor = (providerId: string): string =>
+  providerId === "google"
+    ? "https://accounts.google.com"
+    : issuerForProviderId(providerId);
 
 export const providerIdFromIssuer = (issuer: string): string | null => {
   for (const prefix of [OAUTH_ISSUER_PREFIX, LOCAL_ISSUER_PREFIX]) {
@@ -206,6 +241,12 @@ export function parseAccountQuery({
       if (providerId !== null) {
         return { kind: "byProviderSubject", providerId, accountId };
       }
+      // A provider that asserts its own issuer. Falling through to the
+      // refusal below made every Google, GitHub, GitLab and Azure sign-in on
+      // the deployment fail the moment ONE user was finalized: the callback
+      // key names no user, so it takes the fleet gate, and the throw left no
+      // legacy fallthrough for the users still held on that branch.
+      return { kind: "byIssuerSubject", issuer, accountId };
     }
   }
   if (only(where, "accountId", "issuer", "providerId", "userId")) {

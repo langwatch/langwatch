@@ -211,6 +211,13 @@ app:
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
   nodeEnv: ""
 
+  # Proxy hops allowed to append the X-Forwarded-For chain used by public auth
+  # rate limits. Set this to the ingress controller or load balancer egress
+  # addresses/CIDRs for the deployment. Empty keeps the safe socket-peer
+  # fallback; the chart cannot infer network-specific CIDRs.
+  ## @param app.trustedProxyAddresses [string, default: ""] Comma-separated trusted proxy addresses or IPv4 CIDR ranges. Required only for a proxy that reaches the app from a public address; a private, loopback or link-local hop is read as infrastructure without it.
+  trustedProxyAddresses: ""
+
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets
   ## @extra app.credentialsEncryptionKey Configuration for credentials encryption.
@@ -614,6 +621,33 @@ app:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # LangWatch-hosted services this install may call with the license it holds.
+  #
+  # There is no switch that turns these on. The license decides: one that names
+  # a hosted service can reach it, one that names none reaches nothing. So a
+  # default render carries no LANGWATCH_CONNECT_ variable and an install on an
+  # offline license calls nothing, which an operator checks against the license
+  # blob rather than against this file.
+  #
+  # `disabled` is the escape hatch an audit asks for: set it and this install
+  # calls LangWatch for nothing at all, hosted services and usage reporting
+  # alike, whatever its license says.
+  # See https://docs.langwatch.ai/self-hosting/connect
+  ## @extra app.connect Connected hosted services configuration.
+  ## @param app.connect.disabled [boolean] Switches hosted services and usage reporting off entirely.
+  ## @param app.connect.gatewayEndpoint [string] Where hosted services are called. Empty uses the published endpoint.
+  ## @param app.connect.licenseEndpoint [string] Where the license registers itself. Empty uses the published endpoint.
+  ## @param app.connect.instanceId [string] Identity this install presents. Empty uses the id minted into its own database.
+  connect:
+    disabled: false
+    gatewayEndpoint: ""
+    licenseEndpoint: ""
+    # Set this only when an operator has a reason to name the identity. The
+    # default is minted once into this install's own database, so it survives
+    # restarts, backups and hostname changes; a second install with a database
+    # of its own presents another id and is refused as the wrong instance.
+    instanceId: ""
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -622,7 +656,7 @@ app:
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
-    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    # as AUTH_PROVIDER, so it has to be one the app recognises:
     #   email (default), google, github, gitlab, azure-ad, auth0, okta,
     #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under

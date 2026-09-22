@@ -11,7 +11,12 @@
  *   - python: langwatch.experiment.run(...) / langwatch.workflow.run(...)
  *   - typescript: langwatch.experiments.runWithResults(...) /
  *     langwatch.workflows.run(...)
+ *   - go: net/http POST to start, then poll + GET results
  *   - shell: curl POST to start, then poll + GET results
+ *
+ * Go has no evaluations entry point on the SDK yet (the Go SDK is tracing only),
+ * so its snippet drives the REST API directly, the same three calls the shell
+ * snippet makes.
  */
 import {
   buildEvaluateParameters,
@@ -20,7 +25,7 @@ import {
 } from "~/optimization_studio/utils/evaluateApiSnippet";
 import type { WorkflowField } from "~/optimization_studio/utils/workflowFields";
 
-export type RunSnippetLang = "python" | "typescript" | "shell";
+export type RunSnippetLang = "python" | "typescript" | "go" | "shell";
 export type RunSnippetDataSource = "attached" | "inline" | "dataset_id";
 export type RunSnippetKind = "workflow" | "experiment";
 
@@ -247,8 +252,248 @@ ${comment}
 void main();`;
 }
 
+/** Path of the endpoint that starts a run, relative to the app origin. */
+function runStartPath({ kind, identifier }: BuildRunSnippetInput): string {
+  return kind === "experiment"
+    ? `/api/experiments/${identifier}/run`
+    : `/api/workflows/${identifier}/evaluate`;
+}
+
+/**
+ * Render the entries of a Go `map[string]any` literal, one `"key": value,` per
+ * line at the given indent. Values are pre-aligned the way gofmt aligns a
+ * composite literal, so the snippet reads as already-formatted Go.
+ */
+function toGoMapEntries({
+  record,
+  indent,
+}: {
+  record: Record<string, string | number | boolean>;
+  indent: string;
+}): string {
+  const entries = Object.entries(record).map(
+    ([key, value]) =>
+      [`${JSON.stringify(key)}:`, JSON.stringify(value)] as const,
+  );
+  const width = Math.max(...entries.map(([key]) => key.length));
+  return entries
+    .map(([key, value]) => `${indent}${key.padEnd(width)} ${value},`)
+    .join("\n");
+}
+
+/** The body literal passed to json.Marshal, varying by data source. */
+function goRequestBody({
+  dataSource,
+  parametersExample,
+  inlineRow,
+}: {
+  dataSource: RunSnippetDataSource;
+  parametersExample: Record<string, string | number | boolean>;
+  inlineRow: Record<string, string | number | boolean>;
+}): string {
+  const indent = "\t\t\t";
+  if (dataSource === "inline") {
+    const rows = toGoMapEntries({ record: inlineRow, indent });
+    return `\t\t"data": []map[string]any{{\n${rows}\n\t\t}},`;
+  }
+  if (dataSource === "dataset_id") {
+    return `\t\t"dataset_id": ${JSON.stringify(DATASET_ID_PLACEHOLDER)},`;
+  }
+  const parameters = toGoMapEntries({ record: parametersExample, indent });
+  return `\t\t"parameters": map[string]any{\n${parameters}\n\t\t},`;
+}
+
+/**
+ * The Go snippet: start the run, poll it to a terminal status, then read the
+ * per-row results back. Authenticated with `Authorization: Bearer`, never the
+ * legacy X-Auth-Token header. The body is marshalled from a map literal rather
+ * than pasted in as a raw string, so a field identifier can never break out of
+ * the generated source.
+ */
+function buildGoSnippet(input: BuildRunSnippetInput): string {
+  const { baseUrl, dataSource, datasetName } = input;
+  const parametersExample = buildParametersExample(
+    input.entryFields,
+    input.datasetColumns,
+  );
+  const inlineRow = buildInlineExampleRow(
+    input.entryFields,
+    input.datasetColumns,
+  );
+  const comment = dataSourceComment({
+    dataSource,
+    datasetName,
+    commentPrefix: "\t//",
+  });
+  const body = goRequestBody({ dataSource, parametersExample, inlineRow });
+
+  return `package main
+
+import (
+\t"bytes"
+\t"context"
+\t"encoding/json"
+\t"errors"
+\t"fmt"
+\t"io"
+\t"log"
+\t"net/http"
+\t"os"
+\t"time"
+)
+
+const (
+\tbaseURL     = ${JSON.stringify(baseUrl)}
+\tstartPath   = ${JSON.stringify(runStartPath(input))}
+\tmaxAttempts = 1800
+\tpollEvery   = 2 * time.Second
+)
+
+// The statuses that end a run; on anything else it is still going.
+var terminalStatuses = map[string]bool{
+\t"completed":   true,
+\t"failed":      true,
+\t"stopped":     true,
+\t"interrupted": true,
+}
+
+func main() {
+\tctx := context.Background()
+
+${comment}
+\tbody, err := json.Marshal(map[string]any{
+${body}
+\t})
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
+
+\trunID, err := startRun(ctx, body)
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
+\tfmt.Println("Started run:", runID)
+
+\tif err := waitForRun(ctx, runID); err != nil {
+\t\tlog.Fatal(err)
+\t}
+
+\t// Read the results back
+\tresults, err := fetchResults(ctx, runID)
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
+\tfmt.Println(string(results)) // per-row results
+}
+
+// call issues an authenticated request. LANGWATCH_API_KEY travels as a bearer
+// token, the same key the Python and TypeScript SDKs read from the environment.
+func call(ctx context.Context, method, url string, body []byte) (int, []byte, error) {
+\tvar reader io.Reader
+\tif body != nil {
+\t\treader = bytes.NewReader(body)
+\t}
+\treq, err := http.NewRequestWithContext(ctx, method, url, reader)
+\tif err != nil {
+\t\treturn 0, nil, err
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\tif body != nil {
+\t\treq.Header.Set("Content-Type", "application/json")
+\t}
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\treturn 0, nil, err
+\t}
+\tdefer resp.Body.Close()
+
+\tout, err := io.ReadAll(resp.Body)
+\tif err != nil {
+\t\treturn resp.StatusCode, nil, err
+\t}
+\treturn resp.StatusCode, out, nil
+}
+
+// 1. Start the run.
+func startRun(ctx context.Context, body []byte) (string, error) {
+\tcode, out, err := call(ctx, http.MethodPost, baseURL+startPath, body)
+\tif err != nil {
+\t\treturn "", err
+\t}
+\tif code != http.StatusOK {
+\t\treturn "", fmt.Errorf("could not start the run (HTTP %d): %s", code, out)
+\t}
+
+\t// The experiment endpoint answers runId, the workflow endpoint run_id.
+\tvar started struct {
+\t\tRunID       string \`json:"runId"\`
+\t\tLegacyRunID string \`json:"run_id"\`
+\t}
+\tif err := json.Unmarshal(out, &started); err != nil {
+\t\treturn "", err
+\t}
+\tif started.RunID != "" {
+\t\treturn started.RunID, nil
+\t}
+\tif started.LegacyRunID != "" {
+\t\treturn started.LegacyRunID, nil
+\t}
+\treturn "", errors.New("the run was accepted but no run id came back")
+}
+
+// 2. Poll until it finishes. Branch on the HTTP status, not the body: a
+// non-200 response (404, an auth failure, a 5xx) carries no status field, so
+// matching the body alone spins for the full hour instead of failing fast.
+func waitForRun(ctx context.Context, runID string) error {
+\turl := baseURL + "/api/experiments/runs/" + runID
+\tfor attempt := 0; attempt < maxAttempts; attempt++ {
+\t\tcode, out, err := call(ctx, http.MethodGet, url, nil)
+\t\tif err != nil {
+\t\t\treturn err
+\t\t}
+\t\tif code == http.StatusNotFound {
+\t\t\treturn fmt.Errorf("run %s not found (expired, or never recorded); giving up", runID)
+\t\t}
+\t\tif code != http.StatusOK {
+\t\t\treturn fmt.Errorf("could not read run %s (HTTP %d); giving up", runID, code)
+\t\t}
+
+\t\tvar run struct {
+\t\t\tStatus string \`json:"status"\`
+\t\t}
+\t\tif err := json.Unmarshal(out, &run); err != nil {
+\t\t\treturn err
+\t\t}
+\t\tfmt.Println("status:", run.Status)
+\t\tif terminalStatuses[run.Status] {
+\t\t\treturn nil
+\t\t}
+
+\t\tselect {
+\t\tcase <-ctx.Done():
+\t\t\treturn ctx.Err()
+\t\tcase <-time.After(pollEvery):
+\t\t}
+\t}
+\treturn fmt.Errorf("gave up waiting for %s after %d polls", runID, maxAttempts)
+}
+
+// 3. Fetch the per-row results.
+func fetchResults(ctx context.Context, runID string) ([]byte, error) {
+\tcode, out, err := call(ctx, http.MethodGet, baseURL+"/api/experiments/runs/"+runID+"/results", nil)
+\tif err != nil {
+\t\treturn nil, err
+\t}
+\tif code != http.StatusOK {
+\t\treturn nil, fmt.Errorf("could not read the results of %s (HTTP %d): %s", runID, code, out)
+\t}
+\treturn out, nil
+}`;
+}
+
 function buildShellSnippet(input: BuildRunSnippetInput): string {
-  const { kind, identifier, baseUrl, dataSource, datasetName } = input;
+  const { baseUrl, dataSource, datasetName } = input;
   const parametersExample = buildParametersExample(
     input.entryFields,
     input.datasetColumns,
@@ -258,10 +503,7 @@ function buildShellSnippet(input: BuildRunSnippetInput): string {
     input.datasetColumns,
   );
 
-  const startUrl =
-    kind === "experiment"
-      ? `${baseUrl}/api/experiments/${identifier}/run`
-      : `${baseUrl}/api/workflows/${identifier}/evaluate`;
+  const startUrl = `${baseUrl}${runStartPath(input)}`;
 
   let body: Record<string, unknown>;
   if (dataSource === "inline") {
@@ -331,5 +573,6 @@ curl -s "${baseUrl}/api/experiments/runs/$RUN_ID/results" \\
 export function buildRunSnippet(input: BuildRunSnippetInput): string {
   if (input.lang === "python") return buildPythonSnippet(input);
   if (input.lang === "typescript") return buildTypescriptSnippet(input);
+  if (input.lang === "go") return buildGoSnippet(input);
   return buildShellSnippet(input);
 }

@@ -1,0 +1,149 @@
+---
+title: Instant Evals CLI reference
+sidebarTitle: CLI reference
+keywords: langwatch cli, instant-eval, run, estimate, status, results, sample, cancel, flags
+description: Every langwatch instant-eval subcommand and flag, what each prints, and the exit codes a script can read.
+---
+
+## Subcommands
+
+| Command | What it does |
+|---|---|
+| `run [question]` | Starts a run, waits for it and prints the matches |
+| `estimate [question]` | Counts the rows and reports the cost without judging any |
+| `status <id>` | Reads one run: where it is, what it matched, what it cost |
+| `list` | Lists the project's runs, newest first |
+| `results <id>` | Reads a page of the run's verdicts |
+| `sample <id>` | Reads a few rows with the judged text beside the verdict |
+| `cancel <id>` | Asks a run to stop before its next page |
+
+The CLI uses the project of your `langwatch login`, or the key in `LANGWATCH_API_KEY`. Reading runs needs `analytics:view`; starting or cancelling one needs `analytics:manage`.
+
+## run
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" --target threads --last 7d --limit 100
+```
+
+The question goes first, or as `--ask` when you want several. `estimate` takes the same flags, less `--name`, `--estimate`, `--detach` and `--show`.
+
+| Flag | What it does |
+|---|---|
+| `[question]` | The question, as the first argument |
+| `--ask <question>` | The same, as a flag. Repeat it to ask several questions of the same text |
+| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the `--ask` it describes |
+| `--threshold <probability>` | For a yes or no question: the probability at or above which the answer counts as yes (default 0.5). A question takes criteria or a threshold, not both |
+| `--score <min..max>` | Ask for a rating on that whole-numbered scale instead of a yes or no, for example `1..5` |
+| `--category <name=meaning>` | Ask which option fits. Repeat it for each option, after the `--ask` it describes |
+| `--id <name>` | What to call the question before it, which becomes its column (default `q1`, `q2` and so on) |
+| `--questions-file <path>` | Read the questions from a JSON or YAML file instead of flags |
+| `--target <target>` | What one row is: `traces`, `threads` or `llm-spans` (default `traces`) |
+| `--filter <filter>` | Narrow the rows with a trace filter, for example `"service:checkout AND cost:>0.01"` |
+| `--last <window>` | How far back to look: `30m`, `24h`, `7d`, `2w` (default `7d`) |
+| `--start <instant>`, `--end <instant>` | The window, exactly, as ISO 8601 or epoch milliseconds |
+| `--sql <statement>`, `--sql-file <path>` | Run a LangWatchQL statement of your own instead of a target |
+| `--param <key=value>` | Bind one of your statement's parameters. Repeat it for each |
+| `--limit <n>` | Rows the run may judge (default 1,000; up to 10,000 on every plan and 100,000 on a paid plan) |
+| `--name <name>` | What to call the run |
+| `--estimate` | Report the cost and exit without starting the run |
+| `--detach` | Create the run, print its id and return instead of waiting |
+| `--show <n>` | Rows to print when the run finishes (default 20, at most 25) |
+
+### What run prints
+
+The statement it wrote and the two window values, then one progress line that updates in place:
+
+```
+Judging 3,200/10,000 · 412 matched · 1.9M tokens · 12s
+```
+
+When the run ends, the headline replaces it, followed by the first rows and the `results` command that reads the rest:
+
+```
+Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33
+```
+
+A run over more than 1,000 rows prints its estimate before it starts. Ctrl-C stops watching; the run keeps going, and the command prints the `status` line that reads it back.
+
+### Exit code
+
+`run` exits 0 when the run finished and non-zero when it failed, was cancelled or was interrupted before it ended, so a script can tell a red run from a green one. `--detach` exits 0 as soon as the run is created.
+
+## estimate
+
+```bash
+langwatch instant-eval estimate "the customer sounds annoyed" --target threads --last 30d --limit 10000
+```
+
+Prints the rows, the requests, the tokens and the cost, and judges no row. See [Limits and cost](/features/instant-evals/limits-and-cost#reading-the-cost-before-you-start) for how the number is reached.
+
+## status
+
+```bash
+langwatch instant-eval status <id>
+langwatch instant-eval status <id> --wait
+langwatch instant-eval status <id> --wait 10
+```
+
+Prints the run:
+
+- its id, name and status
+- rows judged over rows total, the matched count, and the unjudged rows
+- the tokens and the cost
+- the questions, the matches per question, and the statement
+
+Pass `--wait` to follow the run until it ends, for up to 45 minutes or the number of minutes you give. It exits non-zero when the run failed.
+
+A run's status is one of `queued`, `planning`, `running`, `finished`, `failed` or `cancelled`.
+
+## list
+
+```bash
+langwatch instant-eval list
+langwatch instant-eval list --limit 100 --before 2026-09-18T00:00:00Z --before-id <id>
+```
+
+| Flag | What it does |
+|---|---|
+| `--limit <n>` | Runs to list, at most 100 (default 20) |
+| `--before <instant>` | Runs created before this instant, ISO 8601 |
+| `--before-id <id>` | The id of the last run on the previous page, with `--before`, so a page starts after it |
+
+## results
+
+```bash
+langwatch instant-eval results <id> --question annoyed --matched --limit 200
+langwatch instant-eval results <id> --cursor <cursor>
+```
+
+| Flag | What it does |
+|---|---|
+| `--question <id>` | Only that question's verdicts |
+| `--matched`, `--unmatched` | Only the yes or no verdicts that matched, or only the ones that did not |
+| `--status <status>` | Only `judged`, `skipped` or `failed` verdicts |
+| `--limit <n>` | Verdicts per page, at most 1,000 (default 100) |
+| `--cursor <cursor>` | The cursor the previous page printed on its last line |
+
+Each verdict prints as the trace, the question, the status, the answer with its probability, and the conversation. See [Results](/features/instant-evals/results) for the JSON shape.
+
+## sample
+
+```bash
+langwatch instant-eval sample <id> -n 5
+```
+
+`-n, --number <n>` sets how many rows to read, at most 25 (default 5). The text is re-read through the run's own statement, so sampling judges no row again and is not charged. A text longer than 2,000 characters is cut on screen; read it whole with `-o json`.
+
+## cancel
+
+```bash
+langwatch instant-eval cancel <id>
+```
+
+Stops the run before its next page and keeps every verdict it wrote. Cancelling a run that already ended answers `instant_eval_already_finished`.
+
+## Output formats
+
+Every subcommand takes the shared output flags: `-o table|json|agents|yaml`, `--json <fields>` and `--jq <path>`.
+
+In `-o json`, `run` still waits for the run and prints one document holding the run and the verdicts of the rows it showed. The statement is a field of that document rather than a printed block, and the progress line goes to standard error, so standard output holds one object.

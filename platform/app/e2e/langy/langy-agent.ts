@@ -43,6 +43,56 @@ export interface PageContextChip {
   label: string;
 }
 
+/**
+ * One tool frame on a turn stream: the call as the agent issued it (`start`)
+ * or as it settled (`end`), in stream order.
+ *
+ * The stored message flattens a turn's calls into one list, so it cannot say
+ * which calls were batched into one step and which waited for a result. The
+ * stream can: a call whose `start` precedes every `end` of its turn was issued
+ * blind, before any tool had answered.
+ */
+export interface LangyToolEvent {
+  turnId: string;
+  phase: "start" | "end";
+  id: string;
+  name: string;
+  /** The command the call ran, when it ran one. */
+  command: string | null;
+  input: unknown;
+}
+
+/** The tool event a stream entry describes, or null for any other entry. */
+export function toolEventOf({
+  entry,
+  turnId,
+}: {
+  entry: Record<string, unknown>;
+  turnId: string;
+}): LangyToolEvent | null {
+  if (entry.type !== "tool") return null;
+  const phase =
+    entry.phase === "start" || entry.phase === "end" ? entry.phase : null;
+  if (!phase) return null;
+  const input = entry.input;
+  const inputCommand = (input as { command?: unknown } | null | undefined)
+    ?.command;
+  const command =
+    typeof inputCommand === "string" && inputCommand
+      ? inputCommand
+      : typeof entry.command === "string" && entry.command
+        ? entry.command
+        : null;
+  return {
+    turnId,
+    phase,
+    id: typeof entry.id === "string" ? entry.id : "",
+    name: typeof entry.name === "string" ? entry.name : "tool",
+    command,
+    input,
+  };
+}
+
 export interface LangySessionState {
   conversationId: string | null;
   /**
@@ -77,6 +127,12 @@ export interface LangySessionState {
    * carried an action.
    */
   toolOutputs: string[];
+  /**
+   * Every tool frame on this session's turn streams, start and end, in
+   * order. The ordering assertions read this: which call was issued after
+   * which result, a fact the settled list above cannot carry.
+   */
+  toolEvents: LangyToolEvent[];
 }
 
 /** Mirror langyChatTransport.ts's message shape: {role, parts: [{type, text}]}. */
@@ -266,6 +322,7 @@ async function streamTurnText({
   onNavigate,
   onNarration,
   onSettledTool,
+  onToolFrame,
   onUiAction,
 }: {
   cookie: string;
@@ -282,6 +339,8 @@ async function streamTurnText({
   onNarration?: (text: string) => void;
   /** Called for each settled tool card on the stream, in order. */
   onSettledTool?: (call: SettledToolCall) => void;
+  /** Called for every tool frame, start and end, in stream order. */
+  onToolFrame?: (event: LangyToolEvent) => void;
   /**
    * Called for each dispatched UI action on the stream, in order.
    *
@@ -341,6 +400,22 @@ async function streamTurnText({
       if (entry.type === "delta" && typeof entry.text === "string") {
         assistantText += entry.text;
         textAfterLastTool += entry.text;
+      } else if (entry.type === "tool" && entry.name === "say") {
+        // A line said with the `say` tool is Langy's own words, drawn as
+        // prose where the call happened, so it reads as text here: it joins
+        // the passage in progress and the next tool frame fixes its place.
+        // It is no work of the turn: not a settled call, and it does not
+        // start the trailing-text fold on its own.
+        if (entry.phase === "start") {
+          const said = sayTextOf(entry.input);
+          if (said) {
+            const separator = textAfterLastTool.trim() === "" ? "" : "\n\n";
+            assistantText += separator + said;
+            textAfterLastTool += separator + said;
+          }
+        }
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
       } else if (entry.type === "tool") {
         // The passage that was running when this call started belongs in front
         // of it. Reported here rather than at the end of the stream because
@@ -348,6 +423,8 @@ async function streamTurnText({
         if (textAfterLastTool.trim() !== "") onNarration?.(textAfterLastTool);
         textAfterLastTool = "";
         sawTool = true;
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
         if (entry.phase === "end") {
           toolSeq += 1;
           onSettledTool?.({
@@ -476,6 +553,12 @@ async function streamTurnText({
   );
 }
 
+/** The words a `say` tool call carries, or null when it carries none. */
+function sayTextOf(input: unknown): string | null {
+  const text = (input as { text?: unknown } | undefined)?.text;
+  return typeof text === "string" && text.trim() !== "" ? text : null;
+}
+
 /** One thing a turn did, in the order it did it. */
 type TurnSegment =
   | { kind: "text"; narration: string }
@@ -582,6 +665,13 @@ export type LangyAdapter = AgentAdapter & {
    */
   onUiAction?: (entry: UiActionEntry) => void;
   /**
+   * Called with the id of a conversation this adapter opens, before its first
+   * turn is streamed. The guided fixtures record the id on the organization
+   * here, the way the panel does as soon as the transport names it, so no
+   * other tab on the account sees an organization still owing its kickoff.
+   */
+  onConversationCreated?: (conversationId: string) => Promise<void> | void;
+  /**
    * Forget the conversation, so the next turn opens a new one.
    *
    * A replayed scenario has to start a NEW conversation. Carrying the old id
@@ -593,6 +683,17 @@ export type LangyAdapter = AgentAdapter & {
    * replays.
    */
   resetSession: () => void;
+  /**
+   * Send these parts on the next turn instead of the scenario's own text.
+   *
+   * The guided onboarding kickoff is a user message the app composes, not
+   * words the person typed: a typed part the panel renders as the tour card
+   * beside a text brief the model reads. A scenario that starts on the
+   * kickoff queues the parts and calls `scenario.agent()`; the turn goes
+   * through the same create or continue mutation as every other, and the
+   * override is spent once.
+   */
+  queueNextTurn: (input: { parts: Array<Record<string, unknown>> }) => void;
 };
 
 export function makeLangyAdapter(
@@ -614,7 +715,9 @@ export function makeLangyAdapter(
     toolCommands: [],
     toolNames: [],
     toolOutputs: [],
+    toolEvents: [],
   };
+  let queuedParts: Array<Record<string, unknown>> | null = null;
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -622,12 +725,21 @@ export function makeLangyAdapter(
       // Tool traffic from earlier turns stays out of the product payload: the
       // panel transport sends only the text history, and a role:"tool" message
       // would otherwise reach the API as an empty user message.
-      const messages = input.messages
+      const scriptedMessages = input.messages
         .filter((m: any) => m.role !== "tool")
         .map((m: any) => toTurnMessage(m))
         .filter((m) => m.parts.length > 0 || m.role === "user");
+      // The queued parts stay queued until a turn carrying them settles: a
+      // stream that closes without a terminal marker makes the framework
+      // retry the call, and that retry has to send the kickoff again rather
+      // than an empty message list.
+      const messages: Array<{ role: TurnMessage["role"]; parts: unknown[] }> =
+        queuedParts ? [{ role: "user", parts: queuedParts }] : scriptedMessages;
+      // The same wire shape the panel's transport sends: one identity per
+      // logical send, and the trigger a composer submit carries.
       const turnInput = {
-        requestId: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
+        trigger: "submit-message" as const,
         messages,
         projectId: PROJECT_ID,
         ...(options.pageContext ? { pageContext: options.pageContext } : {}),
@@ -643,8 +755,11 @@ export function makeLangyAdapter(
         conversationId: string;
         turnId: string;
       }>({ cookie, path, input: body });
+      const opened = state.conversationId !== conversationId;
       state.conversationId = conversationId;
       state.currentTurnId = turnId;
+      if (opened)
+        await adapterWithState.onConversationCreated?.(conversationId);
 
       const segments: TurnSegment[] = [];
       const settledTools: SettledToolCall[] = [];
@@ -653,6 +768,7 @@ export function makeLangyAdapter(
         params: { projectId: PROJECT_ID, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
         onNarration: (narration) => segments.push({ kind: "text", narration }),
+        onToolFrame: (event) => state.toolEvents.push(event),
         onSettledTool: (call) => {
           settledTools.push(call);
           segments.push({ kind: "tool", call });
@@ -668,6 +784,7 @@ export function makeLangyAdapter(
         // tab that has closed.
         onUiAction: (entry) => adapterWithState.onUiAction?.(entry),
       });
+      queuedParts = null;
       if (settledTools.length === 0) {
         return { role: "assistant", content: text };
       }
@@ -683,6 +800,10 @@ export function makeLangyAdapter(
       state.toolCommands.length = 0;
       state.toolNames.length = 0;
       state.toolOutputs.length = 0;
+      state.toolEvents.length = 0;
+    },
+    queueNextTurn: ({ parts }: { parts: Array<Record<string, unknown>> }) => {
+      queuedParts = parts;
     },
   });
   return adapterWithState;

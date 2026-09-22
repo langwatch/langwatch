@@ -119,6 +119,13 @@ export interface CreateVirtualKeyInput {
    * `{}` clears it.
    */
   metadata?: Record<string, string>;
+  /**
+   * Withhold the secret from the response and get a one-time reveal id
+   * instead. The secret is parked for 24 hours and served once, to the
+   * person the key is for, through the LangWatch app; the caller never
+   * holds it.
+   */
+  reveal_once?: boolean;
 }
 
 export interface UpdateVirtualKeyInput {
@@ -154,6 +161,14 @@ export interface UpdateVirtualKeyInput {
 export interface VirtualKeyWithSecret {
   virtual_key: VirtualKey;
   secret: string;
+}
+
+/** What a create with `reveal_once` answers: the id that reads the secret once. */
+export interface VirtualKeyWithReveal {
+  virtual_key: VirtualKey;
+  reveal_id: string;
+  /** The display prefix, safe to show in place of the secret. */
+  preview: string;
 }
 
 /** One page of the virtual-key listing, exactly as the wire serves it. */
@@ -360,13 +375,22 @@ export class VirtualKeysApiService {
   /**
    * Mint a key. The response carries the secret ONCE; nothing ever serves it
    * again, so a create that times out is recovered with `idempotencyKey`
-   * rather than by listing.
+   * rather than by listing. With `reveal_once` the response carries a reveal
+   * id in place of the secret.
    */
+  async create(
+    input: CreateVirtualKeyInput & { reveal_once: true },
+    options?: IdempotentCreateOptions,
+  ): Promise<VirtualKeyWithReveal>;
   async create(
     input: CreateVirtualKeyInput,
     options?: IdempotentCreateOptions,
-  ): Promise<VirtualKeyWithSecret> {
-    return this.request<VirtualKeyWithSecret>(
+  ): Promise<VirtualKeyWithSecret>;
+  async create(
+    input: CreateVirtualKeyInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<VirtualKeyWithSecret | VirtualKeyWithReveal> {
+    return this.request<VirtualKeyWithSecret | VirtualKeyWithReveal>(
       "create virtual key",
       "/api/gateway/v1/virtual-keys",
       {

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { prisma as defaultPrisma } from "~/server/db";
 
@@ -106,7 +106,11 @@ export async function resolveCallerProjectScope({
     );
   }
   const projects = await prisma.project.findMany({
-    where: { team: { organizationId }, archivedAt: null },
+    where: {
+      team: { organizationId },
+      archivedAt: null,
+      kind: { not: "internal_governance" },
+    },
     select: {
       id: true,
       name: true,

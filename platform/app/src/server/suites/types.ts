@@ -29,7 +29,7 @@ export function isSuiteKind(value: string): value is SuiteKind {
 }
 
 const suiteTargetFields = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   /**
    * The id of the prompt or agent. A connected target may also say
    * `<name>@<environment>`, which the run resolves to the agent id before
@@ -99,6 +99,7 @@ export const SUITE_AGENT_TARGET_TYPES = [
   "code",
   "workflow",
   "connected",
+  "voice",
 ] as const;
 export type SuiteAgentTargetType = (typeof SUITE_AGENT_TARGET_TYPES)[number];
 

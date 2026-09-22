@@ -33,6 +33,11 @@ import {
   type ScenarioFieldValues,
   type SuiteFieldDefinition,
 } from "~/server/scenarios/suite-fields";
+import {
+  type CallerVoiceConfig,
+  DEFAULT_CALLER_VOICE,
+  parseCallerVoiceConfig,
+} from "~/server/scenarios/voice/caller-voice.config";
 import { api } from "~/utils/api";
 import {
   formatParameterLine,
@@ -63,6 +68,9 @@ export type CaseDraft = {
   judgeModel: string | null;
   maxTurns: number | null;
   minTurns: number | null;
+  /** The simulated caller's voice for a voice target. Null follows the
+   *  project default, the way an unset scenario does. */
+  callerVoice: CallerVoiceConfig | null;
 };
 
 const EMPTY_DRAFT: CaseDraft = {
@@ -77,7 +85,25 @@ const EMPTY_DRAFT: CaseDraft = {
   judgeModel: null,
   maxTurns: null,
   minTurns: null,
+  callerVoice: null,
 };
+
+/**
+ * What a stored `callerVoice` column reads as in the draft: `null` when the
+ * scenario never customized it (absent, or parsed back to exactly the
+ * defaults), otherwise the config to seed the block with open.
+ */
+export function callerVoiceFromScenario(
+  raw: unknown,
+): CallerVoiceConfig | null {
+  if (raw === null || raw === undefined) return null;
+  const parsed = parseCallerVoiceConfig(raw);
+  const isDefault =
+    parsed.voiceModel === DEFAULT_CALLER_VOICE.voiceModel &&
+    parsed.interruptProbability === DEFAULT_CALLER_VOICE.interruptProbability &&
+    parsed.effects === DEFAULT_CALLER_VOICE.effects;
+  return isDefault ? null : parsed;
+}
 
 /** What a stored scenario reads as in the editor. */
 function draftFromScenario(scenario: Scenario): CaseDraft {
@@ -95,6 +121,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
+    callerVoice: callerVoiceFromScenario(scenario.callerVoice),
   };
 }
 
@@ -328,6 +355,10 @@ function savePayload({
     judgeModel: draft.judgeModel,
     maxTurns: draft.maxTurns,
     minTurns: draft.minTurns,
+    // The column is not nullable, so the removed block sends the default
+    // config back — that is what the router reads as "clear" (see
+    // scenario-crud.router.ts).
+    callerVoice: draft.callerVoice ?? DEFAULT_CALLER_VOICE,
   };
 }
 

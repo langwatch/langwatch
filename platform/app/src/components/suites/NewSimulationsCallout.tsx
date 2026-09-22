@@ -3,6 +3,7 @@ import posthog from "posthog-js";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { LuArrowRight, LuSparkles, LuX } from "react-icons/lu";
+import { useGuidedPathActive } from "~/features/guided-onboarding/guidedPathActive";
 import {
   preferLegacySimulations,
   useLegacySimulationsPreference,
@@ -30,7 +31,13 @@ import { Link } from "../ui/link";
  * dismissal, the retirement and the recorded preference, so a person who
  * wants the way back to the previous screens can still reach it.
  *
+ * While a guided onboarding path is being set up the card stays off: Langy
+ * navigates here at the end of the llmops path, and a card beside the run
+ * results it opened is noise. Nothing is snoozed, so it shows once the path
+ * is done.
+ *
  * @see specs/suites/new-simulations-callout.feature
+ * @see specs/features/onboarding/guided-tour.feature
  */
 const SNOOZE_DAYS = 14;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
@@ -101,6 +108,7 @@ export function NewSimulationsCallout({
   // the dismissal, the retirement and the recorded preference.
   const revived = router.query[WELCOME_CALLOUT_QUERY_PARAM] === "1";
   const retired = Date.now() >= SUNSET;
+  const guidedPathActive = useGuidedPathActive();
 
   useEffect(() => {
     setHasMounted(true);
@@ -111,6 +119,7 @@ export function NewSimulationsCallout({
   }, [projectId]);
 
   if (!hasMounted || !projectId || !projectSlug) return null;
+  if (guidedPathActive) return null;
   if (!revived && (dismissed || legacyPreferred || retired)) return null;
 
   const href =

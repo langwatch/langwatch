@@ -14,7 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useDrawerStore } from "../../../stores/drawerStore";
-import type { LensConfig } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
+import type { LensConfig } from "../../../stores/viewSlice";
 import {
   mapSessionGroupToConversationGroup,
   type SessionGroupPayloadItem,
@@ -97,6 +98,8 @@ const expandToggle = () =>
 beforeEach(() => {
   openDrawerMock.mockClear();
   useDrawerStore.getState().closeDrawer();
+  // The open rows are page state in the store, so each case starts closed.
+  useExplorerStore.getState().setExpandedRows([]);
   // The virtualizer windows rows to the scroll element's height, and jsdom
   // measures every element as zero, which windows the table down to no rows
   // at all and leaves every assertion below passing vacuously. Publishing a
@@ -159,6 +162,23 @@ describe("given the conversations lens is showing grouped rows", () => {
 
       expect(openDrawerMock).not.toHaveBeenCalled();
       expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+    });
+  });
+
+  describe("when the table unmounts with a conversation open", () => {
+    /** @scenario "Open rows leave the component and survive a remount" */
+    it("shows the same conversation open when it mounts again", async () => {
+      const user = userEvent.setup();
+      const first = renderBody([conversationRow()]);
+      await user.click(expandToggle());
+      first.unmount();
+
+      renderBody([conversationRow()]);
+
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+      expect(Array.from(useExplorerStore.getState().expandedRows)).toEqual([
+        "conv-1",
+      ]);
     });
   });
 });

@@ -7,11 +7,7 @@
  * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
  * migration stage that removes them.
  */
-import {
-  bindingGrants,
-  legacyTeamFallbackGrants,
-  matchResourceGrant,
-} from "./matchers";
+import { bindingGrants, matchResourceGrant } from "./matchers";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles";
 import type { ScopeChainLink } from "./scope";
 import type {
@@ -47,13 +43,7 @@ export type DecideContext = {
   };
 };
 
-/**
- * Demo project: any signed-in user gets the demo-viewer bag on the one
- * configured project. Mirrors isDemoProject(), which legacy reaches only from
- * the session-backed tRPC path (rbac.ts:1118) — so api-key and anonymous
- * principals are excluded here too, and an anonymous caller's only path stays
- * the resource tier.
- */
+/** The demo viewer role is available to signed-in users, never API keys. */
 export function demoProjectStep({
   grants,
   permission,
@@ -68,18 +58,8 @@ export function demoProjectStep({
 }
 
 /**
- * LEGACY-QUIRK(C): a user with no OrganizationUser row is denied outright at
- * every binding tier — organization (rbac.ts:1016), team, and project
- * (resolveProjectPermissionContext, rbac.ts:1083) all read membership before
- * they read bindings, so a stale binding left by a since-closed cross-org
- * path never authorizes. Api-key principals hold no org membership and pass
- * this gate untouched — past it they may still resolve through bindings or
- * an api-key-audience resource grant. The resource tier is deliberately
- * outside this OUTRIGHT denial: share links are how a non-member or an
- * anonymous caller sees anything at all. Membership-before-bindings still
- * holds there — bindingsStep and legacyTeamFallbackStep carry their own
- * non-member guard, so on a resource scope a non-member's only path is the
- * resource tier, never a leftover binding on the resource's lineage.
+ * User bindings require active organization membership. Resource grants may
+ * authorize non-members or anonymous readers; API keys have their own grants.
  */
 export function organizationMembershipGateStep({
   grants,
@@ -101,12 +81,7 @@ export function organizationMembershipGateStep({
   };
 }
 
-/**
- * LEGACY-QUIRK(C): every org member holds the org-member bag on
- * ORGANIZATION-scope checks regardless of bindings (the personal-context
- * floor, rbac.ts:1058). Applies to org checks only — project/team checks have
- * no floor.
- */
+/** Active members receive the organization-member permissions at org scope. */
 export function organizationRoleFloorStep({
   grants,
   permission,
@@ -152,27 +127,6 @@ export function bindingsStep({
   return;
 }
 
-/** LEGACY-QUIRK(B): the TeamUser fallback (see legacyTeamFallbackGrants). */
-export function legacyTeamFallbackStep({
-  grants,
-  permission,
-  scope,
-  chain,
-  chainBindings,
-  base,
-}: DecideContext): AuthzDecision | undefined {
-  if (principalLacksMembership(grants)) return;
-  const granted = legacyTeamFallbackGrants({
-    grants,
-    scope,
-    chain,
-    chainBindingCount: chainBindings.length,
-    permission,
-  });
-  if (!granted) return;
-  return { ...base, allowed: true, via: "legacy-team-fallback" };
-}
-
 /** ADR-092 §8 — the resource tier (see matchResourceGrant). */
 export function resourceGrantStep({
   grants,
@@ -212,10 +166,7 @@ export function denyStep({
     return { ...base, allowed: false, denialReason: "membership-disabled" };
   }
 
-  const hadAnyPath =
-    grants.isOrgMember ||
-    chainBindings.length > 0 ||
-    grants.legacyTeamMemberships.length > 0;
+  const hadAnyPath = grants.isOrgMember || chainBindings.length > 0;
 
   return {
     ...base,

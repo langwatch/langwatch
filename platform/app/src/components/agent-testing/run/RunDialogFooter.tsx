@@ -10,7 +10,7 @@
  */
 
 import { Box, chakra } from "@chakra-ui/react";
-import { Play } from "lucide-react";
+import { Phone, Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "~/components/ui/tooltip";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
@@ -42,6 +42,7 @@ export function RunDialogFooter({
   blockedReason,
   warning,
   onRun,
+  onCallItMyself,
   onClose,
 }: {
   controller: RunDialogController;
@@ -59,6 +60,13 @@ export function RunDialogFooter({
   warning?: string | null;
   /** What Run does. Defaults to queueing the run. */
   onRun?: () => void;
+  /**
+   * Opens the browser call panel for a voice target, so the person speaks to
+   * the agent themselves instead of a simulated caller (AC23). Shown beside Run
+   * only when the target is a voice agent; absent for every other target
+   * (AC25).
+   */
+  onCallItMyself?: () => void;
   onClose: () => void;
 }) {
   const runButton = (
@@ -101,6 +109,17 @@ export function RunDialogFooter({
       >
         Cancel
       </chakra.button>
+      {onCallItMyself ? (
+        <SmallButton
+          variant="outline"
+          disabled={controller.isBusy}
+          onClick={onCallItMyself}
+          data-testid="run-dialog-call-it-myself"
+        >
+          <Phone size={13} />
+          Call it myself
+        </SmallButton>
+      ) : null}
       {isRunBlocked && blockedReason ? (
         <Tooltip content={blockedReason}>
           {/* A disabled button never dispatches pointer events, which would

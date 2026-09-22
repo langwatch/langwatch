@@ -9,7 +9,7 @@
  * the same mistake.
  *
  * @see dev/docs/best_practices/error-handling.md
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

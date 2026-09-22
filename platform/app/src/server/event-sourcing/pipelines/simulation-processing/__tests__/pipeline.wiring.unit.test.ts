@@ -62,6 +62,10 @@ describe("the simulation processing pipeline", () => {
           loadRunAttachments: noAttachments,
           enqueue: noop,
         },
+        scenarioRunMilestones: {
+          projects: { resolveOrgAdmin: async () => null as never },
+          trackActiveDay: noop,
+        },
       });
 
       const names = pipeline.commands.map((command) => command.name);

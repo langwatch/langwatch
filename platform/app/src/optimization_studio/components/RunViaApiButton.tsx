@@ -17,7 +17,7 @@ import type { WorkflowField } from "../utils/workflowFields";
 /**
  * Shows how to trigger this workflow's evaluation from CI or scripts: the same
  * run the Evaluate button starts, through the unified evaluations-v3 backend.
- * Offers a language picker (Python, TypeScript, Shell) and a data-source picker
+ * Offers a language picker (Python, TypeScript, Go, Shell) and a data-source picker
  * (attached dataset, inline data, dataset id), and always shows how to read the
  * per-row results back. The example mirrors the entry point's own fields.
  */

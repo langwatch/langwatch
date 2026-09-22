@@ -57,7 +57,7 @@
  *    not just how.
  */
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
@@ -74,10 +74,16 @@ import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
 import { migrateUp } from "../../../clickhouse/goose";
 import { lwqlTenantCapability } from "../capability";
+import { derivePostgresCatalog } from "../catalog/derivePostgresCatalog";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import { LWQL_POSTGRES_SKIPPED_MODELS } from "../catalog/postgresSkippedModels";
+import { LWQL_POSTGRES_ALL_OVERRIDES } from "../catalog/postgresViews";
+import { LWQL_PRISMA_MANIFEST } from "../catalog/prismaManifest";
 import {
+  isPostgresResident,
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
+  lwqlPhysicalColumn,
   lwqlPostgresViews,
 } from "../catalog/types";
 import {
@@ -101,6 +107,7 @@ import {
   postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "../provisioning/postgresMapping";
+import { postgresModelSeedStatements } from "./lwqlPostgresModelSeed";
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";
@@ -523,6 +530,9 @@ export const REAL_FACT_TABLES = [
   "trace_analytics_rollup",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
+  "coding_agent_sessions",
+  "coding_agent_session_events",
+  "instant_eval_judgments",
 ] as const;
 
 /**
@@ -1057,7 +1067,214 @@ async function seedRealFactRows({
     ),
   });
 
+  await admin.insert({
+    table: `${database}.coding_agent_sessions`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        SessionId: `${tenant.tenantId}-coding-session-${week}`,
+        SessionKeySource: "session_id",
+        Version: "1",
+        StartedAt: seedWeekStart(week),
+        UpdatedAt: seedWeekStart(week),
+        Agent: "claude_code",
+        AgentVersion: "1.0.0",
+        TraceIds: [`${tenant.tenantId}-trace-${week}-0`],
+        FinalRequestId: `${tenant.tenantId}-final-request-${week}`,
+        UserId: `${tenant.tenantId}-end-user`,
+        TerminalType: "tmux",
+        Entrypoint: "cli",
+        ModelCalls: 3,
+        ToolCalls: 5,
+        SubAgents: 0,
+        Prompts: 2,
+        PromptChars: 480,
+        ResponseChars: 900,
+        CostUsd: 0.42,
+        AgentReportedCostUsd: 0.4,
+        Title: `${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`,
+      })),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.coding_agent_session_events`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        SessionId: `${tenant.tenantId}-coding-session-${week}`,
+        TimeUnixMs: seedWeekStart(week),
+        RecordId: `${tenant.tenantId}-coding-event-${week}`.padEnd(64, "0"),
+        EventKind: "model_call",
+        Agent: "claude_code",
+        SessionKeySource: "session_id",
+        TraceId: `${tenant.tenantId}-trace-${week}-0`,
+        SpanId: `${tenant.tenantId}-span-${week}-0`,
+        QuerySource: "repl_main_thread",
+        RequestId: `${tenant.tenantId}-final-request-${week}`,
+        Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+        InputTokens: 100,
+        OutputTokens: 20,
+        CostUsd: 0.05,
+      })),
+    ),
+  });
+
+  // The one `claude_code.tool` span `coding_tool_results` reads, plus the
+  // `api_request_body` log record its LEFT join can find. Seeded here (not in
+  // the generic sweep below) because the two rows must correlate by TraceId,
+  // not merely both exist.
+  const toolTraceId = (tenantId: string) => `${tenantId}-tool-trace-0`;
+  await admin.command({ query: `SYSTEM STOP MERGES ${database}.log_records` });
+  await admin.command({ query: `TRUNCATE TABLE ${database}.log_records` });
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: tenants.map((tenant) => ({
+      ProjectionId: `${tenant.tenantId}/tool-span`,
+      TenantId: tenant.tenantId,
+      TraceId: toolTraceId(tenant.tenantId),
+      SpanId: `${tenant.tenantId}-tool-span-0`,
+      Sampled: 1,
+      StartTime: seedWeekStart(SEED_WEEK_COUNT - 1),
+      EndTime: seedWeekStart(SEED_WEEK_COUNT - 1),
+      DurationMs: 40,
+      SpanName: "claude_code.tool",
+      SpanKind: 3,
+      ServiceName: "api",
+      ScopeName: "langwatch",
+      ResourceAttributes: {},
+      // Same captured-content keys every other seeded span carries: a bare
+      // `LIMIT 1` with no `ORDER BY` elsewhere in this suite is free to read
+      // this row first, and it must satisfy the same content assertions.
+      SpanAttributes: {
+        "langwatch.input": SEEDED_CONTENT.spanInput,
+        "langwatch.output": SEEDED_CONTENT.spanOutput,
+      },
+      Cost: 0,
+    })),
+  });
+  await admin.insert({
+    table: `${database}.log_records`,
+    format: "JSONEachRow",
+    values: tenants.map((tenant) => ({
+      TenantId: tenant.tenantId,
+      CorrelationTraceId: toolTraceId(tenant.tenantId),
+      TimeUnixMs: seedWeekStart(SEED_WEEK_COUNT - 1),
+      RecordId: `${tenant.tenantId}-tool-log-record`.padEnd(64, "0"),
+      EventName: "api_request_body",
+      CorrelationSpanId: `${tenant.tenantId}-tool-span-0`,
+      ProviderSessionId: `${tenant.tenantId}-coding-session-${SEED_WEEK_COUNT - 1}`,
+      AttributesJson: JSON.stringify({
+        body: JSON.stringify({
+          messages: [
+            {
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: `${tenant.tenantId}-tool-span-0`,
+                  content: SEEDED_CONTENT.spanOutput,
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    })),
+  });
+
+  await seedRemainingDerivedSourceTables({ admin, database, tenants });
   await seedAnalyticsProjections({ admin, database, tenants, weeks });
+}
+
+/**
+ * ClickHouse-resident source tables the catalog reads that carry no
+ * hand-crafted fixture above and no `AggregateFunction` column — a plain
+ * `ReplacingMergeTree` where "the isolation proof has a tenant-a row and a
+ * tenant-b row" is the whole ask. One row per tenant, the physical tenant
+ * column set (usually `TenantId`, `stored_objects` uses `project_id`),
+ * everything else left to ClickHouse's own column defaults.
+ *
+ * Deliberately generic and driven off {@link LWQL_VIEW_CATALOG} rather than a
+ * second hand-maintained table list: a table the catalog starts reading is
+ * covered here automatically, the way it already is by
+ * {@link runShippedMigrations}. The two `AggregateFunction`-bearing tables
+ * (`gateway_budget_scope_totals`, `simulation_run_metrics_rollup`) are
+ * excluded — no plain `INSERT` can populate an aggregate-state column, so
+ * they get their own `*State()` seed below.
+ */
+const AGGREGATING_SOURCE_TABLES = new Set([
+  "gateway_budget_scope_totals",
+  "simulation_run_metrics_rollup",
+]);
+
+async function seedRemainingDerivedSourceTables({
+  admin,
+  database,
+  tenants,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  tenants: readonly LangWatchQLTenantFixture[];
+}): Promise<void> {
+  const alreadySeeded = new Set([
+    ...REAL_FACT_TABLES,
+    "log_records",
+    ...AGGREGATING_SOURCE_TABLES,
+  ]);
+
+  const remaining = new Set(
+    LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))
+      .map((view) => view.sourceTable)
+      .filter((table) => !alreadySeeded.has(table)),
+  );
+
+  // Truncated first: a reused container carries whatever a previous run of
+  // this same seed inserted, and re-seeding on top of untouched rows collides
+  // two identical-key physical rows into the dedup views' output — the
+  // `ReplacingMergeTree` only collapses them on a background merge, which
+  // this suite never waits for.
+  for (const table of [...remaining, ...AGGREGATING_SOURCE_TABLES]) {
+    await admin.command({ query: `SYSTEM STOP MERGES ${database}.${table}` });
+    await admin.command({ query: `TRUNCATE TABLE ${database}.${table}` });
+  }
+
+  for (const table of remaining) {
+    const view = LWQL_VIEW_CATALOG.find(
+      (candidate) => candidate.sourceTable === table,
+    )!;
+    const tenantColumn = lwqlPhysicalColumn(view, "TenantId");
+    await admin.insert({
+      table: `${database}.${table}`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        [tenantColumn]: tenant.tenantId,
+      })),
+    });
+  }
+
+  // `gateway_budget_scope_totals` and `simulation_run_metrics_rollup`:
+  // AggregatingMergeTree tables whose non-key columns are `AggregateFunction`
+  // states — only reachable through the matching `*State()` combinator, never
+  // a plain scalar `INSERT`.
+  for (const tenant of tenants) {
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.gateway_budget_scope_totals ` +
+        `(TenantId, Scope, ScopeId, Window, BudgetId, PeriodStart, SpendUSD, TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite, RequestCount, UpdatedAt, SpendNanoUSD) ` +
+        `SELECT '${tenant.tenantId}', 'project', '${tenant.tenantId}', 'day', 'budget-1', now64(3), ` +
+        `sumState(toDecimal64(1.5, 6)), sumState(toUInt64(100)), sumState(toUInt64(20)), sumState(toUInt64(5)), sumState(toUInt64(3)), countState(), now64(3), sumState(toInt64(1500000000))`,
+    });
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.simulation_run_metrics_rollup ` +
+        `(TenantId, ScenarioRunId, TraceId, TotalCost, RoleCosts, RoleLatencies, OccurredAt, PartitionMonth) ` +
+        `SELECT '${tenant.tenantId}', '${tenant.tenantId}-sim-rollup', '${tenant.tenantId}-trace-rollup', ` +
+        `argMaxState(toFloat64(0.5), now64(3)), argMaxState(map('assistant', 0.5), now64(3)), argMaxState(map('assistant', 120.0), now64(3)), maxState(now64(3)), toUInt32(202601)`,
+    });
+  }
 }
 
 /**
@@ -1331,6 +1548,37 @@ async function seedAnalyticsProjections({
       })),
     });
   }
+
+  // One judgement per seeded trace, per tenant: the judgments view reads this
+  // table, and an isolation assertion over a view whose table is empty proves
+  // nothing.
+  await admin.insert({
+    table: `${database}.instant_eval_judgments`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) => ({
+          TenantId: tenant.tenantId,
+          RunId: `${tenant.tenantId}-instant-eval-run`,
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          QuestionId: "annoyed",
+          ThreadId: "",
+          SpanId: "",
+          Kind: "boolean",
+          Status: "judged",
+          Passed: index % 2,
+          Score: null,
+          Label: "",
+          Probability: 0.5 + index / 100,
+          Probabilities: "",
+          Error: "",
+          OccurredAt: seedWeekStart(week),
+          CreatedAt: seedWeekStart(week),
+          UpdatedAt: seedWeekStart(week),
+        })),
+      ),
+    ),
+  });
 
   for (const part of ROLLUP_MERGE_FIXTURE.evaluationParts) {
     await admin.insert({
@@ -1703,13 +1951,15 @@ export const PG_MAPPED_TABLE = mappedCatalogEntry(PG_MAPPED_VIEW).sourceTable;
 /** The tenant column, which every approved view exposes under the same name. */
 export const PG_MAPPED_TENANT_COLUMN = "TenantId";
 /**
- * A column of the base relation the approved view leaves out.
+ * The exposed name of a base-relation column the approved view leaves out.
  *
- * `Annotation.comment` is a free-text carrier the catalog deliberately does not
- * expose. Taken from the real model rather than a synthetic `secret_note`, so
- * the unreachability proof is about the shipped exclusion policy.
+ * `Annotation.email` is a person identifier the catalog strips (a `comment` is
+ * now *gated* rather than absent, so it no longer proves unreachability). Its
+ * exposed name would be `Email`; the view omits it, so a `SELECT "Email"` over
+ * the view is an unknown identifier. Taken from the real model rather than a
+ * synthetic column, so the proof is about the shipped exclusion policy.
  */
-export const PG_EXCLUDED_COLUMN = "comment";
+export const PG_EXCLUDED_COLUMN = "Email";
 
 /** One PostgreSQL-resident catalog entry, by the name a caller writes. */
 function mappedCatalogEntry(
@@ -1785,45 +2035,45 @@ export interface LangWatchQLPostgresHarness {
 }
 
 /**
- * The application tables the mapped catalog reads, in the shape Prisma creates
- * them.
- *
- * Hand-written rather than migrated because the suite needs the *relations the
- * catalog names*, not the application's whole schema — every mapped base
- * relation, with every column the catalog reads plus at least one it
- * deliberately excludes. Quoted and mixed-case exactly as Prisma emits them, so
- * that a mapping which forgot to quote fails here rather than in production.
+ * Where Prisma keeps the application migrations, resolved from the directory the
+ * tests run in (`platform/app`), exactly as `lwqlCatalogCollision.unit.test.ts`
+ * resolves the ClickHouse ones.
  */
-const PG_BASE_TABLE_DDL: Record<string, string> = {
-  Annotation:
-    '("id" text primary key, "projectId" text not null, "traceId" text not null, ' +
-    '"isThumbsUp" boolean, "comment" text, "email" text, "createdAt" timestamptz not null, ' +
-    '"updatedAt" timestamptz not null)',
-  Project:
-    '("id" text primary key, "name" text not null, "slug" text not null, ' +
-    '"apiKey" text not null, "createdAt" timestamptz not null)',
-  // `type` is a PostgreSQL *enum* here, not text, because that is what Prisma
-  // creates for `ExperimentType` — and whether ClickHouse's PostgreSQL engine
-  // can read an enum column at all is exactly the kind of thing a `text` stand-in
-  // would hide until production.
-  Experiment:
-    '("id" text primary key, "projectId" text not null, "name" text, "slug" text not null, ' +
-    '"type" "ExperimentType" not null, "workbenchState" jsonb, "createdAt" timestamptz not null, ' +
-    '"archivedAt" timestamptz)',
-  BatchEvaluation:
-    '("id" text primary key, "projectId" text not null, "experimentId" text not null, ' +
-    '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
-    '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
-    '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
-    '"data" jsonb not null, "createdAt" timestamptz not null, "updatedAt" timestamptz not null)',
-  LlmPromptConfig:
-    '("id" text primary key, "projectId" text not null, "name" text not null, ' +
-    '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
-  LlmPromptConfigVersion:
-    '("id" text primary key, "projectId" text not null, "configId" text not null, ' +
-    '"version" integer not null, "commitMessage" text, "configData" jsonb not null, ' +
-    '"createdAt" timestamptz not null)',
-};
+const PG_MIGRATIONS_DIR = join(process.cwd(), "prisma/migrations");
+
+/**
+ * Every application migration concatenated in apply order, as one SQL script.
+ *
+ * The real schema, not a hand-written stand-in: the catalog is *derived* from
+ * the application's models now, so a base relation the derivation names — a
+ * column, a NOT NULL, an enum, a `@map`'d name — must be the shipped one or the
+ * proof proves nothing. Prisma migrations are plain SQL, so replaying them
+ * through `psql -f` reproduces exactly what production runs.
+ *
+ * `0_init` sorts before the timestamped directories ('0' < '2'), which is the
+ * order Prisma applies them; `migration_lock.toml` is a file, not a directory,
+ * so filtering to directories drops it without a special case.
+ */
+function concatenatedPrismaMigrations(): string {
+  const directories = readdirSync(PG_MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (directories.length === 0) {
+    throw new Error(
+      `lwql harness: no Prisma migrations found under ${PG_MIGRATIONS_DIR}`,
+    );
+  }
+  return directories
+    .map(
+      (directory) =>
+        `-- migration: ${directory}\n${readFileSync(
+          join(PG_MIGRATIONS_DIR, directory, "migration.sql"),
+          "utf8",
+        )}`,
+    )
+    .join("\n\n");
+}
 
 /**
  * LangWatchQL databases that map this one PostgreSQL role at the same time.
@@ -1867,9 +2117,16 @@ const PG_LOAD_FIXTURE_ROWS_PER_TENANT = 250;
  * `ANALYZE` is what gives the planner the statistics to choose it.
  */
 const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
+  // Column-named against the real, migrated Annotation table (it now has far
+  // more columns than the six the fixture fills, all nullable). No parent
+  // Project/Team/Organization rows for the filler tenants: the Annotation
+  // table's parent relations are `relationMode = "prisma"`, enforced in
+  // application code rather than by a database foreign key, so an orphan
+  // Annotation inserts cleanly.
   `INSERT INTO ${PG_SCHEMA}."Annotation" ` +
+    `("id", "projectId", "traceId", "isThumbsUp", "comment", "email", "createdAt", "updatedAt") ` +
     `SELECT 'filler-note-' || g, 'filler-tenant-' || (g % ${PG_LOAD_FIXTURE_TENANTS}), ` +
-    `'filler-trace-' || g, true, 'excluded-comment-of-filler', 'excluded-email-of-filler', ` +
+    `'filler-trace-' || g, true, 'comment of filler', 'excluded-email-of-filler', ` +
     `now(), now() ` +
     `FROM generate_series(1, ${PG_LOAD_FIXTURE_TENANTS * PG_LOAD_FIXTURE_ROWS_PER_TENANT}) g`,
   `CREATE INDEX IF NOT EXISTS "Annotation_projectId_idx" ON ${PG_SCHEMA}."Annotation" ("projectId")`,
@@ -1877,7 +2134,43 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
 ];
 
 /**
- * One tenant's rows in every mapped base relation.
+ * The models {@link postgresTenantSeedStatements} hand-seeds, so the generic
+ * {@link postgresModelSeedStatements} skips them rather than seeding a second,
+ * colliding row. `Organization`, `Team` and `User` are the tenancy spine (never
+ * derived into a view); the rest are the six formerly-hand-written views plus
+ * the two organization-fan-out fixtures (`Topic`, `VirtualKey`).
+ */
+export const LWQL_EXPLICITLY_SEEDED_MODELS = [
+  "Organization",
+  "Team",
+  "User",
+  "Project",
+  "Annotation",
+  "Experiment",
+  "BatchEvaluation",
+  "LlmPromptConfig",
+  "LlmPromptConfigVersion",
+  "Topic",
+  "VirtualKey",
+] as const;
+
+/**
+ * The whole derived Postgres catalog, computed once from the same manifest,
+ * skip map and overrides the shipped catalog is built from.
+ *
+ * Shared between {@link postgresTenantSeedStatements} (every generic caller's
+ * seed) and {@link startLangWatchQLPostgres} (the view/reader-role setup), so
+ * the two never derive it separately and drift.
+ */
+const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
+  manifest: LWQL_PRISMA_MANIFEST,
+  skip: LWQL_POSTGRES_SKIPPED_MODELS,
+  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
+});
+
+/**
+ * One tenant's rows in every mapped base relation, followed by one row per
+ * every *other* derived view's base model (the generic seed).
  *
  * Parameterized rather than fixed to the two harness fixtures because the
  * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
@@ -1892,9 +2185,19 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
  * `traceIds` ties annotations to whatever traces the caller seeded on the
  * ClickHouse side, so an annotation-to-trace join has matching rows; the
  * default is the shape the isolation suite seeds.
+ *
+ * The generic seed runs last (its rows may reference the explicit ones as
+ * foreign keys) and skips {@link LWQL_EXPLICITLY_SEEDED_MODELS} so a model
+ * this function already inserted never gets a second, colliding row. Every
+ * caller of this function — not only {@link startLangWatchQLPostgres} — needs
+ * this, since `postgresEngineIsolation.integration.test.ts` and friends read
+ * every derived view's engine table and would otherwise find nothing seeded
+ * for the ~85 views the explicit seed above does not cover.
  */
 export function postgresTenantSeedStatements({
   tenantId,
+  organizationId = `${tenantId}-org`,
+  teamId = `${tenantId}-team`,
   traceIds = [`${tenantId}-trace-1`, `${tenantId}-trace-2`],
   thumbsUp = [true, false],
   scores = [0.5, 0.9],
@@ -1902,6 +2205,17 @@ export function postgresTenantSeedStatements({
   stamp = "2026-01-01T00:00:00Z",
 }: {
   tenantId: string;
+  /**
+   * The organization this tenant's project hangs off. Defaults to a per-tenant
+   * organization so every tenant is its own organization — which is what makes
+   * the org fan-out negative test meaningful: the `virtual_keys` view derives
+   * its TenantId by walking Organization → Team → Project, so a VirtualKey must
+   * be visible under its own organization's project and no other's, and that is
+   * only a claim if the two tenants sit in two organizations.
+   */
+  organizationId?: string;
+  /** The team between the organization and the project. Defaults per tenant. */
+  teamId?: string;
   /** Traces the seeded annotations point at. One annotation per entry. */
   traceIds?: readonly string[];
   /** The verdict of the annotation at each index, cycled if shorter. */
@@ -1920,51 +2234,142 @@ export function postgresTenantSeedStatements({
   stamp?: string;
 }): string[] {
   const at = `'${stamp}'`;
-  const rows = (table: string, values: string[]): string =>
-    `INSERT INTO ${PG_SCHEMA}."${table}" VALUES ${values.join(", ")}`;
+  // Column-named, because the tables are the migrated ones now: positional
+  // VALUES would break the moment a migration adds a column, and every
+  // identifier is quoted because Prisma emits mixed-case column names.
+  const rows = (table: string, columns: string, values: string[]): string =>
+    `INSERT INTO ${PG_SCHEMA}."${table}" (${columns}) VALUES ${values.join(", ")}`;
+  const userId = `${tenantId}-user`;
   const verdict = (index: number): string => {
     const value = thumbsUp[index % thumbsUp.length];
     return value === null || value === undefined ? "NULL" : String(value);
   };
-  return [
-    rows("Project", [
-      `('${tenantId}', 'Project ${tenantId}', '${tenantId}-slug', ` +
-        `'excluded-apikey-of-${tenantId}', ${at})`,
+  const explicit: string[] = [
+    // The tenancy spine: Organization → Team → Project. None of Organization,
+    // Team or User is derived into a LangWatchQL view (identity / access-control
+    // plumbing), so their column values never reach a view and carry no
+    // `excluded-` markers — except the person identifier on User, which one day
+    // might, and is marked so a leak is caught if it ever does.
+    rows("Organization", '"id", "name", "slug"', [
+      `('${organizationId}', 'Org ${tenantId}', '${organizationId}-slug')`,
     ]),
+    rows("Team", '"id", "name", "slug", "organizationId"', [
+      `('${teamId}', 'Team ${tenantId}', '${teamId}-slug', '${organizationId}')`,
+    ]),
+    rows("User", '"id", "email"', [
+      `('${userId}', 'excluded-email-of-${tenantId}')`,
+    ]),
+    // The tenant IS the project id, exactly as before. `apiKey` and `lwqlKey`
+    // are the two secret-material columns the catalog strips, so both carry the
+    // marker; `lwqlKey` has a database default but is set explicitly so the
+    // exclusion proof has a distinctive string to look for. Both are unique,
+    // hence the per-tenant suffix.
+    rows(
+      "Project",
+      '"id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework"',
+      [
+        `('${tenantId}', 'Project ${tenantId}', '${tenantId}-slug', ` +
+          `'excluded-apikey-of-${tenantId}', 'excluded-lwqlkey-of-${tenantId}', ` +
+          `'${teamId}', 'python', 'openai')`,
+      ],
+    ),
+    // One VirtualKey per organization. `hashedSecret` is stripped (secret
+    // material) and marked; `displayPrefix` and `name` are exposed, so they must
+    // NOT contain the marker. `createdById` points at the User above.
+    rows(
+      "VirtualKey",
+      '"id", "organizationId", "name", "hashedSecret", "displayPrefix", "createdById"',
+      [
+        `('${tenantId}-vk', '${organizationId}', 'VK ${tenantId}', ` +
+          `'excluded-hash-of-${organizationId}', 'vk-${tenantId}', '${userId}')`,
+      ],
+    ),
+    // Two topics per project. `centroid`, `embeddings_model` and `p95Distance`
+    // are the clustering internals the Topic override strips, so the model name
+    // carries the marker; `name` is exposed and does not.
+    rows(
+      "Topic",
+      '"id", "projectId", "name", "embeddings_model", "centroid", "p95Distance"',
+      [1, 2].map(
+        (index) =>
+          `('${tenantId}-topic-${index}', '${tenantId}', 'Topic ${tenantId} ${index}', ` +
+          `'excluded-model', '{}'::jsonb, 0.5)`,
+      ),
+    ),
+    // `comment` is now *gated* (exposed to a caller with content access), not
+    // stripped, so it must NOT carry the marker; `email` is still stripped as a
+    // person identifier, so it keeps it.
     rows(
       "Annotation",
+      '"id", "projectId", "traceId", "isThumbsUp", "comment", "email", "createdAt", "updatedAt"',
       traceIds.map(
         (traceId, index) =>
           `('${tenantId}-note-${index + 1}', '${tenantId}', '${traceId}', ${verdict(index)}, ` +
-          `'excluded-comment-of-${tenantId}', 'excluded-email-of-${tenantId}', ${at}, ${at})`,
+          `'comment of ${tenantId}', 'excluded-email-of-${tenantId}', ${at}, ${at})`,
       ),
     ),
-    rows("Experiment", [
-      `('${tenantId}-experiment', '${tenantId}', 'Experiment ${tenantId}', ` +
-        `'${tenantId}-exp-slug', 'BATCH_EVALUATION_V2', '{"excluded":"workbench"}'::jsonb, ${at}, NULL)`,
-    ]),
+    rows(
+      "Experiment",
+      '"id", "projectId", "name", "slug", "type", "workbenchState", "createdAt"',
+      [
+        `('${tenantId}-experiment', '${tenantId}', 'Experiment ${tenantId}', ` +
+          `'${tenantId}-exp-slug', 'BATCH_EVALUATION_V2', '{"workbench":"state"}'::jsonb, ${at})`,
+      ],
+    ),
     rows(
       "BatchEvaluation",
+      '"id", "projectId", "experimentId", "evaluation", "status", "score", "label", ' +
+        '"passed", "cost", "datasetId", "datasetSlug", "details", "data", "createdAt", "updatedAt"',
       scores.map(
         (score, index) =>
           `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
           `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
           `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
-          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at}, ${at})`,
+          `'details of ${tenantId}', '{"rows":"data"}'::jsonb, ${at}, ${at})`,
       ),
     ),
-    rows("LlmPromptConfig", [
-      `('${promptId}', '${tenantId}', 'Prompt ${tenantId}', ` +
-        `'${tenantId}/handle', ${at}, NULL)`,
-    ]),
+    rows(
+      "LlmPromptConfig",
+      '"id", "projectId", "organizationId", "name", "handle", "createdAt"',
+      [
+        `('${promptId}', '${tenantId}', '${organizationId}', 'Prompt ${tenantId}', ` +
+          `'${tenantId}/handle', ${at})`,
+      ],
+    ),
     rows(
       "LlmPromptConfigVersion",
+      // `config` is the database column `configData` is `@map`'d to.
+      '"id", "projectId", "configId", "version", "commitMessage", "config", "schemaVersion", "createdAt"',
       [1, 2].map(
         (version) =>
           `('${promptId}-v${version}', '${tenantId}', '${promptId}', ` +
-          `${version}, 'excluded-commit-of-${tenantId}', '{"excluded":"prompt text"}'::jsonb, ${at})`,
+          `${version}, 'commit of ${tenantId}', '{"prompt":"text"}'::jsonb, '1', ${at})`,
       ),
     ),
+  ];
+  // Every other derived view's base model, generated from the manifest, after
+  // the explicit seeds so a foreign key to one of those (e.g. a VirtualKey or
+  // a prompt) points at a row that already exists.
+  return [
+    ...explicit,
+    ...postgresModelSeedStatements({
+      tenantId,
+      organizationId,
+      teamId,
+      userId,
+      views: LWQL_HARNESS_DERIVED_POSTGRES_VIEWS,
+      manifest: LWQL_PRISMA_MANIFEST,
+      alreadySeeded: LWQL_EXPLICITLY_SEEDED_MODELS,
+      // `promptId` is caller-chosen, so a generic row's foreign key to
+      // `LlmPromptConfig`/`LlmPromptConfigVersion` must point at the id this
+      // call's explicit seed actually wrote above, not the fixed
+      // `<tenant>-prompt`/`<tenant>-prompt-v1` convention.
+      explicitIds: {
+        LlmPromptConfig: promptId,
+        LlmPromptConfigVersion: `${promptId}-v1`,
+      },
+      schema: PG_SCHEMA,
+    }),
   ];
 }
 
@@ -1978,12 +2383,13 @@ export function postgresTenantSeedStatements({
  * enabling it later measures nothing until the pool is cycled.
  *
  * Deliberately NOT `.withReuse()`, unlike the ClickHouse container beside it.
- * Reuse hands every caller the same container, and this setup drops and
- * recreates a fixed set of relations in a fixed schema — so with
- * `VITEST_INTEGRATION_PARALLEL=1` (CI, `maxWorkers: 2`) two suites interleave
- * their drop/create and the second `CREATE TYPE "ExperimentType"` loses to the
- * first with `42710: type already exists`. The ClickHouse half is safe because
- * each suite gets its own LangWatchQL database; the PostgreSQL half has no such
+ * The setup replays the whole Prisma migration history into a fresh database
+ * and then seeds a fixed set of rows in a fixed schema. Reuse hands every caller
+ * the same container, so with `VITEST_INTEGRATION_PARALLEL=1` (CI,
+ * `maxWorkers: 2`) two suites would replay those migrations on top of each
+ * other — the second `CREATE TABLE`/`CREATE TYPE` losing to the first with
+ * `42P07`/`42710: already exists`. The ClickHouse half is safe because each
+ * suite gets its own LangWatchQL database; the PostgreSQL half has no such
  * per-suite name, so isolation comes from the container. A private container
  * per suite costs a few seconds and removes the race by construction.
  */
@@ -2051,22 +2457,46 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
   };
 
   const mapped = mappedCatalogEntry(PG_MAPPED_VIEW);
-  const baseRelations = Object.keys(PG_BASE_TABLE_DDL);
+
+  // The real schema, built by replaying the whole migration history in one
+  // `psql -f`. One connection, one script — far cheaper than one exec per
+  // migration — and it runs BEFORE `log_statement='all'` below so the hundreds
+  // of migration statements never land in the log the rowsRead measurements
+  // read. `ON_ERROR_STOP=1` makes psql exit non-zero on the first failing
+  // statement, which the check below turns into a named error rather than a
+  // schema that is silently missing half its tables.
+  await container.copyContentToContainer([
+    {
+      content: concatenatedPrismaMigrations(),
+      target: "/tmp/lwql-migrations.sql",
+    },
+  ]);
+  const migration = await container.exec([
+    "psql",
+    "-U",
+    PG_ADMIN_USER,
+    "-d",
+    PG_DATABASE,
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-f",
+    "/tmp/lwql-migrations.sql",
+  ]);
+  if (migration.exitCode !== 0) {
+    throw new Error(
+      `lwql harness: replaying the Prisma migrations failed ` +
+        `(psql exit ${migration.exitCode}). psql stops on the first error, so ` +
+        `the tail below names the migration statement that failed:\n${migration.stderr}`,
+    );
+  }
+
   await applyAsAdmin([
     `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
     ...lwqlApprovedPostgresViewNames().map(
       (view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`,
     ),
-    ...baseRelations.map(
-      (table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`,
-    ),
-    `DROP TYPE IF EXISTS ${PG_SCHEMA}."ExperimentType"`,
-    `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
-      `('DSPY', 'BATCH_EVALUATION', 'BATCH_EVALUATION_V2')`,
-    ...baseRelations.map(
-      (table) =>
-        `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
-    ),
+    // Each call already appends the generic seed (every other derived view's
+    // base model) after its explicit rows — see `postgresTenantSeedStatements`.
     ...[TENANT_A, TENANT_B].flatMap((tenant) =>
       postgresTenantSeedStatements({ tenantId: tenant.tenantId }),
     ),

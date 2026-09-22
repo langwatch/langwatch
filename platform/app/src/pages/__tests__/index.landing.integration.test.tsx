@@ -16,6 +16,7 @@ let mockResolveHome: {
   data?: { destination: string; isOverride: boolean } & Record<string, unknown>;
   isError: boolean;
 } = { isError: false };
+let mockWorkspace: Record<string, unknown> = {};
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -38,12 +39,14 @@ vi.mock("~/features/navigation/useReachableProducts", () => ({
 // project this fixture resolves is the organization's, so they answer with it.
 vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org_1" },
-    organizations: [{ id: "org_1" }],
-    project: { id: "project_1", slug: "demo", isPersonal: false },
-  }),
+  useOrganizationTeamProject: () => mockWorkspace,
+}));
+
+// Stubbed to markers rather than rendered: what this file checks is WHICH of
+// the two surfaces "/" draws, not what either one says. The words on the
+// failure come from the code-keyed registry and are tested where it lives.
+vi.mock("~/features/errors", () => ({
+  HandledErrorState: () => <div data-testid="workspace-failed" />,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -51,11 +54,21 @@ vi.mock("~/utils/api", () => ({
     governance: {
       resolveHome: { useQuery: () => mockResolveHome },
     },
+    // Asked only of somebody who belongs to no organization, to tell a
+    // just-tested SSO arrival apart from a genuine first-time sign-up — the
+    // difference between an explanatory screen and "create your
+    // organization". Every case in this file has an organization, so the
+    // query is disabled and answers nothing; it still has to exist.
+    identity: {
+      myTestArrival: {
+        useQuery: () => ({ data: null, isLoading: false, isError: false }),
+      },
+    },
   },
 }));
 
 vi.mock("../../components/LoadingScreen", () => ({
-  LoadingScreen: () => null,
+  LoadingScreen: () => <div data-testid="loading-screen" />,
 }));
 
 import { writeLastVisitedProduct } from "~/features/navigation/logic/productMemory";
@@ -64,6 +77,13 @@ import Index from "../index";
 beforeEach(() => {
   localStorage.clear();
   replaceMock.mockClear();
+  mockWorkspace = {
+    isLoading: false,
+    workspaceError: null,
+    organization: { id: "org_1" },
+    organizations: [{ id: "org_1" }],
+    project: { id: "project_1", slug: "demo", isPersonal: false },
+  };
   mockResolveHome = {
     data: {
       destination: "/demo",
@@ -128,6 +148,31 @@ describe("the root landing", () => {
       rerender(<Index />);
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the organization graph refused the read", () => {
+    /** @scenario The landing address says a refused read failed rather than waiting on it */
+    it("says the workspace could not be opened instead of waiting on it", () => {
+      mockWorkspace = {
+        isLoading: false,
+        workspaceError: new Error("UNAUTHORIZED"),
+        organization: undefined,
+        organizations: undefined,
+        project: undefined,
+      };
+      // The home resolver is asked for an organization, so a refused graph
+      // leaves it switched off and answerless — there is no second source the
+      // page could have fallen back to.
+      mockResolveHome = { isError: false };
+
+      const { queryByTestId } = render(<Index />);
+
+      // The redirect never comes for a graph that will not answer, so the
+      // loading screen this page shows while deciding would be permanent.
+      expect(queryByTestId("workspace-failed")).not.toBeNull();
+      expect(queryByTestId("loading-screen")).toBeNull();
+      expect(replaceMock).not.toHaveBeenCalled();
     });
   });
 });

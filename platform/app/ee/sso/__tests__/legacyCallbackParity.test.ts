@@ -68,6 +68,7 @@ const pinsTheLegacyPath = (providerId: string): boolean => {
 
 describe("legacy callback rewrites", () => {
   describe("given the generic-OAuth providers this build ships", () => {
+    /** @scenario "Enterprise OAuth keeps the callback path customers registered" */
     it.each([
       ...LEGACY_CALLBACK_PROVIDER_IDS,
     ])("pins %s to the legacy callback path, so its rewrite is the one that serves it", (providerId) => {

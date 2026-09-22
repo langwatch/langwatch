@@ -268,3 +268,5 @@ When your adapter calls an agent that runs as a separate service, the judge cann
 </Tabs>
 
 Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-testing/linking-your-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
+
+Also check: [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation, for an evaluator declared in the test itself that grades every run against a golden answer, with the same mappings and the same gate as one attached on the platform.

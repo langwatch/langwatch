@@ -10,6 +10,12 @@
  * a user, because a control request belongs to a person. A key with no user
  * behind it can hold no requests, so it lists none and can approve none.
  *
+ * The project in the credential is the login's, not the request's. A device
+ * login signs the command line in as the person's personal project, while the
+ * conversation that asked lives on a team project. So the list is the person's
+ * requests across every project they can read, and approving or cancelling one
+ * resolves the request's own project and checks the caller's permission there.
+ *
  * The **connect** endpoints are the long-poll transport of the control socket,
  * for a network that blocks WebSockets. They carry the minted session key, not
  * the developer's key, and they authenticate inside the handler with the same
@@ -30,8 +36,12 @@ import {
   type ProjectEndpointMeta,
 } from "~/server/api/v1/project-service";
 import { V1_API_VERSION } from "~/server/api/v1/version";
+import { getApp } from "~/server/app-layer/app";
 import { INSTANCE_TOKEN_HEADER } from "~/server/connected-agents/long-poll.transport";
-import { toControlRequestWire } from "~/server/langy-local-control/control-request.service";
+import {
+  type StoredControlRequest,
+  toControlRequestWire,
+} from "~/server/langy-local-control/control-request.service";
 import { LangyLocalRequestInvalidError } from "~/server/langy-local-control/errors";
 import {
   approveControlRequestBodySchema,
@@ -139,6 +149,77 @@ function requireUser(c: Context): string {
   return userId;
 }
 
+type ControlPermission = "langy:view" | "langy:create";
+
+/** Whether the person holds `permission` on the project a request names. */
+async function permittedOn({
+  userId,
+  projectId,
+  permission,
+}: {
+  userId: string;
+  projectId: string;
+  permission: ControlPermission;
+}): Promise<boolean> {
+  const { permitted } = await getApp().permissions.getDecision({
+    userId,
+    permission,
+    scope: { tier: "project", id: projectId },
+  });
+  return permitted;
+}
+
+/**
+ * The person's open requests on the projects they can still read. A request
+ * on a project the person was removed from since it was raised is left out.
+ */
+async function listReadable(userId: string): Promise<StoredControlRequest[]> {
+  const requests = await getLocalControlRuntime().requests.listOpen({ userId });
+  const decisions = new Map<string, boolean>();
+  const readable: StoredControlRequest[] = [];
+  for (const request of requests) {
+    let permitted = decisions.get(request.projectId);
+    if (permitted === undefined) {
+      permitted = await permittedOn({
+        userId,
+        projectId: request.projectId,
+        permission: "langy:view",
+      });
+      decisions.set(request.projectId, permitted);
+    }
+    if (permitted) readable.push(request);
+  }
+  return readable;
+}
+
+/**
+ * The request the caller is about to act on, when it is addressed to them and
+ * they hold `permission` on its own project. Anything else answers exactly
+ * like an unknown id, so the answer never tells a caller which requests
+ * exist.
+ */
+async function requireAddressed({
+  requestId,
+  userId,
+  permission,
+}: {
+  requestId: string;
+  userId: string;
+  permission: ControlPermission;
+}): Promise<StoredControlRequest> {
+  const request = await getLocalControlRuntime().requests.read(requestId);
+  if (!request || request.userId !== userId) {
+    throw new LangyLocalRequestInvalidError({ requestId });
+  }
+  const permitted = await permittedOn({
+    userId,
+    projectId: request.projectId,
+    permission,
+  });
+  if (!permitted) throw new LangyLocalRequestInvalidError({ requestId });
+  return request;
+}
+
 function registerRequestEndpoints(v: ControlVersion): void {
   v.get(
     "/requests",
@@ -146,14 +227,11 @@ function registerRequestEndpoints(v: ControlVersion): void {
       ...guard("langy:view"),
       output: listControlRequestsResponseSchema,
       description:
-        "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
       docs: { operationId: "listLangyControlRequests", tags: ["Langy"] },
     },
-    async (c, { app }: { app: ControlApp }) => {
-      const requests = await getLocalControlRuntime().requests.listOpen({
-        projectId: app.project.id,
-        userId: requireUser(c),
-      });
+    async (c) => {
+      const requests = await listReadable(requireUser(c));
       return { requests: requests.map(toControlRequestWire) };
     },
   );
@@ -169,11 +247,16 @@ function registerRequestEndpoints(v: ControlVersion): void {
         "Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused.",
       docs: { operationId: "approveLangyControlRequest", tags: ["Langy"] },
     },
-    async (c, { params, app }: { params: { id: string }; app: ControlApp }) => {
-      const approved = await getLocalControlRuntime().requests.approve({
+    async (c, { params }: { params: { id: string } }) => {
+      const userId = requireUser(c);
+      const request = await requireAddressed({
         requestId: params.id,
-        userId: requireUser(c),
-        projectId: app.project.id,
+        userId,
+        permission: "langy:create",
+      });
+      const approved = await getLocalControlRuntime().requests.approve({
+        requestId: request.id,
+        userId,
       });
       return {
         sessionKey: approved.sessionKey,
@@ -184,7 +267,7 @@ function registerRequestEndpoints(v: ControlVersion): void {
           url: conversationUrl(
             approved.request.conversationId,
             env.BASE_HOST,
-            app.project.slug,
+            approved.projectSlug,
           ),
         },
       };
@@ -201,11 +284,16 @@ function registerRequestEndpoints(v: ControlVersion): void {
         "Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again.",
       docs: { operationId: "cancelLangyControlRequest", tags: ["Langy"] },
     },
-    async (c, { params, app }: { params: { id: string }; app: ControlApp }) => {
-      await getLocalControlRuntime().requests.cancel({
+    async (c, { params }: { params: { id: string } }) => {
+      const userId = requireUser(c);
+      const request = await requireAddressed({
         requestId: params.id,
-        userId: requireUser(c),
-        projectId: app.project.id,
+        userId,
+        permission: "langy:create",
+      });
+      await getLocalControlRuntime().requests.cancel({
+        requestId: request.id,
+        userId,
       });
       return { id: params.id, cancelled: true as const };
     },

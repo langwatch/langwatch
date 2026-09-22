@@ -22,6 +22,10 @@ import {
   meanTtftMs,
 } from "../../services/coding-agent-session.derivation";
 import {
+  contextUsageKey,
+  MAX_USAGE_CONTEXTS,
+} from "../../services/coding-agent-session.types";
+import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
@@ -52,6 +56,26 @@ function initStateOf(
   ).initState();
 }
 
+/**
+ * The working context the contribute command stamps a model-call
+ * contribution with, as it rides the event.
+ */
+interface ContextStamp {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+}
+
+function stampOn(branch: string): ContextStamp {
+  return {
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    branch,
+  };
+}
+
 function spanFactsEvent({
   name,
   spanId,
@@ -61,6 +85,7 @@ function spanFactsEvent({
   endMs = 2_000,
   statusCode = 0,
   agent = "claude_code",
+  stamp,
 }: {
   name: string;
   spanId: string;
@@ -70,6 +95,7 @@ function spanFactsEvent({
   endMs?: number;
   statusCode?: number;
   agent?: string;
+  stamp?: ContextStamp;
 }): SpanFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -88,6 +114,7 @@ function spanFactsEvent({
       statusCode,
       facts,
       scopeName: "com.anthropic.claude_code.tracing",
+      ...stamp,
     },
   } as unknown as SpanFactsContributedEvent;
 }
@@ -97,11 +124,13 @@ function logFactsEvent({
   traceId = null,
   timeMs = 1_500,
   agent = "claude_code",
+  stamp,
 }: {
   facts: Record<string, string | number | boolean>;
   traceId?: string | null;
   timeMs?: number;
   agent?: string;
+  stamp?: ContextStamp;
 }): LogFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -120,6 +149,7 @@ function logFactsEvent({
       providerKind: "claude_code",
       scopeName: "com.anthropic.claude_code.events",
       facts,
+      ...stamp,
     },
   } as unknown as LogFactsContributedEvent;
 }
@@ -2081,6 +2111,362 @@ describe("coding-agent session fold, codex", () => {
       expect(
         isCodingAgentSessionSpan({ name: "claude_code.tool", scopeName: null }),
       ).toBe(true);
+    });
+  });
+});
+
+describe("coding-agent session fold, codex helper threads", () => {
+  /**
+   * The title generator's turn from codex 0.154, as the fold receives it: the
+   * helper's own tokens, nothing marking it. The mark rides the thread's
+   * app-server request span, stored stamped with the helper's thread id and
+   * contributing the auxiliary fact.
+   */
+  const helperTurnFacts = {
+    "gen_ai.request.model": "gpt-5.6-luna",
+    "gen_ai.response.model": "gpt-5.6-luna",
+    "gen_ai.usage.input_tokens": "387",
+    "gen_ai.usage.output_tokens": "16",
+    "gen_ai.usage.cache_read.input_tokens": "4864",
+    "gen_ai.usage.cache_creation.input_tokens": "0",
+    "codex.turn.token_usage.non_cached_input_tokens": "387",
+  };
+  const helperRequestFacts = { "langwatch.session.auxiliary": true };
+
+  const requestSpan = (spanId: string) =>
+    spanFactsEvent({
+      name: "turn/start",
+      spanId,
+      agent: "codex",
+      facts: helperRequestFacts,
+    });
+  const turnSpan = (spanId: string) =>
+    spanFactsEvent({
+      name: "session_task.turn",
+      spanId,
+      agent: "codex",
+      facts: helperTurnFacts,
+    });
+
+  describe("when the helper thread's request span contributes", () => {
+    /** @scenario "a codex helper thread's request span marks its session as auxiliary" */
+    it("marks the session auxiliary, in whichever order the thread's signals land", () => {
+      const projection = makeProjection();
+
+      // Log events first, then the request span, then the turn span: the
+      // order the export batches actually arrived in.
+      const afterPrompt =
+        projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent: "codex",
+            facts: { "event.name": "codex.user_prompt", prompt_length: 463 },
+          }),
+          initStateOf(projection),
+        );
+      expect(afterPrompt.auxiliary).toBe(false);
+
+      const marked = projection.handleCodingAgentSessionSpanFactsContributed(
+        requestSpan("helper-request"),
+        afterPrompt,
+      );
+      expect(marked.auxiliary).toBe(true);
+      // The request span counts nothing; the turn span still counts the
+      // helper's own work on its own session.
+      expect(marked.modelCalls).toBe(0);
+
+      const afterTurn = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("helper-turn"),
+        marked,
+      );
+      expect(afterTurn.auxiliary).toBe(true);
+      expect(afterTurn.modelCalls).toBe(1);
+      expect(afterTurn.models).toEqual(["gpt-5.6-luna"]);
+
+      // And the reverse order: the turn span before the request span.
+      const turnFirst = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("helper-turn"),
+        initStateOf(projection),
+      );
+      expect(turnFirst.auxiliary).toBe(false);
+      const thenRequest =
+        projection.handleCodingAgentSessionSpanFactsContributed(
+          requestSpan("helper-request"),
+          turnFirst,
+        );
+      expect(thenRequest.auxiliary).toBe(true);
+      expect(thenRequest.modelCalls).toBe(1);
+    });
+
+    /** @scenario "a codex turn without the fact keeps its session unmarked" */
+    it("leaves a session unmarked when only its turn span arrived", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("user-turn"),
+        initStateOf(projection),
+      );
+
+      expect(state.auxiliary).toBe(false);
+    });
+  });
+
+  describe("when an auxiliary session's row is stored and read back", () => {
+    /** @scenario "an auxiliary session round-trips through its stored row" */
+    it("decodes the mark, and decodes its absence as unmarked", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        requestSpan("helper-request"),
+        initStateOf(projection),
+      );
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+      expect(row.auxiliary).toBe(true);
+      expect(codingAgentSessionStateFromRow(row).auxiliary).toBe(true);
+
+      // A row from before the column decodes its default.
+      expect(
+        codingAgentSessionStateFromRow({ ...row, auxiliary: false }).auxiliary,
+      ).toBe(false);
+    });
+  });
+});
+
+/**
+ * Where a session's tokens went: every model call charges the context it was
+ * stamped with, next to the cumulative counters.
+ *
+ * @see specs/coding-agent/session-git-context.feature
+ */
+describe("usage by declared context", () => {
+  const callFacts = (input: number) => ({
+    model: "claude-fable-5",
+    input_tokens: input,
+    output_tokens: input / 10,
+    cache_read_tokens: input * 2,
+    cache_creation_tokens: input / 5,
+  });
+
+  describe("when model calls arrive stamped with different branches", () => {
+    /** @scenario A model call's tokens and cost are charged to the context stamped on it */
+    it("records each branch's own tokens and cost, and the counters stay the sum", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: callFacts(100),
+          stamp: stampOn("main"),
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-2",
+          startMs: 3_000,
+          endMs: 4_000,
+          facts: callFacts(300),
+          stamp: stampOn("feat/split"),
+        }),
+        state,
+      );
+
+      const main = state.usageByContext[contextUsageKey(stampOn("main"))];
+      const split =
+        state.usageByContext[contextUsageKey(stampOn("feat/split"))];
+      expect(main).toMatchObject({
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "main",
+        inputTokens: 100,
+        outputTokens: 10,
+        cacheReadTokens: 200,
+        cacheCreationTokens: 20,
+      });
+      expect(split).toMatchObject({
+        branch: "feat/split",
+        inputTokens: 300,
+        outputTokens: 30,
+        cacheReadTokens: 600,
+        cacheCreationTokens: 60,
+      });
+      expect(state.inputTokens).toBe(400);
+      expect(state.cacheReadTokens).toBe(800);
+      expect(state.costUsd).toBeGreaterThan(0);
+      expect(main!.costUsd + split!.costUsd).toBeCloseTo(state.costUsd, 10);
+    });
+
+    it("charges a codex turn span the same way, since its tokens ride no log record", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-1",
+          agent: "codex",
+          facts: {
+            "gen_ai.request.model": "gpt-5.6-sol",
+            "gen_ai.usage.input_tokens": "2936",
+            "gen_ai.usage.output_tokens": "7",
+            "gen_ai.usage.cache_read.input_tokens": "11008",
+            "gen_ai.usage.cache_creation.input_tokens": "0",
+          },
+          stamp: stampOn("fix/review"),
+        }),
+        initStateOf(projection),
+      );
+
+      expect(
+        state.usageByContext[contextUsageKey(stampOn("fix/review"))],
+      ).toMatchObject({
+        inputTokens: 2936,
+        outputTokens: 7,
+        cacheReadTokens: 11008,
+        cacheCreationTokens: 0,
+        costUsd: state.costUsd,
+      });
+    });
+
+    it("charges a logs-only agent's api_request, which is its model call", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.api_request",
+            model: "claude-fable-5",
+            input_tokens: 50,
+            output_tokens: 5,
+            cost_usd: 0.25,
+          },
+          stamp: stampOn("main"),
+        }),
+        initStateOf(projection),
+      );
+
+      expect(
+        state.usageByContext[contextUsageKey(stampOn("main"))],
+      ).toMatchObject({ inputTokens: 50, outputTokens: 5, costUsd: 0.25 });
+      expect(state.costUsd).toBe(0.25);
+    });
+  });
+
+  describe("when a model call arrives with no stamp", () => {
+    /** @scenario A model call with no stamp is charged to no context */
+    it("charges no context and still counts the call", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: callFacts(100),
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.usageByContext).toEqual({});
+      expect(state.inputTokens).toBe(100);
+    });
+
+    it("treats a partial stamp as no stamp", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: callFacts(100),
+          stamp: { ...stampOn("main"), branch: "" },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.usageByContext).toEqual({});
+    });
+  });
+
+  describe("when a session declares more contexts than the record holds", () => {
+    /** @scenario The per-context usage record stops growing at its bound */
+    it("keeps the first contexts it saw and keeps counting every call", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+      const calls = MAX_USAGE_CONTEXTS + 5;
+
+      for (let index = 0; index < calls; index++) {
+        state = projection.handleCodingAgentSessionSpanFactsContributed(
+          spanFactsEvent({
+            name: "claude_code.llm_request",
+            spanId: `llm-${index}`,
+            startMs: 1_000 + index,
+            endMs: 1_001 + index,
+            facts: callFacts(10),
+            stamp: stampOn(`feat/${index}`),
+          }),
+          state,
+        );
+      }
+
+      expect(Object.keys(state.usageByContext)).toHaveLength(
+        MAX_USAGE_CONTEXTS,
+      );
+      expect(
+        state.usageByContext[contextUsageKey(stampOn("feat/0"))],
+      ).toBeDefined();
+      expect(
+        state.usageByContext[contextUsageKey(stampOn(`feat/${calls - 1}`))],
+      ).toBeUndefined();
+      expect(state.inputTokens).toBe(10 * calls);
+    });
+  });
+
+  describe("when the fold state is projected to its row and rebuilt", () => {
+    /** @scenario The per-context usage survives the row and rebuilds identically */
+    it("writes one entry per context and decodes them back under the same keys", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+      for (const [index, branch] of ["main", "feat/two"].entries()) {
+        state = projection.handleCodingAgentSessionSpanFactsContributed(
+          spanFactsEvent({
+            name: "claude_code.llm_request",
+            spanId: `llm-${index}`,
+            startMs: 1_000 + index * 500,
+            endMs: 1_100 + index * 500,
+            facts: callFacts(100 * (index + 1)),
+            stamp: stampOn(branch),
+          }),
+          state,
+        );
+      }
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+
+      expect(row.usageByContext.map((usage) => usage.branch)).toEqual([
+        "main",
+        "feat/two",
+      ]);
+      expect(codingAgentSessionStateFromRow(row).usageByContext).toEqual(
+        state.usageByContext,
+      );
+      // A row from before the column decodes to no record.
+      expect(
+        codingAgentSessionStateFromRow({ ...row, usageByContext: [] })
+          .usageByContext,
+      ).toEqual({});
     });
   });
 });

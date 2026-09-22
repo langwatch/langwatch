@@ -45,6 +45,7 @@ import * as path from "node:path";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
+	codexGatewayBlockBaseUrl,
 	codexHasGatewayBlock,
 	codexHasOtelBlock,
 	codexOtelBlockEndpoint,
@@ -74,7 +75,7 @@ import {
 	listIngestionKeys,
 	mintIngestionKey,
 } from "./cli-api";
-import type { GovernanceConfig } from "./config";
+import { isIsolatedConfig, type GovernanceConfig } from "./config";
 import {
 	buildOtelEnvBlock,
 	SOURCE_TYPE_BY_TOOL,
@@ -89,6 +90,7 @@ import {
 	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
+	rcLangwatchBlockUrls,
 	rcPath,
 	tildify,
 	toolMarkers,
@@ -550,6 +552,42 @@ function scopedShellFunctionNeedsRefresh(
 	);
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** True for an endpoint served from this machine. Unparseable reads as not. */
+export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
+	if (!endpoint) return false;
+	try {
+		return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Whether a tool's persisted wiring reports to an instance on this machine.
+ * A scoped shell function carries no parsed endpoint, so every address in
+ * its block is parsed and judged by its host.
+ */
+function toolWiringPointsAtLoopback(tool: string): boolean {
+	if (tool === "claude") {
+		const target = appSettingsTargetFor("claude");
+		if (!target) return false;
+		return isLoopbackEndpoint(
+			appEnvValues(target).OTEL_EXPORTER_OTLP_ENDPOINT,
+		);
+	}
+	if (tool === "codex") {
+		return isLoopbackEndpoint(
+			codexOtelBlockEndpoint(defaultCodexConfigPath()) ?? undefined,
+		);
+	}
+	const markers = toolMarkers(tool);
+	return REFRESH_SHELLS.some((shell) =>
+		rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
+	);
+}
+
 function toolWiringNeedsLoginRefresh(
 	tool: string,
 	expectedEndpoint: string,
@@ -569,6 +607,12 @@ export interface LoginTelemetryRefreshResult {
 	mintedAny: boolean;
 	/** Restart advice when a live launcher predates successfully changed wiring. */
 	warnings?: string[];
+	/**
+	 * Tools whose wiring points at another instance and was left alone, with
+	 * the reason: this login lives in a config of its own, or it is a login on
+	 * this machine and the wiring reports to a deployment elsewhere.
+	 */
+	kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
 }
 
 /**
@@ -578,6 +622,19 @@ export interface LoginTelemetryRefreshResult {
  * ingest key on the new instance for each. A block already pointing at
  * this instance is left alone here - key-level drift is re-synced
  * value-exactly by the next wrapper run, which resolves a key anyway.
+ *
+ * Two logins never take the wiring over, and both are reported in `kept`:
+ *
+ *   - a login in a config of its own (`isIsolatedConfig`). The wiring under
+ *     the home belongs to the home's default config, so nothing under the
+ *     home is read for rewriting, minted for, or written.
+ *   - a login on this machine (localhost) while the wiring reports to a
+ *     deployment elsewhere. A local stack comes and goes, and taking the
+ *     wiring silently would drop the telemetry of every plain tool run once
+ *     it stops. Running `langwatch <tool>` on that login is the explicit way
+ *     to move a tool over. Wiring that already reports to this machine is
+ *     refreshed as usual, which is what a self-hosted install on localhost
+ *     needs when its port changes.
  *
  * Wholly best-effort: per-tool failures (no personal workspace yet,
  * network) skip that tool; the login itself never fails on refresh.
@@ -592,26 +649,61 @@ export async function refreshTelemetryWiringForLogin(
 	const warnings: string[] = [];
 	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
+	if (isIsolatedConfig()) {
+		const tools = Object.keys(SOURCE_TYPE_BY_TOOL).filter((tool) => {
+			try {
+				return toolWiringNeedsLoginRefresh(tool, expectedEndpoint);
+			} catch {
+				return false;
+			}
+		});
+		return {
+			labels,
+			mintedAny,
+			...(tools.length > 0
+				? { kept: { tools, reason: "isolated_config" as const } }
+				: {}),
+		};
+	}
+
+	const loopbackLogin = isLoopbackEndpoint(expectedEndpoint);
+	const keptForLoopback: string[] = [];
+
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
-			if (cfg.tool_project_keys?.[tool]?.secret) {
-				// Project-pinned wiring is deliberate scope, not stale personal
-				// wiring; a new login never re-points it at the personal path.
-				continue;
-			}
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
-			// codex's notify hook is what recovers the conversation, and it does
-			// not depend on the exporter endpoint. A config already pointing at
-			// this login skips the refresh below, so a device whose [otel] block
-			// predates the hook would never be given one. Idempotent and quiet
-			// when the hook is already in place.
+			// A login on this machine leaves a tool that reports elsewhere
+			// wholly alone, the codex hook and guidance below included: the
+			// hook names this CLI's own path, which is no business of a config
+			// file this login does not take over.
+			if (
+				loopbackLogin &&
+				toolWiringNeedsLoginRefresh(tool, expectedEndpoint) &&
+				!toolWiringPointsAtLoopback(tool)
+			) {
+				keptForLoopback.push(tool);
+				continue;
+			}
+			// codex's notify hook is what recovers the conversation, and the
+			// guidance beside it is what tells a session to declare the checkout
+			// it moved to. Neither names an endpoint or a key, so both stand
+			// ahead of the pin check: a pinned codex needs them exactly as a
+			// personal one does, and only the mint and the rewiring below are a
+			// pin's to refuse. A config already pointing at this login skips the
+			// refresh below, so a device whose [otel] block predates either would
+			// never be given one. Idempotent and quiet when they are in place.
 			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
 				assertCodexTurnHarvest();
 				assertCodexAgentGuidance();
+			}
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
 			}
 			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
@@ -659,7 +751,13 @@ export async function refreshTelemetryWiringForLogin(
 	// the login that wrote it. Re-sync it with this login's gateway URL
 	// when present - no ingest key involved.
 	try {
-		if (codexHasGatewayBlock(defaultCodexConfigPath())) {
+		if (
+			loopbackLogin &&
+			codexHasGatewayBlock(defaultCodexConfigPath()) &&
+			!isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined)
+		) {
+			if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
+		} else if (codexHasGatewayBlock(defaultCodexConfigPath())) {
 			const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
 			if (result.action !== "unchanged") {
 				labels.push(`codex gateway block (${displayCodexConfigPath()})`);
@@ -669,5 +767,29 @@ export async function refreshTelemetryWiringForLogin(
 		// Best-effort, same as above.
 	}
 
-	return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };
+	return {
+		labels,
+		mintedAny,
+		...(warnings.length > 0 ? { warnings } : {}),
+		...(keptForLoopback.length > 0
+			? { kept: { tools: keptForLoopback, reason: "loopback_login" as const } }
+			: {}),
+	};
+}
+
+/** The lines the login prints for wiring it left alone. Exported for tests. */
+export function keptWiringLines(
+	kept: NonNullable<LoginTelemetryRefreshResult["kept"]>,
+): string[] {
+	const tools = kept.tools.join(", ");
+	if (kept.reason === "isolated_config") {
+		return [
+			`Left the wiring of ${tools} as it is: this login lives in its own config file (LANGWATCH_CLI_CONFIG), so it is not this machine's login.`,
+		];
+	}
+	const example = kept.tools[0] ?? "claude";
+	return [
+		`Left the wiring of ${tools} as it is: it reports to another LangWatch, and a login on this machine does not take it over.`,
+		`To report to this one instead, run the tool through it once: langwatch ${example}`,
+	];
 }

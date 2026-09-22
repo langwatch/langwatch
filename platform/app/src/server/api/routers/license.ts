@@ -1,53 +1,24 @@
+import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
+import { ConnectDisabledError } from "@ee/licensing/connect/install/connectErrors";
+import { getConnectLicenseClient } from "@ee/licensing/connect/install/connectLicenseClient";
+import { installInstanceId } from "@ee/licensing/connect/install/instanceIdentity";
 import { authProviderIsMounted, platformSSOAllowed } from "@ee/sso/sso-gate";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
+import { syncLicenseNow } from "~/server/licenseSyncWorker";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
-import type { LicenseData } from "../../../../ee/licensing";
-import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
+import type { LicenseStatus } from "../../../../ee/licensing";
 import { licenseValidationError } from "../../../../ee/licensing/errors";
-import { buildMintedPlan } from "../../../../ee/licensing/mintedPlan";
-import {
-  encodeLicenseKey,
-  generateLicenseId,
-  signLicense,
-} from "../../../../ee/licensing/signing";
-
-const logger = createLogger("langwatch:api:licenseRouter");
 
 /**
- * Schema for plan limits input. Licenses encode only the enforced levers
- * (member seats, messages volume) plus identity; projects, teams, and
- * experimentation resources are OSS/uncapped and not part of licenses.
+ * What an organization does with the license it holds: read its status,
+ * activate one, remove it.
+ *
+ * Issuing a license is not here. It is a LangWatch operator action in the
+ * backoffice, signed with a server secret (`licenseRegistry` router, ADR-141).
  */
-const planLimitsSchema = z.object({
-  maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  canPublish: z.boolean(),
-  webhookEndpointsEnabled: z.boolean().optional(),
-  usageUnit: z.enum(["traces", "events"]),
-});
-
-/** Schema for license generation input */
-const generateLicenseSchema = z.object({
-  privateKey: z.string().min(1, "Private key is required"),
-  organizationName: z.string().min(1, "Organization name is required"),
-  email: z.string().email("Invalid email format"),
-  expiresAt: z.date(),
-  planType: z.enum(["PRO", "ENTERPRISE", "CUSTOM"]),
-  plan: planLimitsSchema,
-});
-
 export const licenseRouter = createTRPCRouter({
   /**
    * Gets the current license status for an organization.
@@ -141,6 +112,56 @@ export const licenseRouter = createTRPCRouter({
     }),
 
   /**
+   * Redeems an activation code and stores the license it minted.
+   *
+   * The code is the credential for one call to the connect host and is never
+   * stored on the install: what comes back is an ordinary signed license, which
+   * goes through exactly the same validation and storage as one a customer
+   * pasted. An air-gapped install pastes its license instead and calls nothing.
+   */
+  activate: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        code: z.string().min(1, "Activation code is required").max(200),
+      }),
+    )
+    .permission("organization:manage")
+    .mutation(async ({ input }) => {
+      const config = readConnectConfig();
+      if (!config.permitted) throw new ConnectDisabledError();
+
+      const instanceId = await installInstanceId(prisma);
+      const answer = await getConnectLicenseClient(
+        config.licenseEndpoint,
+      ).activate({ code: input.code, instanceId });
+
+      const result = await getLicenseHandler().validateAndStoreLicense(
+        input.organizationId,
+        answer.license,
+      );
+      if (!result.success) throw licenseValidationError(result.error);
+
+      return { success: true, planInfo: result.planInfo };
+    }),
+
+  /**
+   * Syncs the license with LangWatch now, so a seat change or a renewal made
+   * on the registry reaches this install without waiting for the daily pass.
+   * Answers with what changed; a refusal from the host is thrown as its code.
+   */
+  refresh: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+      }),
+    )
+    .permission("organization:manage")
+    .mutation(async ({ input }) => {
+      return await syncLicenseNow({ organizationId: input.organizationId });
+    }),
+
+  /**
    * Removes the license from an organization.
    */
   remove: protectedProcedure
@@ -159,84 +180,5 @@ export const licenseRouter = createTRPCRouter({
         success: true,
         removed: result.removed,
       };
-    }),
-
-  /**
-   * Generates a new license key.
-   * Requires organization:manage permission - only org admins can generate licenses.
-   */
-  generate: protectedProcedure
-    .input(
-      z
-        .object({
-          organizationId: z.string().min(1),
-        })
-        .merge(generateLicenseSchema),
-    )
-    .permission("organization:manage")
-    .mutation(async ({ input }) => {
-      const { privateKey, organizationName, email, expiresAt, planType, plan } =
-        input;
-
-      // Validate expiration is in the future
-      if (expiresAt <= new Date()) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Expiration date must be in the future",
-        });
-      }
-
-      // Get plan template for name/type
-      const template = getPlanTemplate(planType);
-      const planName = template?.name ?? planType;
-      const planTypeValue = template?.type ?? planType;
-
-      // Build the license data
-      const licenseData: LicenseData = {
-        licenseId: generateLicenseId(),
-        version: 1,
-        organizationName,
-        email,
-        issuedAt: new Date().toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        plan: buildMintedPlan({
-          type: planTypeValue,
-          name: planName,
-          maxMembers: plan.maxMembers,
-          maxMembersLite: plan.maxMembersLite,
-          maxMessagesPerMonth: plan.maxMessagesPerMonth,
-          canPublish: plan.canPublish,
-          webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
-          usageUnit: plan.usageUnit,
-        }),
-      };
-
-      try {
-        // Sign the license
-        const signedLicense = signLicense(licenseData, privateKey);
-
-        // Encode as base64
-        const licenseKey = encodeLicenseKey(signedLicense);
-
-        return { licenseKey };
-      } catch (error) {
-        logger.error(
-          { organizationId: input.organizationId, error },
-          "[license] Failed to sign license",
-        );
-        // A signing-key failure already says which of the three things went
-        // wrong, and the handled-error middleware maps it to a 400 with that
-        // code intact. Re-wrapping would flatten all three into one message
-        // the UI cannot key off.
-        if (HandledError.isHandled(error)) throw error;
-        // Real copy on a 4xx, so the authored-prose channel renders it as-is;
-        // the cause rides along for the logs rather than being discarded, and
-        // is never shown (its message would be a crypto diagnostic).
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Failed to sign license. Please check your private key.",
-          cause: error,
-        });
-      }
     }),
 });

@@ -21,6 +21,10 @@ import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
 } from "./errors";
+import {
+  executeExplorerBackendAction,
+  isExplorerActionKindOnBackend,
+} from "./explorerBackendExecutor";
 import type { PageActionDefinition } from "./pageManifests";
 
 const logger = createLogger("langwatch:langy:ui-actions:backend");
@@ -53,6 +57,16 @@ export async function executeBackendAction({
   definition: PageActionDefinition;
   payload: unknown;
 }): Promise<unknown> {
+  // The Explorer has no saved document to edit, so its away form is a link
+  // rather than a write, and it needs no experiment named.
+  if (isExplorerActionKindOnBackend(kind)) {
+    return executeExplorerBackendAction({
+      projectSlug: context.projectSlug,
+      kind,
+      payload,
+    });
+  }
+
   const slug = context.experimentSlug;
   if (!slug) throw new LangyUiExperimentRequiredError(kind);
 

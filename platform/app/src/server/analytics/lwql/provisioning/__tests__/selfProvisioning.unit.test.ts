@@ -19,7 +19,7 @@
  *    tables are dropped first so a changed catalog converges on upgrade.
  *
  * @see ../selfProvisioning.ts — the module under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -30,10 +30,12 @@ import { qualified } from "../accessModel";
 import { lwqlSourceTables } from "../catalogStatements";
 import { productionLangWatchQLNames } from "../productionProvisioning";
 import {
+  canProvisionAppFunctions,
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
@@ -441,6 +443,88 @@ describe("lwqlPostgresReaderModeFromEnv", () => {
           LWQL_MANAGE_POSTGRES_READER: value,
         }),
       ).toBe("grants-only");
+    });
+  });
+});
+
+describe("given a self-hosted ClickHouse with more than one replica", () => {
+  describe("when it has no user_defined_zookeeper_path", () => {
+    /** @scenario "A multi-replica server without a shared function store is provisioned without the functions" */
+    it("is provisioned without the app functions", () => {
+      expect(
+        canProvisionAppFunctions({
+          maxTotalReplicas: 3,
+          userDefinedZookeeperPath: "",
+        }),
+      ).toBe(false);
+
+      const statements = selfHostedClickHouseProvisioningStatements({
+        names: NAMES,
+        restrictedPassword: "pw",
+        sourceDatabase: SOURCE_DATABASE,
+        postgres: {
+          endpoint: { host: "pg", port: 5432, database: "langwatch" },
+          readerPassword: "reader",
+        },
+        includeAppFunctions: false,
+      });
+
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(false);
+      expect(statements.some((s) => s.startsWith("CREATE USER"))).toBe(true);
+    });
+  });
+
+  describe("when its function store is in Keeper", () => {
+    it("is provisioned with the app functions", () => {
+      expect(
+        canProvisionAppFunctions({
+          maxTotalReplicas: 3,
+          userDefinedZookeeperPath: "/clickhouse/user_defined",
+        }),
+      ).toBe(true);
+    });
+  });
+});
+
+describe("given a single-node ClickHouse", () => {
+  describe("when the function store is probed", () => {
+    /** @scenario "A single-node server is provisioned with the functions" */
+    it("reads no replicas and keeps the functions on local disk", async () => {
+      const probe = await probeAppFunctionStore({
+        query: async (sql) =>
+          sql.includes("system.replicas") ? [{ max_total_replicas: "0" }] : [],
+      });
+
+      expect(probe).toEqual({
+        maxTotalReplicas: 0,
+        userDefinedZookeeperPath: "",
+      });
+      expect(canProvisionAppFunctions(probe)).toBe(true);
+      const statements = selfHostedClickHouseProvisioningStatements({
+        names: NAMES,
+        restrictedPassword: "pw",
+        sourceDatabase: SOURCE_DATABASE,
+        postgres: {
+          endpoint: { host: "pg", port: 5432, database: "langwatch" },
+          readerPassword: "reader",
+        },
+      });
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(true);
+    });
+
+    it("leaves the functions out of a server that cannot answer", async () => {
+      const probe = await probeAppFunctionStore({
+        query: async () => {
+          throw new Error("UNKNOWN_TABLE system.server_settings");
+        },
+      });
+
+      expect(probe).toBeNull();
+      expect(canProvisionAppFunctions(probe)).toBe(false);
     });
   });
 });

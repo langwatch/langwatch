@@ -66,6 +66,12 @@ const mockGetSuiteById = vi.hoisted(() =>
   })),
 );
 
+// SuiteRail and RunsSidebar mount the simulations welcome card, which reads
+// whether a guided onboarding path is active; no path is in these tests.
+vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
+  useGuidedPathActive: () => false,
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     // The run dialog reads the saved evaluators for the ones a run carries.
@@ -173,6 +179,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 vi.mock("~/hooks/useDrawer", () => ({

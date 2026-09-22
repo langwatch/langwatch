@@ -24,3 +24,10 @@ Feature: Every settings page keeps the settings chrome
     Scenario: No page the Settings menu opens is left without it
       Given every page that Settings can open
       Then each of them keeps the settings chrome
+
+    @unit
+    Scenario: An address that only forwards is not framed on the way past
+      Given a settings address whose page moved into a tab of another page
+      When somebody opens the old address
+      Then they are forwarded to the page it moved to
+      And no settings frame is drawn around the forwarding itself

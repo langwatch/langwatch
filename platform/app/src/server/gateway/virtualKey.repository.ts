@@ -90,7 +90,7 @@ export type CreateVirtualKeyData = {
    * Langy in-product assistant. Drives the managed-row badge + lock-down on
    * the gateway/virtual-keys page.
    */
-  purpose?: "USER" | "LANGY";
+  purpose?: "USER" | "LANGY" | "CONNECT";
 };
 
 export type SetVirtualKeyDisabledData = {

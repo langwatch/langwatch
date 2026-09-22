@@ -73,3 +73,28 @@ Feature: S3PollingPullerAdapter (universal S3-polling adapter)
     Given the credentialRef resolves to NEW credentials on a subsequent run
     When the adapter requests a fresh AWS S3 client
     Then it fetches the latest credentials (no in-process credential caching across runOnce calls)
+
+  Rule: The OpenAI compliance export names people by id and keeps nothing it does not need
+
+    OpenAI's compliance export carries both the person's id and their email
+    on every line. The audit trail names the person by the id the provider
+    owns; the address is left where it came from. And because that address
+    would otherwise ride along inside a verbatim copy of the line, the
+    OpenAI compliance source keeps no such copy: the audit row holds the
+    fields it was mapped to and nothing else.
+
+    Background:
+      Given an IngestionSource of type `openai_compliance`
+      And the bucket holds a compliance line whose `user` has both an `id` and an `email`
+
+    @unit
+    Scenario: An OpenAI compliance event names the person by their provider id, never by email
+      When the puller reads the line
+      Then the event's actor is the person's provider id
+      And the email appears nowhere in the emitted record
+
+    @unit
+    Scenario: An OpenAI compliance event keeps no raw copy of what the provider sent
+      When the puller reads the line and the worker maps it to an audit row
+      Then the audit row carries no verbatim copy of the provider's line
+      And the email appears nowhere in the audit row

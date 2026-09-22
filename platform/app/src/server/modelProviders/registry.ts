@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ModelProvider } from "~/generated/prisma/client";
+import { E164_PHONE_PATTERN } from "~/server/agents/voice/voice-agent.config";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
@@ -565,6 +566,33 @@ export const modelProviders = {
     enabledSince: new Date("2026-07-25"),
     blurb:
       "Voice models for lifelike text to speech and accurate transcription.",
+  },
+  twilio: {
+    name: "Twilio",
+    // A non-LLM credential container, the same class as Azure Content Safety:
+    // it holds the account a phone-target voice agent is dialled from, and
+    // offers no chat models, so `type: "safety"` keeps it out of every model
+    // selector and out of dispatch (`isDispatchableProvider`).
+    type: "safety",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "TWILIO_AUTH_TOKEN",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      // The account the call is billed to. A public identifier, not a secret,
+      // so it is named in PUBLIC_CREDENTIAL_FIELDS and rendered back editable.
+      TWILIO_ACCOUNT_SID: z.string().min(1),
+      // The one secret of the three. Contains "TOKEN", so the classifier masks
+      // it whatever the public list says (SECRET_CREDENTIAL_MARKERS).
+      TWILIO_AUTH_TOKEN: z.string().min(1),
+      // The account's own Twilio number (E.164) a call originates FROM. Public,
+      // validated at the schema boundary so a malformed number fails on save.
+      TWILIO_FROM_NUMBER: z.string().regex(E164_PHONE_PATTERN, {
+        message: "Enter the number in E.164 form, like +14155550123",
+      }),
+    }),
+    optionalKeys: [],
+    enabledSince: new Date("2026-09-10"),
+    blurb: "Dial phone-target voice agents from your Twilio account.",
   },
   azure: {
     name: "Azure OpenAI",

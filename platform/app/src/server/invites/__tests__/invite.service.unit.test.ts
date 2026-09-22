@@ -43,7 +43,9 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
-      SENDGRID_API_KEY: "test-sendgrid-key",
+      EMAIL_PROVIDER: "smtp",
+      SMTP_URL: "smtp://127.0.0.1:1025",
+      SENDGRID_API_KEY: void 0,
     },
   };
 });
@@ -165,6 +167,9 @@ describe("InviteService", () => {
         update: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      // The acceptance claim and the revoke are SQL; the resend and extend
+      // claims still go through `updateMany`.
+      $executeRaw: vi.fn().mockResolvedValue(1),
       organization: {
         findFirst: vi.fn(),
       },
@@ -172,7 +177,7 @@ describe("InviteService", () => {
         findFirst: vi.fn(),
         findUnique: vi.fn(),
       },
-      customRole: {
+      role: {
         findMany: vi.fn(),
       },
     };
@@ -448,7 +453,7 @@ describe("InviteService", () => {
 
   describe("checkLicenseLimits()", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.role.findMany.mockResolvedValue([]);
     });
 
     describe("when member limit is exceeded", () => {
@@ -781,7 +786,8 @@ describe("InviteService", () => {
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
-      it("sends invite emails for each invite", async () => {
+      /** @scenario Invitations use the configured email provider */
+      it("sends each invite through SMTP without a SendGrid key", async () => {
         await service.approvePaymentPendingInvites({
           subscriptionId: "sub-1",
           organizationId: "org-1",
@@ -926,16 +932,15 @@ describe("InviteService", () => {
         expect(teamBinding!.scopeId).toBe("team-1");
 
         // Verify: invite was claimed ACCEPTED — a conditional update on the
-        // PENDING status, recording who accepted.
-        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({ status: "PENDING" }),
-            data: expect.objectContaining({
-              status: "ACCEPTED",
-              acceptedByUserId: "user-flow-1",
-            }),
-          }),
+        // PENDING status, recording who accepted. The claim binds the
+        // acceptor first.
+        const claims = mockPrisma.$executeRaw.mock.calls.filter(
+          ([statement]: [TemplateStringsArray]) =>
+            statement.join("?").includes("'ACCEPTED'"),
         );
+        expect(claims).toHaveLength(1);
+        expect(claims[0]?.[0].join("?")).toMatch(/"status" = 'PENDING'/);
+        expect(claims[0]?.[1]).toBe("user-flow-1");
       });
     });
   });
@@ -954,9 +959,7 @@ describe("InviteService", () => {
 
       beforeEach(() => {
         (mockPrisma as any).organizationUser = { createMany: vi.fn() };
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 1,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(1);
         // The writer is module-level and shared, so what the previous test
         // sent it would otherwise be counted as this one's.
         ledger.attachBindings.mockClear();
@@ -971,9 +974,9 @@ describe("InviteService", () => {
       describe("when it is applied", () => {
         it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
           const order: string[] = [];
-          mockPrisma.organizationInvite.updateMany.mockImplementation(() => {
+          mockPrisma.$executeRaw.mockImplementation(() => {
             order.push("accepted");
-            return Promise.resolve({ count: 1 });
+            return Promise.resolve(1);
           });
           ledger.attachBindings.mockImplementation(() => {
             order.push("granted");
@@ -1012,6 +1015,7 @@ describe("InviteService", () => {
           expect(order).toContain("emitted");
         });
 
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 
@@ -1045,6 +1049,7 @@ describe("InviteService", () => {
       });
 
       describe("when the invite records no sender", () => {
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("attributes the grants to the service rather than to the invitee", async () => {
           await service.applyInvite({
             userId: "user-flow-2",

@@ -3,6 +3,7 @@ import { normalizeIdentifierValue } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import {
   type Organization,
   type OrganizationInvite,
@@ -16,6 +17,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
@@ -65,7 +67,6 @@ const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
-import { env } from "~/env.mjs";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
@@ -80,6 +81,7 @@ import {
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { sendInviteReRequestEmail } from "../mailer/inviteReRequestEmail";
+import { hasEmailProvider } from "../mailer/providers";
 import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
 import { buildInviteAcceptUrl } from "./invite-link";
 import { assertInviteSendAllowed } from "./invite-send-throttle";
@@ -299,6 +301,7 @@ interface CreateAdminInviteInput {
   organizationId: string;
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
+  requestedBy?: string | null;
 }
 
 /**
@@ -339,7 +342,7 @@ interface CreatePaymentPendingInviteInput {
 
 /**
  * Service that encapsulates invite creation, validation, and acceptance
- * logic, extracted from the organization router.
+ * logic used by the invite router and other application adapters.
  *
  * Dependencies are injected to follow DIP and enable testability.
  */
@@ -484,12 +487,15 @@ export class InviteService {
     const currentMembersLite =
       await this.licenseRepo.getMembersLiteCount(organizationId);
 
-    const customRoles = await this.prisma.customRole.findMany({
+    const customRoles = await liveRoles(this.prisma).findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
     const customRoleMap = new Map(
-      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
+      customRoles.map((r) => [
+        r.id,
+        z.array(z.string()).parse(r.permissions ?? []),
+      ]),
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
@@ -588,6 +594,7 @@ export class InviteService {
             : undefined,
         role: input.role,
         status: "PENDING",
+        requestedBy: input.requestedBy ?? null,
       },
     });
   }
@@ -605,7 +612,7 @@ export class InviteService {
     organization: Organization;
     inviteCode: string;
   }): Promise<{ emailNotSent: boolean }> {
-    if (!env.SENDGRID_API_KEY) {
+    if (!hasEmailProvider()) {
       return { emailNotSent: true };
     }
     try {
@@ -704,7 +711,10 @@ export class InviteService {
       (tx) =>
         this.persistInvites({
           tx,
-          invites: validInvites,
+          invites: validInvites.map((invite) => ({
+            ...invite,
+            requestedBy: user?.id ?? null,
+          })),
           organization,
           isStrict,
         }),
@@ -834,8 +844,8 @@ export class InviteService {
   /**
    * The team side of one requested invite, from whichever form the request
    * used: explicit team role entries, or the legacy comma-separated team id
-   * list. Returns null when the invite names no teams at all, or when
-   * lenient validation drops it entirely.
+   * list. Organization members may have no team assignment; returns null for
+   * teamless external invites or when lenient validation drops the invite.
    */
   private async resolveInviteTeams({
     organizationId,
@@ -860,6 +870,9 @@ export class InviteService {
         role: invite.role,
         isStrict,
       });
+    }
+    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+      return { teamAssignments: [], teamIdsString: "" };
     }
     return null;
   }
@@ -1109,6 +1122,15 @@ export class InviteService {
    * of `applyInvite` rather than an omission here: it marks the invite
    * ACCEPTED in the same transaction that creates the membership, before it
    * emits a single grant. A revocable invite has granted nothing.
+   *
+   * The revoke and the acceptance claim in `applyInvite` are the two
+   * conditional writes that meet on one row, and both are SQL with their
+   * conditions against the table. Through `updateMany` the conditions sit in
+   * a subquery, and a statement that waited on the row lock re-checks only
+   * the outer id predicate against the committed row, so an acceptance that
+   * waited on a revoke would land over it and the admin's revocation would be
+   * lost, or a revoke would mark an accepted invite REVOKED while the
+   * membership stands.
    */
   async revokeInvite({
     organizationId,
@@ -1117,15 +1139,15 @@ export class InviteService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ success: true }> {
-    const revoked = await this.prisma.organizationInvite.updateMany({
-      where: {
-        id: inviteId,
-        organizationId,
-        status: { in: ["PENDING", "PAYMENT_PENDING"] },
-      },
-      data: { status: "REVOKED" },
-    });
-    if (revoked.count === 0) {
+    const revoked = await this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'REVOKED',
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+    `;
+    if (revoked === 0) {
       throw new InviteNotFoundError("Invitation not found");
     }
     return { success: true };
@@ -1193,6 +1215,46 @@ export class InviteService {
       },
       emailNotSent,
     };
+  }
+
+  /**
+   * Move an invitation's expiry out, without touching its code.
+   *
+   * The asymmetry with `resendInvite` is the whole reason both exist. A
+   * resend mints a fresh code, which stops the old link working and sends a
+   * new mail — right when the person lost the mail, wrong when they still
+   * have it open and merely ran out of time. An extension changes one field
+   * and sends nothing, so the link already in their inbox starts working
+   * again.
+   *
+   * Measured from NOW rather than from the old expiry, so extending a
+   * fortnight-stale invitation gives the same fortnight as extending one
+   * that lapsed this morning. The caller is told the new expiry as a date;
+   * a duration would leave the reader adding it up.
+   */
+  async extendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite }> {
+    const existing = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+    });
+    if (existing?.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const freshExpiration = new Date(Date.now() + INVITE_EXPIRATION_MS);
+    const claimed = await this.prisma.organizationInvite.updateMany({
+      where: { id: existing.id, organizationId, status: "PENDING" },
+      data: { expiration: freshExpiration },
+    });
+    if (claimed.count === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    return { invite: { ...existing, expiration: freshExpiration } };
   }
 
   /**
@@ -1429,24 +1491,23 @@ export class InviteService {
     // expected (status, inviteCode) pair, inside the same transaction as the
     // membership write. Two racers on one PENDING invite cannot both win —
     // the loser's update matches nothing, the transaction rolls back, and
-    // no membership row is written for them.
+    // no membership row is written for them. SQL with the conditions against
+    // the table, for the reason given on `revokeInvite`.
     const prisma = this.requireRootClient();
     const claimed = await prisma.$transaction(async (tx) => {
-      const claim = await tx.organizationInvite.updateMany({
-        where: {
-          id: invite.id,
-          organizationId: invite.organizationId,
-          inviteCode: invite.inviteCode,
-          status: "PENDING",
-          OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
-        },
-        data: {
-          status: "ACCEPTED",
-          acceptedByUserId: userId,
-          acceptedViaIdentifierId: viaIdentifierId ?? null,
-        },
-      });
-      if (claim.count === 0) return false;
+      const claim = await tx.$executeRaw`
+        UPDATE "OrganizationInvite"
+           SET "status" = 'ACCEPTED',
+               "acceptedByUserId" = ${userId},
+               "acceptedViaIdentifierId" = ${viaIdentifierId ?? null},
+               "updatedAt" = now()
+         WHERE "id" = ${invite.id}
+           AND "organizationId" = ${invite.organizationId}
+           AND "inviteCode" = ${invite.inviteCode}
+           AND "status" = 'PENDING'
+           AND ("expiration" IS NULL OR "expiration" > now())
+      `;
+      if (claim === 0) return false;
       await tx.organizationUser.createMany({
         data: [
           {

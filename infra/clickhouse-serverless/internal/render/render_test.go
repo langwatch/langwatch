@@ -583,17 +583,27 @@ func TestRenderAll_LWQLRendersAccessModel(t *testing.T) {
 		fmt.Sprintf("%x", h),
 		"profile: lwql_restricted",
 		"GRANT SELECT ON langwatch.lwql_*",
-		"GRANT SELECT ON langwatch.trace_summaries",
+		// Source tables are column-scoped to the exposed columns (#8085); views
+		// keep the whole-object grant.
+		"GRANT SELECT(`",
+		"ON langwatch.trace_summaries",
 		"GRANT SELECT ON langwatch.traces",
 		"GRANT SELECT ON langwatch.prompt_versions",
-		"KeyHash = getSetting('custom_api_key_hash')",
+		"splitByChar(',', getSetting('custom_api_key_hash'))",
+		"GROUP BY KeyHash",
 		"HAVING uniqExact(TenantId) = 1",
+		"TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map",
 		"changeable_in_readonly",
 	} {
 		if !strings.Contains(users, want) {
 			t.Errorf("users.d/lwql.yaml missing %q\n--- actual ---\n%s", want, users)
 		}
 	}
+	// A source table must be column-scoped, never granted whole-object (#8085).
+	if strings.Contains(users, "GRANT SELECT ON langwatch.trace_summaries") {
+		t.Errorf("trace_summaries must be column-scoped, not whole-object\n--- actual ---\n%s", users)
+	}
+
 	// The plaintext LWQL password must never reach the rendered config; only its
 	// hash does.
 	if strings.Contains(users, "lwql-secret") {
@@ -698,5 +708,54 @@ func TestRenderAll_LWQLNamedCollectionDefaultsPgUser(t *testing.T) {
 	}
 	if !strings.Contains(server, "user: lwql_ro") {
 		t.Errorf("user must default to lwql_ro when unset\n--- actual ---\n%s", server)
+	}
+}
+
+// The LangWatchQL app functions are SQL user-defined functions created by DDL,
+// and a CREATE FUNCTION writes the local disk store of whichever replica ran it.
+// In replicated mode the store has to live in Keeper instead, or two of the
+// three replicas answer UNKNOWN_FUNCTION for a function the third has.
+// @scenario "A replicated chart-managed server stores the functions in Keeper"
+func TestRenderAll_LWQLUserDefinedStoreInKeeperForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	input.LWQLPassword = "lwql-secret"
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	server := string(serverData)
+	if !strings.Contains(server, "user_defined_zookeeper_path: /clickhouse/user_defined") {
+		t.Errorf("replicated mode must move the SQL function store into Keeper\n--- actual ---\n%s", server)
+	}
+}
+
+// On a single node there is no Keeper to reach, so declaring the path would
+// point the function store at an ensemble that is not there. The control for
+// the test above: without it, a renderer that always wrote the path would pass
+// that one and be wrong here.
+// @scenario "A single-node server stores them on local disk"
+func TestRenderAll_LWQLUserDefinedStoreLocalForStandalone(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LWQLPassword = "lwql-secret"
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "user_defined_zookeeper_path") {
+		t.Errorf("standalone mode must leave the SQL function store on local disk\n--- actual ---\n%s", string(serverData))
 	}
 }

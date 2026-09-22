@@ -19,7 +19,10 @@ vi.mock("../../../../ee/admin/isAdmin", () => ({
 }));
 
 // We import after the mock so the module sees our stubbed isAdmin.
-import { checkOpsPermission, resolveOpsScope } from "../rbac";
+import {
+  checkOpsPermission,
+  resolveOpsScope,
+} from "~/server/app-layer/authz/permission-adapters";
 
 describe("resolveOpsScope (lw#3584)", () => {
   describe("when the caller is a non-admin user", () => {

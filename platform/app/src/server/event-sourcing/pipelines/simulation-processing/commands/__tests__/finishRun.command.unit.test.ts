@@ -49,6 +49,35 @@ function queuedEvent(): SimulationProcessingEvent {
 }
 
 describe("FinishRunCommand", () => {
+  describe("when the run was queued against a connected agent", () => {
+    /** @scenario "the finished run event carries the target the run was queued with" */
+    it("carries the connected target on the finished event", async () => {
+      const queued = queuedEvent();
+      (queued.data as Record<string, unknown>).target = {
+        type: "connected",
+        referenceId: "agent-1",
+      };
+      const deps = makeDeps({
+        loadPriorEvents: vi.fn().mockResolvedValue([queued]),
+      });
+      const handler = new FinishRunCommand(deps);
+
+      const events = await handler.handle(makeCommand() as any);
+
+      expect(events[0]!.data).toMatchObject({
+        target: { type: "connected", referenceId: "agent-1" },
+      });
+    });
+
+    it("carries no target when the run never queued", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+
+      const events = await handler.handle(makeCommand() as any);
+
+      expect(events[0]!.data).not.toHaveProperty("target");
+    });
+  });
+
   describe("when the caller supplies all ECST fields", () => {
     it("emits them as given", async () => {
       const deps = makeDeps();

@@ -48,7 +48,7 @@
  *
  * @see ./catalog/lwqlViews.ts — the catalog these statements are built from
  * @see ./accessModel.ts — the access model applied over them
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
@@ -59,6 +59,7 @@ import {
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
   lwqlGrainColumns,
+  lwqlPhysicalColumn,
   lwqlPostgresViews,
   lwqlViewSourceColumns,
 } from "../catalog/types";
@@ -71,9 +72,11 @@ import {
 } from "./accessModel";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  POSTGRES_BASE_ALIAS,
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
 } from "./postgresMapping";
+import { LWQL_SOURCE_ALIAS } from "./sourceAlias";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its
@@ -166,7 +169,12 @@ function quotedColumn(value: string): string {
  * back empty for every row while the view looked correct. Qualifying every
  * source reference with this alias is what keeps the two apart.
  */
-const SOURCE_ALIAS = "src";
+export const SOURCE_ALIAS = LWQL_SOURCE_ALIAS;
+
+// Re-exported so existing importers keep reaching it here, while the constant
+// itself lives in a leaf module a catalog entry can import without closing an
+// import cycle back through this builder. See {@link ./sourceAlias}.
+export { LWQL_SOURCE_ALIAS };
 
 /**
  * Alias the tenant-predicate subquery gives the key map.
@@ -386,7 +394,11 @@ function dedupPredicate(
         : `LangWatchQL view ${view.name} deduplicates on a version column it does not declare`,
     );
   }
-  const grain = lwqlGrainColumns(view);
+  // Grain is exposed names; the subquery runs against the source table, so map
+  // each to the physical column its view column reads (an alias renames it).
+  const grain = lwqlGrainColumns(view).map((column) =>
+    lwqlPhysicalColumn(view, column),
+  );
   const outerKeys = grain.map(sourceColumn);
   const innerKeys = grain.map(quotedColumn);
   const version = quotedColumn(versionColumn);
@@ -417,6 +429,16 @@ function groupedColumnExpression(
   if (grain.includes(column.name)) {
     return columnExpression({ column, source: sourceColumn });
   }
+  // An aggregate-function column carries its own combinator in its expression
+  // (`sumMerge`, `argMaxMerge`, a plain `max` for a SimpleAggregateFunction) —
+  // itself an aggregate, so it is well-defined under the group.
+  if (column.aggregate) {
+    return columnExpression({
+      column,
+      source: sourceColumn,
+      joined: joinedColumnQualifier(view),
+    });
+  }
   if (!column.summed) {
     throw new Error(
       `LangWatchQL view ${view.name} groups by its grain, and column "${column.name}" is neither part of ` +
@@ -424,6 +446,58 @@ function groupedColumnExpression(
     );
   }
   return columnExpression({ column, source: sourceColumn, isAggregated: true });
+}
+
+/**
+ * Qualifies a joined-table column — the joined-side counterpart of
+ * `sourceColumn`, passed to a column's expression as its `joined` argument.
+ *
+ * `undefined` for a single-table view, so a column there gets no joined
+ * qualifier and cannot reference a table the view does not read.
+ */
+function joinedColumnQualifier(
+  view: LangWatchQLViewDefinition,
+): ((name: string) => string) | undefined {
+  const { join } = view;
+  if (!join) return undefined;
+  return (name: string) =>
+    `${assertIdentifier(join.alias, "join alias")}.${quotedColumn(name)}`;
+}
+
+/**
+ * The `<kind> JOIN <table> AS <alias> ON <predicate>` clause, or `""` for a
+ * single-table view — which is what keeps every existing view's SQL byte-identical.
+ *
+ * The joined table lives in the same source database as the primary: a join is
+ * a ClickHouse-only shape (guarded in {@link lwqlViewStatement}), so its
+ * database is the fact one, never the LangWatchQL one.
+ */
+function joinRelationClause(
+  view: LangWatchQLViewDefinition,
+  sourceDatabase: string,
+): string {
+  const { join } = view;
+  if (!join) return "";
+  const relation = `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(join.table, "join table")}`;
+  return (
+    `\n${join.kind ?? "INNER"} JOIN ${relation} ` +
+    `AS ${assertIdentifier(join.alias, "join alias")} ON ${join.on}`
+  );
+}
+
+/**
+ * The pre-filter clause. ANDed onto whatever `where` the dedup or postgres
+ * shape already emitted, and opens the clause itself when there is none.
+ *
+ * Empty when the view declares no pre-filter, so an existing view's rendered
+ * SQL is unchanged to the byte.
+ */
+function preFilterClause(
+  view: LangWatchQLViewDefinition,
+  where: string,
+): string {
+  if (!view.where) return "";
+  return where ? `\n  AND (${view.where})` : `\nWHERE ${view.where}`;
 }
 
 /**
@@ -437,6 +511,37 @@ function groupedColumnExpression(
  * `dedup` is the default strategy; an entry pinning its own wins over it — see
  * {@link dedupStrategyFor}.
  */
+/**
+ * Fail provisioning loudly when a `where`/`on` predicate reads columns that no
+ * grant covers.
+ *
+ * The predicate columns are declared explicitly ({@link
+ * LangWatchQLViewDefinition.whereSourceColumns}, {@link
+ * LangWatchQLViewJoin.onSourceColumns}) rather than parsed out of the SQL, so a
+ * predicate set without its column list would silently drop those columns from
+ * the grants and deny the restricted read at query time. Caught here, at
+ * provisioning, it is a clear catalog error instead of a runtime permission one.
+ */
+function assertPredicateColumnsDeclared(view: LangWatchQLViewDefinition): void {
+  if (view.where && !view.whereSourceColumns?.length) {
+    throw new Error(
+      `LangWatchQL view ${view.name} sets a where predicate but no ` +
+        `whereSourceColumns; list the columns it reads so they are granted`,
+    );
+  }
+  if (view.join) {
+    const on = view.join.onSourceColumns;
+    const declared = (on?.primary?.length ?? 0) + (on?.joined?.length ?? 0) > 0;
+    if (!declared) {
+      throw new Error(
+        `LangWatchQL view ${view.name} declares a join but no ` +
+          `join.onSourceColumns; list the columns its ON reads on each side ` +
+          `so they are granted`,
+      );
+    }
+  }
+}
+
 export function lwqlViewStatement({
   names,
   sourceDatabase,
@@ -453,6 +558,16 @@ export function lwqlViewStatement({
   // to collapse and neither dedup shape applies; what it needs instead is the
   // predicate that keeps the read off the primary from being a whole-table one.
   const postgres = isPostgresResident(view);
+  // A join reaches a second fact table in the same source database. Refused for
+  // a PostgreSQL-resident dataset, whose only relation is its own engine table.
+  if (view.join && postgres) {
+    throw new Error(
+      `LangWatchQL view ${view.name} declares a join and is PostgreSQL-resident; ` +
+        `a join reads a second ClickHouse fact table and cannot apply here`,
+    );
+  }
+  assertPredicateColumnsDeclared(view);
+  const joinedColumn = joinedColumnQualifier(view);
   const strategy = dedupStrategyFor({ view, dedup });
   const grain = lwqlGrainColumns(view);
   // An aggregating source whose published grain is narrower than the engine's
@@ -460,10 +575,13 @@ export function lwqlViewStatement({
   // surplus key columns would surface as extra rows per logical row. The view
   // aggregates instead — `GROUP BY` the grain with every measure summed —
   // which subsumes the merge, so `FINAL` is dropped rather than paid twice.
-  const grouped =
-    !postgres &&
-    view.dedup.aggregating === true &&
-    view.dedup.keyColumns.some((key) => !grain.includes(key));
+  // Any aggregating source renders as a `GROUP BY`, whether its published grain
+  // is narrower than the engine key (the `*_by_minute` rollups, which group away
+  // a breakdown column) or equal to it (a per-key rollup whose every measure is
+  // an `AggregateFunction` state that only a merge combinator can read). `FINAL`
+  // is not an option for the latter: even after a merge the state column is
+  // still binary and needs `-Merge` to finalise, so the view aggregates.
+  const grouped = !postgres && view.dedup.aggregating === true;
   const projection = view.columns
     .map((column) => {
       // The engine table already carries the catalog's names and types — the
@@ -475,7 +593,11 @@ export function lwqlViewStatement({
         ? sourceColumn(column.name)
         : grouped
           ? groupedColumnExpression(view, column)
-          : columnExpression({ column, source: sourceColumn });
+          : columnExpression({
+              column,
+              source: sourceColumn,
+              joined: joinedColumn,
+            });
       return `  ${expression} AS ${quotedColumn(column.name)}`;
     })
     .join(",\n");
@@ -484,20 +606,24 @@ export function lwqlViewStatement({
     strategy === "final" && !postgres && !grouped
       ? `${aliased} FINAL`
       : aliased;
+  const joinClause = joinRelationClause(view, sourceDatabase);
   const where = postgres
     ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
     : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";
+  const preFilter = preFilterClause(view, where);
   const groupBy = grouped
-    ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}`
+    ? `\nGROUP BY ${grain
+        .map((column) => sourceColumn(lwqlPhysicalColumn(view, column)))
+        .join(", ")}`
     : "";
   return (
     `CREATE OR REPLACE VIEW ` +
     `${assertIdentifier(names.database, "database")}.${assertIdentifier(view.name, "view")}\n` +
     `SQL SECURITY INVOKER\n` +
     `AS SELECT\n${projection}\n` +
-    `FROM ${from}${where}${groupBy}`
+    `FROM ${from}${joinClause}${where}${preFilter}${groupBy}`
   );
 }
 
@@ -521,6 +647,44 @@ export function lwqlSourceColumnGrantStatement({
   const columns = lwqlGrantedSourceColumns(view).map(quotedColumn).join(", ");
   return (
     `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
+    `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
+  );
+}
+
+/**
+ * Column-scoped `SELECT` on a joined view's *second* source table.
+ *
+ * The counterpart of {@link lwqlSourceColumnGrantStatement} for the joined
+ * side: an `INVOKER` view reads that table as the caller too, so the caller
+ * must hold a grant on every column the join's `ON` and its joined-column
+ * expressions read — declared on {@link LangWatchQLViewJoin.sourceColumns}.
+ * Returns `undefined` for a view with no join, so a catalog of single-table
+ * views produces no extra statements.
+ */
+export function lwqlJoinSourceColumnGrantStatement({
+  names,
+  sourceDatabase,
+  view,
+}: {
+  names: LangWatchQLNames;
+  sourceDatabase: string;
+  view: LangWatchQLViewDefinition;
+}): string | undefined {
+  if (!view.join) return undefined;
+  const columns = [
+    ...new Set([
+      ...view.join.sourceColumns,
+      // Columns the `ON` reads on the joined side, granted here even when no
+      // projected expression reads them — otherwise the join predicate itself
+      // is denied on the joined table.
+      ...(view.join.onSourceColumns?.joined ?? []),
+    ]),
+  ]
+    .map(quotedColumn)
+    .join(", ");
+  const relation = `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(view.join.table, "join table")}`;
+  return (
+    `GRANT SELECT(${columns}) ON ${relation} ` +
     `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
   );
 }
@@ -556,16 +720,81 @@ export function lwqlSourceTables({
     // readable across tenants by the restricted identity.
     byTable.set(`${database}.${view.sourceTable}`, {
       table: view.sourceTable,
-      // Every source names the owning project the same way — the fact tables
-      // because that is their column, the PostgreSQL-engine tables because the
-      // approved view renamed the application's `projectId` to match. The
-      // catalog would have to grow a per-view tenant column if that ever
-      // stopped being true; today asserting it here is what would catch it.
-      tenantColumn: TENANT_COLUMN,
+      // Almost every source names the owning project `TenantId` — the fact
+      // tables because that is their column, the PostgreSQL-engine tables
+      // because the approved view renamed the application's `projectId` to
+      // match. A ClickHouse fact table that spells it differently
+      // (`stored_objects` carries `project_id`) declares the real column on
+      // {@link LangWatchQLViewDefinition.tenantColumn}, and the row policy must
+      // filter *that* column or it would police the wrong one and read zero
+      // rows. Default preserved so every untouched source is unchanged.
+      tenantColumn: view.tenantColumn ?? TENANT_COLUMN,
       database,
     });
+    // A joined view reads a second fact table, which must be policed too or the
+    // join reaches the joined side unscoped. It is a ClickHouse fact table in
+    // the source database (a join is refused for PostgreSQL-resident views), so
+    // its database is the fact one. Almost every joined source names its project
+    // column `TenantId`; one that spells it differently (`project_id`) declares
+    // it on {@link LangWatchQLViewJoin.tenantColumn} so its policy filters the
+    // real column. Default preserved so every existing join renders unchanged.
+    if (view.join) {
+      byTable.set(`${database}.${view.join.table}`, {
+        table: view.join.table,
+        tenantColumn: view.join.tenantColumn ?? TENANT_COLUMN,
+        database,
+      });
+    }
   }
   return [...byTable.values()];
+}
+
+/**
+ * The columns the restricted identity is granted on each ClickHouse source
+ * table, keyed by table — the single source of truth the Go chart renderer
+ * mirrors so its SaaS grants are column-scoped like the self-hosted ones.
+ *
+ * The exact set {@link lwqlSourceColumnGrantStatement} (primary) and
+ * {@link lwqlJoinSourceColumnGrantStatement} (joined side) grant, unioned per
+ * table and sorted, so a table read by two views is granted the union both
+ * need. PostgreSQL-resident sources are absent: their engine table carries
+ * exactly the exposed columns already and takes the whole-object grant
+ * ({@link lwqlGrantStatement}), which the Go renderer emits for any table this
+ * map omits — matching the whole-table grant the views themselves take.
+ *
+ * Emitted into `lwql_catalog.json` and asserted equal there by
+ * `../catalog/__tests__/manifestParity.unit.test.ts`, so the Go binary grants
+ * exactly the columns this catalog exposes rather than every column of the
+ * source table.
+ */
+export function lwqlSourceColumnGrants({
+  views = LWQL_VIEW_CATALOG,
+}: {
+  views?: readonly LangWatchQLViewDefinition[];
+} = {}): Record<string, string[]> {
+  const byTable = new Map<string, Set<string>>();
+  const add = (table: string, columns: readonly string[]): void => {
+    const set = byTable.get(table) ?? new Set<string>();
+    for (const column of columns) set.add(column);
+    byTable.set(table, set);
+  };
+  for (const view of views) {
+    // A PostgreSQL-engine table takes the whole-object grant, not a column-scoped
+    // one, so it contributes no entry and renders as a whole-table grant in Go.
+    if (isPostgresResident(view)) continue;
+    add(view.sourceTable, lwqlGrantedSourceColumns(view));
+    if (view.join) {
+      add(view.join.table, [
+        ...view.join.sourceColumns,
+        ...(view.join.onSourceColumns?.joined ?? []),
+      ]);
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const [table, columns] of byTable) {
+    out[table] = [...columns].sort();
+  }
+  return out;
 }
 
 /**
@@ -584,16 +813,31 @@ export function lwqlSourceTables({
 export function lwqlPostgresApprovedViewStatements({
   schema,
   views = LWQL_VIEW_CATALOG,
+  readerRole,
 }: {
   /** PostgreSQL schema the application's tables live in. */
   schema: string;
   views?: readonly LangWatchQLViewDefinition[];
+  /**
+   * Forwarded to {@link postgresApprovedViewStatement} — the reader role each
+   * view's upgrade-path fallback re-grants `SELECT` to, if the caller knows
+   * it at this point. See that function's doc comment.
+   */
+  readerRole?: string;
 }): string[] {
-  return lwqlPostgresViews(views).map((view) =>
-    postgresApprovedViewStatement({
+  return lwqlPostgresViews(views).map((view) => {
+    const joins = view.postgres.tenantPath ?? [];
+    // The project column lives on the last hop's relation (the base itself when
+    // the path is empty), so the tenant column is read on that alias while every
+    // other column reads off the base.
+    const tenantAlias = joins[joins.length - 1]?.alias ?? POSTGRES_BASE_ALIAS;
+    return postgresApprovedViewStatement({
       schema,
       view: view.postgres.approvedView,
       baseRelation: view.postgres.baseRelation,
+      joins,
+      rowFilter: view.postgres.rowFilter,
+      readerRole,
       columns: view.columns.map((column) => ({
         exposed: column.name,
         // The tenant column is the one rename every mapping performs; the rest
@@ -602,9 +846,10 @@ export function lwqlPostgresApprovedViewStatements({
           column.name === TENANT_COLUMN
             ? view.postgres.tenantSourceColumn
             : singleSourceColumn(view, column.name),
+        ...(column.name === TENANT_COLUMN ? { alias: tenantAlias } : {}),
       })),
-    }),
-  );
+    });
+  });
 }
 
 /**
@@ -788,6 +1033,16 @@ export function lwqlViewSetupStatements({
         ? lwqlGrantStatement({ names, table: view.sourceTable })
         : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),
+    // The joined side's column grant, for the views that span two tables. Empty
+    // for every single-table view, so the emitted statements are unchanged.
+    ...views.flatMap((view) => {
+      const grant = lwqlJoinSourceColumnGrantStatement({
+        names,
+        sourceDatabase,
+        view,
+      });
+      return grant ? [grant] : [];
+    }),
     ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
   ];
 }

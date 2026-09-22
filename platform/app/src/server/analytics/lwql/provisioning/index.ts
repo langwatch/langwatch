@@ -15,16 +15,24 @@
  * (the view catalog, the statement builders) onto every query boot, the exact
  * coupling this module keeps out.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
+export {
+  type LangWatchQLAppFunctionConflict,
+  type LangWatchQLServerFunctionRow,
+  lwqlAppFunctionConflicts,
+  lwqlAppFunctionCreateQuery,
+  lwqlAppFunctionReconciliationQuery,
+} from "./appFunctionStatements";
 export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
 export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
 export {
+  LWQL_POSTGRES_READER_ROLE,
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
@@ -37,11 +45,13 @@ export {
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
+  canProvisionAppFunctions,
   type LwqlPostgresReaderMode,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "./selfProvisioning";

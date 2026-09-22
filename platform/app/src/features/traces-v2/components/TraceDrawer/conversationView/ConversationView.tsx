@@ -23,6 +23,13 @@ import {
 } from "react";
 import { PIIRedactionAlert } from "~/components/ui/PIIRedactionNotice";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import {
+  buildConversationMarkdownChunks,
+  type ConversationMarkdownChunk,
+  joinConversationMarkdown,
+} from "~/shared/traces/conversation/conversationMarkdown";
+import { buildParsedTurns } from "~/shared/traces/conversation/parsedTurns";
+import { extractSystemText } from "~/shared/traces/transcript/parsing";
 import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
 import { useConversationTurnEvents } from "../../../hooks/useConversationTurnEvents";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
@@ -35,11 +42,6 @@ import {
 import type { TraceListItem } from "../../../types/trace";
 import { FormatSelect } from "../FormatSelect";
 import { RenderedMarkdown } from "../markdownView";
-import {
-  extractReadableText,
-  extractReasoningText,
-  extractSystemText,
-} from "../transcript";
 import { AnnotatedTurnRow } from "./AnnotatedTurnRow";
 import { ConversationExpandContext } from "./expandContext";
 import {
@@ -60,12 +62,6 @@ import {
   threadColumnMaxWidth,
   useRailLayout,
 } from "./useRailLayout";
-import {
-  buildConversationMarkdownChunks,
-  type ConversationMarkdownChunk,
-  joinConversationMarkdown,
-  turnMediaForSide,
-} from "./utils";
 
 type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
 const EMPTY_ANNOTATION_ITEMS: AnnotationByTrace[] = [];
@@ -159,41 +155,13 @@ export const ConversationView = memo(function ConversationView({
     turnTraceIds,
   });
 
-  // Single pass over `turns`: pre-parse the latest user message and the
-  // wall-clock gap to the previous turn. Without this, every ChatTurnRow
-  // re-render would re-JSON.parse the entire input payload on its own.
-  const parsedTurns = useMemo<ParsedTurn[]>(() => {
-    const out: ParsedTurn[] = new Array(turns.length);
-    for (let i = 0; i < turns.length; i++) {
-      const t = turns[i]!;
-      const prev = i > 0 ? turns[i - 1]! : undefined;
-      const gapSecs = prev
-        ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000
-        : 0;
-      out[i] = {
-        turn: t,
-        // Use the shared Transcript helper so we handle the same shapes
-        // the I/O viewer does (chat arrays, single message objects,
-        // typed-block content arrays, and the raw-string fallback).
-        userText: extractReadableText(t.input, "user"),
-        assistantText: extractReadableText(t.output, "assistant"),
-        assistantReasoning: extractReasoningText(t.output),
-        userMedia: turnMediaForSide({
-          refs: t.inputMediaRefs,
-          value: t.input,
-          side: "input",
-        }),
-        assistantMedia: turnMediaForSide({
-          refs: t.outputMediaRefs,
-          value: t.output,
-          side: "output",
-        }),
-        gapSecs,
-        showGap: gapSecs > 5,
-      };
-    }
-    return out;
-  }, [turns]);
+  // One parse of the whole thread, shared with the server-side readers of the
+  // same conversation. Without it every ChatTurnRow re-render would
+  // re-JSON.parse the entire input payload on its own.
+  const parsedTurns = useMemo<ParsedTurn[]>(
+    () => buildParsedTurns({ turns }),
+    [turns],
+  );
 
   // One notice for the whole conversation rather than one per message: the
   // policy that redacted a turn is the project's, and repeating it above every
@@ -224,7 +192,10 @@ export const ConversationView = memo(function ConversationView({
   }, [mode]);
   const markdownChunks = useMemo<ConversationMarkdownChunk[]>(() => {
     if (!hasViewedMarkdown) return EMPTY_CHUNKS;
-    return buildConversationMarkdownChunks(conversationId ?? "", parsedTurns);
+    return buildConversationMarkdownChunks({
+      conversationId: conversationId ?? "",
+      turns: parsedTurns,
+    });
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
   // Only show the skeleton on the very first load. With keepPreviousData

@@ -54,6 +54,22 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+describe("given the turn has ended", () => {
+  /** @scenario "A card left from a finished turn does not lock the message field" */
+  it("reads the idle placeholder even while a card entry still reads pending", () => {
+    useLangyStore.setState({ turnPhase: "idle" });
+    renderComposer(() => {}, { awaitingAnswer: true, terminalConnected: true });
+
+    expect(screen.getByPlaceholderText(IDLE_PLACEHOLDER)).toBeTruthy();
+    expect(
+      screen.queryByPlaceholderText(
+        "Answer on the card above or in the terminal.",
+      ),
+    ).toBeNull();
+    expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
+  });
+});
+
 describe("given a Langy turn is in flight", () => {
   describe("when the user reads the composer", () => {
     /** @scenario The message field says a message waits while Langy works */

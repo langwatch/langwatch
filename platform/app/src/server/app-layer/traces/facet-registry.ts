@@ -37,6 +37,12 @@ export interface FacetQueryContext {
   limit: number;
   offset: number;
   prefix?: string;
+  /**
+   * The active trace filter as a predicate on this facet's own table (see
+   * `scopeTraceFilterToTable`), AND-ed into the query's window predicate.
+   * Absent for the unfiltered discover read and for value lookups.
+   */
+  traceScope?: { sql: string; params: Record<string, unknown> };
 }
 
 export interface FacetQuery {

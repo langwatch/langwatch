@@ -86,7 +86,7 @@ The first preview ships with the two governance resources wired through Hono RES
 |---|---|---|
 | `status` | `status` (top-level, no verb tree, prints setup-state OR-of-flags) | `aiTools:view` |
 | `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` | `aiTools:view` (reads), `aiTools:manage` (writes) |
-| `ingestion-keys` | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage` |
+| `ingestion-keys` | `list` `mint` `rotate` `revoke` (project-scoped ingest-only ApiKeys, `ik-lw-` token returned once at mint) | `organization:view` |
 
 Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `sdks/typescript/src/cli/index.ts`.
 

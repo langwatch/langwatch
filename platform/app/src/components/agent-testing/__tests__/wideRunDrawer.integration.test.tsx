@@ -750,6 +750,61 @@ describe("the wide run detail drawer", () => {
     expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
   });
 
+  /** @scenario "Criteria the judge could not decide read apart from the failed ones" */
+  it("reads an inconclusive section between the failed and the passed ones", () => {
+    mockGetScenario.mockReturnValue({
+      data: {
+        id: "case_1",
+        name: "Angry refund request",
+        version: 6,
+        archivedAt: null,
+        criteria: ["stays polite", "names the refund window", "opens a ticket"],
+      },
+      isLoading: false,
+    });
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.FAILED,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: ["stays polite"],
+          unmetCriteria: ["names the refund window", "opens a ticket"],
+          inconclusiveCriteria: ["opens a ticket"],
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const failed = within(panel).getByTestId("run-verdict-failed-criteria");
+    const inconclusive = within(panel).getByTestId(
+      "run-verdict-inconclusive-criteria",
+    );
+    expect(
+      within(inconclusive).getByText("Inconclusive criteria"),
+    ).toBeInTheDocument();
+    expect(
+      within(inconclusive).getByText("opens a ticket"),
+    ).toBeInTheDocument();
+    expect(
+      within(failed).queryByText("opens a ticket"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(failed).getByText("names the refund window"),
+    ).toBeInTheDocument();
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("Failed criteria")).toBeLessThan(
+      text.indexOf("Inconclusive criteria"),
+    );
+    expect(text.indexOf("Inconclusive criteria")).toBeLessThan(
+      text.indexOf("Passed criteria"),
+    );
+    expect(
+      inconclusive.querySelectorAll("svg.lucide-circle-dashed"),
+    ).toHaveLength(1);
+    expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
+  });
+
   /** @scenario "A pass run hides the Failed criteria section" */
   it("hides the Failed criteria section on a run that met every criterion", () => {
     setRunState(
@@ -892,6 +947,32 @@ describe("the wide run detail drawer", () => {
     expect(text.indexOf("stays polite")).toBeLessThan(
       text.indexOf("The agent stayed calm"),
     );
+  });
+
+  /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
+  it("marks a run that was cut at the call limit in the header band", () => {
+    setRunState(
+      makeRunState({
+        metadata: {
+          langwatch: {
+            targetReferenceId: "agent_1",
+            targetType: "voice",
+            scenarioVersion: 3,
+            isCutAtLimit: true,
+          },
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.getByText("Cut at the call limit")).toBeInTheDocument();
+  });
+
+  /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
+  it("shows no cut-at-limit marker on a run that ran its course", () => {
+    renderWide();
+
+    expect(screen.queryByText("Cut at the call limit")).not.toBeInTheDocument();
   });
 
   // --- The version the run used ---
