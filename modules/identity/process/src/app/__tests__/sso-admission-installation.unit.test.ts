@@ -6,6 +6,7 @@ import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { identityServer } from "../../identity.server.ts";
@@ -13,7 +14,8 @@ import { identityServer } from "../../identity.server.ts";
 const bootIdentity = () =>
   createApp({ role: "api" })
     .withModules([withMemoryRepositories(identityServer)])
-    .withMembers({ producesPipelines: false, adminEmails: [] })
+    .withMembers({ producesPipelines: false, adminEmails: [], publicBaseUrl: undefined })
+    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withConfig({ identity: { ssoDomainProofDnsServers: [] } })
     .withRelational(createApiFixture<PrismaClient>())
     .withEventing(new EventSourcing({ enabled: false }))
@@ -21,6 +23,7 @@ const bootIdentity = () =>
       organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
       auth: createApiFixture<AuthApi>(),
+      user: createApiFixture<UserApi>(),
     })
     .boot();
 

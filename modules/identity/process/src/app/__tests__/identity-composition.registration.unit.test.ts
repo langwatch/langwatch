@@ -78,6 +78,7 @@ function infrastructureFor(input: { eventing: EventSourcing; registersPipelines:
     eventing: input.eventing,
     adminEmails: [],
     registersPipelines: input.registersPipelines,
+    engineProvider: undefined,
   });
 }
 

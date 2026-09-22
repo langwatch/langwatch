@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
 import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
 import type { LegacySignInAccount } from "../identity-signin-accounts.repository.ts";
@@ -51,6 +52,8 @@ export class MemoryIdentityStore {
   readonly joinRejections = new Map<string, Instant>();
   readonly joinCandidates = new Map<string, JoinCandidateOrganization[]>();
   readonly ssoConnections = new Map<string, SsoConnectionState>();
+  /** The engine's provider rows, keyed by the connection they project. */
+  readonly ssoEngineProviders = new Map<string, SsoEngineProviderRow>();
   /** When the re-proof sweep last LOOKED at a connection, by its id. */
   readonly ssoReproofCursors = new Map<string, number>();
   /** The credential vault's twin, keyed by the reference a write minted. */

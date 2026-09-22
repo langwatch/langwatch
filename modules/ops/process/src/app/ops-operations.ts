@@ -29,7 +29,10 @@ import {
   AdminAccessService,
   type AdminAccessServiceOptions,
 } from "../services/admin-access.service.ts";
-import { AdminBackofficeService } from "../services/admin-backoffice.service.ts";
+import {
+  AdminBackofficeService,
+  type OrganizationSsoRouting,
+} from "../services/admin-backoffice.service.ts";
 import { QueueAuditAdapter } from "../services/audit-log.queue-audit.service.ts";
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
@@ -49,8 +52,8 @@ export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   queuePayloads?: QueuePayloadDecoder | undefined;
   users: UserApi;
   auth: AuthApi;
-  /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
-  legacySsoStringWritesRetired?: boolean | undefined;
+  /** Whether one organization's own connection decides its sign-in. */
+  ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
     repository: SchedulerOpsRepository;
     wake: SchedulerWake;
@@ -98,7 +101,7 @@ export class OpsOperations {
         users: this.options.users,
         auth: this.options.auth,
         audit: this.options.audit,
-        legacySsoStringWritesRetired: this.options.legacySsoStringWritesRetired,
+        ssoRouting: this.options.ssoRouting,
       }),
       blobStore: BlobStoreService.create(
         this.options.redis

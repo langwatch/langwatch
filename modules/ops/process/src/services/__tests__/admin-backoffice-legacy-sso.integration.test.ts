@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The backoffice's organization edit, with the routing flip on. The
  * refusal is raised in the ops service graph, and its copy is read from
@@ -6,7 +7,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-operations.ts";
@@ -31,7 +31,7 @@ const refuseEveryQuery = new Proxy(
   },
 );
 
-function backoffice() {
+function backoffice(connectionDecides = true) {
   return OpsOperations.create({
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
@@ -39,7 +39,7 @@ function backoffice() {
     adminEmails: ["olive@example.com"],
     users: new TestUserApi(),
     auth: new AuthStub(),
-    legacySsoStringWritesRetired: true,
+    ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
       repository: {} as never,
       wake: {} as never,
@@ -48,7 +48,7 @@ function backoffice() {
   }).build();
 }
 
-describe("given connection routing decides sign-ins on this installation", () => {
+describe("given an organization whose own connection decides its sign-in", () => {
   describe("when an operator edits the organization's older single sign-on fields", () => {
     /** @scenario "The old single sign-on fields stop being where single sign-on is set up" */
     it("refuses the edit with sso_connection_string_edit_retired and points at the connection", async () => {
@@ -69,6 +69,26 @@ describe("given connection routing decides sign-ins on this installation", () =>
       expect(copy.isRegistered).toBe(true);
       expect(copy.description).toMatch(/connection/i);
       expect(copy.description).not.toMatch(/sso_connection_string_edit/);
+    });
+  });
+});
+
+describe("given an organization that has no connection at all", () => {
+  describe("when an operator edits its older single sign-on fields", () => {
+    /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
+    it("accepts the edit, because that organization's strings still decide", async () => {
+      const ops = backoffice(false);
+
+      const refusal = await ops
+        .adminOperation(organizationEdit({ ssoDomain: "globex.com", ssoProvider: "okta" }))
+        .then(
+          () => null,
+          (error: unknown) => readHandledError(error),
+        );
+
+      // The database stub refuses every query, so reaching it at all is the
+      // proof: the edit was not turned away before it got there.
+      expect(refusal?.code).not.toBe("sso_connection_string_edit_retired");
     });
   });
 });

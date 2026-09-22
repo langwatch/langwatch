@@ -13,17 +13,6 @@ export const opsConfig = Config.define((c) => ({
   metricsApiKey: c.env("METRICS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
-  /**
-   * ADR-117 §5: once the connection projection decides sign-in, legacy
-   * string writes are refused.
-   */
-  legacySsoStringWritesRetired: c.env(
-    "SSOCONN_ROUTING",
-    z
-      .string()
-      .optional()
-      .transform((value) => value === "enforce"),
-  ),
   usageStats: {
     disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
     installMethod: c.env("INSTALL_METHOD", z.string().optional()),

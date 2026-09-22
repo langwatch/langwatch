@@ -21,6 +21,7 @@ import {
   SsoDomainProofNotificationService,
   UnaddressedSsoDomainProofNotifications,
 } from "../../services/sso-domain-proof-notification.service.ts";
+import type { SsoEngineProviderProjection } from "../sso-engine-provider.repository.ts";
 import {
   PrismaJoinRequestAudienceRepository,
   type PrismaJoinRequestAudienceDatabase,
@@ -72,6 +73,12 @@ export type PostgresSsoConnectionPipelineOptions = {
    * and the unsent notice is logged rather than retried forever.
    */
   mail?: SsoDomainProofMail;
+  /**
+   * How the engine's provider rows follow the head this pipeline folds (D09).
+   * Absent, the engine's table is not maintained — a process that mounts no
+   * sign-in door needs none.
+   */
+  engineProvider?: SsoEngineProviderProjection;
 };
 
 /** The one graph the definition and the back office both command through. */
@@ -132,7 +139,10 @@ export class PostgresSsoConnectionPipelineAdapter {
   private compose(): SsoConnectionPipelineGraph {
     if (this.composed) return this.composed;
     const { database, eventSourcing, operators } = this.options;
-    const head = PrismaSsoConnectionProjectionRepository.create(database);
+    const head = PrismaSsoConnectionProjectionRepository.create(
+      database,
+      this.options.engineProvider,
+    );
     const guards = SsoConnectionGuardsService.create({
       connections: PrismaSsoConnectionReadRepository.create(database),
       breakGlass: LocalDoorBreakGlassBindingAdapter.create(),

@@ -13,22 +13,22 @@ import {
   legacySsoStringWritesToRefuse,
 } from "../legacy-sso-string-writes.rules.ts";
 
-function backoffice(retired: boolean) {
+function backoffice(connectionDecides: boolean) {
   const repository = new RepositoryStub();
   const service = AdminBackofficeService.create({
     repository,
     users: new TestUserApi(),
     auth: new AuthStub(),
     audit: new AuditStub(),
-    legacySsoStringWritesRetired: retired,
+    ssoRouting: { connectionDecides: async () => connectionDecides },
   });
   return { repository, service };
 }
 
 describe("the legacy single sign-on string columns", () => {
-  describe("given the connection routing flag is off or in shadow", () => {
+  describe("given an organization whose legacy strings still decide its sign-in", () => {
     describe("when a staff member edits the string columns", () => {
-      /** @scenario "After the flip, the strings stop being written" */
+      /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
       it("keeps accepting the edit, because the strings still decide sign-in", async () => {
         const { repository, service } = backoffice(false);
 
@@ -43,9 +43,9 @@ describe("the legacy single sign-on string columns", () => {
     });
   });
 
-  describe("given the connection routing flag is enforced", () => {
+  describe("given an organization whose own connection decides its sign-in", () => {
     describe("when a staff member edits the string columns", () => {
-      /** @scenario "After the flip, the strings stop being written" */
+      /** @scenario "Once a connection decides, the strings stop being written" */
       it("refuses the edit and writes nothing", async () => {
         const { repository, service } = backoffice(true);
 
@@ -56,7 +56,7 @@ describe("the legacy single sign-on string columns", () => {
         expect(repository.execute).not.toHaveBeenCalled();
       });
 
-      /** @scenario "After the flip, the strings stop being written" */
+      /** @scenario "Once a connection decides, the strings stop being written" */
       it("names the columns that are derived now", () => {
         expect(legacySsoStringColumnsIn({ ssoDomain: "acme.com", ssoProvider: "okta" })).toEqual([
           "ssoDomain",
@@ -66,14 +66,16 @@ describe("the legacy single sign-on string columns", () => {
     });
 
     describe("when the edit names no string column", () => {
-      /** @scenario "After the flip, the strings stop being written" */
+      /** @scenario "Once a connection decides, the strings stop being written" */
       it("leaves every other organization edit alone", async () => {
         const { repository, service } = backoffice(true);
 
         await service.execute(organizationEdit({ name: "Acme" }));
 
         expect(repository.execute).toHaveBeenCalledTimes(1);
-        expect(legacySsoStringWritesToRefuse({ data: undefined, retired: true })).toEqual([]);
+        expect(legacySsoStringWritesToRefuse({ data: undefined, connectionDecides: true })).toEqual(
+          [],
+        );
       });
     });
   });

@@ -16,16 +16,16 @@ export function legacySsoStringColumnsIn(
 }
 
 /**
- * The columns an edit must be refused for, given whether the strings still
- * decide sign-in. Before the flip nothing is refused; after it, accepting the
- * edit would fool a staff member into thinking they had fixed something.
+ * The columns an edit must be refused for, given whether THIS organization's
+ * connection decides its sign-in — per organization, never fleet-wide. Where
+ * the connection decides, accepting the edit would fool a staff member.
  */
 export function legacySsoStringWritesToRefuse({
   data,
-  retired,
+  connectionDecides,
 }: {
   data: Record<string, unknown> | undefined | null;
-  retired: boolean;
+  connectionDecides: boolean;
 }): string[] {
-  return retired ? legacySsoStringColumnsIn(data) : [];
+  return connectionDecides ? legacySsoStringColumnsIn(data) : [];
 }

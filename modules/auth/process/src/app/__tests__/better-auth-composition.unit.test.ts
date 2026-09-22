@@ -49,6 +49,7 @@ async function appFor(named = false): Promise<AuthApp> {
       organizations: createApiFixture<OrganizationApi>(),
     },
     members: {
+      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       logger: createLogger("langwatch:auth:test"),
       // Better Auth's storage and hook repositories take the client and query
       // nothing until a request reaches them; no test below reaches one.

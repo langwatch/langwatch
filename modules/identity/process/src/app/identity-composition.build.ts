@@ -24,6 +24,7 @@ import { PrismaJoinRequestAudienceRepository } from "../repositories/prisma/pris
 import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import { AdminEmailPlatformOperatorsRepository } from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
+import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
 import {
   SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,
@@ -235,11 +236,12 @@ class ProcessRegisteredIdentityEventing implements IdentityEventing {
 function ssoConnectionLedger(options: {
   prisma: ProcessMembers["prisma"];
   eventing: EventSourcing;
+  engineProvider: SsoEngineProviderProjection | undefined;
 }): SsoConnectionLedgerWriterAdapter {
-  const { prisma, eventing } = options;
+  const { prisma, eventing, engineProvider } = options;
 
   return SsoConnectionLedgerWriterAdapter.create({
-    projectionStore: PrismaSsoConnectionProjectionRepository.create(prisma),
+    projectionStore: PrismaSsoConnectionProjectionRepository.create(prisma, engineProvider),
     eventStore: async () => {
       const eventStore = eventing.isEnabled
         ? eventing.getEventStore<SsoConnectionEvent>()
@@ -292,8 +294,10 @@ export function buildIdentityInfrastructure(input: {
   adminEmails: readonly string[];
   /** The composition's own word (unresolved, see the handoff), never a deployment's. */
   registersPipelines: boolean;
+  /** How the engine's provider rows follow the connection head (D09). */
+  engineProvider: SsoEngineProviderProjection | undefined;
 }): IdentityInfrastructure {
-  const { prisma, eventing, adminEmails, registersPipelines } = input;
+  const { prisma, eventing, adminEmails, registersPipelines, engineProvider } = input;
   const identityEventing = registersPipelines
     ? RegisteredIdentityEventing.create(eventing)
     : ProcessRegisteredIdentityEventing.create(eventing);
@@ -327,7 +331,7 @@ export function buildIdentityInfrastructure(input: {
       database: prisma,
       operators,
     }),
-    ssoConnectionLedger: ssoConnectionLedger({ prisma, eventing }),
+    ssoConnectionLedger: ssoConnectionLedger({ prisma, eventing, engineProvider }),
     // Absent where this process composed no event stack: the history refuses
     // by name rather than reading as empty, which is indistinguishable from
     // a connection nothing ever happened to.

@@ -59,6 +59,7 @@ async function appFor(
       organizations: createApiFixture<OrganizationApi>(),
     },
     members: {
+      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       logger: createLogger("langwatch:auth:test"),
       prisma: {} as never,
       redis: null as never,

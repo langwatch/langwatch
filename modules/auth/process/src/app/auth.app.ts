@@ -87,7 +87,14 @@ export type AuthSignUpCollaborators = Readonly<{
  * named tuple so `publicBaseUrl` (a process fact, not one of the fourteen)
  * can be appended to the runtime list below without losing this typing.
  */
-const AUTH_CLOSED_READS = reads("logger", "prisma", "redis", "rateLimiter", "secrets");
+const AUTH_CLOSED_READS = reads(
+  "encryption",
+  "logger",
+  "prisma",
+  "redis",
+  "rateLimiter",
+  "secrets",
+);
 
 /**
  * Process-supplied infrastructure. Declared members required at boot;
@@ -251,6 +258,7 @@ export class AuthApp implements AuthApiContract {
         app.#betterAuth = buildBetterAuth({
           identity,
           prisma: members.prisma,
+          encryption: members.encryption,
           redis: members.redis,
           auth: app,
           users: dependencies.users,

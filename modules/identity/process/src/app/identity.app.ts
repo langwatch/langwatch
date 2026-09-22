@@ -9,12 +9,14 @@ import {
   IdentityApi,
   IdentityCapabilityUnavailableError,
   identityConfig,
+  sealedProviderConfigCipher,
   type IdentityServerConfig,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
+import { UserApi } from "@langwatch/user-contract";
 
 import {
   ssoDomainProofChannels,
@@ -58,6 +60,7 @@ import { SsoConnectionHistoryService } from "../services/sso-connection-history.
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
+import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import {
   SsoLegacyIdentityRetirementService,
@@ -85,8 +88,14 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
  * produces the four identity pipelines — never a deployment's; unresolved,
  * see the handoff. Default preserves the deleted schema's producer-role default.
  */
-type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
-  Readonly<{ producesPipelines: boolean; adminEmails: readonly string[] }>;
+type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption"]> &
+  Readonly<{
+    producesPipelines: boolean;
+    adminEmails: readonly string[];
+    /** Where this deployment answers, which is what a SAML identity provider
+     *  is told LangWatch is called. A process fact, not one of the fourteen. */
+    publicBaseUrl: string | undefined;
+  }>;
 
 type IdentitySetup = FeatureSetup<
   typeof IdentityApp.dependencies,
@@ -166,17 +175,17 @@ function breakGlassDirectory(organizations: OrganizationApi): SsoBreakGlassDirec
 }
 
 /** Standing is the organization's answer; whether somebody holds a door that
- *  is not the identity provider is the module that owns the credential's, and
- *  is unanswered here — see the handoff. */
+ *  is not the identity provider is the module that owns the credential's. */
 function breakGlassEligibility(
   organizations: OrganizationApi,
+  users: UserApi,
 ): (args: { organizationId: string; userId: string }) => Promise<boolean> {
   return breakGlassHolderEligibility({
     isAdministrator: async ({ organizationId, userId }) =>
       (await organizations.findAdministrators({ organizationId })).some(
         (administrator) => administrator.userId === userId,
       ),
-    holdsPassword: async () => true,
+    holdsPassword: ({ userId }) => users.hasPassword({ id: userId }),
   });
 }
 
@@ -200,21 +209,31 @@ export class IdentityApp implements IdentityApi {
     /** Who holds the federated account rows a cutover retires: identity
      *  decides, auth owns and sweeps them. */
     auth: AuthApi,
+    /** Whether somebody holds a password is the module that owns it. */
+    users: UserApi,
   };
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
   static readonly reads = [
-    ...reads("prisma", "eventing"),
+    ...reads("prisma", "eventing", "encryption"),
     "producesPipelines",
     "adminEmails",
+    "publicBaseUrl",
   ] as const;
 
   static create(setup: IdentitySetup): IdentityApp {
+    const engineProviders = SsoEngineProviderService.create({
+      credentials: setup.repositories.ssoCredentials,
+      rows: setup.repositories.ssoEngineProviders,
+      baseUrl: setup.members.publicBaseUrl ?? "",
+      providerConfig: sealedProviderConfigCipher(setup.members.encryption),
+    });
     const infrastructure = buildIdentityInfrastructure({
       prisma: setup.members.prisma,
       eventing: setup.members.eventing,
       adminEmails: setup.members.adminEmails,
       registersPipelines: setup.members.producesPipelines,
+      engineProvider: engineProviders,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create(
@@ -391,7 +410,10 @@ export class IdentityApp implements IdentityApi {
       bindings: setup.repositories.ssoBreakGlass,
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
-      holderIsEligible: breakGlassEligibility(setup.dependencies.organizations),
+      holderIsEligible: breakGlassEligibility(
+        setup.dependencies.organizations,
+        setup.dependencies.users,
+      ),
     });
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,

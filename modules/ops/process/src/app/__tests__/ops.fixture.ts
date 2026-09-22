@@ -8,6 +8,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -92,6 +93,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
     dependencies: {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
+      identity: createApiFixture<IdentityApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>({ record: async () => {} }),
       apiKeys:

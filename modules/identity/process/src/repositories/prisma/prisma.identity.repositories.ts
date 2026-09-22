@@ -24,6 +24,7 @@ import {
 } from "./prisma.sso-connection-reads.repository.ts";
 import { PrismaSsoCredentialRepository } from "./prisma.sso-credential.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
+import { PrismaSsoEngineProviderRepository } from "./prisma.sso-engine-provider.repository.ts";
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { PrismaSsoRegistrantReadRepository } from "./prisma.sso-registrant.repository.ts";
 
@@ -54,6 +55,7 @@ export class PostgresIdentityRepositories {
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
+      ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database),
       ssoRegistrants: PrismaSsoRegistrantReadRepository.create(database),
       ssoMigrationEvidence: PrismaSsoMigrationEvidenceRepository.create(
         database,

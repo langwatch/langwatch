@@ -42,6 +42,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       organizations: createApiFixture<OrganizationApi>(),
     },
     members: {
+      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       logger: createLogger("langwatch:auth:test"),
       prisma: createApiFixture<PrismaClient>(),
       redis: createApiFixture(),

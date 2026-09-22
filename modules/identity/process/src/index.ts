@@ -156,12 +156,6 @@ export type {
 } from "./services/sso-connection-grandfather.service.ts";
 export type { SsoConnectionGuardsDeps } from "./services/sso-connection-guard-checks.service.ts";
 export type { SsoConnectionLedger } from "./rules/sso-connection-ledger.rules.ts";
-export {
-  ShadowComparingDomainRoutingAdapter,
-  type SsoConnectionRoutingShadowDeps,
-  type SsoConnectionRoutingShadowRecord,
-  type SsoConnectionRoutingShadowRecorder,
-} from "./services/sso-connection-routing-shadow.service.ts";
 export type {
   MintedEmailVerification,
   VerificationCeremonyDeps,

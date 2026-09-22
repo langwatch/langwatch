@@ -20,6 +20,7 @@ import type {
 } from "./sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
+import type { SsoEngineProviderRepository } from "./sso-engine-provider.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "./sso-migration-evidence.repository.ts";
 import type { SsoRegistrantReadRepository } from "./sso-registrant.repository.ts";
 
@@ -48,6 +49,8 @@ export interface IdentityRepositories {
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
   /** Where a connection's identity-provider credentials are kept (D09). */
   readonly ssoCredentials: SsoCredentialRepository;
+  /** The engine's provider rows, folded from the connection head (D09). */
+  readonly ssoEngineProviders: SsoEngineProviderRepository;
   /** The ways back in a connection's activation depends on (D05). */
   readonly ssoBreakGlass: SsoBreakGlassRepository;
   /** Who an asserted address and a connection subject belong to (ADR-117 §5). */

@@ -1,10 +1,11 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * The boot loop's own logic: when to run another pass, when to stop, and
  * what shutdown does. No datastore, runner or migration - timers are faked
  * since the loop waits between passes, so tests drive the clock directly.
  */
 import type { MigrationPassSummary } from "../types.ts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
   runPass: vi.fn(),
@@ -167,6 +168,38 @@ describe("startSystemMigrations", () => {
         await stop();
 
         expect(stubs.runPass).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "A shut-out from the last remaining tenants settles once a claim has been granted" */
+      it("settles once the lease store has been seen to grant this process a claim", async () => {
+        // A pass enumerates only the tenants with work left, so a handful of
+        // replicas booting together can genuinely hold every one of them —
+        // and the granted claim is what tells that apart from a lease store
+        // that answers nothing.
+        stubs.runPass
+          .mockResolvedValueOnce({ ...summaryOf({ advanced: 1 }), tenantsSeen: 3, claimed: 2 })
+          .mockResolvedValue({ ...summaryOf({ advanced: 0 }), tenantsSeen: 2, claimed: 2 });
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 8 });
+        await stop();
+
+        expect(stubs.runPass).toHaveBeenCalledTimes(2);
+      });
+
+      /** @scenario "A process never granted a claim keeps trying rather than settling" */
+      it("keeps trying where no pass was ever granted a claim", async () => {
+        stubs.runPass.mockResolvedValue({
+          ...summaryOf({ advanced: 0 }),
+          tenantsSeen: 2,
+          claimed: 2,
+        });
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 30 });
+        await stop();
+
+        expect(stubs.runPass).toHaveBeenCalledTimes(25);
       });
     });
   });

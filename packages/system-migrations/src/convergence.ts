@@ -1,8 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { MigrationPassSummary } from "./types.ts";
+
 import type { SystemMigrationStateRepository } from "./state.repository.ts";
-import type { TenantSource } from "./tenant-source.ts";
 import type { SystemMigration } from "./system-migration.ts";
+import type { TenantSource } from "./tenant-source.ts";
+import type { MigrationPassSummary } from "./types.ts";
 
 /**
  * One composed pass over the fleet. The composition root binds the runner,
@@ -191,22 +192,24 @@ export async function driveSystemMigrationsToConvergence({
   signal: AbortSignal;
   runPass: SystemMigrationPass;
 }): Promise<void> {
+  let leaseGranted = false;
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
     if (signal.aborted) return;
     const summary = await passOrNull({ signal, runPass, pass });
     if (summary === null) return;
+    leaseGranted ||= claimWasGranted(summary);
     // Checked before the stop decision as well as before the next pass: an
     // aborted pass returns whatever it managed, and reading that as
     // convergence would log a false "nothing left to do" at shutdown.
     if (signal.aborted) return;
-    if (converged(summary)) {
+    if (converged({ summary, leaseGranted })) {
       logger.info(
         { summary, passes: pass },
         "system migrations converged; nothing advanced on the last pass",
       );
       return;
     }
-    logger.info({ summary, pass }, continuingBecause(summary));
+    logger.info({ summary, pass }, continuingBecause({ summary, leaseGranted }));
     await sleep({ ms: PASS_INTERVAL_MS, signal });
   }
   // Loud on purpose. Passes are supposed to run out of work.
@@ -241,19 +244,42 @@ async function passOrNull({
 }
 
 /** Why the loop is about to run another pass, in the log's words. */
-function continuingBecause(summary: MigrationPassSummary): string {
-  return summary.advanced === 0
-    ? "every organization was claimed by another process; the loop keeps going rather than reading that as convergence"
-    : "system migration pass advanced the fleet; another pass follows";
+function continuingBecause({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): string {
+  if (summary.advanced > 0) return "system migration pass advanced the fleet; another pass follows";
+  return leaseGranted
+    ? "a peer holds the tenants with work left; the loop keeps going while it drives them"
+    : "every tenant was claimed by another process and no claim has been granted yet, which is also what an unreachable lease store looks like; this pass learned nothing, so the loop keeps trying";
 }
 
 /**
- * Whether a pass proves there is nothing left to do. Nothing advanced is not enough on its own.
+ * Whether a pass proves there is nothing left to do. A total shut-out settles
+ * only once the lease store granted this process a claim: a pass enumerates
+ * only the tenants with work left, which peers can genuinely all hold (#8247).
  */
-function converged(summary: MigrationPassSummary): boolean {
+function converged({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): boolean {
   if (summary.advanced > 0) return false;
   if (summary.tenantsSeen === 0) return true;
-  return summary.claimed < summary.tenantsSeen;
+  if (summary.claimed < summary.tenantsSeen) return true;
+  return leaseGranted;
+}
+
+/** Did the lease store hand THIS process a claim on this pass? `acquire`
+ *  fails safe to "held" on every error, so one tenant the pass saw and did not
+ *  count as claimed is proof the store is reachable and answering. */
+function claimWasGranted(summary: MigrationPassSummary): boolean {
+  return summary.tenantsSeen > summary.claimed;
 }
 
 /** Waits, or returns early the moment the signal aborts. */

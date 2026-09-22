@@ -16,6 +16,7 @@ import type {
 import type { Prisma, PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
 
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
+import type { SsoEngineProviderProjection } from "../sso-engine-provider.repository.ts";
 
 /** The one model the connection head reads and writes, and no other. */
 export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection">;
@@ -40,11 +41,17 @@ function provedCondition(entry: SsoDomainVerification): SsoDomainVerification {
 export class PrismaSsoConnectionProjectionRepository implements StateProjectionStore<SsoConnectionFoldState> {
   static create(
     database: PrismaSsoConnectionProjectionDatabase,
+    /** Keeps the engine's row in step with this head (D09). Absent, the engine's
+     * table is not maintained — what a process mounting no sign-in door wants. */
+    engineProvider?: SsoEngineProviderProjection,
   ): PrismaSsoConnectionProjectionRepository {
-    return new PrismaSsoConnectionProjectionRepository(database);
+    return new PrismaSsoConnectionProjectionRepository(database, engineProvider);
   }
 
-  constructor(private readonly prisma: PrismaSsoConnectionProjectionDatabase) {}
+  constructor(
+    private readonly prisma: PrismaSsoConnectionProjectionDatabase,
+    private readonly engineProvider?: SsoEngineProviderProjection,
+  ) {}
 
   async tryLoad(
     key: string,
@@ -125,6 +132,9 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       where: { id },
       create: { id, ...columns },
       update: columns,
+    });
+    await this.engineProvider?.project({
+      connection: { ...state, connectionId: id },
     });
   }
 

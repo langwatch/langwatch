@@ -134,6 +134,11 @@ export {
   ssoSamlRegistrationSchema,
 } from "./sso-idp-registration.ts";
 export {
+  isSealedProviderConfig,
+  sealedProviderConfigCipher,
+  type SsoProviderConfigCipher,
+} from "./sso-provider-config.ts";
+export {
   type SsoConnectionRemoval,
   type SsoSetupCommand,
   type SsoSetupConnectionView,

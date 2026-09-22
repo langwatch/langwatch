@@ -22,6 +22,7 @@ import type {
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
+import type { OrganizationSsoRouting } from "../services/admin-backoffice.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingOpsIntrospectionAdapter } from "../services/eventing.ops-introspection.service.ts";
 import { AdminAuditSink } from "../services/impersonation.service.ts";
@@ -175,11 +176,11 @@ export function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       const operations = OpsOperations.create({
         adminEmails: members.adminEmails,
-        // Once the connection projection decides sign-in, editing the legacy
-        // `ssoDomain`/`ssoProvider` strings changes nothing a person
-        // experiences, so the backoffice refuses rather than accepting a
-        // no-op (ADR-117 §5).
-        legacySsoStringWritesRetired: config.legacySsoStringWritesRetired,
+        // Where an organization's connection decides its sign-in, editing
+        // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
+        // person experiences, so the backoffice refuses rather than accepting
+        // a no-op. Asked of identity per organization (ADR-117 §5).
+        ssoRouting: organizationSsoRouting(dependencies.identity),
         database: members.prisma,
         audit: new UnauditedOpsAuditSink(members.logger),
         auditLog: dependencies.auditLog,
@@ -253,5 +254,15 @@ export function buildOpsInfrastructure(input: {
     explainClients,
     findOpsApiKey: () => config.apiKey ?? null,
     isProduction: members.nodeEnvironment === "production",
+  };
+}
+
+/** Which route decides one organization's sign-in, asked of identity: one
+ *  holding a connection is routed by it, one holding none is still routed by
+ *  its legacy strings, and no installation-wide switch changes both. */
+function organizationSsoRouting(identity: OpsAppDependencies["identity"]): OrganizationSsoRouting {
+  return {
+    connectionDecides: async ({ organizationId }) =>
+      (await identity.ssoConnectionReads().findForOrganization({ organizationId })).length > 0,
   };
 }

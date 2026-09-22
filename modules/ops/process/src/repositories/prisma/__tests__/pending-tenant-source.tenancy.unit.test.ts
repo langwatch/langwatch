@@ -56,6 +56,7 @@ function guardedPrisma(rows: unknown[]): {
 }
 
 describe("given a pass asks which tenants still have work for its migrations", () => {
+  /** @scenario "A pass may ask which tenants have work left across the whole installation" */
   it("accepts the installation-wide walk over users rather than refusing the pass", async () => {
     const { prisma, queryRaw } = guardedPrisma([{ id: "user-1" }]);
 
@@ -67,6 +68,7 @@ describe("given a pass asks which tenants still have work for its migrations", (
     expect(queryRaw).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "A pass may ask which tenants have work left across the whole installation" */
   it("accepts the installation-wide walk over organizations too", async () => {
     const { prisma, queryRaw } = guardedPrisma([{ id: "org-1" }]);
 
@@ -78,6 +80,7 @@ describe("given a pass asks which tenants still have work for its migrations", (
     expect(queryRaw).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "A pass may ask which tenants have work left across the whole installation" */
   it("asks nothing at all when the pass drives no migrations", async () => {
     const { prisma, queryRaw } = guardedPrisma([{ id: "user-1" }]);
 

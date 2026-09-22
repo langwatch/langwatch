@@ -22,6 +22,7 @@ import {
   type OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
   AdminSessionExpiredError,
@@ -260,6 +261,9 @@ export type OpsCapability = OpsService & {
 export interface OpsAppDependencies {
   users: UserApiContract;
   auth: AuthApiContract;
+  /** Which of an organization's two routes decides its sign-in — the module
+   *  that owns connections answers, per organization. */
+  identity: IdentityApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApiContract;
 }
@@ -512,6 +516,7 @@ export class OpsApp implements OpsApi {
   static readonly dependencies = {
     users: UserApi,
     auth: AuthApi,
+    identity: IdentityApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,

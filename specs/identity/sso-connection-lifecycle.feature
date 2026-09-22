@@ -380,13 +380,6 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
 
   # ── Routing flip ───────────────────────────────────────────────────────
 
-  @unit
-  Scenario: Shadow mode compares connection routing against string routing
-    Given the connection routing flag is in shadow
-    When any user signs in through a routed domain
-    Then both lookups run and a disagreement is logged with both answers
-    And the string-based answer keeps deciding the sign-in
-
   # There is no fleet-wide flip, and the staged flag that was going to carry
   # one was designed out rather than built. Routing asks the connection
   # projection first and falls back to the columns per organization, so which
@@ -400,8 +393,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And it is still accepted for "globex", whose strings still decide
 
   @unit
-  Scenario: After the flip, the strings stop being written
-    Given the connection routing flag is enforced
+  Scenario: Once a connection decides, the strings stop being written
+    Given an organization whose connection decides its sign-in
     When SSO configuration changes
     Then only connection commands change it
     And the legacy string columns are derived, no longer written

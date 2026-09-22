@@ -10,6 +10,7 @@ import { AuthApi } from "@langwatch/auth-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EventSourcing } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -37,7 +38,6 @@ function process(role: "api" | "worker") {
         apiKey: undefined,
         metricsApiKey: undefined,
         clickhouseOpsUrl: undefined,
-        legacySsoStringWritesRetired: false,
         usageStats: { disabled: false, installMethod: undefined },
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
@@ -53,6 +53,7 @@ function process(role: "api" | "worker") {
     .provide({
       user: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
+      identity: createApiFixture<IdentityApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       "audit-log": createApiFixture<AuditLogApi>({ record: async () => {} }),
       "api-key": createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),

@@ -138,6 +138,15 @@ Feature: Running system migrations across organizations
     Then no further pass starts
     And runtime processes do not start
 
+  # A pass now enumerates only the tenants with work left, so it may ask that
+  # question of the whole installation — a walk no single tenant owns, which
+  # the multitenancy guard has to admit or no process serves.
+  @unit
+  Scenario: A pass may ask which tenants have work left across the whole installation
+    Given the question a tenant source asks is the tenant list itself
+    When the multitenancy guard reads it
+    Then it is admitted rather than refusing the pass
+
   # `lease.acquire` fails safe to false on contention AND on any Redis error,
   # and a tenant that cannot be claimed does no work — so a pass shut out of
   # the whole fleet reports exactly what a converged one reports. Reading that
@@ -149,6 +158,24 @@ Feature: Running system migrations across organizations
     When the pass advances nothing
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
+
+  # Enumerating only the tenants with work left makes a handful the whole of a
+  # settled fleet, and a few replicas booting together can genuinely hold every
+  # one of them. "Shut out of everything" is therefore no longer proof of a
+  # broken lease store, so the proof is named instead: a tenant this process
+  # claimed is one the lease store answered for, because a claim fails safe to
+  # "held" on every error.
+  @unit
+  Scenario: A shut-out from the last remaining tenants settles once a claim has been granted
+    Given an earlier pass claimed a tenant of its own
+    When every later pass finds the few remaining tenants held by a peer
+    Then the loop stops rather than running to the cap
+
+  @unit
+  Scenario: A process never granted a claim keeps trying rather than settling
+    Given no pass has ever been granted a claim
+    When every pass finds every tenant held
+    Then the loop keeps running to the cap
 
   @unit
   Scenario: A loop that never converges prevents startup

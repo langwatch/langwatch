@@ -45,6 +45,15 @@ class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
 }
 
 class NoopAuthService implements BrowserSessionApi {
+  /** Auth's cutover half, which nothing here exercises. */
+  async retireLegacySsoAccess(): Promise<{ retired: number; remaining: number }> {
+    return { retired: 0, remaining: 0 };
+  }
+
+  async countLegacySsoAccess(): Promise<number> {
+    return 0;
+  }
+
   async listBrowserSessions(): Promise<never[]> {
     return [];
   }

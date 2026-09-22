@@ -390,3 +390,44 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When the directory pushes that administrator as inactive, or deletes them
     Then the push is refused before the membership row or their grants go
     And the refusal is the organization's own, not a second copy of the rule
+
+  # ── The tenant's own directory resource ────────────────────────────────
+  #
+  # A person's SCIM userName, display name and active flag belong to the
+  # organization whose directory pushed them, not to the account they sign in
+  # with: one account in two organizations carries two resources, and neither
+  # directory can rename, disable or delete the account itself.
+
+  @unit @regression
+  Scenario: Directory lifecycle and profile changes affect only their organization
+    Given a person belongs to two organizations and has an active session
+    When one directory changes their profile or deactivates them
+    Then only that organization's directory profile and access change
+    And the shared account identity and sessions remain unchanged
+    When that directory reactivates them
+    Then no membership or grants are restored
+    And a global account disable is not cleared
+
+  @unit @regression
+  Scenario: Inactive directory resources remain readable without granting access
+    When a directory provisions a person as inactive
+    Then GET and filtered paginated listings return the inactive resource
+    And no organization membership is granted
+    When the directory updates the inactive profile or cost center
+    Then no organization membership is granted
+    When the directory deletes the resource
+    Then GET no longer returns it
+    And listings and updates no longer reach it
+    And an inactive tenant tombstone continues blocking SSO
+    When the directory explicitly provisions the primary account again
+    Then the tombstone is cleared without creating a second account
+
+  @unit @regression
+  Scenario: Directory usernames stay unique without mutating a conflicting resource
+    Given two users have directory resources in one organization
+    When PUT or PATCH would assign the other user's normalized username
+    Then the request returns a uniqueness conflict before changing profile or access
+    And a manually added member's fallback username is protected before directory adoption
+    And the database refuses duplicate live names independently
+    When the original resource is deleted
+    Then its username can be assigned to another resource

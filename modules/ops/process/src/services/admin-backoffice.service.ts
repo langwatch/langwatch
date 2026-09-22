@@ -21,9 +21,25 @@ export interface AdminBackofficeServiceOptions {
   users: UserApi;
   auth: AuthApi;
   audit: AdminAuditSink;
-  /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
-  legacySsoStringWritesRetired?: boolean | undefined;
+  /** Whether an organization's own connection decides its sign-in, asked of
+   *  the module that owns connections. */
+  ssoRouting?: OrganizationSsoRouting | undefined;
 }
+
+/**
+ * Which of the two routes decides one organization's sign-in. Routing reads
+ * the connection projection first and falls back to the legacy columns, so the
+ * answer differs by organization and is never set fleet-wide.
+ */
+export interface OrganizationSsoRouting {
+  connectionDecides(args: { organizationId: string }): Promise<boolean>;
+}
+
+/** The answer for a process that composed no connection reader: the strings
+ *  still decide, which is what an installation with no connections has. */
+const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
+  connectionDecides: async () => false,
+};
 
 /** Ops-owned application service for the legacy react-admin wire surface. */
 export class AdminBackofficeService {
@@ -32,7 +48,7 @@ export class AdminBackofficeService {
     private readonly users: UserApi,
     private readonly auth: AuthApi,
     private readonly audit: AdminAuditSink,
-    private readonly legacySsoStringWritesRetired: boolean,
+    private readonly ssoRouting: OrganizationSsoRouting,
   ) {}
 
   static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
@@ -41,7 +57,7 @@ export class AdminBackofficeService {
       options.users,
       options.auth,
       options.audit,
-      options.legacySsoStringWritesRetired ?? false,
+      options.ssoRouting ?? STRINGS_STILL_DECIDE,
     );
   }
 
@@ -56,7 +72,7 @@ export class AdminBackofficeService {
       return this.updateUser(parsed);
     }
 
-    const normalized = this.normalizeOrganizationDomain(parsed);
+    const normalized = await this.normalizeOrganizationDomain(parsed);
     const result = await this.repository.execute(normalized);
     await this.auditMutation(normalized, result);
 
@@ -152,7 +168,9 @@ export class AdminBackofficeService {
     return result;
   }
 
-  private normalizeOrganizationDomain(input: AdminOperationInput): AdminOperationInput {
+  private async normalizeOrganizationDomain(
+    input: AdminOperationInput,
+  ): Promise<AdminOperationInput> {
     if (
       input.resource !== "organization" ||
       (input.method !== "create" && input.method !== "update")
@@ -163,7 +181,7 @@ export class AdminBackofficeService {
     const data = { ...input.params.data };
     const retiredColumns = legacySsoStringWritesToRefuse({
       data,
-      retired: this.legacySsoStringWritesRetired,
+      connectionDecides: await this.connectionDecides(input),
     });
     if (retiredColumns.length > 0) {
       throw new SsoConnectionStringEditRetiredError(
@@ -176,6 +194,14 @@ export class AdminBackofficeService {
     }
 
     return { ...input, params: { ...input.params, data } };
+  }
+
+  /** An organization being created has no connection yet, so its strings are
+   *  still what decides. */
+  private async connectionDecides(input: AdminOperationInput): Promise<boolean> {
+    const organizationId = input.params.id;
+    if (typeof organizationId !== "string" || organizationId === "") return false;
+    return this.ssoRouting.connectionDecides({ organizationId });
   }
 
   private async auditMutation(
