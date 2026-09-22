@@ -64,6 +64,7 @@ import {
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
 import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
+import { lwqlPostgresViews } from "~/server/analytics/lwql/catalog/types";
 import { LWQL_EXAMPLES } from "~/server/analytics/lwql/examples";
 import {
   lwqlViewSetupStatements,
@@ -439,6 +440,31 @@ describe("given the /api/v1/query REST family", () => {
       const result = await readSchema(projectA);
 
       expect(result.functions).toEqual([...LWQL_ALLOWED_FUNCTION_NAMES]);
+    });
+
+    /** @scenario "The self-describing catalog output names every derived view" */
+    it("names every derived PostgreSQL-resident view with its columns", async () => {
+      const result = await readSchema(projectA);
+      const views: any[] = result.views;
+      const byName = new Map(views.map((view) => [view.name, view] as const));
+
+      for (const postgresView of lwqlPostgresViews(LWQL_VIEW_CATALOG)) {
+        const qualified = `${database}.${postgresView.name}`;
+        expect(byName.has(qualified), qualified).toBe(true);
+      }
+
+      const columnNamesOf = (viewName: string) => {
+        const view = byName.get(`${database}.${viewName}`);
+        expect(view, `${database}.${viewName}`).toBeDefined();
+        return view.columns.map((column: any) => column.name);
+      };
+
+      expect(columnNamesOf("topics")).toEqual(
+        expect.arrayContaining(["TopicId", "TopicName", "TenantId"]),
+      );
+      expect(columnNamesOf("virtual_keys")).toEqual(
+        expect.arrayContaining(["TenantId"]),
+      );
     });
   });
 
