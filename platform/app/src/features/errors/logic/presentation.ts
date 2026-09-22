@@ -621,6 +621,94 @@ const presentations = {
     describe: () =>
       "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
+  checkup_clickhouse_migrations_pending: {
+    title: "ClickHouse migrations are pending",
+    describe: () =>
+      "Run the ClickHouse migrations, then run the checkup again.",
+  },
+  checkup_clickhouse_not_configured: {
+    title: "ClickHouse is not configured",
+    describe: () => "Set CLICKHOUSE_URL on the app and worker deployments.",
+  },
+  checkup_clickhouse_unreachable: {
+    title: "ClickHouse did not answer",
+    describe: () =>
+      "Check CLICKHOUSE_URL and that ClickHouse accepts connections from the app.",
+  },
+  checkup_email_not_configured: {
+    title: "Email is not configured",
+    describe: () =>
+      "Configure an email provider so invitations and alerts can be sent.",
+  },
+  checkup_gateway_control_plane_mismatch: {
+    title: "The AI Gateway reports another control plane",
+    describe: () => "Point the gateway's control plane URL at this app.",
+  },
+  checkup_gateway_unreachable: {
+    title: "The AI Gateway did not answer",
+    describe: () =>
+      "Check that the gateway is running and that the app can reach it.",
+  },
+  checkup_license_corrupted: {
+    title: "The license could not be read",
+    describe: () => "Enter the activation code or license key again.",
+  },
+  checkup_license_expired: {
+    title: "The license has expired",
+    describe: () =>
+      "Renew it, then enter the new activation code on the License page.",
+  },
+  checkup_license_invalid: {
+    title: "The license does not verify",
+    describe: () =>
+      "Enter the activation code or license key again, or contact support.",
+  },
+  checkup_lwql_not_provisionable: {
+    title: "LWQL functions cannot be provisioned",
+    describe: () =>
+      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+  },
+  checkup_model_provider_refused: {
+    title: "A model provider refused the test call",
+    describe: () =>
+      "Check the provider's key and quota on the Model Providers page.",
+  },
+  checkup_no_model_provider: {
+    title: "No model provider is configured",
+    describe: () => "Add a model provider on the Model Providers page.",
+  },
+  checkup_postgres_migration_failed: {
+    title: "A Postgres migration failed",
+    describe: () =>
+      "Resolve the failed migration, then run the migrations again.",
+  },
+  checkup_postgres_migrations_pending: {
+    title: "Postgres migrations are pending",
+    describe: () => "Run the Postgres migrations, then run the checkup again.",
+  },
+  checkup_postgres_unreachable: {
+    title: "Postgres did not answer",
+    describe: () =>
+      "Check DATABASE_URL and that the database accepts connections from the app.",
+  },
+  checkup_redis_not_configured: {
+    title: "Redis is not configured",
+    describe: () => "Set REDIS_URL on the app and worker deployments.",
+  },
+  checkup_redis_unreachable: {
+    title: "Redis did not answer",
+    describe: () =>
+      "Check REDIS_URL and that Redis accepts connections from the app.",
+  },
+  checkup_smtp_refused: {
+    title: "The SMTP server refused the connection",
+    describe: () => "Check the SMTP host, port and credentials.",
+  },
+  checkup_storage_write_failed: {
+    title: "Writing to storage failed",
+    describe: () =>
+      "Check the bucket or path exists and that the app's credentials allow put and delete.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {

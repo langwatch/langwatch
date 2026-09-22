@@ -22,7 +22,6 @@ import {
 } from "~/server/analytics/lwql/provisioning";
 import { getApp } from "~/server/app-layer/app";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { getMigrateStatus } from "~/server/clickhouse/goose";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { readInstallVersion } from "~/server/installVersion";
@@ -117,7 +116,8 @@ export function realCheckupDeps({
     clickhouse: {
       configured: Boolean(env.CLICKHOUSE_URL),
       ping: async () => {
-        const client = await getClickHouseClientForOrganization(organizationId);
+        const client =
+          await getApp().clickhouse.resolveOrganizationClient(organizationId);
         const answer = await client.ping();
         if (!answer.success) {
           throw answer.error ?? new Error("ping was not successful");
@@ -125,7 +125,8 @@ export function realCheckupDeps({
       },
       migrationStatus: () => getMigrateStatus(),
       appFunctionsProvisionable: async () => {
-        const client = await getClickHouseClientForOrganization(organizationId);
+        const client =
+          await getApp().clickhouse.resolveOrganizationClient(organizationId);
         const probe = await probeAppFunctionStore({
           query: async (sql) => {
             const result = await client.query({

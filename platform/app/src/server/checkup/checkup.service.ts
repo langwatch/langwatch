@@ -484,16 +484,21 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.licensing,
       };
     }
+    if (license.expired) {
+      return {
+        outcome: "refused",
+        code: "checkup_license_expired",
+        detail: `The license expired on ${licenseDay(license.expiresAt) ?? "an unknown date"}.`,
+        fix: "Renew it, then enter the new activation code on the License page.",
+        docsPath: CHECKUP_DOCS.licensing,
+      };
+    }
     if (!license.valid) {
       return {
         outcome: "refused",
-        code: license.expired
-          ? "checkup_license_expired"
-          : "checkup_license_invalid",
-        detail: license.expired
-          ? `The license expired on ${licenseDay(license.expiresAt) ?? "an unknown date"}.`
-          : "The license does not verify.",
-        fix: "Renew it, then enter the new activation code on the License page.",
+        code: "checkup_license_invalid",
+        detail: "The license does not verify.",
+        fix: "Enter the activation code or license key again, or contact support.",
         docsPath: CHECKUP_DOCS.licensing,
       };
     }
@@ -821,10 +826,7 @@ export class CheckupService {
         first.result.outcome === "refused" ? first.result.message : "";
       return {
         outcome: "refused",
-        code:
-          first.result.outcome === "refused"
-            ? first.result.code
-            : "checkup_model_provider_refused",
+        code: "checkup_model_provider_refused",
         detail:
           `${refused.map((entry) => entry.provider).join(", ")} refused the connection test. ${message}`.trim(),
         fix: "Open Settings, Model providers, and test the provider there to see the refusal in full.",

@@ -63,6 +63,9 @@ vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    checkup: {
+      startupNotice: { useQuery: () => ({ data: undefined }) },
+    },
     scenarios: {
       getSuiteRunData: {
         useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),

@@ -81,7 +81,11 @@ function fakeInvoicer({ failFirst = false } = {}) {
         id: `in_${calls}`,
         status: "open",
         currency,
-        amountDueCents: lines.reduce((sum, line) => sum + line.amountCents, 0),
+        amountDueCents: lines.reduce(
+          (sum: number, line: { amountCents: number }) =>
+            sum + line.amountCents,
+          0,
+        ),
         subscriptionId: null,
         periodEnd: null,
       };
