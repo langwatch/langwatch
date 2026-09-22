@@ -5,7 +5,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type React from "react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -263,6 +269,117 @@ describe("TalkToItPanel", () => {
         { role: "caller", text: "I need a refund." },
         { role: "agent", text: "Sure, let me check." },
       ]);
+    });
+  });
+
+  describe("when an unsaved call is named and saved after the limit has elapsed", () => {
+    // The server derives the cut-at-limit marker from endedAt - startedAt
+    // (#8028). An unsaved agent's first finish comes back needing a name, so
+    // the real save runs a second time only after the user has typed one —
+    // and that can take longer than the call limit. The end time is frozen
+    // when the call ended, so this slow second save keeps the short call's
+    // real span and cannot persist it as cut (#8214).
+    it("posts the end time from when the call ended, not from when the name was saved", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) },
+      });
+
+      // A controllable wall clock starting at a real epoch instant (the panel
+      // stores startedAt as an absolute Date.now(), so it must be non-zero):
+      // mint at t0, the call ends 5s later (well under the 300s limit). The
+      // first finish needs a name; by the time the named save runs, the clock
+      // has jumped past the limit.
+      const t0 = 1_700_000_000_000;
+      let now = t0;
+      const realNow = Date.now;
+      Date.now = () => now;
+      try {
+        const json = (value: unknown, status = 200) =>
+          new Response(JSON.stringify(value), {
+            status,
+            headers: { "content-type": "application/json" },
+          });
+        const finishCalls: Array<Record<string, unknown>> = [];
+        let finishCount = 0;
+        const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+          const href = String(url);
+          if (href.endsWith("/api/voice/session")) {
+            return json({
+              transport: "elevenlabs_convai",
+              sessionToken: "signed.token",
+              maxDurationSeconds: 300,
+              connect: { signedUrl: "wss://x" },
+            });
+          }
+          if (href.includes("/finish")) {
+            finishCount += 1;
+            finishCalls.push(
+              JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+            );
+            // The first save of an unsaved agent comes back needing a name,
+            // so the panel drops to the name prompt and waits for the user.
+            if (finishCount === 1) {
+              return json({ error: "voice_name_required" }, 422);
+            }
+            return json({
+              runId: "voicecall_x",
+              agentId: "agent_1",
+              source: "provider",
+              hasFetchFailed: false,
+              hasAudio: false,
+            });
+          }
+          return json({});
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        openCall.mockImplementationOnce(
+          async ({ handlers }: { handlers: VoiceCallHandlers }) => {
+            handlers.onConnected({ conversationId: "conv_1" });
+            handlers.onTranscript({ role: "caller", text: "quick question" });
+            return { hangUp: vi.fn(async () => {}), getInputVolume: () => 0 };
+          },
+        );
+
+        // An unsaved agent — no agentId — so the first finish needs a name.
+        render(
+          <TalkToItPanel
+            projectId="p1"
+            projectSlug="proj"
+            transport="elevenlabs_convai"
+            agentId=""
+          />,
+          { wrapper: Wrapper },
+        );
+        const hangUp = await screen.findByTestId("talk-hang-up");
+        // The user ends the call five seconds in.
+        now = t0 + 5_000;
+        hangUp.click();
+
+        // The first save bounces back asking for a name.
+        const nameInput = await screen.findByTestId("talk-name-input");
+        await waitFor(() => {
+          expect(finishCalls).toHaveLength(1);
+        });
+
+        // The user takes their time naming the agent — well past the limit.
+        now = t0 + 10 * 60 * 1000;
+        fireEvent.change(nameInput, { target: { value: "Refund bot" } });
+        (await screen.findByTestId("talk-name-save")).click();
+
+        await waitFor(() => {
+          expect(finishCalls).toHaveLength(2);
+        });
+        const body = finishCalls[1]!;
+        const startedAt = body.startedAt as number;
+        const endedAt = body.endedAt as number;
+        // The span is the call's real length (~5s), not the ~10min gap to the
+        // named save — so the server reads it as below the limit, not cut.
+        expect(endedAt - startedAt).toBeLessThan(300 * 1000);
+      } finally {
+        Date.now = realNow;
+      }
     });
   });
 
