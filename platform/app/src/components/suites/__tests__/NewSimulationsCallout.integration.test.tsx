@@ -73,7 +73,7 @@ describe("<NewSimulationsCallout />", () => {
     vi.clearAllMocks();
     guidedPathActive = false;
     for (const key of Object.keys(routerQuery)) delete routerQuery[key];
-    // The card retires on 2026-09-22; the tests read it while it still shows,
+    // The card retires on 2026-09-29; the tests read it while it still shows,
     // whatever the machine's clock says.
     vi.useFakeTimers({
       toFake: ["Date"],
@@ -210,7 +210,7 @@ describe("<NewSimulationsCallout />", () => {
     describe("when the sidebar renders", () => {
       /** @scenario "The callout retires three weeks after the new screens shipped" */
       it("renders nothing past the retirement date", () => {
-        vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+        vi.setSystemTime(new Date("2026-09-30T12:00:00Z"));
 
         renderWithProviders(<NewSimulationsCallout target="scenarios" />);
 
@@ -229,7 +229,7 @@ describe("<NewSimulationsCallout />", () => {
     describe("when the sidebar renders past the retirement date", () => {
       /** @scenario "The simulations-welcome address parameter brings the callout back" */
       it("shows the callout", () => {
-        vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+        vi.setSystemTime(new Date("2026-09-30T12:00:00Z"));
 
         renderWithProviders(<NewSimulationsCallout target="scenarios" />);
 

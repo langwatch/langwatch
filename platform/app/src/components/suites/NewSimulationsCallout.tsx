@@ -42,8 +42,11 @@ import { Link } from "../ui/link";
 const SNOOZE_DAYS = 14;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 const STORAGE_PREFIX = "langwatch:new-simulations-callout-dismissed:v1:";
-/** Three weeks after the new screens shipped, the announcement retires. */
-const SUNSET = Date.parse("2026-09-22T00:00:00Z");
+/**
+ * The announcement retires once the new screens have been live long enough for
+ * existing users to have seen them; after this instant the card renders nothing.
+ */
+const SUNSET = Date.parse("2026-09-29T00:00:00Z");
 /** The address parameter that brings the retired or dismissed card back. */
 export const WELCOME_CALLOUT_QUERY_PARAM = "simulations-welcome";
 

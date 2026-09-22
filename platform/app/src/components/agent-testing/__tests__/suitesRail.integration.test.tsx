@@ -19,6 +19,7 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
+import { WELCOME_CALLOUT_QUERY_PARAM } from "~/components/suites/NewSimulationsCallout";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { SuiteNameDialog } from "../cases/SuiteNameDialog";
@@ -30,10 +31,14 @@ import {
 import type { SuiteLastRun } from "../cases/useTestCasesData";
 
 const routerPush = vi.fn();
+// The router query is mutable so a single test can carry the welcome-card
+// address parameter without dragging in a clock double; every other test keeps
+// the default query.
+let routerQuery: Record<string, string> = { project: "test-project" };
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
-    query: { project: "test-project" },
+    query: routerQuery,
     push: routerPush,
     isReady: true,
   }),
@@ -203,6 +208,7 @@ describe("the test suites rail", () => {
 
   beforeEach(() => {
     routerPush.mockClear();
+    routerQuery = { project: "test-project" };
     setProjectRuns([]);
     suitesGetAllQuery.mockReturnValue({
       data: [
@@ -734,8 +740,13 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The rail carries the new-simulations announcement" */
-  // biome-ignore lint/suspicious/noSkippedTests: the callout retired on 2026-09-22 (real clock); lw#8254 tracks it
-  it.skip("carries the new-simulations announcement", () => {
+  it("carries the new-simulations announcement", () => {
+    // The address parameter revives the card past its sunset, so the assertion
+    // rides the routing harness instead of the wall clock.
+    routerQuery = {
+      project: "test-project",
+      [WELCOME_CALLOUT_QUERY_PARAM]: "1",
+    };
     renderRail();
 
     expect(
