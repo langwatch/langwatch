@@ -106,9 +106,9 @@ Every change ships with tests. No exceptions. This is not aspirational — it is
 
 Target near-100% coverage via integration + unit tests. E2E tests are deprioritized (see below).
 
-## Non-Overlapping Test Coverage
+## Test Hierarchy
 
-Each level has a distinct purpose. Avoid overlap.
+Avoid overlap. Each level has a distinct purpose.
 
 | Level | Purpose | Mocking | Quantity |
 |-------|---------|---------|----------|
