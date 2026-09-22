@@ -160,6 +160,7 @@ export class FinishRunAdapter implements CommandHandler<
         scenarioSetId: ecst.scenarioSetId,
       }),
       ...(ecst.traceIds !== undefined && { traceIds: ecst.traceIds }),
+      ...(ecst.target !== undefined && { target: ecst.target }),
       ...(ecst.evaluators !== undefined && { evaluators: ecst.evaluators }),
     };
 
@@ -184,7 +185,8 @@ export class FinishRunAdapter implements CommandHandler<
 
   /**
    * Fills ECST gaps from prior events: caller-supplied fields win; backfills
-   * identity, traceIds, evaluators (prior events always read for evaluators).
+   * identity, traceIds, target, evaluators (prior events always read for
+   * evaluators).
    */
   private async backfillEcstFields(
     tenantId: string,
@@ -192,13 +194,13 @@ export class FinishRunAdapter implements CommandHandler<
   ): Promise<
     Pick<
       SimulationRunFinishedEventData,
-      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
+      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "target" | "evaluators"
     >
   > {
     const { scenarioRunId } = data;
     const result: Pick<
       SimulationRunFinishedEventData,
-      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
+      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "target" | "evaluators"
     > = {
       scenarioId: data.scenarioId,
       batchRunId: data.batchRunId,
@@ -221,6 +223,7 @@ export class FinishRunAdapter implements CommandHandler<
 
     const queuedEvent = priorEvents.find(isSimulationRunQueuedEvent);
     result.evaluators = queuedEvent?.data.evaluators;
+    result.target = queuedEvent?.data.target;
 
     if (!result.scenarioId || !result.batchRunId || !result.scenarioSetId) {
       const queued = queuedEvent;

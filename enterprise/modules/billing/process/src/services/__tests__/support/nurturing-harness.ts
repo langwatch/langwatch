@@ -3,7 +3,8 @@
  */
 import { vi } from "vitest";
 
-import { setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
+import type { NurturingProfile } from "../../../repositories/nurturing-profile.repository.ts";
+import { setProfiles, setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
 import { BillingErrorReporter } from "../../billing-error-reporter.service.ts";
 import { NurturingService } from "../../nurturing.service.ts";
 
@@ -62,6 +63,32 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
 /** Registers no sink at all, as a deployment with no Customer.io key composes. */
 export function registerNoNurturingSink(): void {
   setSink(null);
+}
+
+/** Registers a profile reader that answers one fixed profile, or none, for every lookup. */
+export function registerProfileReader(
+  profile: NurturingProfile | null,
+  memberUserIds: string[] = [],
+): void {
+  setProfiles({
+    findProfile: async () => profile,
+    memberUserIds: async () => memberUserIds,
+  });
+}
+
+/** Registers a profile reader whose lookup rejects, for failure-path tests. */
+export function registerFailingProfileReader(error: unknown): void {
+  setProfiles({
+    findProfile: async () => {
+      throw error;
+    },
+    memberUserIds: async () => [],
+  });
+}
+
+/** Registers no profile reader at all. */
+export function registerNoProfileReader(): void {
+  setProfiles(null);
 }
 
 /** Lets the fire-and-forget calls settle before the assertions read them. */

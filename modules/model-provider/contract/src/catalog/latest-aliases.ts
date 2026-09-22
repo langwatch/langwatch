@@ -1,6 +1,15 @@
+/**
+ * Virtual "latest" / "latest-mini" aliases: resolve to the newest main/fast
+ * tier model at read time (grammar in `./model-tiers.ts`). Code-only, and
+ * only openai/anthropic/gemini are aliased.
+ */
 import { llmModels } from "./model-catalog.ts";
-/** "latest" aliases resolve to current registry flagships; code-only, not in llmModels.json. */
-import { compareModelSortKeys, type ModelSortKey, rankOpenAIChatModel } from "./model-tiers.ts";
+import {
+  compareModelSortKeys,
+  type ModelSortKey,
+  type ModelVariant,
+  rankChatModel,
+} from "./model-tiers.ts";
 
 const REGISTRY = llmModels.models;
 
@@ -33,59 +42,35 @@ export function isLatestAlias(model: string): boolean {
   return ALIAS_PATTERN.test(model);
 }
 
-/**
- * Generic "newest chat model for this provider" picker. Callers supply a
- * parse function deciding scope and sort key. The catalog walk, filter and
- * version sort are shared, since every provider follows the same shape.
- */
-function pickLatestChat(
-  provider: string,
-  parse: (id: string) => ModelSortKey | null,
-): string | undefined {
+/** The newest catalog chat model of a provider's tier, or null if none ranks. */
+export function pickChatModel(provider: string, variant: ModelVariant): string | null {
   const candidates: (ModelSortKey & { id: string })[] = [];
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== provider || model.mode !== "chat") continue;
-    const parsed = parse(model.id);
+    const parsed = rankChatModel({ id: model.id, provider, variant });
     if (parsed) candidates.push({ id: model.id, ...parsed });
   }
   candidates.sort(compareModelSortKeys);
-  return candidates[0]?.id;
+  return candidates[0]?.id ?? null;
 }
 
-/** Resolve latest alias to current flagship (opus/sonnet or flagship/mini per provider). */
+/**
+ * The chat model a provider card recommends: the newest main-tier model in
+ * the catalog, the same pick `<provider>/latest` resolves to where that
+ * alias exists. Provider-qualified, e.g. `openai/gpt-5.6-terra`.
+ */
+export function recommendedChatModel(provider: string): string | null {
+  return pickChatModel(provider, "main");
+}
+
+/**
+ * Resolves an alias to its concrete current pick, e.g. `openai/gpt-5.6-luna`.
+ * Null if the input is not an alias or nothing matches the variant.
+ */
 export function resolveLatestAlias(model: string): string | null {
   const parts = parseLatestAlias(model);
   if (!parts) return null;
-  const { provider, suffix } = parts;
-  if (provider === "openai") {
-    const variant = suffix === "latest" ? "flagship" : "mini";
-    return pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ?? null;
-  }
-  if (provider === "anthropic") {
-    const family = suffix === "latest" ? "opus" : "sonnet";
-    return (
-      pickLatestChat("anthropic", (id) => {
-        const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(id);
-        if (!m) return null;
-        return { major: Number(m[1]), minor: Number(m[2]) };
-      }) ?? null
-    );
-  }
-  if (provider === "gemini") {
-    const allowed =
-      suffix === "latest"
-        ? new Set(["pro", "pro-preview"])
-        : new Set(["flash", "flash-lite", "flash-preview", "flash-lite-preview"]);
-    return (
-      pickLatestChat("gemini", (id) => {
-        const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);
-        if (!m) return null;
-        if (!allowed.has(m[3]!)) return null;
-        return { major: Number(m[1]), minor: Number(m[2]) };
-      }) ?? null
-    );
-  }
-  return null;
+  return pickChatModel(parts.provider, parts.suffix === "latest" ? "main" : "fast");
 }
 
 /**
@@ -101,7 +86,7 @@ export function expandLatestAlias(model: string): string {
 export interface LatestAliasEntry {
   /** The alias id stored in config and shown as the value, e.g. `openai/latest`. */
   alias: string;
-  /** The concrete model id the alias currently resolves to, e.g. `openai/gpt-5.5`. */
+  /** The concrete model id the alias currently resolves to, e.g. `openai/gpt-5.6-terra`. */
   resolved: string | null;
   provider: LatestAliasProvider;
   suffix: LatestAliasSuffix;
@@ -109,8 +94,8 @@ export interface LatestAliasEntry {
 
 /**
  * Enumerates every supported alias paired with its current resolution.
- * Used by the model picker to render the two virtual entries per
- * provider with a subtitle showing the concrete model.
+ * Used by the model picker to render the two virtual entries per provider
+ * with a subtitle showing the concrete model.
  */
 export function allLatestAliases(): LatestAliasEntry[] {
   const out: LatestAliasEntry[] = [];

@@ -2188,6 +2188,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/onboarding/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract

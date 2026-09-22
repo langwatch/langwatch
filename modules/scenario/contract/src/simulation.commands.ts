@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { scenarioEvaluationResultSchema } from "./schemas/event-schemas.ts";
+import { simulationTargetSchema } from "./simulation-target.ts";
 import { simulationMessageSchema } from "./simulation.ts";
 
 const simulationRunIdentitySchema = z.object({
@@ -22,12 +23,7 @@ export const simulationQueueRunSchema = z.object({
   ...simulationRunIdentitySchema.shape,
   ...simulationRunDetailsSchema.shape,
   secretParameters: z.record(z.string(), z.string()).optional(),
-  target: z
-    .object({
-      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
-      referenceId: z.string(),
-    })
-    .optional(),
+  target: simulationTargetSchema.optional(),
 });
 export type SimulationQueueRun = z.infer<typeof simulationQueueRunSchema>;
 
@@ -82,6 +78,7 @@ export const simulationFinishRunSchema = z.object({
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
   traceIds: z.array(z.string()).optional(),
+  target: simulationTargetSchema.optional(),
 });
 export type SimulationFinishRun = z.infer<typeof simulationFinishRunSchema>;
 

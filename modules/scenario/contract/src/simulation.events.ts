@@ -12,6 +12,7 @@ import {
   simulationEventMessageSchema,
   simulationEventResultsSchema,
 } from "./simulation-event.values.ts";
+import { simulationTargetSchema } from "./simulation-target.ts";
 
 const runSecretCiphertextSchema = z.record(z.string(), z.string());
 
@@ -48,12 +49,7 @@ export const simulationRunQueuedEventDataSchema = z.object({
    */
   secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
-  target: z
-    .object({
-      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
-      referenceId: z.string(),
-    })
-    .optional(),
+  target: simulationTargetSchema.optional(),
   /**
    * The evaluators the run is graded with, resolved from its suite and plan
    * when queued. Absent before this was recorded, and on a code-driven run,
@@ -130,6 +126,8 @@ export const simulationRunFinishedEventDataSchema = z.object({
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
   traceIds: z.array(z.string()).optional(),
+  /** Target the run executed against, carried forward from its queued event. */
+  target: simulationTargetSchema.optional(),
   /**
    * The evaluators the run is graded with, carried forward from its queued
    * event so nothing downstream re-reads the suite or plan. Backfilled live
