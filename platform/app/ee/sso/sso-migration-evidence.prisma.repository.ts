@@ -9,7 +9,6 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
-import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 import {
   connectionRefOf,
   finalizationBlockers,
@@ -26,6 +25,7 @@ import type {
   SsoMigrationFinalizationEvidence,
   SsoMigrationFinalizationReadPort,
 } from "./sso-migration-finalization.service";
+import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 import type { SsoMigrationProgressReadPort } from "./sso-self-serve.service";
 import type { SelfServeMigrationView } from "./sso-self-serve.types";
 
