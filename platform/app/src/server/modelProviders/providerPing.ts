@@ -166,15 +166,25 @@ function classify({
 function readFailure(error: unknown): {
   status: number | undefined;
   body: string;
+  answered: boolean;
 } {
   const carrier = error as { statusCode?: unknown; responseBody?: unknown };
   const status =
     typeof carrier?.statusCode === "number" ? carrier.statusCode : undefined;
+  const responseBody =
+    typeof carrier?.responseBody === "string" ? carrier.responseBody : "";
   const body = [
     error instanceof Error ? error.message : String(error ?? ""),
-    typeof carrier?.responseBody === "string" ? carrier.responseBody : "",
+    responseBody,
   ].join(" ");
-  return { status, body };
+  // Something that answered has a status line, a body, or both. A failure
+  // carrying neither never got that far, whatever words the SDK wrapped it
+  // in.
+  return {
+    status,
+    body,
+    answered: status !== undefined || responseBody !== "",
+  };
 }
 
 /**
@@ -214,6 +224,13 @@ function describeRefusal({
  * the provider itself is having a moment. A refusal we cannot place is the
  * provider's fault, not the customer's, so it says so rather than sending
  * them to check a key that is fine.
+ *
+ * A failure that never reached the provider is not a refusal at all, and the
+ * two must not be confused: "it answered and would not confirm the key" is
+ * the wrong thing to read when the address was never opened. What separates
+ * them is whether anything came back, not the words the SDK wrapped the
+ * failure in, which differ per transport (`Cannot connect to API` from the
+ * AI SDK, `fetch failed` from undici).
  */
 function verdictOf({
   provider,
@@ -224,11 +241,10 @@ function verdictOf({
   error: unknown;
   hasConfigurableEndpoint: boolean;
 }): ValidationResult {
-  const { status, body } = readFailure(error);
-  const classified =
-    status === undefined && /abort|timeout|fetch failed|network/i.test(body)
-      ? ("unreachable" as const)
-      : classify({ status, body });
+  const { status, body, answered } = readFailure(error);
+  const classified = answered
+    ? classify({ status, body })
+    : ("unreachable" as const);
   logger.info(
     { provider, status, classifiedAs: classified },
     `Connection ping refused (${describeRefusal({ provider, error, status, classified })})`,

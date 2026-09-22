@@ -218,6 +218,26 @@ describe("given a chat provider", () => {
     });
   });
 
+  describe("when nothing answers at the provider's address", () => {
+    /** @scenario "A generation that never reached the provider is not read as a refusal" */
+    it("reports it as unreachable rather than as a refusal", async () => {
+      // What the AI SDK throws when the connection itself fails: no status,
+      // no response body, and a message naming none of the words a transport
+      // happens to use.
+      generateTextMock.mockRejectedValue(
+        Object.assign(new Error("Cannot connect to API:  "), {
+          statusCode: undefined,
+          responseBody: undefined,
+        }),
+      );
+      const result = await pingModelProvider({
+        modelProvider: row(),
+        projectId: "project-1",
+      });
+      expect(refusedCode(result)).toBe("provider_unreachable");
+    });
+  });
+
   describe("when the provider refuses for a reason we cannot place", () => {
     it("attributes it to the provider", async () => {
       generateTextMock.mockRejectedValue(

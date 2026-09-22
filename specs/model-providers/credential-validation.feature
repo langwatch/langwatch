@@ -485,6 +485,16 @@ Feature: Credential Validation
     Then the connection is tested through the AI gateway, the way Langy reaches it
     And I am told whether it works, rather than that it cannot be tested
 
+  # "It answered and would not confirm the key" is the wrong thing to read
+  # when the address was never opened. What separates the two is whether
+  # anything came back, not the words the SDK wrapped the failure in.
+  @unit
+  Scenario: A generation that never reached the provider is not read as a refusal
+    Given I have a configured provider whose endpoint nothing answers on
+    When I test the connection
+    Then I am told the provider could not be reached
+    And I am not told the credential was refused
+
   @unit
   Scenario: A refused credential is not asked twice
     Given I have a configured provider whose credential the provider refuses
