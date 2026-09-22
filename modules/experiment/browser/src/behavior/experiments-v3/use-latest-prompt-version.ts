@@ -18,6 +18,8 @@ type UseLatestPromptVersionOptions = {
   configId: string | undefined;
   /** The current version number */
   currentVersion: number | undefined;
+  /** `false` for N-mounted instances (one per target column) — that storm was #5585. */
+  isLiveRefetchEnabled?: boolean;
 };
 
 /**
@@ -28,6 +30,7 @@ type UseLatestPromptVersionOptions = {
 export const useLatestPromptVersion = ({
   configId,
   currentVersion,
+  isLiveRefetchEnabled = true,
 }: UseLatestPromptVersionOptions): UseLatestPromptVersionResult => {
   const { project } = useOrganizationTeamProject();
 
@@ -44,8 +47,8 @@ export const useLatestPromptVersion = ({
     },
     {
       enabled: !!configId && !!project?.id,
-      staleTime: 0,
-      refetchOnWindowFocus: true,
+      staleTime: isLiveRefetchEnabled ? 0 : 30_000,
+      refetchOnWindowFocus: isLiveRefetchEnabled,
     },
   );
 
