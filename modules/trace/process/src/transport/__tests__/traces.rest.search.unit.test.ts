@@ -1,0 +1,574 @@
+/**
+ * `POST /api/v1/traces/search`: digest/json formats, evaluations, pagination,
+ * the projection DSL and the date axis, all over real services - only
+ * `TraceApi` itself is a double.
+ */
+import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  bindRestMiddleware,
+  createRestRuntime,
+  projectRestFacts,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
+import type {
+  Evaluation,
+  TraceApi,
+  TracesForProjectResult,
+  TraceWithGuardrail,
+} from "@langwatch/trace-contract";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+
+import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
+
+const PROTECTIONS = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+
+/** A `TraceWithGuardrail` row with the fields the search route reads. */
+function traceRow(input: {
+  traceId: string;
+  startedAt: number;
+  inputValue?: string;
+  outputValue?: string;
+}): TraceWithGuardrail {
+  return {
+    trace_id: input.traceId,
+    project_id: "project-123",
+    input: { value: input.inputValue ?? `input-${input.traceId}` },
+    output: { value: input.outputValue ?? `output-${input.traceId}` },
+    timestamps: {
+      started_at: input.startedAt,
+      inserted_at: input.startedAt,
+      updated_at: input.startedAt,
+    },
+    metadata: {},
+    spans: [],
+    lastGuardrail: undefined,
+  };
+}
+
+const TRACE_1 = traceRow({
+  traceId: "trace-1",
+  startedAt: 1000,
+  inputValue: "What is AI?",
+  outputValue: "AI is artificial intelligence.",
+});
+const TRACE_2 = traceRow({
+  traceId: "trace-2",
+  startedAt: 3000,
+  inputValue: "Hello",
+  outputValue: "Hi there",
+});
+
+const EVAL_1: Evaluation = {
+  evaluation_id: "eval-1",
+  evaluator_id: "evaluator-1",
+  name: "sentiment",
+  status: "processed",
+  score: 0.95,
+  label: "positive",
+  timestamps: { started_at: 1000, finished_at: 2000 },
+};
+
+function tracePage(rows: TraceWithGuardrail[], extra: Partial<TracesForProjectResult> = {}) {
+  return {
+    groups: rows.length > 0 ? [rows] : [],
+    totalHits: rows.length,
+    traceChecks: Object.fromEntries(rows.map((r) => [r.trace_id, []])),
+    ...extra,
+  };
+}
+
+const DEFAULT_PAGE: TracesForProjectResult = tracePage([TRACE_1, TRACE_2], {
+  traceChecks: { "trace-1": [EVAL_1], "trace-2": [] },
+});
+
+const boundaryErrorHandler: RestErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    const serialized = error.serialize();
+    return c.json(
+      { error: serialized.code, ...serialized.meta, reasons: serialized.reasons },
+      (serialized.httpStatus ?? 500) as ContentfulStatusCode,
+    );
+  }
+  return c.json({ error: "internal_server_error" }, 500);
+};
+
+function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}) {
+  const listTraces: TraceApi["listTraces"] =
+    overrides.listTraces ?? vi.fn(async () => DEFAULT_PAGE);
+  const resolveApiKeyProtections: TraceApi["resolveApiKeyProtections"] = vi.fn(
+    async () => PROTECTIONS,
+  );
+  const platformUrl: TraceApi["platformUrl"] = ({ projectSlug, path }) =>
+    `https://app.langwatch.test/${projectSlug}${path}`;
+
+  const stub = createApiFixture<TraceApi>({ listTraces, resolveApiKeyProtections, platformUrl });
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({
+        actor: { type: "user" as const, id: "user-1" },
+        scope: { tier: "project" as const, id: "project-123" },
+      }),
+    },
+  });
+
+  const hono = runtime.mount(tracesRest.router(), {
+    app: () => stub,
+    credential: "project",
+    onError: boundaryErrorHandler,
+    facts: [
+      bindRestMiddleware(projectRestFacts, () => ({
+        projectSlug: "project-one",
+        viewerUserId: null,
+        actorId: "user-1",
+      })),
+      bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: "user-1" })),
+    ],
+  });
+
+  const send = (body: Record<string, unknown>) =>
+    hono.request("http://api.test/api/v1/traces/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  return { send, listTraces };
+}
+
+/** The `/search` response envelope, typed loosely at the boundary a real client reads it at. */
+type SearchBody = Readonly<{
+  traces: Record<string, unknown>[];
+  pagination: Record<string, unknown>;
+  schema?: Record<string, unknown>;
+  error?: string;
+  reasons?: { code: string; meta: Record<string, unknown> }[];
+}>;
+
+async function bodyOf(res: Response): Promise<SearchBody> {
+  return (await res.json()) as SearchBody;
+}
+
+describe("POST /search", () => {
+  describe("when format is digest", () => {
+    it("passes includeSpans as false by default", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, format: "digest" });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ options: expect.objectContaining({ includeSpans: false }) }),
+      );
+    });
+
+    it("returns compact summary digests instead of full span content", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "digest" });
+      const body = await bodyOf(res);
+      expect(body.traces).toHaveLength(2);
+      expect(body.traces[0]?.formatted_trace).toBe(
+        "Input: What is AI?\nOutput: AI is artificial intelligence.",
+      );
+    });
+
+    it("includes trace metadata in each digest entry", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "digest" });
+      const body = await bodyOf(res);
+      const first = body.traces[0];
+      expect(first).toHaveProperty("trace_id", "trace-1");
+      expect(first).toHaveProperty("input");
+      expect(first).toHaveProperty("output");
+      expect(first).toHaveProperty("timestamps");
+      expect(first).toHaveProperty("metadata");
+    });
+  });
+
+  describe("when includeSpans is true", () => {
+    it("passes includeSpans true to the trace service", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, format: "json", includeSpans: true });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ options: expect.objectContaining({ includeSpans: true }) }),
+      );
+    });
+  });
+
+  describe("when format is json", () => {
+    it("returns raw trace data", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "json" });
+      const body = await bodyOf(res);
+      expect(body.traces).toHaveLength(2);
+      expect(body.traces[0]).toHaveProperty("trace_id", "trace-1");
+      expect(body.traces[0]).not.toHaveProperty("formatted_trace");
+    });
+  });
+
+  describe("when format defaults via llmMode", () => {
+    it("uses digest format when llmMode is true", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, llmMode: true });
+      const body = await bodyOf(res);
+      expect(body.traces[0]).toHaveProperty("formatted_trace");
+    });
+  });
+
+  describe("when traceChecks contains evaluations", () => {
+    it("includes evaluations in json format response traces", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "json" });
+      const body = await bodyOf(res);
+      expect(body.traces[0]?.evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1]?.evaluations).toEqual([]);
+    });
+
+    it("includes evaluations in digest format response traces", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "digest" });
+      const body = await bodyOf(res);
+      expect(body.traces[0]?.evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1]?.evaluations).toEqual([]);
+    });
+
+    it("includes evaluations when llmMode is true", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, llmMode: true });
+      const body = await bodyOf(res);
+      expect(body.traces[0]?.evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1]?.evaluations).toEqual([]);
+    });
+  });
+
+  describe("when result set is large", () => {
+    it("serializes many traces with correct comma separation", async () => {
+      const manyTraces = Array.from({ length: 50 }, (_, i) =>
+        traceRow({ traceId: `trace-${i}`, startedAt: i * 100 }),
+      );
+      const { send } = mount({
+        listTraces: vi.fn(async () => tracePage(manyTraces, { scrollId: "next-page-token" })),
+      });
+
+      const res = await send({ startDate: 0, endDate: 10000 });
+      const body = await bodyOf(res);
+      expect(body.traces).toHaveLength(50);
+      expect(body.traces[0]?.trace_id).toBe("trace-0");
+      expect(body.traces[49]?.trace_id).toBe("trace-49");
+      expect(body.pagination.scrollId).toBe("next-page-token");
+    });
+
+    describe("when the service reports an updated-axis snapshot boundary", () => {
+      it("puts it on the wire, since a client cannot resume safely without it", async () => {
+        const { send } = mount({
+          listTraces: vi.fn(async () =>
+            tracePage([TRACE_1, TRACE_2], {
+              scrollId: "next-page-token",
+              updatedThrough: 1_700_000_123_456,
+            }),
+          ),
+        });
+
+        const res = await send({ startDate: 0, endDate: 10000 });
+        const body = await bodyOf(res);
+        expect(body.pagination.updatedThrough).toBe(1_700_000_123_456);
+      });
+    });
+
+    describe("when the service reports no snapshot boundary", () => {
+      it("omits the field rather than sending a null a client might resume from", async () => {
+        const { send } = mount({
+          listTraces: vi.fn(async () =>
+            tracePage([TRACE_1, TRACE_2], { scrollId: "next-page-token" }),
+          ),
+        });
+
+        const res = await send({ startDate: 0, endDate: 10000 });
+        const body = await bodyOf(res);
+        expect(body.pagination).not.toHaveProperty("updatedThrough");
+      });
+    });
+
+    it("returns valid JSON for empty result set", async () => {
+      const { send } = mount({ listTraces: vi.fn(async () => tracePage([])) });
+      const res = await send({ startDate: 1000, endDate: 5000 });
+      const body = await bodyOf(res);
+      expect(body.traces).toHaveLength(0);
+      expect(body.pagination.totalHits).toBe(0);
+    });
+  });
+
+  describe("when a trace fails to serialize", () => {
+    it("drops it and surfaces a skipped count in pagination", async () => {
+      const badTrace = traceRow({ traceId: "bad-trace", startedAt: 1 });
+      const metadata: Record<string, unknown> = badTrace.metadata as Record<string, unknown>;
+      metadata.self = badTrace; // a circular ref makes JSON.stringify throw in the serialize loop
+
+      const { send } = mount({
+        listTraces: vi.fn(async () => tracePage([badTrace, TRACE_1])),
+      });
+
+      const res = await send({ startDate: 1000, endDate: 5000, format: "json" });
+      const body = await bodyOf(res);
+      expect(body.traces).toHaveLength(1);
+      expect(body.traces[0]?.trace_id).toBe("trace-1");
+      expect(body.pagination.skipped).toBe(1);
+    });
+
+    it("omits skipped from pagination when nothing is dropped", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "json" });
+      const body = await bodyOf(res);
+      expect(body.pagination).not.toHaveProperty("skipped");
+    });
+  });
+
+  describe("when no projection select is provided", () => {
+    it("does not compile a projection", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      await send({ startDate: 1000, endDate: 5000, format: "json" });
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("omits the schema field from the response", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, format: "json" });
+      const body = await bodyOf(res);
+      expect(body).not.toHaveProperty("schema");
+    });
+  });
+
+  describe("when a projection select is provided", () => {
+    it("compiles the projection with from, select, and protections", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      await send({ startDate: 1000, endDate: 5000, from: "traces", select: ["trace_id"] });
+      expect(spy).toHaveBeenCalledWith({
+        from: "traces",
+        select: ["trace_id"],
+        protections: PROTECTIONS,
+      });
+      spy.mockRestore();
+    });
+
+    it("forwards the compiled plan to the trace service", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, from: "traces", select: ["trace_id"] });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({ projection: spy.mock.results[0]?.value.plan }),
+        }),
+      );
+      spy.mockRestore();
+    });
+
+    it("projects each trace through the compiled projector", async () => {
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      const body = await bodyOf(res);
+      expect(body.traces).toEqual([{ trace_id: "trace-1" }, { trace_id: "trace-2" }]);
+    });
+
+    it("includes the resolved schema in the response envelope", async () => {
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      const body = await bodyOf(res);
+      expect(body.schema).toEqual({
+        from: "traces",
+        columns: [{ path: "trace_id", type: "string", collection: false }],
+      });
+    });
+
+    it("defaults from to traces when only select is provided", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      await send({ startDate: 1000, endDate: 5000, select: ["trace_id"] });
+      expect(spy).toHaveBeenCalledWith({
+        from: "traces",
+        select: ["trace_id"],
+        protections: PROTECTIONS,
+      });
+      const res = await send({ startDate: 1000, endDate: 5000, select: ["trace_id"] });
+      const body = await bodyOf(res);
+      expect(body).toHaveProperty("schema");
+      spy.mockRestore();
+    });
+  });
+
+  describe("when the projection select is invalid", () => {
+    it("responds 422", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, select: ["nonexistent_field"] });
+      expect(res.status).toBe(422);
+    });
+
+    // The path used to be concatenated into the sentence. It is structure now:
+    // an unknown select path is a field violation like any other, so a caller
+    // reads it where it reads every other one - reasons[].meta. See
+    // specs/features/domain-error-contract.feature.
+    it("names the invalid path in a reason rather than in the message", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, select: ["nonexistent_field"] });
+      const body = await bodyOf(res);
+      expect(body.error).toBe("validation_error");
+      expect(body.reasons).toHaveLength(1);
+      expect(body.reasons?.[0]?.code).toBe("schema_failure");
+      expect(body.reasons?.[0]?.meta.field).toBe("select");
+      expect(body.reasons?.[0]?.meta.received).toBe("nonexistent_field");
+    });
+
+    it("does not query the trace service", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, select: ["nonexistent_field"] });
+      expect(listTraces).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the projection request fails schema validation", () => {
+    it("rejects an unsupported from entity with 422", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        from: "sessions",
+        select: ["trace_id"],
+      });
+      expect(res.status).toBe(422);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("rejects an empty select array with 422", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, select: [] });
+      expect(res.status).toBe(422);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("rejects a select with more than 200 paths with 422", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        select: Array.from({ length: 201 }, (_, i) => `metadata.key_${i}`),
+      });
+      expect(res.status).toBe(422);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it("rejects a select path longer than 256 characters with 422", async () => {
+      const spy = vi.spyOn(TraceProjectionCompileService, "compileProjection");
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        select: [`metadata.${"x".repeat(300)}`],
+      });
+      expect(res.status).toBe(422);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
+  describe("when a date axis is specified", () => {
+    it("forwards dateField 'updated' to the trace service", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, dateField: "updated" });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ options: expect.objectContaining({ dateField: "updated" }) }),
+      );
+    });
+
+    it("defaults dateField to occurred when not specified", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000 });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ options: expect.objectContaining({ dateField: "occurred" }) }),
+      );
+    });
+
+    it("rejects an unsupported date axis with 422", async () => {
+      const { send } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, dateField: "created" });
+      expect(res.status).toBe(422);
+    });
+  });
+});
+
+/**
+ * FINDING search-filter-door-missing (handoff §11): `traceSearchBodySchema`
+ * has no `filter` field, so upstream's compiled query-language filter never
+ * reaches this route. `it.todo` pending that door - do not edit the route.
+ */
+
+/* oxlint-disable vitest/warn-todo -- the finding above names why these stay todo */
+describe("POST /search with a trace filter", () => {
+  describe("when the filter is well formed", () => {
+    it.todo("passes a compiled condition down, not the string");
+    it.todo("bounds the translation to the window the search asked for");
+    it.todo("does not forward the raw string as a search field");
+  });
+
+  describe("when no filter is sent", () => {
+    it.todo("sends no condition of the filter's own");
+  });
+
+  describe("when the filter is whitespace", () => {
+    it.todo("is the same request as no filter");
+  });
+
+  // specs/langy/langy-trace-explorer-actions.feature has these three scenario
+  // titles already, unbound - the capability they need is this same missing door.
+  describe("given the origins the Trace Explorer leaves out", () => {
+    describe("when the search names no origin", () => {
+      it.todo("excludes the Langy origin, after the filter's own terms");
+    });
+
+    describe("when the filter names an origin", () => {
+      it.todo("excludes no origin");
+    });
+
+    describe("when the origin filter names an origin", () => {
+      it.todo("excludes no origin");
+    });
+  });
+
+  describe("when the filter cannot be parsed", () => {
+    it.todo("answers 422 naming the filter field");
+  });
+
+  describe("when a span clause rides the updated axis", () => {
+    it.todo("answers 422 rather than a result set missing rows");
+    it.todo("allows a trace-level clause on the same axis");
+    it.todo("allows the same span clause on the occurred axis");
+  });
+
+  describe("when the filter names a field the language does not have", () => {
+    it.todo("answers 422 and names the fields that exist");
+  });
+});
