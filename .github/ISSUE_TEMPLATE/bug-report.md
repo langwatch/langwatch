@@ -18,8 +18,8 @@ Steps to reproduce the behavior:
 
 **Expected behaviour as acceptance criteria**
 
-- Given <context>, when <action>, then <expected outcome>
-- Given <context>, when <action>, then <expected outcome>
+- Given [context], when [action], then [expected outcome]
+- Given [context], when [action], then [expected outcome]
 
 ## Definition of Done
 
