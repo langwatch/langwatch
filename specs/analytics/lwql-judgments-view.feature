@@ -26,12 +26,6 @@ Feature: The judgments dataset, an Instant Eval run's answers as ordinary SQL
     Then it joins on the tenant and the trace id
     And its partition-pruning time column is when the judgement was written
 
-  @unit
-  Scenario: The published catalog and the code catalog agree
-    When the shipped catalog manifest is compared with the code
-    Then the judgments dataset is a granted view in both
-    And its source table is a granted read in both
-
   @integration
   Scenario: A judgement written by one project is invisible to another
     Given a judgement written for another project

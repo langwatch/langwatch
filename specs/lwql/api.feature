@@ -813,15 +813,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given the chart is rendered with chart-managed ClickHouse at one replica and at three replicas
     Then the application pod template differs between the two renders
 
-  # Design C: whoever owns the ClickHouse server owns the access model. The app
-  # self-provisions ONLY when it owns nothing else — external/BYO ClickHouse. For
-  # chart-managed ClickHouse the owning pod renders the access model as config, so
-  # the app must not also run the provisioning DDL (one owner per entity name).
+  # Issue #8258: the application always owns the LangWatchQL access model. There
+  # is no self-provision switch and no rendered access model — every deployment,
+  # chart-managed or external ClickHouse, hands the app only the two LWQL
+  # passwords, and the app converges the whole model at boot.
   @e2e
-  Scenario: App self-provisioning is exclusive to external ClickHouse under Design C
+  Scenario: The application self-provisions the LangWatchQL access model on every deployment
     Given the chart is rendered once with chart-managed ClickHouse and once with external ClickHouse
-    Then the application carries the LangWatchQL self-provisioning environment variable only in the external-ClickHouse render
-    And the chart-managed render leaves provisioning to the ClickHouse server that owns the access model
+    Then both renders hand the application the two LangWatchQL passwords and no self-provision switch
+    And neither render carries a rendered LangWatchQL access model for the ClickHouse server to own
 
   @e2e
   Scenario: A single-replica deployment provisions LangWatchQL unchanged
@@ -843,11 +843,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the database engine is unchanged
     And provisioning against a database name that differs from the connection URL's is refused
 
-  # P1 (#6635): under LWQL_SELF_PROVISION every app pod runs the convergence at
-  # boot, and it is destructive (CREATE USER OR REPLACE, drop/recreate the
-  # PostgreSQL-engine tables, grants, row policies). Two pods running it at once
-  # race — one recreating the restricted identity while another queries through
-  # it mid-drop. A single global Postgres advisory lock gates entry so the
+  # P1 (#6635): every app pod runs the convergence at boot, and it is
+  # destructive (CREATE USER OR REPLACE, drop/recreate the PostgreSQL-engine
+  # tables, grants, row policies). Two pods running it at once race — one
+  # recreating the restricted identity while another queries through it
+  # mid-drop. A single global Postgres advisory lock gates entry so the
   # sequence runs one pod at a time; the convergence is idempotent, so the pod
   # that waits simply re-runs it.
   @integration
@@ -855,6 +855,44 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given two pods run the LangWatchQL self-provision convergence at the same time
     Then the two locked bodies never overlap
     And one run finishes before the other starts
+
+  # Issue #8258: the app owns the access model on every distribution, so the
+  # connection is derived whenever the password is present — there is no
+  # self-provision switch to read.
+  @unit
+  Scenario: Provisioning no longer reads a self-provision switch
+    Given LWQL_CLICKHOUSE_PASSWORD and CLICKHOUSE_URL are set
+    When the LangWatchQL connection is derived from the environment
+    Then the restricted connection is returned
+
+  # Issue #8258: where the ClickHouse server itself owns an LWQL entity in its
+  # read-only config store (users.xml / config.xml), provisioning yields to it
+  # and provisions the rest, rather than crashing the boot.
+  @integration
+  Scenario: A config-defined LangWatchQL entity is skipped, not fatal
+    Given a ClickHouse whose users.d defines the langwatch_lwql user and lwql_restricted profile
+    And whose config.d defines the lwql_postgres named collection
+    When LangWatchQL provisioning runs against it
+    Then each config-defined entity is logged as skipped at warn and provisioning does not fail
+    And the LangWatchQL views and the config-defined restricted identity both exist afterwards
+
+  @unit
+  Scenario: A config-store readonly error on one statement does not abort the rest
+    Given a statement list where one statement is rejected with a config-store read-only error
+    When the config-store-tolerant runner executes the list
+    Then that statement is skipped and reported while the remaining statements still run
+    And a statement rejected for any other reason still aborts the run
+
+  # Issue #8258: the app owns the LangWatchQL access model on every distribution,
+  # so the chart-managed ClickHouse renderer must render none of it — no
+  # identity, profile, row policy or named collection — while still granting the
+  # default user the management privileges the app's convergence needs at boot.
+  @unit
+  Scenario: Chart-managed ClickHouse renders no LangWatchQL access model
+    Given the clickhouse-serverless renderer runs with any input
+    When the rendered users.d and config.d output is inspected
+    Then no langwatch_lwql user, lwql_restricted profile, row policy or lwql_postgres named collection is rendered
+    And the default user keeps access_management and named_collection_control and the custom_ settings prefix
 
   @integration
   Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
@@ -1215,12 +1253,6 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When the query door resolves the caller's content protections
       Then a content category is offered only when every readable project grants it
       And an empty readable set offers no content
-
-    @unit
-    Scenario: The tenant predicate and the rendered config predicate are the same text
-      Given the single-sourced LangWatchQL tenant predicate template
-      When the application row policy and the rendered ClickHouse config are compared
-      Then both use the same predicate text, so neither can drift into over-broad or empty results
 
   Rule: Discover what I can ask
 

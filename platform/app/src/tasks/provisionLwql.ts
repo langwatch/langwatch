@@ -1,41 +1,41 @@
 /**
- * Deploy-time provisioning for LangWatchQL: creates the ClickHouse-native
- * views and the PostgreSQL approved views, and backfills the key-map table
- * from every project's `lwqlKey`. In the explicit five-`LWQL_*`-variables
- * deployment (the SaaS cloud), the ClickHouse access model (restricted user,
- * settings profile, grants, row policies) and the PostgreSQL-mapped views are
- * infra's job — terraform provisions both out of band, and this task touches
- * neither.
+ * Deploy-time provisioning for LangWatchQL: the application owns the whole
+ * access model on every distribution (issue #8258) and converges it on every
+ * boot. Whenever `LWQL_CLICKHOUSE_PASSWORD` (+ `LWQL_POSTGRES_READER_PASSWORD`)
+ * is set, this task provisions the PostgreSQL reader role, the ClickHouse
+ * restricted identity, its settings profile, grants and row policies, the
+ * named collection, the PostgreSQL-engine tables, the views, and backfills the
+ * key-map table from every project's `lwqlKey` — from
+ * `../server/analytics/lwql/provisioning/selfProvisioning.ts`'s composition.
  *
- * Under `LWQL_SELF_PROVISION=true` (issue #6635 — the Helm chart and other
- * self-hosted distributions) there is no terraform, and this task owns the
- * whole model: it additionally converges the PostgreSQL reader role, the
- * restricted identity, the named collection, and the PostgreSQL-engine
- * tables, from `../server/analytics/lwql/provisioning/selfProvisioning.ts`'s composition.
- * That path is deliberately non-fatal — a default-on feature must never turn
- * a server-side provisioning failure into a boot crashloop; the endpoint
- * simply stays fail-closed ("unavailable") until the next boot converges.
+ * The path is deliberately non-fatal — a default-on feature must never turn a
+ * server-side provisioning failure into a boot crashloop; the endpoint simply
+ * stays fail-closed ("unavailable") until the next boot converges. Where the
+ * ClickHouse server already owns an LWQL entity in its own read-only config
+ * store (users.xml / config.xml), that entity's statements are logged and
+ * skipped and the rest is still provisioned — see `runClickHouseStatements`.
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
- * this task writes into) in `start:prepare:db`. A deploy with no `LWQL_*`
- * environment configured is unaffected: {@link lwqlConnectionFromEnv} returns
- * `null` and this task exits immediately. Idempotent every run — every
+ * this task writes into) in `start:prepare:db`. A deploy with no
+ * `LWQL_CLICKHOUSE_PASSWORD` is unaffected: {@link lwqlSelfProvisionFromEnv}
+ * returns `null` and this task exits immediately. Idempotent every run — every
  * generator emits `IF NOT EXISTS`/`OR REPLACE`/`CREATE OR REPLACE` DDL, and
  * the key-map backfill only inserts rows missing from the table.
  *
- * @see ../server/analytics/lwql/provisioning/productionProvisioning.ts — the pure
+ * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the pure
  *   composition this orchestrates
- * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the self-hosted extras
+ * @see ../server/analytics/lwql/provisioning/clickhouseStatementRunner.ts — the
+ *   config-store-tolerant statement runner
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
   canProvisionAppFunctions,
+  inventoryConfigStoreLwqlEntities,
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   LWQL_POSTGRES_READER_ROLE,
@@ -43,16 +43,16 @@ import {
   type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlPostgresReaderModeFromEnv,
   lwqlPostgresSchemaFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
-  postgresReaderStatementsFor,
   probeAppFunctionStore,
-  productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
+  redactSecrets,
+  runClickHouseStatements,
   selfHostedClickHouseProvisioningStatements,
+  selfHostedPostgresReaderStatements,
   withLwqlSelfProvisionLock,
   withTenancyOptOut,
 } from "../server/analytics/lwql/provisioning";
@@ -178,61 +178,6 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Replaces every occurrence of each secret with a fixed marker.
- *
- * A ClickHouse error echoes the statement that failed, and the access-model
- * DDL embeds the restricted identity's password (`CREATE USER ... IDENTIFIED
- * WITH sha256_password BY '...'`) and the named collection's PostgreSQL reader
- * password; a connection error can surface the admin `CLICKHOUSE_URL` or
- * `DATABASE_URL`. Everything logged out of a provisioning failure goes through
- * here first. Literal `split`/`join` so no secret has to be escaped into a
- * regexp; empty and undefined secrets are skipped rather than matched.
- */
-export function redactSecrets(
-  text: string,
-  secrets: readonly (string | undefined)[],
-): string {
-  let redacted = text;
-  for (const secret of secrets) {
-    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
-  }
-  return redacted;
-}
-
-/**
- * One statement per round trip rather than a single batched command: a failure
- * here is an operator's problem to fix, and ClickHouse reports only that *the*
- * command failed. Sending them individually is what lets the log name which
- * one, which is the difference between an actionable error and "provisioning
- * failed".
- */
-async function runClickHouseStatements({
-  client,
-  statements,
-  secrets = [],
-}: {
-  client: ClickHouseClient;
-  statements: string[];
-  /** Values to strip from the logged error — see {@link redactSecrets}. */
-  secrets?: readonly (string | undefined)[];
-}): Promise<void> {
-  for (const [index, statement] of statements.entries()) {
-    try {
-      await client.command({ query: statement });
-    } catch (error) {
-      logger.error(
-        {
-          error: redactSecrets(errorMessage(error), secrets),
-          statement: `${index + 1}/${statements.length}`,
-        },
-        "lwql provisioning failed creating ClickHouse objects",
-      );
-      throw error;
-    }
-  }
-}
-
-/**
  * Whether this server can hold the app functions on every replica. A server
  * that cannot is provisioned without them, with the setting named in the log:
  * half the replicas answering UNKNOWN_FUNCTION is worse than none of them.
@@ -257,11 +202,12 @@ async function appFunctionsProvisionable(
 }
 
 /**
- * The `LWQL_SELF_PROVISION=true` path: the whole model, and never a thrown
- * error. This mode ships default-on in the Helm chart, so a ClickHouse server
- * that refuses access-model DDL (say, an external one without
- * `access_management` for the admin user) must degrade to a loud log and a
- * fail-closed endpoint, not a crashlooping deployment.
+ * Provisions the whole LangWatchQL model, and never throws. It ships default-on
+ * on every distribution, so a ClickHouse server that refuses access-model DDL
+ * (say, an external one without `access_management` for the admin user) must
+ * degrade to a loud log and a fail-closed endpoint, not a crashlooping
+ * deployment. A server that already owns an LWQL entity in its read-only config
+ * store is yielded to, per statement, by {@link runClickHouseStatements}.
  */
 async function selfProvisionAll({
   selfProvision,
@@ -274,7 +220,7 @@ async function selfProvisionAll({
 }): Promise<void> {
   logger.info(
     { database: names.database, sourceDatabase },
-    "self-provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views (LWQL_SELF_PROVISION)",
+    "provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views",
   );
 
   // Everything this path can log carries one of these somewhere: the access
@@ -318,17 +264,23 @@ async function selfProvisionAll({
           // directly.
           readerRole: LWQL_POSTGRES_READER_ROLE,
         }),
-        // After the views: the reader role's grants name them.
-        ...postgresReaderStatementsFor({
-          mode: "manage-role",
+        // After the views: the reader role's grants name them. The app owns
+        // the dedicated lwql_ro reader on every distribution, converging it
+        // from the reader password alone.
+        ...selfHostedPostgresReaderStatements({
           schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
           readerPassword: selfProvision.postgresReaderPassword,
-        }).statements,
+        }),
       ]);
 
       await withAdminClickHouseClient(async (client) => {
+        // Named first at WARN so the operator sees by name any LWQL identity
+        // the ClickHouse server already owns in its read-only config store,
+        // before the statements that will skip it run.
+        await inventoryConfigStoreLwqlEntities({ client, names });
+
         const includeAppFunctions = await appFunctionsProvisionable(client);
-        await runClickHouseStatements({
+        const { skipped } = await runClickHouseStatements({
           client,
           secrets,
           statements: selfHostedClickHouseProvisioningStatements({
@@ -342,6 +294,12 @@ async function selfProvisionAll({
             includeAppFunctions,
           }),
         });
+        if (skipped.length > 0) {
+          logger.warn(
+            { skippedCount: skipped.length },
+            "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
+          );
+        }
 
         // Same non-fatal contract as the explicit path: the backfill is
         // convergent, so a slow key-map table must not undo the provisioning
@@ -366,145 +324,29 @@ async function selfProvisionAll({
 }
 
 export default async function execute() {
-  // The mode is whichever one the operator asked for, never whichever one's
-  // inputs happen to have arrived. `LWQL_SELF_PROVISION=true` with an
-  // incomplete Secret (both passwords are `optional: true` in the chart) used
-  // to fall through to the explicit path below — which is fatal on error,
-  // rethrown by the task runner into `start.sh`'s `set -e`, i.e. a
-  // CrashLoopBackOff for a feature the chart promises will "degrade, not brick
-  // an upgrade". Self-provisioning declines loudly and lets the pod boot.
-  const selfProvisionRequested = process.env.LWQL_SELF_PROVISION === "true";
+  // The app owns the model on every distribution, so there is one path and no
+  // switch. `lwqlSelfProvisionFromEnv` returns the derived inputs when both
+  // LangWatchQL passwords are set, or null when they are not.
   const selfProvision = lwqlSelfProvisionFromEnv();
-  if (selfProvisionRequested && !selfProvision) {
-    logger.warn(
-      "LWQL_SELF_PROVISION is true but its inputs are incomplete — skipping provisioning this boot; LangWatchQL queries stay refused (fail-closed) until the configuration is complete",
-    );
+  if (!selfProvision) {
+    // A password present but the inputs incomplete (both are `optional: true`
+    // in the chart) is a misconfiguration to surface, not a crash: declining
+    // loudly keeps the boot-never-crashes contract. No password at all is
+    // simply a deployment not running LangWatchQL.
+    if (process.env.LWQL_CLICKHOUSE_PASSWORD) {
+      logger.warn(
+        "LangWatchQL is partially configured — skipping provisioning this boot; queries stay refused (fail-closed) until the configuration is complete",
+      );
+    } else {
+      logger.info("LWQL not configured, skipping");
+    }
     return;
   }
 
-  const connection = selfProvision?.connection ?? lwqlConnectionFromEnv();
-  if (!connection) {
-    logger.info("LWQL not configured, skipping");
-    return;
-  }
-
-  const names = productionLangWatchQLNames({ connection });
+  const names = productionLangWatchQLNames({
+    connection: selfProvision.connection,
+  });
   const { database: sourceDatabase } = parseConnectionUrl();
 
-  if (selfProvision) {
-    await selfProvisionAll({ selfProvision, names, sourceDatabase });
-    return;
-  }
-
-  logger.info(
-    { database: names.database, sourceDatabase },
-    "provisioning LangWatchQL objects — the ClickHouse access model and PostgreSQL-mapped views are provisioned by infra, out of band",
-  );
-
-  // The schema the tables actually live in (Prisma's `?schema=` URL
-  // parameter), not a hardcoded `public` — the SaaS cloud deploys with
-  // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(
-    process.env.DATABASE_URL,
-  );
-
-  // The reader role the named collection dials PostgreSQL as. Two ownership
-  // models on the non-self-provision path, told apart by the EXPLICIT
-  // LWQL_MANAGE_POSTGRES_READER flag (see lwqlPostgresReaderModeFromEnv) —
-  // never by "a password arrived", which the mode selection at the top of this
-  // task forbids and which SaaS/terraform (it may set the reader password for
-  // its own uses) would otherwise trip:
-  //   - "manage-role" — chart-managed ClickHouse PAIRED WITH chart-managed
-  //     PostgreSQL (Helm, issue #6635): nothing else creates the reader, so
-  //     the chart hands us LWQL_MANAGE_POSTGRES_READER=true plus the reader
-  //     password and the app converges lwql_ro here (the same Secret key the
-  //     subchart mounts the collection's password from) before ClickHouse
-  //     dials it. Shares selfProvisioning's builder so the role's isolation
-  //     (read-only, statement timeout, connection budget, approved-view-only
-  //     grants) is identical to the self-provisioned server's.
-  //   - "grants-only" — SaaS/terraform, or an operator-owned external
-  //     PostgreSQL: the reader role is owned out of band and the app holds no
-  //     mandate to touch it, so it only re-issues the view grants against
-  //     whatever views exist now (a view added by this deploy would otherwise
-  //     have no grant until someone re-ran the out-of-band job). A no-op where
-  //     the role is absent. Running CREATE/ALTER ROLE here would either
-  //     crashloop a default-on feature (a non-superuser DATABASE_URL) or
-  //     silently rotate the operator's own reader password.
-  //
-  // Computed before the approved views are provisioned (not just before the
-  // reader statements below) so the views' own upgrade-path fallback can
-  // re-grant this same role — see productionPostgresApprovedViewStatements's
-  // `readerRole`. On manage-role the chart never sets a custom role name, so
-  // this is always the dedicated LWQL_POSTGRES_READER_ROLE there too.
-  const readerMode = lwqlPostgresReaderModeFromEnv();
-  const explicitReaderRole =
-    readerMode === "manage-role"
-      ? LWQL_POSTGRES_READER_ROLE
-      : process.env.LWQL_POSTGRES_READER_ROLE || LWQL_POSTGRES_READER_ROLE;
-
-  try {
-    await runPostgresStatements(
-      productionPostgresApprovedViewStatements({
-        schema: postgresSchema,
-        readerRole: explicitReaderRole,
-      }),
-    );
-    // The two modes take different inputs (manage-role converges the dedicated
-    // lwql_ro reader from the password alone; grants-only re-grants a
-    // caller-named role), so dispatch per arm rather than passing a role that
-    // the manage-role arm would ignore. On manage-role WITH a password, role is
-    // simply not passed (the app always converges lwql_ro there). On manage-role
-    // WITHOUT a password, the grants-only fallback grants the DEFAULT lwql_ro
-    // role, not LWQL_POSTGRES_READER_ROLE — the chart never sets that env var on
-    // this path, so passing it through would silently grant nothing.
-    const readerResult =
-      readerMode === "manage-role"
-        ? postgresReaderStatementsFor({
-            mode: "manage-role",
-            readerPassword: process.env.LWQL_POSTGRES_READER_PASSWORD,
-            schema: postgresSchema,
-          })
-        : postgresReaderStatementsFor({
-            mode: "grants-only",
-            schema: postgresSchema,
-            role: process.env.LWQL_POSTGRES_READER_ROLE,
-          });
-    if (readerResult.warningMessage) {
-      logger.warn(readerResult.warningMessage);
-    }
-    await runPostgresStatements(readerResult.statements);
-  } catch (error) {
-    logger.error(
-      { error },
-      "lwql provisioning failed creating PostgreSQL approved views",
-    );
-    throw error;
-  }
-
-  await withAdminClickHouseClient(async (client) => {
-    await runClickHouseStatements({
-      client,
-      statements: productionClickHouseObjectStatements({
-        names,
-        sourceDatabase,
-      }),
-    });
-
-    // Fatal, exactly like the views above. The inline sync on project
-    // creation only ever covers projects created *after* a failure, so a
-    // backfill that fails on the first deploy leaves every pre-existing
-    // project without a key-map row until some later deploy happens to
-    // re-run this task. That state is not a degraded LangWatchQL, it is a
-    // silently wrong one: the row policies resolve an absent hash to an
-    // empty tenant set, so queries return zero rows with HTTP 200 rather
-    // than `lwql_unavailable`, and nothing in the request path detects it.
-    //
-    // Failing the deploy costs nothing extra in availability terms: this
-    // runs on the same admin client as the ClickHouse objects above, so any
-    // outage able to fail the backfill has already failed those and aborted
-    // the deploy one step earlier.
-    await backfillKeyMap({ client, names, sourceDatabase });
-  });
-
-  logger.info("LangWatchQL provisioning complete");
+  await selfProvisionAll({ selfProvision, names, sourceDatabase });
 }

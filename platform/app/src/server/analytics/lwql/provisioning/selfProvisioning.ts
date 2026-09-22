@@ -1,30 +1,30 @@
 /**
- * LangWatchQL self-provisioning — the deployment mode where the application
- * itself owns the whole access model (issue #6635).
+ * LangWatchQL self-provisioning — the application owns the whole access model
+ * on every distribution (issue #8258).
  *
- * The SaaS cloud provisions the restricted identity, profile, grants, row
- * policies, named collection and reader role out of band (terraform,
- * langwatch-saas#1126), so the app there only ever *uses* the five `LWQL_*`
- * values. A self-hosted install has no terraform: it holds admin credentials
- * for both stores by construction (`CLICKHOUSE_URL`, `DATABASE_URL`), and this
- * module is what turns those into a working LangWatchQL deployment on every
- * boot — `LWQL_SELF_PROVISION=true` plus two generated passwords in, the five
- * `LWQL_*` values derived, every access-model object converged idempotently.
+ * The app holds admin credentials for both stores by construction
+ * (`CLICKHOUSE_URL`, `DATABASE_URL`), so it does not wait on any out-of-band
+ * job to provision the restricted identity, profile, grants, row policies,
+ * named collection or reader role: this module turns those admin credentials
+ * into a working LangWatchQL deployment on every boot — the two generated
+ * passwords in, the `LWQL_*` connection values derived, every access-model
+ * object converged idempotently. Where the ClickHouse server instead owns an
+ * entity in its own config store, provisioning yields to it and provisions the
+ * rest (see `clickhouseStatementRunner.ts`).
  *
  * Two halves, matching the split the rest of the module keeps:
  *
  *  - **Env derivation** ({@link lwqlSelfProvisionFromEnv}) — builds the
  *    restricted connection the executor serves with, from the admin URLs and
- *    SaaS-convention default names. Pure over its `env` argument.
+ *    the shared default names. Pure over its `env` argument.
  *  - **Statement composition** ({@link selfHostedClickHouseProvisioningStatements},
  *    {@link selfHostedPostgresReaderStatements}) — sequences the reference
  *    builders (`accessModel.ts`, `postgresMapping.ts`, `catalogStatements.ts`) in the
  *    order the integration harness proves works: access model, bridge,
  *    views. Pure; `src/tasks/provisionLwql.ts` is the only caller with I/O.
  *
- * The names default to the SaaS ones on purpose — one convention across every
- * distribution, so a self-hosted operator reading the docs and a cloud
- * operator reading terraform see the same objects.
+ * The names are one convention across every distribution, so every operator
+ * reading the docs sees the same objects.
  *
  * @see specs/lwql/api.feature
  */
@@ -95,44 +95,12 @@ export function lwqlSelfProvisionFromEnv(
   const postgresReaderPassword = env.LWQL_POSTGRES_READER_PASSWORD;
   if (!postgresReaderPassword) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but LWQL_POSTGRES_READER_PASSWORD is not set — the access model will not be provisioned this boot",
+      "LangWatchQL: LWQL_CLICKHOUSE_PASSWORD is set but LWQL_POSTGRES_READER_PASSWORD is not — the access model will not be provisioned this boot",
     );
     return null;
   }
 
   return { connection, postgresReaderPassword };
-}
-
-/**
- * On the NON-self-provision path (chart-managed ClickHouse, or SaaS/terraform),
- * whether THIS deployment owns the PostgreSQL reader role (`lwql_ro`) — creating
- * it, setting its password, and locking down its grants — or only re-grants an
- * externally-owned role SELECT on the approved views.
- *
- *  - `"manage-role"`: chart-managed ClickHouse PAIRED WITH chart-managed
- *    PostgreSQL — the one deployment where nothing else provisions the reader,
- *    so the chart signals it with `LWQL_MANAGE_POSTGRES_READER=true` (see
- *    `charts/langwatch/templates/_helpers.tpl`, `langwatch.sharedEnv`) and the
- *    app converges `lwql_ro` from `LWQL_POSTGRES_READER_PASSWORD`.
- *  - `"grants-only"`: everything else — SaaS/terraform, or an operator-owned
- *    external PostgreSQL — owns the role out of band. The app must NEVER run
- *    `CREATE ROLE` / `ALTER ROLE … PASSWORD` against it as the `DATABASE_URL`
- *    user: that either throws (a non-superuser connection) and crashloops a
- *    default-on feature, or silently rotates the operator's reader password.
- *
- * Keyed on an EXPLICIT flag, never on "a reader password happens to be present":
- * SaaS/terraform may also set `LWQL_POSTGRES_READER_PASSWORD`, and implicit-mode
- * detection is exactly what `provisionLwql`'s mode selection forbids. A password
- * present without the flag stays `"grants-only"`.
- */
-export type LwqlPostgresReaderMode = "manage-role" | "grants-only";
-
-export function lwqlPostgresReaderModeFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): LwqlPostgresReaderMode {
-  return env.LWQL_MANAGE_POSTGRES_READER === "true"
-    ? "manage-role"
-    : "grants-only";
 }
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */

@@ -31,7 +31,6 @@
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
 
 import {
   isClickHouseObjectAccessDeniedError,
@@ -59,8 +58,6 @@ import {
   LWQL_MAX_RESULT_BYTES,
   LWQL_MAX_RESULT_ROWS,
 } from "./limits";
-
-const logger = createLogger("langwatch:analytics:lwql:executor");
 
 /** One column of a result, as the server typed it. */
 export interface LangWatchQLColumn {
@@ -356,64 +353,19 @@ export function createLangWatchQLExecutor(
  * Reads the restricted identity's connection from the environment, or reports
  * that this deployment has none.
  *
- * `null` rather than a throw, and rather than a default pointing at the
- * application's own ClickHouse: an unconfigured deployment must refuse LangWatchQL
- * queries, and a partially-configured one must refuse them too. Every field is
- * required for exactly that reason.
+ * The app owns the LangWatchQL access model on every distribution (issue
+ * #8258): `provisionLwql` converges it on the connection derived from the admin
+ * `CLICKHOUSE_URL`, so the query path must resolve that same connection or it
+ * would query a server holding none of the objects. This is that single
+ * derivation — {@link lwqlDerivedConnectionFromEnv} treats the per-field
+ * `LWQL_*` as overrides and refuses (null, logged) any that would split
+ * provisioning from querying.
  *
- * The two cases are indistinguishable to a caller and must not be to an
- * operator, so a partial configuration is logged with the names it is missing.
- * They are not read through the validated env module: the variables are
- * optional by design — most deployments provision no LangWatchQL identity — and an
- * optional entry there would not reject a misspelling either, while making them
- * required would refuse to boot every deployment that does not run this API.
+ * `null` rather than a throw: a deployment with no `LWQL_CLICKHOUSE_PASSWORD`
+ * simply is not running the API, and a partially-configured one must refuse
+ * every query too. The name is kept because the query path, the service, and
+ * the instant-eval row source all call it.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
-  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
-  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
-  // so resolving a *different* connection here would query a server where none
-  // of it exists. Checked before `absent` rather than after: a deployment that
-  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
-  // through to the explicit values and split provisioning from querying.
-  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
-  // and refuses outright on one that cannot be honoured.
-  if (process.env.LWQL_SELF_PROVISION === "true") {
-    return lwqlDerivedConnectionFromEnv();
-  }
-
-  const url = process.env.LWQL_CLICKHOUSE_URL;
-  const username = process.env.LWQL_CLICKHOUSE_USER;
-  const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
-  const database = process.env.LWQL_DATABASE;
-  const tenantSetting = process.env.LWQL_TENANT_SETTING;
-
-  const required = [
-    ["LWQL_CLICKHOUSE_URL", url],
-    ["LWQL_CLICKHOUSE_USER", username],
-    ["LWQL_CLICKHOUSE_PASSWORD", password],
-    ["LWQL_DATABASE", database],
-    ["LWQL_TENANT_SETTING", tenantSetting],
-  ] as const;
-  const absent = required.filter(([, value]) => !value).map(([name]) => name);
-
-  if (absent.length > 0) {
-    // A deployment that set *some* of these meant to enable the API and got a
-    // silent refusal on every query instead, so name what is missing. One that
-    // set none is simply not running the API and says nothing. Variable names
-    // only, never their values — one of these is a password.
-    if (absent.length < required.length) {
-      logger.warn(
-        { absent },
-        "LangWatchQL is partially configured, so every query will be refused",
-      );
-    }
-    return null;
-  }
-  // Re-checked rather than asserted: `absent` is computed by a callback, which
-  // TypeScript cannot use to narrow these five, and reaching for `!` here would
-  // silently outlive someone editing the list above.
-  if (!url || !username || !password || !database || !tenantSetting)
-    return null;
-
-  return { url, username, password, database, tenantSetting };
+  return lwqlDerivedConnectionFromEnv();
 }

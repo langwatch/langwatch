@@ -751,21 +751,16 @@ export function lwqlSourceTables({
 
 /**
  * The columns the restricted identity is granted on each ClickHouse source
- * table, keyed by table — the single source of truth the Go chart renderer
- * mirrors so its SaaS grants are column-scoped like the self-hosted ones.
+ * table, keyed by table — the single source of truth for the column-scoped
+ * grants the application provisions on every distribution (issue #8258).
  *
  * The exact set {@link lwqlSourceColumnGrantStatement} (primary) and
  * {@link lwqlJoinSourceColumnGrantStatement} (joined side) grant, unioned per
  * table and sorted, so a table read by two views is granted the union both
  * need. PostgreSQL-resident sources are absent: their engine table carries
  * exactly the exposed columns already and takes the whole-object grant
- * ({@link lwqlGrantStatement}), which the Go renderer emits for any table this
- * map omits — matching the whole-table grant the views themselves take.
- *
- * Emitted into `lwql_catalog.json` and asserted equal there by
- * `../catalog/__tests__/manifestParity.unit.test.ts`, so the Go binary grants
- * exactly the columns this catalog exposes rather than every column of the
- * source table.
+ * ({@link lwqlGrantStatement}) for any table this map omits — matching the
+ * whole-table grant the views themselves take.
  */
 export function lwqlSourceColumnGrants({
   views = LWQL_VIEW_CATALOG,
@@ -855,9 +850,8 @@ export function lwqlPostgresApprovedViewStatements({
 /**
  * The approved views the reader role must be granted, in catalog order.
  *
- * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
- * #6635); on cloud the same access model is infra-owned (langwatch-saas#1126) and this
- * is the reference implementation terraform must match.
+ * Provisioned by the application on every distribution (issue #8258) — it owns
+ * the access model, so there is no infra-owned copy to keep in parity.
  */
 export function lwqlApprovedPostgresViewNames(
   views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG,
@@ -878,9 +872,8 @@ export function lwqlApprovedPostgresViewNames(
  * Headroom on top of the pools' total demand, for the connection a
  * re-provisioning run or an operator's `psql` needs while the pools are full.
  *
- * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
- * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
- * is the reference implementation terraform must match.
+ * Provisioned by the application on every distribution (issue #8258) — it owns
+ * the reader role, so there is no infra-owned copy to keep in parity.
  */
 export function lwqlPostgresReaderConnectionLimit({
   views = LWQL_VIEW_CATALOG,
@@ -915,12 +908,9 @@ export function lwqlPostgresReaderConnectionLimit({
  * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
  * views over them, and after the named collection exists.
  *
- * Two callers, two ownership models. Self-hosted deployments run this for
- * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
- * so it is a production path. On cloud the same tables are
- * owned by infra (langwatch-saas#1126) and this stays the reference
- * implementation terraform must match — keep it and its tests in sync with
- * both.
+ * The application provisions this on every distribution (issue #8258): it owns
+ * these tables on both self-hosted and cloud, so there is one definition and no
+ * rendered copy to keep in parity.
  */
 export function lwqlPostgresEngineTableStatements({
   names,
@@ -984,11 +974,9 @@ function singleSourceColumn(
  * {@link lwqlPostgresEngineTableStatements}, which must have run first.
  * This function only exposes them.
  *
- * Two callers, two ownership models. Self-hosted deployments run this for real
- * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
- * a production path. On cloud the same views' grants and access model are
- * owned by infra (langwatch-saas#1126) and this stays the reference
- * implementation terraform must match — keep it and its tests in sync with both.
+ * The application provisions this on every distribution (issue #8258): it owns
+ * these views' grants and access model on both self-hosted and cloud, so there
+ * is one definition and no rendered copy to keep in parity.
  */
 export function lwqlViewSetupStatements({
   names,

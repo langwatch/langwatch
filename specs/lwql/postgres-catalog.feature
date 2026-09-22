@@ -134,8 +134,8 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
     @unit
     Scenario: The catalog ground truth lists every derived view
       Given the derived Postgres catalog
-      When lwql_catalog.json and the columns manifest are regenerated
-      Then every derived view and its columns appear in both
+      When the columns manifest is regenerated from the code catalog
+      Then every derived view and its columns appear in it
       And a stale ground truth fails the check that compares them
 
     @integration

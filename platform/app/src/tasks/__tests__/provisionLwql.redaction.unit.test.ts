@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { redactSecrets } from "../provisionLwql";
+import { redactSecrets } from "../../server/analytics/lwql/provisioning";
 
 describe("redactSecrets", () => {
   describe("given a message that echoes a secret", () => {

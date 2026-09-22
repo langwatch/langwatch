@@ -102,6 +102,7 @@ import {
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
 } from "../provisioning/catalogStatements";
+import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../provisioning/clickhouseStatementRunner";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresNamedCollectionStatements,
@@ -140,8 +141,26 @@ export const CLICKHOUSE_ERROR_CODE = {
   SYNTAX_ERROR: 62,
   /** A setting change refused by `readonly = 1`. */
   READONLY: 164,
+  /**
+   * An entity owned by the read-only `users_xml` config store cannot be created
+   * or altered through SQL — what provisioning tolerates and skips.
+   */
+  ACCESS_STORAGE_READONLY:
+    CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY,
   /** Refused by grants. */
   ACCESS_DENIED: 497,
+  /**
+   * A `DROP NAMED COLLECTION` of a config-XML-defined collection — the SQL store
+   * has no copy to remove, reported even with `IF EXISTS`. Tolerated and skipped.
+   */
+  NAMED_COLLECTION_DOESNT_EXIST:
+    CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+  /** A named collection already defined in a config XML — tolerated and skipped. */
+  NAMED_COLLECTION_ALREADY_EXISTS:
+    CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+  /** An immutable, config-XML-owned named collection under ALTER/DROP — tolerated. */
+  NAMED_COLLECTION_IS_IMMUTABLE:
+    CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
 } as const;
 
 /** PostgreSQL SQLSTATEs this proof discriminates between. */
@@ -312,21 +331,33 @@ function writeConfigFile(
  * migrated tables instead. The whole-table grant the fixture path issues would
  * otherwise sit *underneath* the column-scoped one and quietly widen it back
  * out, since ClickHouse grants are additive.
+ *
+ * `extraConfigFiles` copies additional server config into the container (a
+ * `users.d`/`config.d` file defining an LWQL entity in the read-only config
+ * store, say), and folds each file's content into the reuse-hash label so a
+ * changed file never reuses a container running the previous config.
  */
 export async function startLangWatchQLClickHouse({
   suite,
   facts = "fixture",
+  extraConfigFiles = [],
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
+  /** Extra server config files to install before ClickHouse starts. */
+  extraConfigFiles?: Array<{ name: string; target: string; contents: string }>;
 }): Promise<LangWatchQLClickHouseHarness> {
   const names = lwqlNamesForSuite(suite);
   const accessManagementXml = clickHouseAccessManagementConfigXml({
     administrativeUser: ADMIN_USER,
   });
-  const configDigest = createHash("sha256")
-    .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
-    .update(accessManagementXml)
+  const configDigest = extraConfigFiles
+    .reduce(
+      (hash, file) => hash.update(file.target).update(file.contents),
+      createHash("sha256")
+        .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
+        .update(accessManagementXml),
+    )
     .digest("hex")
     .slice(0, 16);
 
@@ -358,6 +389,10 @@ export async function startLangWatchQLClickHouse({
         ),
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
       },
+      ...extraConfigFiles.map((file) => ({
+        source: writeConfigFile(configDirectory, file.name, file.contents),
+        target: file.target,
+      })),
     ])
     // Reaching PostgreSQL on the docker host; see the module comment.
     .withExtraHosts([

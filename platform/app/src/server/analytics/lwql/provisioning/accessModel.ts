@@ -334,15 +334,9 @@ export function lwqlGrantStatement({
 }
 
 /**
- * The tenant predicate, single-sourced across languages (ADR-101).
- *
- * The predicate is defined once, as SQL text with `{placeholder}` slots, in
- * `./lwqlTenantPredicate.sql`. The Go config renderer
- * (`infra/clickhouse-serverless/internal/render/lwql.go`) embeds that same file,
- * and `__tests__/lwqlPredicateParity.unit.test.ts` fails when this constant and
- * the file drift apart — so the row policy this app self-provisions and the row
- * filter the chart renders can never silently diverge into "zero rows" or
- * "over-broad rows" on a chart-managed server.
+ * The tenant predicate. This constant is the single source: the app owns the
+ * row policy on every distribution (issue #8258), so there is one definition of
+ * the predicate and nothing to keep in parity with a rendered copy.
  *
  * The predicate is a *set* membership as of #8085: the tenant capability carries
  * a comma-joined set of per-project key hashes (see {@link lwqlTenantCapabilitySet}
@@ -355,8 +349,8 @@ export const LWQL_TENANT_PREDICATE_TEMPLATE =
   "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
 
 /**
- * The key map's self-policy expression, single-sourced across languages the same
- * way (`./lwqlKeyMapSelfFilter.sql`).
+ * The key map's self-policy expression. Like {@link LWQL_TENANT_PREDICATE_TEMPLATE},
+ * this constant is the single source — the app owns the key-map row policy.
  *
  * It has to be set membership too, not a bare equality: ClickHouse applies the
  * key map's own row policy to *every* read of that table, including the subquery
@@ -516,11 +510,9 @@ export function dropLangWatchQLRowPolicyStatement({
  * NOT created here — they come from migrations and from the PG mapping. This
  * function provisions only the access model over them.
  *
- * Two callers, two ownership models. Self-hosted deployments run this for
- * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
- * so it is a production path. On cloud the same access model is owned by
- * infra (langwatch-saas#1126) and this stays the reference implementation
- * terraform must match — keep it and its tests in sync with both.
+ * The application provisions this on every distribution (issue #8258): it owns
+ * the LangWatchQL access model on both self-hosted and cloud, so there is one
+ * definition and no rendered copy to keep in parity.
  */
 export function lwqlClickHouseSetupStatements({
   names,

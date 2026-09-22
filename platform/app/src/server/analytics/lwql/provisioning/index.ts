@@ -30,7 +30,15 @@ export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
-export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
+export {
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
+  type ConfigStoreLwqlEntity,
+  inventoryConfigStoreLwqlEntities,
+  redactSecrets,
+  type RunClickHouseStatementsResult,
+  runClickHouseStatements,
+  type SkippedProvisioningStatement,
+} from "./clickhouseStatementRunner";
 export {
   LWQL_POSTGRES_READER_ROLE,
   type LwqlKeyMapBackfillPlan,
@@ -41,15 +49,12 @@ export {
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
-  productionPostgresReaderGrantStatements,
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
   canProvisionAppFunctions,
-  type LwqlPostgresReaderMode,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
   probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
