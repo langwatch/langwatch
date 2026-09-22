@@ -121,6 +121,11 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // over stored_objects, with tenantColumn "project_id". Audited: a
   // read-only SELECT-only view definition; no delete/update/truncate.
   /^src\/server\/analytics\/lwql\/catalog\/overrides\/coding\.ts$/,
+  // catalog/includedTables.ts is the opt-in list of ClickHouse tables the
+  // LWQL catalog derives read-only views for; "stored_objects" appears there
+  // only as a string entry. Audited: a static name list, no query,
+  // delete, update, or truncate on the table.
+  /^src\/server\/analytics\/lwql\/catalog\/includedTables\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {
