@@ -190,10 +190,14 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         client: harness.admin,
         statements,
         secrets: [RESTRICTED_PASSWORD, READER_PASSWORD],
-        // The real inventory: a 495 is tolerated only against a statement that
-        // names the config-store user or profile it found. Every 495-failing
-        // statement here (the CREATE USER, its grants and row policies) names
-        // langwatch_lwql or lwql_restricted, so all are tolerated.
+        // The real inventory: a 495 is tolerated only when the statement's OWN
+        // target is inventoried by kind and name. The 495-failing statements
+        // here — the CREATE USER, the CREATE SETTINGS PROFILE, and the GRANTs
+        // to the config-owned user — target langwatch_lwql or lwql_restricted,
+        // so they are tolerated. The key-map row policy is NOT config-owned
+        // (this XML defines no policies), so it is created in the SQL store,
+        // never skipped: a config-owned user in its `TO` clause must not excuse
+        // a missing policy.
         configStoreEntities: preflight,
       });
 
@@ -229,6 +233,13 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         ),
         "the config-owned named collection CREATE was skipped as 669/670/671",
       ).toBe(true);
+      // The key-map row policy is not config-owned, so it was created, never
+      // skipped — the config-owned user named in its `TO` clause must not
+      // launder a missing policy into a tolerated skip.
+      expect(
+        skipped.some((s) => s.statement.startsWith("CREATE ROW POLICY")),
+        "no row-policy statement was skipped",
+      ).toBe(false);
       // Every skip is one of the four tolerated codes, never a laundered failure.
       for (const skip of skipped) {
         expect([
@@ -254,6 +265,20 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
           `view ${view.name} was provisioned`,
         ).toBe(true);
       }
+
+      // Provisioning created the key-map row policy in the SQL store: its own
+      // target was never config-owned, so tenant isolation is in place — the
+      // exact statement the loose match would have skipped.
+      const policyRows = (await (
+        await harness.admin.query({
+          query: `SELECT short_name FROM system.row_policies WHERE short_name = '${names.keyMapTable}_self'`,
+          format: "JSONEachRow",
+        })
+      ).json()) as Array<{ short_name: string }>;
+      expect(
+        policyRows.length,
+        "the key-map row policy was created, not skipped",
+      ).toBeGreaterThan(0);
 
       // The config-store identity is still the one that exists, untouched.
       const userRows = (await (

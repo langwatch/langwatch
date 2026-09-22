@@ -271,10 +271,14 @@ from `LWQL_POSTGRES_READER_PASSWORD`. This requires the `DATABASE_URL` role
 to be allowed to `CREATE`/`ALTER ROLE`; if it isn't, the app logs the failure
 and LangWatchQL stays refused (fail-closed) rather than crashing the pod.
 Chart-managed PostgreSQL grants this by default. An external PostgreSQL
-needs the `DATABASE_URL` user to hold that grant, or you can pre-create
-`lwql_ro` yourself with the same shape the app converges
-(`postgresReaderRoleStatements` in
-`platform/app/src/server/analytics/lwql/provisioning/postgresMapping.ts`):
+needs the `DATABASE_URL` user to hold that grant regardless of whether
+`lwql_ro` already exists: the app re-converges the role (password, settings,
+grants) with `ALTER ROLE` on every boot, so pre-creating `lwql_ro` does not
+remove the requirement. Pre-creating it with the same shape the app
+converges (`postgresReaderRoleStatements` in
+`platform/app/src/server/analytics/lwql/provisioning/postgresMapping.ts`)
+only helps if you cannot grant `CREATE ROLE` at all — the `DATABASE_URL`
+user still needs `ALTER ROLE` on `lwql_ro` for the app to converge it:
 
 ```sql
 CREATE ROLE "lwql_ro" LOGIN;

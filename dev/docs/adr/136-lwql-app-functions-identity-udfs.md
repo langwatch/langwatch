@@ -11,8 +11,9 @@ values the database cannot compute.
 walk is where facts about a statement are recorded; the hydration plan is
 recorded the same way, for the same reason.
 [ADR-141](141-the-app-owns-the-lwql-access-model.md): the app self-provisions
-the LangWatchQL access model on every deployment. App functions are the one
-LangWatchQL object that cannot follow that pattern, and §4 says why.
+the LangWatchQL access model on every deployment, and app functions follow
+that same provisioning path. There is no config-time XML form for SQL UDFs, so
+provisioning is always application-driven; §4 explains the constraint.
 
 **Related:** [ADR-082](082-lwql-analytics-views-invoker-column-grants-final-dedup.md)
 (the `INVOKER` views and column grants these run beside),
@@ -177,12 +178,10 @@ SQL provisioned by the application at boot, not config. There is no XML form of
 `user_defined_executable_functions_config`, is for *executable* UDFs that fork
 a process per call, which is not what this is.
 
-So they are the one SQL-provisioned LangWatchQL object, applied by the same
-administrative connection and generated from the same application catalog as the
-views they sit beside: `productionClickHouseObjectStatements` on the cloud
-path, `lwqlClickHouseSetupStatements` on the self-hosted one. Deliberately not
-part of the access model: nothing about them grants, policies or authenticates
-anything.
+So they are SQL-provisioned by the application on every deployment, applied by
+the same administrative connection and generated from the same application
+catalog as the views they sit beside. Deliberately not part of the access model:
+nothing about them grants, policies or authenticates anything.
 
 ### Replication
 

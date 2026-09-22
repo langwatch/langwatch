@@ -6,9 +6,10 @@
  * its read-only config store (users.xml / config.xml) rejects the statement
  * that would create or alter it. This runner skips the named-collection
  * rejections (669 / 670 / 671) unconditionally, and a 495 only when the failing
- * statement names an inventoried config-store entity — an unexplained 495
- * aborts, so a wholly read-only access storage cannot boot unprovisioned. Every
- * other error still aborts the run.
+ * statement's OWN target entity — matched by kind AND name — is inventoried. A
+ * config-owned user named in a row policy's `TO` clause does not excuse the
+ * policy, so an unexplained 495 aborts and a wholly read-only access storage
+ * cannot boot unprovisioned. Every other error still aborts the run.
  *
  * A hand-built fake client stands in for `@clickhouse/client` here: it is a
  * boundary we do not own, and a fake throwing a real code-carrying error is the
@@ -220,6 +221,97 @@ describe("runClickHouseStatements", () => {
       ]);
       // The statement after the tolerated 495 still ran.
       expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+  });
+
+  describe("when a 495 fails a statement whose own target differs from its grantee", () => {
+    // A row policy names the config-owned user in its `TO` clause, but the
+    // statement's own target is the POLICY. The read-only user must not excuse
+    // a missing row policy — that would boot without tenant isolation.
+    const ROW_POLICY =
+      "CREATE ROW POLICY OR REPLACE traces_tenant ON langwatch.traces\n" +
+      "  USING TenantId = 1\n" +
+      "  TO langwatch_lwql";
+    const readonly = () =>
+      String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY);
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("aborts a row-policy 495 when only the user (its grantee) is inventoried", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [ROW_POLICY]: readonly() },
+      });
+
+      await expect(
+        runClickHouseStatements({
+          client,
+          statements: [ROW_POLICY, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("tolerates the row-policy 495 once that policy is inventoried by short name", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [ROW_POLICY]: readonly() },
+      });
+
+      const result = await runClickHouseStatements({
+        client,
+        statements: [ROW_POLICY, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [{ kind: "row_policy", name: "traces_tenant" }],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for an entity the config store does not own fails provisioning" */
+    it("tolerates a GRANT 495 against the inventoried grantee user", async () => {
+      const GRANT = "GRANT SELECT ON langwatch.traces TO langwatch_lwql";
+      const ran: string[] = [];
+      const client = fakeClient({ ran, rejections: { [GRANT]: readonly() } });
+
+      const result = await runClickHouseStatements({
+        client,
+        statements: [GRANT, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("aborts a settings-profile 495 when only the user is inventoried", async () => {
+      const PROFILE =
+        "CREATE SETTINGS PROFILE OR REPLACE lwql_restricted\n  SETTINGS readonly = 1 CONST";
+      const ran: string[] = [];
+      const client = fakeClient({ ran, rejections: { [PROFILE]: readonly() } });
+
+      await expect(
+        runClickHouseStatements({
+          client,
+          statements: [PROFILE, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
     });
   });
 });

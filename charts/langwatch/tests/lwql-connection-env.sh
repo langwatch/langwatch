@@ -73,7 +73,7 @@ has_env() {
 is_secret_ref() {
   local render="$1" src="$2" var="$3"
   awk -v want="$src" -v v="$var" '
-    /^# Source:/ { insrc = (index($0, want) > 0) }
+    /^# Source:/ { insrc = (index($0, want) > 0); found=0; vf=0 }
     insrc && $0 ~ "- name: " v "$" { found=1; next }
     insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0 }
     found && /valueFrom:/ { vf=1 }

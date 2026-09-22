@@ -59,20 +59,73 @@ const NAMED_COLLECTION_CODES: ReadonlySet<number> = new Set([
   CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
 ]);
 
+// Whole-token identifier, optionally backticked, capturing the bare name.
+const IDENTIFIER = "`?([A-Za-z0-9_]+)`?";
+// Optional `OR REPLACE` / `IF [NOT] EXISTS` between the object keyword and name.
+const OPTIONAL_MODIFIERS =
+  "(?:OR\\s+REPLACE\\s+)?(?:IF\\s+(?:NOT\\s+)?EXISTS\\s+)?";
+
+const STATEMENT_TARGET_PATTERNS: ReadonlyArray<{
+  readonly kind: ConfigStoreLwqlEntity["kind"];
+  readonly pattern: RegExp;
+}> = [
+  // A row policy names its short name right after the object keyword; `ON
+  // <db.table>` follows. Checked first: its keyword is the most specific.
+  {
+    kind: "row_policy",
+    pattern: new RegExp(
+      `^\\s*(?:CREATE|ALTER|DROP)\\s+ROW\\s+POLICY\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
+      "i",
+    ),
+  },
+  {
+    kind: "settings_profile",
+    pattern: new RegExp(
+      `^\\s*(?:CREATE|ALTER|DROP)\\s+SETTINGS\\s+PROFILE\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
+      "i",
+    ),
+  },
+  {
+    // `CREATE USER ... SETTINGS PROFILE <p>` still targets the user: the profile
+    // is a clause, and this pattern anchors on `USER`, not on `SETTINGS`.
+    kind: "user",
+    pattern: new RegExp(
+      `^\\s*(?:CREATE|ALTER|DROP)\\s+USER\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
+      "i",
+    ),
+  },
+  // A grant/revoke targets the grantee — the user named after TO/FROM.
+  {
+    kind: "user",
+    pattern: new RegExp(`^\\s*GRANT\\b[\\s\\S]*?\\bTO\\s+${IDENTIFIER}`, "i"),
+  },
+  {
+    kind: "user",
+    pattern: new RegExp(
+      `^\\s*REVOKE\\b[\\s\\S]*?\\bFROM\\s+${IDENTIFIER}`,
+      "i",
+    ),
+  },
+];
+
 /**
- * Whether `statement` names `identifier` as a whole token — bounded by any
- * non-identifier character, so a backticked, quoted, or bare occurrence all
- * match, but a longer name that merely contains it does not. Used to decide
- * whether a 495 failure targets an inventoried config-store entity.
+ * The access entity a statement targets in its OWN right — the user it
+ * creates/alters/drops or grants to, the settings profile, or the row policy by
+ * its short name — or `null` for a statement that targets no config-store entity
+ * (a table, view, named collection, function, or anything unrecognized).
+ *
+ * A 495 is excused only when this target matches an inventoried entity by BOTH
+ * kind and name, so a row-policy statement whose `TO <user>` clause names the
+ * config-owned user is NOT excused by that user: the target is the policy, not
+ * the grantee. Keyword matching is case-insensitive and whole-token; names may
+ * be backticked.
  */
-function statementNamesIdentifier(
-  statement: string,
-  identifier: string,
-): boolean {
-  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(
-    statement,
-  );
+function statementTarget(statement: string): ConfigStoreLwqlEntity | null {
+  for (const { kind, pattern } of STATEMENT_TARGET_PATTERNS) {
+    const match = pattern.exec(statement);
+    if (match) return { kind, name: match[1] };
+  }
+  return null;
 }
 
 /** Throws unless `name` is a bare identifier safe to interpolate into a query. */
@@ -151,14 +204,16 @@ export interface RunClickHouseStatementsResult {
  *
  * A `NAMED COLLECTION` statement rejected with 669/670/671 is always tolerated
  * (the code itself proves the collection is config-XML-owned). A 495
- * ACCESS_STORAGE_READONLY is tolerated only when the failing statement targets
- * an entity in `configStoreEntities` — the inventory of what the server owns in
- * its read-only store — by name: the restricted user, its settings profile, or
- * one of the LWQL row policies. A 495 whose target is *not* inventoried means
- * the whole access storage is read-only for an entity nobody owns as config, so
- * the model would silently go unprovisioned; that goes through the error+throw
- * path. A tolerated statement is logged at WARN, collected into `skipped`, and
- * stepped over. Every other error still throws.
+ * ACCESS_STORAGE_READONLY is tolerated only when the failing statement's OWN
+ * target entity — the user it creates or grants to, its settings profile, or a
+ * row policy by short name (see {@link statementTarget}) — is in
+ * `configStoreEntities` by matching kind AND name. Matching a config-owned user
+ * named merely in a policy's `TO` clause is deliberately not enough: that would
+ * let a missing row policy be skipped and boot continue without tenant
+ * isolation. A 495 whose own target is not inventoried means the model would
+ * silently go unprovisioned; that goes through the error+throw path. A tolerated
+ * statement is logged at WARN, collected into `skipped`, and stepped over.
+ * Every other error still throws.
  */
 export async function runClickHouseStatements({
   client,
@@ -225,10 +280,15 @@ function toleratedConfigStoreSkipCode({
   if (code !== null && NAMED_COLLECTION_CODES.has(code)) return code;
   const isReadonly =
     code === CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
+  // The statement's OWN target must be inventoried — matched by kind AND name.
+  // Matching any inventoried name appearing anywhere would let a row policy's
+  // `TO <config-owned user>` clause excuse a missing policy, booting without
+  // tenant isolation.
+  const target = isReadonly ? statementTarget(statement) : null;
   if (
-    isReadonly &&
-    configStoreEntities.some((entity) =>
-      statementNamesIdentifier(statement, entity.name),
+    target &&
+    configStoreEntities.some(
+      (entity) => entity.kind === target.kind && entity.name === target.name,
     )
   ) {
     return code;
@@ -236,7 +296,7 @@ function toleratedConfigStoreSkipCode({
   logger.error(
     { error: redactSecrets(errorMessage(error), secrets), statement: position },
     isReadonly
-      ? "lwql provisioning: ClickHouse access storage is read-only for a statement whose target entity is not in the config-store inventory — the access model would go unprovisioned, so provisioning is failing rather than booting with an incomplete model"
+      ? "lwql provisioning: ClickHouse access storage is read-only for a statement whose own target entity is not in the config-store inventory — the access model would go unprovisioned (a config-owned user does not excuse a missing row policy), so provisioning is failing rather than booting with an incomplete model"
       : "lwql provisioning failed creating ClickHouse objects",
   );
   throw error;

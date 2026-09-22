@@ -895,6 +895,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the run aborts rather than skipping the statement
     And a read-only error whose target entity is in the inventory is skipped and the run continues
 
+  # Issue #8258: a 495 is matched against the statement's OWN target — the entity
+  # it creates or grants to — by kind AND name, not any inventoried name appearing
+  # anywhere in the text. A row policy names the restricted user in its `TO`
+  # clause, so a config-owned user must not excuse a read-only row policy: doing
+  # so would skip a missing policy and boot without tenant isolation.
+  @unit
+  Scenario: A read-only access storage for a row policy is not excused by the config-owned user
+    Given a row-policy statement rejected with a read-only error whose only inventoried match is the user named in its TO clause
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the row policy
+    And the same read-only error is skipped only once the row policy itself is in the inventory
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the
