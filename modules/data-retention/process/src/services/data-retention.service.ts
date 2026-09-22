@@ -60,6 +60,11 @@ export class DataRetentionService {
 
   private constructor(private readonly options: DataRetentionServiceOptions) {}
 
+  /** The days a row with no override in its cascade is kept for. */
+  getPlatformDefaultRetentionDays(): number {
+    return this.options.defaultRetentionDays;
+  }
+
   async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
     const cached = await this.options.cache.get(input.projectId);
     if (cached !== void 0) {

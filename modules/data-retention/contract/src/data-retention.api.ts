@@ -25,6 +25,12 @@ export type RetentionCallerInput = { userId: string };
 
 /** The callable server boundary for retention policy, pins, and metering. */
 export interface DataRetentionApi {
+  /**
+   * The days a row with no override in its cascade is kept for, which is this
+   * deployment's own fact: a peer stamping a TTL reads it here rather than
+   * claiming `LANGWATCH_DEFAULT_RETENTION_DAYS` a second time.
+   */
+  getPlatformDefaultRetentionDays(): number;
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention>;
   getRetentionDays(input: { projectId: string; category: RetentionCategory }): Promise<number>;
   listOrganizationRules(input: { organizationId: string }): Promise<RetentionPolicy[]>;

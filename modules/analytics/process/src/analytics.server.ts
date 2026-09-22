@@ -73,7 +73,7 @@ export type AnalyticsServiceCompositionInput = {
   resolveClient: AnalyticsClickHouseClientResolver;
   clickhouseEnabled: boolean;
   tripwire?: AnalyticsTripwire;
-  defaultRetentionDays?: number;
+  defaultRetentionDays?: () => number;
   evaluationReadMetrics?: AnalyticsEvaluationReadMetrics;
 };
 

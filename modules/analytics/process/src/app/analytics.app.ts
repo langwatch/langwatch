@@ -37,7 +37,7 @@ import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError } from "@langwatch/handled-error";
@@ -130,7 +130,7 @@ export interface AnalyticsAppDependencies {
 export type AnalyticsInfrastructure = Readonly<{
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient | null>) | null;
   clickhouseEnabled?: boolean;
-  defaultRetentionDays?: number;
+  defaultRetentionDays?: () => number;
 }>;
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
@@ -143,6 +143,8 @@ type AnalyticsDependencies = Readonly<{
   plans: typeof EntitlementApi;
   /** Every app-function value is one of this peer's traces, rendered by it. */
   traces: typeof TraceApi;
+  /** The owner of the platform retention default an evaluation row is stamped with. */
+  retention: typeof DataRetentionApi;
 }>;
 
 /**
@@ -253,6 +255,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     plans: EntitlementApi,
     /** Every app-function value is one of this peer's traces, rendered by it. */
     traces: TraceApi,
+    retention: DataRetentionApi,
   };
   static readonly config = analyticsServerConfig;
   /**
@@ -272,7 +275,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
       // process before `create()` runs if no ClickHouse was configured, so by
       // the time this constructs, ClickHouse is always available.
       clickhouseEnabled: true,
-      defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
+      // Data retention owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a second claim
+      // on it refuses the whole process, and two defaults expire rows.
+      defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
     });
     const langwatchQl = setup.config.langwatchQl;
     const connectionValues = [

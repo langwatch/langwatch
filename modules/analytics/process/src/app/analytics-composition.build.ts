@@ -22,7 +22,7 @@ export class AnalyticsAdapter {
     resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
     clickhouseEnabled: boolean;
     tripwire?: AnalyticsTripwire;
-    defaultRetentionDays?: number;
+    defaultRetentionDays?: () => number;
     evaluationReadMetrics?: AnalyticsEvaluationReadMetrics;
   }): AnalyticsServiceContract {
     return AnalyticsService.create({
@@ -33,7 +33,7 @@ export class AnalyticsAdapter {
       evaluationRepository: options.clickhouseEnabled
         ? ClickHouseAnalyticsEvaluationRepository.create({
             resolveClient: options.resolveClient,
-            defaultRetentionDays: options.defaultRetentionDays ?? 30,
+            defaultRetentionDays: options.defaultRetentionDays ?? (() => 30),
             readMetrics: options.evaluationReadMetrics,
           })
         : NullAnalyticsEvaluationRepository.create(),

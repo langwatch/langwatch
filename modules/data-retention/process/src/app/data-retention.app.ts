@@ -222,6 +222,10 @@ export class DataRetentionApp implements DataRetentionApiContract {
     return this.#retention.getResolvedForProject(input);
   }
 
+  getPlatformDefaultRetentionDays(): number {
+    return this.#retention.getPlatformDefaultRetentionDays();
+  }
+
   getRetentionDays(input: { projectId: string; category: RetentionCategory }): Promise<number> {
     return this.#retention.getRetentionDays(input);
   }

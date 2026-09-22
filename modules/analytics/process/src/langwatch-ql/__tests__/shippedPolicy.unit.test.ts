@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 /** `…/langwatch-ql/__tests__` → `modules/analytics/process/` */
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 /** the package → repository root */
-const REPO_ROOT = fileURLToPath(new URL("../../../../../../../", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const ADR_ROOT = join(REPO_ROOT, "dev", "docs", "adr");
 const SRC_ROOT = join(PACKAGE_ROOT, "src");
 const PARSER_MODULE = join(SRC_ROOT, "rules", "langwatch-ql-parser.rules.ts");

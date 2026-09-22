@@ -73,7 +73,7 @@ function repository(): ClickHouseAnalyticsEvaluationRepository {
   });
   return ClickHouseAnalyticsEvaluationRepository.create({
     resolveClient: async () => client ?? null,
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
   });
 }
 

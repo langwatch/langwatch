@@ -22,6 +22,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 
 import type { InstantEvalApp } from "../app/instant-eval.app.ts";
+import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import { INSTANT_EVAL_PROCESS_NAME } from "./instant-eval-processing-data.process.ts";
 import {
   instantEvalPageDedupeId,
@@ -93,8 +94,9 @@ export class InstantEvalProcessingPipelineAdapter {
  */
 export const instantEvalEventing = defineEventingModule({
   pipeline: INSTANT_EVAL_PIPELINE_NAME,
-  // No repository registry: this module builds its own from the ClickHouse
-  // member, so the setup carries none.
-  build: ({ app }: EventingSetup<undefined, InstantEvalApp>) => app.eventingPipeline(),
+  // The tier the process selected is handed in; this half reads the app's
+  // already-built pipeline, which was composed over the same instances.
+  build: ({ app }: EventingSetup<InstantEvalRepositories, InstantEvalApp>) =>
+    app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

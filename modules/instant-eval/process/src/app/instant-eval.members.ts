@@ -22,3 +22,22 @@ export type InstantEvalClickHouseClient = {
 export type InstantEvalClickHouseResolver = (
   tenantId: string,
 ) => Promise<InstantEvalClickHouseClient>;
+
+/**
+ * The process's one routing ClickHouse member, carried per tenant. Not a
+ * second connection — the member already routes and guards every statement.
+ */
+export type InstantEvalClickHouseMember = {
+  query<T>(input: {
+    tenantId: string;
+    sql: string;
+    params?: Record<string, unknown>;
+    settings?: Record<string, string | number>;
+  }): Promise<{ rows: T[] }>;
+  insert(input: {
+    tenantId: string;
+    table: string;
+    rows: Record<string, unknown>[];
+    settings?: Record<string, string | number>;
+  }): Promise<unknown>;
+};

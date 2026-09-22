@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -59,6 +60,7 @@ function harness() {
           Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),
       }),
       traces: createApiFixture<TraceApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),

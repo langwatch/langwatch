@@ -1,23 +1,28 @@
-import type { InstantEvalClickHouseResolver } from "../../app/instant-eval.members.ts";
+import type {
+  InstantEvalClickHouseMember,
+  InstantEvalClickHouseResolver,
+} from "../../app/instant-eval.members.ts";
 import type { InstantEvalRepositories } from "../instant-eval.repositories.ts";
 import { ClickHouseInstantEvalJudgmentsRepository } from "./clickhouse.instant-eval-judgments.repository.ts";
 import { ClickHouseInstantEvalRunRepository } from "./clickhouse.instant-eval-run.repository.ts";
+import { ClickHouseInstantEvalSession } from "./clickhouse.instant-eval-session.store.ts";
 
-/** Both stores over one tenant-resolved ClickHouse connection. */
-export class ClickHouseInstantEvalRepositories implements InstantEvalRepositories {
-  readonly runs: ClickHouseInstantEvalRunRepository;
-  readonly judgments: ClickHouseInstantEvalJudgmentsRepository;
+/**
+ * The live tier: both stores over the process's one routing ClickHouse
+ * member, resolved per tenant so every statement names its tenant first.
+ */
+export class ClickHouseInstantEvalRepositories {
+  static readonly requires = ["clickhouse"] as const;
 
-  private constructor(resolveClient: InstantEvalClickHouseResolver) {
-    this.runs = ClickHouseInstantEvalRunRepository.create({ resolveClient });
-    this.judgments = ClickHouseInstantEvalJudgmentsRepository.create({ resolveClient });
-  }
+  static create(
+    members: Readonly<{ clickhouse: InstantEvalClickHouseMember }>,
+  ): InstantEvalRepositories {
+    const resolveClient: InstantEvalClickHouseResolver = (tenantId) =>
+      Promise.resolve(new ClickHouseInstantEvalSession(members.clickhouse, tenantId));
 
-  static create({
-    resolveClient,
-  }: {
-    resolveClient: InstantEvalClickHouseResolver;
-  }): ClickHouseInstantEvalRepositories {
-    return new ClickHouseInstantEvalRepositories(resolveClient);
+    return {
+      runs: ClickHouseInstantEvalRunRepository.create({ resolveClient }),
+      judgments: ClickHouseInstantEvalJudgmentsRepository.create({ resolveClient }),
+    };
   }
 }

@@ -62,7 +62,8 @@ function readOutcome({
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
   static create(options: {
     resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
-    defaultRetentionDays: number;
+    /** Read per stamp: the owner of the default answers it, not this module. */
+    defaultRetentionDays: () => number;
     readMetrics?: AnalyticsEvaluationReadMetrics;
   }): ClickHouseAnalyticsEvaluationRepository {
     return new ClickHouseAnalyticsEvaluationRepository(
@@ -76,7 +77,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     private readonly resolveClient: (
       tenantId: string,
     ) => Promise<EvaluationAnalyticsClickHouseClient | null>,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
     private readonly readMetrics?: AnalyticsEvaluationReadMetrics,
   ) {
     super();
@@ -92,7 +93,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
         values: [
           toSlimRecord(
             parsed.row,
-            parsed.retentionDays ?? this.defaultRetentionDays,
+            parsed.retentionDays ?? this.defaultRetentionDays(),
             parsed.appliedEventIds,
           ),
         ],
@@ -134,7 +135,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
         values: entries.map((entry) =>
           toSlimRecord(
             entry.row,
-            entry.retentionDays ?? this.defaultRetentionDays,
+            entry.retentionDays ?? this.defaultRetentionDays(),
             entry.appliedEventIds,
           ),
         ),
@@ -207,7 +208,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     const client = await this.clientFor(parsed.row.tenantId);
     await client.insert({
       table: ROLLUP_TABLE,
-      values: [toRollupRecord(parsed.row, parsed.retentionDays ?? this.defaultRetentionDays)],
+      values: [toRollupRecord(parsed.row, parsed.retentionDays ?? this.defaultRetentionDays())],
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
@@ -236,7 +237,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     await client.insert({
       table: ROLLUP_TABLE,
       values: parsed.rows.map((row) =>
-        toRollupRecord(row, parsed.retentionDays ?? this.defaultRetentionDays),
+        toRollupRecord(row, parsed.retentionDays ?? this.defaultRetentionDays()),
       ),
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },

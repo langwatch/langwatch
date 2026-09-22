@@ -2,7 +2,7 @@
  * The Go renderer's LWQL manifest must agree with this repo's catalog — Go
  * embeds a static JSON copy nothing in that repo can validate. This test
  * derives both sets from the catalog so a drift (`batch_evaluations` did) fails here.
- * @see ../../../../../../../../infra/clickhouse-serverless/internal/render/lwql.go
+ * @see ../../../../../../infra/clickhouse-serverless/internal/render/lwql.go
  * @see ../lwql-view-catalog.rules.ts — the catalog the manifest mirrors
  * @see ../../services/langwatch-ql-view-provisioning.service.ts — source-table derivation
  */
@@ -19,7 +19,7 @@ const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
 const MANIFEST_PATH = fileURLToPath(
   new URL(
-    "../../../../../../../../infra/clickhouse-serverless/internal/render/lwql_catalog.json",
+    "../../../../../../infra/clickhouse-serverless/internal/render/lwql_catalog.json",
     import.meta.url,
   ),
 );

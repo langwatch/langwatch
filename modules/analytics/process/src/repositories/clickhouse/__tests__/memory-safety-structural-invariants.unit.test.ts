@@ -129,7 +129,7 @@ describe("memory-safety", () => {
      */
     const traceServicePath = path.resolve(
       __dirname,
-      "../../../../../../trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "../../../../../../trace/process/src/repositories/clickhouse/trace-legacy-read.repository.ts",
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
@@ -176,7 +176,7 @@ describe("memory-safety", () => {
   describe("when the topic counting query is checked for a LIMIT clause", () => {
     const traceServicePath = path.resolve(
       __dirname,
-      "../../../../../../trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "../../../../../../trace/process/src/repositories/clickhouse/trace-legacy-read.repository.ts",
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
@@ -199,7 +199,7 @@ describe("memory-safety", () => {
   describe("when the field discovery query is checked for a LIMIT clause", () => {
     const traceServicePath = path.resolve(
       __dirname,
-      "../../../../../../trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "../../../../../../trace/process/src/repositories/clickhouse/trace-legacy-read.repository.ts",
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 

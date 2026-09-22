@@ -43,7 +43,6 @@ import {
   type InstantEvalProcessingPipelineDefinition,
 } from "../eventing/instant-eval-processing.pipeline.ts";
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
-import { ClickHouseInstantEvalRepositories } from "../repositories/clickhouse/clickhouse.instant-eval.repositories.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import {
   toInstantEvalEstimateWire,
@@ -70,32 +69,9 @@ import { InstantEvalRunService } from "../services/instant-eval-run.service.ts";
 import { InstantEvalSampleService } from "../services/instant-eval-sample.service.ts";
 import { InstantEvalSpendService } from "../services/instant-eval-spend.service.ts";
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
-import type {
-  InstantEvalClickHouseClient,
-  InstantEvalClickHouseResolver,
-} from "./instant-eval.members.ts";
 
 /** Seconds of refill a bucket holds as burst, at the sustained rate. */
 const BUCKET_BURST_SECONDS = 2;
-
-/**
- * The process's one routing ClickHouse member, carried per tenant. Not a
- * second connection — the member already routes and guards every statement.
- */
-type InstantEvalClickHouseMember = {
-  query<T>(input: {
-    tenantId: string;
-    sql: string;
-    params?: Record<string, unknown>;
-    settings?: Record<string, string | number>;
-  }): Promise<{ rows: T[] }>;
-  insert(input: {
-    tenantId: string;
-    table: string;
-    rows: Record<string, unknown>[];
-    settings?: Record<string, string | number>;
-  }): Promise<unknown>;
-};
 
 /**
  * The Redis surface this module uses: the judge's token bucket, the budget
@@ -110,7 +86,6 @@ type InstantEvalRedis = InstantEvalRateLimiterRedis & {
 };
 
 type InstantEvalMembers = Readonly<{
-  clickhouse: InstantEvalClickHouseMember;
   /** The shared bucket, holds and cancel hints; absent in a memory process. */
   redis: InstantEvalRedis | null;
 }>;
@@ -129,56 +104,9 @@ type InstantEvalDependencies = Readonly<{
 type InstantEvalSetup = FeatureSetup<
   InstantEvalDependencies,
   InstantEvalMembers,
-  InstantEvalServerConfig
+  InstantEvalServerConfig,
+  InstantEvalRepositories
 >;
-
-class ClickHouseMemberSession implements InstantEvalClickHouseClient {
-  constructor(
-    private readonly clickhouse: InstantEvalClickHouseMember,
-    private readonly tenantId: string,
-  ) {}
-
-  async query<T>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-  }): Promise<{ json(): Promise<T[]> }> {
-    const { rows } = await this.clickhouse.query<T>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      ...(input.query_params ? { params: input.query_params } : {}),
-      ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
-    });
-    return { json: () => Promise.resolve(rows) };
-  }
-
-  async insert(input: {
-    table: string;
-    values: Record<string, unknown>[];
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-  }): Promise<unknown> {
-    await this.clickhouse.insert({
-      tenantId: this.tenantId,
-      table: input.table,
-      rows: input.values,
-      ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
-    });
-    return undefined;
-  }
-}
-
-/** The settings the member takes: booleans and absences dropped. */
-function settingsOf(
-  settings: Record<string, string | number | boolean | undefined>,
-): Record<string, string | number> {
-  const carried: Record<string, string | number> = {};
-  for (const [name, value] of Object.entries(settings)) {
-    if (typeof value === "string" || typeof value === "number") carried[name] = value;
-    else if (typeof value === "boolean") carried[name] = value ? 1 : 0;
-  }
-  return carried;
-}
 
 export class InstantEvalApp implements InstantEvalApiContract {
   static readonly contract = InstantEvalApi;
@@ -194,11 +122,8 @@ export class InstantEvalApp implements InstantEvalApiContract {
   static readonly secrets = {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
-  /**
-   * `clickhouse` is where both of this module's tables live; `redis` is the
-   * shared token bucket that paces the judge across every pod.
-   */
-  static readonly reads = ["clickhouse", "redis"] as const;
+  /** `redis` is the shared token bucket that paces the judge across every pod. */
+  static readonly reads = ["redis"] as const;
 
   private constructor(
     private readonly access: InstantEvalAccessService,
@@ -216,7 +141,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
   }
 
   private static withSecrets(setup: InstantEvalSetup, apiKey: string | undefined): InstantEvalApp {
-    const repositories = InstantEvalApp.repositoriesOf(setup);
+    const repositories = setup.repositories;
     const judge = InstantEvalApp.judgeOf(setup, apiKey);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
@@ -424,13 +349,6 @@ export class InstantEvalApp implements InstantEvalApiContract {
   /** Binds the built pipeline's own senders; every write goes through them. */
   connectCommands(commands: Readonly<Record<string, unknown>>): void {
     this.dispatcher.connect(commands);
-  }
-
-  private static repositoriesOf(setup: InstantEvalSetup): InstantEvalRepositories {
-    const clickhouse = setup.members.clickhouse;
-    const resolveClient: InstantEvalClickHouseResolver = (tenantId) =>
-      Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
-    return ClickHouseInstantEvalRepositories.create({ resolveClient });
   }
 
   /**
