@@ -9,9 +9,22 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActivationCodesSection } from "../ActivationCodesSection";
+
+const activeCode = {
+  id: "ac_1",
+  organizationName: "ACME",
+  email: "ops@acme.test",
+  codeHint: "G7H8",
+  planType: "enterprise",
+  maxMembers: 25,
+  expiresAt: "2027-01-01T00:00:00.000Z",
+  reusable: false,
+  redemptionCount: 0,
+  status: "active",
+};
 
 const listResult: {
   data?: { codes: unknown[] };
@@ -19,7 +32,9 @@ const listResult: {
   isLoading: boolean;
 } = { data: { codes: [] }, error: null, isLoading: false };
 
-let revokeOptions: { onError?: (error: unknown) => void } = {};
+/** What the mutation does when the component calls `mutate`. */
+let revokeOutcome: "error" | "none" = "none";
+const revokeError = new Error("boom");
 
 const showErrorToast = vi.fn();
 
@@ -30,10 +45,12 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ ...listResult, refetch: vi.fn() }),
       },
       revokeActivationCode: {
-        useMutation: (options: { onError?: (error: unknown) => void }) => {
-          revokeOptions = options;
-          return { mutate: vi.fn(), isPending: false };
-        },
+        useMutation: (options: { onError?: (error: unknown) => void }) => ({
+          mutate: () => {
+            if (revokeOutcome === "error") options.onError?.(revokeError);
+          },
+          isPending: false,
+        }),
       },
     },
   },
@@ -67,7 +84,7 @@ describe("ActivationCodesSection", () => {
     listResult.data = { codes: [] };
     listResult.error = null;
     listResult.isLoading = false;
-    revokeOptions = {};
+    revokeOutcome = "none";
     showErrorToast.mockClear();
   });
 
@@ -92,13 +109,14 @@ describe("ActivationCodesSection", () => {
     describe("when revoking a code fails", () => {
       /** @scenario "A revoke that fails tells the operator who asked for it" */
       it("tells the operator rather than failing silently", () => {
-        renderSection();
+        listResult.data = { codes: [activeCode] };
+        revokeOutcome = "error";
 
-        const error = new Error("boom");
-        revokeOptions.onError?.(error);
+        renderSection();
+        fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
 
         expect(showErrorToast).toHaveBeenCalledWith({
-          error,
+          error: revokeError,
           fallbackTitle: "The activation code was not revoked",
         });
       });
