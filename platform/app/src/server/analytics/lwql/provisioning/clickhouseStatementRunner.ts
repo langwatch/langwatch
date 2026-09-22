@@ -65,19 +65,19 @@ const IDENTIFIER = "`?([A-Za-z0-9_]+)`?";
 const OPTIONAL_MODIFIERS =
   "(?:OR\\s+REPLACE\\s+)?(?:IF\\s+(?:NOT\\s+)?EXISTS\\s+)?";
 
+// A row policy is keyed by short name AND its `ON <db>.<table>` target, so the
+// pattern captures all three: 1 = short name, 2 = database (optional), 3 =
+// table. Two tables can carry the same bare short name, so the ON target is
+// load-bearing, not decoration — see {@link toleratedConfigStoreSkipCode}.
+const ROW_POLICY_PATTERN = new RegExp(
+  `^\\s*(?:CREATE|ALTER|DROP)\\s+ROW\\s+POLICY\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}\\s+ON\\s+(?:${IDENTIFIER}\\.)?${IDENTIFIER}`,
+  "i",
+);
+
 const STATEMENT_TARGET_PATTERNS: ReadonlyArray<{
-  readonly kind: ConfigStoreLwqlEntity["kind"];
+  readonly kind: "user" | "settings_profile";
   readonly pattern: RegExp;
 }> = [
-  // A row policy names its short name right after the object keyword; `ON
-  // <db.table>` follows. Checked first: its keyword is the most specific.
-  {
-    kind: "row_policy",
-    pattern: new RegExp(
-      `^\\s*(?:CREATE|ALTER|DROP)\\s+ROW\\s+POLICY\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
-      "i",
-    ),
-  },
   {
     kind: "settings_profile",
     pattern: new RegExp(
@@ -111,19 +111,31 @@ const STATEMENT_TARGET_PATTERNS: ReadonlyArray<{
 /**
  * The access entity a statement targets in its OWN right — the user it
  * creates/alters/drops or grants to, the settings profile, or the row policy by
- * its short name — or `null` for a statement that targets no config-store entity
- * (a table, view, named collection, function, or anything unrecognized).
+ * its short name AND its `ON <db>.<table>` target — or `null` for a statement
+ * that targets no config-store entity (a table, view, named collection,
+ * function, or anything unrecognized).
  *
- * A 495 is excused only when this target matches an inventoried entity by BOTH
- * kind and name, so a row-policy statement whose `TO <user>` clause names the
- * config-owned user is NOT excused by that user: the target is the policy, not
- * the grantee. Keyword matching is case-insensitive and whole-token; names may
- * be backticked.
+ * A 495 is excused only when this target matches an inventoried entity (see
+ * {@link toleratedConfigStoreSkipCode}). A row-policy statement whose `TO <user>`
+ * clause names the config-owned user is NOT excused by that user — the target is
+ * the policy, not the grantee — and a policy short name is qualified by its ON
+ * target, so the same short name on another table is a different policy. Keyword
+ * matching is case-insensitive and whole-token; names may be backticked.
  */
 function statementTarget(statement: string): ConfigStoreLwqlEntity | null {
+  const policy = ROW_POLICY_PATTERN.exec(statement);
+  if (policy) {
+    // `noUncheckedIndexedAccess`: narrow the required groups. The short name and
+    // table are mandatory in the pattern, so a match always has them; database
+    // is the optional `(?:<db>\.)?` group and may be undefined.
+    const [, name, database, table] = policy;
+    if (name !== undefined && table !== undefined) {
+      return { kind: "row_policy", name, database, table };
+    }
+  }
   for (const { kind, pattern } of STATEMENT_TARGET_PATTERNS) {
-    const match = pattern.exec(statement);
-    if (match) return { kind, name: match[1] };
+    const name = pattern.exec(statement)?.[1];
+    if (name !== undefined) return { kind, name };
   }
   return null;
 }
@@ -258,10 +270,37 @@ export async function runClickHouseStatements({
 }
 
 /**
+ * Whether an inventoried `entity` is the statement's own `target`. Users and
+ * settings profiles match on kind + name. A row policy also matches on its `ON`
+ * table, and on the database only when the statement qualifies it AND the
+ * inventoried entity has one (both compared exactly) — so `x_tenant ON db.a`
+ * never excuses `x_tenant ON db.b`, but an unqualified inventory row still
+ * matches a qualified statement on the same table.
+ */
+function entityMatchesTarget(
+  entity: ConfigStoreLwqlEntity,
+  target: ConfigStoreLwqlEntity,
+): boolean {
+  if (entity.kind !== target.kind || entity.name !== target.name) return false;
+  if (entity.kind === "row_policy" && target.kind === "row_policy") {
+    if (entity.table !== target.table) return false;
+    if (
+      entity.database !== undefined &&
+      target.database !== undefined &&
+      entity.database !== target.database
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Classifies a failed statement: returns the tolerated config-store code to skip
  * it under, or logs the failure at ERROR and rethrows. Keeps the abort/skip
  * decision — and its ERROR logging — out of {@link runClickHouseStatements}'s
- * loop.
+ * loop. A 495 is tolerated only when the statement's own target — matched by
+ * short name and, for a row policy, its ON target — is in the inventory.
  */
 function toleratedConfigStoreSkipCode({
   error,
@@ -280,18 +319,17 @@ function toleratedConfigStoreSkipCode({
   if (code !== null && NAMED_COLLECTION_CODES.has(code)) return code;
   const isReadonly =
     code === CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
-  // The statement's OWN target must be inventoried — matched by kind AND name.
-  // Matching any inventoried name appearing anywhere would let a row policy's
-  // `TO <config-owned user>` clause excuse a missing policy, booting without
-  // tenant isolation.
+  // The statement's OWN target must be inventoried — matched by kind, name and,
+  // for a row policy, its ON target (see {@link entityMatchesTarget}). Matching
+  // by name alone would let a row policy's `TO <config-owned user>` clause excuse
+  // a missing policy, or an inventoried `x_tenant ON db.a` excuse a read-only
+  // `x_tenant ON db.b` — booting a table with no tenant isolation.
   const target = isReadonly ? statementTarget(statement) : null;
   if (
     target &&
-    configStoreEntities.some(
-      (entity) => entity.kind === target.kind && entity.name === target.name,
-    )
+    configStoreEntities.some((entity) => entityMatchesTarget(entity, target))
   ) {
-    return code;
+    return CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
   }
   logger.error(
     { error: redactSecrets(errorMessage(error), secrets), statement: position },
@@ -302,11 +340,24 @@ function toleratedConfigStoreSkipCode({
   throw error;
 }
 
-/** An LWQL access entity found pre-defined in the ClickHouse config store. */
-export interface ConfigStoreLwqlEntity {
-  readonly kind: "user" | "settings_profile" | "row_policy";
-  readonly name: string;
-}
+/**
+ * An LWQL access entity found pre-defined in the ClickHouse config store, or the
+ * target of a statement being classified. A row policy is keyed by its short
+ * name AND its `ON <db>.<table>` target — two tables can share a bare short name
+ * — so that variant carries `table` (and `database` when the source qualifies
+ * it); a user or settings profile is keyed by name alone.
+ */
+export type ConfigStoreLwqlEntity =
+  | { readonly kind: "user"; readonly name: string }
+  | { readonly kind: "settings_profile"; readonly name: string }
+  | {
+      readonly kind: "row_policy";
+      readonly name: string;
+      /** The table the policy is on. */
+      readonly table: string;
+      /** The database qualifying `table`; undefined when the source omits it. */
+      readonly database?: string;
+    };
 
 const CONFIG_STORE_ENTITY_KINDS: ReadonlySet<string> = new Set([
   "user",
@@ -322,8 +373,9 @@ const CONFIG_STORE_ENTITY_KINDS: ReadonlySet<string> = new Set([
  * about to skip, and so a 495 is tolerated only against one of these names.
  *
  * Row policies are matched by the restricted user they apply to (the only user
- * the LWQL policies target); their `short_name` is what the CREATE ROW POLICY
- * statements name, so that is the identity returned.
+ * the LWQL policies target); each is returned by `short_name` AND its
+ * `database`/`table` — a policy is keyed by short name plus ON target, so the
+ * same short name on another table is a different policy.
  *
  * A non-identifier name (a quote or any character outside `[A-Za-z0-9_]`)
  * throws before any query is issued, refusing to interpolate it. A query that
@@ -345,23 +397,42 @@ export async function inventoryConfigStoreLwqlEntities({
   // rather than closing the string literal it is spliced into.
   const restrictedUser = assertPlainIdentifier(names.restrictedUser);
   const settingsProfile = assertPlainIdentifier(names.settingsProfile);
+  // `database`/`table` are meaningful only for a row policy (keyed by short name
+  // + ON target); the user/profile rows carry empty strings so the UNION ALL
+  // keeps one column shape.
   const query =
-    `SELECT 'user' AS kind, name FROM system.users ` +
+    `SELECT 'user' AS kind, name, '' AS database, '' AS table FROM system.users ` +
     `WHERE storage = 'users_xml' AND name = '${restrictedUser}'\n` +
     `UNION ALL\n` +
-    `SELECT 'settings_profile' AS kind, name FROM system.settings_profiles ` +
+    `SELECT 'settings_profile' AS kind, name, '' AS database, '' AS table FROM system.settings_profiles ` +
     `WHERE storage = 'users_xml' AND name = '${settingsProfile}'\n` +
     `UNION ALL\n` +
-    `SELECT 'row_policy' AS kind, short_name AS name FROM system.row_policies ` +
+    `SELECT 'row_policy' AS kind, short_name AS name, database, table FROM system.row_policies ` +
     `WHERE storage = 'users_xml' AND has(apply_to_list, '${restrictedUser}')`;
   try {
     const result = await client.query({ query, format: "JSONEachRow" });
-    const rows = (await result.json()) as Array<{ kind: string; name: string }>;
+    const rows = (await result.json()) as Array<{
+      kind: string;
+      name: string;
+      database: string;
+      table: string;
+    }>;
     const entities = rows
-      .filter((row): row is ConfigStoreLwqlEntity =>
-        CONFIG_STORE_ENTITY_KINDS.has(row.kind),
-      )
-      .map((row) => ({ kind: row.kind, name: row.name }));
+      .filter((row) => CONFIG_STORE_ENTITY_KINDS.has(row.kind))
+      .map(
+        (row): ConfigStoreLwqlEntity =>
+          row.kind === "row_policy"
+            ? {
+                kind: "row_policy",
+                name: row.name,
+                table: row.table,
+                database: row.database,
+              }
+            : {
+                kind: row.kind as "user" | "settings_profile",
+                name: row.name,
+              },
+      );
     if (entities.length > 0) {
       logger.warn(
         { entities },

@@ -907,6 +907,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the run aborts rather than skipping the row policy
     And the same read-only error is skipped only once the row policy itself is in the inventory
 
+  # Issue #8258: ClickHouse keys a row policy by short name AND its `ON db.table`
+  # target, and two tables can share a bare short name. Inventorying and matching
+  # on the short name alone would let a config-owned `x_tenant ON db.a` excuse a
+  # read-only `x_tenant ON db.b`, booting table b with its GRANT applied but no
+  # tenant policy — so the ON target is part of the identity that must match.
+  @unit
+  Scenario: A read-only access storage for a row policy on one table does not excuse the same short name on another table
+    Given a read-only row-policy statement on one table whose only inventoried match is the same short name on a different table
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the row policy
+    And the same read-only error is skipped only when the inventoried policy is on the very table the statement targets
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the

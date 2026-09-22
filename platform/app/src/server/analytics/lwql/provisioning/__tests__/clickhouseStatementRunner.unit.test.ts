@@ -257,7 +257,7 @@ describe("runClickHouseStatements", () => {
 
     // # Issue #8258
     /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
-    it("tolerates the row-policy 495 once that policy is inventoried by short name", async () => {
+    it("tolerates the row-policy 495 once that policy is inventoried by short name and ON target", async () => {
       const ran: string[] = [];
       const client = fakeClient({
         ran,
@@ -267,7 +267,14 @@ describe("runClickHouseStatements", () => {
       const result = await runClickHouseStatements({
         client,
         statements: [ROW_POLICY, "CREATE OR REPLACE VIEW v AS SELECT 1"],
-        configStoreEntities: [{ kind: "row_policy", name: "traces_tenant" }],
+        configStoreEntities: [
+          {
+            kind: "row_policy",
+            name: "traces_tenant",
+            database: "langwatch",
+            table: "traces",
+          },
+        ],
       });
 
       expect(result.skipped.map((s) => s.code)).toEqual([
@@ -312,6 +319,70 @@ describe("runClickHouseStatements", () => {
       ).rejects.toBeInstanceOf(FakeClickHouseError);
 
       expect(ran).toEqual([]);
+    });
+  });
+
+  describe("when a row policy's short name is shared across tables", () => {
+    // ClickHouse keys a row policy by short name AND `ON db.table`, so an
+    // inventoried `x_tenant ON langwatch.a` must NOT excuse a read-only
+    // `x_tenant ON langwatch.b`: the second table would otherwise boot with no
+    // tenant policy while its GRANT still runs.
+    const readonly = () =>
+      String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY);
+    const POLICY_ON_B =
+      "CREATE ROW POLICY OR REPLACE x_tenant ON langwatch.b\n" +
+      "  USING TenantId = 1\n" +
+      "  TO langwatch_lwql";
+    const INVENTORY_ON_A: ConfigStoreLwqlEntity = {
+      kind: "row_policy",
+      name: "x_tenant",
+      database: "langwatch",
+      table: "a",
+    };
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy on one table does not excuse the same short name on another table" */
+    it("aborts a 495 on `x_tenant ON b` when only `x_tenant ON a` is inventoried", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [POLICY_ON_B]: readonly() },
+      });
+
+      await expect(
+        runClickHouseStatements({
+          client,
+          statements: [POLICY_ON_B, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [INVENTORY_ON_A],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy on one table does not excuse the same short name on another table" */
+    it("tolerates the 495 on the very table the inventoried policy is on", async () => {
+      const POLICY_ON_A =
+        "CREATE ROW POLICY OR REPLACE x_tenant ON langwatch.a\n" +
+        "  USING TenantId = 1\n" +
+        "  TO langwatch_lwql";
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [POLICY_ON_A]: readonly() },
+      });
+
+      const result = await runClickHouseStatements({
+        client,
+        statements: [POLICY_ON_A, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [INVENTORY_ON_A],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
     });
   });
 });
