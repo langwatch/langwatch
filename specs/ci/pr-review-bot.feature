@@ -110,6 +110,17 @@ Feature: PR Review Bot workflow
     Then GitHub cancels the earlier run for that PR
 
   # ============================================================================
+  # Permissions
+  # ============================================================================
+
+  @unit
+  Scenario: The review workflow grants exactly contents write and pull-requests write
+    When the workflow runs
+    Then the workflow grants permissions: contents: write, pull-requests: write
+    And the workflow does not grant any extra permissions
+    And the contents: write permission enables resolveReviewThread on the default token
+
+  # ============================================================================
   # Action Pinning
   # ============================================================================
   #

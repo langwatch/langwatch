@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
-  contents: write
+  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
   pull-requests: write
 
 concurrency:

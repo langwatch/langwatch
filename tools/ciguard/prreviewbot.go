@@ -29,6 +29,13 @@ var prReviewBotGateClauses = map[string]string{
 // the gate above) can run a review.
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
 
+// prReviewBotRequiredPermissions are the exact permissions the review job must grant:
+// contents: write (for resolveReviewThread) and pull-requests: write (for posting reviews).
+var prReviewBotRequiredPermissions = map[string]string{
+	"contents":      "write",
+	"pull-requests": "write",
+}
+
 // fullSHAPattern matches a full 40-character commit SHA, the only ref this
 // workflow's pins are allowed to carry.
 var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -36,7 +43,8 @@ var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
 // the invariants specs/ci/pr-review-bot.feature describes: the three-clause
 // skip gate, the trigger types that can run a review, single-review-in-flight
-// concurrency, and full-SHA pinning on every action it uses.
+// concurrency, full-SHA pinning on every action it uses, and the required
+// permissions block.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -47,6 +55,7 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	problems = append(problems, prReviewBotGates(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
+	problems = append(problems, prReviewBotPermissions(workflow)...)
 	problems = append(problems, prReviewBotPinning(workflow)...)
 
 	return problems, nil
@@ -123,6 +132,40 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 
 	if !workflow.Concurrency.CancelsInProgress() {
 		problems = append(problems, fmt.Sprintf("%s does not set cancel-in-progress: true", PRReviewBotWorkflow))
+	}
+
+	return problems
+}
+
+// prReviewBotPermissions checks the workflow's top-level permissions block
+// grants exactly contents: write and pull-requests: write, with no extra
+// permissions. contents: write is required for resolveReviewThread.
+func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
+	perms := workflow.Permissions
+	if perms == nil {
+		return []string{fmt.Sprintf("%s declares no top-level permissions block", PRReviewBotWorkflow)}
+	}
+
+	var problems []string
+
+	// Check that required permissions exist with correct values
+	for key, expectedValue := range prReviewBotRequiredPermissions {
+		actualValue, exists := perms[key]
+		if !exists {
+			problems = append(problems, fmt.Sprintf(
+				"%s permissions block missing %q (required for PR reviews)", PRReviewBotWorkflow, key))
+		} else if actualValue != expectedValue {
+			problems = append(problems, fmt.Sprintf(
+				"%s permissions block grants %s: %q, want %q", PRReviewBotWorkflow, key, actualValue, expectedValue))
+		}
+	}
+
+	// Check that no extra permissions are granted
+	for key := range perms {
+		if _, required := prReviewBotRequiredPermissions[key]; !required {
+			problems = append(problems, fmt.Sprintf(
+				"%s permissions block has extra key %q (only contents and pull-requests are needed)", PRReviewBotWorkflow, key))
+		}
 	}
 
 	return problems

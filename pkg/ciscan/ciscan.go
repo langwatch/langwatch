@@ -156,10 +156,14 @@ func (c Concurrency) CancelsInProgress() bool {
 // Workflow is a single .yml file under .github/workflows.
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
-	Path        string
-	On          On             `yaml:"on"`
-	Concurrency Concurrency    `yaml:"concurrency"`
-	Jobs        map[string]Job `yaml:"jobs"`
+	Path string
+	On   On `yaml:"on"`
+	// Permissions is the top-level `permissions:` block, keyed by scope
+	// (e.g. "contents") with its grant ("read"/"write"). Nil when the
+	// workflow declares none.
+	Permissions map[string]string `yaml:"permissions"`
+	Concurrency Concurrency       `yaml:"concurrency"`
+	Jobs        map[string]Job    `yaml:"jobs"`
 }
 
 // WorkflowDir is where GitHub requires workflows to live.

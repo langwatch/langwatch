@@ -23,7 +23,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
-  contents: read
+  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
   pull-requests: write
 
 concurrency:
@@ -42,7 +42,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@3b0a47e67927b9666da148f44f892de63d2feba7 # main 2026-09-18
+      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -197,11 +197,40 @@ func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "does not key on the PR number")
 }
 
+// @scenario "The review workflow grants exactly contents write and pull-requests write"
+func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
+	withRead := strings.Replace(goodPRReviewBotWorkflow,
+		"  contents: write",
+		"  contents: read", 1)
+	root := writePRReviewBotWorkflow(t, withRead)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "contents")
+	assert.Contains(t, strings.Join(problems, "\n"), "write")
+}
+
+func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
+	withExtra := strings.Replace(goodPRReviewBotWorkflow,
+		"  pull-requests: write",
+		"  pull-requests: write\n  issues: write", 1)
+	root := writePRReviewBotWorkflow(t, withExtra)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "issues")
+	assert.Contains(t, strings.Join(problems, "\n"), "extra")
+}
+
 // @scenario "Every action the workflow uses is pinned to a full commit SHA"
-func TestPRReviewBotRejectsAFloatingTag(t *testing.T) {
+func TestPRReviewBotRejectsAFloatingRef(t *testing.T) {
 	floating := strings.Replace(goodPRReviewBotWorkflow,
-		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
-		"actions/checkout@v7 # v7", 1)
+		"langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521",
+		"langwatch/langwatch-pr-review-bot@main", 1)
 	root := writePRReviewBotWorkflow(t, floating)
 
 	problems, err := ciguard.PRReviewBot(root)
