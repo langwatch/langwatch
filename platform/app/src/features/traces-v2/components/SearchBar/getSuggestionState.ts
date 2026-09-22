@@ -31,10 +31,19 @@ export type SuggestionGrammar = {
   opensOnEmptyToken: boolean;
 };
 
-/** The grammar of the traces search bar. */
+/**
+ * The grammar of the traces search bar.
+ *
+ * U+00A0 ends a token as an ordinary space does. A space typed at the end of
+ * the bar arrives as U+00A0, from the editor's own boundary character and
+ * from the browser's normalisation of a trailing space, and the rest of the
+ * bar reads it as a space. Without it here the next clause is read as more of
+ * the previous value, and the field list never opens again after the first
+ * chip.
+ */
 export const SEARCH_GRAMMAR: SuggestionGrammar = {
   valueSeparator: ":",
-  tokenTerminators: new Set([" ", "\t", "\n", "(", ")"]),
+  tokenTerminators: new Set([" ", " ", "\t", "\n", "(", ")"]),
   fieldPattern: /^[a-zA-Z][\w.]*$/,
   opensOnEmptyToken: false,
 };
@@ -78,7 +87,7 @@ function findActiveTokenStart({
  * open the field list on `user` halfway through, where Enter accepts a field
  * instead of searching.
  */
-function isInsideQuotedValue(text: string, cursorPos: number): boolean {
+export function isInsideQuotedValue(text: string, cursorPos: number): boolean {
   let open = false;
   for (let i = 0; i < cursorPos && i < text.length; i++) {
     const char = text[i];

@@ -1977,6 +1977,13 @@ Rule: Dropdown open and close based on cursor position
     When the user types "model is broken"
     Then the dropdown stays closed throughout
 
+  @unit
+  Scenario: The field list opens for every clause, not only the first
+    Given the search bar holds a chip and the space after it, which the editor writes as a non-breaking space
+    When the user types the next field name
+    Then the dropdown opens in field-name mode on that name
+    And the same holds for its value, because a non-breaking space ends a token the way a space does
+
 
 Rule: Enter is contextual based on dropdown state
   Enter accepts when the dropdown is open; Enter submits when it is closed.

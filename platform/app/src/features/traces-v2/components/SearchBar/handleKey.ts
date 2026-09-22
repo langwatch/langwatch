@@ -1,6 +1,7 @@
 import { isInstantEvalField } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import {
   getSuggestionState,
+  isInsideQuotedValue,
   SEARCH_GRAMMAR,
   type SuggestionState,
 } from "./getSuggestionState";
@@ -143,6 +144,24 @@ function quoteSentenceValueAction(ctx: EditorContext): KeyAction | null {
   };
 }
 
+/**
+ * A quote typed against the closing quote of the value steps over it, the
+ * way Arrow Right would, rather than opening a second pair. The quotes were
+ * put there for the reader, so closing them by hand is the natural way out.
+ */
+function stepOverClosingQuoteAction(ctx: EditorContext): KeyAction | null {
+  if (ctx.text[ctx.cursorPos] !== '"') return null;
+  if (!isInsideQuotedValue(ctx.text, ctx.cursorPos)) return null;
+  return {
+    kind: "accept",
+    tokenStart: ctx.cursorPos,
+    tokenEnd: ctx.cursorPos + 1,
+    replacement: '"',
+    reopenInValueMode: false,
+    caretBack: 0,
+  };
+}
+
 /** Where the token under the caret ends: the next terminator, or the text's end. */
 function activeTokenEnd(text: string, cursorPos: number): number {
   let end = cursorPos;
@@ -158,6 +177,10 @@ function activeTokenEnd(text: string, cursorPos: number): number {
 export function handleKey(ctx: EditorContext, key: string): KeyAction {
   if (key === " ") {
     return quoteSentenceValueAction(ctx) ?? { kind: "noop" };
+  }
+
+  if (key === '"') {
+    return stepOverClosingQuoteAction(ctx) ?? { kind: "noop" };
   }
 
   if (key === "Enter" || key === "Tab") {

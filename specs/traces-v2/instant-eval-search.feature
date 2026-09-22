@@ -208,6 +208,7 @@ Feature: Instant Evals inside the Trace Explorer
       And a space inside a value already quoted is typed as a space
       And a space after an ordinary field's value still ends the term
       And while the caret is inside the quotes no field list opens on a word of the question
+      And Arrow Right, End or a click leaves the quotes, Enter searches from inside them, and a quote typed against the closing quote steps over it rather than opening a second pair
 
   # ---------------------------------------------------------------------------
   # Starting a run

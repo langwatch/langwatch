@@ -52,8 +52,9 @@ export function applyAcceptToEditor(editor: Editor, action: KeyAction): void {
     .replaceWith(from, to, view.state.schema.text(action.replacement))
     .scrollIntoView();
   // An accept that opened a pair of quotes leaves the caret between them, so
-  // the value is typed inside the chip rather than after it.
-  if (action.caretBack) {
+  // the value is typed inside the chip rather than after it. Zero parks it
+  // right after the replacement, past a closing quote stepped over.
+  if (action.caretBack !== undefined) {
     const caret = from + action.replacement.length - action.caretBack;
     tr = tr.setSelection(TextSelection.create(tr.doc, caret));
   }

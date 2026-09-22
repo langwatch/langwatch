@@ -96,6 +96,44 @@ describe("handleKey", () => {
     });
   });
 
+  // ── A quote against the closing quote ───────────────────────────────────
+
+  describe("given a quote is pressed", () => {
+    describe("when the caret sits against the closing quote of the question", () => {
+      /** @scenario "A space belongs to the question being typed" */
+      it("steps over it instead of opening a second pair", () => {
+        const action = handleKey(
+          ctx({ text: 'eval:"annoyed"', cursorPos: 13 }),
+          '"',
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 13,
+          tokenEnd: 14,
+          replacement: '"',
+          reopenInValueMode: false,
+          caretBack: 0,
+        });
+      });
+    });
+
+    describe("when the caret is past the closing quote", () => {
+      it("does nothing, so a new quoted term can open", () => {
+        expect(
+          handleKey(ctx({ text: 'eval:"annoyed" ', cursorPos: 15 }), '"'),
+        ).toEqual<KeyAction>({ kind: "noop" });
+      });
+    });
+
+    describe("when the next character is a quote but the caret is outside any value", () => {
+      it("does nothing, because there is no pair to close", () => {
+        expect(
+          handleKey(ctx({ text: '"phrase"', cursorPos: 0 }), '"'),
+        ).toEqual<KeyAction>({ kind: "noop" });
+      });
+    });
+  });
+
   // ── Enter ────────────────────────────────────────────────────────────────
 
   describe("given Enter is pressed", () => {

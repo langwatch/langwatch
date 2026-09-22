@@ -319,6 +319,35 @@ describe("getSuggestionState", () => {
     });
   });
 
+  describe("given the clauses are separated by a non-breaking space", () => {
+    describe("when a second field name is being typed", () => {
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens field mode on it, because U+00A0 ends a token as a space does", () => {
+        // The editor writes U+00A0 between clauses, and the browser turns a
+        // trailing typed space into one. Read as an ordinary character it
+        // glued the next clause onto the previous value, and the field list
+        // stopped opening after the first chip.
+        expect(getSuggestionState("status:error ser", 16)).toEqual({
+          open: true,
+          mode: "field",
+          query: "ser",
+          tokenStart: 13,
+        });
+      });
+
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens value mode on the second clause's own value", () => {
+        expect(getSuggestionState("status:error service:ap", 24)).toEqual({
+          open: true,
+          mode: "value",
+          field: "service",
+          query: "ap",
+          tokenStart: 13,
+        });
+      });
+    });
+  });
+
   describe("given the cursor sits exactly on the '@' character", () => {
     describe("when the cursor is before the '@'", () => {
       it("returns closed because the @ has not been entered yet from cursor's perspective", () => {
