@@ -79,31 +79,26 @@ export async function realUsageReportPreview(
   });
 }
 
-export function realCheckupDeps({
-  prisma,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  organizationId: string;
-}): CheckupDeps {
-  const gatewayBaseUrl =
-    env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_BASE_URL ?? null;
+type CheckupScope = { prisma: PrismaClient; organizationId: string };
 
-  const firstProject = async () =>
+/** The organization's oldest project, which the write and canary probes use. */
+function firstProjectOf({ prisma, organizationId }: CheckupScope) {
+  return async () =>
     await prisma.project.findFirst({
       where: { team: { organizationId } },
       orderBy: { createdAt: "asc" },
       select: { id: true, apiKey: true },
     });
+}
+
+function datastoreDeps({
+  prisma,
+  organizationId,
+}: CheckupScope): Pick<CheckupDeps, "postgres" | "clickhouse" | "redis"> {
+  const organizationClient = () =>
+    getApp().clickhouse.resolveOrganizationClient(organizationId);
 
   return {
-    organizationId,
-    now: () => new Date(),
-    install: {
-      version: readInstallVersion(),
-      processRole: getApp().config.processRole,
-      environment: process.env.NODE_ENV ?? "unknown",
-    },
     postgres: {
       ping: async () => {
         const rows = await prisma.$queryRaw<{ server_version: string }[]>`
@@ -116,17 +111,14 @@ export function realCheckupDeps({
     clickhouse: {
       configured: Boolean(env.CLICKHOUSE_URL),
       ping: async () => {
-        const client =
-          await getApp().clickhouse.resolveOrganizationClient(organizationId);
-        const answer = await client.ping();
+        const answer = await (await organizationClient()).ping();
         if (!answer.success) {
           throw answer.error ?? new Error("ping was not successful");
         }
       },
       migrationStatus: () => getMigrateStatus(),
       appFunctionsProvisionable: async () => {
-        const client =
-          await getApp().clickhouse.resolveOrganizationClient(organizationId);
+        const client = await organizationClient();
         const probe = await probeAppFunctionStore({
           query: async (sql) => {
             const result = await client.query({
@@ -143,6 +135,13 @@ export function realCheckupDeps({
       target: env.REDIS_CLUSTER_ENDPOINTS ?? env.REDIS_URL ?? null,
       ready: () => assertRedisReady(PROBE_TIMEOUT_MS),
     },
+  };
+}
+
+function gatewayDeps(): Pick<CheckupDeps, "gateway"> {
+  const gatewayBaseUrl =
+    env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_BASE_URL ?? null;
+  return {
     gateway: {
       baseUrl: gatewayBaseUrl,
       expectedControlPlaneUrl:
@@ -155,6 +154,14 @@ export function realCheckupDeps({
       },
       probeControlPlane: () => probeControlPlane(gatewayBaseUrl),
     },
+  };
+}
+
+function licensingDeps({
+  prisma,
+  organizationId,
+}: CheckupScope): Pick<CheckupDeps, "license" | "connect" | "identity"> {
+  return {
     license: async () => {
       const status = await getLicenseHandler().getLicenseStatus(organizationId);
       return {
@@ -203,9 +210,12 @@ export function realCheckupDeps({
       };
     },
     identity: () => readInstanceIdentityRow(prisma),
-    usageReportsDisabled: Boolean(env.DISABLE_USAGE_STATS),
-    usageReportEndpoint: () => usageStatsEndpoint(prisma),
-    reach: (url) => reach(url),
+  };
+}
+
+function storageDeps(scope: CheckupScope): Pick<CheckupDeps, "storage"> {
+  const firstProject = firstProjectOf(scope);
+  return {
     storage: {
       destination: async () => {
         const project = await firstProject();
@@ -235,13 +245,17 @@ export function realCheckupDeps({
         await registry.delete(uri);
       },
     },
-    email: {
-      provider: emailProviderName(),
-      smtpConfigured: isSmtpConfigured(),
-      verifySmtp: async () => {
-        await nodemailer.createTransport(buildSmtpTransportOptions()).verify();
-      },
-    },
+  };
+}
+
+function modelProviderDeps({
+  prisma,
+  organizationId,
+}: CheckupScope): Pick<
+  CheckupDeps,
+  "modelProviders" | "modelProviderBudget" | "testModelProvider"
+> {
+  return {
     modelProviders: async () => {
       const rows = await prisma.modelProvider.findMany({
         where: { organizationId, enabled: true },
@@ -269,6 +283,12 @@ export function realCheckupDeps({
           return { outcome: "unchecked", reason: result.reason };
       }
     },
+  };
+}
+
+function canaryDeps(scope: CheckupScope): Pick<CheckupDeps, "canary"> {
+  const firstProject = firstProjectOf(scope);
+  return {
     canary: async (name, params) => {
       const project = await firstProject();
       if (!project) return { status: 412, body: { message: "no project" } };
@@ -287,6 +307,35 @@ export function realCheckupDeps({
       }
       return { status: response.status, body };
     },
+  };
+}
+
+export function realCheckupDeps(scope: CheckupScope): CheckupDeps {
+  const { prisma, organizationId } = scope;
+  return {
+    organizationId,
+    now: () => new Date(),
+    install: {
+      version: readInstallVersion(),
+      processRole: getApp().config.processRole,
+      environment: process.env.NODE_ENV ?? "unknown",
+    },
+    ...datastoreDeps(scope),
+    ...gatewayDeps(),
+    ...licensingDeps(scope),
+    usageReportsDisabled: Boolean(env.DISABLE_USAGE_STATS),
+    usageReportEndpoint: () => usageStatsEndpoint(prisma),
+    reach: (url) => reach(url),
+    ...storageDeps(scope),
+    email: {
+      provider: emailProviderName(),
+      smtpConfigured: isSmtpConfigured(),
+      verifySmtp: async () => {
+        await nodemailer.createTransport(buildSmtpTransportOptions()).verify();
+      },
+    },
+    ...modelProviderDeps(scope),
+    ...canaryDeps(scope),
   };
 }
 

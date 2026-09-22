@@ -52,7 +52,6 @@ const LICENSE = mintLicense({
   connectServices: ["instant_evals", "managed_models"],
 });
 const LICENSE_KEY = LICENSE.licenseKey;
-const LICENSE_ID = LICENSE.licenseData.licenseId;
 
 const USAGE: ConnectUsage = {
   services: ["instant_evals", "managed_models"],
