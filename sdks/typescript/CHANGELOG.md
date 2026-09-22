@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.16.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.15.0...typescript-sdk@v1.16.0) (2026-09-22)
+
+
+### Features
+
+* **instant-evals:** meter judgements on the gateway spend spine, a Stripe meter and a 1 USD free budget ([#8220](https://github.com/langwatch/langwatch/issues/8220)) ([e5a2252](https://github.com/langwatch/langwatch/commit/e5a22526eca51e242d9018e3ac24928fe9250131))
+* **instant-evals:** the CLI that waits for the answer, the target shorthand and estimate before spend ([#8216](https://github.com/langwatch/langwatch/issues/8216)) ([c01b277](https://github.com/langwatch/langwatch/commit/c01b277a7631308a2d45dfa5ac97dd3a46ef58ff))
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
+* **lwql:** eval functions judged by the classifier interface (Instant Evals) ([#8201](https://github.com/langwatch/langwatch/issues/8201)) ([1eb6dfe](https://github.com/langwatch/langwatch/commit/1eb6dfe76206df168df94c443319760dc4bc4591))
+* **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
+* **query:** one reference door for LWQL and trace filters, filter and facets on the traces API, langwatch query CLI, MCP run_query ([#8198](https://github.com/langwatch/langwatch/issues/8198)) ([0b5f4d0](https://github.com/langwatch/langwatch/commit/0b5f4d0add6cdc6c6483264f1ff4847f44410eb5))
+* **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
+* **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
+
+
+### Bug Fixes
+
+* **instant-evals:** end-to-end dogfood on main, five fixes in how numbers and words reach the caller ([#8233](https://github.com/langwatch/langwatch/issues/8233)) ([c5c0030](https://github.com/langwatch/langwatch/commit/c5c00301250d6c8354b126732c56e80e3dda9514))
+* **instant-evals:** review sweep over the ten Instant Evals PRs ([#8230](https://github.com/langwatch/langwatch/issues/8230)) ([1126498](https://github.com/langwatch/langwatch/commit/11264989ee5efa081e282bc0fd12f0917d3f2c92))
+* **onboarding:** pick order badges, tour logo, offer gating, and CLI share-control login ([#8223](https://github.com/langwatch/langwatch/issues/8223)) ([0c5adf4](https://github.com/langwatch/langwatch/commit/0c5adf4017720ee124f5cb086dde122d4feef75f))
+
 ## [1.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.14.0...typescript-sdk@v1.15.0) (2026-09-13)
 
 
