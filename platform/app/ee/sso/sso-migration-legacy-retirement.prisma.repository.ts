@@ -3,12 +3,12 @@ import { isLiveIdentifierState } from "@langwatch/identity";
 import type { IdentityService } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
 import {
   type SsoLegacyIdentityRetirementPort,
   SsoMigrationFinalizationBlockedError,
 } from "./sso-migration-finalization.service";
+import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
 
 /** Retires connection-scoped Auth0 identities through their ordinary ceremonies. */
 export class PrismaSsoLegacyIdentityRetirement
