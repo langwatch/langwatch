@@ -75,6 +75,11 @@ import { SsoMigrationProgressService } from "../services/sso-migration-progress.
 import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
 import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
 import { SsoSetupService } from "../services/sso-setup.service.ts";
+import {
+  SsoTestArrivalService,
+  type SsoTestArrivalAccounts,
+  type SsoTestArrivalMemberships,
+} from "../services/sso-test-arrival.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
@@ -128,6 +133,7 @@ type IdentityAppParts = {
   ssoDomainReproof: SsoDomainReproofService | null;
   ssoAssertion: SsoAssertionService;
   ssoArrival: SsoArrivalService;
+  ssoTestArrival: SsoTestArrivalService;
   ssoActivity: SsoAuthenticationActivityService;
   ssoMigrationCallbacks: SsoMigrationCallbackService;
   ssoBreakGlass: SsoBreakGlassService;
@@ -154,6 +160,27 @@ function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMembershi
       return summary ? { id: summary.id, name: summary.name } : null;
     },
   };
+}
+
+/**
+ * What a test arrival reads, and nothing that could provision: belonging
+ * anywhere at all, and the organization a connection was being proved for.
+ */
+function testArrivalMemberships(organizations: OrganizationApi): SsoTestArrivalMemberships {
+  return {
+    hasAnyMembership: async ({ userId }) =>
+      (await organizations.organizationIdsForMember({ userId })).length > 0,
+    findOrganization: async ({ organizationId }) => {
+      const summary = await organizations.findProvisioningSummary(organizationId);
+      return summary ? { id: summary.id, name: summary.name } : null;
+    },
+  };
+}
+
+/** Which providers signed this person in, from the module that owns every
+ *  `Account` row (ADR-129) — identity reads none of them itself. */
+function testArrivalAccounts(auth: AuthApi): SsoTestArrivalAccounts {
+  return { findAccountProvidersForUser: (args) => auth.findFederatedAccountProviders(args) };
 }
 
 /** The organization's own member rows, as the migration read asks for them:
@@ -361,6 +388,11 @@ export class IdentityApp implements IdentityApi {
       authz: setup.dependencies.permissions,
       adoption: SsoArrivalAdoptionService.create(backfill),
     });
+    const ssoTestArrival = SsoTestArrivalService.create({
+      accounts: testArrivalAccounts(setup.dependencies.auth),
+      connections: setup.repositories.ssoConnections,
+      memberships: testArrivalMemberships(setup.dependencies.organizations),
+    });
     const ssoActivity = SsoAuthenticationActivityService.create({
       connections: setup.repositories.ssoConnections,
       activity: setup.repositories.ssoMigrationEvidence,
@@ -453,6 +485,7 @@ export class IdentityApp implements IdentityApi {
       ssoDomainReproof,
       ssoAssertion,
       ssoArrival,
+      ssoTestArrival,
       ssoActivity,
       ssoMigrationCallbacks,
       ssoBreakGlass: ssoBreakGlassGrants,
@@ -597,6 +630,10 @@ export class IdentityApp implements IdentityApi {
 
   ssoArrival(): SsoArrivalService {
     return this.#parts.ssoArrival;
+  }
+
+  ssoTestArrival(): SsoTestArrivalService {
+    return this.#parts.ssoTestArrival;
   }
 
   ssoActivity(): SsoAuthenticationActivityService {

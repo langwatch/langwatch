@@ -55,6 +55,7 @@ import type {
   UserPasskeyOffer,
   UserProfile,
   UserSsoStatus,
+  UserTestArrival,
   UserTourPreference,
   UserVerificationCompleted,
 } from "./user.ts";
@@ -119,6 +120,12 @@ export interface UserApi {
     currentSessionId?: string | undefined;
   }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
+  /**
+   * Where this person's own sign-in leaves them: the connection they were
+   * testing while it is not live yet, and nothing for everybody else —
+   * identity's answer, since it owns the connection (ADR-129).
+   */
+  testArrivalStanding(input: { userId: string }): Promise<UserTestArrival>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   deactivate(input: UserIdInput): Promise<UserProfile>;
   reactivate(input: UserIdInput): Promise<UserProfile>;

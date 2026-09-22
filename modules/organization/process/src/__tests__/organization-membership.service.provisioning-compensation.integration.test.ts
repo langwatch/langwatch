@@ -105,6 +105,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         seats,
         sessions,
         grantCache,
+        testArrivals: { standingFor: async () => ({ testing: false }) as const },
       });
 
       await expect(failing.createForProvisioning({ name, slug })).rejects.toThrow(SEEDING_FAILURE);
@@ -124,6 +125,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         seats,
         sessions,
         grantCache,
+        testArrivals: { standingFor: async () => ({ testing: false }) as const },
       }).createForProvisioning({ name, slug });
       retriedOrganizationId = retried.organization.id;
 

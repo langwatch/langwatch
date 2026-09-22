@@ -40,6 +40,7 @@ import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.b
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
+import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -187,6 +188,8 @@ export class AuthApp implements AuthApiContract {
   /** The `Account` rows a retiring connection is judged over — auth's own,
    *  swept for a peer that owns none of them (ADR-129). */
   readonly #legacySsoAccess: LegacySsoAccessService;
+  /** The provider side of the same rows: which ways in somebody holds. */
+  readonly #federatedAccounts: FederatedAccountReadsService;
   /**
    * The deployment's ONE Better Auth instance, or nothing where it named no
    * browser-session identity. Assigned once in {@link AuthApp.create}: it must
@@ -210,6 +213,7 @@ export class AuthApp implements AuthApiContract {
     members: AuthInfrastructure,
     dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
     legacySsoAccess: LegacySsoAccessService,
+    federatedAccounts: FederatedAccountReadsService,
   ) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -217,11 +221,13 @@ export class AuthApp implements AuthApiContract {
     this.#members = members;
     this.#dependencies = dependencies;
     this.#legacySsoAccess = legacySsoAccess;
+    this.#federatedAccounts = federatedAccounts;
   }
 
   static create(setup: AuthSetup): Promise<AuthApp> {
     const { members, repositories, dependencies, config } = setup;
     const now = members.now ?? nowInstant;
+    const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
 
     const app = new AuthApp(
       BrowserSessionService.create({
@@ -238,10 +244,11 @@ export class AuthApp implements AuthApiContract {
       members,
       { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
       LegacySsoAccessService.create({
-        accounts: PrismaBetterAuthHooksRepository.create(members.prisma),
+        accounts: accountRows,
         memberships: legacyAccessMemberships(dependencies.organizations),
         connections: legacyAccessConnections(dependencies.identity),
       }),
+      FederatedAccountReadsService.create({ accounts: accountRows }),
     );
 
     app.#offersPasskeys = config.passkeysEnabled;
@@ -297,6 +304,10 @@ export class AuthApp implements AuthApiContract {
 
   countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number> {
     return this.#legacySsoAccess.count(input);
+  }
+
+  findFederatedAccountProviders(input: { userId: string }): Promise<string[]> {
+    return this.#federatedAccounts.findProvidersForUser(input);
   }
 
   /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */

@@ -2649,6 +2649,11 @@ const presentations = {
     describe: () =>
       "Your identity provider answered, but the answer did not match a connection this organization accepts. Sign in again through your organization's single sign-on link, or ask an administrator.",
   },
+  sso_test_arrival_cannot_create_organization: {
+    title: "Finish setting up single sign-on first",
+    describe: () =>
+      "This sign-in was the test your connection needs, so it is not a new workspace. Go back to the single sign-on setup in the organization you were proving and finish activating it.",
+  },
   sso_assertion_without_address: {
     title: "Your identity provider sent no email address",
     describe: () =>

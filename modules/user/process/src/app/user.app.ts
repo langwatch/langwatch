@@ -63,6 +63,7 @@ import type {
   UserProfile,
   UserProfilesInput,
   UserSsoStatus,
+  UserTestArrival,
   UserTourPreference,
   UserVerificationCompleted,
   UpdateUserProfileInput,
@@ -847,6 +848,12 @@ export class UserApp implements UserApi {
     await this.#peers.identity.completeEmailVerification(input);
 
     return { verified: true };
+  }
+
+  /** Where the caller's own sign-in leaves them: identity answers from the
+   *  account it left behind and the connection's own state, never the browser. */
+  testArrivalStanding(input: { userId: string }): Promise<UserTestArrival> {
+    return this.#peers.identity.ssoTestArrival().standingFor(input);
   }
 
   // -- the two REST doors ----------------------------------------------------

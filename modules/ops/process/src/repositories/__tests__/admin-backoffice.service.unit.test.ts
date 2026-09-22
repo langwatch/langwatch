@@ -35,6 +35,10 @@ class AuthFake implements BrowserSessionApi {
     return 0;
   }
 
+  async findFederatedAccountProviders(): Promise<string[]> {
+    return [];
+  }
+
   async listBrowserSessions(): Promise<never[]> {
     return [];
   }

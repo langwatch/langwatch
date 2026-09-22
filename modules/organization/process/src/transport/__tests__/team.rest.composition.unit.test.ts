@@ -246,6 +246,7 @@ function application() {
     seats: unreachableSeats,
     sessions: unreachableSessions,
     grantCache: unreachableGrantCache,
+    testArrivals: { standingFor: async () => ({ testing: false }) as const },
   });
 
   const app = ServerOrganizationApp.createForTesting({

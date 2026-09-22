@@ -11,12 +11,19 @@ import type {
   OrganizationSessionRevocation,
 } from "../../app/organization.members.ts";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
-import { OrganizationMembershipService } from "../organization-membership.service.ts";
+import {
+  OrganizationMembershipService,
+  type OrganizationTestArrivals,
+} from "../organization-membership.service.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
 const mockRevokeAllBrowserSessions = vi.fn();
+const mockCreateAndAssign = vi.fn();
+const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
+  testing: false,
+}));
 
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
@@ -29,7 +36,7 @@ describe("OrganizationMembershipService", () => {
     findUserOrgRoleByTeamId: vi.fn(),
     tryFindPrimaryIntentById: vi.fn(),
     findActiveAdministratorIds: vi.fn(),
-    createAndAssign: vi.fn(),
+    createAndAssign: mockCreateAndAssign,
     createForProvisioning: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),
     tryFindProvisioningSummaryById: vi.fn(),
@@ -62,6 +69,9 @@ describe("OrganizationMembershipService", () => {
   const grantCache = {
     invalidateOrganization: mockInvalidateOrganization,
   } as unknown as OrganizationGrantCache;
+  /** Nobody here is mid-way through proving a connection; the one test that
+   *  is says so itself. */
+  const testArrivals = { standingFor: mockStandingFor };
 
   let service: OrganizationMembershipService;
 
@@ -79,6 +89,35 @@ describe("OrganizationMembershipService", () => {
       seats,
       sessions,
       grantCache,
+      testArrivals,
+    });
+  });
+
+  describe("createAndAssign()", () => {
+    /** @scenario "A test arrival is not sent to the screen that creates an organization" */
+    it("refuses somebody mid-way through proving a connection", async () => {
+      mockStandingFor.mockResolvedValueOnce({
+        testing: true,
+        connectionId: "local_ssoc_acme",
+        organizationId: "org_acme",
+        organizationName: "Acme",
+      });
+
+      await expect(
+        service.createAndAssign({ userId: "user-456", orgName: "Acme" }),
+      ).rejects.toMatchObject({ code: "sso_test_arrival_cannot_create_organization" });
+      expect(mockCreateAndAssign).not.toHaveBeenCalled();
+    });
+
+    it("creates one for somebody who simply has no organization yet", async () => {
+      mockCreateAndAssign.mockResolvedValue({
+        organization: { id: "org-123" },
+        team: { id: "team-123" },
+      });
+
+      await service.createAndAssign({ userId: "user-456", orgName: "Acme" });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -394,6 +433,7 @@ describe("OrganizationMembershipService", () => {
               ),
           } as unknown as OrganizationSessionRevocation,
           grantCache,
+          testArrivals,
         });
         vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(activeMember);
 

@@ -17,6 +17,7 @@ const deployment = {
 };
 
 describe("given a deployment holding no registered connection", () => {
+  /** @scenario "An issuer nobody registered is refused by name" */
   it("trusts its own address and nothing else", () => {
     expect(resolveTrustedOrigins(deployment)).toEqual(["https://app.langwatch.test"]);
   });
@@ -31,6 +32,7 @@ describe("given a deployment holding no registered connection", () => {
 });
 
 describe("given a customer registered an issuer", () => {
+  /** @scenario "An issuer a customer registered is one this installation may fetch from" */
   it("trusts its ORIGIN, because that is what the engine compares", () => {
     expect(
       resolveTrustedOrigins({
@@ -61,6 +63,7 @@ describe("given an operator's own allowlist", () => {
 });
 
 describe("given a worktree running the identity-provider simulator", () => {
+  /** @scenario "The worktree simulator is trusted outside production only" */
   it("trusts it outside production", () => {
     expect(
       resolveTrustedOrigins({
@@ -72,6 +75,7 @@ describe("given a worktree running the identity-provider simulator", () => {
   });
 
   describe("when the deployment is production", () => {
+    /** @scenario "The worktree simulator is trusted outside production only" */
     it("refuses it: it signs whatever it is asked to sign", () => {
       expect(
         resolveTrustedOrigins({

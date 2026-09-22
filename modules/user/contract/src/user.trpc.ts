@@ -39,6 +39,7 @@ import {
   userAccountInfoSchema,
   userAvatarResultSchema,
   userSsoStatusSchema,
+  userTestArrivalSchema,
   userTourPreferenceSchema,
 } from "./user.ts";
 
@@ -159,4 +160,8 @@ export const identityTrpc = defineTrpcContract("identity")
   .mutation("completeVerification")
   .withInput(userApiCompleteVerificationInputSchema)
   .withOutput(identityVerificationCompletedSchema)
+
+  .query("myTestArrival")
+  .withInput(userApiEmptyInputSchema)
+  .withOutput(userTestArrivalSchema)
   .build();

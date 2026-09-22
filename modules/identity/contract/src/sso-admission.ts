@@ -31,3 +31,20 @@ export interface SsoAssertionRefusal {
 }
 
 export type SsoAssertionDecision = Readonly<{ action: "continue" }> | SsoAssertionRefusal;
+
+/**
+ * Where somebody's own sign-in leaves them: testing a connection that has not
+ * gone live, named so a screen can say which organization was being proved.
+ * A union rather than a nullable, so "not a tester" is an answer.
+ */
+export type SsoTestArrivalStanding =
+  | Readonly<{
+      testing: true;
+      connectionId: string;
+      organizationId: string;
+      organizationName: string;
+    }>
+  | Readonly<{ testing: false }>;
+
+/** The answer for everybody who is not proving a connection. */
+export const NOT_A_TEST_ARRIVAL: SsoTestArrivalStanding = { testing: false };

@@ -571,6 +571,7 @@ export const APP_ERROR_CODES = [
   "sso_saml_not_self_serve",
   "sso_setup_address_mismatch",
   "sso_sign_in_refused",
+  "sso_test_arrival_cannot_create_organization",
   "storage_not_writable",
   "subscription_ambiguous",
   "subscription_not_linked",

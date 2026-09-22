@@ -153,6 +153,24 @@ export type UserAccountInfo = z.infer<typeof userAccountInfoSchema>;
 export const userSsoStatusSchema = z.object({ pendingSsoSetup: z.boolean() }).strict();
 export type UserSsoStatus = z.infer<typeof userSsoStatusSchema>;
 
+/**
+ * Where a sign-in through a connection that is not live yet leaves somebody:
+ * the administrator's own mandatory test sign-in, which happens before the
+ * connection can admit anybody. `testing: false` is everybody else's answer.
+ */
+export const userTestArrivalSchema = z.discriminatedUnion("testing", [
+  z
+    .object({
+      testing: z.literal(true),
+      connectionId: z.string(),
+      organizationId: z.string(),
+      organizationName: z.string(),
+    })
+    .strict(),
+  z.object({ testing: z.literal(false) }).strict(),
+]);
+export type UserTestArrival = z.infer<typeof userTestArrivalSchema>;
+
 export const userTourPreferenceSchema = z
   .object({
     dismissed: z.boolean(),

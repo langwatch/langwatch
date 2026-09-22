@@ -41,6 +41,7 @@ beforeEach(() => {
     seats: createApiFixture<OrganizationSeatLicense>(),
     sessions: createApiFixture<OrganizationSessionRevocation>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),
+    testArrivals: { standingFor: async () => ({ testing: false }) as const },
   });
 });
 

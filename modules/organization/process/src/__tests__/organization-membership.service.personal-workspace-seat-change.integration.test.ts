@@ -78,6 +78,7 @@ describe.skipIf(!DB_URL)(
       seats,
       sessions,
       grantCache,
+      testArrivals: { standingFor: async () => ({ testing: false }) as const },
     });
 
     const testNamespace = `pw-seat-${nanoid(8)}`;

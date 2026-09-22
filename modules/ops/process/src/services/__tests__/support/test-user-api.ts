@@ -109,6 +109,9 @@ export class TestUserApi implements UserApi {
     this.overrides.revokeOtherBrowserSessions?.(input) ??
     this.unimplemented("revokeOtherBrowserSessions");
 
+  testArrivalStanding: UserApi["testArrivalStanding"] = (input) =>
+    this.overrides.testArrivalStanding?.(input) ?? this.unimplemented("testArrivalStanding");
+
   revokeAllBrowserSessions: UserApi["revokeAllBrowserSessions"] = (input) =>
     this.overrides.revokeAllBrowserSessions?.(input) ??
     this.unimplemented("revokeAllBrowserSessions");

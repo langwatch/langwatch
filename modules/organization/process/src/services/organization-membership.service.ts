@@ -1,4 +1,8 @@
 import { newAuthzBindingId, type AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import {
+  SsoTestArrivalCannotCreateOrganizationError,
+  type SsoTestArrivalStanding,
+} from "@langwatch/identity-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
@@ -40,6 +44,15 @@ import type {
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
+
+/**
+ * Whether this person is mid-way through proving a single sign-on connection
+ * rather than starting out. Identity's answer, since it owns the connection
+ * and the account the test sign-in left behind (ADR-129).
+ */
+export interface OrganizationTestArrivals {
+  standingFor(args: { userId: string }): Promise<SsoTestArrivalStanding>;
+}
 
 /** The KSUID resources an organization and its first team are born under. */
 const ORGANIZATION_KSUID_RESOURCE = "organization";
@@ -123,6 +136,7 @@ export class OrganizationMembershipService {
     seats: OrganizationSeatLicense;
     sessions: OrganizationSessionRevocation;
     grantCache: OrganizationGrantCache;
+    testArrivals: OrganizationTestArrivals;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -134,6 +148,7 @@ export class OrganizationMembershipService {
       seats: OrganizationSeatLicense;
       sessions: OrganizationSessionRevocation;
       grantCache: OrganizationGrantCache;
+      testArrivals: OrganizationTestArrivals;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
@@ -180,6 +195,17 @@ export class OrganizationMembershipService {
     primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
   }): Promise<CreateAndAssignResult> {
+    // A TEST SIGN-IN IS NOT A SIGNUP, and this is the one door: onboarding's
+    // own mutation delegates here, so a check up there is one this call walks
+    // straight past. Creating an organization for the tester strands the real
+    // organization's setup inside a second, empty one.
+    const arrival = await this.dependencies.testArrivals.standingFor({ userId: params.userId });
+    if (arrival.testing) {
+      throw new SsoTestArrivalCannotCreateOrganizationError(
+        `session opened through connection ${arrival.connectionId}, which is not live`,
+      );
+    }
+
     const orgName = params.orgName ?? params.userDisplayName ?? "My Organization";
     const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
     const orgSlug =

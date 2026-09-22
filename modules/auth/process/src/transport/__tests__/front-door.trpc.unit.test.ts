@@ -42,6 +42,7 @@ const door: AuthApi = {
   revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),
   retireLegacySsoAccess: () => unreached("retireLegacySsoAccess"),
   countLegacySsoAccess: () => unreached("countLegacySsoAccess"),
+  findFederatedAccountProviders: () => unreached("findFederatedAccountProviders"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */

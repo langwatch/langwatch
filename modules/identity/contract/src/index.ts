@@ -120,6 +120,8 @@ export {
   type SsoAssertionDecision,
   type SsoAssertionRefusal,
   type SsoAssertionRefusalReason,
+  NOT_A_TEST_ARRIVAL,
+  type SsoTestArrivalStanding,
 } from "./sso-admission.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
@@ -320,6 +322,7 @@ export {
   SsoSamlNotSelfServeError,
   SsoSetupAddressMismatchError,
   SsoSignInRefusedError,
+  SsoTestArrivalCannotCreateOrganizationError,
 } from "./identity.errors.ts";
 export {
   BREAK_GLASS_MAX_WINDOW_DAYS,

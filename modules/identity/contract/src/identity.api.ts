@@ -66,7 +66,11 @@ import type {
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
 import type { ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
-import type { SsoArrivingUser, SsoAssertionDecision } from "./sso-admission.ts";
+import type {
+  SsoArrivingUser,
+  SsoAssertionDecision,
+  SsoTestArrivalStanding,
+} from "./sso-admission.ts";
 import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
@@ -548,6 +552,15 @@ export interface SsoArrivalApi {
   admit(args: { user: SsoArrivingUser; connectionId: string; domain: string }): Promise<void>;
 }
 
+/**
+ * Where a person who belongs to no organization stands: not testing anything,
+ * for almost everybody — and the connection an administrator's mandatory test
+ * sign-in went through, which happened before it could admit anybody.
+ */
+export interface SsoTestArrivalApi {
+  standingFor(args: { userId: string }): Promise<SsoTestArrivalStanding>;
+}
+
 /** The directory-sync guards. */
 export interface ScimSyncGuardsApi {
   issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
@@ -609,6 +622,7 @@ export interface IdentityApi {
   ssoDomainReproof(): SsoDomainReproofApi;
   ssoAssertion(): SsoAssertionApi;
   ssoArrival(): SsoArrivalApi;
+  ssoTestArrival(): SsoTestArrivalApi;
   ssoActivity(): SsoAuthenticationActivityApi;
   ssoMigrationCallbacks(): SsoMigrationCallbackApi;
   ssoBreakGlass(): SsoBreakGlassApi;

@@ -833,3 +833,19 @@ export class SsoCertificateInvalidError extends SsoConnectionCommandRefusedError
     this.name = "SsoCertificateInvalidError";
   }
 }
+
+/**
+ * Somebody signed in to prove a connection is being offered a workspace of
+ * their own: creating one strands the real organization's setup behind a
+ * second, empty one. Refused rather than hidden — the screen is reachable.
+ */
+export class SsoTestArrivalCannotCreateOrganizationError extends HandledError {
+  constructor(detail: string) {
+    super(
+      "sso_test_arrival_cannot_create_organization",
+      "sso_test_arrival_cannot_create_organization",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoTestArrivalCannotCreateOrganizationError";
+  }
+}

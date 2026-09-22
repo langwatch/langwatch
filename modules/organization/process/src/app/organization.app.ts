@@ -341,6 +341,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       seats: members.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
+      testArrivals: setup.dependencies.identity.ssoTestArrival(),
     });
     const groups = OrganizationGroupScopeService.create({
       organizations,

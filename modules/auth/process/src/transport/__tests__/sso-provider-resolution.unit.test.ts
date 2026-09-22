@@ -1,8 +1,7 @@
 /**
- * The door reaches a provider (D09). Identity folds one row per dialable
- * connection and seals its dialing document; this is the other half — the
- * engine finding that row by the address somebody typed, and reading the
- * document back through the deployment's own cipher.
+ * The door reaches a provider (D09). Identity seals one dialing document per
+ * dialable connection; this is the other half — the engine finding that row
+ * by the address typed, and reading it back through the deployment's cipher.
  */
 import { sealedProviderConfigCipher } from "@langwatch/identity-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -105,6 +104,7 @@ const signInThroughSso = async (
 };
 
 describe("given identity folded a provider row for a proved domain", () => {
+  /** @scenario "An issuer nobody registered is refused by name" */
   it("reads the sealed dialing document back and asks that provider", async () => {
     const { status, body } = await signInThroughSso(
       transportOver({ rows: [providerRow()], opening: true }),
@@ -118,6 +118,7 @@ describe("given identity folded a provider row for a proved domain", () => {
     expect(body.message).toContain("https://idp.acme.test/.well-known/openid-configuration");
   });
 
+  /** @scenario "An issuer a customer registered is one this installation may fetch from" */
   it("sends the customer to their own provider once its issuer is registered", async () => {
     stubDiscovery();
 

@@ -117,6 +117,12 @@ export interface AuthApi {
   /** The same reading, retiring nothing: what a finalization re-reads between
    *  its steps to see whether legacy access is actually gone. */
   countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number>;
+  /**
+   * Which identity providers this person holds an account through, each named
+   * once. Auth owns every `Account` row, so a peer deciding something about
+   * them asks rather than reading them (ADR-129).
+   */
+  findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
 }
 
 /** Which accounts a legacy-access question is about: the connection being

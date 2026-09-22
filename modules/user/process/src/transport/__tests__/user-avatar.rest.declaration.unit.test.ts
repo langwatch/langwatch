@@ -18,11 +18,13 @@ describe("the user-avatar REST family", () => {
       expect(declaration.v1Twin).toBe(false);
       expect(
         declaration.routes.map((route) => [route.path, route.operation, route.methods]),
-      ).toEqual([["/api/user-avatar/:projectId/:id", "readUserAvatarBytes", ["get", "head"]]]);
+      ).toEqual([
+        ["/api/user-avatar/:projectId/:userAvatarId", "readUserAvatarBytes", ["get", "head"]],
+      ]);
     });
 
     it("answers behind the browser's own door, which a project key opens too", () => {
-      expect(declaration.credential).toBe("session");
+      expect(declaration.credential).toBe("browser");
     });
 
     it("asks no permission and resolves no scope: the object's own tags are the gate", () => {

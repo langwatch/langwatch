@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The one `identity.*` procedure and the shape it takes.
+ * The `identity.*` procedures and the shapes they take.
  * @see specs/identity/identifier-model.feature
  */
 import { identityTrpc } from "@langwatch/user-contract";
@@ -10,10 +10,34 @@ import { identityTrpcTransport } from "../identity.trpc.ts";
 
 describe("the identity tRPC surface", () => {
   describe("given the declaration a process mounts", () => {
-    it("keeps the namespace and the one procedure the verification link calls", () => {
+    it("keeps the namespace and the procedures the sign-in surfaces call", () => {
       expect(identityTrpcTransport.namespace).toBe("identity");
-      expect(Object.keys(identityTrpc.members)).toEqual(["completeVerification"]);
+      expect(Object.keys(identityTrpc.members)).toEqual(["completeVerification", "myTestArrival"]);
       expect(identityTrpc.members.completeVerification?.kind).toBe("mutation");
+      expect(identityTrpc.members.myTestArrival?.kind).toBe("query");
+    });
+
+    /** @scenario "A sign-in through a connection that is not live yet is a test arrival" */
+    it("answers a test arrival with the connection and organization, or not one", () => {
+      const standing = identityTrpc.members.myTestArrival?.output.safeParse({
+        testing: true,
+        connectionId: "local_ssoc_one",
+        organizationId: "org_acme",
+        organizationName: "Acme",
+      });
+      const nobody = identityTrpc.members.myTestArrival?.output.safeParse({ testing: false });
+
+      expect(standing?.success).toBe(true);
+      expect(nobody?.success).toBe(true);
+    });
+
+    it("takes nothing from the browser: the session names whose standing it is", () => {
+      const parsed = identityTrpc.members.myTestArrival?.input.safeParse({
+        connectionId: "local_ssoc_other",
+      });
+
+      expect(parsed?.success).toBe(true);
+      expect(parsed?.data).toEqual({});
     });
 
     it("demands both proofs together, so a forwarded link verifies nothing", () => {
