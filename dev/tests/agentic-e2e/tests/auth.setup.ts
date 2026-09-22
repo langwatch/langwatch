@@ -132,7 +132,7 @@ setup("authenticate", async ({ page, request }) => {
   if (!hasProject) {
     console.log("No project found — creating org + project via API...");
     const initResponse = await page.request.post(
-      "/api/trpc/onboarding.initializeOrganization?batch=1",
+      "/api/trpc/organization.initializeOrganization?batch=1",
       {
         data: {
           "0": {

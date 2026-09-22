@@ -21,10 +21,10 @@ type SignUpData = Readonly<Record<string, unknown>>;
 
 /** `joinRequests.lookup` feeds the create screen's join-instead notice. */
 export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> & {
-  onboarding: {
+  organization: {
     /**
-     * Mints the reader's first organization, its team and — on the LLM Ops
-     * track — its first project. The governance track answers a null
+     * Mints the reader's first organization, its team and, on the LLM Ops
+     * track, its first project. The governance track answers a null
      * `projectSlug`, sending that reader through the home resolver instead.
      */
     initializeOrganization: {
@@ -46,7 +46,9 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> & {
         output: unknown;
       };
     };
+  };
 
+  onboarding: {
     /** The guided takeover/tour's durable state, plus the variant it was assigned. */
     getGuidedState: {
       query: {
@@ -251,7 +253,7 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> & {
 /**
  * The onboarding family's typed tRPC hooks — same machinery, transport and
  * cache as the application's `api` proxy (see `createModuleApi`). Also
- * exported as `api`, so moved call sites keep their `api.onboarding.*` spelling.
+ * exported as `api`, so call sites read `api.<namespace>.<procedure>`.
  */
 export const onboardingApi = createModuleApi<OnboardingApiMap>();
 

@@ -125,7 +125,7 @@ export class OrganizationOnboardingService {
     } catch (error) {
       this.deps.signals.reportError(error, {
         extra: {
-          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+          origin: "organization.initializeOrganization.ensureDefaultCatalog",
           organizationId,
         },
       });
@@ -148,7 +148,7 @@ export class OrganizationOnboardingService {
     } catch (error) {
       this.deps.signals.reportError(error, {
         extra: {
-          origin: "onboarding.initializeOrganization",
+          origin: "organization.initializeOrganization",
           organizationId: input.organizationId,
         },
       });

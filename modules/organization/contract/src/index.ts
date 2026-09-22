@@ -28,6 +28,5 @@ export * from "./organization.trpc.ts";
 export * from "./team.trpc.ts";
 export * from "./group.trpc.ts";
 export * from "./join-request.trpc.ts";
-export * from "./onboarding.trpc.ts";
 export * from "./personal-workspace-features.trpc.ts";
 export * from "./ui-scope.ts";

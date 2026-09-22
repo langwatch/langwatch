@@ -51,7 +51,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And the user has zero Organization memberships (no org, no team, no project)
     When they hit "/" or any post-auth landing
     Then they are routed to "/onboarding/welcome" (NOT /me, NOT /governance)
-    And the welcome page calls `api.onboarding.initializeOrganization`
+    And the welcome page calls `api.organization.initializeOrganization`
     And that call creates: an Organization, a Personal Team membership,
         2 RoleBindings (Owner on the org + Member on the personal team),
         and a first project under the new org

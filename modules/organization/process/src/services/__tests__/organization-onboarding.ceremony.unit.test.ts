@@ -167,7 +167,7 @@ describe("given a customer who declared the coding-agent intent", () => {
       expect(result).toMatchObject({ success: true, organizationId: ORGANIZATION.id });
       expect(signals.reportError).toHaveBeenCalledWith(failure, {
         extra: {
-          origin: "onboarding.initializeOrganization",
+          origin: "organization.initializeOrganization",
           organizationId: ORGANIZATION.id,
         },
       });
@@ -189,7 +189,7 @@ describe("given a customer who declared the coding-agent intent", () => {
       expect(result).toMatchObject({ success: true });
       expect(signals.reportError).toHaveBeenCalledWith(failure, {
         extra: {
-          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+          origin: "organization.initializeOrganization.ensureDefaultCatalog",
           organizationId: ORGANIZATION.id,
         },
       });

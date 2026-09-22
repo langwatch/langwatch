@@ -63,7 +63,6 @@ export {
 } from "./transport/organization-management.rest.ts";
 export { groupTrpcTransport } from "./transport/group.trpc.ts";
 export { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
-export { onboardingTrpcTransport } from "./transport/onboarding.trpc.ts";
 export {
   organizationSessionPersonFact,
   organizationTrpcTransport,

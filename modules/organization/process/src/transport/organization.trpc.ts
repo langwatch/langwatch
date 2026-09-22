@@ -19,13 +19,13 @@ export const organizationSessionPersonFact = defineTrpcFact(
 type SessionPerson = Readonly<{ name: string | null; email: string | null }> | null;
 
 /**
- * The one opt-out this namespace makes, and the same sentence for all three
- * procedures that make it: each runs before or across membership, so there is
+ * The one opt-out this namespace makes, and the same sentence for every
+ * procedure that makes it: each runs before or across membership, so there is
  * no scope to check and no permission the caller could hold.
  */
 const BEFORE_MEMBERSHIP = {
   reason:
-    "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
+    "runs before or across organization membership: the sign-up ceremony, creating an organization, listing the caller's own, accepting an invite",
 } as const;
 
 /** `organization:manage`, resolved from the team the change addresses. */
@@ -240,4 +240,28 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .withFacts(organizationSessionPersonFact)
   .withPermission(AUDIT_LOG_VIEW)
   .handle(({ app, input, actor }, person) => app.readAuditLogs(input, callerOf(actor, person)))
+
+  /**
+   * The sign-up ceremony, and the screen after it. The ceremony itself —
+   * catalogue, personal workspace, first project, announcements — is the
+   * application's.
+   */
+  .procedure("initializeOrganization")
+  .withFacts(organizationSessionPersonFact)
+  .noPermission(BEFORE_MEMBERSHIP)
+  .handle(({ app, input, actor }, person) =>
+    app.initializeOrganization(input, {
+      id: actor.id,
+      name: person?.name ?? null,
+      email: person?.email ?? null,
+    }),
+  )
+
+  .procedure("setIntegrationMethod")
+  .noPermission(BEFORE_MEMBERSHIP)
+  .handle(({ app, input, actor }) => {
+    app.recordIntegrationMethod({ userId: actor.id, selection: input.integrationMethod });
+
+    return { success: true as const };
+  })
   .build();

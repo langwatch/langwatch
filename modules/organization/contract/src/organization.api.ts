@@ -32,7 +32,6 @@ import type {
   JoinRequestPending,
 } from "./join-request.responses.ts";
 import type { OrganizationInitialized } from "./onboarding.responses.ts";
-import type { OnboardingInitializeOrganizationInput } from "./onboarding.trpc.ts";
 import type {
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -56,6 +55,7 @@ import type {
   OrganizationApiInviteScope,
   OrganizationApiUpdateTeamMemberRoleInput,
 } from "./organization.trpc-schemas.ts";
+import type { OnboardingInitializeOrganizationInput } from "./organization.trpc.ts";
 import type {
   EnrichedAuditLog,
   GetOrganizationBillingProfileInput,
