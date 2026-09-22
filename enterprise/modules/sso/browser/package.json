@@ -27,7 +27,8 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
-    "lucide-react": "catalog:"
+    "lucide-react": "catalog:",
+    "react-icons": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
