@@ -11,26 +11,38 @@ import type { PrismaClient, User } from "~/generated/prisma/client";
 import { sessionRevocation } from "../app-layer/identity/runtime";
 import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
+/** The collaborators a caller may hand in; each defaults over `prisma`. */
+interface UserServiceCollaborators {
+  cliTokenRevocation?: CliTokenRevocationService;
+  /**
+   * Composed over this service's OWN client rather than the app's, so a
+   * caller handing in a client — every test here does — revokes against the
+   * one it handed in.
+   */
+  sessions?: SessionRevocationService;
+  /**
+   * The same legacy `ssoDomain`/`ssoProvider` lookup the sign-in hooks
+   * read, injected so a test can fake it without a database.
+   */
+  legacySsoOrganizations?: OrganizationSsoProviderLookup;
+}
+
 export class UserService {
+  private readonly cliTokenRevocation: CliTokenRevocationService;
+  private readonly sessions: SessionRevocationService;
+  private readonly legacySsoOrganizations: OrganizationSsoProviderLookup;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly cliTokenRevocation: CliTokenRevocationService = CliTokenRevocationService.create(),
-    /**
-     * Composed over this service's OWN client rather than the app's, so a
-     * caller handing in a client — every test here does — revokes against the
-     * one it handed in.
-     */
-    private readonly sessions: SessionRevocationService = sessionRevocation({
-      prisma,
-    }),
-    /**
-     * The same legacy `ssoDomain`/`ssoProvider` lookup the sign-in hooks
-     * read, injected so a test can fake it without a database.
-     */
-    private readonly legacySsoOrganizations: OrganizationSsoProviderLookup = new PrismaLegacySsoOrganizationRepository(
-      prisma,
-    ),
-  ) {}
+    collaborators: UserServiceCollaborators = {},
+  ) {
+    this.cliTokenRevocation =
+      collaborators.cliTokenRevocation ?? CliTokenRevocationService.create();
+    this.sessions = collaborators.sessions ?? sessionRevocation({ prisma });
+    this.legacySsoOrganizations =
+      collaborators.legacySsoOrganizations ??
+      new PrismaLegacySsoOrganizationRepository(prisma);
+  }
 
   static create(prisma: PrismaClient): UserService {
     return new UserService(prisma);
