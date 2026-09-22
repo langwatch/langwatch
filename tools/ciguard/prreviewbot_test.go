@@ -13,6 +13,12 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
+// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
+const prReviewBotPermissionsBlock = `permissions:
+  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+  pull-requests: write
+`
+
 // goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
 // stands when every invariant holds. Individual tests mutate one clause of
 // it at a time so each failure mode is isolated.
@@ -22,10 +28,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
-permissions:
-  contents: read
-  pull-requests: write
-
+` + prReviewBotPermissionsBlock + `
 concurrency:
   group: pr-review-bot-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -42,7 +45,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@3b0a47e67927b9666da148f44f892de63d2feba7 # main 2026-09-18
+      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -197,11 +200,100 @@ func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "does not key on the PR number")
 }
 
+// @scenario "The review workflow grants exactly contents write and pull-requests write"
+func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
+	withRead := strings.Replace(goodPRReviewBotWorkflow,
+		"  contents: write",
+		"  contents: read", 1)
+	root := writePRReviewBotWorkflow(t, withRead)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `permissions block grants contents: "read", want "write"`)
+}
+
+func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no top-level permissions block")
+}
+
+func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
+	withoutPullRequests := strings.Replace(goodPRReviewBotWorkflow,
+		"  pull-requests: write\n", "", 1)
+	root := writePRReviewBotWorkflow(t, withoutPullRequests)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `missing "pull-requests"`)
+}
+
+func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
+	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "permissions: write-all\n", 1)
+	root := writePRReviewBotWorkflow(t, shorthand)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `shorthand "write-all"`)
+}
+
+func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
+	withExtra := strings.Replace(goodPRReviewBotWorkflow,
+		"  pull-requests: write",
+		"  pull-requests: write\n  issues: write", 1)
+	root := writePRReviewBotWorkflow(t, withExtra)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "issues")
+	assert.Contains(t, strings.Join(problems, "\n"), "extra")
+}
+
+// @scenario "The review workflow grants exactly contents write and pull-requests write"
+func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
+	overridden := strings.Replace(goodPRReviewBotWorkflow,
+		"  review:\n    if:",
+		"  review:\n    permissions:\n      contents: read\n      pull-requests: write\n    if:", 1)
+	root := writePRReviewBotWorkflow(t, overridden)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `permissions block grants contents: "read", want "write"`)
+}
+
 // @scenario "Every action the workflow uses is pinned to a full commit SHA"
 func TestPRReviewBotRejectsAFloatingTag(t *testing.T) {
 	floating := strings.Replace(goodPRReviewBotWorkflow,
-		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
-		"actions/checkout@v7 # v7", 1)
+		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+		"actions/checkout@v7", 1)
+	root := writePRReviewBotWorkflow(t, floating)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "not a full 40-character commit SHA")
+}
+
+func TestPRReviewBotRejectsAFloatingBranchRef(t *testing.T) {
+	floating := strings.Replace(goodPRReviewBotWorkflow,
+		"langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521",
+		"langwatch/langwatch-pr-review-bot@main", 1)
 	root := writePRReviewBotWorkflow(t, floating)
 
 	problems, err := ciguard.PRReviewBot(root)
