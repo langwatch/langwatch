@@ -65,6 +65,11 @@ The four that lanes break most often:
 - **No whole-tree checks.** `tsc --noEmit --ignoreConfig <file>` while working;
   `pnpm typecheck:one <package>` once, at the end. Never `pnpm typecheck`,
   `pnpm lint` or `pnpm format`.
+- **Never run `oxfmt --write` on a computed list you have not looked at.** An
+  empty expansion formats the WHOLE repository (2,681 files, 2026-09-22), and
+  several paths after the flags can silently format nothing. Write the list to
+  a file, `test -s` it, then `xargs -0 pnpm exec oxfmt --write --disable-nested-config`
+  — and read the file count oxfmt prints back against what you passed.
 - **Never read a `.env` or any secret-bearing file.**
 - **No subagents and no forks.** You are the lane.
 
