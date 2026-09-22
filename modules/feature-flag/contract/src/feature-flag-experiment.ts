@@ -8,9 +8,15 @@ import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-
  * tenant, so excluding it makes the unanswerable case unrepresentable.
  */
 export type AuthenticatedExperimentTarget =
-  | { kind: "project"; userId: string; projectId: string; organizationId: string }
-  | { kind: "organization"; userId: string; organizationId: string }
-  | { kind: "user"; userId: string };
+  | {
+      kind: "project";
+      userId: string;
+      projectId: string;
+      organizationId: string;
+      userEmail?: string;
+    }
+  | { kind: "organization"; userId: string; organizationId: string; userEmail?: string }
+  | { kind: "user"; userId: string; userEmail?: string };
 
 export type ExperimentEvaluationTarget =
   | AuthenticatedExperimentTarget

@@ -297,16 +297,27 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
         throw this.projectOrganizationMismatch(input.projectId);
       }
 
-      return { kind: "project", userId: input.userId, projectId: input.projectId, organizationId };
+      return {
+        kind: "project",
+        userId: input.userId,
+        projectId: input.projectId,
+        organizationId,
+        userEmail: input.userEmail,
+      };
     }
 
     if (input.organizationId) {
       await this.authorizeOrganizationView(input.userId, input.organizationId);
 
-      return { kind: "organization", userId: input.userId, organizationId: input.organizationId };
+      return {
+        kind: "organization",
+        userId: input.userId,
+        organizationId: input.organizationId,
+        userEmail: input.userEmail,
+      };
     }
 
-    return { kind: "user", userId: input.userId };
+    return { kind: "user", userId: input.userId, userEmail: input.userEmail };
   }
 
   private async authorizeProjectView(userId: string, projectId: string): Promise<void> {

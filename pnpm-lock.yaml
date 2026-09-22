@@ -9126,6 +9126,9 @@ importers:
       motion:
         specifier: 'catalog:'
         version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      posthog-js:
+        specifier: 'catalog:'
+        version: 1.415.6
       react-contextual-analytics:
         specifier: 'catalog:'
         version: 1.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

@@ -123,6 +123,7 @@
     "libphonenumber-js": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",
+    "posthog-js": "catalog:",
     "react-contextual-analytics": "catalog:",
     "react-feather": "catalog:",
     "react-hook-form": "catalog:",

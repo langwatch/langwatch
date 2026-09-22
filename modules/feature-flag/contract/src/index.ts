@@ -26,6 +26,7 @@ export type {
   RuleEvaluationContext,
 } from "./feature-flag-rules.ts";
 export {
+  emailDomainsOf,
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,

@@ -1,4 +1,5 @@
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs } from "@langwatch/time";
 
 import { readableDate } from "./display-formatters.ts";
@@ -20,6 +21,10 @@ export interface TargetingSummary {
   enabledProjectCount: number;
   /** The first stretch of creation dates a rule switches the flag on for. */
   enabledNewUsers: AgeRange | null;
+  /** The share of users, in percent, the first percentage rule switches on. */
+  enabledPercentage: number | null;
+  /** The domains the first email domain rule switches on, empty when none. */
+  enabledEmailDomains: string[];
   /**
    * Targets an earlier rule switches off. Only read alongside
    * `enabledForEveryone`, where the catch-all would otherwise claim the whole
@@ -52,6 +57,8 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
     }),
     enabledProjectCount: count({ decisions: projects, enabled: true }),
     enabledNewUsers: bare(ages.find((range) => range.enabled)),
+    enabledPercentage: enabledPercentage(reachable),
+    enabledEmailDomains: enabledEmailDomains(reachable),
     excludedOrganizationCount: count({
       decisions: organizations,
       enabled: false,
@@ -87,8 +94,38 @@ export function targetingLabel(summary: TargetingSummary): string | null {
     }),
     pluralize({ count: summary.enabledProjectCount, noun: "project" }),
     summary.enabledNewUsers ? describeRange(summary.enabledNewUsers) : null,
+    summary.enabledPercentage !== null ? `${summary.enabledPercentage}% of users` : null,
+    summary.enabledEmailDomains.length > 0
+      ? `users at ${summary.enabledEmailDomains.join(", ")}`
+      : null,
   ]);
   return targets ? `Enabled for ${targets}` : null;
+}
+
+/**
+ * The share the first percentage rule switches on, or null. Only a rule
+ * whose sole condition is the percentage counts: one that also names an
+ * organization speaks for that organization's users alone.
+ */
+function enabledPercentage(rules: FeatureFlagRules): number | null {
+  for (const rule of rules) {
+    const percentage = rule.match.percentage;
+    if (percentage === undefined || Object.keys(rule.match).length > 1) continue;
+    return rule.enabled ? percentage : null;
+  }
+  return null;
+}
+
+/**
+ * The domains the first email domain rule switches on, or none. As with the
+ * percentage, only a rule whose sole condition is the domain counts.
+ */
+function enabledEmailDomains(rules: FeatureFlagRules): string[] {
+  for (const rule of rules) {
+    if (rule.match.emailDomain === undefined || Object.keys(rule.match).length > 1) continue;
+    return rule.enabled ? emailDomainsOf(rule.match.emailDomain) : [];
+  }
+  return [];
 }
 
 /**

@@ -4,8 +4,9 @@
  * exact tenant target, not the scope id a declaration would read off input.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { FeatureFlagApi, featureFlagTrpc } from "@langwatch/feature-flag-contract";
+import { z } from "zod";
 
 const AUTHORIZED_BY_THE_APP =
   "the feature's own resolver authorizes the exact tenant target before any flag is read or written";
@@ -17,14 +18,23 @@ const EXPERIMENT_PERMISSIONS = [
   "featureFlags:manageExperiments",
 ] as const;
 
+/** The session's email, for an email domain rule — bound once at the process
+ * (matched to `organization.trpc.ts`'s fact by name, not import). */
+const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
+
 export const featureFlagTrpcTransport = defineTrpcRouter(FeatureFlagApi, featureFlagTrpc)
   .procedure("isEnabled")
+  .withFacts(callerEmailFact)
   .serviceAuthorized({
     reason: AUTHORIZED_BY_THE_APP,
     permissions: TENANT_READ_PERMISSIONS,
   })
-  .handle(async ({ app, input, actor }) => ({
-    enabled: await app.isEnabledForCaller({ ...input, userId: actor.id }),
+  .handle(async ({ app, input, actor }, callerEmail) => ({
+    enabled: await app.isEnabledForCaller({
+      ...input,
+      userId: actor.id,
+      userEmail: callerEmail ?? undefined,
+    }),
   }))
 
   .procedure("isEnabledForAnyOrganization")

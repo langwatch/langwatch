@@ -53,6 +53,8 @@ const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string 
     { value: "ORGANIZATION", label: "Organization" },
     { value: "PROJECT", label: "Project" },
     { value: "NEW_USERS", label: "New users" },
+    { value: "PERCENTAGE", label: "Percentage of users" },
+    { value: "EMAIL_DOMAIN", label: "Email domain" },
   ],
 });
 
@@ -61,6 +63,8 @@ const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   ORGANIZATION: "Organization id",
   PROJECT: "Project id",
   NEW_USERS: "Organization created on or after",
+  PERCENTAGE: "Percentage of users",
+  EMAIL_DOMAIN: "Email domains",
 };
 
 const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
@@ -68,6 +72,8 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
   ORGANIZATION: "organization_xxxx",
   PROJECT: "project_xxxx",
   NEW_USERS: "",
+  PERCENTAGE: "50",
+  EMAIL_DOMAIN: "acme.com, acme.io",
 };
 
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
@@ -75,6 +81,18 @@ const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   ORGANIZATION: "Every organization rule needs an organization id.",
   PROJECT: "Every project rule needs a project id.",
   NEW_USERS: "Every new users rule needs a date.",
+  PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
+  EMAIL_DOMAIN: "Every email domain rule needs one or more domains, without the @.",
+};
+
+/** The `<input>` type the field's scope needs: a date picker, a number, or free text. */
+const SCOPE_FIELD_INPUT_TYPE: Record<ScopeKind, "date" | "number" | "text"> = {
+  EVERYONE: "text",
+  ORGANIZATION: "text",
+  PROJECT: "text",
+  NEW_USERS: "date",
+  PERCENTAGE: "number",
+  EMAIL_DOMAIN: "text",
 };
 
 export function FeatureFlagRulesDialog({
@@ -319,7 +337,7 @@ function RuleTargetField({
       <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
       <Input
         size="sm"
-        type={isNewUsers ? "date" : "text"}
+        type={SCOPE_FIELD_INPUT_TYPE[rule.scopeKind]}
         fontFamily={isNewUsers ? void 0 : "mono"}
         fontSize="xs"
         placeholder={SCOPE_FIELD_PLACEHOLDER[rule.scopeKind]}

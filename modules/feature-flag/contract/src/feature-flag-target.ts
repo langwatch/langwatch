@@ -38,9 +38,15 @@ export type FeatureFlagTargetInput = z.infer<typeof featureFlagTargetInputSchema
  * is for backend kill switches with no tenant, never a stand-in for one.
  */
 export type FeatureFlagTarget =
-  | { kind: "project"; projectId: string; organizationId?: string; userId?: string }
-  | { kind: "organization"; organizationId: string; userId?: string }
-  | { kind: "user"; userId: string }
+  | {
+      kind: "project";
+      projectId: string;
+      organizationId?: string;
+      userId?: string;
+      userEmail?: string;
+    }
+  | { kind: "organization"; organizationId: string; userId?: string; userEmail?: string }
+  | { kind: "user"; userId: string; userEmail?: string }
   | { kind: "anonymous"; anonymousId: string }
   | { kind: "system" };
 
@@ -84,10 +90,15 @@ export function ruleContextForTarget(target: FeatureFlagTarget): {
   projectId?: string;
   organizationId?: string;
   bucketingId?: string;
+  userEmail?: string;
 } {
+  const userEmail =
+    target.kind === "anonymous" || target.kind === "system" ? void 0 : target.userEmail;
+
   return {
     projectId: projectIdForTarget(target),
     organizationId: organizationIdForTarget(target),
     bucketingId: bucketingIdForTarget(target),
+    userEmail,
   };
 }

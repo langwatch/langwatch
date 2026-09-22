@@ -1,4 +1,5 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs } from "@langwatch/time";
 
 import { readableDate } from "./display-formatters.ts";
@@ -13,7 +14,11 @@ export type ScopeKind =
   | "ORGANIZATION"
   | "PROJECT"
   /** Organizations created on or after a date — shown as "New users". */
-  | "NEW_USERS";
+  | "NEW_USERS"
+  /** A stable share of users, in percent — shown as "Percentage of users". */
+  | "PERCENTAGE"
+  /** Signed-in users at one or more email domains — shown as "Email domain". */
+  | "EMAIL_DOMAIN";
 
 export interface UIRule {
   /**
@@ -23,7 +28,10 @@ export interface UIRule {
    */
   id: string;
   scopeKind: ScopeKind;
-  /** An organization or project id, or a date for `NEW_USERS`. */
+  /**
+   * An organization or project id, a date for `NEW_USERS`, a percent for
+   * `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
+   */
   target: string;
   enabled: boolean;
   /**
@@ -82,6 +90,22 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         otherConditions: without({ match: rule.match, key: "organizationCreatedAfter" }),
       };
     }
+    if (rule.match.percentage !== undefined) {
+      return {
+        ...base,
+        scopeKind: "PERCENTAGE" as const,
+        target: String(rule.match.percentage),
+        otherConditions: without({ match: rule.match, key: "percentage" }),
+      };
+    }
+    if (rule.match.emailDomain !== undefined) {
+      return {
+        ...base,
+        scopeKind: "EMAIL_DOMAIN" as const,
+        target: emailDomainsOf(rule.match.emailDomain).join(", "),
+        otherConditions: without({ match: rule.match, key: "emailDomain" }),
+      };
+    }
     return { ...base, scopeKind: "EVERYONE" as const, target: "", otherConditions: {} };
   });
 }
@@ -102,8 +126,32 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
     if (rule.scopeKind === "NEW_USERS") {
       return { match: { ...rest, organizationCreatedAfter: target }, enabled: rule.enabled };
     }
+    if (rule.scopeKind === "PERCENTAGE") {
+      return { match: { ...rest, percentage: Number(target) }, enabled: rule.enabled };
+    }
+    if (rule.scopeKind === "EMAIL_DOMAIN") {
+      return {
+        match: { ...rest, emailDomain: singleOrList(parseEmailDomains(target)) },
+        enabled: rule.enabled,
+      };
+    }
     return { match: {}, enabled: rule.enabled };
   });
+}
+
+/** Domains typed into the field, stored form: split on commas, lowercased,
+ * no padding or leading `@`, empties dropped ("@Acme.com, x.io" -> the two). */
+export function parseEmailDomains(target: string): string[] {
+  return target
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter((domain) => domain !== "");
+}
+
+/** One domain is stored as a string, several as a list. */
+function singleOrList(domains: string[]): string | string[] {
+  const [only] = domains;
+  return domains.length === 1 && only !== undefined ? only : domains;
 }
 
 /** The rule's other conditions: its match without the one the scope owns. */
@@ -148,13 +196,27 @@ export function withRuleMoved(
   return moved;
 }
 
-/**
- * The rule this operator has left unfillable, or undefined when every rule
- * can match something. A scoped rule with no target and a new-users rule with
- * no date are both rules the operator believes are live.
- */
+/** The rule this operator has left unfillable — no target, an out-of-range
+ * percentage, or a domain field with an `@` in it — or undefined if none. */
 export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
-  return rules.find((rule) => rule.scopeKind !== "EVERYONE" && rule.target.trim() === "");
+  return rules.find((rule) => {
+    if (rule.scopeKind === "EVERYONE") return false;
+    const target = rule.target.trim();
+    if (target === "") return true;
+    if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
+    if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
+    return false;
+  });
+}
+
+function isPercentage(target: string): boolean {
+  const percentage = Number(target);
+  return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100;
+}
+
+function areEmailDomains(target: string): boolean {
+  const domains = parseEmailDomains(target);
+  return domains.length > 0 && domains.every((domain) => !/[@\s]/.test(domain));
 }
 
 /**

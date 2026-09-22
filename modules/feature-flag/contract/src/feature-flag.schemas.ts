@@ -104,10 +104,10 @@ export const experimentTenantPolicyInputSchema = z
   .strict();
 
 /**
- * The signed-in person a request is authorized as. It is the session's own
- * identifier, never a field of the request body.
+ * The signed-in person a request is authorized as; `userEmail` arrives as a
+ * process fact, for an email domain targeting rule (absent without one).
  */
-export type FeatureFlagCaller = Readonly<{ userId: string }>;
+export type FeatureFlagCaller = Readonly<{ userId: string; userEmail?: string }>;
 
 export type FeatureFlagReadForCaller = z.infer<typeof featureFlagReadInputSchema> &
   FeatureFlagCaller;
