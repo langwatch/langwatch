@@ -956,6 +956,24 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a probe error alone never re-provisions — the watch keeps polling until a snapshot is authoritative
     And a config store that never releases the model gives up at the budget with a warning
 
+  # The re-provision gate is only as trustworthy as the probe behind it, so the
+  # ownership classification is split from its I/O and unit-tested directly: a
+  # pure classifier over two counts (config-store entities, SQL-store users) and
+  # a probe that reads those counts against an injected client. The config store
+  # wins whenever it still renders an entity; else the app-owned SQL-store user
+  # if present; else neither. Connectivity is proven first, so an unreachable
+  # ClickHouse makes the probe throw rather than report a spurious "neither" the
+  # watch would re-provision against. The SQL-store count excludes the config
+  # store's `users_xml` rather than pinning one storage kind.
+  @unit
+  Scenario: The ownership probe classifies who owns the LangWatchQL access model
+    Given the ownership classifier reads a config-store entity count and a SQL-store user count
+    When the config store still renders any entity the classifier reports the config store owns the model
+    And when only the app-owned SQL-store user is present the classifier reports the SQL store owns it
+    And when neither count is positive the classifier reports the model is owned by neither
+    When the probe cannot reach ClickHouse it throws rather than reporting neither owns the model
+    And the probe counts SQL-store users by the restricted user name excluding the config store's users_xml
+
   @integration
   Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
     Given a pod holds the LangWatchQL self-provision lock inside its transaction

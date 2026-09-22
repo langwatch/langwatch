@@ -28,7 +28,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { LwqlAccessModelOwner } from "../../../../tasks/provisionLwql";
+import type { LwqlAccessModelOwner } from "./accessModelOwner";
 
 const logger = createLogger("langwatch:analytics:lwql:reconvergence");
 

@@ -28,7 +28,7 @@
 import { createLogger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LwqlAccessModelOwner } from "../../../../../tasks/provisionLwql";
+import type { LwqlAccessModelOwner } from "../accessModelOwner";
 import {
   resetLwqlReconvergenceWatchForTests,
   startLwqlReconvergenceWatch,

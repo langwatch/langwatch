@@ -47,6 +47,7 @@ import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   LWQL_POSTGRES_READER_ROLE,
+  type LwqlAccessModelOwner,
   type LwqlKeyMapBackfillPlan,
   type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
@@ -55,6 +56,7 @@ import {
   lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
   probeAppFunctionStore,
+  probeLwqlAccessModelOwner,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   redactSecrets,
@@ -391,25 +393,17 @@ export function lwqlSelfProvisionInputs(): {
   };
 }
 
-/** Which store currently owns the LangWatchQL access model, if any. */
-export type LwqlAccessModelOwner = "config_store" | "sql_store" | "none";
-
 /**
  * Which store owns the LangWatchQL access model right now, proven fresh at call
- * time, for the server-side reconvergence watch to poll:
+ * time, for the server-side reconvergence watch to poll. A stateless snapshot
+ * rather than an inference over probe history: a transient error can never
+ * fabricate a "none" (the probe throws instead, and the watch keeps polling),
+ * and a pod that rolled before the first probe still reads correctly.
  *
- * - `"config_store"` — the read-only users.xml identities are still rendered
- *   (the previous ClickHouse pod, mid-upgrade). The app must keep waiting.
- * - `"sql_store"` — the app-owned SQL-store user is present: the model is live,
- *   nothing to do.
- * - `"none"` — neither is present, so the app must (re-)provision.
- *
- * A stateless snapshot rather than an inference over probe history: a transient
- * error can never fabricate a "none" (it throws instead), and a pod that rolled
- * before the first probe still reads correctly. {@link inventoryConfigStoreLwqlEntities}
- * swallows read errors and returns `[]`, so this probe first proves connectivity
- * with a trivial query — an unreachable ClickHouse *throws* (the watch keeps
- * polling) instead of reporting a spurious "none".
+ * The classification is the sole gate on a destructive re-provision, so the
+ * decision and its I/O live in {@link probeLwqlAccessModelOwner} /
+ * {@link classifyLwqlAccessModelOwner} where they are unit-tested; this only
+ * resolves the inputs and hands the probe an admin client.
  */
 export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
   const inputs = lwqlSelfProvisionInputs();
@@ -421,35 +415,9 @@ export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
     process.env.CLICKHOUSE_URL,
     process.env.DATABASE_URL,
   ];
-  return withAdminClickHouseClient(async (client) => {
-    // Connectivity check: throws on an unreachable server, so the caller can
-    // distinguish "cannot read yet" from an authoritative ownership answer.
-    await (
-      await client.query({ query: "SELECT 1", format: "JSONEachRow" })
-    ).text();
-
-    const configStoreEntities = await inventoryConfigStoreLwqlEntities({
-      client,
-      names,
-      secrets,
-    });
-    if (configStoreEntities.length > 0) return "config_store";
-
-    // The config store owns nothing; is the app-owned user present in any SQL
-    // access store? Excluding `users_xml` (the config store, already checked
-    // above and the same literal `inventoryConfigStoreLwqlEntities` filters on)
-    // rather than pinning `local_directory` keeps this correct on ClickHouse
-    // deployments whose SQL storage is `replicated`, `memory`, etc.
-    const result = await client.query({
-      query:
-        "SELECT count() AS n FROM system.users " +
-        "WHERE name = {user:String} AND storage != 'users_xml'",
-      query_params: { user: names.restrictedUser },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{ n: number | string }>;
-    return Number(rows[0]?.n ?? 0) > 0 ? "sql_store" : "none";
-  });
+  return withAdminClickHouseClient((client) =>
+    probeLwqlAccessModelOwner({ client, names, secrets }),
+  );
 }
 
 export default async function execute() {

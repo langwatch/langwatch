@@ -20,6 +20,11 @@
 
 export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
 export {
+  classifyLwqlAccessModelOwner,
+  type LwqlAccessModelOwner,
+  probeLwqlAccessModelOwner,
+} from "./accessModelOwner";
+export {
   type LangWatchQLAppFunctionConflict,
   type LangWatchQLServerFunctionRow,
   lwqlAppFunctionConflicts,
