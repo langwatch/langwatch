@@ -10,6 +10,7 @@ import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscri
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
 import type { BillingReportOrganizationRepository } from "./organization/billing-report-organization.repository.ts";
+import type { ProjectActiveDayRepository } from "./project-active-day.repository.ts";
 import type { BillingSubscription } from "./subscription.repository.ts";
 import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
 
@@ -22,6 +23,7 @@ export interface BillingRepositories {
   readonly nurturingProfiles: NurturingProfileRepository;
   readonly organizations: BillingAccountFactsRepository;
   readonly organizationPricing: OrganizationPricingRepository;
+  readonly projectActiveDays: ProjectActiveDayRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
   readonly subscriptions: BillingSubscription;
   readonly tenantOrganizations: TenantOrganizationRepository;

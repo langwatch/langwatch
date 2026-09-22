@@ -11,9 +11,12 @@ import {
   useLegacySimulationsPreference,
 } from "../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useOptionalScenarioHost } from "../../../model/scenario-host.ts";
 
 /**
  * Small announcement card pinned to the bottom of the Agent Testing sidebars.
+ * Stays off while a guided onboarding path is being set up or its tour
+ * runs: nothing is snoozed, so it shows once the path is done.
  * @see specs/suites/new-simulations-callout.feature
  */
 const SNOOZE_DAYS = 14;
@@ -87,6 +90,7 @@ export function NewSimulationsCallout({
   // the dismissal, the retirement and the recorded preference.
   const revived = router.query[WELCOME_CALLOUT_QUERY_PARAM] === "1";
   const retired = nowInstant().epochMilliseconds >= SUNSET;
+  const guidedPathActive = useOptionalScenarioHost()?.isGuidedPathActive() ?? false;
 
   useEffect(() => {
     setHasMounted(true);
@@ -97,6 +101,7 @@ export function NewSimulationsCallout({
   }, [projectId]);
 
   if (!hasMounted || !projectId || !projectSlug) return null;
+  if (guidedPathActive) return null;
   if (!revived && (dismissed || legacyPreferred || retired)) return null;
 
   const href =

@@ -112,6 +112,13 @@ export abstract class ScenarioHostApi {
   abstract succeeded(notice: ScenarioSuccessNotice): void;
 
   abstract failed(failure: ScenarioFailureNotice): void;
+
+  /**
+   * Whether a guided onboarding path is active — onboarding's own answer,
+   * wired here by the shell. The welcome-back callout stays quiet while
+   * it reads true.
+   */
+  abstract isGuidedPathActive(): boolean;
 }
 
 const ScenarioHostContext = createContext<ScenarioHostApi | undefined>(void 0);

@@ -41,6 +41,10 @@ export interface CioPersonTraits {
 
   // Trace milestones
   has_traces: boolean;
+  sdk_language?: string;
+  sdk_framework?: string;
+  first_trace_at?: string;
+  last_trace_at?: string;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -105,6 +109,7 @@ export type CioEventName =
   | "workflow_created"
   | "experiment_ran"
   | "first_prompt_created"
+  | "first_trace_integrated"
   | "joined_via_invite"
   | "joined_via_sso"
   | "onboarding_paths_selected"

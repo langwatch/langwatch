@@ -10,6 +10,7 @@ import { MemoryBillingWebhookBillingSubscription } from "./memory.billing-webhoo
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
 import { MemoryNurturingProfileRepository } from "./memory.nurturing-profile.repository.ts";
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
+import { MemoryProjectActiveDayRepository } from "./memory.project-active-day.repository.ts";
 import { MemoryBillingSubscription } from "./memory.subscription.repository.ts";
 import { MemoryBillingTenantOrganizationRepository } from "./memory.tenant-organization.repository.ts";
 
@@ -30,6 +31,7 @@ export class MemoryBillingRepositories {
       nurturingProfiles: MemoryNurturingProfileRepository.create(store),
       organizations: MemoryBillingOrganizationRepository.create(store),
       organizationPricing: MemoryOrganizationPricingRepository.create(store),
+      projectActiveDays: MemoryProjectActiveDayRepository.create(),
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
       subscriptions,
       tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),

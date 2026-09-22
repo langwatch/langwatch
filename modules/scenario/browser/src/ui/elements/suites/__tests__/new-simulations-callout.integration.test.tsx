@@ -19,6 +19,13 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   })),
 }));
 
+// Whether a guided onboarding path is active; the bare rig mounts no
+// ScenarioHostProvider, so this stands in for it.
+let guidedPathActive = false;
+vi.mock("../../../../model/scenario-host.ts", () => ({
+  useOptionalScenarioHost: () => ({ isGuidedPathActive: () => guidedPathActive }),
+}));
+
 // The bare rig has no router; the query object stands in for the address.
 const routerQuery: Record<string, unknown> = {};
 vi.mock("@langwatch/browser-host/use-router", () => ({
@@ -33,7 +40,10 @@ const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> 
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
-import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout.tsx";
+import {
+  NewSimulationsCallout,
+  WELCOME_CALLOUT_QUERY_PARAM,
+} from "../../../sections/suites/new-simulations-callout.tsx";
 
 const SNOOZE_KEY = "langwatch:new-simulations-callout-dismissed:v1:project-1";
 const PREFERENCE_KEY = "langwatch:prefer-legacy-simulations:v1:project-1";
@@ -53,6 +63,7 @@ describe("<NewSimulationsCallout />", () => {
     setUiStorage(new BrowserUiStorage());
     localStorage.clear();
     vi.clearAllMocks();
+    guidedPathActive = false;
     for (const key of Object.keys(routerQuery)) delete routerQuery[key];
     // The card retires on 2026-09-22; the tests read it while it still shows,
     // whatever the machine's clock says.
@@ -135,6 +146,35 @@ describe("<NewSimulationsCallout />", () => {
 
         expect(screen.queryByText("Welcome to the new simulations screen")).toBeNull();
       });
+    });
+  });
+
+  describe("given a guided onboarding path is being set up", () => {
+    /** @scenario "the callout stays quiet while a guided onboarding path is active" */
+    it("pins no card, and snoozes nothing", () => {
+      guidedPathActive = true;
+
+      const { unmount } = renderWithProviders(<NewSimulationsCallout target="runs" />);
+
+      expect(screen.queryByText("Welcome to the new simulations screen")).toBeNull();
+      expect(localStorage.getItem(SNOOZE_KEY)).toBeNull();
+      expect(localStorage.getItem(PREFERENCE_KEY)).toBeNull();
+
+      // Once the path is done the card shows as if it had never been held.
+      unmount();
+      guidedPathActive = false;
+      renderWithProviders(<NewSimulationsCallout target="runs" />);
+      expect(screen.getByText("Welcome to the new simulations screen")).toBeDefined();
+    });
+
+    /** @scenario "the callout stays quiet while a guided onboarding path is active" */
+    it("stays off even with the address parameter that brings the card back", () => {
+      guidedPathActive = true;
+      routerQuery[WELCOME_CALLOUT_QUERY_PARAM] = "1";
+
+      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+      expect(screen.queryByText("Welcome to the new simulations screen")).toBeNull();
     });
   });
 

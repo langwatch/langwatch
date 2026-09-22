@@ -38,6 +38,7 @@ type ScenarioHostActions = {
   readonly navigate: (to: string, options?: { replace?: boolean }) => void;
   readonly succeeded: (notice: ScenarioSuccessNotice) => void;
   readonly failed: (failure: ScenarioFailureNotice) => void;
+  readonly isGuidedPathActive: () => boolean;
 };
 
 class CapabilityScenarioHost extends ScenarioHostApi {
@@ -102,7 +103,18 @@ class CapabilityScenarioHost extends ScenarioHostApi {
   failed(failure: ScenarioFailureNotice): void {
     this.actions.failed(failure);
   }
+
+  isGuidedPathActive(): boolean {
+    return this.actions.isGuidedPathActive();
+  }
 }
+
+/**
+ * Reads false until the shell wires onboarding's `guidedPath` capability
+ * through, the same inert-until-wired shape onboarding's own host mount
+ * uses for langy/sidebar/governance.
+ */
+const INERT_GUIDED_PATH_ACTIVE = (): boolean => false;
 
 /**
  * The mount the declaration names: one provider above the routed tree, so a
@@ -164,6 +176,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
             options?.replace === true ? navigation.replace(to) : navigation.navigate(to),
           succeeded: (notice) => feedback.succeeded(notice),
           failed: (failure) => feedback.failed(failure),
+          isGuidedPathActive: INERT_GUIDED_PATH_ACTIVE,
         },
       ),
     [

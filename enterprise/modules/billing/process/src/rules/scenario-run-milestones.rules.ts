@@ -2,6 +2,7 @@ import {
   isSimulationRunFinishedEvent,
   UNGRADED_RUN_STATUSES,
   type SimulationProcessingEvent,
+  type SimulationRunFinishedEvent,
 } from "@langwatch/scenario-contract";
 
 /**

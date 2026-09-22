@@ -150,6 +150,55 @@ Feature: Customer.io nurturing integration
     Then the organization is created successfully
     And no Customer.io requests are made
 
+  # ---------------------------------------------------------------------------
+  # R3: Trace integration subscriber — customerIoTraceSync
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: First trace identifies user with trace milestones
+    Given a project that has never received a trace
+    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
+    Then the user is identified in Customer.io with has_traces true
+    And the user traits include sdk_language, sdk_framework, and first_trace_at
+
+  @integration
+  Scenario: First trace fires first_trace_integrated event
+    Given a project that has never received a trace
+    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
+    Then a "first_trace_integrated" event is tracked with sdk_language, sdk_framework, and project_id
+
+  @integration
+  Scenario: First trace fires immediately without debouncing
+    Given a project that has never received a trace
+    When the first trace is processed
+    Then the Customer.io calls are made immediately without delay
+
+  # Langy's own turns trace into the project with origin "langy"; they are
+  # not the customer's traces and never reach the CRM as one.
+  @unit
+  Scenario: Langy's own turn does not reach Customer.io as a first trace
+    Given a project that has never received a trace
+    When one of Langy's own turns is processed
+    Then no Customer.io identify or track call is made
+
+  @integration
+  Scenario: Subsequent traces update count and timestamp with debouncing
+    Given a project that already has traces
+    When a new trace is processed
+    Then the user is identified in Customer.io with updated trace_count and last_trace_at
+    And the update is debounced so at most one call per project per 5 minutes
+
+  @unit
+  Scenario: Trace sync subscriber uses project-scoped job ID for debouncing
+    Given the customerIoTraceSync subscriber
+    When makeJobId is called for a project
+    Then the returned ID is "cio-trace-sync-{projectId}"
+
+  @unit
+  Scenario: Trace sync does not duplicate first-trace detection logic
+    Given the projectMetadata subscriber already tracks first trace via Project.firstMessage
+    When the customerIoTraceSync subscriber processes a trace
+    Then it reads the existing first-trace flag rather than re-detecting it
 
   # ---------------------------------------------------------------------------
   # R6: Team and feature adoption hooks
