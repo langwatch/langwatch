@@ -370,79 +370,6 @@ test_external_clickhouse() {
   helm_uninstall "$ext_release"
 }
 
-# -----------------------------------------------------------------------------
-# SUITE: lwql external-PostgreSQL bridge secret guard (live-cluster lookup)
-# -----------------------------------------------------------------------------
-# The guard in templates/_helpers.tpl (langwatch.validateSecrets) that catches
-# an operator's existingSecret missing lwql_pg_password or lwql_password uses
-# Helm's `lookup` function to read the Secret from a live API server. `helm
-# template` never has one (lookup returns nil there), so lwql-connection-env.sh
-# cannot exercise this branch at all -- only a real install against a live
-# cluster can. `helm install` (not `helm template --dry-run`) has called lookup
-# against the live API server since Helm 3.1, so no `--dry-run=server` flag
-# (Helm 3.13+, newer than this repo's pinned 3.12.0) is needed here: submitting
-# a real install and reading whether the render step failed is enough, and
-# skipping --wait/--atomic keeps it fast since nothing here needs to become
-# Ready (the bridge host resolves to nothing real).
-test_lwql_external_postgres_secret_guard() {
-  sep; info "Suite: lwql external-PostgreSQL bridge secret guard (lookup)"
-
-  local NAMESPACE="lwql-secret-guard"
-  local RELEASE="lwql-guard"
-  local secret="lwql-bridge-secret"
-
-  kubectl --context "$KUBE_CTX" create namespace "$NAMESPACE" \
-    --dry-run=client -o yaml | kubectl --context "$KUBE_CTX" apply -f - >/dev/null
-
-  # Negative case: the Secret exists but is missing lwql_password -- the render
-  # must fail closed, naming the missing key, instead of installing an identity
-  # with a password nobody set.
-  kc delete secret "$secret" --ignore-not-found >/dev/null
-  kc create secret generic "$secret" --from-literal=lwql_pg_password=reader-pw >/dev/null
-
-  local out="${TMPDIR:-/tmp}/lwql-guard-neg.log"
-  if hc upgrade "$RELEASE" "$CHART_DIR" --install \
-      -f "$CHART_DIR/tests/values-e2e.yaml" \
-      --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host=extpg \
-      --set clickhouse.lwqlAccessModel.existingSecret="$secret" \
-      >"$out" 2>&1; then
-    fail "lwql-guard-neg-installed: helm install succeeded although $secret is missing lwql_password -- the lookup guard should have failed the render. Output:
-$(cat "$out")"
-  fi
-  if grep -q "lwql_password" "$out"; then
-    pass "lookup guard fails the render and names lwql_password when the Secret is missing it"
-  else
-    fail "lwql-guard-neg-message: helm install failed as expected but the error did not name lwql_password. Output:
-$(cat "$out")"
-  fi
-
-  # Positive case: the Secret carries both keys -- the render (and install)
-  # must succeed.
-  kc delete secret "$secret" --ignore-not-found >/dev/null
-  kc create secret generic "$secret" \
-    --from-literal=lwql_pg_password=reader-pw \
-    --from-literal=lwql_password=identity-pw >/dev/null
-
-  out="${TMPDIR:-/tmp}/lwql-guard-pos.log"
-  if hc upgrade "$RELEASE" "$CHART_DIR" --install \
-      -f "$CHART_DIR/tests/values-e2e.yaml" \
-      --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host=extpg \
-      --set clickhouse.lwqlAccessModel.existingSecret="$secret" \
-      >"$out" 2>&1; then
-    pass "lookup guard passes the render and installs when the Secret carries both keys"
-  else
-    fail "lwql-guard-pos-install-failed: helm install failed although $secret carries both keys. Output:
-$(cat "$out")"
-  fi
-
-  hc uninstall "$RELEASE" >/dev/null 2>&1 || true
-  kubectl --context "$KUBE_CTX" delete namespace "$NAMESPACE" --wait=false >/dev/null 2>&1 || true
-}
-
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: App health check
 # Upgrades the release to enable the app (1 replica) and verifies /api/health.
@@ -473,24 +400,22 @@ test_app() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: LangWatchQL access model — chart-managed render (issue #6635, Design C)
-# Runs after test_app. For chart-managed ClickHouse the clickhouse-serverless pod
-# that OWNS the server renders the LangWatchQL access model as config at boot —
-# the restricted user, its settings profile, grants, tenant row filters and the
-# lwql_postgres named collection. The app does NOT self-provision it
-# (LWQL_SELF_PROVISION is off for chart-managed: one owner per entity name), so
-# re-invoking the app's provision task must be a harmless no-op. Asserts the
+# SUITE: LangWatchQL access model — app self-provisioning (issue #8258)
+# Runs after test_app. The app always owns the access model, on every path —
+# chart-managed ClickHouse included. At boot it derives the ClickHouse target
+# from CLICKHOUSE_URL and self-provisions the restricted user, its settings
+# profile, grants, tenant row filters and the lwql_postgres named collection
+# via SQL DDL (no chart template renders any of it any more). Asserts the
 # access model exists (identity, profile, row policies, named collection — the
 # single-replica scenario's contract), that the restricted identity is genuinely
 # restricted, that the endpoint refuses while the backend objects stand (the
-# flag-off AC), and that a re-run does not disturb the renderer-owned model.
+# flag-off AC), and that a re-run is idempotent.
 #
 # The PostgreSQL-engine tables, the lwql_ro reader role and the approved
 # PostgreSQL views are NOT asserted here: they are the full-model scenario
 # deferred to tracking issue #7387 (specs/lwql/api.feature, "Clustered
 # chart-managed ClickHouse provisions the full LangWatchQL access model",
-# @unimplemented), and the reader role has no chart-managed creation path — it
-# belongs to the app's external self-provision path, covered by its own tests.
+# @unimplemented).
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
 test_lwql() {
@@ -522,21 +447,23 @@ test_lwql() {
   fi
 
   # PostgreSQL bridge, ClickHouse side: the lwql_postgres named collection the
-  # renderer emits when clickhouse.lwqlAccessModel.postgres.host is set (values-e2e wires it
-  # to the in-cluster PostgreSQL). Existence only — the collection is config, not
-  # dialed at boot; the engine tables that consume it, plus the PostgreSQL reader
-  # role and approved views, are the full-model scenario deferred to #7387.
+  # app self-provisions from DATABASE_URL, dialing the in-cluster PostgreSQL.
+  # Existence only here — the engine tables that consume it, plus the
+  # PostgreSQL reader role and approved views, are the full-model scenario
+  # deferred to #7387.
   assert_eq "named collection lwql_postgres exists" \
     "$(ch_query "$pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
 
   # The restricted identity: authenticates, reads zero key-map rows without a
   # tenant capability (row policy default-deny), and has no admin surface.
-  # Design C: for chart-managed ClickHouse the owning pod creates langwatch_lwql
-  # from the ClickHouse credentials Secret (key lwql_password), which is also
-  # where the app/workers read the query password from — one source, no divergence.
+  # Issue #8258: the app self-provisions langwatch_lwql on every posture from
+  # LWQL_CLICKHOUSE_PASSWORD, which it reads from the APP Secret (not the
+  # ClickHouse credentials Secret — that Secret holds no LWQL material any more).
   local lwql_pw
-  lwql_pw=$(kc get secret "${RELEASE}-clickhouse" \
-    -o jsonpath='{.data.lwql_password}' | base64 -d)
+  lwql_pw=$(kc get secret "langwatch-app-secrets" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+  assert_eq "langwatch_lwql lives in the SQL store" \
+    "$(ch_query "$pod" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "local_directory"
   assert_eq "restricted identity authenticates" \
     "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
   assert_eq "key map reads empty without a tenant capability" \
@@ -560,13 +487,12 @@ test_lwql() {
     http://localhost:5560/api/v1/query)
   assert_eq "query endpoint refuses unauthenticated" "$http_code" "401"
 
-  # For chart-managed ClickHouse the clickhouse-serverless subchart owns the
-  # ACCESS MODEL (identity, profile, row policies, lwql_postgres), while the app
-  # owns the LangWatchQL VIEWS: the ClickHouse views over its own tables, the
-  # PostgreSQL approved views, and the api-key -> tenant backfill. Re-invoking the
-  # app's provision task must run that app-owned half IDEMPOTENTLY: exit 0,
-  # actually provision, and disturb neither the key-map rows nor the
-  # renderer-owned identity.
+  # The app owns the whole access model AND the LangWatchQL VIEWS: the
+  # restricted identity, profile, row policies, lwql_postgres, the ClickHouse
+  # views over its own tables, the PostgreSQL approved views, and the
+  # api-key -> tenant backfill. Re-invoking the app's provision task must be
+  # IDEMPOTENT: exit 0, actually provision, and disturb neither the key-map
+  # rows nor the identity it already created.
   local rows_before rows_after provision_out
   rows_before=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
   if provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
@@ -606,7 +532,7 @@ $provision_out"
   # while the config still rendered. A wrong bridge password fails here; a correct
   # one returns a count. `lwql_annotations` is the approved view lwql:provision
   # created and granted lwql_ro SELECT on (postgres-resident dataset "annotations"
-  # in lwql_catalog.json). The default ClickHouse user issues the query — the
+  # in the app catalog, platform/app/src/server/analytics/lwql/catalog). The default ClickHouse user issues the query — the
   # collection fixes the PostgreSQL identity regardless of the ClickHouse caller,
   # so this probes the bridge, not langwatch_lwql's own grants. (The
   # postgres-resident ClickHouse views themselves are the full-model scenario
@@ -1001,7 +927,6 @@ main() {
   test_upgrade_strategy_boundary
   test_upgrade
   test_external_clickhouse
-  test_lwql_external_postgres_secret_guard
   test_cold_storage_and_backup
 
   sep

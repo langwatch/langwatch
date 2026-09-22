@@ -985,7 +985,7 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
-# @scenario "App self-provisioning is exclusive to external ClickHouse under Design C"
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
 # @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
@@ -998,9 +998,10 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-external.yaml")
   assert_not_contains "ext-ch: no CH StatefulSet" "$ch_ext" "clickhouse-serverless/templates"
   assert_contains "ext-ch: CLICKHOUSE_URL env" "$ch_ext" "name: CLICKHOUSE_URL"
-  # Design C: the chart cannot render config into a server it does not run, so
-  # the app self-provisions the LWQL access model for external ClickHouse.
-  assert_contains "ext-ch: LWQL_SELF_PROVISION on for external CH" "$ch_ext" "name: LWQL_SELF_PROVISION"
+  # Issue #8258: the app always self-provisions the LWQL access model, on
+  # every posture — no chart-rendered DDL switch exists any more.
+  assert_not_contains "ext-ch: no LWQL_SELF_PROVISION env anywhere" "$ch_ext" "name: LWQL_SELF_PROVISION"
+  assert_contains "ext-ch: app still wired with LWQL query password" "$ch_ext" "name: LWQL_CLICKHOUSE_PASSWORD"
 
   # postgres-external: DATABASE_URL from secret
   local pg_ext
@@ -1027,50 +1028,26 @@ test_infra_overlays() {
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
 
-  # Design C: chart-managed ClickHouse renders the LWQL access model as config
-  # in the subchart, so the app must NOT self-provision it — LWQL_SELF_PROVISION
-  # is absent at replicas=3.
-  assert_not_contains "repl-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_repl" "name: LWQL_SELF_PROVISION"
+  # Issue #8258: the app self-provisions the LWQL access model on every
+  # posture, chart-managed ClickHouse included — so LWQL_SELF_PROVISION never
+  # renders anywhere, and the query password is always wired.
+  assert_not_contains "repl-ch: no LWQL_SELF_PROVISION env" "$ch_repl" "name: LWQL_SELF_PROVISION"
 
-  # ...and also absent at replicas=1 (chart-managed at any replica count).
+  # ...same at replicas=1 (chart-managed at any replica count).
   local ch_single
   ch_single=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
+  assert_not_contains "single-ch: no LWQL_SELF_PROVISION env" "$ch_single" "name: LWQL_SELF_PROVISION"
 
-  # Design C: with app-side provisioning DDL off for chart-managed ClickHouse,
-  # the provisioner MOVES to the subchart — it does not vanish. Three ends of
-  # that contract are assertable from the parent chart here. The vendored
-  # clickhouse-serverless-0.3.0 tarball DOES render the LWQL volume/env (checked
-  # in #3 below); only the XML config CONTENT (langwatch_lwql user, grants, row
-  # policies, lwql_postgres named collection) is written inside the container at
-  # boot by ch-config rather than by helm, so that content stays covered by the
-  # subchart's own Go render tests, not this parent-chart harness.
-  #
-  #   1. The subchart is switched ON by default. Helm cannot derive
-  #      clickhouse.lwqlAccessModel.enabled from lwql.enabled, so the parent values set it,
-  #      and langwatch.lwql.provisioningGuard fails the render if an operator
-  #      turns it off while leaving LWQL enabled — otherwise NOBODY provisions.
-  assert_render_refuses "chart-managed: guard refuses LWQL-on with subchart-off" \
-    "requires clickhouse.lwqlAccessModel.enabled=true" \
-    --set clickhouse.lwqlAccessModel.enabled=false
-  #   2. The app still gets the query-time LWQL password on the chart-managed
-  #      path: it authenticates as langwatch_lwql regardless of who provisioned,
-  #      so cutting the password (the old selfProvisionActive gate) would break
-  #      every query even though the identity exists.
+  # The app still gets the query-time LWQL password on the chart-managed path:
+  # it authenticates as langwatch_lwql regardless of ClickHouse posture.
   assert_contains "chart-managed: app still wired with LWQL query password" \
     "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
-  #   3. The provisioning password actually REACHES the ClickHouse pod. The
-  #      clickhouse-serverless lwql-secrets volume mounts ONE Secret by name and
-  #      projects a key from it into /mnt/secrets/lwql, and the volume is
-  #      optional:true — so a Secret/key name that does not resolve is silently
-  #      skipped, config.go skips the absent file, and the langwatch_lwql user is
-  #      never created with no error anywhere. Env-var wiring (#2) does not prove
-  #      the mount resolves. Extract the secretName + key the volume references
-  #      and assert the RESOLVED Secret in the SAME render carries that key.
-  assert_secret_key_resolves "chart-managed: lwql-secrets volume key exists in rendered Secret" \
-    "$ch_single" "lwql-secrets"
+
+  # No chart template renders any part of the access model any more.
+  assert_not_contains "chart-managed: no CLICKHOUSE_LWQL_* config rendered" \
+    "$ch_single" "CLICKHOUSE_LWQL_"
 
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then
