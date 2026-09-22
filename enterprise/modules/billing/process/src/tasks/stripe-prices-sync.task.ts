@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  OPTIONAL_STRIPE_METER_NAMES,
   OPTIONAL_STRIPE_PRICE_NAMES,
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
@@ -280,6 +281,9 @@ export const resolveRequiredMeterMappings = (params: {
       (meter) => normalizeMeterEventName(meter.event_name) === key,
     );
     if (matches.length === 0) {
+      // An optional meter is provisioned per mode by hand, so an unmapped one
+      // is the window before that, not a catalogue defect.
+      if (OPTIONAL_STRIPE_METER_NAMES.includes(key)) continue;
       errors.push(`Missing required meter mapping for ${key} in ${environment} mode`);
       continue;
     }

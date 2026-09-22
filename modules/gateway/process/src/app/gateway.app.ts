@@ -1083,6 +1083,19 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.usage.summaryForVirtualKey(input);
   }
 
+  async sumSpendNanoUsdByRequestType(
+    input: Parameters<GatewayApi["sumSpendNanoUsdByRequestType"]>[0],
+  ): Promise<number> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so nothing was spent.
+    if (!service) return 0;
+
+    return service.sumSpendNanoUsdByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
   async findSpendEventsPage(
     input: Parameters<GatewayApi["findSpendEventsPage"]>[0],
   ): ReturnType<GatewayApi["findSpendEventsPage"]> {

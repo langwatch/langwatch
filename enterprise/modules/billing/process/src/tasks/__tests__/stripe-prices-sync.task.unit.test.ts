@@ -1,4 +1,5 @@
 import {
+  OPTIONAL_STRIPE_METER_NAMES,
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
   type StripeEnvironment,
@@ -290,7 +291,11 @@ describe("syncStripePrices", () => {
     it("errors when a required meter has no match", () => {
       const result = resolveRequiredMeterMappings({ environment: "test", fetchedMeters: [] });
 
-      expect(result.errors).toHaveLength(STRIPE_METER_NAMES.length);
+      // The optional meters are skipped rather than reported, so only the
+      // required ones can put an error here.
+      expect(result.errors).toHaveLength(
+        STRIPE_METER_NAMES.length - OPTIONAL_STRIPE_METER_NAMES.length,
+      );
       expect(result.errors[0]).toContain("Missing required meter mapping");
     });
 

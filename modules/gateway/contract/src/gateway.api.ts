@@ -593,6 +593,18 @@ export interface GatewayApi extends GatewayInternalProtocol {
   recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult>;
 
   /**
+   * What one request type has cost these tenants, in integer nano-USD, over the
+   * whole ledger or the window given. Confirmed rows only, and 0 where this
+   * deployment has no spend source: an absent ledger was never written to.
+   */
+  sumSpendNanoUsdByRequestType(input: {
+    tenantIds: readonly string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number>;
+
+  /**
    * One page of the spend-event ledger for a project, newest first, with
    * virtual-key names resolved. Answers null with no ClickHouse spend
    * source, so a door renders disabled rather than an empty page.

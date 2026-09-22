@@ -99,16 +99,17 @@ describeIfStripeKey("Stripe billing integration", () => {
       for (const priceName of STRIPE_PRICE_NAMES) {
         const priceId = prices[priceName];
         // An optional name is provisioned per Stripe mode by hand, so its
-        // absence here is the window before that, not a broken catalogue.
-        if (!priceId) {
-          expect(OPTIONAL_STRIPE_PRICE_NAMES).toContain(priceName);
-          continue;
-        }
+        // absence is the window before that; the assertion below names which
+        // ones were allowed to be missing.
+        if (!priceId) continue;
 
         const stripePrice = await stripe.prices.retrieve(priceId);
 
         expect(stripePrice.active).toBe(true);
       }
+
+      const unmapped = STRIPE_PRICE_NAMES.filter((priceName) => !prices[priceName]);
+      expect(unmapped.filter((name) => !OPTIONAL_STRIPE_PRICE_NAMES.includes(name))).toEqual([]);
     }, 120_000);
 
     it("confirms base plan prices are recurring", async () => {

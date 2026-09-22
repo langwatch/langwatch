@@ -31,10 +31,9 @@ export const STRIPE_PRICE_NAMES = [
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
 
 /**
- * Names that may be absent from the catalog in a given Stripe mode. Every
- * other name is required and resolution throws for a missing one; these are
+ * Names that may be absent from the catalog in a given Stripe mode. They are
  * provisioned per mode by hand, so the feature stays off rather than the whole
- * deployment failing to boot. @see specs/instant-evals/instant-eval-billing.feature
+ * deployment failing to boot; every other name is required.
  */
 export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = ["GROWTH_INSTANT_EVAL_USD"];
 

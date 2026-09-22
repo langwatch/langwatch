@@ -113,9 +113,8 @@ export const resolveGrowthEventsPriceId = ({
 
 /**
  * The Instant Evals price on a Growth subscription, when the mode has one.
- * United States dollars only, and absent until the meter and price behind it
- * are provisioned: a checkout that failed over a meter for a separate feature
- * would block every Growth signup. @see specs/instant-evals/instant-eval-billing.feature
+ * Dollars only, and absent until the meter behind it is provisioned: failing a
+ * checkout over another feature's meter would block every Growth signup.
  */
 export const resolveGrowthInstantEvalPriceId = ({
   currency,
@@ -133,10 +132,9 @@ export const isGrowthInstantEvalPriceProvisioned = ({
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
 /**
- * Creates Stripe checkout line items for a Growth plan subscription: a seat
- * line item (quantity = coreMembers), a metered events line item, and where it
- * is provisioned a metered Instant Evals one (neither metered item carries a
- * quantity — Stripe tracks usage via usage records).
+ * Stripe checkout line items for a Growth subscription: a seat item (quantity
+ * = coreMembers), a metered events item, and where provisioned a metered
+ * Instant Evals one. Neither metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,

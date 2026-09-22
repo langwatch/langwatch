@@ -6,10 +6,9 @@ export interface BillingCheckpoint {
 }
 
 /**
- * Durable two-phase checkpoint: writeIntent before Stripe, confirm after.
- * Also tracks consecutive failures for the circuit breaker. Keyed by the
- * Stripe meter event name as well, because each meter reports its own running
- * total in its own unit. @see specs/instant-evals/instant-eval-billing.feature
+ * Durable two-phase checkpoint: writeIntent before Stripe, confirm after, with
+ * the consecutive failures the circuit breaker reads. Keyed by the Stripe
+ * meter too: each meter reports its own running total, in its own unit.
  */
 export abstract class BillingCheckpointRepository {
   abstract findCheckpoint(params: {

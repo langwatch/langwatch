@@ -100,6 +100,18 @@ export abstract class GatewaySpendEvents {
     filters?: SpendFilters;
   }): Promise<{ rows: SpendSummaryRow[]; nextCursor: string | null }>;
 
+  /**
+   * The charged cost of every confirmed request of one request type across
+   * these tenants, as integer nano-USD. Absent a window this is the whole
+   * ledger, which is what a lifetime allowance reads.
+   */
+  abstract sumCostNanoUsdByRequestType(input: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number>;
+
   abstract readEndUserSpend(input: {
     tenantIds: string[];
     endUserId: string;

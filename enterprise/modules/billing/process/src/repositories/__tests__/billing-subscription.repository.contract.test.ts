@@ -71,6 +71,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
         repositories.checkpoints.findCheckpoint({
           organizationId: "org-1",
           billingMonth: "2026-09",
+          meter: "langwatch_billable_events",
         }),
       ).resolves.toBeNull();
     });
@@ -79,7 +80,11 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
   describe("when the roll-up writes an intent and then confirms it", () => {
     it("promotes the pending total and clears the failure count", async () => {
       const repositories = create();
-      const month = { organizationId: "org-1", billingMonth: "2026-09" };
+      const month = {
+        organizationId: "org-1",
+        billingMonth: "2026-09",
+        meter: "langwatch_billable_events",
+      };
 
       await repositories.checkpoints.writeIntent({
         ...month,

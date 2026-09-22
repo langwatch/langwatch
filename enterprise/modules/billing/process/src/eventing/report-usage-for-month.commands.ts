@@ -11,14 +11,46 @@ import { nowInstant } from "@langwatch/time";
 import type { BillingCheckpointRepository } from "../repositories/billing-checkpoint.repository.ts";
 import type { BillingOrganizationCache } from "../repositories/organization/billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/organization/billing-report-organization.repository.ts";
-import type { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
+import {
+  instantEvalMeterIdentifier,
+  instantEvalMeterUnitsToUsd,
+  INSTANT_EVAL_USD_EVENT_NAME,
+} from "../rules/instant-eval-meter.rules.ts";
+import type {
+  BillableEventsQueryService,
+  BillableEventsTotalResult,
+} from "../services/billable-events-query.service.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
+import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
 
 /** Stripe meter event name for billable events. */
-const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
+export const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
+
+/**
+ * One meter the month is reported on. Each keeps its own checkpoint and its
+ * own unit — the events meter counts, the Instant Evals meter holds
+ * ten-thousandths of a dollar — and what is shared is the protocol around them.
+ */
+interface BillingMeter {
+  readonly eventName: string;
+  /** The month's running total in the meter's own integer unit. */
+  readonly queryTotal: (args: {
+    organizationId: string;
+    billingMonth: string;
+  }) => Promise<BillableEventsTotalResult>;
+  /** The delta as the meter event carries it. */
+  readonly toValue: (deltaUnits: number) => number;
+  /** The deterministic idempotency key for one delta. */
+  readonly identifier: (args: {
+    organizationId: string;
+    billingMonth: string;
+    lastReportedTotal: number;
+    targetTotal: number;
+  }) => string;
+}
 
 /** Maximum consecutive failures before circuit-breaker trips. */
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -37,6 +69,8 @@ export interface ReportUsageForMonthCommandDeps {
    *  caller must skip the month rather than report a total it did not read —
    *  a distinct outcome from a verified `{ outcome: "counted"; total: 0 }`. */
   queryBillableEventsTotal: BillableEventsQueryService["queryBillableEventsTotal"];
+  /** The Instant Evals meter's total, read off the gateway spend ledger. */
+  queryInstantEvalSpendTotal: InstantEvalSpendQueryService["queryInstantEvalSpendTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCache;
@@ -51,9 +85,11 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
- * Builds a deterministic idempotency key for Stripe meter events.
+ * The events meter's identifier predates the second meter, so it keeps the
+ * shape it always had: an identifier is what stops a redelivered delta being
+ * charged twice, and renaming it across a deploy would break exactly that.
  */
-function buildIdentifier({
+function billableEventsIdentifier({
   organizationId,
   billingMonth,
   lastReportedTotal,
@@ -81,7 +117,24 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     return new ReportUsageForMonthCommandHandler(deps);
   }
 
-  constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}
+  private readonly meters: readonly BillingMeter[];
+
+  constructor(private readonly deps: ReportUsageForMonthCommandDeps) {
+    this.meters = [
+      {
+        eventName: BILLABLE_EVENTS_EVENT_NAME,
+        queryTotal: (args) => deps.queryBillableEventsTotal(args),
+        toValue: (delta) => delta,
+        identifier: billableEventsIdentifier,
+      },
+      {
+        eventName: INSTANT_EVAL_USD_EVENT_NAME,
+        queryTotal: (args) => deps.queryInstantEvalSpendTotal(args),
+        toValue: instantEvalMeterUnitsToUsd,
+        identifier: instantEvalMeterIdentifier,
+      },
+    ];
+  }
 
   static getAggregateId(payload: ReportUsageForMonthCommandData): string {
     return payload.organizationId;
@@ -142,12 +195,19 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         return [];
       }
 
-      // 2. Report for billing month
-      shouldSelfDispatch = await this.reportForBillingMonth({
-        organizationId,
-        billingMonth,
-        stripeCustomerId: org.stripeCustomerId,
-      });
+      // 2. Report for billing month, one meter after the other. A meter that
+      // fails does not stop the next: each keeps its own checkpoint and its
+      // own breaker.
+      shouldSelfDispatch = false;
+      for (const meter of this.meters) {
+        shouldSelfDispatch =
+          (await this.reportOneMeter({
+            meter,
+            organizationId,
+            billingMonth,
+            stripeCustomerId: org.stripeCustomerId,
+          })) || shouldSelfDispatch;
+      }
     } catch (error) {
       // Never propagate to framework — log and return empty events
       logger.error(
@@ -176,15 +236,51 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   /**
-   * Two-phase checkpoint: writes `pendingReportedTotal` before calling
-   * Stripe (intent), then on success promotes it to `lastReportedTotal`
-   * and clears pending. Returns true when self-dispatch should fire.
+   * One meter's report, with its failure kept to itself: a throw here would
+   * otherwise skip every meter after it, with no self-dispatch to come back.
+   * Answers whether another tick is owed, which a failure always is.
+   */
+  private async reportOneMeter(input: {
+    meter: BillingMeter;
+    organizationId: string;
+    billingMonth: string;
+    stripeCustomerId: string;
+  }): Promise<boolean> {
+    try {
+      return await this.reportForBillingMonth(input);
+    } catch (error) {
+      logger.error(
+        {
+          organizationId: input.organizationId,
+          billingMonth: input.billingMonth,
+          meter: input.meter.eventName,
+          error,
+        },
+        "usage reporting failed for one meter, continuing with the rest",
+      );
+      this.deps.errorReporter.capture(toError(error), {
+        handler: "reportUsageForMonth",
+        organizationId: input.organizationId,
+        billingMonth: input.billingMonth,
+        meter: input.meter.eventName,
+      });
+
+      return true;
+    }
+  }
+
+  /**
+   * Two-phase checkpoint, for one meter: writes `pendingReportedTotal` before
+   * calling Stripe (intent), then on success promotes it to
+   * `lastReportedTotal`. Returns true when self-dispatch should fire.
    */
   private async reportForBillingMonth({
+    meter,
     organizationId,
     billingMonth,
     stripeCustomerId,
   }: {
+    meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
@@ -192,6 +288,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     const checkpoint = await this.deps.billingCheckpoints.findCheckpoint({
       organizationId,
       billingMonth,
+      meter: meter.eventName,
     });
 
     const lastReportedTotal = checkpoint?.lastReportedTotal ?? 0;
@@ -222,10 +319,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       );
     } else {
       // Normal path: query ClickHouse for deduplicated count.
-      const totalResult = await this.deps.queryBillableEventsTotal({
-        organizationId,
-        billingMonth,
-      });
+      const totalResult = await meter.queryTotal({ organizationId, billingMonth });
 
       if (totalResult.outcome === "unavailable") {
         // ClickHouse not available
@@ -253,6 +347,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       await this.deps.billingCheckpoints.writeIntent({
         organizationId,
         billingMonth,
+        meter: meter.eventName,
         lastReportedTotal,
         pendingReportedTotal: targetTotal,
       });
@@ -268,7 +363,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       return false;
     }
 
-    const identifier = buildIdentifier({
+    const identifier = meter.identifier({
       organizationId,
       billingMonth,
       lastReportedTotal,
@@ -290,10 +385,10 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         organizationId,
         events: [
           {
-            eventName: BILLABLE_EVENTS_EVENT_NAME,
+            eventName: meter.eventName,
             identifier,
             timestamp: Math.floor(nowInstant().epochMilliseconds / 1000),
-            value: delta,
+            value: meter.toValue(delta),
           },
         ],
       });
@@ -327,6 +422,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         await this.deps.billingCheckpoints.clearPendingAndIncrementFailures({
           organizationId,
           billingMonth,
+          meter: meter.eventName,
           consecutiveFailures: consecutiveFailures + 1,
         });
 
@@ -337,6 +433,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       await this.deps.billingCheckpoints.confirm({
         organizationId,
         billingMonth,
+        meter: meter.eventName,
         lastReportedTotal: targetTotal,
       });
 
@@ -363,6 +460,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       await this.deps.billingCheckpoints.incrementFailures({
         organizationId,
         billingMonth,
+        meter: meter.eventName,
         lastReportedTotal,
         pendingReportedTotal: targetTotal,
         consecutiveFailures: consecutiveFailures + 1,

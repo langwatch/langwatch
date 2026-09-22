@@ -34,6 +34,7 @@
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",

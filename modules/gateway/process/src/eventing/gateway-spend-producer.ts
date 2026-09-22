@@ -43,6 +43,10 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
     return Promise.reject(producerOnly(this.processName, "summarise the spend ledger"));
   }
 
+  sumCostNanoUsdByRequestType(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by request type"));
+  }
+
   readEndUserSpend(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "read one end user's spend"));
   }

@@ -51,6 +51,16 @@ export class GatewaySpendEventsService {
     return this.repository.walkSpendEvents(input);
   }
 
+  /** What one request type has cost these tenants, in integer nano-USD. */
+  sumSpendNanoUsdByRequestType(input: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    return this.repository.sumCostNanoUsdByRequestType(input);
+  }
+
   getEndUserSpend(input: {
     tenantIds: string[];
     endUserId: string;

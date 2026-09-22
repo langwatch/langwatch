@@ -14,15 +14,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import {
-  GatewaySpendCursorAdapter,
-  type GatewaySpendEventsCursor,
-} from "../../rules/gateway-spend-cursor.rules.ts";
-import {
-  GatewaySpendFiltersAdapter,
-  SPEND_STATUS_IN_FLIGHT,
-} from "../../rules/gateway-spend-filters.rules.ts";
-import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
 import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import {
   EMPTY_SPEND_USAGE,
@@ -36,6 +27,15 @@ import {
   type SpendGroupByKey,
   type SpendSummaryRow,
 } from "../../repositories/gateway-spend-events.repository.ts";
+import {
+  GatewaySpendCursorAdapter,
+  type GatewaySpendEventsCursor,
+} from "../../rules/gateway-spend-cursor.rules.ts";
+import {
+  GatewaySpendFiltersAdapter,
+  SPEND_STATUS_IN_FLIGHT,
+} from "../../rules/gateway-spend-filters.rules.ts";
+import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;
@@ -477,6 +477,52 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       GatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
     );
     return { rows, nextCursor };
+  }
+
+  /**
+   * Confirmed rows only, and the window is optional: a lifetime allowance
+   * reads the whole ledger, and a caller that gives one bounds `OccurredAt`
+   * so the month partitions prune.
+   */
+  async sumCostNanoUsdByRequestType({
+    tenantIds,
+    requestType,
+    fromMs,
+    toMs,
+  }: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    if (tenantIds.length === 0) return 0;
+    const client = await this.resolveClient(tenantIds[0]!);
+    const clauses: string[] = [];
+    if (fromMs !== undefined) {
+      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+    }
+    if (toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+    }
+    const result = await client.query({
+      query: `
+        SELECT sum(CostNanoUSD) AS CostNanoUSD
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND RequestType = {requestType:String}
+          AND Status = 'confirmed'
+          ${clauses.join("\n          ")}
+      `,
+      query_params: {
+        tenantIds,
+        requestType,
+        ...(fromMs === undefined ? {} : { fromMs }),
+        ...(toMs === undefined ? {} : { toMs }),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Record<string, unknown>[];
+    return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
   }
 
   async readEndUserSpend({

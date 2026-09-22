@@ -19,12 +19,14 @@ const {
   mockSelfDispatch,
   mockCaptureException,
   mockQueryBillableEventsTotal,
+  mockQueryInstantEvalSpendTotal,
   mockLogger,
 } = vi.hoisted(() => {
   const reportUsageDeltaFn = vi.fn();
   const selfDispatchFn = vi.fn();
   const captureExceptionFn = vi.fn();
   const queryBillableEventsTotalFn = vi.fn();
+  const queryInstantEvalSpendTotalFn = vi.fn();
 
   const createMockLogger = (): Record<string, unknown> => ({
     info: vi.fn(),
@@ -58,6 +60,7 @@ const {
     mockSelfDispatch: selfDispatchFn,
     mockCaptureException: captureExceptionFn,
     mockQueryBillableEventsTotal: queryBillableEventsTotalFn,
+    mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
     mockLogger: loggerInstance,
   };
 });
@@ -136,6 +139,7 @@ async function createHandler() {
       getUsageSummary: vi.fn(),
     }),
     queryBillableEventsTotal: mockQueryBillableEventsTotal,
+    queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
@@ -149,6 +153,9 @@ async function createHandler() {
 describe("ReportUsageForMonthCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // No spend ledger unless a test says otherwise, so the Instant Evals
+    // meter stays out of the way of every assertion about the events one.
+    mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   });
 
   // ========================================================================
@@ -309,6 +316,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // Phase 1: writes pending intent
       expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 100,
@@ -317,6 +325,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // Phase 2: confirms checkpoint
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 150,
@@ -326,6 +335,73 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSelfDispatch).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org-1" }),
       );
+    });
+  });
+
+  describe("given both meters have something to report", () => {
+    /** @scenario "The Instant Eval meter keeps its own checkpoint" */
+    it("reports each on its own meter, checkpoint and identifier", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 12_345 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      // The events meter carries its count; the Instant Evals one carries the
+      // month's dollars to four places, not its meter units.
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: "langwatch_billable_events",
+              identifier: "org-1:2026-02:from:0:to:150",
+              value: 150,
+            }),
+          ],
+        }),
+      );
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: "langwatch_instant_eval_usd",
+              identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:12345",
+              value: 1.2345,
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_instant_eval_usd",
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 12_345,
+      });
+    });
+  });
+
+  describe("given the events meter throws before Stripe is reached", () => {
+    /** @scenario "The Instant Eval meter keeps its own checkpoint" */
+    it("still reports the Instant Evals meter, and owes another tick", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryBillableEventsTotal.mockRejectedValue(new Error("ClickHouse is down"));
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 20 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [expect.objectContaining({ eventName: "langwatch_instant_eval_usd" })],
+        }),
+      );
+      expect(mockSelfDispatch).toHaveBeenCalled();
     });
   });
 
@@ -351,6 +427,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // Phase 2: confirms checkpoint at 50
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 50,
@@ -424,6 +501,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // pendingReportedTotal cleared, consecutiveFailures incremented
       expect(mockBillingCheckpoints.clearPendingAndIncrementFailures).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         consecutiveFailures: 1,
@@ -458,6 +536,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // consecutiveFailures incremented
       expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 0,
@@ -522,6 +601,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       // Phase 2 confirms with reset counter
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_billable_events",
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 200,
