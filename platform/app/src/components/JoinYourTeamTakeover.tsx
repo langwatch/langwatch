@@ -40,10 +40,11 @@ export function JoinYourTeamTakeover({
    * The organization currently being viewed — `string` to scope to it,
    * explicit `null` for "no organization context at all" (onboarding), or
    * `undefined` for "there is a context, but it has not resolved yet".
-   * Every caller must pick one deliberately; there is no safe default.
+   * Every caller must pick one deliberately, so the prop is required: an
+   * omission is a type error, not a silent "not resolved yet".
    */
-  currentOrganizationId?: string | null;
-} = {}) {
+  currentOrganizationId: string | null | undefined;
+}) {
   // The shell renders on public pages too (a shared trace), where there is no
   // session to ask about — and a protected query fired there is a refusal
   // nobody asked for.
