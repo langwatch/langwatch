@@ -1,3 +1,4 @@
+import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import type { KeyAction } from "./handleKey";
@@ -47,9 +48,15 @@ export function applyAcceptToEditor(editor: Editor, action: KeyAction): void {
   const from = action.tokenStart + PARAGRAPH_OFFSET;
   const to = action.tokenEnd + PARAGRAPH_OFFSET;
   const view = editor.view;
-  const tr = view.state.tr
+  let tr = view.state.tr
     .replaceWith(from, to, view.state.schema.text(action.replacement))
     .scrollIntoView();
+  // An accept that opened a pair of quotes leaves the caret between them, so
+  // the value is typed inside the chip rather than after it.
+  if (action.caretBack) {
+    const caret = from + action.replacement.length - action.caretBack;
+    tr = tr.setSelection(TextSelection.create(tr.doc, caret));
+  }
   view.dispatch(tr);
   // Restore focus — `editor.commands.focus()` would do this in the chain
   // version; we call it explicitly so the user can keep typing.

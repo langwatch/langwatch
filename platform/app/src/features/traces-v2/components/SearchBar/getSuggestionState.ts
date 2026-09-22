@@ -69,6 +69,28 @@ function findActiveTokenStart({
   return start;
 }
 
+/**
+ * Whether the caret sits inside a quoted value whose closing quote has not
+ * been typed yet.
+ *
+ * Everything there is one value, however the words read: an `eval` question
+ * runs to several words, and `eval:"is the user annoyed"` would otherwise
+ * open the field list on `user` halfway through, where Enter accepts a field
+ * instead of searching.
+ */
+function isInsideQuotedValue(text: string, cursorPos: number): boolean {
+  let open = false;
+  for (let i = 0; i < cursorPos && i < text.length; i++) {
+    const char = text[i];
+    if (char === "\\") {
+      i += 1;
+      continue;
+    }
+    if (char === '"') open = !open;
+  }
+  return open;
+}
+
 export function getSuggestionState(
   text: string,
   cursorPos: number,
@@ -79,6 +101,8 @@ export function getSuggestionState(
   if (text.trim().length === 0) {
     return { open: true, mode: "field", query: "", tokenStart: 0 };
   }
+
+  if (isInsideQuotedValue(text, cursorPos)) return { open: false };
 
   const wordStart = findActiveTokenStart({ text, cursorPos, grammar });
 

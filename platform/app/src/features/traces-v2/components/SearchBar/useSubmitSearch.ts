@@ -1,6 +1,11 @@
 import { useCallback, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
+  type InstantEvalChipTarget,
+  queryWithoutInstantEvalChip,
+  resolveInstantEvalChips,
+} from "~/server/app-layer/traces/query-language/instantEvalChips";
+import {
   requoteBareTerms,
   splitBareWords,
 } from "~/server/app-layer/traces/query-language/mutations";
@@ -100,6 +105,55 @@ function useApplyRoute({
 }
 
 /**
+ * The run a typed eval chip asks for, or null when every chip of the query
+ * already has one.
+ *
+ * The question is judged as written: it came from the reader, not from a
+ * sentence the router had to rewrite, so no model stands between Enter and
+ * the estimate. The criteria are left to the judge's defaults for the same
+ * reason. The fallback is the query as typed, because a refusal must leave the
+ * chip where the reader put it rather than turn it into a phrase search.
+ *
+ * Read from the store at submit time rather than from the debounced copy: the
+ * chip the reader just typed has to be matched against the window and the
+ * lens the search is about to run in.
+ */
+function typedEvalRunOf({
+  queryText,
+  projectId,
+}: {
+  queryText: string;
+  projectId: string;
+}): InstantEvalRoutePayload | null {
+  const { activeLensId, timeRange, evalRuns } = useExplorerStore.getState();
+  const { chips } = resolveInstantEvalChips({
+    queryText,
+    lensId: activeLensId,
+    window: {
+      from: timeRange.from,
+      to: timeRange.to,
+      ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+    },
+    runsByKey: evalRuns ?? {},
+  });
+  const pending = chips.find((chip) => chip.runId === null);
+  if (!pending) return null;
+  const target: InstantEvalChipTarget = pending.target;
+  return {
+    projectId,
+    sentence: pending.question,
+    question: { instructions: pending.question },
+    target,
+    otherQuery: queryWithoutInstantEvalChip({
+      queryText,
+      question: pending.question,
+    }),
+    fallbackQuery: queryText,
+    timeRange: { from: timeRange.from, to: timeRange.to },
+  };
+}
+
+/**
  * What Enter does with the text in the search bar.
  *
  * A text without bare words is a filter and is applied as typed. A text with
@@ -133,6 +187,47 @@ export function useSubmitSearch({
     onModelUnavailable,
   });
 
+  const route = useCallback(
+    ({
+      text,
+      seq,
+      projectId,
+      options,
+    }: {
+      text: string;
+      seq: number;
+      projectId: string;
+      options?: SubmitSearchOptions;
+    }) => {
+      // Read at submit time: the range the user sees is the one the search
+      // runs in, not the debounced copy a pending timer may still hold.
+      const { timeRange, queryText } = useExplorerStore.getState();
+      const range = { from: timeRange.from, to: timeRange.to };
+      routeSearch.mutate(
+        {
+          projectId,
+          text,
+          timeRange: range,
+          activeQuery: queryText,
+          lensId: useExplorerStore.getState().activeLensId,
+          isLangyAvailable,
+          ...(options?.forceKind ? { forceKind: options.forceKind } : {}),
+        },
+        {
+          onSuccess: (result) => {
+            if (seq !== submitSeqRef.current) return;
+            applyRoute({ result, text, projectId, timeRange: range });
+          },
+          onError: () => {
+            if (seq !== submitSeqRef.current) return;
+            applyQueryText(requoteBareTerms(text));
+          },
+        },
+      );
+    },
+    [applyQueryText, applyRoute, isLangyAvailable, routeSearch],
+  );
+
   const submitSearch = useCallback(
     (text: string, options?: SubmitSearchOptions) => {
       const trimmed = text.trim();
@@ -147,47 +242,34 @@ export function useSubmitSearch({
       const { sentence } = splitBareWords(trimmed);
       if (!sentence) {
         applyQueryText(trimmed);
+        // A query of explicit terms is applied as typed and needs no router,
+        // with one exception: an `eval` chip is a filter over the verdicts of
+        // a run, so a chip typed by hand filters on nothing until a run has
+        // answered it. Enter starts that run, under the same estimate and
+        // cost rule a routed sentence gets.
+        if (!project?.id || isSamplePreview) return;
+        const run = typedEvalRunOf({ queryText: trimmed, projectId: project.id });
+        if (run) onInstantEval(run);
         return;
       }
       if (!project?.id || isSamplePreview) {
         applyQueryText(requoteBareTerms(trimmed));
         return;
       }
-      // Read at submit time: the range the user sees is the one the search
-      // runs in, not the debounced copy a pending timer may still hold.
-      const { timeRange, queryText } = useExplorerStore.getState();
-      const range = { from: timeRange.from, to: timeRange.to };
-      const projectId = project.id;
-      routeSearch.mutate(
-        {
-          projectId,
-          text: trimmed,
-          timeRange: range,
-          activeQuery: queryText,
-          lensId: useExplorerStore.getState().activeLensId,
-          isLangyAvailable,
-          ...(options?.forceKind ? { forceKind: options.forceKind } : {}),
-        },
-        {
-          onSuccess: (result) => {
-            if (seq !== submitSeqRef.current) return;
-            applyRoute({ result, text: trimmed, projectId, timeRange: range });
-          },
-          onError: () => {
-            if (seq !== submitSeqRef.current) return;
-            applyQueryText(requoteBareTerms(trimmed));
-          },
-        },
-      );
+      route({
+        text: trimmed,
+        seq,
+        projectId: project.id,
+        ...(options ? { options } : {}),
+      });
     },
     [
       applyQueryText,
-      applyRoute,
       isSamplePreview,
-      isLangyAvailable,
+      onInstantEval,
       onSupersede,
       project?.id,
-      routeSearch,
+      route,
     ],
   );
 

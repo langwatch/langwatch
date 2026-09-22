@@ -296,15 +296,24 @@ describe("getSuggestionState", () => {
     });
 
     describe("when the cursor sits inside a quoted value after a space inside the quotes", () => {
-      it("opens passive field-mode for the post-space identifier (the active token is no longer the quoted value)", () => {
-        // The space terminates the value-mode token, leaving "po" as the new
-        // active word. Identifier-shape, so passive autocomplete opens —
-        // dropdown is invisible if no fields prefix-match.
+      /** @scenario "A space belongs to the question being typed" */
+      it("returns closed because everything inside the quotes is one value", () => {
+        // A word after a space inside the quotes is still part of the value.
+        // Reading it as a new token opened the field list halfway through a
+        // multi-word value, where Enter accepts a field rather than searching.
         expect(getSuggestionState('@status:"refund po', 18)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits after the closing quote", () => {
+      it("opens field-mode again, because the value ended", () => {
+        expect(getSuggestionState('status:"refund policy" mo', 25)).toEqual({
           open: true,
           mode: "field",
-          query: "po",
-          tokenStart: 16,
+          query: "mo",
+          tokenStart: 23,
         });
       });
     });

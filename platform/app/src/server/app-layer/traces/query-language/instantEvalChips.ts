@@ -138,6 +138,39 @@ export function queryWithoutInstantEvalChips(queryText: string): string {
 }
 
 /**
+ * The query with one eval chip removed, every other term left as typed.
+ *
+ * The scope a run judges carries no eval chip at all, which is what
+ * {@link queryWithoutInstantEvalChips} answers. This is the other question:
+ * what the bar holds beside one chip, so the chip's run can put it back next
+ * to the terms it was typed with, other eval chips included.
+ */
+export function queryWithoutInstantEvalChip({
+  queryText,
+  question,
+}: {
+  queryText: string;
+  question: string;
+}): string {
+  const trimmed = queryText.trim();
+  if (!trimmed) return "";
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return trimmed;
+  }
+  const wanted = question.replace(/\s+/g, " ").trim();
+  const next = filterAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type === "ImplicitField") return true;
+    if (!isInstantEvalField(node.field.name)) return true;
+    const value = chipValueOf(node as TagToken);
+    return value === null || value.replace(/\s+/g, " ").trim() !== wanted;
+  });
+  return isEmptyAST(next) ? "" : serialize(next);
+}
+
+/**
  * The chip text for a question: the bare field when the target is what the
  * lens judges anyway, the forcing spelling when it is not.
  */

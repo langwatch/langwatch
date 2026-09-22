@@ -1,6 +1,18 @@
-import type { SuggestionState } from "./getSuggestionState";
+import { isInstantEvalField } from "~/server/app-layer/traces/query-language/instantEvalChips";
+import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 
 const FIELD_VALUE_SEPARATOR = ":";
+
+/**
+ * Whether this field's value is a sentence rather than one term.
+ *
+ * The filter language ends a term at a space, which is what separates
+ * `status:error` from the clause after it. An `eval` value is the question a
+ * judge reads, so its spaces belong to the value and it is written quoted.
+ */
+function takesSentence(fieldName: string): boolean {
+  return isInstantEvalField(fieldName);
+}
 
 export type EditorContext = {
   text: string;
@@ -25,6 +37,12 @@ export type KeyAction =
       tokenEnd: number;
       replacement: string;
       reopenInValueMode: boolean;
+      /**
+       * Where to leave the caret, counted back from the end of the
+       * replacement. Used to park it inside the quotes of a value the user
+       * still has to write.
+       */
+      caretBack?: number;
     };
 
 function acceptAction(
@@ -48,6 +66,19 @@ function acceptAction(
         tokenEnd,
         replacement: highlighted,
         reopenInValueMode: false,
+      };
+    }
+    // A field whose value is a sentence opens its quotes here, with the
+    // caret between them: the question is typed inside the chip, spaces and
+    // all, rather than ending it at the first space.
+    if (takesSentence(highlighted)) {
+      return {
+        kind: "accept",
+        tokenStart,
+        tokenEnd,
+        replacement: `${highlighted}${FIELD_VALUE_SEPARATOR}""`,
+        reopenInValueMode: false,
+        caretBack: 1,
       };
     }
     return {
@@ -78,7 +109,36 @@ function acceptAction(
   };
 }
 
+/**
+ * A space typed into an unquoted sentence value quotes it, rather than ending
+ * the term. Without this a question cannot be typed by hand at all: the first
+ * space leaves the chip and the rest of the words become a separate search.
+ *
+ * Read from the text rather than from `ctx.suggestion`, so a dropdown the
+ * reader closed with Escape does not change what a space does.
+ */
+function quoteSentenceValueAction(ctx: EditorContext): KeyAction | null {
+  const live = getSuggestionState(ctx.text, ctx.cursorPos);
+  if (!live.open || live.mode !== "value") return null;
+  if (!takesSentence(live.field)) return null;
+  const value = live.query;
+  return {
+    kind: "accept",
+    tokenStart: live.tokenStart,
+    tokenEnd: ctx.cursorPos,
+    // An empty value swallows the space: the question starts at its first
+    // word, and a leading space in a chip is dropped when it is read anyway.
+    replacement: `${live.field}${FIELD_VALUE_SEPARATOR}"${value}${value ? " " : ""}"`,
+    reopenInValueMode: false,
+    caretBack: 1,
+  };
+}
+
 export function handleKey(ctx: EditorContext, key: string): KeyAction {
+  if (key === " ") {
+    return quoteSentenceValueAction(ctx) ?? { kind: "noop" };
+  }
+
   if (key === "Enter" || key === "Tab") {
     if (ctx.suggestion.open && ctx.highlightedText) {
       const accept = acceptAction(ctx, ctx.highlightedText);

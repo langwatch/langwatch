@@ -12,6 +12,74 @@ function ctx(overrides: Partial<EditorContext> = {}): EditorContext {
 }
 
 describe("handleKey", () => {
+  // ── Space inside a question ─────────────────────────────────────────────
+
+  describe("given a space is pressed", () => {
+    describe("when the value being typed is an unquoted eval question", () => {
+      /** @scenario "A space belongs to the question being typed" */
+      it("quotes the value and leaves the caret inside the quotes", () => {
+        const action = handleKey(
+          ctx({ text: "eval:annoyed", cursorPos: 12 }),
+          " ",
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 0,
+          tokenEnd: 12,
+          replacement: 'eval:"annoyed "',
+          reopenInValueMode: false,
+          caretBack: 1,
+        });
+      });
+
+      /** @scenario "A space belongs to the question being typed" */
+      it("opens the quotes with no leading space when nothing is typed yet", () => {
+        const action = handleKey(ctx({ text: "eval:", cursorPos: 5 }), " ");
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 0,
+          tokenEnd: 5,
+          replacement: 'eval:""',
+          reopenInValueMode: false,
+          caretBack: 1,
+        });
+      });
+
+      /** @scenario "A space belongs to the question being typed" */
+      it("keeps the terms typed before it", () => {
+        const action = handleKey(
+          ctx({ text: "status:error eval.llm:slow", cursorPos: 26 }),
+          " ",
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 13,
+          tokenEnd: 26,
+          replacement: 'eval.llm:"slow "',
+          reopenInValueMode: false,
+          caretBack: 1,
+        });
+      });
+    });
+
+    describe("when the question is already quoted", () => {
+      /** @scenario "A space belongs to the question being typed" */
+      it("does nothing, so the space is typed into the value", () => {
+        expect(
+          handleKey(ctx({ text: 'eval:"the user is', cursorPos: 17 }), " "),
+        ).toEqual<KeyAction>({ kind: "noop" });
+      });
+    });
+
+    describe("when the value being typed is an ordinary field", () => {
+      it("does nothing, because a space ends the term there", () => {
+        expect(
+          handleKey(ctx({ text: "status:err", cursorPos: 10 }), " "),
+        ).toEqual<KeyAction>({ kind: "noop" });
+      });
+    });
+  });
+
   // ── Enter ────────────────────────────────────────────────────────────────
 
   describe("given Enter is pressed", () => {
@@ -57,6 +125,34 @@ describe("handleKey", () => {
           tokenEnd: 5,
           replacement: "status:",
           reopenInValueMode: true,
+        });
+      });
+    });
+
+    describe("when the highlighted field takes a question as its value", () => {
+      /** @scenario "A space belongs to the question being typed" */
+      it("accepts it with open quotes and the caret between them", () => {
+        const action = handleKey(
+          ctx({
+            text: "ev",
+            cursorPos: 2,
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "ev",
+              tokenStart: 0,
+            },
+            highlightedText: "eval",
+          }),
+          "Enter",
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 0,
+          tokenEnd: 2,
+          replacement: 'eval:""',
+          reopenInValueMode: false,
+          caretBack: 1,
         });
       });
     });
