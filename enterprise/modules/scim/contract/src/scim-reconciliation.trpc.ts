@@ -9,9 +9,24 @@
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 
+import {
+  organizationReconciliationSchema,
+  scimReconciliationScopeSchema,
+} from "./scim-reconciliation.ts";
 import { scimConnectionRequestsInputSchema, scimRequestEntrySchema } from "./scim-request-log.ts";
 
 export const scimReconciliationTrpc = defineTrpcContract("scimReconciliation")
+  /**
+   * Where every one of the organization's directory syncs stands (ADR-122).
+   *
+   * Read-only, deliberately and permanently: the remediation for a failed
+   * apply is the directory's next push, which re-asserts everything it still
+   * believes, and a control here would be a second thing pushing the same
+   * state.
+   */
+  .query("getAll")
+  .withInput(scimReconciliationScopeSchema)
+  .withOutput(organizationReconciliationSchema)
   /**
    * Every request the directory made on one connection, newest first.
    *

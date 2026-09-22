@@ -9,6 +9,24 @@ export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export { ScimService } from "./scim.service.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
 export {
+  RECENT_DIRECTORY_CHANGE_LIMIT,
+  connectionReconciliationSchema,
+  organizationReconciliationSchema,
+  scimReconciliationChangeSchema,
+  scimReconciliationFailureSchema,
+  scimReconciliationScopeSchema,
+  scimSyncStatusCopySchema,
+  scimSyncToneSchema,
+  type ConnectionReconciliation,
+  type OrganizationReconciliation,
+  type ScimDirectoryOwnership,
+  type ScimReconciliationChange,
+  type ScimReconciliationFailure,
+  type ScimReconciliationScope,
+  type ScimSyncStatusCopy,
+  type ScimSyncTone,
+} from "./scim-reconciliation.ts";
+export {
   SCIM_REQUEST_FEED_LIMIT,
   SCIM_REQUEST_LOG_RETENTION_MS,
   scimConnectionRequestsInputSchema,

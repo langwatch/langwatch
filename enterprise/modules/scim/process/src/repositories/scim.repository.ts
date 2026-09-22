@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  ScimDirectoryOwnership,
   ScimRequestLogEntry,
   ScimRequestRecord,
   ScimTokenRecord,
@@ -254,4 +255,8 @@ export abstract class ScimRepository extends ScimGrantRepository {
     userId: string;
   }): Promise<void>;
   abstract listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
+  /** Whom these connections' directories have claimed, one row per identifier. */
+  abstract findDirectoryOwnership(input: {
+    connectionIds: string[];
+  }): Promise<ScimDirectoryOwnership[]>;
 }

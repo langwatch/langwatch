@@ -54,6 +54,13 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
       },
     },
     scimReconciliation: {
+      getAll: {
+        useQuery: () => ({
+          data: { connections: [], recentChanges: [] },
+          isLoading: false,
+          isError: false,
+        }),
+      },
       getRequests: {
         useQuery: (input: { organizationId: string; connectionId: string }) => {
           calls.getRequests(input);

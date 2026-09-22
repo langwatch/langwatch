@@ -11,6 +11,7 @@
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { OrganizationReconciliation, ScimReconciliationScope } from "./scim-reconciliation.ts";
 import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
 import type {
   IssuedScimToken,
@@ -115,6 +116,18 @@ export interface ScimApi {
    * activity feed because they decided nothing.
    */
   findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]>;
+
+  /**
+   * Where every one of this organization's directory syncs stands, in words
+   * (ADR-122): what each connection is waiting for, when it last heard from
+   * the directory, how many people that directory manages, what it asked for
+   * that has not been applied, and the access it changed lately.
+   *
+   * The organization is what the read is BUILT from rather than a filter
+   * beside a connection id, so another organization's connection is not
+   * excluded — it was never in the answer to be excluded from.
+   */
+  getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation>;
 
   // ── SCIM 2.0 users ───────────────────────────────────────────────────────
 

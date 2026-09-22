@@ -15,6 +15,10 @@ import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { ScimApi, scimReconciliationTrpc } from "@langwatch/enterprise-scim-contract";
 
 export const scimReconciliationTrpcTransport = defineTrpcRouter(ScimApi, scimReconciliationTrpc)
+  .procedure("getAll")
+  .withPermission("sso:view")
+  .handle(({ app, input }) => app.getDirectoryReconciliation(input))
+
   .procedure("getRequests")
   .withPermission("sso:view")
   .handle(({ app, input }) => app.findDirectoryRequests(input))

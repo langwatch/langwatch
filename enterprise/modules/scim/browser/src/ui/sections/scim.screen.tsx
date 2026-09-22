@@ -29,6 +29,7 @@ import {
 import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
+import { DirectoryReconciliation } from "./directory-reconciliation.tsx";
 import { DirectoryRequests } from "./directory-requests.tsx";
 
 export default function ScimScreen() {
@@ -213,6 +214,8 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
             </Table.Root>
           </Card.Body>
         </Card.Root>
+
+        <DirectoryReconciliation organizationId={organizationId} />
 
         <DirectoryRequests
           organizationId={organizationId}

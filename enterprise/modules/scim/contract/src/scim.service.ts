@@ -1,5 +1,6 @@
 import type { Instant } from "@langwatch/time";
 
+import type { ScimDirectoryOwnership } from "./scim-reconciliation.ts";
 import type {
   ScimRequestLogEntry,
   ScimRequestLogQuery,
@@ -45,6 +46,16 @@ export abstract class ScimService {
   abstract findRequestLog(query: ScimRequestLogQuery): Promise<ScimRequestLogEntry[]>;
   /** Drops what has aged out, answering how many rows went. */
   abstract sweepExpiredRequests(input: { now: Instant }): Promise<number>;
+
+  /**
+   * Who each of these connections' directories has claimed, one row per
+   * identifier it knows somebody by. The count a customer reads is derived
+   * from this and the people who still exist, so the rows travel rather than
+   * a number nobody can check.
+   */
+  abstract findDirectoryOwnership(input: {
+    connectionIds: string[];
+  }): Promise<ScimDirectoryOwnership[]>;
   abstract createUser(input: {
     organizationId: string;
     connectionId?: string | null;

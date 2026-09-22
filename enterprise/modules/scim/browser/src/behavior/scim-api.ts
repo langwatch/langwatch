@@ -22,6 +22,15 @@ export type ScimApiMap = ContractApiMap<typeof scimTokenTrpc> &
 export type ScimRequestRow =
   OutputsFromMap<ScimApiMap>["scimReconciliation"]["getRequests"][number];
 
+/** One connection's directory sync, as the panel renders it: words the
+ *  server wrote, never a state name or a reason code. */
+export type ConnectionReconciliationRow =
+  OutputsFromMap<ScimApiMap>["scimReconciliation"]["getAll"]["connections"][number];
+
+/** One membership change the directory itself caused. */
+export type DirectoryChangeRow =
+  OutputsFromMap<ScimApiMap>["scimReconciliation"]["getAll"]["recentChanges"][number];
+
 /**
  * The SCIM family's typed tRPC hooks. Same machinery, same transport and same
  * React Query cache as the application's `api` proxy.

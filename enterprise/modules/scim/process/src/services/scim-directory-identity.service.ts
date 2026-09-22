@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ScimWriteOutsideConnectionError } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimWriteOutsideConnectionError,
+  type ScimDirectoryOwnership,
+} from "@langwatch/enterprise-scim-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 
@@ -25,6 +28,11 @@ export class ScimDirectoryIdentityService {
 
   forgetUser(input: { connectionId: string; userId: string }): Promise<void> {
     return this.repository.forgetDirectoryIdentitiesForUser(input);
+  }
+
+  /** Whom these connections' directories have claimed (ADR-122). */
+  findOwnership(input: { connectionIds: string[] }): Promise<ScimDirectoryOwnership[]> {
+    return this.repository.findDirectoryOwnership(input);
   }
 
   async assertWritable(input: { connectionId: string | null; userId: string }): Promise<void> {

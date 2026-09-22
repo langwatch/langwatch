@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
+  type ScimDirectoryOwnership,
   type ScimCreateGroupRequest,
   type ScimGroup,
   type ScimListResponse,
@@ -130,6 +131,10 @@ export class ScimService extends ScimServiceContract {
 
   sweepExpiredRequests(input: { now: Instant }): Promise<number> {
     return this.requests.sweepExpired(input);
+  }
+
+  findDirectoryOwnership(input: { connectionIds: string[] }): Promise<ScimDirectoryOwnership[]> {
+    return this.identities.findOwnership(input);
   }
 
   async generateToken(input: {

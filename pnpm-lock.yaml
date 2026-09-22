@@ -2952,6 +2952,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
+      '@langwatch/error-presentation':
+        specifier: workspace:*
+        version: link:../../../../packages/error-presentation
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error

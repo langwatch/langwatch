@@ -12,6 +12,7 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   ScimService,
+  type ScimDirectoryOwnership,
   type ScimRequestLogEntry,
   type ScimRequestLogQuery,
   type ScimRequestRecord,
@@ -27,6 +28,7 @@ import {
   ScimConnectionsService,
   type ScimConnectionReads,
 } from "../../../services/scim-connections.service.ts";
+import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
 
 export class ScimServiceFake extends ScimService {
   readonly verifyToken = vi.fn(
@@ -40,6 +42,9 @@ export class ScimServiceFake extends ScimService {
     async (_query: ScimRequestLogQuery): Promise<ScimRequestLogEntry[]> => [],
   );
   readonly sweepExpiredRequests = vi.fn(async (_input: { now: Instant }): Promise<number> => 0);
+  readonly findDirectoryOwnership = vi.fn(
+    async (_input: { connectionIds: string[] }): Promise<ScimDirectoryOwnership[]> => [],
+  );
   readonly findOrganizationBySsoDomain = vi.fn();
   readonly listUsers = vi.fn();
   readonly deleteUser = vi.fn();
@@ -103,6 +108,18 @@ export function scimTestApp(
   const app = ScimApp.createWithService({
     scim,
     connections: ScimConnectionsService.create(identity),
+    reconciliation: ScimReconciliationService.create({
+      identity: {
+        ...identity,
+        scimSyncReads: () => ({
+          findForOrganization: () => Promise.resolve([]),
+          findByConnection: () => Promise.resolve(null),
+        }),
+      },
+      grants: { findDirectoryCausedChanges: () => Promise.resolve([]) },
+      people: { getProfiles: () => Promise.resolve([]) },
+      directory: scim,
+    }),
     entitlements,
     auditLog,
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),

@@ -32,12 +32,14 @@ import {
   type ScimCreateUserRequest,
   type ScimDirectoryScope,
   type ScimError,
+  type OrganizationReconciliation,
   type ScimGroup,
   type ScimListResponse,
   type ScimPatchRequest,
   type ScimConnectionRequestsInput,
   type ScimRefusalReason,
   type ScimRequestEntry,
+  type ScimReconciliationScope,
   type ScimReplaceGroupRequest,
   type ScimServerConfig,
   type ScimService,
@@ -64,6 +66,7 @@ import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
+import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
 import type { ScimSyncLifecycle } from "./scim.members.ts";
 
 /**
@@ -169,16 +172,19 @@ export class ScimApp implements ScimApiContract {
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #webhook: ScimDirectoryStreamService;
   readonly #retirement: ScimConnectionRetirementService;
+  readonly #reconciliation: ScimReconciliationService;
 
   private constructor(options: {
     scim: ScimService;
     connections: ScimConnectionsService;
+    reconciliation: ScimReconciliationService;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     auditLog: Pick<AuditLogApi, "record">;
     webhookSecret: () => string | undefined;
   }) {
     this.#scim = options.scim;
     this.#connections = options.connections;
+    this.#reconciliation = options.reconciliation;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
     this.#retirement = ScimConnectionRetirementService.create({
@@ -209,6 +215,12 @@ export class ScimApp implements ScimApiContract {
     return ScimApp.createWithService({
       scim,
       connections: ScimConnectionsService.create(dependencies.identity),
+      reconciliation: ScimReconciliationService.create({
+        identity: dependencies.identity,
+        grants: dependencies.authorization,
+        people: dependencies.users,
+        directory: scim,
+      }),
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
@@ -223,6 +235,7 @@ export class ScimApp implements ScimApiContract {
   static createWithService(options: {
     scim: ScimService;
     connections: ScimConnectionsService;
+    reconciliation: ScimReconciliationService;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     auditLog: Pick<AuditLogApi, "record">;
     webhookSecret: () => string | undefined;
@@ -325,6 +338,10 @@ export class ScimApp implements ScimApiContract {
 
   verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
     return this.#scim.verifyToken(input);
+  }
+
+  getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation> {
+    return this.#reconciliation.getAll(input);
   }
 
   async findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]> {

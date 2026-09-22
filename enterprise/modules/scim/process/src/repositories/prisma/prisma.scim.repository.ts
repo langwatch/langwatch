@@ -1,5 +1,6 @@
 import {
   scimRefusalReasonSchema,
+  type ScimDirectoryOwnership,
   type ScimRequestLogEntry,
   type ScimRequestRecord,
 } from "@langwatch/enterprise-scim-contract";
@@ -91,6 +92,10 @@ type ScimIdentityDatabase = {
       where: { userId: string };
       select: { connectionId: true };
     }): Promise<{ connectionId: string }[]>;
+    findMany(input: {
+      where: { connectionId: { in: string[] } };
+      select: { connectionId: true; userId: true };
+    }): Promise<{ connectionId: string; userId: string }[]>;
     upsert(input: {
       where: {
         connectionId_externalId: { connectionId: string; externalId: string };
@@ -653,6 +658,17 @@ export class PrismaScimRepository extends ScimRepository {
       select: { connectionId: true },
     });
     return rows.map((row) => row.connectionId);
+  }
+
+  async findDirectoryOwnership(input: {
+    connectionIds: string[];
+  }): Promise<ScimDirectoryOwnership[]> {
+    if (input.connectionIds.length === 0) return [];
+
+    return this.prisma.scimExternalId.findMany({
+      where: { connectionId: { in: input.connectionIds } },
+      select: { connectionId: true, userId: true },
+    });
   }
 }
 
