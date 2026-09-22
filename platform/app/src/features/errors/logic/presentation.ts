@@ -1314,6 +1314,22 @@ const presentations = {
         : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
     },
   },
+  provider_out_of_credit: {
+    // fault: customer, and the only refusal on this screen that a key will
+    // never fix. It is also the one a models listing cannot see, which is why
+    // the check sends a real generation.
+    title: "That account is out of credit",
+    describe: () =>
+      "The provider took the key and refused to generate: the account behind it has no credit or quota left. Top it up with the provider, then try again.",
+  },
+  provider_usage_limit_reached: {
+    // fault: customer, but nothing to buy and nothing to fix — a plan-billed
+    // lane (a ChatGPT plan behind Codex, for one) refuses until its window
+    // rolls over. The copy says wait, not "check your key".
+    title: "That plan is over its usage limit",
+    describe: () =>
+      "The provider took the key and refused to generate until the plan's allowance resets. Wait for the window to roll over, or use a provider billed per request.",
+  },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —
     // a 429 or a 503 is theirs to fix, so the copy must not send the customer

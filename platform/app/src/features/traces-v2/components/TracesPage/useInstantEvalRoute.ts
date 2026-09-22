@@ -8,6 +8,7 @@ import {
   queryWithoutInstantEvalChips,
 } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
+import type { ModelTrouble } from "~/server/app-layer/traces/search-router/contracts";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalConfirmation } from "./InstantEvalConfirmDialog";
@@ -39,6 +40,14 @@ export interface InstantEvalRoutePayload {
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
   fallbackQuery: string;
   timeRange: { from: number; to: number };
+  /**
+   * Set when the question is the sentence as typed because no model rewrote
+   * it. The run is the same run either way; this is what the strip under the
+   * bar reads to say so, and to offer the model settings.
+   */
+  modelTrouble?: ModelTrouble;
+  /** The handled code of that failure, when it carried one. */
+  modelErrorCode?: string;
 }
 
 /**
@@ -242,6 +251,7 @@ function useInstantEvalStarter({
 } {
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const registerEvalRun = useExplorerStore((s) => s.registerEvalRun);
+  const recordSearchNotice = useExplorerStore((s) => s.recordSearchNotice);
   const start = api.tracesV2.instantEval.start.useMutation();
   const { pendingRef, setConfirmation, refuse } = outcome;
 
@@ -259,8 +269,22 @@ function useInstantEvalStarter({
           }),
         }),
       );
+      if (!payload.modelTrouble) return;
+      // After the apply, and against the text the store settled on rather
+      // than the text handed to it: the strip shows while the bar still holds
+      // the query it is about, and `applyQueryText` canonicalises what it is
+      // given.
+      recordSearchNotice({
+        projectId: payload.projectId,
+        query: useExplorerStore.getState().queryText,
+        interpretedAs: "instant_eval",
+        modelTrouble: payload.modelTrouble,
+        ...(payload.modelErrorCode
+          ? { modelErrorCode: payload.modelErrorCode }
+          : {}),
+      });
     },
-    [applyQueryText, registerEvalRun],
+    [applyQueryText, recordSearchNotice, registerEvalRun],
   );
 
   const startRun = useCallback(
