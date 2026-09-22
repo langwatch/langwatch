@@ -1,11 +1,12 @@
 /**
- * pi AgentSession wiring. The model comes from generated models.json - the
- * ONLY provider is the mediated gateway. The resource loader discovers
- * nothing: the wrapper owns the system prompt, with only inline factories as extensions.
+ * pi AgentSession wiring: model from the generated models.json, state under
+ * the worker home, auto-compaction on, pi's own retry off (the LLM proxy
+ * retries instead), and a resource loader whose only tools are inline.
  */
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -16,7 +17,10 @@ import {
   type ExtensionAPI,
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
+
 import type { LangyWorkerConfig } from "./config.js";
+import { guidedSkillRefusal } from "./guided-kickoff.js";
+import { closingLineRefusal } from "./guided-turn-end.js";
 import { writeModelsJson } from "./models.js";
 import {
   CODE_ACCESS_TOOL_NAME,
@@ -24,6 +28,8 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
+import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
+import { SECRET_SNIPPET_TOOL_NAME, createSecretSnippetExtension } from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -39,14 +45,16 @@ export const ENABLED_TOOLS = [
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SAY_TOOL_NAME,
+  SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
 
 /**
- * The one channel through which the per-turn system prompt reaches pi:
- * `AgentSession.prompt()` resets it to the base on every call, so the holder
- * is mutated by the turn runner before each prompt via a `before_agent_start` result.
+ * The one channel through which the per-turn system prompt reaches pi, via a
+ * `before_agent_start` extension result; the runner mutates the holder
+ * before each prompt.
  */
 export type SystemPromptHolder = { current: string };
 
@@ -71,17 +79,17 @@ export type CreateLangySessionOptions = {
 export type LangySessionHandle = {
   session: AgentSession;
   /**
-   * Whether the session continues a persisted transcript this home already
-   * held: the manager skips the transcript seed and the prompt prefix stays
-   * byte-stable for provider caching. False means genuinely fresh.
+   * The session continues a persisted transcript this home already held (a
+   * respawn after an idle reap or crash); the manager then skips the seed
+   * and the prompt prefix stays byte-stable. False means a fresh session.
    */
   resumed: boolean;
 };
 
 /**
- * Resume the newest persisted session when the home still holds one, keeping
- * its own context instead of a re-seeded transcript. A failed listing or a
- * corrupt file degrades to a fresh session rather than failing the spawn.
+ * Resume the newest persisted session when the home still holds one; a
+ * failed listing or a corrupt file degrades to a fresh session rather than
+ * failing the spawn.
  */
 export function openSessionManager({ home, sessionDir }: { home: string; sessionDir: string }): {
   sessionManager: SessionManager;
@@ -141,9 +149,18 @@ export async function createLangySession({
       createSkillExtension({
         skillsDir: config.skillsDir,
         disabledSkills: config.disabledSkills,
+        refuse: (name) => guidedSkillRefusal({ name, guided: turnContext.guided }),
       }),
       createQuestionExtension({ turnContext }),
-      createLocalWorkspaceExtension({ turnContext }),
+      createSayExtension({
+        refuse: (text) =>
+          closingLineRefusal({ text, calls: turnContext.calls }) ??
+          repeatedLineRefusal({ text, calls: turnContext.calls }),
+      }),
+      createSecretSnippetExtension(),
+      // Registers `bash` in place of pi's built-in: the extension's tool wins
+      // the name in the session's registry.
+      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
     ],
   });
   await resourceLoader.reload();

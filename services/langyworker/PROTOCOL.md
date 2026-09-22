@@ -73,15 +73,32 @@ Per turn, all tagged with the turn's `turnId`:
 {"type":"tool_update","turnId":"t1","id":"call_1","name":"bash","output":"partial output"}
 {"type":"tool_end","turnId":"t1","id":"call_1","name":"bash","input":{"command":"ls"},"isError":false,"output":"full output"}
 {"type":"plan","turnId":"t1","items":[{"content":"Find the slowest traces","status":"in_progress"}]}
+{"type":"guided_turn","turnId":"t1","event":"guided_turn_continued","segment":1,"missing":["the branch line","the first scenario card"]}
 ```
 
 Event payload shapes follow pi's native session events: `delta` and `reasoning`
 carry `message_update` text/thinking deltas verbatim; `tool_*` carry
 `tool_execution_*` fields (`toolCallId` -> `id`, `toolName` -> `name`,
 `args` -> `input`, result text -> `output`). `tool_end.input` is replayed from
-the matching `tool_start` (pi's end event does not carry args). `plan` is
+the matching `tool_start` (pi's end event does not carry args). `tool_end.local`
+is `true` when the call ran in the developer's shared folder through the local
+control path (a `local_*` tool, or `bash` while a folder is connected), and
+absent when it ran in the sandbox; the manager's GitHub gate and the panel read
+it, since a git push or a gh call there used the developer's own credentials. `plan` is
 emitted on every successful `todowrite` tool call with the full current list;
 `status` is one of `pending`, `in_progress`, `completed`, `cancelled`.
+
+`guided_turn` is the report of the guided turn end guard (`guided-turn-end.ts`):
+`event` is `guided_turn_continued` when the wrapper appended a continuation to a
+guided turn that ended on none of the calls the skill allows, and
+`guided_turn_bare_end` when it gave up on a second bare end. `segment` is 1 for
+the calls before any card answered inside the turn and one more per answered
+card: a card answered in the turn hands the turn the work that follows, so the
+guard reads the calls after it as a segment of their own, with one continuation
+of their own and a small cap over the turn. `missing` names what the turn owed,
+in the guard's own words (line and card names, never the model's text). The
+manager logs it under the event name and draws no frame for it. The wrapper's
+stderr is not read by the manager, so this event is the guard's only sink.
 
 Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 
@@ -124,22 +141,22 @@ Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 ```ts
 type LangyWorkerConfig = {
   model: {
-    id: string; // model id sent to the API
+    id: string;                                  // model id sent to the API
     api: "openai-completions" | "openai-responses" | "anthropic-messages";
-    baseUrlEnv: string; // env var NAME holding the base URL (e.g. "OPENAI_BASE_URL")
-    apiKeyEnv: string; // env var NAME holding the API key (e.g. "OPENAI_API_KEY")
+    baseUrlEnv: string;                          // env var NAME holding the base URL (e.g. "OPENAI_BASE_URL")
+    apiKeyEnv: string;                           // env var NAME holding the API key (e.g. "OPENAI_API_KEY")
     reasoning?: boolean;
-    contextWindow?: number; // default 128000
-    maxTokens?: number; // default 16384
-    compat?: Record<string, unknown>; // pi compat flags verbatim (supportsStore, supportsReasoningEffort, ...)
+    contextWindow?: number;                      // default 128000
+    maxTokens?: number;                          // default 16384
+    compat?: Record<string, unknown>;            // pi compat flags verbatim (supportsStore, supportsReasoningEffort, ...)
     // Any additional keys are passed through verbatim into the generated pi
     // model entry (name, headers, samplingParams, thinkingLevelMap, ...).
   };
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-  personaPrompt: string; // first system-prompt section
-  agentsFilePath: string; // absolute path, usually $HOME/AGENTS.md
-  skillsDir?: string; // dir of <name>/SKILL.md skills for the `skill` tool
-  sessionDir: string; // pi session JSONL storage dir
+  personaPrompt: string;                         // first system-prompt section
+  agentsFilePath: string;                        // absolute path, usually $HOME/AGENTS.md
+  skillsDir?: string;                            // dir of <name>/SKILL.md skills for the `skill` tool
+  sessionDir: string;                            // pi session JSONL storage dir
 };
 ```
 

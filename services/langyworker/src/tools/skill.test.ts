@@ -1,8 +1,26 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listSkills, parseSkillFrontmatter, renderSkillInventory } from "./skill.js";
+
+import {
+  SKILL_TOOL_NAME,
+  createSkillExtension,
+  listSkills,
+  parseSkillFrontmatter,
+  readSkillBody,
+  renderSkillInventory,
+} from "./skill.js";
+
+type RegisteredTool = {
+  name: string;
+  execute: (
+    toolCallId: string,
+    params: unknown,
+  ) => Promise<{ content: { type: string; text: string }[] }>;
+};
 
 describe("parseSkillFrontmatter", () => {
   describe("when a SKILL.md with frontmatter", () => {
@@ -93,5 +111,88 @@ describe("renderSkillInventory", () => {
 
   it("names the empty state", () => {
     expect(renderSkillInventory([])).toBe("No skills installed.");
+  });
+});
+
+describe("readSkillBody", () => {
+  let skillsDir: string;
+  beforeEach(() => {
+    skillsDir = mkdtempSync(join(tmpdir(), "langy-skill-body-"));
+    mkdirSync(join(skillsDir, "guided-onboarding"));
+    writeFileSync(
+      join(skillsDir, "guided-onboarding", "SKILL.md"),
+      "---\nname: guided-onboarding\n---\n# Body\n",
+    );
+  });
+  afterEach(() => rmSync(skillsDir, { recursive: true, force: true }));
+
+  describe("when the skill is installed", () => {
+    it("returns its SKILL.md whole", () => {
+      expect(readSkillBody({ skillsDir, name: "guided-onboarding" })).toBe(
+        "---\nname: guided-onboarding\n---\n# Body\n",
+      );
+    });
+  });
+
+  describe("when the skill is not installed, or no skills directory is set", () => {
+    it("returns nothing", () => {
+      expect(readSkillBody({ skillsDir, name: "tracing" })).toBeUndefined();
+      expect(readSkillBody({ skillsDir: undefined, name: "guided-onboarding" })).toBeUndefined();
+    });
+  });
+});
+
+describe("createSkillExtension", () => {
+  let skillsDir: string;
+  beforeEach(() => {
+    skillsDir = mkdtempSync(join(tmpdir(), "langy-skill-tool-"));
+    mkdirSync(join(skillsDir, "guided-onboarding"));
+    writeFileSync(
+      join(skillsDir, "guided-onboarding", "SKILL.md"),
+      "---\nname: guided-onboarding\ndescription: The path\n---\n# Script\n",
+    );
+    mkdirSync(join(skillsDir, "tracing"));
+    writeFileSync(
+      join(skillsDir, "tracing", "SKILL.md"),
+      "---\nname: tracing\ndescription: Traces\n---\n# Tracing\n",
+    );
+  });
+  afterEach(() => rmSync(skillsDir, { recursive: true, force: true }));
+
+  /** The `skill` tool as pi registers it, under the given rule. */
+  function skillTool(refuse?: (name: string) => string | undefined): RegisteredTool {
+    const tools = new Map<string, RegisteredTool>();
+    const pi = {
+      registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
+      on: () => undefined,
+    };
+    (
+      createSkillExtension({ skillsDir, refuse }) as { factory: (pi: ExtensionAPI) => void }
+    ).factory(pi as unknown as ExtensionAPI);
+    return tools.get(SKILL_TOOL_NAME)!;
+  }
+
+  describe("when a refusal rule holds for the skill asked for", () => {
+    /** @scenario "The skill is refused outside a guided conversation" */
+    it("refuses the load with the rule and returns none of the script", async () => {
+      const tool = skillTool((name) =>
+        name === "guided-onboarding" ? "Not for this conversation." : undefined,
+      );
+
+      await expect(tool.execute("t1", { name: "guided-onboarding" })).rejects.toThrow(
+        "Not for this conversation.",
+      );
+      const loaded = await tool.execute("t2", { name: "tracing" });
+      expect(loaded.content[0]?.text).toContain("# Tracing");
+      const inventory = await tool.execute("t3", {});
+      expect(inventory.content[0]?.text).toContain("guided-onboarding");
+    });
+  });
+
+  describe("when no rule holds", () => {
+    it("loads the skill whole", async () => {
+      const loaded = await skillTool(() => undefined).execute("t1", { name: "guided-onboarding" });
+      expect(loaded.content[0]?.text).toContain("# Script");
+    });
   });
 });

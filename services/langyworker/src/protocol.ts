@@ -69,9 +69,8 @@ export function parseCommand(line: string): ManagerCommand | undefined {
 // ---- wrapper -> manager -------------------------------------------------
 
 /**
- * `resumed` reports whether the worker continued a persisted session (see
- * session.ts). The manager skips the transcript seed when true; an absent
- * field reads as false, so an older worker binary keeps the seed path.
+ * `resumed`: the worker continued a persisted session (see session.ts); an
+ * absent field reads as false, so an older worker keeps the seed path.
  */
 export type ReadyEvent = { type: "ready"; protocol: number; resumed: boolean };
 export type PongEvent = { type: "pong" };
@@ -100,6 +99,8 @@ export type ToolEndEvent = {
   input: unknown;
   isError: boolean;
   output: string;
+  /** The call ran on the developer's machine via local control; absent means it ran sandboxed. */
+  local?: boolean;
 };
 export type PlanItem = { content: string; status: string };
 export type PlanEvent = { type: "plan"; turnId: string; items: PlanItem[] };
@@ -111,6 +112,20 @@ export type TurnDoneEvent = {
 };
 export type HandoffEvent = { type: "handoff"; turnId: string; seed: string };
 
+/**
+ * The guided turn end guard's report (guided-turn-end.ts): a continuation
+ * was appended, or the guard gave up on a second bare end. `missing` names
+ * what the turn owed in the guard's own words, never the model's text.
+ */
+export type GuidedTurnEvent = {
+  type: "guided_turn";
+  turnId: string;
+  event: "guided_turn_continued" | "guided_turn_bare_end";
+  /** 1 for the calls before any card answered inside the turn, one more per answered card. */
+  segment: number;
+  missing: string[];
+};
+
 export type WorkerEvent =
   | ReadyEvent
   | PongEvent
@@ -121,6 +136,7 @@ export type WorkerEvent =
   | ToolUpdateEvent
   | ToolEndEvent
   | PlanEvent
+  | GuidedTurnEvent
   | TurnDoneEvent
   | HandoffEvent;
 

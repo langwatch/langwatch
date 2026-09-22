@@ -1,13 +1,14 @@
 /**
- * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`. pi's
- * native loading can't satisfy Langy's AGENTS.md contract since the wrapper
- * owns the system prompt outright - a name returns SKILL.md, else the inventory.
+ * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`, since
+ * the wrapper owns the system prompt outright and cannot use pi's native
+ * skill injection.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Type } from "typebox";
+
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export const SKILL_TOOL_NAME = "skill";
 
@@ -19,10 +20,7 @@ export type SkillEntry = {
 };
 
 /** Minimal SKILL.md frontmatter reader: `name:` and `description:` between --- fences. */
-export function parseSkillFrontmatter(markdown: string): {
-  name?: string;
-  description?: string;
-} {
+export function parseSkillFrontmatter(markdown: string): { name?: string; description?: string } {
   if (!markdown.startsWith("---")) return {};
   const end = markdown.indexOf("\n---", 3);
   if (end === -1) return {};
@@ -64,10 +62,28 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
         baseDir,
       });
     } catch {
-      // A directory without a readable SKILL.md is not a skill.
+      // A directory without a readable SKILL.md is not a skill: skip it.
+      continue;
     }
   }
   return skills;
+}
+
+/** The SKILL.md of one installed skill, or undefined when it is not installed. */
+export function readSkillBody({
+  skillsDir,
+  name,
+}: {
+  skillsDir: string | undefined;
+  name: string;
+}): string | undefined {
+  const skill = listSkills(skillsDir).find((s) => s.name === name);
+  if (!skill) return undefined;
+  try {
+    return readFileSync(skill.filePath, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 export function renderSkillInventory(skills: SkillEntry[]): string {
@@ -77,18 +93,36 @@ export function renderSkillInventory(skills: SkillEntry[]): string {
 
 const skillParams = Type.Object({
   name: Type.Optional(
-    Type.String({
-      description: "Skill name to load. Omit to list every installed skill.",
-    }),
+    Type.String({ description: "Skill name to load. Omit to list every installed skill." }),
   ),
 });
+
+/** A rule a load is checked against: the refusal to answer with, or nothing. */
+export type SkillRefusal = (name: string) => string | undefined;
+
+/** A skill's SKILL.md text, or a thrown message naming the read failure. */
+function readSkillMarkdown(skill: SkillEntry): string {
+  try {
+    return readFileSync(skill.filePath, "utf8");
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : "unreadable";
+    throw new Error(`Could not read skill "${skill.name}": ${cause}`);
+  }
+}
 
 export function createSkillExtension({
   skillsDir,
   disabledSkills,
+  refuse,
 }: {
   skillsDir: string | undefined;
   disabledSkills?: string[];
+  /**
+   * Consulted with the name of an installed skill before it is read. A
+   * refusal is thrown, so the model reads the rule as the call's error and
+   * none of the skill's script reaches it.
+   */
+  refuse?: SkillRefusal;
 }): InlineExtension {
   const disabled = new Set(disabledSkills);
   // Filtered before the inventory line and the execute closure both read
@@ -106,7 +140,7 @@ export function createSkillExtension({
       pi.registerTool({
         name: SKILL_TOOL_NAME,
         label: "Skill",
-        description: `Load a skill's instructions by name, or call without a name to list every skill installed.${inventoryLine}`,
+        description: `Load a skill's instructions by name, or call without a name to list every skill installed.${inventoryLine} A skill whose own rule says it is not for this conversation is refused with the rule.`,
         parameters: skillParams,
         async execute(_toolCallId, params) {
           const name = typeof params.name === "string" ? params.name.trim() : "";
@@ -128,14 +162,9 @@ export function createSkillExtension({
               details: {},
             };
           }
-          let markdown: string;
-          try {
-            markdown = readFileSync(skill.filePath, "utf8");
-          } catch (error) {
-            throw new Error(
-              `Could not read skill "${name}": ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
+          const refused = refuse?.(skill.name);
+          if (refused !== undefined) throw new Error(refused);
+          const markdown = readSkillMarkdown(skill);
           return {
             content: [
               {

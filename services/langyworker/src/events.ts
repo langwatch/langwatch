@@ -1,12 +1,12 @@
 /**
  * Maps pi's native session events onto the wire protocol, tagged with the
- * turn's id, bounded per PROTOCOL.md. Replays `tool_start` input on
- * `tool_end` (pi's end event omits it); mirrors `todowrite` as `plan`.
+ * turn's id, bounded per PROTOCOL.md.
  */
 
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 
 import { boundJsonValue, boundText, type WorkerEvent } from "./protocol.js";
+import { ranInFolder } from "./tools/local-workspace.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
 
 export type SessionEventLike = {
@@ -15,6 +15,11 @@ export type SessionEventLike = {
 };
 
 type ContentBlock = { type?: string; text?: string };
+
+/** A session event field read as a string, or "" when it is not one. */
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 /** Concatenate the text blocks of a tool result content array. */
 export function contentText(result: unknown): string {
@@ -34,10 +39,20 @@ export function contentText(result: unknown): string {
  */
 const MAX_RECOVERED_OUTPUT_BYTES = 1024 * 1024;
 
+/** A cut at the cap can land inside a code point; step back to a boundary. */
+function codePointBoundaryBefore(buffer: Buffer, offset: number): number {
+  let end = offset;
+  while (end > 0) {
+    const byte = buffer[end];
+    if (byte === undefined || (byte & 0b1100_0000) !== 0b1000_0000) break;
+    end--;
+  }
+  return end;
+}
+
 /**
- * pi's bash tool truncates big output to its TAIL and saves the full text to
- * a file. A tail cut removes a JSON document's head, so the frame recovers
- * the saved file instead; the model's own context keeps pi's truncated view.
+ * pi's bash tool truncates big output to its TAIL and saves the full text
+ * to a file; recover it so the frame keeps the document's structure.
  */
 export function settledToolOutput(result: unknown): string {
   const text = contentText(result);
@@ -55,15 +70,8 @@ export function settledToolOutput(result: unknown): string {
       if (want <= 0) return text;
       const buffer = Buffer.alloc(want);
       const read = readSync(fd, buffer, 0, want, 0);
-      // A cut at the cap can land inside a code point; step back to a boundary.
-      let end = read;
-      if (read === MAX_RECOVERED_OUTPUT_BYTES && size > MAX_RECOVERED_OUTPUT_BYTES) {
-        while (end > 0) {
-          const byte = buffer[end];
-          if (byte === undefined || (byte & 0b1100_0000) !== 0b1000_0000) break;
-          end--;
-        }
-      }
+      const truncated = read === MAX_RECOVERED_OUTPUT_BYTES && size > MAX_RECOVERED_OUTPUT_BYTES;
+      const end = truncated ? codePointBoundaryBefore(buffer, read) : read;
       return buffer.toString("utf8", 0, end);
     } finally {
       closeSync(fd);
@@ -83,13 +91,7 @@ export class TurnEventMapper {
       case "message_update": {
         const delta = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
         if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [
-            {
-              type: "delta",
-              turnId: this.turnId,
-              text: boundText({ text: delta.delta }),
-            },
-          ];
+          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
         }
         if (
           delta?.type === "thinking_delta" &&
@@ -97,18 +99,14 @@ export class TurnEventMapper {
           delta.delta !== ""
         ) {
           return [
-            {
-              type: "reasoning",
-              turnId: this.turnId,
-              text: boundText({ text: delta.delta }),
-            },
+            { type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) },
           ];
         }
         return [];
       }
       case "tool_execution_start": {
-        const id = String(event.toolCallId ?? "");
-        const name = String(event.toolName ?? "");
+        const id = stringField(event.toolCallId);
+        const name = stringField(event.toolName);
         this.toolInputs.set(id, event.args);
         return [
           {
@@ -126,39 +124,43 @@ export class TurnEventMapper {
           {
             type: "tool_update",
             turnId: this.turnId,
-            id: String(event.toolCallId ?? ""),
-            name: String(event.toolName ?? ""),
+            id: stringField(event.toolCallId),
+            name: stringField(event.toolName),
             ...(output !== "" ? { output: boundText({ text: output }) } : {}),
           },
         ];
       }
-      case "tool_execution_end": {
-        const id = String(event.toolCallId ?? "");
-        const name = String(event.toolName ?? "");
-        const input = this.toolInputs.get(id);
-        this.toolInputs.delete(id);
-        const isError = event.isError === true;
-        const events: WorkerEvent[] = [
-          {
-            type: "tool_end",
-            turnId: this.turnId,
-            id,
-            name,
-            input: boundJsonValue({ value: input }),
-            isError,
-            output: boundText({ text: settledToolOutput(event.result) }),
-          },
-        ];
-        if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {
-          const items = normalizeTodos(input);
-          if (items.length > 0) {
-            events.push({ type: "plan", turnId: this.turnId, items });
-          }
-        }
-        return events;
-      }
+      case "tool_execution_end":
+        return this.mapToolExecutionEnd(event);
       default:
         return [];
     }
+  }
+
+  private mapToolExecutionEnd(event: SessionEventLike): WorkerEvent[] {
+    const id = stringField(event.toolCallId);
+    const name = stringField(event.toolName);
+    const input = this.toolInputs.get(id);
+    this.toolInputs.delete(id);
+    const isError = event.isError === true;
+    const events: WorkerEvent[] = [
+      {
+        type: "tool_end",
+        turnId: this.turnId,
+        id,
+        name,
+        input: boundJsonValue({ value: input }),
+        isError,
+        output: boundText({ text: settledToolOutput(event.result) }),
+        ...(ranInFolder(event.result) ? { local: true } : {}),
+      },
+    ];
+    if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {
+      const items = normalizeTodos(input);
+      if (items.length > 0) {
+        events.push({ type: "plan", turnId: this.turnId, items });
+      }
+    }
+    return events;
   }
 }
