@@ -26,7 +26,7 @@ Steps to reproduce the behavior:
 - [ ] Regression scenario in a `specs/**/*.feature` file tagged `@unit`/`@integration`/`@e2e`
 - [ ] Scenario binds via `/** @scenario`
 - [ ] Tests pass (regression fails without the fix)
-- [ ] Use-proof embedded in the PR
+- [ ] Use-proof embedded in the PR (see `dev/docs/TESTING_PHILOSOPHY.md#use-proof`)
 - [ ] Docs updated if needed
 
 See `specs/README.md` for feature file binding.

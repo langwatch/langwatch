@@ -17,7 +17,7 @@ A feature file should be a **complete specification** of the work:
 - All user-visible behaviors are described
 - No gaps - if it's not in the feature file, it's not in scope
 
-### Test Level Coverage
+### Non-Overlapping Test Coverage
 Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
 | Tag | Purpose | What It Tests |
@@ -41,16 +41,6 @@ Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 - Complete coverage plan with appropriate test levels
 
 See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.
-
-## Use-proof
-
-A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
-- A screenshot of the rendered UI showing the feature in action
-- A command-line output demonstrating the API response
-- A browser-test report with screenshots of the full workflow
-- A trace or log showing the expected behavior occurred
-
-Use-proofs are embedded in PR descriptions or linked from the PR body, providing visual evidence that every acceptance criterion was validated before merge.
 
 ## From issue to feature file
 

@@ -234,6 +234,16 @@ When a scenario in a legacy feature file describes behavior that has no matching
 
 `@unimplemented` is a lightweight promise that the gap is tracked, not ignored. Every removal of an `@unimplemented` tag must land with either a new `@scenario` binding or a feature-file edit that removes the scenario entirely.
 
+## Use-proof
+
+A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
+- A screenshot of the rendered UI showing the feature in action
+- A command-line output demonstrating the API response
+- A browser-test report with screenshots of the full workflow
+- A trace or log showing the expected behavior occurred
+
+Use-proofs are embedded in PR descriptions or linked from the PR body, providing visual evidence that every acceptance criterion was validated before merge.
+
 ## Workflow
 
 See `specs/README.md` for detailed BDD guidance.

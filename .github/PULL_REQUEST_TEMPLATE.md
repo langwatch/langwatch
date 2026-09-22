@@ -24,7 +24,7 @@ Copy from the issue. Tick each. Link its scenario.
 - [ ] Feature file exists in `specs/**/*.feature` (when behaviour changes)
 - [ ] Parity check passes (`check-feature-parity` gate in CI)
 - [ ] Tests pass
-- [ ] Use-proof embedded in this PR
+- [ ] Use-proof embedded in this PR (see `dev/docs/TESTING_PHILOSOPHY.md#use-proof`)
 - [ ] Docs updated
 
 See `specs/README.md` for feature file binding.
