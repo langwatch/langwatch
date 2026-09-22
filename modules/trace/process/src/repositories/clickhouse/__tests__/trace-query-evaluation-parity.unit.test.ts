@@ -699,9 +699,10 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = traceQueryRepository.translateFilter(`${key}:${literal}`, "tenant-1", {
-          from: 0,
-          to: 1,
+        const compiled = traceQueryRepository.translateFilter({
+          queryText: `${key}:${literal}`,
+          tenantId: "tenant-1",
+          timeRange: { from: 0, to: 1 },
         });
         expect(compiled?.sql).toContain(def.expression);
       },
@@ -742,9 +743,10 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        traceQueryRepository.translateFilter(`${field}:x`, "tenant-1", {
-          from: 0,
-          to: 1,
+        traceQueryRepository.translateFilter({
+          queryText: `${field}:x`,
+          tenantId: "tenant-1",
+          timeRange: { from: 0, to: 1 },
         }),
       ).toThrow(FilterFieldUnknownError);
     });
@@ -845,9 +847,10 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = traceQueryRepository.translateFilter("codex", "tenant-1", {
-      from: 0,
-      to: 1,
+    const compiled = traceQueryRepository.translateFilter({
+      queryText: "codex",
+      tenantId: "tenant-1",
+      timeRange: { from: 0, to: 1 },
     });
     expect(compiled!.sql).toContain("FROM stored_spans");
     expect(compiled!.sql).toContain("SpanName ILIKE");
@@ -878,9 +881,10 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return traceQueryRepository.translateFilter(query, "tenant-1", {
-      from: 1000,
-      to: 2000,
+    return traceQueryRepository.translateFilter({
+      queryText: query,
+      tenantId: "tenant-1",
+      timeRange: { from: 1000, to: 2000 },
     });
   }
 

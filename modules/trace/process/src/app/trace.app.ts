@@ -97,6 +97,8 @@ import {
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
   type ExplorerInstantEvalRunInput,
+  explorerHiddenOrigins,
+  type ResolvedInstantEvalRun,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -107,6 +109,10 @@ import { z } from "zod";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import {
+  andFilterConditions,
+  findHiddenOriginConditions,
+} from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
@@ -206,6 +212,12 @@ export type TracesListReader = Readonly<{
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number>;
+  getTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]>;
   getSuggestions(params: {
     tenantId: string;
     field: string;
@@ -1055,8 +1067,51 @@ export class TraceApp implements TraceApi, CollectorApp {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
+    evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
-    return traceQueryTranslator.translateFilter(input.query, input.tenantId, input.timeRange);
+    return traceQueryTranslator.translateFilter({
+      queryText: input.query,
+      tenantId: input.tenantId,
+      timeRange: input.timeRange,
+      ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+    });
+  }
+
+  /**
+   * The Explorer's own filter: the query compiled, with the origins the
+   * Explorer hides left out unless the query names `origin` itself.
+   */
+  compileExplorerTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): { sql: string; params: Record<string, unknown> } {
+    const compiled = this.translateTraceFilter(input);
+
+    return andFilterConditions([
+      ...(compiled ? [compiled] : []),
+      ...findHiddenOriginConditions({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
+    ]);
+  }
+
+  /** The trace ids a filter selects, newest first and capped. */
+  findTraceIdsForFilter(input: {
+    projectId: string;
+    filter: string;
+    window: { from: number; to: number };
+    limit: number;
+  }): Promise<readonly string[]> {
+    return this.#dependencies.traces.list.getTraceIds({
+      tenantId: input.projectId,
+      timeRange: input.window,
+      filterWhere: this.compileExplorerTraceFilter({
+        query: input.filter,
+        tenantId: input.projectId,
+        timeRange: input.window,
+      }),
+      limit: input.limit,
+    });
   }
 
   /** The query's positive bare-word terms, for a content (log-body) search. */

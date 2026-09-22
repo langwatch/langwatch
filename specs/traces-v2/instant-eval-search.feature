@@ -86,3 +86,54 @@ Feature: Instant Evals inside the Trace Explorer
       Then the filter leaves out the Langy origin, as the table does
       And an eval chip of the query is not part of what the run judges
       And a request whose chips name an origin is left as asked
+
+  Rule: An eval chip filters by a run's verdicts
+
+    @unit
+    Scenario: An eval chip with a registered run compiles to a verdict subquery
+      Given a query with an eval chip and the run registered for it
+      When the filter is compiled
+      Then it keeps the traces whose latest verdict for that run passed
+      And the run and the window its judgements were written in are bound as parameters
+
+    @unit
+    Scenario: A conversation chip keeps every trace of a matched conversation
+      Given a chip whose run judged conversations
+      When the filter is compiled
+      Then it compares the conversation id rather than the trace id
+
+    @unit
+    Scenario: A negated eval chip keeps the traces the judge did not match
+      Given a query negating an eval chip with a registered run
+      When the filter is compiled
+      Then the verdict subquery is negated whole
+
+    @unit
+    Scenario: A target modifier only resolves a run of that target
+      Given a chip forcing a unit and a run of another unit
+      When the filter is compiled
+      Then it matches no rows
+
+    @unit
+    Scenario: An eval chip with no registered run matches nothing
+      Given a chip forcing a unit and no run registered for it
+      When the filter is compiled
+      Then it matches no rows, so the table is empty while the run starts
+
+    @unit
+    Scenario: A bare eval chip with no registered run keeps its older meaning
+      Given a bare eval chip and no run registered for it
+      When the filter is compiled
+      Then it reads the value as an evaluator name, as it did before Instant Evals
+
+    @unit
+    Scenario: The eval field cannot be evaluated in memory
+      Given a trigger evaluating a saved query with a forcing eval chip
+      When the field is evaluated against a trace in memory
+      Then it answers unsupported, so the query fails closed
+
+    @unit
+    Scenario: The eval field is in the query reference and the autocomplete
+      When the search field registry is read
+      Then eval and its three target spellings are published under the eval group
+

@@ -7,7 +7,11 @@ const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
-  return traceQueryRepository.translateFilter(query, TENANT, TIME_RANGE);
+  return traceQueryRepository.translateFilter({
+    queryText: query,
+    tenantId: TENANT,
+    timeRange: TIME_RANGE,
+  });
 }
 
 describe("dynamic attribute prefix translation", () => {

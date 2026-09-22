@@ -20,6 +20,7 @@ export * from "./trace-instant-eval.schemas.ts";
 export * from "./trace-query-analysis.ts";
 export * from "./trace-query-ast.ts";
 export * from "./trace-query-evaluator-group.ts";
+export * from "./trace-query-examples.ts";
 export * from "./trace-query-grammar.ts";
 export * from "./trace-query-metadata.ts";
 export * from "./trace-query-mutations.ts";

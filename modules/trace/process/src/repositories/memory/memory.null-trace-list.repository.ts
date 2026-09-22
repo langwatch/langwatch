@@ -29,6 +29,10 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
     return 0;
   }
 
+  async findTraceIds(): Promise<string[]> {
+    return [];
+  }
+
   async findDistinctValues(): Promise<string[]> {
     return [];
   }

@@ -24,6 +24,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { HttpInstantEvalJudgeChannel } from "../channels/http/http.instant-eval-judge.channel.ts";
 import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
@@ -99,6 +100,8 @@ type InstantEvalDependencies = Readonly<{
   plans: typeof EntitlementApi;
   /** The spend spine every judged token is filed on. */
   gateway: typeof GatewayApi;
+  /** The query door: a filtered shorthand target resolves its trace ids here. */
+  traces: typeof TraceApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -116,6 +119,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     analytics: AnalyticsApi,
     plans: EntitlementApi,
     gateway: GatewayApi,
+    traces: TraceApi,
   };
   static readonly config = instantEvalConfig;
   /** LangWatch's own judge credential; a deployment without one judges nothing. */
@@ -145,7 +149,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const judge = InstantEvalApp.judgeOf(setup, apiKey);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
-    const { analytics, projects, plans, gateway } = setup.dependencies;
+    const { analytics, projects, plans, gateway, traces } = setup.dependencies;
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
@@ -215,6 +219,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
           budget,
         },
         peers: {
+          selectTraceIds: (input) => traces.findTraceIdsForFilter(input),
           isEnabled: (input) => access.isEnabled(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
           resolveCaller: (input) => InstantEvalApp.callerOf({ analytics, ...input }),

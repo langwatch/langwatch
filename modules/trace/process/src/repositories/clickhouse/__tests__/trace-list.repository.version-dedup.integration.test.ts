@@ -92,7 +92,11 @@ describe.skipIf(!clickHouseConfigured)(
 
     /** The filter the sidebar compiles, so the test reads the production SQL. */
     const filterFor = (queryText: string) => {
-      const compiled = traceQueryRepository.translateFilter(queryText, versionTenant, timeRange);
+      const compiled = traceQueryRepository.translateFilter({
+        queryText,
+        tenantId: versionTenant,
+        timeRange,
+      });
       if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
       return compiled;
     };

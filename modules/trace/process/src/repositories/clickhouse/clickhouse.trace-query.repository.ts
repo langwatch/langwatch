@@ -1,12 +1,16 @@
 import {
+  type FieldHandler,
+  FILTER_TOO_COMPLEX_MESSAGE,
   FilterFieldUnknownError,
   FilterParseError,
+  MAX_FILTER_NODE_COUNT,
   type LiqeQuery,
   type LogicalExpressionToken,
   type ParenthesizedExpressionToken,
   parseTraceQuerySyntax,
   type TagToken,
   type UnaryOperatorToken,
+  type ResolvedInstantEvalRun,
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
@@ -22,7 +26,6 @@ import {
   ClickHouseTraceQueryValuesRepository,
 } from "./clickhouse.trace-query-values.repository.ts";
 
-export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -114,36 +117,47 @@ export class ClickHouseTraceQueryRepository {
     return value.length > 0 ? value : null;
   }
 
-  private translateNode(node: LiqeQuery, negated: boolean, ctx: TranslationContext): string {
+  private translateNode({
+    node,
+    negated,
+    ctx,
+    translateTag,
+  }: {
+    node: LiqeQuery;
+    negated: boolean;
+    ctx: TranslationContext;
+    translateTag: FieldHandler;
+  }): string {
     ctx.nodeCount++;
-    if (ctx.nodeCount > MAX_NODE_COUNT) {
-      throw new FilterParseError("Query too complex");
+    if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+      throw new FilterParseError(FILTER_TOO_COMPLEX_MESSAGE);
     }
+
+    const branch = (side: LiqeQuery, sideNegated: boolean): string =>
+      this.translateNode({ node: side, negated: sideNegated, ctx, translateTag });
 
     switch (node.type) {
       case "EmptyExpression":
         return "1 = 1";
 
       case "Tag":
-        return this.translateTag(node as TagToken, negated, ctx);
+        return translateTag(node as TagToken, negated, ctx);
 
       case "LogicalExpression": {
         const logExpr = node as LogicalExpressionToken;
-        const left = this.translateNode(logExpr.left, negated, ctx);
-        const right = this.translateNode(logExpr.right, negated, ctx);
         const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
-        return `(${left} ${op} ${right})`;
+        return `(${branch(logExpr.left, negated)} ${op} ${branch(logExpr.right, negated)})`;
       }
 
       case "UnaryOperator": {
         const unary = node as UnaryOperatorToken;
         const isNeg = unary.operator === "NOT" || unary.operator === "-";
-        return this.translateNode(unary.operand, negated !== isNeg, ctx);
+        return branch(unary.operand, negated !== isNeg);
       }
 
       case "ParenthesizedExpression": {
         const paren = node as ParenthesizedExpressionToken;
-        return `(${this.translateNode(paren.expression, negated, ctx)})`;
+        return `(${branch(paren.expression, negated)})`;
       }
 
       default:
@@ -340,12 +354,55 @@ export class ClickHouseTraceQueryRepository {
 
   /**
    * Translates a liqe query into a parameterized WHERE fragment or null.
+   * `evalRuns` carries the runs registered for the query's `eval` chips.
    */
-  translateFilter(
-    queryText: string,
-    tenantId: string,
-    timeRange: { from: number; to: number },
-  ): { sql: string; params: Record<string, unknown> } | null {
+  translateFilter({
+    queryText,
+    tenantId,
+    timeRange,
+    evalRuns,
+  }: {
+    queryText: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): { sql: string; params: Record<string, unknown> } | null {
+    const ctx: TranslationContext = {
+      paramCounter: 0,
+      nodeCount: 0,
+      params: {
+        tenantId,
+        timeFrom: timeRange.from,
+        timeTo: timeRange.to,
+      },
+      tenantId,
+      timeRange,
+      ...(evalRuns ? { evalRuns } : {}),
+    };
+
+    const sql = this.translateFilterAst({
+      queryText,
+      ctx,
+      translateTag: (tag, negated, tagCtx) => this.translateTag(tag, negated, tagCtx),
+    });
+
+    return sql === null ? null : { sql, params: ctx.params };
+  }
+
+  /**
+   * The language's boolean structure, compiled with the tag translator given:
+   * a second dialect over other tables supplies its own `translateTag`. Null
+   * for an empty query, and the parameters land on `ctx.params`.
+   */
+  translateFilterAst({
+    queryText,
+    ctx,
+    translateTag,
+  }: {
+    queryText: string;
+    ctx: TranslationContext;
+    translateTag: FieldHandler;
+  }): string | null {
     const trimmed = this.normalizeQuery(queryText);
     if (!trimmed) return null;
 
@@ -358,24 +415,12 @@ export class ClickHouseTraceQueryRepository {
 
     if (ast.type === "EmptyExpression") return null;
 
-    const ctx: TranslationContext = {
-      paramCounter: 0,
-      nodeCount: 0,
-      params: {
-        tenantId,
-        timeFrom: timeRange.from,
-        timeTo: timeRange.to,
-      },
-      tenantId,
-      timeRange,
-    };
-
-    const sql = this.translateNode(ast, false, ctx);
+    const sql = this.translateNode({ node: ast, negated: false, ctx, translateTag });
 
     if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
       throw new FilterParseError("Too many filter conditions");
     }
 
-    return { sql, params: ctx.params };
+    return sql;
   }
 }

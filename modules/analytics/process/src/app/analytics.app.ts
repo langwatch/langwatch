@@ -44,7 +44,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import { TraceApi, type Trace } from "@langwatch/trace-contract";
+import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
@@ -426,10 +426,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
         maxResultBytes: DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes,
         maxExecutionTimeSeconds: DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds,
       },
-      // The filter language's worked examples are trace's to publish; the
-      // document carries the SQL half's alone until `TRACE_FILTER_EXAMPLES`
-      // is exported from `@langwatch/trace-contract`.
-      traceFilterExamples: [],
+      traceFilterExamples: TRACE_FILTER_EXAMPLES,
     });
   }
 

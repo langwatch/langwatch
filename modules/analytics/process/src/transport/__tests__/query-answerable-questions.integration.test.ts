@@ -10,6 +10,7 @@ import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/kernel";
 import { Temporal } from "@langwatch/time";
+import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -1391,7 +1392,7 @@ function mountQueryDoor({
           maxResultBytes: 8_000_000,
           maxExecutionTimeSeconds: 10,
         },
-        traceFilterExamples: [],
+        traceFilterExamples: TRACE_FILTER_EXAMPLES,
       }),
     executeLangWatchQL: (input) => service().execute(input),
   };

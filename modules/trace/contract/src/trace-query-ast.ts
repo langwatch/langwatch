@@ -76,7 +76,11 @@ export function filterAST(ast: LiqeQuery, predicate: (node: LiqeQuery) => boolea
   if (ast.type === "UnaryOperator") {
     if (!predicate(ast.operand)) return EMPTY_AST;
     const inner = filterAST(ast.operand, predicate);
-    return isEmptyAST(inner) ? EMPTY_AST : ast;
+    // The filtered operand is what the node now negates. Returning `ast` kept
+    // the terms the predicate had just removed, so `NOT (status:error OR
+    // service:api)` still carried `status:error` after a caller took the
+    // status terms out.
+    return isEmptyAST(inner) ? EMPTY_AST : { ...ast, operand: inner };
   }
 
   if (ast.type === "LogicalExpression") return filterLogicalExpression(ast, predicate);

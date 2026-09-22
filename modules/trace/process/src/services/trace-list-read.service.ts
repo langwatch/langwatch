@@ -56,6 +56,13 @@ interface NewCountParams {
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
+interface TraceIdsParams {
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+  limit: number;
+}
+
 interface SuggestParams {
   tenantId: string;
   field: string;
@@ -267,6 +274,20 @@ export class TraceListService {
       timeRange: params.timeRange,
       since: params.since,
       filterWhere: params.filterWhere,
+    });
+  }
+
+  /**
+   * The trace ids a filter selects, newest first, capped. What an Instant
+   * Eval run started from the Explorer judges when its own dialect cannot
+   * compile the filter.
+   */
+  async getTraceIds(params: TraceIdsParams): Promise<string[]> {
+    return this.repository.findTraceIds({
+      tenantId: params.tenantId,
+      timeRange: params.timeRange,
+      ...(params.filterWhere ? { filterWhere: params.filterWhere } : {}),
+      limit: params.limit,
     });
   }
 

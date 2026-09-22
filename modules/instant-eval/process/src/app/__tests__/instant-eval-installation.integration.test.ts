@@ -25,6 +25,7 @@ import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalServer } from "../../instant-eval.server.ts";
@@ -139,6 +140,7 @@ function installation({
           getActivePlan: async () => planFor({ free: isFreePlan }),
         }),
         gateway: createApiFixture<GatewayApi>({}),
+        trace: createApiFixture<TraceApi>({}),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),

@@ -20,6 +20,7 @@ import type {
   TraceFullRecord,
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
+import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
@@ -350,7 +351,30 @@ export interface TraceApi extends TraceOtlpIngestApi {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
+    /** The Instant Eval runs registered for the query's `eval` chips. */
+    evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null;
+  /**
+   * The Explorer's own filter: the query compiled, the origins it hides left
+   * out. The facet counts compile without it, so origin keeps offering them.
+   */
+  compileExplorerTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): { sql: string; params: Record<string, unknown> };
+  /**
+   * The trace ids a filter selects, newest first and capped: the predicate the
+   * Explorer's table shows. What an Instant Eval run started from the Explorer
+   * judges when its own dialect cannot compile the filter.
+   */
+  findTraceIdsForFilter(input: {
+    projectId: string;
+    filter: string;
+    window: { from: number; to: number };
+    limit: number;
+  }): Promise<readonly string[]>;
   /** The query's positive bare-word terms, for a content (log-body) search. */
   extractTraceFreeTextTerms(query: string): string[];
   readFieldNames(input: {

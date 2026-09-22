@@ -6,9 +6,9 @@
 
 import type { LiqeQuery } from "liqe";
 
-import { walkAST } from "./trace-query-ast.ts";
+import { filterAST, walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
-import { parse } from "./trace-query-parser.ts";
+import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 /**
  * Rejects queries liqe parses but the server can't execute — e.g. `field:`
@@ -372,4 +372,57 @@ function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {
     ];
   }
   return [];
+}
+
+/**
+ * Whether a tag names the facet's field, or one of its dotted sub-fields
+ * (`evaluator.verdict` belongs to the `evaluator` facet, `event.attribute.x`
+ * to `event`).
+ */
+function tagBelongsToFacet(node: LiqeQuery, facetKey: string): boolean {
+  if (node.type !== "Tag") return false;
+  if (node.field.type === "ImplicitField") return false;
+  const name = node.field.name;
+  return name === facetKey || name.startsWith(`${facetKey}.`);
+}
+
+/**
+ * Whether the query has a term on the facet's field. Free-text terms and other
+ * fields do not count, so a facet the query never names keeps the whole query.
+ */
+export function queryNamesFacet({
+  queryText,
+  facetKey,
+}: {
+  queryText: string;
+  facetKey: string;
+}): boolean {
+  if (!queryText.trim()) return false;
+  let named = false;
+  try {
+    filterAST(parse(queryText), (node) => {
+      if (tagBelongsToFacet(node, facetKey)) named = true;
+      return true;
+    });
+  } catch {
+    return false;
+  }
+  return named;
+}
+
+/**
+ * The query with every term on the facet's own field removed, so the facet
+ * keeps counting its other values while the rest of the query applies. A
+ * query that only named this facet becomes empty.
+ */
+export function queryWithoutFacet({
+  queryText,
+  facetKey,
+}: {
+  queryText: string;
+  facetKey: string;
+}): string {
+  if (!queryText.trim()) return "";
+  const next = filterAST(parse(queryText), (node) => !tagBelongsToFacet(node, facetKey));
+  return isEmptyAST(next) ? "" : serialize(next);
 }

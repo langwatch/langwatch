@@ -2404,3 +2404,35 @@ Rule: Enter routes a sentence
     When the router runs
     Then that route is built without asking the classifier or the model
     And the answer says the caller decided it
+
+  Rule: A facet is counted under the query with its own field left out
+
+    @unit
+    Scenario: The facet's own terms are dropped and the rest kept
+      Given a query naming the status facet and another field
+      When the query is rewritten for the status facet's count
+      Then the status terms are gone and every other term is kept
+      And a field that merely shares the prefix is left alone
+      And a query that named only that facet becomes empty
+
+    @unit
+    Scenario: A facet term under a NOT is removed with the rest
+      Given a query negating a group that names the facet
+      When the query is rewritten for that facet's count
+      Then the negated group no longer carries the facet's term
+
+  Rule: The Explorer leaves Langy's own turns out unless the query names an origin
+
+    @unit
+    Scenario: The list leaves out Langy's turns by default
+      Given a query that does not name the origin field
+      When the Explorer's filter is compiled
+      Then the Langy origin is excluded after the query's own terms
+      And a trace with no origin still counts as the application's
+
+    @unit
+    Scenario: Naming an origin turns the default off
+      Given a query naming the origin field, negated or not
+      When the Explorer's filter is compiled
+      Then nothing is hidden, so picking Langy shows Langy's turns
+      And free text or an attribute holding the word does not count as naming it

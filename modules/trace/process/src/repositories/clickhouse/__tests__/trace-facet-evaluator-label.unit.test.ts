@@ -9,7 +9,11 @@ const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  traceQueryRepository.translateFilter(query, TENANT, TIME_RANGE);
+  traceQueryRepository.translateFilter({
+    queryText: query,
+    tenantId: TENANT,
+    timeRange: TIME_RANGE,
+  });
 
 /** evaluatorLabel is wired the same way as evaluatorVerdict: a categorical
  * facet on evaluation_runs, auto-derived into a partition-pruned subquery on

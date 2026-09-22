@@ -329,7 +329,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       projectId: input.projectId,
       userId: actor.id,
     });
-    const filterWhere = app.translateTraceFilter({
+    const filterWhere = app.compileExplorerTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -342,7 +342,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
         page: input.page,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: filterWhere ?? undefined,
+        filterWhere,
         visibilityCutoffMs: protections.visibilityCutoffMs,
       }),
     );
@@ -366,7 +366,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       projectId: input.projectId,
       userId: actor.id,
     });
-    const filterWhere = app.translateTraceFilter({
+    const filterWhere = app.compileExplorerTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -378,7 +378,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
         sort: input.sort,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: filterWhere ?? undefined,
+        filterWhere,
         contentTerms: contentSearchTermsForViewer({
           terms: app.extractTraceFreeTextTerms(input.query ?? ""),
           protections,
@@ -433,7 +433,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("newCount")
   .withPermission("traces:view")
   .handle(async ({ app, input }) => {
-    const filterWhere = app.translateTraceFilter({
+    const filterWhere = app.compileExplorerTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -442,7 +442,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       tenantId: input.projectId,
       timeRange: input.timeRange,
       since: input.since,
-      filterWhere: filterWhere ?? undefined,
+      filterWhere,
     });
 
     return { count };

@@ -1,11 +1,11 @@
 /**
- * Static markdown describing the trace query language, fed to the LLM that
- * powers AI mode. (The in-app docs drawer renders its own JSX from
- * `SEARCH_FIELDS` / `FIELD_VALUES`, so it doesn't consume this string.)
+ * Static markdown describing the trace query language, for two model readers:
+ * the Explorer's AI mode and the query reference. Documenting only the older
+ * attribute spellings left `span.attribute.` undiscoverable.
  */
 export const QUERY_SYNTAX_DOC = `# Trace query syntax
 
-A small Lucene-flavoured language for filtering traces. Every clause is a
+A small Lucene-flavored language for filtering traces. Every clause is a
 \`field:value\` pair joined by boolean operators. Free text without a field
 matches against trace input/output.
 
@@ -63,25 +63,30 @@ freeText  = literal | quoted
 
 ## Attributes
 
-Two open-ended namespaces let you query arbitrary OTel attributes without
-adding them to the static fields table:
+Three open-ended namespaces let you query arbitrary OTel attributes without
+adding them to the static fields table. One per place an attribute can live:
 
 | Form | Matches | Example |
 | --- | --- | --- |
-| \`attribute.<key>:value\` | trace-level attribute equality (\`Attributes[key]\`) | \`attribute.langwatch.user_id:alice\` |
-| \`event.<key>:value\` | per-event attribute across every span event in the trace | \`event.exception.type:TimeoutError\` |
+| \`trace.attribute.<key>:value\` | trace-level attribute equality (\`Attributes[key]\`) | \`trace.attribute.langwatch.user_id:alice\` |
+| \`span.attribute.<key>:value\` | per-span attribute across every span in the trace (\`SpanAttributes[key]\`) | \`span.attribute.gen_ai.request.model:gpt-5-mini\` |
+| \`event.attribute.<key>:value\` | per-event attribute across every span event in the trace | \`event.attribute.exception.type:TimeoutError\` |
 | \`event:<name>\` | bare event-name filter (no dot in the field) | \`event:tool_call\` |
-| \`has:attribute.<key>\` | trace has *any* value at \`Attributes[key]\` | \`has:attribute.gen_ai.conversation.id\` |
-| \`none:attribute.<key>\` | trace has no value at \`Attributes[key]\` | \`none:attribute.langwatch.user_id\` |
+| \`has:trace.attribute.<key>\` | trace has *any* value at \`Attributes[key]\` | \`has:trace.attribute.gen_ai.conversation.id\` |
+| \`none:trace.attribute.<key>\` | trace has no value at \`Attributes[key]\` | \`none:trace.attribute.langwatch.user_id\` |
+
+Write the namespaced prefixes above. Two older spellings are still accepted so
+saved views and older scripts keep working: \`attribute.<key>\` means
+\`trace.attribute.<key>\`, and \`event.<key>\` means \`event.attribute.<key>\`.
+There is no older spelling for the span namespace.
 
 The dot is the disambiguator — \`event:foo\` matches an event *name*, and
-\`event.foo:bar\` matches an event *attribute*. Same shape applies on the
-trace side via \`attribute.foo:bar\`.
+\`event.attribute.foo:bar\` matches an event *attribute*.
 
 ## Limitations & gotchas
 
 - Operators must be uppercase. \`status:error and model:gpt-4o\` is **invalid** — write \`AND\`.
 - A trailing colon with no value (\`status:\`) is a syntax error. Provide a value or remove the clause.
 - Mixing \`OR\` across different fields (\`status:error OR model:gpt-4o\`) works but bypasses the sidebar facets — prefer staying within one field per \`OR\` chain.
-- Attribute matching is exact equality only — wildcards (\`attribute.foo:*ar\`) and ranges (\`attribute.tokens:>10\`) aren't yet supported on the dynamic namespaces.
+- Attribute matching is exact equality only — wildcards (\`trace.attribute.foo:*ar\`) and ranges (\`trace.attribute.tokens:>10\`) aren't yet supported on the dynamic namespaces.
 `;

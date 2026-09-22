@@ -201,6 +201,17 @@ export interface TraceListRead {
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number>;
 
+  /**
+   * The trace ids matching the filter, newest first and capped. Deduped the
+   * IN-tuple way so a re-written trace is counted once.
+   */
+  findTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]>;
+
   findDistinctValues(params: {
     tenantId: string;
     column: string;

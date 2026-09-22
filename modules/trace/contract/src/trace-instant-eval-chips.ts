@@ -175,6 +175,17 @@ export function instantEvalRunKey({
   return fnv1a(scope);
 }
 
+/**
+ * One run a chip names, checked against the project and dated in epoch
+ * milliseconds, as the compiler binds it.
+ */
+export interface ResolvedInstantEvalRun extends InstantEvalRunReference {
+  /** When the run's judgements started being written. */
+  readonly writtenFrom: number;
+  /** When the last of them could have been written. */
+  readonly writtenUntil: number;
+}
+
 /** A chip and the run behind it, or `null` when none is registered. */
 export interface ResolvedInstantEvalChip extends InstantEvalChip {
   key: string;

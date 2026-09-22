@@ -1,6 +1,7 @@
 import type { TagToken } from "liqe";
 
 import type { DerivedTraceEvent } from "./trace-derived-event.ts";
+import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 
 export interface TraceQueryEvaluationRun {
@@ -18,6 +19,11 @@ export interface TranslationContext {
   params: Record<string, unknown>;
   tenantId: string;
   timeRange: { from: number; to: number };
+  /**
+   * The Instant Eval runs the caller registered for its `eval` chips, already
+   * checked against the project. Absent when the query carries no such chip.
+   */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
 }
 
 export type FieldHandler = (tag: TagToken, negated: boolean, context: TranslationContext) => string;

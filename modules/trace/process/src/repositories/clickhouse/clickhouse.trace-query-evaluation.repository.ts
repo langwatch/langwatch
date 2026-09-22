@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   type LiqeQuery,
   type LogicalExpressionToken,
+  MAX_FILTER_NODE_COUNT,
   type ParenthesizedExpressionToken,
   parseTraceQuerySyntax,
   type TagToken,
@@ -22,10 +23,7 @@ import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   ClickHouseTraceQueryValuesRepository,
 } from "./clickhouse.trace-query-values.repository.ts";
-import {
-  MAX_NODE_COUNT,
-  ClickHouseTraceQueryRepository,
-} from "./clickhouse.trace-query.repository.ts";
+import { ClickHouseTraceQueryRepository } from "./clickhouse.trace-query.repository.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
@@ -45,13 +43,14 @@ export class ClickhouseTraceQueryEvaluationRepository {
    */
   static matches(queryText: string, trace: InMemoryTrace): boolean {
     // Reuse the compiler as the validation gate — it enforces the exact
-    // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
+    // MAX_FILTER_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
     // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
     let compiled: { sql: string; params: Record<string, unknown> } | null;
     try {
-      compiled = traceQueryRepository.translateFilter(queryText, "__in_memory__", {
-        from: 0,
-        to: 0,
+      compiled = traceQueryRepository.translateFilter({
+        queryText,
+        tenantId: "__in_memory__",
+        timeRange: { from: 0, to: 0 },
       });
     } catch {
       return false;
@@ -113,7 +112,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
     state: WalkState,
   ): boolean | Unsupported {
     state.nodeCount++;
-    if (state.nodeCount > MAX_NODE_COUNT) {
+    if (state.nodeCount > MAX_FILTER_NODE_COUNT) {
       return UNSUPPORTED;
     }
 
