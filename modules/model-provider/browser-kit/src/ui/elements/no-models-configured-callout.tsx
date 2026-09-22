@@ -8,7 +8,7 @@ import { ArrowUpRight } from "lucide-react";
 
 import { modelProviderIcons } from "../../provider-icons.ts";
 
-interface Props {
+export interface NoModelsConfiguredCalloutProps {
   size?: "sm" | "md" | "full";
   /** Caller-provided label so the message says "for AI search" when
    *  that's the surface, "for evaluators" when it isn't, etc. */
@@ -22,7 +22,10 @@ const STACKED_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
 
 const SETTINGS_HREF = "/settings/model-providers";
 
-export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Props) {
+export function NoModelsConfiguredCallout({
+  size = "md",
+  forFeatureLabel,
+}: NoModelsConfiguredCalloutProps) {
   const featureSuffix = forFeatureLabel ? ` for ${forFeatureLabel}` : "";
 
   // Whole-row click navigates to settings in a new tab. The inner button

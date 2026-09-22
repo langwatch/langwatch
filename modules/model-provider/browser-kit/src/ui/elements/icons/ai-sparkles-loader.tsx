@@ -1,6 +1,6 @@
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 
-interface AISparklesLoaderProps {
+export interface AISparklesLoaderProps {
   className?: string;
   size?: number;
   color?: string;
