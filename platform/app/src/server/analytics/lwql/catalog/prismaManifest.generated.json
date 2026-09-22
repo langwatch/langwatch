@@ -4046,6 +4046,70 @@
 					"documentation": ""
 				},
 				{
+					"name": "selfHostedCustomer",
+					"columnName": "selfHostedCustomer",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "A customer that runs LangWatch self-hosted. The hosted usage, budgets and\ninvoices of its connected installs attach to this organization (ADR-139)."
+				},
+				{
+					"name": "connectServicesDisabled",
+					"columnName": "connectServicesDisabled",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "LangWatch-hosted services this organization has switched OFF, named the\nway its license names them (\"instant_evals\"). A service the license is\nentitled to is on unless it is listed here, so a customer who bought\nhosted judging gets it without finding a settings page first, and an\nadministrator who switched one off keeps it off across license changes\n(ADR-139, section 2). A license that names no service reaches nothing,\nwhatever this column holds."
+				},
+				{
+					"name": "connectLastSyncAt",
+					"columnName": "connectLastSyncAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When the last license sync succeeded."
+				},
+				{
+					"name": "connectLastSyncError",
+					"columnName": "connectLastSyncError",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The code of the failure the last sync ended on, cleared on the next\nsuccess. Settings, Connect renders the copy for it."
+				},
+				{
+					"name": "issuedLicenses",
+					"columnName": "issuedLicenses",
+					"type": "IssuedLicense",
+					"kind": "relation",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "IssuedLicense"
+					}
+				},
+				{
+					"name": "connectedBilling",
+					"columnName": "connectedBilling",
+					"type": "ConnectedBillingAccount",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "ConnectedBillingAccount"
+					}
+				},
+				{
 					"name": "gatewayChangeEvents",
 					"columnName": "gatewayChangeEvents",
 					"type": "GatewayChangeEvent",
@@ -4184,6 +4248,911 @@
 						"references": [],
 						"to": "GithubBranchPullRequestCheck"
 					}
+				}
+			]
+		},
+		{
+			"name": "IssuedLicense",
+			"tableName": "IssuedLicense",
+			"documentation": "The registry of licenses LangWatch has issued (ADR-139). It lives on\nLangWatch Cloud; a self-hosted install has the table and no rows.\n\nThe row never holds the token an install presents. `tokenHash` is the\nSHA-256 of that token, so read access to this table is not credential\naccess. Status is derived: revoked, superseded, past `expiresAt`, else active.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "licenseId",
+					"columnName": "licenseId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `licenseId` inside the signed license (`lic-<uuid>`)."
+				},
+				{
+					"name": "tokenHash",
+					"columnName": "tokenHash",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "SHA-256 of the `lwl_` token. Looked up on every credential resolution."
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The customer organization on LangWatch Cloud. Null for a license that is\nrecorded but not linked to a customer yet, such as a self-serve purchase:\nit resolves to nothing until an operator links it."
+				},
+				{
+					"name": "organization",
+					"columnName": "organization",
+					"type": "Organization",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "",
+					"relation": {
+						"fields": ["organizationId"],
+						"references": ["id"],
+						"to": "Organization"
+					}
+				},
+				{
+					"name": "organizationName",
+					"columnName": "organizationName",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "As signed into the license."
+				},
+				{
+					"name": "email",
+					"columnName": "email",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "planType",
+					"columnName": "planType",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "maxMembers",
+					"columnName": "maxMembers",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "maxMembersLite",
+					"columnName": "maxMembersLite",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "issuedAt",
+					"columnName": "issuedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "expiresAt",
+					"columnName": "expiresAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "source",
+					"columnName": "source",
+					"type": "IssuedLicenseSource",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "issuedById",
+					"columnName": "issuedById",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The operator who issued or registered it. Null for the purchase flow and the script."
+				},
+				{
+					"name": "revokedAt",
+					"columnName": "revokedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "revokedById",
+					"columnName": "revokedById",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "revokedReason",
+					"columnName": "revokedReason",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "supersededAt",
+					"columnName": "supersededAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Set when the install first presents the license that replaced this one."
+				},
+				{
+					"name": "replacesId",
+					"columnName": "replacesId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The id of the IssuedLicense this one replaces, when it was reissued. A\nplain column ref (relationMode=\"prisma\" cannot declare a self-relation on\nPostgres); the registry service validates it. Unique, so a license is\nreplaced by one license at most."
+				},
+				{
+					"name": "pendingDeliveryLicense",
+					"columnName": "pendingDeliveryLicense",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "A reissued license waiting to be delivered over sync, encrypted. Erased\nwhen the install first presents it. The only license text the registry holds."
+				},
+				{
+					"name": "services",
+					"columnName": "services",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "Hosted services this license may call, such as `instant_evals`."
+				},
+				{
+					"name": "seatRateCents",
+					"columnName": "seatRateCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The annual rate of one seat, in cents of `seatCurrency`. Needed to prorate added seats."
+				},
+				{
+					"name": "seatCurrency",
+					"columnName": "seatCurrency",
+					"type": "Currency",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "commitUsdCents",
+					"columnName": "commitUsdCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The prepaid usage commit for the term, in USD cents."
+				},
+				{
+					"name": "overageEnabled",
+					"columnName": "overageEnabled",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Whether usage may continue past the commit, up to `overageMaxUsdCents`."
+				},
+				{
+					"name": "overageMaxUsdCents",
+					"columnName": "overageMaxUsdCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "instanceId",
+					"columnName": "instanceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The install this license is bound to. Set on first use, cleared by an operator."
+				},
+				{
+					"name": "instanceBoundAt",
+					"columnName": "instanceBoundAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "lastSyncAt",
+					"columnName": "lastSyncAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The last license sync this install reported: when it arrived, the\nLangWatch version that sent it, and the seats in use at that moment.\nNull until the install syncs for the first time."
+				},
+				{
+					"name": "lastSyncVersion",
+					"columnName": "lastSyncVersion",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "reportedMembers",
+					"columnName": "reportedMembers",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "reportedMembersLite",
+					"columnName": "reportedMembersLite",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "virtualKeyId",
+					"columnName": "virtualKeyId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The managed gateway key (purpose CONNECT) that hosted-service traffic of\nthis license runs under. One per license, so spend rows name the install.\nCreated when the license first resolves. A plain column, not a relation."
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ActivationCode",
+			"tableName": "ActivationCode",
+			"documentation": "A short code a fresh install pastes instead of a license blob (ADR-139,\nsection 5). Redeeming it mints the license the code describes and returns\nit signed, which is what identifies a new customer without anybody emailing\na license key around.\n\nThe row holds a hash of the code, never the code. Every lookup hashes what\nthe caller presented first, so the stored value is a step away from anything\nthat could be presented: read access to this table is not credential access.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "codeHash",
+					"columnName": "codeHash",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "SHA-256 of the normalised code. Looked up on every redemption."
+				},
+				{
+					"name": "codeHint",
+					"columnName": "codeHint",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The last four characters, so an operator tells two codes apart in a list\nwithout the list holding either one."
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The customer this code belongs to, and the terms it mints."
+				},
+				{
+					"name": "organizationName",
+					"columnName": "organizationName",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "email",
+					"columnName": "email",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "planType",
+					"columnName": "planType",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "maxMembers",
+					"columnName": "maxMembers",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "maxMembersLite",
+					"columnName": "maxMembersLite",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "licenseTermDays",
+					"columnName": "licenseTermDays",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How long the license this code mints runs for."
+				},
+				{
+					"name": "services",
+					"columnName": "services",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "Hosted services the minted license may call."
+				},
+				{
+					"name": "expiresAt",
+					"columnName": "expiresAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "When the code stops working, which is not the term of what it mints."
+				},
+				{
+					"name": "reusable",
+					"columnName": "reusable",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "A code a customer may redeem on more than one install, for a rollout."
+				},
+				{
+					"name": "redeemedAt",
+					"columnName": "redeemedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Set by the redemption that won, which is what makes a single-use code\nsingle use: the write itself carries the condition."
+				},
+				{
+					"name": "redeemedByInstanceId",
+					"columnName": "redeemedByInstanceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "issuedLicenseId",
+					"columnName": "issuedLicenseId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The license the winning redemption minted."
+				},
+				{
+					"name": "redemptionCount",
+					"columnName": "redemptionCount",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How many installs have redeemed it, which only moves on a reusable code."
+				},
+				{
+					"name": "revokedAt",
+					"columnName": "revokedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "revokedById",
+					"columnName": "revokedById",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "createdById",
+					"columnName": "createdById",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ConnectedBillingAccount",
+			"tableName": "ConnectedBillingAccount",
+			"documentation": "How a connected customer is invoiced (ADR-139, section 7): one payment\nprovider customer, one quarterly usage subscription in USD, and the\ncommercial terms the annual invoice was raised from.\n\nOne row per organization. Every write through it is addressed by a stored\nprovider id, so running onboarding or a renewal twice changes nothing.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organization",
+					"columnName": "organization",
+					"type": "Organization",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": ["organizationId"],
+						"references": ["id"],
+						"to": "Organization"
+					}
+				},
+				{
+					"name": "stripeCustomerId",
+					"columnName": "stripeCustomerId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The customer at the payment provider. Invoiced, never charged."
+				},
+				{
+					"name": "usageSubscriptionId",
+					"columnName": "usageSubscriptionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The one metered subscription, and the item hosted usage is reported on.\nNull between the customer being created and the subscription existing,\nwhich is where a half-finished onboarding resumes from."
+				},
+				{
+					"name": "usageSubscriptionItemId",
+					"columnName": "usageSubscriptionItemId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "termStartsAt",
+					"columnName": "termStartsAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "termEndsAt",
+					"columnName": "termEndsAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "commitUsdCents",
+					"columnName": "commitUsdCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Prepaid usage for the term, in USD cents. The credit grants add up to it."
+				},
+				{
+					"name": "seatCurrency",
+					"columnName": "seatCurrency",
+					"type": "Currency",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The seat contract, which may be in another currency than hosted usage."
+				},
+				{
+					"name": "seatRateCents",
+					"columnName": "seatRateCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "seats",
+					"columnName": "seats",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "bankTransferType",
+					"columnName": "bankTransferType",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "`us_bank_transfer` or `eu_bank_transfer` when the customer pays into a\nvirtual bank account at the provider. Null when it wires to LangWatch's\nown account and finance marks the invoice paid."
+				},
+				{
+					"name": "bankTransferCountry",
+					"columnName": "bankTransferCountry",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "billingEmail",
+					"columnName": "billingEmail",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "pendingRenewal",
+					"columnName": "pendingRenewal",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "A renewal whose credit is waiting for the last usage invoice of the old\nterm to be finalized: the new term's end and commit, and who asked."
+				},
+				{
+					"name": "createdById",
+					"columnName": "createdById",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ConnectedCreditGrant",
+			"tableName": "ConnectedCreditGrant",
+			"documentation": "A paid credit at the payment provider, which only metered usage draws down.\nKept here so a grant is created once per reason and the backoffice can show\nwhat the customer holds without asking the provider.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "accountId",
+					"columnName": "accountId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `ConnectedBillingAccount` row. A plain column ref, like\n`IssuedLicense.replacesId`: relationMode=\"prisma\" carries no foreign keys."
+				},
+				{
+					"name": "stripeCreditGrantId",
+					"columnName": "stripeCreditGrantId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The grant at the payment provider. Unique, so a retry records one row."
+				},
+				{
+					"name": "amountUsdCents",
+					"columnName": "amountUsdCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "kind",
+					"columnName": "kind",
+					"type": "ConnectedCreditGrantKind",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "termEndsAt",
+					"columnName": "termEndsAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The term this credit was granted for, and when the provider lets it lapse:\nafter the last invoice of that term has been finalized, never on the day\nthe term ends."
+				},
+				{
+					"name": "expiresAt",
+					"columnName": "expiresAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ConnectedInvoice",
+			"tableName": "ConnectedInvoice",
+			"documentation": "An invoice LangWatch raised for a connected customer, as the backoffice\nreads it.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "accountId",
+					"columnName": "accountId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `ConnectedBillingAccount` row, as a plain column ref."
+				},
+				{
+					"name": "stripeInvoiceId",
+					"columnName": "stripeInvoiceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "kind",
+					"columnName": "kind",
+					"type": "ConnectedInvoiceKind",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "currency",
+					"columnName": "currency",
+					"type": "Currency",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "amountCents",
+					"columnName": "amountCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "status",
+					"columnName": "status",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The provider's own status: `draft`, `open`, `paid`, `void` or `uncollectible`."
+				},
+				{
+					"name": "paidOutOfBandAt",
+					"columnName": "paidOutOfBandAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "termStartsAt",
+					"columnName": "termStartsAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
 				}
 			]
 		},
@@ -20648,6 +21617,532 @@
 					"documentation": ""
 				}
 			]
+		},
+		{
+			"name": "ConnectedSeatChange",
+			"tableName": "ConnectedSeatChange",
+			"documentation": "What a mid-term seat change of one connected license owes (ADR-141,\nsection 7): the seats added on the reissued license, invoiced prorated to\nthe end of the term.\n\nThe row is written before the payment provider is called and completed\nafter it, so a call that failed halfway is retried by the daily billing\ntick without inventing a second invoice. One row per reissued license.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "licenseId",
+					"columnName": "licenseId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The reissued `IssuedLicense` row that carries the new seat count. A\nplain column ref, like `replacesId`: relationMode=\"prisma\" carries no\nforeign keys."
+				},
+				{
+					"name": "accountId",
+					"columnName": "accountId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `ConnectedBillingAccount` row the invoice is raised against."
+				},
+				{
+					"name": "changedAt",
+					"columnName": "changedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "When the seats changed, which is the day the proration counts from."
+				},
+				{
+					"name": "addedSeats",
+					"columnName": "addedSeats",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Seats on the new license above the seats on the one it replaced."
+				},
+				{
+					"name": "unitAmountCents",
+					"columnName": "unitAmountCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "What one added seat costs for the rest of the term, in cents of `currency`."
+				},
+				{
+					"name": "amountCents",
+					"columnName": "amountCents",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "`unitAmountCents` times `addedSeats`. Zero when nothing is owed."
+				},
+				{
+					"name": "currency",
+					"columnName": "currency",
+					"type": "Currency",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "stripeInvoiceId",
+					"columnName": "stripeInvoiceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The one-off invoice the added seats were billed on."
+				},
+				{
+					"name": "state",
+					"columnName": "state",
+					"type": "ConnectedSeatChangeState",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ConnectedStatement",
+			"tableName": "ConnectedStatement",
+			"documentation": "The monthly usage statement one connected customer was sent (ADR-139,\nsection 7). One row per account per month keeps the statement to one send,\nwhatever runs the tick.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "accountId",
+					"columnName": "accountId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `ConnectedBillingAccount` row. A plain column ref."
+				},
+				{
+					"name": "month",
+					"columnName": "month",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "First day of the month the statement covers, in UTC."
+				},
+				{
+					"name": "sentAt",
+					"columnName": "sentAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "InstanceIdentity",
+			"tableName": "InstanceIdentity",
+			"documentation": "The identity this install presents to LangWatch (ADR-139, section 2).\n\nExactly one row, minted on first use and never rewritten. It survives\nrestarts, backups and hostname changes, and an install restored into\nanother database mints another one, which is what the registry refuses as\nthe wrong instance.\n\nIt replaced an identity built from the organization name and id, which\nleaked the customer's name in cleartext, named one organization rather than\none install, and could not be joined to a license row without splitting a\nstring.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Fixed, so this table holds one row. A second insert loses the race on the\nprimary key and re-reads the winner's id."
+				},
+				{
+					"name": "instanceId",
+					"columnName": "instanceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "A random UUID. Carries nothing about the customer."
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "lastReportAt",
+					"columnName": "lastReportAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When the usage report last reached LangWatch, and why the last attempt\ndid not. Both are what the checkup page reads to say whether reporting\nworks, which nothing recorded before: the sender logged success as soon\nas `fetch` resolved and never looked at the response."
+				},
+				{
+					"name": "lastReportError",
+					"columnName": "lastReportError",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "optionalMetricsOptOut",
+					"columnName": "optionalMetricsOptOut",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The optional category of the usage report, switched off from the checkup\npage. With it off the report still says which release runs and how many\nprojects the install carries, and says nothing about what anyone does\nwith it (ADR-139, section 10)."
+				},
+				{
+					"name": "hostnameOptOut",
+					"columnName": "hostnameOptOut",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Hostname, which names the customer's own network and so has a switch of\nits own rather than travelling with its category."
+				},
+				{
+					"name": "startupNoticeAcknowledgedSchemaVersion",
+					"columnName": "startupNoticeAcknowledgedSchemaVersion",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The report schema version an administrator last dismissed the startup\nnotice for. Zero on a fresh install, so the notice shows once when the\ninstall starts reporting and again whenever the dictionary changes shape."
+				}
+			]
+		},
+		{
+			"name": "SelfHostedInstance",
+			"tableName": "SelfHostedInstance",
+			"documentation": "One self-hosted install, as its daily usage report describes it (ADR-139,\nsection 10). The row is created by the first report that names an instance\nid and is updated by every report after that, so the backoffice reads one\nrow per install rather than folding a history on every page load.\n\nThe report carries no credential, so it identifies an install and never a\ncustomer. `organizationId` and `issuedLicenseId` are resolved from the\nlicense bound to this instance, which the install proved by presenting its\ntoken to license sync. A field in the posted body never reaches them.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "instanceId",
+					"columnName": "instanceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The UUID the install minted for itself. The join key for everything else."
+				},
+				{
+					"name": "firstSeenAt",
+					"columnName": "firstSeenAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "lastSeenAt",
+					"columnName": "lastSeenAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "version",
+					"columnName": "version",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "What the install says about itself."
+				},
+				{
+					"name": "installMethod",
+					"columnName": "installMethod",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "chartVersion",
+					"columnName": "chartVersion",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "hostname",
+					"columnName": "hostname",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The host it answers on, when the operator left hostname reporting on."
+				},
+				{
+					"name": "environment",
+					"columnName": "environment",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "installedAt",
+					"columnName": "installedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The day the install itself says it first came up, which predates the\nfirst report on an install that switched reporting on later."
+				},
+				{
+					"name": "reportSchemaVersion",
+					"columnName": "reportSchemaVersion",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The customer, and the license that named them. Plain column refs rather\nthan relations, like `IssuedLicense.replacesId`: relationMode=\"prisma\"\ncarries no foreign keys, and the receiver resolves both from the license\nregistry rather than from the report."
+				},
+				{
+					"name": "issuedLicenseId",
+					"columnName": "issuedLicenseId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "userEmailDomains",
+					"columnName": "userEmailDomains",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Domains with counts, as `{\"acme.test\": 14}`. Never an address. Null on an\ninstall that switched the optional category off."
+				},
+				{
+					"name": "userDomains",
+					"columnName": "userDomains",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "The same domains as the keys of `userEmailDomains`, flattened so an\noperator can search for one. A JSON object's keys are the domains\nthemselves, and no query language addresses a key it does not already\nknow the name of."
+				},
+				{
+					"name": "latestReport",
+					"columnName": "latestReport",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "What the last report carried, so the list and the drawer read one row:\nthe onboarding ladder, the usage counts and the operational block, under\nthe same keys the dictionary declares."
+				},
+				{
+					"name": "optionalMetricsReported",
+					"columnName": "optionalMetricsReported",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "What the last report said the operator had switched off, read from which\ncategories arrived rather than from a field the install could assert."
+				},
+				{
+					"name": "hostnameReported",
+					"columnName": "hostnameReported",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "reportCount",
+					"columnName": "reportCount",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How many reports have landed, and how many fields the last one carried\nthat this release has no name for. A count above zero says the senders\nare ahead of the receiver."
+				},
+				{
+					"name": "lastUnknownFields",
+					"columnName": "lastUnknownFields",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "raisedSignals",
+					"columnName": "raisedSignals",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "The lead signals already raised for this install. A signal on this list\nis never raised again, which is what keeps a large install from\nreporting that it is large every morning."
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SelfHostedInstanceReport",
+			"tableName": "SelfHostedInstanceReport",
+			"documentation": "One usage report, exactly as it arrived. Kept so a number on an install's\nrow can be traced back to the report that set it, and so a question asked\nlater can be answered over the history rather than over the latest snapshot.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "instanceId",
+					"columnName": "instanceId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The `SelfHostedInstance.instanceId` this report came from. A plain column\nref for the same reason the instance row's refs are."
+				},
+				{
+					"name": "receivedAt",
+					"columnName": "receivedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "version",
+					"columnName": "version",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "reportSchemaVersion",
+					"columnName": "reportSchemaVersion",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "unknownFields",
+					"columnName": "unknownFields",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Fields this release had no name for. Counted, never stored by name."
+				},
+				{
+					"name": "payload",
+					"columnName": "payload",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The validated report, with every unknown field already dropped."
+				}
+			]
 		}
 	],
 	"enums": [
@@ -20688,6 +22183,18 @@
 		{
 			"name": "OrganizationUserRole",
 			"values": ["ADMIN", "MEMBER", "EXTERNAL"]
+		},
+		{
+			"name": "IssuedLicenseSource",
+			"values": ["BACKOFFICE", "PURCHASE", "SCRIPT", "LEGACY_IMPORT"]
+		},
+		{
+			"name": "ConnectedCreditGrantKind",
+			"values": ["commit", "added", "renewal"]
+		},
+		{
+			"name": "ConnectedInvoiceKind",
+			"values": ["annual", "seat_change", "usage"]
 		},
 		{
 			"name": "PlanTypes",
@@ -20837,7 +22344,7 @@
 		},
 		{
 			"name": "VirtualKeyPurpose",
-			"values": ["USER", "LANGY"]
+			"values": ["USER", "LANGY", "CONNECT"]
 		},
 		{
 			"name": "GatewayProviderRotationPolicy",
@@ -20931,6 +22438,10 @@
 		{
 			"name": "GatewayRealtimeSessionStatus",
 			"values": ["OPEN", "CLOSED", "FAILED", "EXPIRED"]
+		},
+		{
+			"name": "ConnectedSeatChangeState",
+			"values": ["intent", "invoiced", "nothing_to_invoice"]
 		}
 	]
 }

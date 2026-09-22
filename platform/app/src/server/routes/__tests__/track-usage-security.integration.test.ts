@@ -40,6 +40,13 @@ vi.mock("~/server/posthog", () => ({
   getPostHogInstance: () => ({ capture }),
 }));
 
+// The registry of self-hosted installs, stood in for so this file can say what
+// the route hands it without reaching a database.
+const recordReport = vi.fn();
+vi.mock("@ee/telemetry/instances/composition", () => ({
+  createSelfHostedInstanceService: () => ({ recordReport }),
+}));
+
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { app } from "../misc";
 
@@ -86,6 +93,7 @@ function request({ body, ip = "203.0.113.5" }: { body: unknown; ip?: string }) {
 
 describe("POST /api/track_usage", () => {
   describe("when the event is the allowlisted daily_usage_stats report", () => {
+    /** @scenario An install on an older version still reaches the old statistics route */
     it("accepts it and forwards exactly the known fields to PostHog", async () => {
       const res = await request({
         body: dailyUsageStatsBody({ totalTraces: 42 }),
@@ -95,8 +103,51 @@ describe("POST /api/track_usage", () => {
       expect(capture).toHaveBeenCalledWith({
         distinctId: "acme__org_1",
         event: "daily_usage_stats",
-        properties: { ...VALID_STATS_FIELDS, totalTraces: 42 },
+        properties: {
+          ...VALID_STATS_FIELDS,
+          totalTraces: 42,
+          unknown_fields: 0,
+        },
       });
+    });
+  });
+
+  describe("when the report is accepted", () => {
+    /** @scenario "The first report from an install creates its row" */
+    it("hands the registry the validated report and the instance it came from", async () => {
+      const res = await request({
+        body: dailyUsageStatsBody({
+          totalTraces: 42,
+          injected_marker: "attacker-controlled",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(recordReport).toHaveBeenCalledTimes(1);
+      const stored = recordReport.mock.calls[0]?.[0] as {
+        instanceId: string;
+        properties: Record<string, unknown>;
+        unknownFields: number;
+      };
+      expect(stored.instanceId).toBe("acme__org_1");
+      expect(stored.properties.totalTraces).toBe(42);
+      expect(stored.properties.injected_marker).toBeUndefined();
+      expect(stored.unknownFields).toBe(1);
+    });
+  });
+
+  describe("when the database refuses the write", () => {
+    /** @scenario "Storage failing never refuses the report" */
+    it("answers the install as though the report had landed", async () => {
+      // Refusing here would take the install with it: a 500 on a day of
+      // storage trouble turns into a gap in every install's history, and the
+      // report is the only thing that tells us an install exists.
+      recordReport.mockRejectedValueOnce(new Error("connection refused"));
+
+      const res = await request({ body: dailyUsageStatsBody() });
+
+      expect(res.status).toBe(200);
+      expect(capture).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -121,24 +172,34 @@ describe("POST /api/track_usage", () => {
   });
 
   describe("when the body carries a property outside the known schema", () => {
-    it("rejects with 400 rather than forwarding the extra field", async () => {
+    /** @scenario "The receiver accepts a report carrying a field it has never heard of" */
+    it("accepts the report and drops the extra field before recording it", async () => {
+      // A newer install naming a metric this release has never heard of is
+      // the ordinary case, not an attack: refusing it would take that
+      // install's telemetry with it, permanently. Dropping the field keeps
+      // the security property, because nothing outside the known set is ever
+      // recorded, and the count says the senders are ahead of this receiver.
       const res = await request({
         body: dailyUsageStatsBody({ injected_marker: "attacker-controlled" }),
       });
 
-      expect(res.status).toBe(400);
-      expect(capture).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(capture).toHaveBeenCalledTimes(1);
+      const properties = capture.mock.calls[0]?.[0]?.properties as Record<
+        string,
+        unknown
+      >;
+      expect(properties.injected_marker).toBeUndefined();
+      expect(properties.unknown_fields).toBe(1);
     });
   });
 
   describe("when an older self-hosted sender omits stat fields this receiver added later", () => {
+    /** @scenario "The receiver accepts a report missing fields it expects" */
     it("accepts the partial report rather than 400ing every field-set drift", async () => {
-      // usageStatsWorker.ts is a stable receiver contract — self-hosted
-      // instances at any historical version hit it, so a shape older than
-      // today's collectUsageStats.ts (e.g. before totalScenarioEvents was
-      // added) must still be accepted. The worker never checks the response
-      // status, so a 400 here would silently and permanently drop that
-      // instance's telemetry with no operator-visible symptom.
+      // This is a stable receiver contract: self-hosted instances at any
+      // version hit it, so a shape older than today's collectUsageStats.ts,
+      // from before totalScenarioEvents was added, must still be accepted.
       const res = await request({
         body: {
           event: "daily_usage_stats",
@@ -151,7 +212,7 @@ describe("POST /api/track_usage", () => {
       expect(capture).toHaveBeenCalledWith({
         distinctId: "legacy-sender__org_1",
         event: "daily_usage_stats",
-        properties: { totalTraces: 1 },
+        properties: { totalTraces: 1, unknown_fields: 0 },
       });
     });
   });

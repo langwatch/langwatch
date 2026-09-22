@@ -20,6 +20,11 @@ interface GenerateLicenseKeyParams {
   maxMessagesPerMonth?: number;
   /** Defaults to one year from `now`. */
   expiresAt?: Date;
+  /**
+   * The LangWatch-hosted services this license may call. Left off or empty,
+   * the minted license carries no entitlement and the install calls nothing.
+   */
+  connectServices?: readonly string[];
   /** Override current time for deterministic testing */
   now?: Date;
 }
@@ -43,6 +48,7 @@ export function generateLicenseKey({
   maxMembersLite,
   maxMessagesPerMonth,
   expiresAt: requestedExpiresAt,
+  connectServices,
   privateKey,
   now = new Date(),
 }: GenerateLicenseKeyParams): GenerateLicenseKeyResult {
@@ -85,6 +91,11 @@ export function generateLicenseKey({
     usageUnit: template.usageUnit,
   });
 
+  // The key is written only where the license names a service, so a license
+  // minted without one signs the same bytes it signed before this field
+  // existed.
+  const services = [...new Set(connectServices ?? [])].sort();
+
   const licenseData: LicenseData = {
     licenseId: generateLicenseId(),
     version: 1,
@@ -93,6 +104,7 @@ export function generateLicenseKey({
     issuedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     plan,
+    ...(services.length > 0 ? { connectServices: services } : {}),
   };
 
   const signedLicense = signLicense(licenseData, privateKey);

@@ -241,13 +241,6 @@ async function routeSearch({
       isInstantEvalAvailable,
     },
   };
-  if (input.forceKind) {
-    return applyClassified({
-      context,
-      classified: input.forceKind,
-      decidedBy: "caller",
-    });
-  }
   const classified = await classify(context);
   if (classified) {
     return applyClassified({ context, classified, decidedBy: "classifier" });

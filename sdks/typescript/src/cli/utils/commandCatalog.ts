@@ -84,6 +84,10 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "instrument",
   // Local status + documentation fetchers.
   "status",
+  // The checkup of a self-hosted install: prints the install's own verdicts
+  // and its usage report, no platform resource to card. Excluded app-side too
+  // (capabilityCatalog.coverage.unit.test.ts).
+  "doctor",
   "docs",
   "scenario-docs",
   // Gateway tool wrappers: exec another AI tool rather than returning a

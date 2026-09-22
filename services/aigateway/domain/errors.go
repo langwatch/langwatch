@@ -146,6 +146,34 @@ const (
 	// new one".
 	ErrKeyExpired   = herr.Code("virtual_key_expired")
 	ErrAuthUpstream = herr.Code("auth_upstream_unavailable")
+	// ErrConnectInstanceRequired means a license token arrived without the
+	// X-LangWatch-Instance header. A license is bound to one install, so the
+	// token alone identifies nothing.
+	ErrConnectInstanceRequired = herr.Code("connect_instance_required")
+	// ErrConnectLicenseNotRegistered means the license behind the token is not
+	// in the registry, or is recorded there without a customer. The install's
+	// operator has to contact LangWatch; retrying changes nothing.
+	ErrConnectLicenseNotRegistered = herr.Code("connect_license_not_registered")
+	// ErrConnectLicenseRevoked means the license was revoked or replaced. The
+	// install keeps working offline on the license it holds, but hosted
+	// services are closed to it for good.
+	ErrConnectLicenseRevoked = herr.Code("connect_license_revoked")
+	// ErrConnectLicenseExpired means the license term ended. A renewed license
+	// opens hosted services again.
+	ErrConnectLicenseExpired = herr.Code("connect_license_expired")
+	// ErrConnectWrongInstance means the license is bound to another install.
+	// Either the token leaked, or the install was rebuilt and an operator has
+	// to reset the binding.
+	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrConnectServiceNotEntitled means the license authenticated but does
+	// not include the hosted service the call needs. Distinct from every
+	// refusal above: the license is live and its other services keep working,
+	// so the fix is a change to the contract rather than to the install.
+	ErrConnectServiceNotEntitled = herr.Code("connect_service_not_entitled")
+	// ErrHostedServiceUnavailable means the gateway could not get an answer
+	// from the control plane for a hosted-service call. Nothing was judged and
+	// nothing was charged, so the caller can retry.
+	ErrHostedServiceUnavailable = herr.Code("hosted_service_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
 	// Without this guard the dispatcher would hand Bifrost a zero-value

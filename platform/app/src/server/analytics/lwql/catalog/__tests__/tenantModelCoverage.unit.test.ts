@@ -29,7 +29,7 @@ import { LWQL_PRISMA_MANIFEST } from "../prismaManifest";
 import type { PrismaField, PrismaManifest } from "../prismaSchema";
 
 const INCLUDED_MODEL_COUNT = 87;
-const UNLISTED_MODEL_COUNT = 56;
+const UNLISTED_MODEL_COUNT = 66;
 
 /**
  * Organization/admin-tier models the application reads only behind a distinct
@@ -44,6 +44,10 @@ const PERMISSION_GATED_MODELS = [
   "Invoice",
   "InvoiceItem",
   "BillingMeterCheckpoint",
+  "IssuedLicense",
+  "ActivationCode",
+  "ConnectedBillingAccount",
+  "SelfHostedInstance",
 ] as const;
 
 /**

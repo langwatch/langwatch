@@ -60161,7 +60161,7 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
+| `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
 | `METRICS_API_KEY` | API key for metrics collection | - |
 
 ## Langy (optional)
@@ -61094,6 +61094,279 @@ LangWatch can send notifications to Slack channels via webhooks for alerts and a
 Used for dataset storage and ClickHouse cold storage/backups. See:
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and backup configuration
 - [Environment Variables](/self-hosting/configuration/environment-variables#object-storage-s3) for S3 configuration reference
+
+---
+
+# FILE: ./self-hosting/connect.mdx
+
+---
+title: "Connect: hosted services for a self-hosted install"
+description: "Let a licensed install call LangWatch-hosted services over two outbound hosts, metered against your contract and capped from Settings"
+sidebarTitle: Connect
+keywords: connect, hosted services, self-hosted, license sync, activation code, seats, instant evals judge, managed models, metered usage
+---
+
+Connect lets a licensed self-hosted install call two LangWatch-hosted services, the Instant Evals judge and managed models, over outbound connections to two hosts. Everything else keeps running on your own infrastructure.
+
+Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches no hosted service at all, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
+
+A service your license names is on. An organization admin switches off the ones they do not want in **Settings, Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+
+<Info>
+**Also check:** [Editions and licensing](/self-hosting/licensing), [Data and telemetry](/self-hosting/data-and-telemetry), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## The two hosts
+
+Connect talks to two hosts, split by what the data is, so a network rule can allow one without the other and prove from the firewall that no content leaves.
+
+| Host | What travels | Who sends it |
+|---|---|---|
+| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
+
+The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
+
+## What leaves the install
+
+Each service states what it sends before you switch it on. Your traces, datasets, saved prompts and your own model provider keys stay on your infrastructure whichever services are on.
+
+| What is on | What this install sends to LangWatch |
+|---|---|
+| Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
+| Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
+| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+
+## Activate with a code
+
+A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+
+1. Open **Settings, License**.
+2. Choose **Enter activation code**, paste the code, and confirm.
+3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
+
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch and never opens a connection.
+
+## Endpoints and variables
+
+The endpoints default to LangWatch's own hosts, so you name them only when LangWatch gave you different ones. A default install sets none of these.
+
+```yaml
+app:
+  connect:
+    # Every value here is optional. Set none of them and the license decides.
+    gatewayEndpoint: "https://gateway.langwatch.ai"
+    licenseEndpoint: "https://connect.langwatch.ai"
+    # Set this only when you have a reason to name the identity yourself. The
+    # default is minted once into this install's own database and never
+    # rewritten, so it survives restarts, backups and hostname changes.
+    instanceId: ""
+    # The auditor's switch: with it on, the install opens no connection to
+    # LangWatch for any reason, whatever its license says.
+    disabled: false
+```
+
+The chart writes these as environment variables on the app and the workers. Set them directly on any other deployment method:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `LANGWATCH_CONNECT_DISABLED` | off | Switches hosted services, the license sync and the usage report off entirely. With it on, the install builds no client and opens no connection to LangWatch, whatever its license says. It only ever refuses. |
+| `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `https://gateway.langwatch.ai` | Where hosted services are called. |
+| `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the activation, the daily license sync and the usage report of a connected install go. |
+| `LANGWATCH_CONNECT_INSTANCE_ID` | a UUID minted into this install's own database | The identity this install presents on both hosts. |
+| `DISABLE_USAGE_STATS` | `false` | Stops the daily usage report and that alone. See [Data and telemetry](/self-hosting/data-and-telemetry). |
+| `SERVICE_VERSION` | the app image tag | The release this install reports. The chart sets it for you. |
+
+Both endpoints must be `https`; plain `http` is accepted for a loopback host only, for a developer running both sides on one machine. Restart the app and the workers after changing any of them.
+
+### Outbound rules
+
+Connect needs two destinations open, both on port 443:
+
+```
+gateway.langwatch.ai:443
+connect.langwatch.ai:443
+```
+
+Behind a forward proxy, set `HTTPS_PROXY` (and `NO_PROXY` for the hosts that skip it) on the app and the worker pods. The install sends its hosted calls and its license sync through the proxy when any of `HTTPS_PROXY`, `HTTP_PROXY` or `NO_PROXY` is set.
+
+**Settings, Checkup** has a button that reaches both hosts from the install and, when one is blocked, names the host and port the rule has to allow.
+
+### The instance id
+
+The instance id is a UUID the install mints into its own database the first time it needs one and never rewrites, so it survives restarts, backups and hostname changes. It carries no organization name. LangWatch binds your license to the first install that presents it.
+
+A second install running a copy of the database presents another id and is refused with `connect_wrong_instance`. If you rebuilt or moved an install on purpose, ask LangWatch to reset the binding, or set `LANGWATCH_CONNECT_INSTANCE_ID` to the old id before the first boot of the new install.
+
+## What an admin sees in Settings, Connect
+
+**Settings, Connect** is on a self-hosted install only, next to **License** and **Checkup**. Every member of the organization can open it; changing a service or the cap needs organization management rights.
+
+| Section | What it shows |
+|---|---|
+| Hosted services | One row per service your license names, switched on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
+| Spend | Spent, cap and remaining, and the day the current period started. A figure reads "Not available" while the spend ledger cannot be read. |
+| Spending cap in USD | The cap you set yourself, between zero and the maximum your contract allows. A higher number is refused and the message names the maximum. |
+| License sync | The last successful sync and any sync failure, from the first one. |
+
+Switching a service on or off takes effect within a minute, with no restart.
+
+## What does the license sync send
+
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+
+LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
+
+## Seats
+
+The licensed seat count is a hard cap: the seat past it is refused, on a connected license as on an offline one. To add seats, ask LangWatch. LangWatch changes the seats on your license, invoices the added seats prorated to the end of the term, and the install picks the new license up on the next sync or when an admin presses **Refresh license** on the License page.
+
+Existing members are never locked out by a seat change; only the next invitation past the cap is refused.
+
+## License renewal
+
+A renewed or reissued license reaches the install in the sync answer. There is no key to receive by email and paste, and **Refresh license** fetches it now.
+
+A delivered license that does not verify is not applied. The install keeps the license it has and shows the failure in Settings, Connect.
+
+## Instant Evals through Connect
+
+An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
+
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+
+Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
+
+## Managed models
+
+With **Managed models** on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
+
+```bash
+curl https://<your-gateway>/v1/chat/completions \
+  -H "Authorization: Bearer <your virtual key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
+```
+
+Your own providers are untouched: a model spelled without the prefix goes to your own credentials as before. Calls to a `langwatch/` model are metered against the same cap as every other hosted service.
+
+## Air-gapped installs and existing licenses
+
+An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
+
+The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+
+For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
+
+## Check the wiring
+
+**Settings, Checkup** reports whether the install is correctly wired: the data stores, the license, the last sync, the last usage report, and a button that reaches both LangWatch hosts and names the host and port a rule has to allow. `langwatch doctor` prints the same rows from a terminal.
+
+## Errors an admin can meet
+
+| Code | What it means | What to do |
+|---|---|---|
+| `connect_disabled` | An operator switched Connect off in the deployment configuration. | Remove `app.connect.disabled` (or `LANGWATCH_CONNECT_DISABLED`) and restart. |
+| `connect_unreachable` | The install could not reach LangWatch. | The message names the host and port an outbound rule has to allow. |
+| `connect_license_not_registered` | LangWatch has no record of this license for hosted services. | Contact LangWatch to have hosted services set up for your license. |
+| `connect_license_revoked` | The license is no longer active. | Contact LangWatch for a new license. |
+| `connect_license_expired` | The term has ended. | Renew the license. |
+| `connect_wrong_instance` | The license is bound to another install. | Ask LangWatch to reset the binding if you rebuilt or moved this install. |
+| `connect_service_not_entitled` | The service is not part of your license. | Contact LangWatch to add it. |
+| `connect_budget_exhausted` | The cap has been reached and hosted calls stop. | An organization admin raises the cap in Settings, Connect, up to the contract maximum. |
+| `license_sync_failed` | The daily sync did not complete. | It runs again in a day, or press Refresh license. Your seats and services are unchanged meanwhile. |
+| `rate_limited` | The license synced as often as LangWatch allows in a day. | Wait and refresh later; the daily sync is unaffected. |
+| `hosted_service_unavailable` | LangWatch did not answer. | No text was judged and no charge was made. Try again in a moment. |
+| `activation_code_*` | The code was refused: unknown, expired, already used, or bound to another install. | The message names which. Ask LangWatch for a new code. |
+
+## How hosted usage is billed
+
+You prepay a usage commit for the term. It is charged at list rates as a line on the annual invoice, next to the seats, and hosted usage draws it down. What is left of the commit expires with the term.
+
+When the commit is spent, hosted calls stop. They keep running past it only when your contract enables overage, which carries a maximum you agreed, prefilled at a quarter of the commit and changeable by LangWatch. The cap you set in Settings, Connect can be anywhere between zero and that maximum.
+
+Overage is invoiced quarterly in arrears. Seats added mid-term are invoiced when LangWatch changes them, prorated to the end of the term.
+
+For a month with hosted usage, LangWatch emails a statement to your billing contact.
+
+---
+
+# FILE: ./self-hosting/data-and-telemetry.mdx
+
+---
+title: "Data and telemetry: what a self-hosted install sends to LangWatch"
+description: "The two channels a self-hosted install can open to LangWatch, what each one carries, where to read your own copy of the report, and the three switches that stop parts of it or all of it"
+sidebarTitle: Data and telemetry
+keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup
+---
+
+A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
+
+You can read the exact report your install sends on **Settings, Checkup**, copy it, and switch parts of it off from the same page. This page says what the two channels are, what each carries, and which switch stops what.
+
+<Info>
+**Also check:** [Usage report dictionary](/self-hosting/usage-report-dictionary), [Connect](/self-hosting/connect), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## The two channels
+
+| Channel | Who sends it | Where it goes | What it carries | How to stop it |
+|---|---|---|---|---|
+| Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+
+The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
+
+Both go out over HTTPS on port 443. Behind a forward proxy, set `HTTPS_PROXY` on the app and the workers and the install sends both through it.
+
+## What the usage report is for
+
+The report tells LangWatch that your install exists, which release it runs, how far it got in setting up, and how much it is used. That is what decides which installation path gets attention, which release an upgrade notice reaches, and who to contact when a version you run has a problem.
+
+The company running the install is reported as email domains with counts, for example `acme.com: 14`. Never an address, never a name. The domain is the one field that says who you are, and it is the first one to switch off if you would rather it did not.
+
+## Read your own copy
+
+Open **Settings, Checkup** and scroll to **What this install sends to LangWatch**. The section shows the report your install would send right now, pretty printed, with a copy button and the host it goes to. What you read there is what leaves the install, not a description of it.
+
+From a terminal, `langwatch doctor` prints the same report after the checkup rows:
+
+```bash
+langwatch doctor
+langwatch doctor --format json
+```
+
+The CLI needs a project API key of the install, either from `langwatch login` or in `LANGWATCH_API_KEY`, with `LANGWATCH_ENDPOINT` pointing at your install.
+
+## The three switches
+
+| Switch | Where | What it stops |
+|---|---|---|
+| `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
+| Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
+| Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+
+`LANGWATCH_CONNECT_DISABLED=true` is a fourth switch, for an audit that has to prove absence rather than derive it from the license. With it set the install builds no client and opens no connection to LangWatch for any reason: no hosted service, no license sync, no usage report.
+
+The switches on the Checkup page are stored in the install's own database, so they hold across restarts, upgrades and every browser. Organization management rights are needed to change them; every member can read the report.
+
+## When the report starts
+
+The first report goes out at the next 12:00 UTC after boot, and one a day after that. An install shows its administrators a notice once, in the app, when it starts reporting and again whenever the report changes shape. The notice links this page and the Checkup page, and dismissing it records the dismissal in the database so it stays dismissed for everyone.
+
+## What is never collected
+
+The dictionary page keeps the exact list. In short: no trace or span content, no prompts, no dataset contents, no evaluation inputs or outputs, no project names, no user names, no email addresses, no IP addresses, no keys of any kind.
+
+## Where it lands
+
+The report lands in a database at LangWatch, one row per install and one per report, where the LangWatch team reads it. LangWatch also sends the report to PostHog for analysis and updates the account's traits in Customer.io, both under a data processing agreement. No other party receives it.
+
+## Existing installs
+
+An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, which is what the startup notice tells you, and the switches above are how to trim it.
 
 ---
 
@@ -63510,7 +63783,7 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+Volume is bounded by your own hardware, not by us. A self-hosted deployment is not metered and sends no usage back to LangWatch unless its license names a hosted service, in which case [Connect](/self-hosting/connect) meters what that service judges or serves.
 </Note>
 
 ## What an Enterprise license adds
@@ -63525,6 +63798,8 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. The license decides which of them this install may call, an organization admin can switch off the ones they do not want, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
@@ -63606,7 +63881,7 @@ The SSO gate is deployment-wide: one genuinely licensed organization enables SSO
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">
-No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+No, unless the license names a hosted service: [Connect](/self-hosting/connect) then meters what that service judges or serves, and the daily license sync reports your seat counts. A license that names none reaches no hosted service and the deployment is not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
 </Accordion>
 </AccordionGroup>
 
@@ -65943,6 +66218,179 @@ If you encounter issues during an upgrade:
 - Check the [Troubleshooting guide](/self-hosting/troubleshooting)
 - Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
 - Contact [support](https://langwatch.ai/support)
+
+---
+
+# FILE: ./self-hosting/usage-report-dictionary.mdx
+
+---
+title: "Usage report dictionary: every field a self-hosted install sends"
+description: "The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from."
+sidebarTitle: Usage report dictionary
+keywords: usage report, telemetry, self-hosted, dictionary, fields, opt out, privacy
+---
+
+{/* Generated by `bash docs/scripts/generate-usage-report-dictionary.sh` from */}
+{/* platform/app/src/server/usage-report/dictionary.ts. Do not edit by hand. */}
+
+This page is schema version 3 of the report, and the report carries that number in `report_schema_version`. The dictionary in the code renders this page, so a field on this page is a field the report can carry and a field the report carries is on this page.
+
+Each field has a category, and the category decides what switches it off. The report is one JSON document a day; see [Data and telemetry](/self-hosting/data-and-telemetry) for where it goes and how to read your own copy of it.
+
+<Info>
+**Also check:** [Data and telemetry](/self-hosting/data-and-telemetry), [Connect](/self-hosting/connect), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## Standard fields
+
+The identifiers that travel with every report: which install this is, which release it runs, and when the report was taken.
+
+Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `instance_id` | at the time of the report | Tells one install apart from another, so two reports can be read as one install changing over time rather than two installs. | InstanceIdentity.instanceId |
+| `report_schema_version` | at the time of the report | Says which version of this dictionary produced the report, so a stored report is read back against the list that made it. | USAGE_REPORT_SCHEMA_VERSION |
+| `version` | at the time of the report | The release this install runs, so a bug report can be matched to a build and an upgrade notice can reach the installs that need it. | SERVICE_VERSION |
+| `install_method` | at the time of the report | How this install was deployed, so the installation instructions that are actually used get the attention. | INSTALL_METHOD |
+| `chart_version` | at the time of the report | The Helm chart release, which moves separately from the app and is the other half of a deployment problem. | LANGWATCH_CHART_VERSION |
+| `environment` | at the time of the report | Whether this is a production install or somebody trying it out, so the two are not counted together. | NODE_ENV |
+| `first_seen_at` | at the time of the report | When this install first minted its identity, which is how long it has been running. | InstanceIdentity.createdAt |
+| `timestamp` | at the time of the report | When the report was taken, so a late arrival is not read as current. | the clock at collection |
+
+## Operational fields
+
+What it takes to support this install: how it is divided up, how people sign in, and whether the license names a hosted service.
+
+Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `organizations` | at the time of the report | How many organizations share this install, which decides whether an install is one customer or a platform. | Organization |
+| `teams` | at the time of the report | How the install is divided up, which is what team-level features have to work against. | Team |
+| `projects` | at the time of the report | How many projects the install carries, which is the unit limits and screens are scoped to. | Project |
+| `users` | at the time of the report | How many people use the install, which is what support and seat questions start from. | OrganizationUser |
+| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER |
+| `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
+| `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
+
+## Subscription fields
+
+License compliance. These travel on the license channel only, from an install whose license names a hosted service, and never in the usage report.
+
+Not part of the usage report.
+
+No field of this category is in the usage report at this schema version.
+
+## Optional fields
+
+Who runs the install, how far they got, what they do with it and how they run it. This is the part you can switch off on the Checkup page without touching the rest.
+
+Switched off as a whole from **Settings, Checkup**. `hostname` has a switch of its own on the same page.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `user_email_domains` | at the time of the report | The company running the install, as domains with counts (acme.com: 14). Never an address, and never a name. It is how we know who to support and who to talk to, and it is the field to switch off first if you would rather we did not. | User.email, the part after the @, counted |
+| `hostname` (own switch) | at the time of the report | The address this install answers on, which tells a support conversation apart from a test. It names your own network, so it has a switch of its own. | BASE_HOST |
+| `first_project_at` | at the time of the report | When the install got its first project, the first rung of getting started. | min(Project.createdAt) |
+| `first_member_at` | at the time of the report | When a second person joined, which is when an install stops being one person trying it out. | the second OrganizationUser.createdAt |
+| `first_dataset_at` | at the time of the report | When the install got its first dataset, which is the rung installs stall on more than any other. | min(Dataset.createdAt) |
+| `first_evaluation_at` | at the time of the report | When the install first ran an evaluation, which is what people come for. | min(BatchEvaluation.createdAt) |
+| `first_monitor_at` | at the time of the report | When the install first set up a monitor, which is when evaluation became continuous rather than a one-off. | min(Monitor.createdAt) |
+| `first_prompt_at` | at the time of the report | When the install first saved a prompt. | min(LlmPromptConfig.createdAt) |
+| `first_workflow_at` | at the time of the report | When the install first built a workflow in the optimization studio. | min(Workflow.createdAt) |
+| `first_model_provider_at` | at the time of the report | When a model provider was first configured, which every evaluation, studio run and Langy turn needs before it can call a model. | min(ModelProvider.createdAt) |
+| `first_annotation_at` | at the time of the report | When somebody first reviewed a trace by hand. | min(Annotation.createdAt) |
+| `first_trigger_at` | at the time of the report | When the install first set up an alert. | min(Trigger.createdAt) |
+| `first_experiment_at` | at the time of the report | When the install first ran an experiment. | min(Experiment.createdAt) |
+| `first_gateway_request_at` | at the time of the report | When the first model call went through the AI gateway, which is when model traffic started being routed rather than only observed. | min(gateway_spend.OccurredAt) |
+| `first_instant_eval_run_at` | at the time of the report | When the install first ran an Instant Eval over its own traces. | min(instant_eval_runs.CreatedAt) |
+| `first_langy_turn_at` | at the time of the report | When somebody first asked Langy a question. | min(LangyConversationTurnProjection.createdAt) |
+| `first_coding_agent_session_at` | at the time of the report | When the first coding agent session was recorded, which is when the install started watching agents rather than only applications. | min(coding_agent_sessions.StartedAt) |
+| `totalTraces` | lifetime | How much the install ingests, which is the one number that says whether it is in production. | trace_summaries, counted per organization and added up |
+| `traces_7d` | last 7 days | How much the install ingests, which is the one number that says whether it is in production. Over the last seven days. | trace_summaries, counted per organization and added up |
+| `traces_28d` | last 28 days | How much the install ingests, which is the one number that says whether it is in production. Over the last twenty-eight days. | trace_summaries, counted per organization and added up |
+| `totalScenarioEvents` | lifetime | How much simulation testing the install does. | simulation_runs, deduplicated by run |
+| `scenario_runs_7d` | last 7 days | How much simulation testing the install does. Over the last seven days. | simulation_runs, deduplicated by run |
+| `scenario_runs_28d` | last 28 days | How much simulation testing the install does. Over the last twenty-eight days. | simulation_runs, deduplicated by run |
+| `annotations` | lifetime | How much reviewing by hand happens, which is the signal that a team is reading its own traces. | Annotation |
+| `annotations_7d` | last 7 days | How much reviewing by hand happens, which is the signal that a team is reading its own traces. Over the last seven days. | Annotation |
+| `annotations_28d` | last 28 days | How much reviewing by hand happens, which is the signal that a team is reading its own traces. Over the last twenty-eight days. | Annotation |
+| `batchEvaluations` | lifetime | How many evaluation runs the install has done. | BatchEvaluation |
+| `batch_evaluations_7d` | last 7 days | How many evaluation runs the install has done. Over the last seven days. | BatchEvaluation |
+| `batch_evaluations_28d` | last 28 days | How many evaluation runs the install has done. Over the last twenty-eight days. | BatchEvaluation |
+| `datasets` | lifetime | How many datasets the install holds. | Dataset |
+| `datasets_7d` | last 7 days | How many datasets the install holds. Over the last seven days. | Dataset |
+| `datasets_28d` | last 28 days | How many datasets the install holds. Over the last twenty-eight days. | Dataset |
+| `datasetRecords` | lifetime | How big those datasets are, which is what dataset performance work is sized against. | DatasetRecord |
+| `dataset_records_7d` | last 7 days | How big those datasets are, which is what dataset performance work is sized against. Over the last seven days. | DatasetRecord |
+| `dataset_records_28d` | last 28 days | How big those datasets are, which is what dataset performance work is sized against. Over the last twenty-eight days. | DatasetRecord |
+| `experiments` | lifetime | How many experiments the install has run. | Experiment |
+| `experiments_7d` | last 7 days | How many experiments the install has run. Over the last seven days. | Experiment |
+| `experiments_28d` | last 28 days | How many experiments the install has run. Over the last twenty-eight days. | Experiment |
+| `prompts` | lifetime | How many prompts the install manages here rather than in its own code. | LlmPromptConfig |
+| `prompts_7d` | last 7 days | How many prompts the install manages here rather than in its own code. Over the last seven days. | LlmPromptConfig |
+| `prompts_28d` | last 28 days | How many prompts the install manages here rather than in its own code. Over the last twenty-eight days. | LlmPromptConfig |
+| `monitors` | lifetime | How many continuous evaluations are configured. | Monitor |
+| `monitors_7d` | last 7 days | How many continuous evaluations are configured. Over the last seven days. | Monitor |
+| `monitors_28d` | last 28 days | How many continuous evaluations are configured. Over the last twenty-eight days. | Monitor |
+| `workflows` | lifetime | How many optimization studio workflows exist. | Workflow |
+| `workflows_7d` | last 7 days | How many optimization studio workflows exist. Over the last seven days. | Workflow |
+| `workflows_28d` | last 28 days | How many optimization studio workflows exist. Over the last twenty-eight days. | Workflow |
+| `triggers` | lifetime | How many alerts are configured. | Trigger |
+| `triggers_7d` | last 7 days | How many alerts are configured. Over the last seven days. | Trigger |
+| `triggers_28d` | last 28 days | How many alerts are configured. Over the last twenty-eight days. | Trigger |
+| `spans` | lifetime | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. | stored_spans, rows counted per organization and added up |
+| `spans_7d` | last 7 days | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. Over the last seven days. | stored_spans, rows counted per organization and added up |
+| `spans_28d` | last 28 days | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. Over the last twenty-eight days. | stored_spans, rows counted per organization and added up |
+| `gateway_requests` | lifetime | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. | gateway_spend, rows counted per organization and added up |
+| `gateway_requests_7d` | last 7 days | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. Over the last seven days. | gateway_spend, rows counted per organization and added up |
+| `gateway_requests_28d` | last 28 days | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. Over the last twenty-eight days. | gateway_spend, rows counted per organization and added up |
+| `gateway_spend_usd` | lifetime | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `gateway_spend_usd_7d` | last 7 days | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. Over the last seven days. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `gateway_spend_usd_28d` | last 28 days | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. Over the last twenty-eight days. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `instant_eval_runs` | lifetime | How many Instant Evals the install has run over its own traces. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_runs_7d` | last 7 days | How many Instant Evals the install has run over its own traces. Over the last seven days. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_runs_28d` | last 28 days | How many Instant Evals the install has run over its own traces. Over the last twenty-eight days. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_judgments` | lifetime | How many judgments those runs produced, which is how much of the install's traffic has been judged. | instant_eval_judgments, counted per organization and added up |
+| `instant_eval_judgments_7d` | last 7 days | How many judgments those runs produced, which is how much of the install's traffic has been judged. Over the last seven days. | instant_eval_judgments, counted per organization and added up |
+| `instant_eval_judgments_28d` | last 28 days | How many judgments those runs produced, which is how much of the install's traffic has been judged. Over the last twenty-eight days. | instant_eval_judgments, counted per organization and added up |
+| `langy_turns` | lifetime | How many questions Langy has answered, which says whether the assistant is used or only present. | LangyConversationTurnProjection |
+| `langy_turns_7d` | last 7 days | How many questions Langy has answered, which says whether the assistant is used or only present. Over the last seven days. | LangyConversationTurnProjection |
+| `langy_turns_28d` | last 28 days | How many questions Langy has answered, which says whether the assistant is used or only present. Over the last twenty-eight days. | LangyConversationTurnProjection |
+| `langy_users` | lifetime | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. | LangyConversationProjection.userId, distinct, by last activity |
+| `langy_active_users_7d` | last 7 days | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. Over the last seven days. | LangyConversationProjection.userId, distinct, by last activity |
+| `langy_active_users_28d` | last 28 days | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. Over the last twenty-eight days. | LangyConversationProjection.userId, distinct, by last activity |
+| `coding_agent_sessions` | lifetime | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `coding_agent_sessions_7d` | last 7 days | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. Over the last seven days. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `coding_agent_sessions_28d` | last 28 days | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. Over the last twenty-eight days. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `pull_requests` | lifetime | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. | GithubPullRequest, by the day the pull request was opened |
+| `pull_requests_7d` | last 7 days | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. Over the last seven days. | GithubPullRequest, by the day the pull request was opened |
+| `pull_requests_28d` | last 28 days | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. Over the last twenty-eight days. | GithubPullRequest, by the day the pull request was opened |
+| `annotationQueues` | lifetime | How many review queues exist, which says whether reviewing is a workflow or an occasional thing. | AnnotationQueue |
+| `annotationQueueItems` | lifetime | How much has gone through those queues. | AnnotationQueueItem |
+| `annotationScores` | lifetime | How many scores reviewers recorded. | AnnotationScore |
+| `customGraphs` | lifetime | How many charts were built, which says whether the analytics surface is used. | CustomGraph, builder charts only |
+| `active_users_28d` | last 28 days | How many people signed in over four weeks, which is the difference between an install that is running and one that is used. | Session.expires, counted distinct by user |
+| `active_projects_28d` | last 28 days | How many projects saw activity over four weeks, which separates a live project from a folder no one opened. | Project.updatedAt |
+| `model_providers` | at the time of the report | Which model providers are configured, by name only. Never a key, never an endpoint, never a deployment name. | ModelProvider.provider, distinct |
+| `storage_backend` | at the time of the report | Where stored objects go, so a storage problem names the backend it is about. | the resolved storage configuration |
+| `email_configured` | at the time of the report | Whether the install can send email, because an install that cannot send email cannot invite anyone and will look abandoned. | EMAIL_PROVIDER |
+| `gateway_configured` | at the time of the report | Whether the AI gateway is set up, which decides whether model traffic is routed or only observed. | LW_GATEWAY_BASE_URL |
+
+## Never collected
+
+The report carries counts and metadata. It never carries any of these, at any schema version:
+
+- Trace or span content, in any form
+- Prompts, whether saved here or sent through the gateway
+- Dataset contents
+- Evaluation inputs and outputs
+- Project names
+- User names
+- Email addresses (only the domain after the @, counted)
+- IP addresses
+- API keys, model provider keys, or any other credential
 
 ---
 

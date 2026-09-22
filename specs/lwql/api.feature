@@ -930,6 +930,32 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then no langwatch_lwql user, lwql_restricted profile, row policy or lwql_postgres named collection is rendered
     And the default user keeps access_management and named_collection_control and the custom_ settings prefix
 
+  # Issue #8258: a helm upgrade can boot the app against the OLD ClickHouse pod,
+  # which still serves users.d/lwql.yaml, so the access-model DDL is skipped as
+  # config-store-owned (495). Moments later the pod rolls to the new chart, which
+  # renders no access model — the XML identity is gone and, without this, nothing
+  # re-provisions until the next app boot. The deploy task is a short-lived
+  # process, so the long-running app server watches instead: it polls a stateless
+  # ownership probe on a backoff and decides from each snapshot alone, never
+  # inferring from history. The probe reports which store owns the model right
+  # now — the config store (the old pod still rendering it), the SQL store (the
+  # app-owned model is already live), or neither. Config store → keep waiting;
+  # SQL store → nothing to do; neither → re-provision the app-owned model once.
+  # A probe that throws (ClickHouse mid-roll) is treated as still-waiting and
+  # never re-provisions on the failure alone, so a transient error can never fire
+  # a re-provision against a healthy install. The first poll fires within seconds
+  # so a pod that rolled before the server listened is still caught, and a config
+  # store that never releases gives up at a ~30-minute budget with a warning.
+  @unit
+  Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
+    Given the running app server polls a stateless LangWatchQL ownership probe after a chart upgrade
+    When a probe finds the model is owned by neither the config store nor the SQL store
+    Then the app re-provisions the app-owned access model exactly once and stops watching
+    And while the config store still owns the model the watch keeps polling on a backoff
+    And when the SQL store already owns the model the watch stops without re-provisioning
+    And a probe error alone never re-provisions — the watch keeps polling until a snapshot is authoritative
+    And a config store that never releases the model gives up at the budget with a warning
+
   @integration
   Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
     Given a pod holds the LangWatchQL self-provision lock inside its transaction

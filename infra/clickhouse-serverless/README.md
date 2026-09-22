@@ -37,12 +37,16 @@ bridging into PostgreSQL via SQL DDL on every deployment, against whichever
 ClickHouse it is pointed at (chart-managed or BYO/external) — see
 [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).
 
-What `ch-config` still renders is the two prerequisites that DDL needs from
+What `ch-config` still renders is the three prerequisites that DDL needs from
 the server itself: `zz-access-management.yaml` grants the `default` user
 `access_management` + `named_collection_control` (the right to create users,
-profiles, row policies and named collections through SQL), and
+profiles, row policies and named collections through SQL),
 `custom-settings-prefixes.yaml` declares the `custom_` settings prefix the
-per-query tenant capability rides on. See `internal/render/access.go`.
+per-query tenant capability rides on, and `zz-server-settings.yaml` sets
+`access_control_improvements.settings_constraints_replace_previous` to `true`
+(without it, ClickHouse rejects the `<database>_profile` settings profile's
+`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). See
+`internal/render/access.go`.
 
 ## What Gets Computed
 

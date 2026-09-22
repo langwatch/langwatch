@@ -11,6 +11,9 @@
  * migration-URL parse (the regression path) rather than the not-configured
  * early return.
  *
+ * The chart-upgrade reconvergence is a server-side watch, unit-tested in
+ * `../../server/analytics/lwql/provisioning/__tests__/reconvergence.unit.test.ts`.
+ *
  * @see ../provisionLwql.ts
  * @see specs/lwql/api.feature
  */

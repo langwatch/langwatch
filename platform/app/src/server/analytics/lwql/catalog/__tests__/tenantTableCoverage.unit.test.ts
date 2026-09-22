@@ -18,7 +18,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { lwqlSourceColumnGrants } from "../../provisioning/catalogStatements";
+import type { LangWatchQLNames } from "../../provisioning/accessModel";
+import { lwqlSourceColumnGrantStatement } from "../../provisioning/catalogStatements";
 import {
   type ColumnsManifest,
   LWQL_COLUMNS_MANIFEST,
@@ -57,6 +58,14 @@ const UNLISTED_TABLE_COUNT = 5;
 
 // Two disjoint names so a grant assertion built from this manifest cannot
 // pass by accident.
+const NAMES: LangWatchQLNames = {
+  database: "lwql_unit",
+  restrictedUser: "lwql_unit_reader",
+  settingsProfile: "lwql_unit_profile",
+  keyMapTable: "lwql_api_key_tenant_map",
+  tenantSetting: "custom_api_key_hash",
+};
+
 const TWO_TABLE_MANIFEST: ColumnsManifest = {
   tables: [
     {
@@ -159,9 +168,17 @@ describe("given every table in the committed ClickHouse columns manifest", () =>
       expect(sources).toEqual(["alpha_rows"]);
       expect(sources).not.toContain("omega_rows");
 
-      const grants = lwqlSourceColumnGrants({ views });
-      expect(Object.keys(grants)).toContain("alpha_rows");
-      expect(Object.keys(grants)).not.toContain("omega_rows");
+      const grants = views
+        .map((view) =>
+          lwqlSourceColumnGrantStatement({
+            names: NAMES,
+            sourceDatabase: "lwql_unit_source",
+            view,
+          }),
+        )
+        .join("\n");
+      expect(grants).toContain("alpha_rows");
+      expect(grants).not.toContain("omega_rows");
     });
   });
 

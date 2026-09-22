@@ -9,11 +9,19 @@
  * `../server/analytics/lwql/provisioning/selfProvisioning.ts`'s composition.
  *
  * The path is deliberately non-fatal — a default-on feature must never turn a
- * server-side provisioning failure into a boot crashloop; the endpoint simply
- * stays fail-closed ("unavailable") until the next boot converges. Where the
- * ClickHouse server already owns an LWQL entity in its own read-only config
- * store (users.xml / config.xml), that entity's statements are logged and
- * skipped and the rest is still provisioned — see `runClickHouseStatements`.
+ * server-side provisioning failure into a boot crashloop; on a hard failure the
+ * endpoint simply stays fail-closed ("unavailable") until the next boot
+ * converges. Where the ClickHouse server already owns an LWQL entity in its own
+ * read-only config store (users.xml / config.xml), that entity's statements are
+ * logged and skipped and the rest is still provisioned — see
+ * `runClickHouseStatements`. Such a skip can be transient rather than permanent
+ * — a helm upgrade boots the app against the OLD ClickHouse pod, which still
+ * serves `users.d/lwql.yaml`, before the pod rolls to a chart that renders no
+ * access model. This deploy task is a short-lived process, so it cannot wait out
+ * that window itself; instead the long-running app server watches the config
+ * store and re-provisions once the old pod's rendered model is gone, using this
+ * task's exported {@link lwqlAccessModelOwner} probe and
+ * {@link selfProvisionAll} converge (see `startLwqlReconvergenceWatch`).
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
  * this task writes into) in `start:prepare:db`. A deploy with no
@@ -195,10 +203,76 @@ async function appFunctionsProvisionable(
   // A layout that could not be read has already been logged by the probe.
   if (probe === null) return false;
   logger.error(
-    { maxTotalReplicas: probe.maxTotalReplicas },
+    { maxTotalReplicas: probe?.maxTotalReplicas ?? null },
     "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
   );
   return false;
+}
+
+/**
+ * Converges the ClickHouse side on an admin client: inventories the config-store
+ * entities, runs the access-model/bridge/view DDL (yielding to config-owned
+ * entities), and backfills the key map. Split out of {@link selfProvisionAll} to
+ * keep each function small; a throw here still propagates to that function's
+ * non-fatal handler.
+ */
+async function convergeClickHouse({
+  client,
+  names,
+  selfProvision,
+  sourceDatabase,
+  endpoint,
+  secrets,
+}: {
+  client: ClickHouseClient;
+  names: LangWatchQLNames;
+  selfProvision: LwqlSelfProvisionEnv;
+  sourceDatabase: string;
+  endpoint: NonNullable<ReturnType<typeof lwqlPostgresEndpointFromDatabaseUrl>>;
+  secrets: readonly (string | undefined)[];
+}): Promise<void> {
+  // Named first at WARN so the operator sees by name any LWQL identity the
+  // ClickHouse server already owns in its read-only config store, before the
+  // statements that will skip it run.
+  const configStoreEntities = await inventoryConfigStoreLwqlEntities({
+    client,
+    names,
+    secrets,
+  });
+
+  const includeAppFunctions = await appFunctionsProvisionable(client);
+  const result = await runClickHouseStatements({
+    client,
+    secrets,
+    configStoreEntities,
+    statements: selfHostedClickHouseProvisioningStatements({
+      names,
+      restrictedPassword: selfProvision.connection.password,
+      sourceDatabase,
+      postgres: {
+        endpoint,
+        readerPassword: selfProvision.postgresReaderPassword,
+      },
+      includeAppFunctions,
+    }),
+  });
+  if (result.skipped.length > 0) {
+    logger.warn(
+      { skippedCount: result.skipped.length },
+      "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
+    );
+  }
+
+  // Same non-fatal contract as the explicit path: the backfill is convergent, so
+  // a slow key-map table must not undo the provisioning above (already committed).
+  try {
+    await backfillKeyMap({ client, names, sourceDatabase });
+  } catch (error) {
+    logger.error(
+      { error: redactSecrets(errorMessage(error), secrets) },
+      "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+    );
+  }
 }
 
 /**
@@ -208,8 +282,11 @@ async function appFunctionsProvisionable(
  * degrade to a loud log and a fail-closed endpoint, not a crashlooping
  * deployment. A server that already owns an LWQL entity in its read-only config
  * store is yielded to, per statement, by {@link runClickHouseStatements}.
+ *
+ * The running server watches the config store separately and calls this again
+ * once a chart-upgrade window closes — see {@link startLwqlReconvergenceWatch}.
  */
-async function selfProvisionAll({
+export async function selfProvisionAll({
   selfProvision,
   names,
 }: {
@@ -276,51 +353,16 @@ async function selfProvisionAll({
         }),
       ]);
 
-      await withAdminClickHouseClient(async (client) => {
-        // Named first at WARN so the operator sees by name any LWQL identity
-        // the ClickHouse server already owns in its read-only config store,
-        // before the statements that will skip it run.
-        const configStoreEntities = await inventoryConfigStoreLwqlEntities({
+      await withAdminClickHouseClient((client) =>
+        convergeClickHouse({
           client,
           names,
+          selfProvision,
+          sourceDatabase,
+          endpoint,
           secrets,
-        });
-
-        const includeAppFunctions = await appFunctionsProvisionable(client);
-        const { skipped } = await runClickHouseStatements({
-          client,
-          secrets,
-          configStoreEntities,
-          statements: selfHostedClickHouseProvisioningStatements({
-            names,
-            restrictedPassword: selfProvision.connection.password,
-            sourceDatabase,
-            postgres: {
-              endpoint,
-              readerPassword: selfProvision.postgresReaderPassword,
-            },
-            includeAppFunctions,
-          }),
-        });
-        if (skipped.length > 0) {
-          logger.warn(
-            { skippedCount: skipped.length },
-            "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
-          );
-        }
-
-        // Same non-fatal contract as the explicit path: the backfill is
-        // convergent, so a slow key-map table must not undo the provisioning
-        // above (which this run already committed).
-        try {
-          await backfillKeyMap({ client, names, sourceDatabase });
-        } catch (error) {
-          logger.error(
-            { error: redactSecrets(errorMessage(error), secrets) },
-            "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-          );
-        }
-      });
+        }),
+      );
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
@@ -330,13 +372,88 @@ async function selfProvisionAll({
     );
   }
 }
+/**
+ * The provisioning inputs derived from the environment, or `null` when
+ * LangWatchQL is not configured on this deployment. Shared by {@link execute},
+ * the {@link selfProvisionAll} converge, and the
+ * {@link lwqlAccessModelOwner} probe so the env/name derivation lives
+ * in exactly one place.
+ */
+export function lwqlSelfProvisionInputs(): {
+  selfProvision: LwqlSelfProvisionEnv;
+  names: LangWatchQLNames;
+} | null {
+  const selfProvision = lwqlSelfProvisionFromEnv();
+  if (!selfProvision) return null;
+  return {
+    selfProvision,
+    names: productionLangWatchQLNames({ connection: selfProvision.connection }),
+  };
+}
+
+/** Which store currently owns the LangWatchQL access model, if any. */
+export type LwqlAccessModelOwner = "config_store" | "sql_store" | "none";
+
+/**
+ * Which store owns the LangWatchQL access model right now, proven fresh at call
+ * time, for the server-side reconvergence watch to poll:
+ *
+ * - `"config_store"` — the read-only users.xml identities are still rendered
+ *   (the previous ClickHouse pod, mid-upgrade). The app must keep waiting.
+ * - `"sql_store"` — the app-owned SQL-store user is present: the model is live,
+ *   nothing to do.
+ * - `"none"` — neither is present, so the app must (re-)provision.
+ *
+ * A stateless snapshot rather than an inference over probe history: a transient
+ * error can never fabricate a "none" (it throws instead), and a pod that rolled
+ * before the first probe still reads correctly. {@link inventoryConfigStoreLwqlEntities}
+ * swallows read errors and returns `[]`, so this probe first proves connectivity
+ * with a trivial query — an unreachable ClickHouse *throws* (the watch keeps
+ * polling) instead of reporting a spurious "none".
+ */
+export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
+  const inputs = lwqlSelfProvisionInputs();
+  if (!inputs) return "none";
+  const { selfProvision, names } = inputs;
+  const secrets = [
+    selfProvision.connection.password,
+    selfProvision.postgresReaderPassword,
+    process.env.CLICKHOUSE_URL,
+    process.env.DATABASE_URL,
+  ];
+  return withAdminClickHouseClient(async (client) => {
+    // Connectivity check: throws on an unreachable server, so the caller can
+    // distinguish "cannot read yet" from an authoritative ownership answer.
+    await (
+      await client.query({ query: "SELECT 1", format: "JSONEachRow" })
+    ).text();
+
+    const configStoreEntities = await inventoryConfigStoreLwqlEntities({
+      client,
+      names,
+      secrets,
+    });
+    if (configStoreEntities.length > 0) return "config_store";
+
+    // The config store owns nothing; is the app-owned SQL-store user present?
+    const result = await client.query({
+      query:
+        "SELECT count() AS n FROM system.users " +
+        "WHERE name = {user:String} AND storage = 'local_directory'",
+      query_params: { user: names.restrictedUser },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{ n: number | string }>;
+    return Number(rows[0]?.n ?? 0) > 0 ? "sql_store" : "none";
+  });
+}
 
 export default async function execute() {
   // The app owns the model on every distribution, so there is one path and no
-  // switch. `lwqlSelfProvisionFromEnv` returns the derived inputs when both
+  // switch. `lwqlSelfProvisionInputs` returns the derived inputs when both
   // LangWatchQL passwords are set, or null when they are not.
-  const selfProvision = lwqlSelfProvisionFromEnv();
-  if (!selfProvision) {
+  const inputs = lwqlSelfProvisionInputs();
+  if (!inputs) {
     // A password present but the inputs incomplete (both are `optional: true`
     // in the chart) is a misconfiguration to surface, not a crash: declining
     // loudly keeps the boot-never-crashes contract. No password at all is
@@ -351,12 +468,8 @@ export default async function execute() {
     return;
   }
 
-  const names = productionLangWatchQLNames({
-    connection: selfProvision.connection,
-  });
-
   // `sourceDatabase` is parsed inside selfProvisionAll's try, so a CLICKHOUSE_URL
   // that parses but names an invalid database identifier degrades non-fatally
   // instead of throwing out of this task.
-  await selfProvisionAll({ selfProvision, names });
+  await selfProvisionAll(inputs);
 }
