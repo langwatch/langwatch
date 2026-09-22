@@ -1,4 +1,6 @@
 import { type MutableRefObject, useCallback, useRef } from "react";
+import { toaster } from "~/components/ui/toaster";
+import { explainAnyError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type InstantEvalChipTarget,
@@ -30,9 +32,10 @@ interface UseSubmitSearchOptions {
    * back and charge for a run over results nobody is looking at.
    */
   onSupersede: () => void;
-  /** Enter fell back to a phrase because no model could route it. */
-  onModelUnavailable: () => void;
 }
+
+/** What the toast adds when the router itself could not be reached. */
+const PHRASE_INSTEAD_NOTE = "The words were searched as a phrase instead.";
 
 interface RoutedSubmit {
   result: RouteSearchResult;
@@ -45,13 +48,12 @@ interface RoutedSubmit {
 function useApplyRoute({
   onLangy,
   onInstantEval,
-  onModelUnavailable,
-}: Pick<
-  UseSubmitSearchOptions,
-  "onLangy" | "onInstantEval" | "onModelUnavailable"
->): (submit: RoutedSubmit) => void {
+}: Pick<UseSubmitSearchOptions, "onLangy" | "onInstantEval">): (
+  submit: RoutedSubmit,
+) => void {
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const recordAiTranslation = useExplorerStore((s) => s.recordAiTranslation);
+  const recordSearchNotice = useExplorerStore((s) => s.recordSearchNotice);
   return useCallback(
     ({ result, text, projectId, timeRange }: RoutedSubmit) => {
       switch (result.kind) {
@@ -64,7 +66,18 @@ function useApplyRoute({
           return;
         case "free_text":
           applyQueryText(result.query);
-          if (result.isModelUnavailable) onModelUnavailable();
+          // A phrase the classifier picked is the right answer and says
+          // nothing further. A phrase that is what is left of another route
+          // gets the strip, so the quotes around the words are explained
+          // rather than just appearing.
+          if (result.fellBackFrom && result.modelTrouble) {
+            recordSearchNotice({
+              projectId,
+              query: useExplorerStore.getState().queryText,
+              interpretedAs: "free_text",
+              modelTrouble: result.modelTrouble,
+            });
+          }
           return;
         case "langy":
           onLangy(result.question);
@@ -78,6 +91,9 @@ function useApplyRoute({
             otherQuery: result.otherQuery,
             fallbackQuery: result.fallbackQuery,
             timeRange,
+            ...(result.modelTrouble
+              ? { modelTrouble: result.modelTrouble }
+              : {}),
           });
           return;
       }
@@ -85,9 +101,9 @@ function useApplyRoute({
     [
       applyQueryText,
       recordAiTranslation,
+      recordSearchNotice,
       onInstantEval,
       onLangy,
-      onModelUnavailable,
     ],
   );
 }
@@ -147,11 +163,10 @@ function useRouteSubmit({
   isLangyAvailable,
   onLangy,
   onInstantEval,
-  onModelUnavailable,
   submitSeqRef,
 }: Pick<
   UseSubmitSearchOptions,
-  "isLangyAvailable" | "onLangy" | "onInstantEval" | "onModelUnavailable"
+  "isLangyAvailable" | "onLangy" | "onInstantEval"
 > & {
   submitSeqRef: MutableRefObject<number>;
 }): {
@@ -160,11 +175,7 @@ function useRouteSubmit({
 } {
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const routeSearch = api.tracesV2.routeSearch.useMutation();
-  const applyRoute = useApplyRoute({
-    onLangy,
-    onInstantEval,
-    onModelUnavailable,
-  });
+  const applyRoute = useApplyRoute({ onLangy, onInstantEval });
 
   const route = useCallback(
     ({
@@ -194,9 +205,20 @@ function useRouteSubmit({
             if (seq !== submitSeqRef.current) return;
             applyRoute({ result, text, projectId, timeRange: range });
           },
-          onError: () => {
+          onError: (error) => {
             if (seq !== submitSeqRef.current) return;
+            // The words still get searched, and the reader is told that is
+            // what happened. A sentence coming back as a quoted phrase with
+            // nothing said about it reads as the search having worked.
             applyQueryText(requoteBareTerms(text));
+            const { title, description } = explainAnyError(error);
+            toaster.create({
+              title,
+              description: [description, PHRASE_INSTEAD_NOTE]
+                .filter(Boolean)
+                .join(" "),
+              type: "warning",
+            });
           },
         },
       );
@@ -224,7 +246,6 @@ export function useSubmitSearch({
   onLangy,
   onInstantEval,
   onSupersede,
-  onModelUnavailable,
 }: UseSubmitSearchOptions): {
   submitSearch: (text: string) => void;
   isRouting: boolean;
@@ -238,7 +259,6 @@ export function useSubmitSearch({
     isLangyAvailable,
     onLangy,
     onInstantEval,
-    onModelUnavailable,
     submitSeqRef,
   });
 

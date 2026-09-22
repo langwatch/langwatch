@@ -48,8 +48,8 @@ import {
   finishFilter,
   freeText,
   instantEval,
-  isModelUnavailableError,
   langy,
+  modelTroubleOf,
   type RouteContext,
 } from "./routes";
 
@@ -136,8 +136,8 @@ async function routeWithModel(
       ...context.available,
     });
   } catch (error) {
-    const isModelUnavailable = isModelUnavailableError(error);
-    if (!isModelUnavailable) {
+    const modelTrouble = modelTroubleOf(error);
+    if (modelTrouble === "model_failed") {
       logger.warn(
         { projectId: input.projectId, err: error },
         "Model could not route the search; searching the phrase instead",
@@ -146,7 +146,7 @@ async function routeWithModel(
     return freeText({
       context,
       decidedBy: "fallback",
-      isModelUnavailable,
+      modelTrouble,
       fellBackFrom: "routing",
     });
   }
@@ -156,7 +156,16 @@ async function routeWithModel(
       return finishFilter({ context, generated: decision.query, decidedBy });
     case "instant_eval":
       if (!context.available.isInstantEvalAvailable) {
-        return freeText({ context, decidedBy });
+        // The route the model picked is not open to this project, so the
+        // phrase is the search that runs. It is still a fallback and the
+        // strip under the bar says so: a sentence that came back as a
+        // quoted phrase with nothing to explain it is the silence this
+        // signal exists to end.
+        return freeText({
+          context,
+          decidedBy: "fallback",
+          fellBackFrom: "instant_eval",
+        });
       }
       return instantEval({
         context,

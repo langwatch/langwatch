@@ -195,8 +195,8 @@ describe("tracesV2.routeSearch", () => {
       expect(result).toEqual({
         kind: "free_text",
         query: '"annoyed users"',
-        decidedBy: "model",
-        isModelUnavailable: false,
+        decidedBy: "fallback",
+        fellBackFrom: "instant_eval",
       });
       expect(JSON.stringify(model.doGenerateCalls[0]?.prompt)).toContain(
         "`instant_eval` is not available on this project",
@@ -224,8 +224,8 @@ describe("tracesV2.routeSearch", () => {
         kind: "free_text",
         query: 'status:error AND "annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: true,
         fellBackFrom: "routing",
+        modelTrouble: "no_model",
       });
     });
   });
@@ -288,15 +288,15 @@ describe("tracesV2.routeSearch", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: true,
         fellBackFrom: "routing",
+        modelTrouble: "no_model",
       });
     });
   });
 
   describe("given the model fails on every attempt", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
-    it("searches the phrase without flagging a missing model", async () => {
+    it("searches the phrase and names the model as the failure", async () => {
       mockGetVercelAIModel.mockResolvedValue(
         new MockLanguageModelV3({
           doGenerate: async () => {
@@ -312,8 +312,8 @@ describe("tracesV2.routeSearch", () => {
       expect(result).toMatchObject({
         kind: "free_text",
         query: '"annoyed users"',
-        isModelUnavailable: false,
         fellBackFrom: "routing",
+        modelTrouble: "model_failed",
       });
     });
   });

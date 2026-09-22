@@ -161,6 +161,63 @@ describe("given the router handed over a question", () => {
     });
   });
 
+  describe("when no model could write the question", () => {
+    /** @scenario "A judge question no model could write is judged as typed" */
+    it("runs the sentence as the question and says so under the bar", () => {
+      const { result } = renderHook(() => useInstantEvalRoute());
+      act(() =>
+        result.current.onInstantEvalRoute({
+          ...payload,
+          question: { instructions: "frustrated users" },
+          modelTrouble: "model_failed",
+        }),
+      );
+      // No criteria on the wire: the judge reads the words as they stand.
+      expect(lastCall(mutations.estimate).input).toMatchObject({
+        question: { instructions: "frustrated users" },
+      });
+      expect(
+        (lastCall(mutations.estimate).input.question as Record<string, unknown>)
+          .criteria,
+      ).toBeUndefined();
+
+      act(() =>
+        lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
+      );
+      act(() =>
+        lastCall(mutations.start).options.onSuccess?.({
+          id: "run-9",
+          status: "queued",
+        }),
+      );
+      expect(useExplorerStore.getState().queryText).toBe(
+        'service:api AND eval:"frustrated users"',
+      );
+      expect(useExplorerStore.getState().searchNotice).toEqual({
+        projectId: "project-1",
+        query: 'service:api AND eval:"frustrated users"',
+        interpretedAs: "instant_eval",
+        question: "frustrated users",
+        modelTrouble: "model_failed",
+      });
+    });
+
+    it("says nothing under the bar when a model wrote the question", () => {
+      const { result } = renderHook(() => useInstantEvalRoute());
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() =>
+        lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
+      );
+      act(() =>
+        lastCall(mutations.start).options.onSuccess?.({
+          id: "run-10",
+          status: "queued",
+        }),
+      );
+      expect(useExplorerStore.getState().searchNotice).toBeNull();
+    });
+  });
+
   describe("when the bar already carries an eval chip", () => {
     /** @scenario "A second question judges the same rows as the first" */
     it("judges the scope without the first chip and keeps both chips in the bar", () => {

@@ -3,8 +3,9 @@
  *
  * Each turns the shared {@link RouteContext} into the answer the Explorer
  * applies: chips, a phrase, a question to judge with, or a handover to the
- * assistant. A builder that cannot produce its route falls to the phrase
- * search rather than to an error state, and says what it fell back from.
+ * assistant. A builder that cannot produce its route degrades rather than
+ * erroring, and says so on the result: the filter route falls to the phrase
+ * search, and the judgement route judges the sentence exactly as typed.
  *
  * @see ./route-search.ts: which of them runs
  * @see ../../../../../../specs/traces-v2/search.feature
@@ -22,6 +23,7 @@ import type {
 import { combineQueries, quoteAsPhrase } from "../query-language/mutations";
 import { parse } from "../query-language/parse";
 import type {
+  ModelTrouble,
   RouteAvailability,
   RouteSearchInput,
   RouteSearchResult,
@@ -35,18 +37,51 @@ const logger = createLogger("langwatch:traces:search-router");
 /**
  * The codes model resolution fails with when the project has no model to
  * call: none set at any scope, or one set whose provider is switched off.
- * Both are fixed from the model provider settings, so both get the primer.
+ * Both are fixed from the model provider settings, which is what the strip
+ * under the bar offers when one of them is why a search degraded.
  */
 const MODEL_UNAVAILABLE_CODES: readonly string[] = [
   "model_not_configured",
   "model_provider_disabled",
 ];
 
-export function isModelUnavailableError(error: unknown): boolean {
-  return (
+/** Which of the two model problems this failure is. */
+export function modelTroubleOf(error: unknown): ModelTrouble {
+  const unavailable =
     error instanceof HandledError &&
-    MODEL_UNAVAILABLE_CODES.includes(error.code)
-  );
+    MODEL_UNAVAILABLE_CODES.includes(error.code);
+  return unavailable ? "no_model" : "model_failed";
+}
+
+/**
+ * The cause, short enough to sit inside the log message.
+ *
+ * It goes in the message rather than beside it because the collector that
+ * carries these lines ships `msg` and drops the structured fields, so a
+ * failure logged only as `err` reaches the operator as "something failed".
+ * Everything used here is already curated for a customer-facing disclosure
+ * (`summarizeProviderError` extracts a status, a vendor name and a model id
+ * and no prose), so nothing the provider wrote travels with it.
+ */
+function describeCause(error: unknown): string {
+  if (error instanceof HandledError) {
+    const meta = error.meta as {
+      httpStatus?: unknown;
+      provider?: unknown;
+      model?: unknown;
+    };
+    return [
+      error.code,
+      typeof meta.model === "string" ? meta.model : undefined,
+      typeof meta.provider === "string" ? meta.provider : undefined,
+      typeof meta.httpStatus === "number"
+        ? `HTTP ${meta.httpStatus}`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  return error instanceof Error ? error.name : "unknown error";
 }
 
 /** A query the language parses, or null when it does not. */
@@ -86,12 +121,12 @@ function phraseSearch({
 export function freeText({
   context,
   decidedBy,
-  isModelUnavailable = false,
+  modelTrouble,
   fellBackFrom,
 }: {
   context: RouteContext;
   decidedBy: SearchRouteDecidedBy;
-  isModelUnavailable?: boolean;
+  modelTrouble?: ModelTrouble;
   fellBackFrom?: SearchRouteKind | "routing";
 }): RouteSearchResult {
   context.deps.recordDecision({ route: "free_text", decidedBy });
@@ -99,8 +134,8 @@ export function freeText({
     kind: "free_text",
     query: phraseSearch(context),
     decidedBy,
-    isModelUnavailable,
     ...(fellBackFrom ? { fellBackFrom } : {}),
+    ...(modelTrouble ? { modelTrouble } : {}),
   };
 }
 
@@ -137,10 +172,12 @@ export function instantEval({
   context,
   question,
   decidedBy,
+  modelTrouble,
 }: {
   context: RouteContext;
-  question: { instructions: string; criteria: [string, string] };
+  question: { instructions: string; criteria?: [string, string] };
   decidedBy: SearchRouteDecidedBy;
+  modelTrouble?: ModelTrouble;
 }): RouteSearchResult {
   context.deps.recordDecision({ route: "instant_eval", decidedBy });
   return {
@@ -150,6 +187,7 @@ export function instantEval({
     otherQuery: context.explicitQuery,
     fallbackQuery: phraseSearch(context),
     decidedBy,
+    ...(modelTrouble ? { modelTrouble } : {}),
   };
 }
 
@@ -181,12 +219,12 @@ export async function buildFilterRoute({
   } catch (error) {
     logger.warn(
       { projectId: context.input.projectId, err: error },
-      "Filter route could not be built; searching the phrase instead",
+      `Filter route could not be built; searching the phrase instead (${describeCause(error)})`,
     );
     return freeText({
       context,
       decidedBy: "fallback",
-      isModelUnavailable: isModelUnavailableError(error),
+      modelTrouble: modelTroubleOf(error),
       fellBackFrom: "filter",
     });
   }
@@ -211,13 +249,19 @@ export async function buildInstantEvalRoute({
   } catch (error) {
     logger.warn(
       { projectId: context.input.projectId, err: error },
-      "Instant Eval question could not be written; searching the phrase instead",
+      `Instant Eval question could not be written; judging the sentence as typed (${describeCause(error)})`,
     );
-    return freeText({
+    // Not the phrase search. The sentence describes a judgement either way,
+    // and a judgement of the words as written is the search the reader asked
+    // for; matching those words literally is a different search that finds
+    // the wrong rows without saying so. This is what a chip typed by hand
+    // already does: the question as it stands, no criteria, no model between
+    // Enter and the estimate.
+    return instantEval({
       context,
+      question: { instructions: context.sentence },
       decidedBy: "fallback",
-      isModelUnavailable: isModelUnavailableError(error),
-      fellBackFrom: "instant_eval",
+      modelTrouble: modelTroubleOf(error),
     });
   }
   if (built.kind === "filter") {
