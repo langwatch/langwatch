@@ -4,7 +4,6 @@ import type { Project } from "~/generated/prisma/client";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
-import { useLegacySimulationsPreference } from "../hooks/useLegacySimulationsPreference";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -258,9 +257,6 @@ function TestSection({
   const agentTestingFlagLoading = workspaceLoading
     ? true
     : flagReadCanRun && flagReadLoading;
-  // A browser that recorded the previous-screens preference reads the
-  // Simulations group while the flag stays on for the rest of the project.
-  const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   return (
     <SidebarSection
@@ -269,8 +265,7 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      {agentTestingFlagLoading ? null : agentTestingEnabled &&
-        !legacyPreferred ? (
+      {agentTestingFlagLoading ? null : agentTestingEnabled ? (
         <PageMenuLink
           path={projectRoutes.agent_testing.path}
           icon={featureIcons.agent_testing.icon}
