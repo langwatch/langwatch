@@ -2077,6 +2077,11 @@ When nothing is outstanding, select **Finish the update**. The status reads
 **Finishing** while access through the previous provider is taken away, then
 **Complete**: your new connection is the only way your people sign in.
 
+<Frame>
+  <img src="/images/access/sso-update-finished-light.png" alt="The update status reads Complete. Everyone signs in through the new connection and the previous provider signs nobody in." className="block dark:hidden" />
+  <img src="/images/access/sso-update-finished-dark.png" alt="The update status reads Complete. Everyone signs in through the new connection and the previous provider signs nobody in." className="hidden dark:block" />
+</Frame>
+
 Finishing is not reversible. Switching back is no longer offered once it
 starts. If a check fails part-way, the page says which one and offers **Try
 finishing again**.
