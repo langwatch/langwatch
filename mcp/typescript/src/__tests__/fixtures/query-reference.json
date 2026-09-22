@@ -8280,7 +8280,7 @@
         },
         {
           "name": "analytics.ai_tool_entries",
-          "description": "Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog. Three first-class tile types via `type` discriminator: - \"coding_assistant\" - click expands to setup helper (e.g. `langwatch claude`) - \"model_provider\"   - click expands to inline personal-VK creation - \"external_tool\"    - click expands to admin-attached markdown + external link Scoping: organization-default entries can be OVERRIDDEN at the team tier (same `slug` + `scope=team` + matching `scopeId`) so admins can hide or re-skin a globally-listed tool for a specific team. The user-facing `list` endpoint resolves this hierarchy at read time. `config` is a discriminated JSON union per `type`: coding_assistant: { setupCommand, setupDocsUrl, helperText? } model_provider:   { providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? } external_tool:    { descriptionMarkdown, linkUrl, ctaLabel? } Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature",
+          "description": "Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog.",
           "grain": "one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -8311,7 +8311,7 @@
             {
               "name": "Scope",
               "type": "String",
-              "description": "\"organization\" | \"team\". String not enum so new scopes ship",
+              "description": "\"organization\" | \"team\".",
               "unit": null,
               "gates": [],
               "available": true
@@ -8319,7 +8319,7 @@
             {
               "name": "ScopeId",
               "type": "String",
-              "description": "organizationId or teamId, narrowing what scope this entry applies",
+              "description": "organizationId or teamId, narrowing what scope this entry applies to.",
               "unit": null,
               "gates": [],
               "available": true
@@ -8343,7 +8343,7 @@
             {
               "name": "Slug",
               "type": "String",
-              "description": "Stable slug for team-overrides-org resolution (a team-scoped",
+              "description": "Stable slug for team-overrides-org resolution (a team-scoped entry with the same slug as an org-scoped one hides the org default for users in that team).",
               "unit": null,
               "gates": [],
               "available": true
@@ -8351,7 +8351,7 @@
             {
               "name": "IconAsset",
               "type": "Nullable(String)",
-              "description": "Icon source - single column, prefix-discriminated:",
+              "description": "Icon source - single column, prefix-discriminated: \"preset:claude_code\" / \"preset:codex\" /...",
               "unit": null,
               "gates": [
                 "output"
@@ -8369,7 +8369,7 @@
             {
               "name": "Enabled",
               "type": "Bool",
-              "description": "When false the entry is hidden from the user-facing list but",
+              "description": "When false the entry is hidden from the user-facing list but remains in the admin list (so admins can re-enable without losing per-entry config).",
               "unit": null,
               "gates": [],
               "available": true
@@ -8377,7 +8377,7 @@
             {
               "name": "Config",
               "type": "String",
-              "description": "Per-type config JSON. Validated via zod discriminated union",
+              "description": "Per-type config JSON.",
               "unit": null,
               "gates": [
                 "output"
@@ -8429,7 +8429,7 @@
         },
         {
           "name": "analytics.ai_tool_entry_departments",
-          "description": "Per-department scope binding for AiToolEntry. Empty set = org-wide. Non-empty = entry visible only to members of those departments (an OrganizationUser whose `departmentId` is in the set). Mirrors AiToolEntryTeam's shape. `departmentId` is a plain column ref (relationMode=\"prisma\"), matching how Department is referenced elsewhere; the service validates the id belongs to the org.",
+          "description": "Per-department scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project",
           "joinKeys": [
             "TenantId",
@@ -8437,7 +8437,7 @@
             "EntryId",
             "DepartmentId"
           ],
-          "timeColumn": "TenantId",
+          "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
             {
@@ -8473,18 +8473,18 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AiToolEntryDepartmentId, EntryId, DepartmentId\nFROM analytics.ai_tool_entry_departments\nORDER BY TenantId DESC\nLIMIT 100"
+          "exampleSql": "SELECT AiToolEntryDepartmentId, EntryId, DepartmentId\nFROM analytics.ai_tool_entry_departments\nLIMIT 100"
         },
         {
           "name": "analytics.ai_tool_entry_teams",
-          "description": "@deprecated Per-team scope binding for AiToolEntry. Superseded by AiToolEntryDepartment; kept so the rename migration is non-destructive. No new rows are written here.",
+          "description": "Per-team scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
             "AiToolEntryTeamId",
             "EntryId"
           ],
-          "timeColumn": "TenantId",
+          "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
             {
@@ -8512,7 +8512,7 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AiToolEntryTeamId, EntryId\nFROM analytics.ai_tool_entry_teams\nORDER BY TenantId DESC\nLIMIT 100"
+          "exampleSql": "SELECT AiToolEntryTeamId, EntryId\nFROM analytics.ai_tool_entry_teams\nLIMIT 100"
         },
         {
           "name": "analytics.analytics",
@@ -8678,7 +8678,7 @@
             {
               "name": "MarkedForDatasetAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Set while the annotator wants this item's trace added to a dataset once",
+              "description": "Set while the annotator wants this item's trace added to a dataset once the queue walk is finished.",
               "unit": null,
               "gates": [],
               "available": true
@@ -8695,7 +8695,7 @@
             "AnnotationQueueId",
             "AnnotationScoreId"
           ],
-          "timeColumn": "TenantId",
+          "timeColumn": null,
           "freshness": "live — read from PostgreSQL at query time",
           "columns": [
             {
@@ -8723,7 +8723,7 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationQueueId, AnnotationScoreId\nFROM analytics.annotation_queue_scores\nORDER BY TenantId DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationQueueId, AnnotationScoreId\nFROM analytics.annotation_queue_scores\nLIMIT 100"
         },
         {
           "name": "analytics.annotation_queues",
@@ -9044,7 +9044,7 @@
         },
         {
           "name": "analytics.anomaly_alerts",
-          "description": "Persisted anomaly detection. Inserted by the anomaly-detection reactor (event-sourcing pipeline; modeled on PR #3351's alertTrigger pattern) when a rule's threshold trips while processing a freshly-arrived ActivityEventReceived event. Read by api.activityMonitor.recentAnomalies for the admin dashboard. Dedup: (ruleId, triggerWindowStart) - re-evaluating the same window updates the existing row rather than creating a duplicate. Acknowledgement / resolution are admin actions on the row. Spec: specs/ai-gateway/governance/anomaly-detection.feature",
+          "description": "Persisted anomaly detection.",
           "grain": "one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -9081,7 +9081,7 @@
             {
               "name": "Severity",
               "type": "String",
-              "description": "Denormalised from rule for fast WHERE filtering on the",
+              "description": "Denormalised from rule for fast WHERE filtering on the dashboard query (no join needed for the common path).",
               "unit": null,
               "gates": [
                 "output"
@@ -9123,7 +9123,7 @@
             {
               "name": "TriggerSpendUsd",
               "type": "Nullable(Decimal(18, 6))",
-              "description": "Numeric trigger context. Per-rule-type detail in `detail` JSONB.",
+              "description": "Numeric trigger context.",
               "unit": null,
               "gates": [
                 "costs"
@@ -9141,7 +9141,7 @@
             {
               "name": "Detail",
               "type": "String",
-              "description": "Per-rule-type extra context: {topActors: [...], baseline: ...,",
+              "description": "Per-rule-type extra context:.",
               "unit": null,
               "gates": [
                 "output"
@@ -9161,7 +9161,7 @@
             {
               "name": "DestinationStatus",
               "type": "String",
-              "description": "Per-destination dispatch outcome:",
+              "description": "Per-destination dispatch outcome:, slack:..., pagerduty:..., siem:..., email:... }.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9195,7 +9195,7 @@
         },
         {
           "name": "analytics.anomaly_rules",
-          "description": "Admin-defined anomaly detection rule. Evaluated server-side at ingest time (Option C - not in this slice yet) against gateway_activity_events. When triggered, an alert is dispatched to the destinations configured on the rule (Slack / SIEM / webhook / PagerDuty / email). This is a configuration entity - the actual rule evaluation + alert state lives in a future ClickHouse table (gateway_anomaly_alerts) and a server-side worker. Spec: specs/ai-gateway/governance/anomaly-rules.feature (Alexis lane B C-UI; mocked-v0 today, real persistence is THIS slice).",
+          "description": "Admin-defined anomaly detection rule.",
           "grain": "one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -9233,7 +9233,7 @@
             {
               "name": "ScopeId",
               "type": "String",
-              "description": "Org id / team id / project id / source-type string / source id",
+              "description": "Org id / team id / project id / source-type string / source id - narrows what the rule applies to.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9259,7 +9259,7 @@
             {
               "name": "Severity",
               "type": "String",
-              "description": "'critical' | 'warning' | 'info'. Drives default destination",
+              "description": "'critical' | 'warning' | 'info'.",
               "unit": null,
               "gates": [
                 "output"
@@ -9269,7 +9269,7 @@
             {
               "name": "RuleType",
               "type": "String",
-              "description": "Extensible rule taxonomy: 'spend_spike' | 'rate_limit' |",
+              "description": "Extensible rule taxonomy: 'spend_spike' | 'rate_limit' | 'tool_mismatch' | 'after_hours' | 'unusual_model' | 'pii_leak' | 'custom'.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9277,7 +9277,7 @@
             {
               "name": "ThresholdConfig",
               "type": "String",
-              "description": "Per-rule-type threshold shape. Examples:",
+              "description": "Per-rule-type threshold shape.",
               "unit": null,
               "gates": [
                 "output"
@@ -9287,7 +9287,7 @@
             {
               "name": "DestinationConfig",
               "type": "String",
-              "description": "Alert routing per destination. Shape:",
+              "description": "Alert routing per destination.",
               "unit": null,
               "gates": [
                 "output"
@@ -9297,7 +9297,7 @@
             {
               "name": "Status",
               "type": "String",
-              "description": "'active' (default - evaluator picks it up) | 'disabled' (admin",
+              "description": "'active' (default - evaluator picks it up) | 'disabled' (admin paused; rule rows kept for audit). 'archived' uses archivedAt timestamp instead so we can filter `archivedAt IS NULL` cheaply.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9483,88 +9483,6 @@
           "exampleSql": "SELECT BatchEvaluationId, ExperimentId, Status\nFROM analytics.batch_evaluations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.billing_meter_checkpoints",
-          "description": "Rows of the BillingMeterCheckpoint table, one row per (TenantId, BillingMeterCheckpointId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, BillingMeterCheckpointId); an organization-scoped row appears once per project",
-          "joinKeys": [
-            "TenantId",
-            "BillingMeterCheckpointId"
-          ],
-          "timeColumn": "UpdatedAt",
-          "freshness": "live — read from PostgreSQL at query time",
-          "columns": [
-            {
-              "name": "TenantId",
-              "type": "String",
-              "description": "Project the row belongs to. Join key to every other view.",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
-              "name": "BillingMeterCheckpointId",
-              "type": "String",
-              "description": "BillingMeterCheckpointId",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
-              "name": "BillingMonth",
-              "type": "String",
-              "description": "BillingMonth",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
-              "name": "Meter",
-              "type": "String",
-              "description": "Meter",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
-              "name": "LastReportedTotal",
-              "type": "Int32",
-              "description": "LastReportedTotal",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
-              "name": "PendingReportedTotal",
-              "type": "Nullable(Int32)",
-              "description": "PendingReportedTotal",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
-              "name": "ConsecutiveFailures",
-              "type": "Int32",
-              "description": "ConsecutiveFailures",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
-              "name": "UpdatedAt",
-              "type": "DateTime64(3)",
-              "description": "UpdatedAt",
-              "unit": null,
-              "gates": [],
-              "available": true
-            }
-          ],
-          "exampleSql": "SELECT BillingMeterCheckpointId, LastReportedTotal, PendingReportedTotal\nFROM analytics.billing_meter_checkpoints\nWHERE UpdatedAt >= subtractDays(now(), 7)\nORDER BY UpdatedAt DESC\nLIMIT 100"
-        },
-        {
           "name": "analytics.costs",
           "description": "Rows of the Cost table, one row per CostId.",
           "grain": "one row per CostId",
@@ -9734,7 +9652,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "Discriminator for the two chart shapes that share this table:",
+              "description": "Discriminator for the two chart shapes that share this table: - \"builder\" (default) - the chart builder's own `graph` payload - \"workbench_sql\" - a saved LangWatchQL workbench chart, whose `graph` holds the versioned definition Each reader filters by its own kind, so neither sees the other's rows and a builder chart can never be interpreted as a workbench definition.",
               "unit": null,
               "gates": [],
               "available": true
@@ -10278,7 +10196,7 @@
         },
         {
           "name": "analytics.department_membership_histories",
-          "description": "One dated person → department link (ADR-128 §13, #7882). `OrganizationUser.departmentId` stays the CURRENT assignment every screen reads; these rows are its history, appended by the same `assignUser` write so the two cannot drift. They exist for the cost reads: January's spend stays with January's department, so a read resolves against the link that was open on the cost's day, not against today's pointer. Members with no link on a day resolve to \"unassigned\", never to an error. Same shape as IdentityMatch's dated links, same one-open-link guard: the partial unique index in the migration rejects a second open row per (organizationId, userId) with SQLSTATE 23505.",
+          "description": "One dated person → department link.",
           "grain": "one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -10332,7 +10250,7 @@
             {
               "name": "ValidTo",
               "type": "Nullable(DateTime64(3))",
-              "description": "Null means the link is open. Reassignment and clearing close it.",
+              "description": "Null means the link is open.",
               "unit": null,
               "gates": [],
               "available": true
@@ -10350,7 +10268,7 @@
         },
         {
           "name": "analytics.departments",
-          "description": "A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing, ...). Assigned to OrganizationUser, Team, and Project via their `departmentId` column. Pure accounting: never grants or restricts access. See specs/ai-gateway/governance/departments.feature.",
+          "description": "A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...).",
           "grain": "one row per (TenantId, DepartmentId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -10412,7 +10330,7 @@
         },
         {
           "name": "analytics.discovered_agents",
-          "description": "The same shape as DiscoveredPerson for non-human actors - Genie spaces, Copilot bots, OpenAI projects - plus whatever provider-native metadata the source published. Discovering an agent grants it nothing either.",
+          "description": "A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published.",
           "grain": "one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -10467,7 +10385,7 @@
             {
               "name": "Metadata",
               "type": "String",
-              "description": "Workspace, plan, and kin - provider-native descriptive fields only. Never",
+              "description": "Workspace, plan, and kin - provider-native descriptive fields only.",
               "unit": null,
               "gates": [
                 "output"
@@ -10511,7 +10429,7 @@
         },
         {
           "name": "analytics.discovered_persons",
-          "description": "A name-text seen on a provider's cost or audit rows: \"the provider told us someone called m.silva exists\". One row per provider-scoped identity. This is the unit of GDPR erasure (ADR-128 §9), and deliberately so: most of these people have no LangWatch login at all - contractors, seat holders who never signed in, anyone whose email a provider put on a cost row - so there is no platform user to key on and a user-deletion event can never fire for them.",
+          "description": "A name-text seen on a provider's cost or audit rows: \"the provider told us someone called m.silva exists\".",
           "grain": "one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -10539,7 +10457,7 @@
             {
               "name": "Provider",
               "type": "String",
-              "description": "\"anthropic\" | \"openai\" | \"databricks\" | ... - the provider that named them.",
+              "description": "\"anthropic\" | \"openai\" | \"databricks\" |... - the provider that named them.",
               "unit": null,
               "gates": [],
               "available": true
@@ -10547,7 +10465,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "person | service_account - determined deterministically per ADR-128 §10",
+              "description": "person | service_account - determined deterministically per (a bare UUID in Databricks `executed_by` is a service account, never an agent), never guessed from the shape of a name.",
               "unit": null,
               "gates": [],
               "available": true
@@ -10581,7 +10499,7 @@
             {
               "name": "ErasedAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Set when this row's identity has been erased. The row survives so its",
+              "description": "Set when this row's identity has been erased.",
               "unit": null,
               "gates": [],
               "available": true
@@ -10589,7 +10507,7 @@
             {
               "name": "MoneyRowsPendingAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Set alongside `erasedAt` and cleared once the daily cost rows have been",
+              "description": "Set alongside `erasedAt` and cleared once the daily cost rows have been removed and their rebuild requested.",
               "unit": null,
               "gates": [
                 "costs"
@@ -10609,7 +10527,7 @@
             {
               "name": "SuspendedAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "ADR-128 §12 conflict rule: automatic linking has stopped for this",
+              "description": "conflict rule: automatic linking has stopped for this identity because evidence pointed at two candidates, or contradicted an existing link.",
               "unit": null,
               "gates": [
                 "costs"
@@ -10704,7 +10622,7 @@
         },
         {
           "name": "analytics.erased_identifier_suppressions",
-          "description": "Hashes of erased identifiers - the do-not-reimport list. Without it the erasure is undone by the pipeline that produced it: the pullers look 30 days back, so the next day's pull re-ingests the same email and re-writes what we erased. Every write path carrying an identifier consults this list and drops a suppressed one (ADR-128 §9 step 1). It stores hashes and never identifiers, so it is not itself a copy of the data it exists to keep out. The stored `identifierHash` and the pseudonym written in place of the erased value are the same function of the same input - HMAC-SHA256(secret, identifier) - so a write path computes that digest once and uses it twice: as the membership test, and, on a hit, as the replacement value. That is why no original-to-pseudonym mapping table exists; one would hold the erased identifier in plaintext forever. Scoped to the provider as well as the organization: the same string can be a different person under a different provider.",
+          "description": "Hashes of erased identifiers - the do-not-reimport list.",
           "grain": "one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -10895,7 +10813,7 @@
             {
               "name": "Version",
               "type": "Int32",
-              "description": "The number the version is addressed and displayed by. Numbered rows hold",
+              "description": "The number the version is addressed and displayed by.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12011,7 +11929,7 @@
         },
         {
           "name": "analytics.github_branch_pull_request_checks",
-          "description": "The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again. A branch with no pull request is the common case, so `notFoundAt` plus `recheckAfter` is what keeps an unmapped branch from costing a GitHub call on every read. Spec: specs/integrations/github-connection.feature.",
+          "description": "The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again.",
           "grain": "one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12081,7 +11999,7 @@
             {
               "name": "NotFoundAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Set while the branch resolves to no pull request; cleared once one is",
+              "description": "Set while the branch resolves to no pull request; cleared once one is found.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12105,7 +12023,7 @@
             {
               "name": "LastRequestedAt",
               "type": "DateTime64(3)",
-              "description": "When a reader last asked about this branch, whether or not GitHub was",
+              "description": "When a reader last asked about this branch, whether or not GitHub was called.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12131,7 +12049,7 @@
         },
         {
           "name": "analytics.github_installations",
-          "description": "The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization. Short-lived (1h) installation access tokens are minted against these rows on demand, by Langy for writes (bot-authored pull requests, scoped to the installation's repositories) and by pull-request linkage for reads. No user token and no secret are stored here, the crown jewel is the App private key, held only in the control-plane env. Spec: specs/integrations/github-connection.feature. installationId is globally unique (one GitHub installation, one row); a single LangWatch organization may own MANY installations (different GitHub accounts), so the org to installation relationship is one-to-many.",
+          "description": "The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization.",
           "grain": "one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12161,7 +12079,7 @@
             {
               "name": "InstallationId",
               "type": "String",
-              "description": "GitHub installation id (numeric; stored as string). Globally unique.",
+              "description": "GitHub installation id (numeric; stored as string).",
               "unit": null,
               "gates": [],
               "available": true
@@ -12169,7 +12087,7 @@
             {
               "name": "AccountLogin",
               "type": "String",
-              "description": "The GitHub account (organization or user) the App is installed on.",
+              "description": "The GitHub account the App is installed on.",
               "unit": null,
               "gates": [
                 "output"
@@ -12195,7 +12113,7 @@
             {
               "name": "RepositorySelection",
               "type": "String",
-              "description": "\"all\" or \"selected\" — whether the App can see every repo on the account",
+              "description": "\"all\" or \"selected\" — whether the App can see every repo on the account or only a chosen subset.",
               "unit": null,
               "gates": [
                 "output"
@@ -12205,7 +12123,7 @@
             {
               "name": "Repositories",
               "type": "Nullable(String)",
-              "description": "Cached repository list [{ id, fullName }] when repositorySelection =",
+              "description": "Cached repository list [ ] when repositorySelection = \"selected\".",
               "unit": null,
               "gates": [
                 "output"
@@ -12215,7 +12133,7 @@
             {
               "name": "SuspendedAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Set when GitHub suspends the installation; cleared on unsuspend. A",
+              "description": "Set when GitHub suspends the installation; cleared on unsuspend.",
               "unit": null,
               "gates": [
                 "costs"
@@ -12243,7 +12161,7 @@
         },
         {
           "name": "analytics.github_pull_requests",
-          "description": "A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced. Spec: specs/integrations/github-connection.feature. The stored title, state, draft and timestamp columns are SNAPSHOTS taken when the mapping was last refreshed. They are fallback labels only: the frontend reads live status from GitHub, so a stale row never presents itself as current truth.",
+          "description": "A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced.",
           "grain": "one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12279,7 +12197,7 @@
             {
               "name": "RepositoryFullName",
               "type": "String",
-              "description": "\"owner/repo\", stored LOWERCASED so a lookup matches whatever casing the",
+              "description": "\"owner/repo\", stored LOWERCASED so a lookup matches whatever casing the session reported.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12365,7 +12283,7 @@
             {
               "name": "PrUpdatedAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "GitHub's own `updated_at` for the snapshot this row holds, and the",
+              "description": "GitHub's own `updated_at` for the snapshot this row holds, and the freshness guard on every write to it: a snapshot older than the stored one is skipped.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12407,7 +12325,7 @@
         },
         {
           "name": "analytics.governance_tenant_histories",
-          "description": "Every ClickHouse `TenantId` this organization has ever written governance rows under, appended on first use and never pruned. The live `resolveGovProjectId` lookup cannot be this translation: it filters `archivedAt: null` and so returns null forever once someone archives the governance project, while the write path re-reads the same project by slug with no such filter and keeps landing rows under the old tenant. The organization would map to zero tenants on read and one on write - a permanent split-brain in which the cost screen reports \"no governance data\" and an erasure job erases nothing and reports success. Reads resolve against the whole history; erasure walks all of it, because personal data does not stop existing in a tenant that stopped being current.",
+          "description": "Every tenant id this organization has ever written governance rows under, appended on first use and never pruned.",
           "grain": "one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12453,7 +12371,7 @@
         },
         {
           "name": "analytics.identity_match_suggestions",
-          "description": "Match candidates a background job computed and a human has yet to confirm (ADR-128 §12). Stored rather than computed when the review screen asks, and the reason is measured rather than stylistic: fuzzy matching is quadratic, there is no database route to it here, and at this document's own example size - 2,000 discovered people against 500 accounts - plain edit distance over the 1,000,000 pairs blocked the event loop for 2.9 seconds. Per page load, uncached, stalling every other request on the instance. A stored row also makes a pending count answerable without paying for the whole sweep. Rows are written only by the job, which prefilters before it scores and recomputes when its inputs change. Confirming one opens an `IdentityMatch` and deletes the suggestion. Suspension deliberately does NOT live here - it is on `DiscoveredPerson`, because a halt on automatic linking that the next recompute clears is not a halt.",
+          "description": "Match candidates a background job computed and a human has yet to confirm.",
           "grain": "one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12491,7 +12409,7 @@
             {
               "name": "UserId",
               "type": "String",
-              "description": "The platform user this might be. Not nullable: a suggestion with no",
+              "description": "The platform user this might be.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12499,7 +12417,7 @@
             {
               "name": "Score",
               "type": "Float64",
-              "description": "Similarity of the two name texts, after the prefilter, in [0, 1]. A",
+              "description": "Similarity of the two name texts, after the prefilter, in [0, 1].",
               "unit": null,
               "gates": [],
               "available": true
@@ -12517,7 +12435,7 @@
         },
         {
           "name": "analytics.identity_matches",
-          "description": "The dated match table: \"`user_abc123` on Anthropic is platform user #42, valid from March 3\", closed when it stops being true. Dating is what makes a re-issued email address survivable: the leaver's link closes at offboarding, the new hire gets a new link, and January's spend stays with January's person. A correction closes the old row and opens a new one; nothing is ever silently rewritten.",
+          "description": "A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true.",
           "grain": "one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12555,7 +12473,7 @@
             {
               "name": "UserId",
               "type": "Nullable(String)",
-              "description": "The platform user. Nullable, and blanked by erasure (ADR-128 §9 step 2) -",
+              "description": "The platform user.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12563,7 +12481,7 @@
             {
               "name": "EvidenceKind",
               "type": "String",
-              "description": "directory_id | verified_email | human_confirmed. Exact verified-email",
+              "description": "directory_id | verified_email | human_confirmed.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12579,7 +12497,7 @@
             {
               "name": "ValidTo",
               "type": "Nullable(DateTime64(3))",
-              "description": "Null means the link is open. Offboarding and corrections close it.",
+              "description": "Null means the link is open.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12715,7 +12633,7 @@
             {
               "name": "LastSuccessAt",
               "type": "Nullable(Float64)",
-              "description": "When a run last completed without erroring. Backfilled by replay, which",
+              "description": "When a run last completed without erroring.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12723,7 +12641,7 @@
             {
               "name": "LastRunScheduledFor",
               "type": "Nullable(Float64)",
-              "description": "Identity of the run whose outcome this row reflects. Outcomes from a",
+              "description": "Identity of the run whose outcome this row reflects.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12731,7 +12649,7 @@
             {
               "name": "LastReadThroughAt",
               "type": "Nullable(Float64)",
-              "description": "ADR-128 - how far the last run read, in epoch milliseconds, and whether",
+              "description": "- how far the last run read, in epoch milliseconds, and whether it reached the end.",
               "unit": "ms",
               "gates": [],
               "available": true
@@ -12749,7 +12667,7 @@
             {
               "name": "LastAgentsListingAt",
               "type": "Nullable(Float64)",
-              "description": "The last time somebody asked this source to enumerate its agents, and how",
+              "description": "The last time somebody asked this source to enumerate its agents, and how that ask ended.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12793,7 +12711,7 @@
             {
               "name": "LastPeopleListingAt",
               "type": "Nullable(Float64)",
-              "description": "The same for people, in its own set of columns rather than sharing the",
+              "description": "The same for people, in its own set of columns rather than sharing the agents set with a kind discriminator.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12895,7 +12813,7 @@
         },
         {
           "name": "analytics.ingestion_sources",
-          "description": "Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor (cf. specs/ai-gateway/governance/activity-monitor.feature + ingestion-sources.feature, docs/ai-gateway/governance/architecture.md). One IngestionSource = one upstream fleet (e.g. \"Miro Cowork\", \"Acme Workato production\"). The runtime ingests events on whatever cadence the source supports - push for OTel/webhook/S3 (Tier C/D), pull for poll-based admin APIs (Tier C). Per-source-type adapters normalise platform-specific shapes into OCSF + AOS before they land in trace_summaries with SourceType + SourceId tags.",
+          "description": "Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor.",
           "grain": "one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -12935,7 +12853,7 @@
             {
               "name": "SourceType",
               "type": "String",
-              "description": "'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |",
+              "description": "'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' | 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).",
               "unit": null,
               "gates": [],
               "available": true
@@ -12943,7 +12861,7 @@
             {
               "name": "Name",
               "type": "String",
-              "description": "Human-friendly label for the admin UI. Unique per-org so two",
+              "description": "Human-friendly label for the admin UI.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12961,7 +12879,7 @@
             {
               "name": "ErrorCount",
               "type": "Int32",
-              "description": "Phase 10 - number of consecutive errors observed by the puller",
+              "description": "Phase 10 - number of consecutive errors observed by the puller worker.",
               "unit": null,
               "gates": [],
               "available": true
@@ -12969,7 +12887,7 @@
             {
               "name": "PullSchedule",
               "type": "Nullable(String)",
-              "description": "Phase 10 - cron schedule for pull-mode sources. Validated by the",
+              "description": "Phase 10 - cron schedule for pull-mode sources.",
               "unit": null,
               "gates": [
                 "output"
@@ -12979,7 +12897,7 @@
             {
               "name": "Status",
               "type": "String",
-              "description": "Status flag. 'active' (default), 'disabled' (admin paused), or",
+              "description": "Status flag. 'active' (default), 'disabled' (admin paused), or 'awaiting_first_event' (created but never received).",
               "unit": null,
               "gates": [],
               "available": true
@@ -12987,7 +12905,7 @@
             {
               "name": "TraceProjectId",
               "type": "Nullable(String)",
-              "description": "ADR-088 v7: optional trace DESTINATION for conversation-bearing pulls",
+              "description": "v7: optional trace DESTINATION for conversation-bearing pulls (Databricks Genie).",
               "unit": null,
               "gates": [],
               "available": true
@@ -12995,7 +12913,7 @@
             {
               "name": "ProviderAccountId",
               "type": "Nullable(String)",
-              "description": "The account the provider itself named when this connection was saved -",
+              "description": "The account the provider itself named when this connection was saved - an OpenAI or Anthropic organization id, read once per save and compared so a second connection cannot read one account's spend twice.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13003,7 +12921,7 @@
             {
               "name": "LastEventAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "Last event timestamp observed (any direction). Surfaces in the",
+              "description": "Last event timestamp observed (any direction).",
               "unit": null,
               "gates": [],
               "available": true
@@ -13011,7 +12929,7 @@
             {
               "name": "LastSuccessAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "ADR-128 - when a pull run last reached the provider without erroring,",
+              "description": "- when a pull run last reached the provider without erroring, mirrored from the ingestionPullRunStatus projection.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13019,7 +12937,7 @@
             {
               "name": "LastReadThroughAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "ADR-128 - how far the last run actually read, and whether it reached the",
+              "description": "- how far the last run actually read, and whether it reached the end.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13037,7 +12955,7 @@
             {
               "name": "UnpricedUsageSince",
               "type": "Nullable(DateTime64(3))",
-              "description": "ADR-088 - the window this source read while pulled cost recording was",
+              "description": "- the window this source read while pulled cost recording was off for the organization, so its spend was dropped rather than priced.",
               "unit": null,
               "gates": [
                 "costs"
@@ -13091,7 +13009,7 @@
         },
         {
           "name": "analytics.ingestion_templates",
-          "description": "Admin/platform-curated catalog row for upstream OTLP normalization. Owns the OTTL transform that reshapes a specific upstream tool's span shape into canonical gen_ai conventions. Users connect via an ingestion key (an ingest-only ApiKey carrying ingestionTemplateId) to land traces in their personal project. `organizationId` NULL = platform-published default (always-visible across every org). NOT NULL = org-authored (visible only within that org). v1 ships only platform-published; org-authored authoring UI lands v2 (the column ships now to avoid a future migration). Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature",
+          "description": "Admin/platform-curated catalog row for upstream OTLP normalization.",
           "grain": "one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",
@@ -13121,7 +13039,7 @@
             {
               "name": "Slug",
               "type": "String",
-              "description": "Stable slug - unique within (organizationId, slug) scope. Generated",
+              "description": "Stable slug - unique within scope.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13129,7 +13047,7 @@
             {
               "name": "SourceType",
               "type": "String",
-              "description": "Mirrors the slug for v1 platform-published rows. Kept as a separate",
+              "description": "Mirrors the slug for v1 platform-published rows.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13155,7 +13073,7 @@
             {
               "name": "IconAsset",
               "type": "Nullable(String)",
-              "description": "Icon source - single column, prefix-discriminated, mirrors",
+              "description": "Icon source - single column, prefix-discriminated, mirrors AiToolEntry.iconAsset: `preset: ` (built-in slot) `data:image/svg+xml;base64,…` (admin-uploaded for org-authored) null → fall back to slug-default in UI.",
               "unit": null,
               "gates": [
                 "output"
@@ -13165,7 +13083,7 @@
             {
               "name": "OttlRules",
               "type": "String",
-              "description": "Admin/platform-authored OTTL statements. Applied at receive time",
+              "description": "Admin/platform-authored OTTL statements.",
               "unit": null,
               "gates": [
                 "output"
@@ -13175,7 +13093,7 @@
             {
               "name": "PlatformPublished",
               "type": "Bool",
-              "description": "True for the v1 platform-published default templates",
+              "description": "True for the v1 platform-published default templates.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13183,7 +13101,7 @@
             {
               "name": "Enabled",
               "type": "Bool",
-              "description": "Admin/platform enable. False = hidden from /me catalog. Existing",
+              "description": "Admin/platform enable.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13233,7 +13151,7 @@
         },
         {
           "name": "analytics.langy_active_turns",
-          "description": "Postgres-authoritative one-turn admission for a conversation. PREPARING claims are leased so a crash before the durable start event can recover; COMMITTED claims are released only by the matching terminal event. Shared Langy conversations only; a member's private conversations are not queryable.",
+          "description": "Postgres-authoritative one-turn admission for a conversation. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyActiveTurnId",
           "joinKeys": [
             "TenantId",
@@ -13341,7 +13259,7 @@
         },
         {
           "name": "analytics.langy_conversation_projections",
-          "description": "Rebuildable operational state folded from Langy's canonical event stream. The source of truth remains the ClickHouse event log. Shared Langy conversations only; a member's private conversations are not queryable.",
+          "description": "Rebuildable operational state folded from Langy's canonical event stream. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyConversationProjectionId",
           "joinKeys": [
             "TenantId",
@@ -13523,7 +13441,7 @@
             {
               "name": "AcceptedAt",
               "type": "Float64",
-              "description": "Event-log acceptance time. Together with lastEventId this is the cursor.",
+              "description": "Event-log acceptance time.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13596,7 +13514,7 @@
             {
               "name": "Status",
               "type": "String",
-              "description": "LangyConversationTurnStatus. Deliberately TEXT, not a Postgres enum: this",
+              "description": "LangyConversationTurnStatus.",
               "unit": null,
               "gates": [],
               "available": true
@@ -13720,7 +13638,7 @@
         },
         {
           "name": "analytics.langy_message_projections",
-          "description": "Rebuildable operational message fact. One source event produces one row. Shared Langy conversations only; a member's private conversations are not queryable.",
+          "description": "Rebuildable operational message fact. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyMessageProjectionId",
           "joinKeys": [
             "TenantId",
@@ -13827,7 +13745,7 @@
         },
         {
           "name": "analytics.langy_turn_requests",
-          "description": "Durable idempotency receipt for one logical Langy send. A transport retry reuses the same requestId and receives the original conversation/turn ids instead of minting a second message or turn. Shared Langy conversations only; a member's private conversations are not queryable.",
+          "description": "Durable idempotency receipt for one logical Langy send. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyTurnRequestId",
           "joinKeys": [
             "TenantId",
@@ -14674,7 +14592,7 @@
             {
               "name": "SourceEventId",
               "type": "String",
-              "description": "The raw source event id, kept UNINDEXED for diagnostics. A caller composes",
+              "description": "The raw source event id, kept UNINDEXED for diagnostics.",
               "unit": null,
               "gates": [],
               "available": true
@@ -14773,7 +14691,7 @@
         },
         {
           "name": "analytics.process_manager_outbox_attempts",
-          "description": "Why an outbox delivery failed, one row per FAILED attempt (specs/ops/dead-letter-recovery.feature). Successes write nothing, so the table grows with trouble, not with traffic. Rows die with their message: the cascade delete is the retention story, riding the existing sweep.",
+          "description": "One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic.",
           "grain": "one row per ProcessManagerOutboxAttemptId",
           "joinKeys": [
             "TenantId",
@@ -14842,7 +14760,7 @@
             {
               "name": "ErrorMessage",
               "type": "String",
-              "description": "The safe failure diagnostic the dispatcher already computes for its",
+              "description": "The safe failure diagnostic the dispatcher already computes for its span — never a raw provider body.",
               "unit": null,
               "gates": [
                 "output"
@@ -15068,7 +14986,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "Project kind:",
+              "description": "Project kind: - \"application\": user-facing workspace where developers send their own app traces.",
               "unit": null,
               "gates": [],
               "available": true
@@ -15178,7 +15096,7 @@
             {
               "name": "PersonalFeatures",
               "type": "String",
-              "description": "Per-feature unlock flags for personal projects only. Shape:",
+              "description": "Per-feature unlock flags for personal projects only.",
               "unit": null,
               "gates": [
                 "output"
@@ -15188,7 +15106,7 @@
             {
               "name": "DepartmentId",
               "type": "Nullable(String)",
-              "description": "Department assignment for spend attribution (the project / agent",
+              "description": "Department assignment for spend attribution (the project / agent lens, used when a trace has no principal user).",
               "unit": null,
               "gates": [],
               "available": true
@@ -15196,7 +15114,7 @@
             {
               "name": "LangyEgressAllowlist",
               "type": "Nullable(String)",
-              "description": "Per-project Langy egress allow-list (ADR-076). A nullable JSON array of",
+              "description": "Per-project Langy egress allow-list.",
               "unit": null,
               "gates": [
                 "output"
@@ -15206,7 +15124,7 @@
             {
               "name": "LastCodingAgentSessionAt",
               "type": "Nullable(DateTime64(3))",
-              "description": "When a coding-agent session was last folded for this project, and when a",
+              "description": "When a coding-agent session was last folded for this project, and when a pull request was last mapped for a branch one of those sessions ran on.",
               "unit": null,
               "gates": [],
               "available": true
@@ -15941,7 +15859,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "Discriminator for the two storage shapes that share this table:",
+              "description": "Discriminator for the two storage shapes that share this table: - \"v1-traces-filter\" (default) - legacy /messages page filter map saved views - \"v2-traces-lens\" - new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON Each client filters by its own kind on read so neither sees the other's rows.",
               "unit": null,
               "gates": [],
               "available": true
@@ -16039,7 +15957,7 @@
             {
               "name": "Snapshot",
               "type": "String",
-              "description": "Envelope { schemaVersion, fields, changedFields } holding the editable",
+              "description": "Envelope holding the editable field set as saved and the names of the fields this save changed.",
               "unit": null,
               "gates": [
                 "output"
@@ -16659,7 +16577,7 @@
         },
         {
           "name": "analytics.topic_clustering_run_history_projections",
-          "description": "Per-project topic clustering run history (audit read model, ADR-051). One row per project; `runs` is the bounded newest-first entry list. Rebuildable by replaying the event log.",
+          "description": "Per-project topic clustering run history (audit read model).",
           "grain": "one row per TopicClusteringRunHistoryProjectionId",
           "joinKeys": [
             "TenantId",
@@ -16722,7 +16640,7 @@
             {
               "name": "AcceptedAt",
               "type": "Float64",
-              "description": "Event-log acceptance time. Together with lastEventId this is the cursor.",
+              "description": "Event-log acceptance time.",
               "unit": null,
               "gates": [],
               "available": true
@@ -16748,7 +16666,7 @@
         },
         {
           "name": "analytics.topic_clustering_run_projections",
-          "description": "Per-project topic clustering run status (ADR-051): the rebuildable operational read model behind the settings page. One row per project; folded from run_completed/run_failed events, never written directly.",
+          "description": "Per-project topic clustering run status: the rebuildable operational read model behind the settings page.",
           "grain": "one row per TopicClusteringRunProjectionId",
           "joinKeys": [
             "TenantId",
@@ -16804,7 +16722,7 @@
             {
               "name": "LastRunOutcome",
               "type": "Nullable(String)",
-              "description": "completed | skipped | failed",
+              "description": "completed | skipped | failed.",
               "unit": null,
               "gates": [
                 "output"
@@ -16916,7 +16834,7 @@
             {
               "name": "InProgressStartedAt",
               "type": "Nullable(Float64)",
-              "description": "Business time the in-progress run opened; bounds how long the read",
+              "description": "Business time the in-progress run opened; bounds how long the read model may report it as running (mirrors the process's stale-run guard).",
               "unit": null,
               "gates": [],
               "available": true
@@ -16948,7 +16866,7 @@
             {
               "name": "AcceptedAt",
               "type": "Float64",
-              "description": "Event-log acceptance time. Together with lastEventId this is the cursor.",
+              "description": "Event-log acceptance time.",
               "unit": null,
               "gates": [],
               "available": true
@@ -16974,7 +16892,7 @@
         },
         {
           "name": "analytics.topic_model_projections",
-          "description": "Cursor row for the topic-model projection (ADR-051). The model itself is the `Topic` table, written through by the projection; this row only records how far the fold has applied the event log.",
+          "description": "Cursor row for the topic-model projection.",
           "grain": "one row per TopicModelProjectionId",
           "joinKeys": [
             "TenantId",
@@ -17027,7 +16945,7 @@
             {
               "name": "AcceptedAt",
               "type": "Float64",
-              "description": "Event-log acceptance time. Together with lastEventId this is the cursor.",
+              "description": "Event-log acceptance time.",
               "unit": null,
               "gates": [],
               "available": true
@@ -17779,7 +17697,7 @@
         },
         {
           "name": "analytics.webhook_endpoint_deliveries",
-          "description": "The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires. One row per HTTP attempt; `dispatchId` groups every attempt of one logical send (the value of the X-LangWatch-Delivery-Id or X-LangWatch-Event-Id header). A slim facts table: outcome, status, latency, a capped error message, and a truncated copy of a failure response. Our request content (URL, headers, body) is never stored. Pruned after 30 days. The two channels used to keep separate tables with the same columns and two prune implementations. They are one table with a discriminator now, so the tenancy columns of the channel that did not write a row are null.",
+          "description": "The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires.",
           "grain": "one row per WebhookEndpointDeliveryId",
           "joinKeys": [
             "TenantId",
@@ -17819,7 +17737,7 @@
             {
               "name": "OrganizationId",
               "type": "Nullable(String)",
-              "description": "Platform tenancy. Null on automations rows.",
+              "description": "Platform tenancy.",
               "unit": null,
               "gates": [],
               "available": true
@@ -17851,7 +17769,7 @@
             {
               "name": "Attempt",
               "type": "Nullable(Int32)",
-              "description": "1-based attempt and the batch's envelope count. Both null on automations",
+              "description": "1-based attempt and the batch's envelope count.",
               "unit": null,
               "gates": [],
               "available": true

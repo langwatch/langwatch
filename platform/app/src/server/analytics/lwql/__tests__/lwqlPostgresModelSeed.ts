@@ -253,24 +253,6 @@ function tenantLink(
 const SEED_COLUMN_OVERRIDES: Readonly<
   Record<string, Readonly<Record<string, string | null>>>
 > = {
-  // `WebhookEndpoint_destination_shape_check`: the seeded `destinationKind`
-  // is 'http' (the enum's first value, per `enumDefault`), which requires
-  // `url` set and every `sqs*` column null. `sqsAccessKeyId` and
-  // `sqsSecretAccessKeyEncrypted` match the secret-column pattern the
-  // derivation strips by default, so without this override they would carry
-  // the `excluded-…` marker (non-null) instead of null and fail the
-  // constraint. The no-leak proof those two columns exist for is instead
-  // carried by `secretEncrypted`, which is required (never null under this
-  // override) and keeps its own marker.
-  WebhookEndpoint: {
-    url: quoteLiteral("https://example.com/webhook"),
-    sqsQueueUrl: null,
-    sqsRoleArn: null,
-    sqsExternalId: null,
-    sqsAccessKeyId: null,
-    sqsSecretAccessKeyEncrypted: null,
-  },
-
   // `extraHeaders` is Json, so rule 4's string-only marker never fires for it;
   // this override nests the marker inside realistic header JSON so the
   // generic "no excluded- marker leaks" isolation proof also exercises it.

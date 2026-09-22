@@ -151,6 +151,20 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       Then the example has no WHERE clause comparing the time column to a date
       And the example orders by the time column instead
 
+    @unit
+    Scenario: A model with no timestamp column advertises no time column
+      Given a Prisma model that carries no DateTime64 or CreatedAt column
+      When the Postgres catalog is derived
+      Then the model's timeColumn is undefined
+      And queries cannot filter by time on that model
+
+    @unit
+    Scenario: A model with a CreatedAt column keeps it as the time column
+      Given a Prisma model that carries a CreatedAt column
+      When the Postgres catalog is derived
+      Then the model's timeColumn is set to CreatedAt
+      And queries can use CreatedAt to filter by time window
+
   Rule: Topics are the proving slice
 
     @integration

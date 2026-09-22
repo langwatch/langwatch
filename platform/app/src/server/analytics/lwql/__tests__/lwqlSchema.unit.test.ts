@@ -64,7 +64,7 @@ function columnsOf(protections: Protections) {
  * cannot be compared to a date.
  */
 function hasBoundableTimeColumn(dataset: {
-  timeColumn: string;
+  timeColumn: string | null;
   columns: readonly { name: string; type: string }[];
 }) {
   const timeColumn = dataset.columns.find(
@@ -351,9 +351,17 @@ describe("given the LangWatchQL schema catalog", () => {
       ).toBeGreaterThan(0);
       for (const dataset of unboundable) {
         expect(dataset.exampleSql, dataset.name).not.toContain("WHERE");
-        expect(dataset.exampleSql, dataset.name).toContain(
-          `ORDER BY ${dataset.timeColumn} DESC`,
-        );
+        if (dataset.timeColumn === null) {
+          // No temporal column at all: nothing to order by either, so the
+          // example is a bare projection with a LIMIT rather than
+          // `ORDER BY null`.
+          expect(dataset.exampleSql, dataset.name).not.toContain("ORDER BY");
+        } else {
+          // A present-but-unboundable time column (an opaque key) still orders.
+          expect(dataset.exampleSql, dataset.name).toContain(
+            `ORDER BY ${dataset.timeColumn} DESC`,
+          );
+        }
       }
     });
 

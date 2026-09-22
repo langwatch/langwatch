@@ -140,8 +140,12 @@ export interface LangWatchQLSchemaView {
   readonly grain: string;
   /** Columns another LangWatchQL view can be joined to this one on. */
   readonly joinKeys: readonly string[];
-  /** Filter on this to prune partitions. */
-  readonly timeColumn: string;
+  /**
+   * Filter on this to prune partitions, or `null` for a view with no temporal
+   * column. Explicitly `null` rather than absent, like `unit`, so a consumer
+   * can tell "this view has no time column" from an older API.
+   */
+  readonly timeColumn: string | null;
   /** How far behind ingestion this view can be. */
   readonly freshness: string;
   readonly columns: readonly LangWatchQLSchemaColumn[];
@@ -254,10 +258,13 @@ export function lwqlExampleSql({
       : `SELECT count() AS rows\nFROM ${database}.${view.name}`;
   }
   if (!lookback) {
+    // A view with no time column has nothing to order by — emit the projection
+    // and a bare LIMIT rather than `ORDER BY undefined`.
+    const orderBy = view.timeColumn ? `ORDER BY ${view.timeColumn} DESC\n` : "";
     return (
       `SELECT ${projection.join(", ")}\n` +
       `FROM ${database}.${view.name}\n` +
-      `ORDER BY ${view.timeColumn} DESC\n` +
+      `${orderBy}` +
       `LIMIT ${EXAMPLE_ROW_LIMIT}`
     );
   }
@@ -300,7 +307,7 @@ export function describeLangWatchQLSchema({
       description: view.description,
       grain: view.grain,
       joinKeys: view.joinKeys,
-      timeColumn: view.timeColumn,
+      timeColumn: view.timeColumn ?? null,
       freshness: view.freshness,
       columns: view.columns.map((column) => ({
         name: column.name,

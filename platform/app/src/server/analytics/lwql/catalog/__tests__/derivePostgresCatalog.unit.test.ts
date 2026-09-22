@@ -23,6 +23,7 @@ import {
   derivePostgresCatalog,
   isStrippedByDefault,
   resolveTenantScope,
+  sanitizeDescription,
 } from "../derivePostgresCatalog";
 import { LWQL_POSTGRES_SKIPPED_MODELS } from "../postgresSkippedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
@@ -239,5 +240,94 @@ describe("given the derived Postgres catalog", () => {
       expect(valueJson.sourceColumns).toEqual(["value"]);
       expect(valueJson.gates).toEqual(["output"]);
     });
+  });
+
+  describe("when a model has no temporal column", () => {
+    /** @scenario "A model with no timestamp column advertises no time column" */
+    it("carries no time column instead of falling back to a key or TenantId", () => {
+      const view = byName.get("ai_tool_entry_departments")!;
+      expect(
+        view.columns.some((column) => column.type.includes("DateTime64")),
+        "fixture assumption: the view exposes no DateTime column",
+      ).toBe(false);
+      expect(view.columns.some((column) => column.name === "CreatedAt")).toBe(
+        false,
+      );
+      expect(view.timeColumn).toBeUndefined();
+    });
+
+    /** @scenario "A model with a CreatedAt column keeps it as the time column" */
+    it("still uses CreatedAt when the model exposes one", () => {
+      expect(byModel.get("Monitor")!.timeColumn).toBe("CreatedAt");
+    });
+  });
+});
+
+describe("sanitizeDescription", () => {
+  it("keeps the first sentence and drops later internal prose", () => {
+    expect(
+      sanitizeDescription(
+        "The dated match table. Dating is what makes it survivable; nothing is ever silently rewritten.",
+      ),
+    ).toBe("The dated match table.");
+  });
+
+  it("strips spec paths, ADR and PR references from the first sentence", () => {
+    expect(
+      sanitizeDescription(
+        "Why an outbox delivery failed (specs/ops/dead-letter.feature).",
+      ),
+    ).toBe("Why an outbox delivery failed.");
+    expect(
+      sanitizeDescription("The platform user (ADR-128 §9 step 2, #42)."),
+    ).toBe("The platform user.");
+  });
+
+  it("strips JSON-shape and angle-bracket fragments (MDX-hostile)", () => {
+    expect(
+      sanitizeDescription(
+        "The tool config { setupCommand, url } and <b>markup</b>.",
+      ),
+    ).toBe("The tool config and markup.");
+  });
+
+  it("joins wrapped lines and takes only the first paragraph", () => {
+    expect(
+      sanitizeDescription(
+        "Org-scoped catalog of AI\ntools.\n\nInternal rationale.",
+      ),
+    ).toBe("Org-scoped catalog of AI tools.");
+  });
+
+  it("appends a period when the first sentence has none", () => {
+    expect(sanitizeDescription("A single line with no terminator")).toBe(
+      "A single line with no terminator.",
+    );
+  });
+
+  it("returns empty when nothing usable remains", () => {
+    expect(sanitizeDescription("")).toBe("");
+    expect(sanitizeDescription("   \n  ")).toBe("");
+  });
+
+  it("drops parentheticals left empty or containing only connector words after stripping", () => {
+    // IngestionSource model: cf. and file references stripped, leaving (cf.)
+    expect(
+      sanitizeDescription(
+        "Per-platform fleet configuration that connects a closed SaaS " +
+          "product's audit / OTel / S3 stream to LangWatch's Activity " +
+          "Monitor (cf. specs/ai-gateway/governance/activity-monitor.feature " +
+          "+ ingestion-sources.feature, docs/ai-gateway/governance/architecture.md).",
+      ),
+    ).toBe(
+      "Per-platform fleet configuration that connects a closed SaaS product's " +
+        "audit / OTel / S3 stream to LangWatch's Activity Monitor.",
+    );
+  });
+
+  it("keeps plus signs inside tokens like svg+xml when surrounded by non-whitespace", () => {
+    expect(
+      sanitizeDescription("SVG content type data:image/svg+xml for rendering."),
+    ).toBe("SVG content type data:image/svg+xml for rendering.");
   });
 });

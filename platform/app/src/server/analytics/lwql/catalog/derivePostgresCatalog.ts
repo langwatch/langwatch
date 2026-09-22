@@ -344,10 +344,65 @@ function defaultColumnUnit(
   return undefined;
 }
 
-/** A field's description: its `///` doc's first line, else the exposed name. */
+/**
+ * A short, publishable description derived from a Prisma `///` doc comment, or
+ * `""` when nothing usable remains.
+ *
+ * A Prisma doc comment is written for the engineer reading the schema: it wraps
+ * across `///` lines, opens with the customer-facing sentence and then trails
+ * into internal prose — spec/PR references, ADR citations, `@deprecated`
+ * markers, JSON-shape fragments in `{ ... }` and `< ... >`, and design notes in
+ * later paragraphs. Publishing the whole comment leaks that prose into the docs,
+ * the schema endpoint and the MCP reference (and its `{ ... }`/`< ... >` breaks
+ * the MDX parser); publishing only the first *line* ships a mid-sentence
+ * fragment. This keeps the first sentence of the first paragraph and strips the
+ * internal markup, so the published surface reads as one clean sentence.
+ */
+export function sanitizeDescription(raw: string): string {
+  if (!raw || raw.trim().length === 0) return "";
+  // The customer-facing sentence lives in the opening paragraph; later
+  // paragraphs are internal rationale. Wrapped lines rejoin to one line.
+  const firstParagraph =
+    raw
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+      .find((paragraph) => paragraph.length > 0) ?? "";
+  let text = firstParagraph
+    .replace(/\{[^}]*\}/g, " ") // JSON-shape fragments (also MDX-hostile)
+    .replace(/<[^>]*>/g, " ") // angle-bracket fragments (also MDX-hostile)
+    .replace(/@\w+/g, " ") // @deprecated / @see and other JSDoc tags
+    .replace(/\bADR-\d+\b/gi, " ") // ADR citations
+    .replace(/§\s*\d+(?:\s+step\s+\d+)?/gi, " ") // section/step references
+    .replace(/(?:\blw)?#\d+\b/gi, " ") // PR/issue numbers (#8209, lw#42)
+    .replace(/\(?\bspecs\/\S+?\.feature\)?/gi, " ") // spec file references
+    .replace(/\s*\(\s*(?:cf|see|e\.g|and|or|per|plus|etc)\s*[^)]*\)/gi, " ") // parentheticals starting with connector words, remove entire parens + contents
+    .replace(/\bcf\.\b/gi, " ") // "cf." cross-references
+    .replace(/\s+\+\s+/g, " ") // "+" delimiters used in lists
+    .replace(/\b(?:docs|specs)\/\S+/gi, " ") // doc or spec file paths
+    .replace(/\b\w+(?:-\w+)*\.feature\b/gi, " ") // feature file references (with or without path)
+    .replace(/\([\s,;:]*\)/g, " "); // parens left holding only punctuation
+  // Keep only the first sentence: a period/!/? followed by a capitalised next
+  // sentence or the end of the paragraph.
+  const sentence = text.match(/^([\s\S]*?[.!?])(?=\s+[A-Z(]|\s*$)/);
+  if (sentence) text = sentence[1]!;
+  text = text
+    .replace(/\(\s*\)/g, " ") // parens left empty by a removal
+    .replace(/\(\s*[,;\s]*\)/g, " ") // parens with only spaces and punctuation
+    .replace(/\(\s*(.+?)\s*[,;]+\s*\)/g, "($1)") // parens with trailing punctuation: clean it
+    .replace(/\s+([.,;:])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/[\s,–-]+$/g, "") // dangling separators a removal left behind
+    .trim();
+  if (text.length === 0) return "";
+  if (!/[.!?]$/.test(text)) text += ".";
+  return text;
+}
+
+/** A field's description: its sanitized `///` doc comment, else the exposed name. */
 function columnDescription(field: PrismaField, exposedName: string): string {
-  const firstLine = field.documentation.split("\n")[0]?.trim();
-  return firstLine && firstLine.length > 0 ? firstLine : exposedName;
+  const sanitized = sanitizeDescription(field.documentation);
+  return sanitized.length > 0 ? sanitized : exposedName;
 }
 
 // ---------------------------------------------------------------------------
@@ -664,20 +719,18 @@ function viewDescription(
 }
 
 /**
- * The model's full doc comment, joined into one line, else a generated line.
+ * The model's sanitized doc comment, else a generated line.
  *
- * A Prisma doc comment wraps across `///` lines mid-sentence, so taking only
- * the first line published fragments ("Superseded by", "Evaluated server-side
- * at"). Joining every non-empty line with a single space reconstitutes the
- * whole sentence for the docs, the schema endpoint and the MCP reference.
+ * {@link sanitizeDescription} takes the first sentence of the comment and
+ * strips its internal markup, so the docs, the schema endpoint and the MCP
+ * reference publish one clean customer-facing sentence rather than the whole
+ * internal comment (which leaks spec/PR references and breaks the MDX parser)
+ * or a mid-sentence first-line fragment. A model with no usable comment falls
+ * back to a generated line naming its grain.
  */
 function defaultDescription(model: PrismaModel, grain: string): string {
-  const full = model.documentation
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .join(" ");
-  if (full.length > 0) return full;
+  const sanitized = sanitizeDescription(model.documentation);
+  if (sanitized.length > 0) return sanitized;
   return `Rows of the ${model.name} table, ${grain}.`;
 }
 
@@ -777,8 +830,7 @@ function deriveModel({
   const grain =
     override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
   const exposedNames = new Set(columns.map((column) => column.name));
-  const timeColumn =
-    override.timeColumn ?? defaultTimeColumn({ columns, keyColumns });
+  const timeColumn = override.timeColumn ?? defaultTimeColumn({ columns });
   const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
 
   assertOverride({ name, model, override, exposedNames });
@@ -799,7 +851,9 @@ function deriveModel({
     gates: [],
     grain,
     joinKeys,
-    timeColumn,
+    // Absent when the model has no temporal column and no explicit override, so
+    // a view never advertises an opaque key as its time dimension.
+    ...(timeColumn !== undefined ? { timeColumn } : {}),
     freshness: LIVE_FRESHNESS,
     dedup: { keyColumns },
     columns,
@@ -833,22 +887,26 @@ function fanOutRowSentence(kind: TenantScope["kind"]): string {
 
 /**
  * The partition-pruning column: `CreatedAt` if exposed, else the first exposed
- * `DateTime64` column, else the first key column (always an exposed column).
+ * `DateTime64` column, else `undefined`.
+ *
+ * A model with no temporal column has nothing to prune partitions on, so it
+ * gets no default time column at all rather than falling back to a key column —
+ * which would advertise an opaque id (in the fan-out case, the raw `TenantId`)
+ * as the dataset's time dimension in the docs and the schema endpoint. A model
+ * that genuinely wants a non-temporal ordering column names it with an explicit
+ * `timeColumn` override.
  */
 function defaultTimeColumn({
   columns,
-  keyColumns,
 }: {
   columns: readonly LangWatchQLViewColumn[];
-  keyColumns: readonly string[];
-}): string {
+}): string | undefined {
   const names = new Set(columns.map((column) => column.name));
   if (names.has("CreatedAt")) return "CreatedAt";
   const firstDateTime = columns.find((column) =>
     column.type.includes("DateTime64"),
   );
-  if (firstDateTime) return firstDateTime.name;
-  return keyColumns[0] ?? TENANT_COLUMN;
+  return firstDateTime?.name;
 }
 
 /** `TenantId` plus every exposed column ending in `Id`, deduplicated. */

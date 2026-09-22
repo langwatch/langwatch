@@ -375,8 +375,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         // so a time column carries no pruning claim to check — the shape guard
         // still requires it to be a real, filterable column.
         if (partitionKey === "") continue;
+        expect(view.timeColumn).toBeDefined();
         expect(
-          partitionKey.includes(view.timeColumn),
+          partitionKey.includes(view.timeColumn!),
           `${view.name} advertises ${view.timeColumn} but ${view.sourceTable} partitions by ${partitionKey}`,
         ).toBe(true);
       }

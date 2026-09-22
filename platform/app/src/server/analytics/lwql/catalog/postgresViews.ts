@@ -32,6 +32,7 @@ import {
 } from "./derivePostgresCatalog";
 import { CONTENT_POSTGRES_OVERRIDES } from "./postgresOverrides/content";
 import { CORE_POSTGRES_OVERRIDES } from "./postgresOverrides/core";
+import { DESCRIPTIONS_POSTGRES_OVERRIDES } from "./postgresOverrides/descriptions";
 import { PARENTS_POSTGRES_OVERRIDES } from "./postgresOverrides/parents";
 import { SENSITIVE_POSTGRES_OVERRIDES } from "./postgresOverrides/sensitive";
 import { TOPICS_POSTGRES_OVERRIDES } from "./postgresOverrides/topics";
@@ -87,6 +88,7 @@ export const LWQL_POSTGRES_ALL_OVERRIDES: Record<
   CONTENT_POSTGRES_OVERRIDES,
   SENSITIVE_POSTGRES_OVERRIDES,
   VISIBILITY_POSTGRES_OVERRIDES,
+  DESCRIPTIONS_POSTGRES_OVERRIDES,
 ]);
 
 /**

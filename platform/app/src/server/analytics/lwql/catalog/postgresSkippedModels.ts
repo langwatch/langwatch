@@ -132,6 +132,8 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
   // distinct permission a project's `analytics:view` key does not hold. Deriving
   // them would let any project API key read organization billing, audit and
   // webhook-management data the application itself gates far more tightly.
+  BillingMeterCheckpoint:
+    "permission-gated: organization Stripe meter totals, admin/billing-tier only, no user-facing path reads it, never analytics:view",
   AuditLog:
     "permission-gated: organization audit trail, read behind auditLog:view (organization.ts), never analytics:view",
   WebhookEndpoint:

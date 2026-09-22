@@ -457,9 +457,11 @@ export interface LangWatchQLViewDefinition {
    *
    * The source table partitions on a function of this column, so a query
    * without a predicate on it reads every partition the tenant has, including
-   * whatever has aged onto object storage.
+   * whatever has aged onto object storage. Absent for a view with no temporal
+   * column and no explicit override: it has nothing to prune on, and naming an
+   * opaque key here would advertise it as a time dimension it is not.
    */
-  readonly timeColumn: string;
+  readonly timeColumn?: string;
   /** How far behind the write path this view can be, for the schema endpoint. */
   readonly freshness: string;
   readonly dedup: LangWatchQLViewDedup;

@@ -88,11 +88,14 @@ describe("given the LangWatchQL view catalog", () => {
 
         // Everything the entry promises a caller can filter or join on has to
         // be a column the view actually exposes, or the schema endpoint is
-        // telling callers to write queries that do not parse.
-        expect(
-          columnNames,
-          `${view.name} advertises a time column it does not expose`,
-        ).toContain(view.timeColumn);
+        // telling callers to write queries that do not parse. A view with no
+        // temporal column carries no time column at all — nothing to check.
+        if (view.timeColumn !== undefined) {
+          expect(
+            columnNames,
+            `${view.name} advertises a time column it does not expose`,
+          ).toContain(view.timeColumn);
+        }
         for (const key of view.joinKeys) {
           expect(
             columnNames,
