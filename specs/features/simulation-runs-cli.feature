@@ -123,8 +123,16 @@ Feature: Simulation Run CLI Commands
     And the message does not claim the project has no simulation runs
 
   @unit
-  Scenario: A refused page size is reported as a validation error, not as a network error
-    When I run "langwatch simulation-run list --limit 200"
+  Scenario: A server-rejected scenario set filter is reported as validation, not network
+    Given the platform rejects a scenario set filter as invalid
+    When I run "langwatch simulation-run list --limit 100 --scenario-set-id set_rejected"
     Then the failure carries the code "validation_error" at status 422
-    And the reasons name the limit field and its maximum
+    And the reasons name the scenario set field
     And no suggestion tells me to check my network
+
+  @regression @unit
+  Scenario: An invalid page size is refused before setup or a request
+    Given simulation-run page sizes must be safe integers from 1 through 100
+    When I list simulation runs with a page size outside that range
+    Then the CLI says "--limit must be between 1 and 100"
+    And it does not resolve credentials, start a spinner, or contact the platform

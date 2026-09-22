@@ -5,15 +5,17 @@ vi.mock("../../../utils/apiKey", () => ({
 }));
 
 vi.mock("ora", () => ({
-  default: () => ({
+  default: vi.fn(() => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
     fail: vi.fn(),
-  }),
+  })),
 }));
 
+import ora from "ora";
 import { listSimulationRunsCommand } from "../list";
 import { getSimulationRunCommand } from "../get";
+import { resolveCredentials } from "../../../utils/apiKey";
 import { setOutputFormat } from "../../../utils/outputScope";
 
 class ProcessExitError extends Error {
@@ -145,8 +147,8 @@ describe("listSimulationRunsCommand()", () => {
     });
   });
 
-  describe("when the platform refuses the limit", () => {
-    /** @scenario "A refused page size is reported as a validation error, not as a network error" */
+  describe("when the platform refuses another query field", () => {
+    /** @scenario "A server-rejected scenario set filter is reported as validation, not network" */
     it("keeps validation_error at 422 instead of degrading to network_error", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -159,8 +161,8 @@ describe("listSimulationRunsCommand()", () => {
               {
                 code: "schema_failure",
                 meta: {
-                  field: "limit",
-                  message: "Number must be less than or equal to 100",
+                  field: "scenarioSetId",
+                  message: "Scenario set filter is invalid",
                 },
               },
             ],
@@ -170,7 +172,10 @@ describe("listSimulationRunsCommand()", () => {
       setOutputFormat("json");
       try {
         await expect(
-          listSimulationRunsCommand({ limit: "200" }),
+          listSimulationRunsCommand({
+            limit: "100",
+            scenarioSetId: "set_rejected",
+          }),
         ).rejects.toThrow(ProcessExitError);
       } finally {
         setOutputFormat(undefined);
@@ -180,8 +185,46 @@ describe("listSimulationRunsCommand()", () => {
       const doc = JSON.parse(String(logSpy.mock.calls[0]?.[0]));
       expect(doc.error.code).toBe("validation_error");
       expect(doc.error.httpStatus).toBe(422);
-      expect(JSON.stringify(doc.error.reasons)).toContain("100");
+      expect(JSON.stringify(doc.error.reasons)).toContain("scenarioSetId");
       expect((doc.error.suggestions ?? []).join(" ")).not.toContain("network");
+    });
+  });
+
+  describe("when the limit is outside the platform range", () => {
+    /** @scenario "An invalid page size is refused before setup or a request" */
+    it("rejects before credentials, spinner, or network", async () => {
+      for (const limit of ["0", "-1", "1.5", "9007199254740992", "200"]) {
+        await expect(
+          listSimulationRunsCommand({ limit }),
+        ).rejects.toMatchObject({ code: 1 });
+
+        expect(console.error).toHaveBeenCalledWith(
+          "Error: --limit must be between 1 and 100",
+        );
+        expect(resolveCredentials).not.toHaveBeenCalled();
+        expect(ora).not.toHaveBeenCalled();
+        expect(mockFetch).not.toHaveBeenCalled();
+        vi.clearAllMocks();
+      }
+    });
+  });
+
+  describe("when the limit is within the platform range", () => {
+    it("accepts the lower and upper boundaries", async () => {
+      for (const limit of ["1", "100"]) {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: async () => ({ runs: [], hasMore: false }),
+        });
+
+        await listSimulationRunsCommand({ limit });
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining(`limit=${limit}`),
+          expect.anything(),
+        );
+        mockFetch.mockClear();
+      }
     });
   });
 
