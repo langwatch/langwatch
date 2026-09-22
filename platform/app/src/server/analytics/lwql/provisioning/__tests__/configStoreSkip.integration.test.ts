@@ -189,7 +189,6 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       const { skipped } = await runClickHouseStatements({
         client: harness.admin,
         statements,
-        secrets: [RESTRICTED_PASSWORD, READER_PASSWORD],
         // The real inventory: a 495 is tolerated only when the statement's OWN
         // target is inventoried by kind and name. The 495-failing statements
         // here — the CREATE USER, the CREATE SETTINGS PROFILE, and the GRANTs
@@ -205,7 +204,7 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       expect(
         skipped.some(
           (s) =>
-            s.statement.startsWith("CREATE USER OR REPLACE") &&
+            s.kind === "CREATE USER" &&
             s.code === CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
         ),
         "the config-owned user CREATE was skipped as 495",
@@ -220,7 +219,7 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       expect(
         skipped.some(
           (s) =>
-            s.statement.startsWith("DROP NAMED COLLECTION") &&
+            s.kind === "DROP NAMED COLLECTION" &&
             namedCollectionCodes.includes(s.code),
         ),
         "the config-owned named collection DROP was skipped as 669/670/671",
@@ -228,7 +227,7 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       expect(
         skipped.some(
           (s) =>
-            s.statement.startsWith("CREATE NAMED COLLECTION") &&
+            s.kind === "CREATE NAMED COLLECTION" &&
             namedCollectionCodes.includes(s.code),
         ),
         "the config-owned named collection CREATE was skipped as 669/670/671",
@@ -237,7 +236,7 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
       // skipped — the config-owned user named in its `TO` clause must not
       // launder a missing policy into a tolerated skip.
       expect(
-        skipped.some((s) => s.statement.startsWith("CREATE ROW POLICY")),
+        skipped.some((s) => s.kind === "CREATE ROW POLICY"),
         "no row-policy statement was skipped",
       ).toBe(false);
       // Every skip is one of the four tolerated codes, never a laundered failure.
@@ -248,7 +247,9 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
           CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
           CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
         ]).toContain(skip.code);
-        expect(skip.statement).not.toContain(RESTRICTED_PASSWORD);
+        // The recorded skip is a statement kind only, never the DDL that carries
+        // the restricted password.
+        expect(skip.kind).not.toContain(RESTRICTED_PASSWORD);
       }
 
       // Provisioning continued: the LangWatchQL views exist despite the skips.

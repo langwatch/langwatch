@@ -49,11 +49,9 @@ export function classifyLwqlAccessModelOwner({
 export async function probeLwqlAccessModelOwner({
   client,
   names,
-  secrets = [],
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
-  secrets?: readonly (string | undefined)[];
 }): Promise<LwqlAccessModelOwner> {
   // Connectivity check: throws on an unreachable server, so the caller can
   // distinguish "cannot read yet" from an authoritative ownership answer.
@@ -64,7 +62,6 @@ export async function probeLwqlAccessModelOwner({
   const configStoreEntities = await inventoryConfigStoreLwqlEntities({
     client,
     names,
-    secrets,
   });
 
   // Is the app-owned user present in any SQL access store? Excluding `users_xml`

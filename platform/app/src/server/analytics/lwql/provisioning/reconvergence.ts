@@ -37,7 +37,11 @@ const DEFAULT_MAX_DELAY_MS = 5 * 60_000;
 const DEFAULT_BUDGET_MS = 30 * 60_000;
 
 export interface LwqlReconvergenceWatch {
-  /** Cancels any pending poll. Idempotent. */
+  /**
+   * Cancels any pending poll and discards the result of a probe already in
+   * flight, so a snapshot that resolves after shutdown began never
+   * re-provisions. Idempotent.
+   */
   stop(): void;
 }
 
@@ -128,6 +132,9 @@ class ReconvergenceWatcher {
     try {
       owner = await this.probe();
     } catch (error) {
+      // stop() may have fired while this probe was in flight (shutdown). Discard
+      // the result before any log or arm — a cancelled watch must not re-poll.
+      if (this.stopped) return;
       // A probe failure is never a decision: the ownership snapshot is unknown,
       // so keep polling. It never re-provisions on its own.
       logger.debug(
@@ -137,6 +144,11 @@ class ReconvergenceWatcher {
       this.arm();
       return;
     }
+
+    // stop() may have fired while this probe was in flight (shutdown). Discard
+    // the ownership snapshot before any decision — a probe that resolves "none"
+    // after shutdown began must never re-provision.
+    if (this.stopped) return;
 
     if (owner === "sql_store") {
       // The app-owned model is already live — nothing to reconverge.

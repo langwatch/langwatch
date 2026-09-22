@@ -20,9 +20,10 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CLICKHOUSE_ERROR_CODE } from "../../__tests__/lwqlClickHouseHarness";
+import { clickHouseLiteral } from "../../sqlText";
 import type { LangWatchQLNames } from "../accessModel";
 import {
   CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
@@ -30,6 +31,26 @@ import {
   inventoryConfigStoreLwqlEntities,
   runClickHouseStatements,
 } from "../clickhouseStatementRunner";
+
+// The runner logs through the module logger; capture every call so a test can
+// prove no argument carries the statement text or the password it embeds.
+const { logCalls } = vi.hoisted(() => ({ logCalls: [] as unknown[][] }));
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual =
+    await importActual<typeof import("@langwatch/observability")>();
+  const record = (...args: unknown[]) => {
+    logCalls.push(args);
+  };
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: record,
+      error: record,
+      info: record,
+      debug: record,
+    }),
+  };
+});
 
 /** The shape `@clickhouse/client` throws: a `code` string on the error. */
 class FakeClickHouseError extends Error {
@@ -94,7 +115,6 @@ describe("runClickHouseStatements", () => {
       const result = await runClickHouseStatements({
         client,
         statements,
-        secrets: ["s3cr3t"],
         // The 495 is tolerated because the failing CREATE USER names an
         // inventoried config-store entity; the 669/670/671 need no inventory.
         configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
@@ -112,9 +132,14 @@ describe("runClickHouseStatements", () => {
         CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
       ]);
       expect(result.skipped.map((s) => s.index)).toEqual([1, 2, 3, 4]);
-      // The password never reaches the recorded/logged skip text.
-      expect(result.skipped[0]?.statement).not.toContain("s3cr3t");
-      expect(result.skipped[0]?.statement).toContain("[REDACTED]");
+      // Only the statement kind is recorded — never the password-bearing text.
+      expect(result.skipped.map((s) => s.kind)).toEqual([
+        "CREATE USER",
+        "DROP NAMED COLLECTION",
+        "ALTER NAMED COLLECTION",
+        "CREATE NAMED COLLECTION",
+      ]);
+      expect(JSON.stringify(result.skipped)).not.toContain("s3cr3t");
     });
   });
 
@@ -160,6 +185,47 @@ describe("runClickHouseStatements", () => {
 
       expect(result.skipped).toEqual([]);
       expect(ran).toHaveLength(2);
+    });
+  });
+
+  describe("when a CREATE USER whose password embeds a quote and a backslash fails", () => {
+    // # Issue #8258
+    /** @scenario "A failed self-provisioning run is logged without leaking a password" */
+    it("logs the kind and code, never the statement text or the password in any form", async () => {
+      logCalls.length = 0;
+      // A password with both metacharacters `clickHouseLiteral` escapes: a
+      // value-based redactor would miss it because the DDL carries the escaped
+      // form, not the raw one. Provisioning must never log either.
+      const password = "p'a\\ss";
+      const literal = clickHouseLiteral(password); // 'p''a\\ss' — as in the DDL
+      const CREATE_USER = `CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY ${literal}`;
+
+      // A fake whose error echoes the failing statement, as ClickHouse does —
+      // proving the runner never forwards that message to the log.
+      const client = {
+        async command({ query }: { query: string }) {
+          throw Object.assign(
+            new Error(`Code: 516. DB::Exception: while executing ${query}`),
+            {
+              code: String(CLICKHOUSE_ERROR_CODE.ACCESS_DENIED),
+              name: "ClickHouseError",
+            },
+          );
+        },
+      } as unknown as ClickHouseClient;
+
+      await expect(
+        runClickHouseStatements({ client, statements: [CREATE_USER] }),
+      ).rejects.toBeInstanceOf(Error);
+
+      const logged = JSON.stringify(logCalls);
+      expect(logCalls.length).toBeGreaterThan(0);
+      expect(logged).not.toContain(password);
+      expect(logged).not.toContain(literal);
+      expect(logged).not.toContain("IDENTIFIED");
+      // What it does log: the kind and the numeric code.
+      expect(logged).toContain("CREATE USER");
+      expect(logged).toContain(String(CLICKHOUSE_ERROR_CODE.ACCESS_DENIED));
     });
   });
 

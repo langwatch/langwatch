@@ -22,7 +22,6 @@ export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
-export { redactSecrets } from "./clickhouseStatementRunner";
 export {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,

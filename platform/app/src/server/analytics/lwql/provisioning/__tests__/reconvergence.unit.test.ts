@@ -205,4 +205,45 @@ describe("startLwqlReconvergenceWatch", () => {
       expect(warnSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("when a probe resolves none after stop() was called mid-flight", () => {
+    /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
+    it("discards the in-flight snapshot and never re-provisions during shutdown", async () => {
+      // A deferred probe: it stays pending until this test resolves it, so
+      // shutdown can begin while the poll is in flight — the exact race where a
+      // late "none" must NOT re-provision during graceful shutdown.
+      let resolveProbe: (owner: LwqlAccessModelOwner) => void = () => undefined;
+      const probe = vi
+        .fn<() => Promise<LwqlAccessModelOwner>>()
+        .mockImplementation(
+          () =>
+            new Promise<LwqlAccessModelOwner>((resolve) => {
+              resolveProbe = resolve;
+            }),
+        );
+      const converge = vi.fn<() => Promise<void>>().mockResolvedValue();
+
+      const watch = startLwqlReconvergenceWatch({
+        probe,
+        converge,
+        initialDelayMs: 1_000,
+        maxDelayMs: 8_000,
+        budgetMs: 600_000,
+      });
+
+      // Fire the first poll: the probe is now in flight, its promise pending.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(probe).toHaveBeenCalledTimes(1);
+      expect(converge).not.toHaveBeenCalled();
+
+      // Shutdown begins mid-flight, then the probe resolves "none": the snapshot
+      // must be discarded before any decision, not acted on.
+      watch.stop();
+      resolveProbe("none");
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(converge).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
 });

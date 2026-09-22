@@ -36,8 +36,8 @@ import {
   probeLwqlAccessModelOwner,
 } from "./accessModelOwner";
 import {
+  clickHouseErrorSummary,
   inventoryConfigStoreLwqlEntities,
-  redactSecrets,
   runClickHouseStatements,
 } from "./clickhouseStatementRunner";
 import {
@@ -177,10 +177,6 @@ async function backfillKeyMap({
   );
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * Whether this server can hold the app functions on every replica. A server
  * that cannot is provisioned without them, with the setting named in the log:
@@ -218,14 +214,12 @@ async function convergeClickHouse({
   selfProvision,
   sourceDatabase,
   endpoint,
-  secrets,
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
   selfProvision: LwqlSelfProvisionEnv;
   sourceDatabase: string;
   endpoint: NonNullable<ReturnType<typeof lwqlPostgresEndpointFromDatabaseUrl>>;
-  secrets: readonly (string | undefined)[];
 }): Promise<void> {
   // Named first at WARN so the operator sees by name any LWQL identity the
   // ClickHouse server already owns in its read-only config store, before the
@@ -233,13 +227,11 @@ async function convergeClickHouse({
   const configStoreEntities = await inventoryConfigStoreLwqlEntities({
     client,
     names,
-    secrets,
   });
 
   const includeAppFunctions = await appFunctionsProvisionable(client);
   const result = await runClickHouseStatements({
     client,
-    secrets,
     configStoreEntities,
     statements: selfHostedClickHouseProvisioningStatements({
       names,
@@ -265,7 +257,7 @@ async function convergeClickHouse({
     await backfillKeyMap({ client, names, sourceDatabase });
   } catch (error) {
     logger.error(
-      { error: redactSecrets(errorMessage(error), secrets) },
+      { error: clickHouseErrorSummary(error) },
       "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
     );
   }
@@ -289,17 +281,6 @@ export async function selfProvisionAll({
   selfProvision: LwqlSelfProvisionEnv;
   names: LangWatchQLNames;
 }): Promise<void> {
-  // Everything this path can log carries one of these somewhere: the access
-  // model DDL embeds the restricted password, the named collection embeds the
-  // PostgreSQL reader password, and a connection failure quotes the URL it
-  // dialled.
-  const secrets = [
-    selfProvision.connection.password,
-    selfProvision.postgresReaderPassword,
-    process.env.CLICKHOUSE_URL,
-    process.env.DATABASE_URL,
-  ];
-
   const endpoint = lwqlPostgresEndpointFromDatabaseUrl(
     process.env.DATABASE_URL,
   );
@@ -356,14 +337,13 @@ export async function selfProvisionAll({
           selfProvision,
           sourceDatabase,
           endpoint,
-          secrets,
         }),
       );
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
     logger.error(
-      { error: redactSecrets(errorMessage(error), secrets) },
+      { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
   }
@@ -403,14 +383,8 @@ export function lwqlSelfProvisionInputs(): {
 export async function lwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
   const inputs = lwqlSelfProvisionInputs();
   if (!inputs) return "none";
-  const { selfProvision, names } = inputs;
-  const secrets = [
-    selfProvision.connection.password,
-    selfProvision.postgresReaderPassword,
-    process.env.CLICKHOUSE_URL,
-    process.env.DATABASE_URL,
-  ];
+  const { names } = inputs;
   return withAdminClickHouseClient((client) =>
-    probeLwqlAccessModelOwner({ client, names, secrets }),
+    probeLwqlAccessModelOwner({ client, names }),
   );
 }

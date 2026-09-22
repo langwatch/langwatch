@@ -14,6 +14,14 @@
  * crash the boot. This runner is that tolerance, kept out of the task module so
  * a test can exercise it without pulling the task's Prisma/db graph.
  *
+ * Provisioning never logs statement text or a raw error message. Both can carry
+ * the restricted user's password or the PostgreSQL reader password in escaped
+ * form — `clickHouseLiteral` doubles `'` and backslashes, so a password with
+ * either is not byte-identical to the value a redactor would strip, and a value-
+ * based redaction cannot be relied on. Every failure is logged by statement kind
+ * ({@link statementKind}), 1-based position, and a {@link clickHouseErrorSummary}
+ * (numeric code and exception type, never the message) instead.
+ *
  * @see ./selfProvisionEntry.ts — the only caller with I/O
  * @see specs/lwql/api.feature
  */
@@ -166,30 +174,120 @@ export function clickHouseErrorCode(error: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+/** The safe fields of a failed provisioning error — never its message. */
+export interface ClickHouseErrorSummary {
+  /** Numeric ClickHouse error code, or `null` for a non-ClickHouse error. */
+  readonly code: number | null;
+  /** The ClickHouse exception type name, else the error's constructor name. */
+  readonly type: string;
+  /** A non-ClickHouse system error's string code (e.g. `ECONNREFUSED`). */
+  readonly systemCode?: string;
+  /** A non-ClickHouse system error's numeric/string errno. */
+  readonly errno?: string | number;
+  /** A non-ClickHouse system error's syscall (e.g. `connect`). */
+  readonly syscall?: string;
 }
 
 /**
- * Replaces every occurrence of each secret with a fixed marker.
- *
- * A ClickHouse error echoes the statement that failed, and the access-model
- * DDL embeds the restricted identity's password (`CREATE USER ... IDENTIFIED
- * WITH sha256_password BY '...'`) and the named collection's PostgreSQL reader
- * password; a connection error can surface the admin `CLICKHOUSE_URL` or
- * `DATABASE_URL`. Everything logged out of a provisioning failure goes through
- * here first. Literal `split`/`join` so no secret has to be escaped into a
- * regexp; empty and undefined secrets are skipped rather than matched.
+ * The safe-to-log shape of a provisioning error: its numeric ClickHouse code and
+ * exception type, and for a non-ClickHouse error (a connection failure, a Prisma
+ * error) only the primitive system fields — never the message. A ClickHouse
+ * error's message echoes the failing statement, which carries the password; a
+ * connection error's message carries the `CLICKHOUSE_URL`/`DATABASE_URL` with
+ * credentials. Both are omitted; only `code`, `errno` and `syscall`, which
+ * cannot contain either, are surfaced.
  */
-export function redactSecrets(
-  text: string,
-  secrets: readonly (string | undefined)[],
-): string {
-  let redacted = text;
-  for (const secret of secrets) {
-    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
+function errorTypeName(error: unknown): string {
+  const type = (error as { type?: unknown } | null)?.type;
+  if (typeof type === "string" && type.length > 0) return type;
+  if (error instanceof Error) return error.constructor.name;
+  return typeof error;
+}
+
+/**
+ * The safe system primitives of a non-ClickHouse error — its string `.code`
+ * (`ECONNREFUSED`, `P2010`), `errno` and `syscall` — none of which can carry SQL
+ * or a connection URL. The message is deliberately never read.
+ */
+function systemErrorFields(error: unknown): {
+  systemCode?: string;
+  errno?: string | number;
+  syscall?: string;
+} {
+  const err = error as {
+    code?: unknown;
+    errno?: unknown;
+    syscall?: unknown;
+  } | null;
+  const fields: {
+    systemCode?: string;
+    errno?: string | number;
+    syscall?: string;
+  } = {};
+  if (typeof err?.code === "string") fields.systemCode = err.code;
+  if (typeof err?.errno === "number" || typeof err?.errno === "string") {
+    fields.errno = err.errno;
   }
-  return redacted;
+  if (typeof err?.syscall === "string") fields.syscall = err.syscall;
+  return fields;
+}
+
+export function clickHouseErrorSummary(error: unknown): ClickHouseErrorSummary {
+  const code = clickHouseErrorCode(error);
+  return {
+    code,
+    type: errorTypeName(error),
+    // A non-ClickHouse error carries no numeric ClickHouse code; surface only
+    // its safe system primitives, never the message.
+    ...(code === null ? systemErrorFields(error) : {}),
+  };
+}
+
+// Leading object keywords that qualify a DDL verb, so `CREATE USER lwql` logs as
+// `CREATE USER` — never the identifier. Consumed until the first non-keyword.
+const STATEMENT_OBJECT_KEYWORDS: ReadonlySet<string> = new Set([
+  "USER",
+  "ROLE",
+  "ROW",
+  "POLICY",
+  "SETTINGS",
+  "PROFILE",
+  "NAMED",
+  "COLLECTION",
+  "FUNCTION",
+  "TABLE",
+  "VIEW",
+  "MATERIALIZED",
+  "LIVE",
+  "DICTIONARY",
+  "DATABASE",
+  "QUOTA",
+  "INTO",
+]);
+
+/**
+ * The leading DDL keywords of a statement — `CREATE USER`, `CREATE ROW POLICY`,
+ * `CREATE NAMED COLLECTION`, `GRANT`, `DROP NAMED COLLECTION` — with no
+ * identifier, quote or value, so it is always safe to log. The `OR REPLACE` and
+ * `IF [NOT] EXISTS` modifiers are dropped as noise; `GRANT`/`REVOKE` reduce to
+ * the verb alone. Returns `UNKNOWN` for a statement with no leading keyword.
+ */
+export function statementKind(statement: string): string {
+  const tokens = statement
+    .replace(/\bOR\s+REPLACE\b/gi, " ")
+    .replace(/\bIF\s+(?:NOT\s+)?EXISTS\b/gi, " ")
+    .trim()
+    .split(/\s+/);
+  const verb = tokens[0]?.toUpperCase();
+  if (verb === undefined || !/^[A-Z]+$/.test(verb)) return "UNKNOWN";
+  if (verb === "GRANT" || verb === "REVOKE") return verb;
+  const objects: string[] = [];
+  for (const token of tokens.slice(1)) {
+    const upper = token.toUpperCase();
+    if (objects.length >= 3 || !STATEMENT_OBJECT_KEYWORDS.has(upper)) break;
+    objects.push(upper);
+  }
+  return [verb, ...objects].join(" ");
 }
 
 /** One statement skipped because its entity is owned by the config store. */
@@ -198,8 +296,8 @@ export interface SkippedProvisioningStatement {
   readonly index: number;
   /** The tolerated ClickHouse error code that caused the skip (495, 669, 670 or 671). */
   readonly code: number;
-  /** The statement text, redacted of any supplied secrets. */
-  readonly statement: string;
+  /** The statement kind ({@link statementKind}) — never the statement text. */
+  readonly kind: string;
 }
 
 export interface RunClickHouseStatementsResult {
@@ -230,13 +328,10 @@ export interface RunClickHouseStatementsResult {
 export async function runClickHouseStatements({
   client,
   statements,
-  secrets = [],
   configStoreEntities = [],
 }: {
   client: ClickHouseClient;
   statements: string[];
-  /** Values to strip from the logged error/statement — see {@link redactSecrets}. */
-  secrets?: readonly (string | undefined)[];
   /**
    * The config-store entities {@link inventoryConfigStoreLwqlEntities} found.
    * A 495 is tolerated only against a statement that names one of these.
@@ -255,13 +350,12 @@ export async function runClickHouseStatements({
         error,
         statement,
         position,
-        secrets,
         configStoreEntities,
       });
-      const redactedStatement = redactSecrets(statement, secrets);
-      skipped.push({ index: index + 1, code, statement: redactedStatement });
+      const kind = statementKind(statement);
+      skipped.push({ index: index + 1, code, kind });
       logger.warn(
-        { code, statement: position, skipped: redactedStatement },
+        { code, statement: position, kind },
         "lwql provisioning skipped a statement whose entity is defined in the ClickHouse config store (read-only) and continued",
       );
     }
@@ -306,13 +400,11 @@ function toleratedConfigStoreSkipCode({
   error,
   statement,
   position,
-  secrets,
   configStoreEntities,
 }: {
   error: unknown;
   statement: string;
   position: string;
-  secrets: readonly (string | undefined)[];
   configStoreEntities: readonly ConfigStoreLwqlEntity[];
 }): number {
   const code = clickHouseErrorCode(error);
@@ -332,7 +424,11 @@ function toleratedConfigStoreSkipCode({
     return CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY;
   }
   logger.error(
-    { error: redactSecrets(errorMessage(error), secrets), statement: position },
+    {
+      error: clickHouseErrorSummary(error),
+      statement: position,
+      kind: statementKind(statement),
+    },
     isReadonly
       ? "lwql provisioning: ClickHouse access storage is read-only for a statement whose own target entity is not in the config-store inventory — the access model would go unprovisioned (a config-owned user does not excuse a missing row policy), so provisioning is failing rather than booting with an incomplete model"
       : "lwql provisioning failed creating ClickHouse objects",
@@ -379,18 +475,16 @@ const CONFIG_STORE_ENTITY_KINDS: ReadonlySet<string> = new Set([
  *
  * A non-identifier name (a quote or any character outside `[A-Za-z0-9_]`)
  * throws before any query is issued, refusing to interpolate it. A query that
- * does run and fails is logged (redacted) and returns empty rather than
- * stopping a provisioning run that is otherwise fine.
+ * does run and fails is logged as an error summary (code and type, never the
+ * message) and returns empty rather than stopping a provisioning run that is
+ * otherwise fine.
  */
 export async function inventoryConfigStoreLwqlEntities({
   client,
   names,
-  secrets = [],
 }: {
   client: ClickHouseClient;
   names: LangWatchQLNames;
-  /** Values to strip from a logged inventory error — see {@link redactSecrets}. */
-  secrets?: readonly (string | undefined)[];
 }): Promise<ConfigStoreLwqlEntity[]> {
   // `productionLangWatchQLNames` does not validate its inputs, so these names
   // are validated here before interpolation: a quote in any of them is rejected
@@ -442,7 +536,7 @@ export async function inventoryConfigStoreLwqlEntities({
     return entities;
   } catch (error) {
     logger.warn(
-      { error: redactSecrets(errorMessage(error), secrets) },
+      { error: clickHouseErrorSummary(error) },
       "lwql provisioning could not inventory the ClickHouse config store for pre-defined LangWatchQL entities — continuing",
     );
     return [];

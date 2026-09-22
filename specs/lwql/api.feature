@@ -1194,15 +1194,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   # The self-provisioning DDL embeds the restricted identity's password and the
   # named collection's PostgreSQL reader password, and a ClickHouse error echoes
-  # the statement that failed. Self-provisioning is non-fatal by contract (the
-  # pod boots, the endpoint stays refused), so the failure is logged, and what
-  # is logged must not carry either secret.
+  # the statement that failed. Because the DDL escapes those passwords (a quote
+  # or backslash is doubled), a value-based redaction cannot be relied on to
+  # strip them. Self-provisioning is non-fatal by contract (the pod boots, the
+  # endpoint stays refused), so the failure is logged — but never the statement
+  # text or the raw error message. Only the statement kind, its position, and the
+  # numeric error code and exception type are logged.
   @unit
   Scenario: A failed self-provisioning run is logged without leaking a password
     Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
     When a statement fails and the error echoes that DDL
-    Then the password and the connection strings are redacted from the logged error
-    And an empty or unset secret never matches
+    Then the logged failure carries only the statement kind, position and error code
+    And neither the password in any escaped form nor the statement text is logged
 
   # Self-provisioning is non-fatal by contract, and that must hold for a
   # misconfigured connection too: a CLICKHOUSE_URL that parses but names an
