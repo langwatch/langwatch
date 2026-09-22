@@ -69,7 +69,6 @@ vi.mock("@ee/licensing/connect/install/connectEntitlement", () => ({
 }));
 
 import {
-  readInstallVersion,
   startLicenseSyncWorker,
   syncLicenseNow,
   syncLicensesForAllOrganizations,
@@ -369,6 +368,7 @@ describe("given a connect host that refuses", () => {
       // The transport turns the registry's envelope into this same error.
       const rateLimited = handledErrorFromHerr(
         {
+          type: "rate_limited",
           code: "rate_limited",
           message: "this license has synced too many times today",
           fault: "customer",
@@ -442,26 +442,6 @@ describe("given an install with nothing to sync", () => {
       await expect(
         refresh({ prisma, client: host.client }),
       ).rejects.toMatchObject({ code: "connect_disabled" });
-    });
-  });
-});
-
-describe("given the version this install reports", () => {
-  describe("when the deployment names one", () => {
-    it("reports what the deployment named", () => {
-      expect(readInstallVersion({ SERVICE_VERSION: "3.17.0" })).toBe("3.17.0");
-      expect(
-        readInstallVersion({
-          OTEL_RESOURCE_ATTRIBUTES:
-            "service.name=langwatch,service.version=4.0",
-        }),
-      ).toBe("4.0");
-    });
-  });
-
-  describe("when the deployment names none", () => {
-    it("reports unknown rather than a number made up here", () => {
-      expect(readInstallVersion({})).toBe("unknown");
     });
   });
 });

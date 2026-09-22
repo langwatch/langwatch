@@ -13,6 +13,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { dateInputToISO } from "../../BackofficeTable";
+import { SERVICE_LABELS, SERVICES, type Service } from "./types";
 
 const PLANS = ["GROWTH", "PRO", "ENTERPRISE", "CUSTOM"] as const;
 
@@ -34,6 +35,7 @@ interface CodeToIssue {
   planType: Plan;
   maxMembers: number;
   licenseTermDays: number;
+  services: Service[];
   expiresAt: Date;
   reusable: boolean;
 }
@@ -101,10 +103,13 @@ interface Draft {
   planType: Plan;
   maxMembers: string;
   licenseTermDays: string;
+  services: Service[];
   expiresOn: string;
   reusable: boolean;
 }
 
+// A code is the connected path: the license it mints syncs and refreshes on
+// its own only while it names a hosted service, so every one starts included.
 const EMPTY_DRAFT: Draft = {
   organizationId: "",
   organizationName: "",
@@ -112,6 +117,7 @@ const EMPTY_DRAFT: Draft = {
   planType: "ENTERPRISE",
   maxMembers: "25",
   licenseTermDays: String(DEFAULT_TERM_DAYS),
+  services: [...SERVICES],
   expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
   reusable: false,
 };
@@ -136,6 +142,7 @@ function issuedFrom(draft: Draft): CodeToIssue | null {
     planType: draft.planType,
     maxMembers: Number(draft.maxMembers),
     licenseTermDays: Number(draft.licenseTermDays),
+    services: draft.services,
     expiresAt: new Date(expiresAt),
     reusable: draft.reusable,
   };
@@ -257,6 +264,33 @@ function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
           </Field.HelperText>
         </Field.Root>
       </HStack>
+      <VStack align="start" gap={2} width="full">
+        <Text fontSize="sm" fontWeight="medium">
+          Hosted services included
+        </Text>
+        <HStack gap={4}>
+          {SERVICES.map((service) => (
+            <Checkbox
+              key={service}
+              checked={draft.services.includes(service)}
+              onCheckedChange={({ checked }) =>
+                set(
+                  "services",
+                  checked === true
+                    ? [...draft.services, service]
+                    : draft.services.filter((s) => s !== service),
+                )
+              }
+            >
+              {SERVICE_LABELS[service]}
+            </Checkbox>
+          ))}
+        </HStack>
+        <Text fontSize="xs" color="fg.muted">
+          The license the code mints syncs and refreshes on its own only while
+          it names one.
+        </Text>
+      </VStack>
       <Field.Root>
         <Field.Label>Code expires on</Field.Label>
         <Input

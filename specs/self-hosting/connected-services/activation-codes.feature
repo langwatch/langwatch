@@ -33,6 +33,13 @@ Feature: Activating a self-hosted install with a code
     When a code is minted
     Then it carries no I, L, O or U
 
+  @integration
+  Scenario: A code names the hosted services the license may call
+    Given an operator issuing an activation code in the backoffice
+    When the operator fills in the customer and issues the code
+    Then every hosted service is included unless the operator unticks it
+    And the license the code mints names those services, so the install syncs and refreshes on its own
+
   # ============================================================================
   # Redeeming
   # ============================================================================

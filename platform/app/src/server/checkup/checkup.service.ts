@@ -491,7 +491,7 @@ export class CheckupService {
           ? "checkup_license_expired"
           : "checkup_license_invalid",
         detail: license.expired
-          ? `The license expired on ${license.expiresAt ?? "an unknown date"}.`
+          ? `The license expired on ${licenseDay(license.expiresAt) ?? "an unknown date"}.`
           : "The license does not verify.",
         fix: "Renew it, then enter the new activation code on the License page.",
         docsPath: CHECKUP_DOCS.licensing,
@@ -503,7 +503,7 @@ export class CheckupService {
         : "";
     return {
       outcome: "verified",
-      detail: `${license.planName ?? "Licensed"} until ${license.expiresAt ?? "no expiry"}${seats}.`,
+      detail: `${license.planName ?? "Licensed"} until ${licenseDay(license.expiresAt) ?? "no expiry"}${seats}.`,
     };
   }
 
@@ -522,7 +522,7 @@ export class CheckupService {
       return {
         outcome: "unchecked",
         detail:
-          "This install's license names no hosted service, so there is no sync to check. A license with hosted services adds Instant Evals judging and managed models, seats with an allowance, and license renewal without pasting a key.",
+          "This install's license names no hosted service, so there is no sync to check. A license with hosted services adds Instant Evals judging and managed models, and delivers renewals and seat changes without a key to paste.",
         fix: "Enter an activation code on the License page. The license and its entitlements arrive over the connect host and refresh daily.",
         docsPath: CHECKUP_DOCS.connect,
       };
@@ -915,4 +915,17 @@ export function portOf(url: string): number {
 
 function normalizeUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+/** The day a license date falls on, as the License page shows it. */
+function licenseDay(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }

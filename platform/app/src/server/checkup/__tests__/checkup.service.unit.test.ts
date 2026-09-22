@@ -157,6 +157,10 @@ describe("CheckupService", () => {
       for (const id of freeCheckIds()) {
         expect(rowOf(rows, id).outcome).toBe("verified");
       }
+      // The license row names the day, not the timestamp the blob carries.
+      expect(rowOf(rows, "license").detail).toBe(
+        "Enterprise until September 21, 2027, 12 of 50 seats used.",
+      );
     });
 
     /** @scenario "A connected install shows its last sync" */

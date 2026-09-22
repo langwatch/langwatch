@@ -20,6 +20,7 @@ import type {
   InstanceUsageCountsInput,
   InstanceUsageStatsRepository,
 } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
+import { readInstallVersion } from "~/server/installVersion";
 import {
   activityCounts,
   onboardingLadder,
@@ -83,7 +84,7 @@ function standardBlock({
   return {
     instance_id: instanceId,
     report_schema_version: USAGE_REPORT_SCHEMA_VERSION,
-    version: process.env.SERVICE_VERSION ?? "unknown",
+    version: readInstallVersion(),
     install_method: process.env.INSTALL_METHOD ?? "self-hosted",
     chart_version: process.env.LANGWATCH_CHART_VERSION ?? null,
     environment: process.env.NODE_ENV ?? "unknown",

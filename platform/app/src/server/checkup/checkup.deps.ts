@@ -25,7 +25,7 @@ import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { getMigrateStatus } from "~/server/clickhouse/goose";
 import { collectUsageStats } from "~/server/collectUsageStats";
-import { readInstallVersion } from "~/server/licenseSyncWorker";
+import { readInstallVersion } from "~/server/installVersion";
 import {
   hasEmailProvider,
   resolveEmailProvider,
@@ -107,9 +107,9 @@ export function realCheckupDeps({
     },
     postgres: {
       ping: async () => {
-        const rows = await prisma.$queryRaw<
-          { server_version: string }[]
-        >`SHOW server_version`;
+        const rows = await prisma.$queryRaw<{ server_version: string }[]>`
+          -- @tenancy: asks the server its version, which belongs to no tenant.
+          SHOW server_version`;
         return rows[0]?.server_version ?? "unknown version";
       },
       migrations: () => pendingPrismaMigrations(prisma),
@@ -308,7 +308,9 @@ async function pendingPrismaMigrations(
       finished_at: Date | null;
       rolled_back_at: Date | null;
     }[]
-  >`SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"`;
+  >`
+    -- @tenancy: the migration ledger describes the whole database, not a tenant.
+    SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"`;
 
   const finished = new Set(
     rows
