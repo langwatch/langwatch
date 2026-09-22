@@ -9,7 +9,7 @@ assignees: ""
 
 ## User story
 
-As a <role>, I want <capability>, so that <benefit>.
+As a [role], I want [capability], so that [benefit].
 
 *One capability per issue; split otherwise.*
 
