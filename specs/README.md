@@ -42,13 +42,23 @@ Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
 See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.
 
+## Use-proof
+
+A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
+- A screenshot of the rendered UI showing the feature in action
+- A command-line output demonstrating the API response
+- A browser-test report with screenshots of the full workflow
+- A trace or log showing the expected behavior occurred
+
+Use-proofs are embedded in PR descriptions or linked from the PR body, providing visual evidence that every acceptance criterion was validated before merge.
+
 ## From issue to feature file
 
 Issues are written as Scrum stories: `As a <role>, I want <capability>, so that <benefit>` with Given/When/Then acceptance criteria and a separate Definition of Done.
 
 When an issue is picked up, the story becomes the `Feature:` narrative (the As/I want/So that lines) and each acceptance criterion becomes one `Scenario:` in the feature file.
 
-Tests bind scenarios via `// @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has at least one bound test.
+Tests bind scenarios via `/** @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has at least one bound test.
 
 See the "Binding Scenarios to Tests" section below.
 
@@ -75,7 +85,7 @@ one scenario may be bound by multiple tests.
 The `platform/app/scripts/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
 has no binding. Enforcement is on by default and fails closed — a new feature file
-needs no registration anywhere. The script carries two ratched deny-lists instead:
+needs no registration anywhere. The script carries two ratcheted deny-lists instead:
 `LEGACY_UNBOUND` for files whose enforced scenarios are not yet bound, and
 `LEGACY_INERT` for files that yield no enforced scenario at all (usually because
 nothing in them is tagged). Both only shrink; taking a file off either list is the
