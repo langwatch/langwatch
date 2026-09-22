@@ -61,21 +61,30 @@ export class ScimDirectoryService {
     prisma,
     grants,
     identities,
+    provenOffboarding,
   }: {
     prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
     identities: ScimGroupMemberAuthority;
+    provenOffboarding: boolean;
   }) {
     this.prisma = prisma;
     this.grants = grants;
     this.identities = identities;
-    this.membership = ScimGroupMembershipService.create(prisma);
+    this.membership = ScimGroupMembershipService.create({
+      repository: prisma,
+      grants,
+      provenOffboarding,
+    });
   }
 
   static create(options: {
     prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
     identities: ScimGroupMemberAuthority;
+    /** `SCIM_V2_GRANTS`, which decides whether a group's grant is what carries
+     *  membership — and so whether leaving one retires a duplicate. */
+    provenOffboarding: boolean;
   }): ScimDirectoryService {
     return new ScimDirectoryService(options);
   }
@@ -302,7 +311,7 @@ export class ScimDirectoryService {
       desired: [],
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
     });
-    await this.membership.remove({ groupId: group.id, userIds: memberIds });
+    await this.membership.remove({ groupId: group.id, organizationId, userIds: memberIds });
     await this.prisma.deleteGroup({ id: group.id });
 
     return;

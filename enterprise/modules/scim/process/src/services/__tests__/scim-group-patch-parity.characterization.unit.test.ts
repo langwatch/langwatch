@@ -47,6 +47,7 @@ function harness() {
   const repo = repository();
   const grants = new GrantsFake();
   const service = ScimDirectoryService.create({
+    provenOffboarding: false,
     prisma: repo,
     grants: ScimGrantsService.create({ repository: repo, grants }),
     identities: { assertWritable: vi.fn(async () => undefined) },

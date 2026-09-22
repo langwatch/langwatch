@@ -14,6 +14,130 @@ export const ssoSetupConnectionSchema = z.object({
 
 export type SsoSetupConnectionInput = z.infer<typeof ssoSetupConnectionSchema>;
 
+/** Whose setup journey is being read. */
+export const ssoSetupOrganizationSchema = z.object({ organizationId: z.string().min(1) });
+
+export type SsoSetupOrganizationInput = z.infer<typeof ssoSetupOrganizationSchema>;
+
+/**
+ * Where an organization's setup stands, as the page reads it in one go.
+ *
+ * The spellings are identity's own (`SsoSetupView`), repeated here because a
+ * wire schema is this module's own statement of what it sends; the transport
+ * maps identity's read onto it, and a value identity stops sending fails to
+ * compile rather than reaching a screen as undefined.
+ */
+const ssoSetupProofSchema = z
+  .object({
+    domain: z.string(),
+    method: z.enum([
+      "dns-txt",
+      "https-file",
+      "license-token",
+      "operator-attested",
+      "legacy-configuration",
+    ]),
+    qualification: z.enum(["QUALIFIED", "UNKNOWN", "LAPSED"]),
+    proofState: z.enum(["VERIFIED", "WAVERING", "LAPSED"]),
+    /** When a lapse becomes final; null while the evidence is there. */
+    graceEndsAtMs: z.number().nullable(),
+    verifiedAtMs: z.number(),
+    verifier: z.object({ type: z.enum(["user", "system"]), id: z.string().nullable() }).strict(),
+  })
+  .strict();
+
+const ssoSetupClaimSchema = z
+  .object({
+    domain: z.string(),
+    state: z.enum(["CLAIMED", "APPROVED", "REJECTED"]),
+    /** Why an operator refused it, so a re-claim starts from what they said. */
+    note: z.string().nullable(),
+    waitsForReview: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupRecordSchema = z
+  .object({
+    domain: z.string(),
+    method: z.enum([
+      "dns-txt",
+      "https-file",
+      "license-token",
+      "operator-attested",
+      "legacy-configuration",
+    ]),
+    expiresAtMs: z.number().nullable(),
+    expired: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupGoLiveSchema = z
+  .object({
+    domainProved: z.boolean(),
+    testSignIn: z.object({ done: z.boolean() }).strict(),
+    breakGlass: z.object({ inPlace: z.boolean(), liveCount: z.number() }).strict(),
+    arrivalsDecided: z.boolean(),
+    ready: z.boolean(),
+    activated: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupConnectionViewSchema = z
+  .object({
+    connectionId: z.string(),
+    state: z.enum([
+      "DRAFT",
+      "CLAIMED",
+      "APPROVED",
+      "REJECTED",
+      "DISCARDED",
+      "VERIFICATION_PENDING",
+      "VERIFIED",
+      "ACTIVE",
+      "SUSPENDED",
+      "TEARDOWN_PENDING",
+      "TORN_DOWN",
+    ]),
+    type: z.enum(["oidc", "saml"]),
+    providerId: z.string(),
+    issuer: z.string().nullable(),
+    source: z.enum(["self-serve", "legacy-grandfathered"]),
+    arrivalPolicy: z.enum(["admit", "request", "refuse"]),
+    /** Null while the registration default stands: going live waits for a
+     *  decision, and "turn everybody away" is a decision too. */
+    arrivalPolicyDecidedAtMs: z.number().nullable(),
+    tearDownAfterMs: z.number().nullable(),
+    createdAtMs: z.number(),
+    verifiedDomains: z.array(z.string()),
+    domainProofs: z.array(ssoSetupProofSchema),
+  })
+  .strict();
+
+export const ssoSetupPageViewSchema = z
+  .object({
+    /** Null before the organization has registered its first connection. */
+    connection: ssoSetupConnectionViewSchema.nullable(),
+    claims: z.array(ssoSetupClaimSchema),
+    record: ssoSetupRecordSchema.nullable(),
+    goLive: ssoSetupGoLiveSchema.nullable(),
+    /** The compatibility route a grandfathered connection stands in for. */
+    legacyRoute: z.object({ domain: z.string(), provider: z.string() }).strict().nullable(),
+    /** The addresses an identity provider is pointed at. This module serves
+     *  them, so identity's own read does not answer them. */
+    serviceProvider: z
+      .object({
+        redirectUrl: z.string(),
+        assertionConsumerServiceUrl: z.string(),
+        singleLogoutUrl: z.string(),
+        entityId: z.string(),
+        metadataUrl: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export type SsoSetupPageView = z.infer<typeof ssoSetupPageViewSchema>;
+
 /**
  * One line of a connection's history, already in a reader's words: identity
  * composes the sentence, so no surface has to know an event's internal name.

@@ -166,6 +166,7 @@ describe("SCIM PATCH operation casing parity", () => {
     const repo = groupRepository();
     const grants = new GrantsFake();
     const service = ScimDirectoryService.create({
+      provenOffboarding: false,
       prisma: repo,
       grants: ScimGrantsService.create({ repository: repo, grants }),
       identities: { assertWritable: vi.fn(async () => undefined) },

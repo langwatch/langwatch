@@ -96,6 +96,7 @@ describe("SCIM characterization: group PATCH membership and operation casing", (
     const repo = groupsRepository();
     const grants = new GrantsFake();
     const groups = ScimDirectoryService.create({
+      provenOffboarding: false,
       prisma: repo,
       grants: ScimGrantsService.create({ repository: repo, grants }),
       identities: { assertWritable: vi.fn(async () => undefined) },

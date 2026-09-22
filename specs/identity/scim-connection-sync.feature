@@ -175,6 +175,25 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the role they hold is the one the directory's mapping asserts
     And no membership is created with a role nothing asserted
 
+  # Older pushes minted an organization-scoped grant per person. With the flag
+  # on, a group's grant is what carries that access, so the direct one is a
+  # duplicate that outlives the group it was meant to stand in for.
+
+  @unit
+  Scenario: Group access replaces the membership grant an older push minted
+    Given the directory grants flag is on
+    When "okta-primary" pushes somebody who already holds a directory-written membership grant
+    Then that organization-scoped grant is retired as the directory
+    And no membership grant is written in its place
+
+  @unit
+  Scenario: Taking somebody out of a group retires the membership grant they kept
+    Given the directory grants flag is on
+    When "okta-primary" takes somebody out of a group, or deletes the group they were in
+    Then the membership grant the directory wrote for them at the organization is retired
+    And it is retired before their group membership goes
+    And a grant an administrator made for them by hand at the same scope stays
+
   @unit @unimplemented
   Scenario: Every membership a directory push causes is explained by an event
     Given "acme" has been synced through a full push, group and removal cycle

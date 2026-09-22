@@ -369,6 +369,32 @@ describe("SCIM user parity", () => {
       expect(repo.removeMembership).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Group access replaces the membership grant an older push minted" */
+    it("retires the membership grant an older push minted rather than restating it", async () => {
+      const { writer, service } = harness({
+        existingUser: user(),
+        membership: null,
+        provenOffboarding: true,
+      });
+
+      await service.createUser({
+        organizationId: "org-1",
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "alice@acme.com",
+        },
+      });
+
+      expect(writer.retireDirectoryGrants).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          userIds: ["user-1"],
+          reason: "directory access is supplied by group membership",
+        }),
+      );
+      expect(writer.attachBindings).not.toHaveBeenCalled();
+    });
+
     it("still deactivates the user, which both paths owe", async () => {
       const { users, service } = harness({
         membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },

@@ -60,7 +60,7 @@ const manualBinding: ScimRoleBindingRecord = {
   customRoleId: null,
 };
 
-function directoryOver() {
+function directoryOver(provenOffboarding = false) {
   const members = new Set([MEMBER, COLLEAGUE]);
   const groups = new Map([[GROUP, administrators]]);
   const writes: string[] = [];
@@ -100,11 +100,17 @@ function directoryOver() {
   grants.revokeBindings.mockImplementation(async () => {
     writes.push("revokeBindings");
   });
+  grants.retireDirectoryGrants.mockImplementation(async () => {
+    writes.push("retireDirectoryGrants");
+
+    return 1;
+  });
 
   const service = ScimDirectoryService.create({
     prisma: repository,
     grants: ScimGrantsService.create({ repository, grants }),
     identities: { assertWritable: vi.fn(async () => undefined) },
+    provenOffboarding,
   });
 
   return { service, grants, members, writes };
@@ -194,5 +200,61 @@ describe("SCIM group access removal", () => {
     await takeMemberOut(directory.service, "remove");
 
     expect(directory.grants.revokeBindings).not.toHaveBeenCalledWith(revoking(GROUP_BINDING));
+  });
+});
+
+describe("SCIM group access removal with the directory grants flag on", () => {
+  let directory: ReturnType<typeof directoryOver>;
+
+  beforeEach(() => {
+    directory = directoryOver(true);
+  });
+
+  /** @scenario "Taking somebody out of a group retires the membership grant they kept" */
+  it.each(["remove", "replace", "delete"] as const)(
+    "retires the membership grant the directory wrote for whoever is taken out on %s",
+    async (operation) => {
+      await takeMemberOut(directory.service, operation);
+
+      expect(directory.grants.retireDirectoryGrants).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: ORGANIZATION,
+          userIds: expect.arrayContaining([MEMBER]),
+          actor: { type: "system", id: "system:scim" },
+          reason: "directory access is supplied by group membership",
+        }),
+      );
+    },
+  );
+
+  /** @scenario "Taking somebody out of a group retires the membership grant they kept" */
+  it("retires it before their group membership goes", async () => {
+    await takeMemberOut(directory.service, "remove");
+
+    expect(directory.writes.indexOf("retireDirectoryGrants")).toBeLessThan(
+      directory.writes.indexOf("removeGroupMembers"),
+    );
+  });
+
+  /** @scenario "Taking somebody out of a group retires the membership grant they kept" */
+  it("leaves the grant an administrator made by hand alone", async () => {
+    await takeMemberOut(directory.service, "remove");
+
+    expect(directory.grants.revokeBindings).not.toHaveBeenCalledWith(revoking(MANUAL_BINDING));
+  });
+
+  it("names nobody the removal left in the group", async () => {
+    await takeMemberOut(directory.service, "remove");
+
+    expect(directory.grants.retireDirectoryGrants).toHaveBeenCalledWith(
+      expect.objectContaining({ userIds: [MEMBER] }),
+    );
+  });
+
+  it("retires nothing while the flag is off", async () => {
+    const off = directoryOver();
+    await takeMemberOut(off.service, "delete");
+
+    expect(off.grants.retireDirectoryGrants).not.toHaveBeenCalled();
   });
 });

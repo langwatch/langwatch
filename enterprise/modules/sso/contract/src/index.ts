@@ -10,6 +10,8 @@ export {
   ssoIssuedDnsRecordSchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
+  ssoSetupOrganizationSchema,
+  ssoSetupPageViewSchema,
   type SsoConnectionHistoryEntry,
   type SsoDomainClaimOutcome,
   type SsoDomainProof,
@@ -18,6 +20,8 @@ export {
   type SsoIssuedDnsRecord,
   type SsoSetupConnectionInput,
   type SsoSetupDomainInput,
+  type SsoSetupOrganizationInput,
+  type SsoSetupPageView,
 } from "./sso-setup.contract.ts";
 export {
   activateSsoConnectionInputSchema,

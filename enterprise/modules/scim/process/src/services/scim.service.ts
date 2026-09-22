@@ -93,7 +93,12 @@ export class ScimService extends ScimServiceContract {
       provenOffboarding,
     });
     this.entitlements = entitlements;
-    this.groups = ScimDirectoryService.create({ prisma, grants, identities: this.identities });
+    this.groups = ScimDirectoryService.create({
+      prisma,
+      grants,
+      identities: this.identities,
+      provenOffboarding,
+    });
   }
 
   static create(options: {

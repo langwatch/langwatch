@@ -15,9 +15,23 @@ import {
   ssoHistoryActivitySchema,
   ssoSetupConnectionSchema,
   ssoSetupDomainSchema,
+  ssoSetupOrganizationSchema,
+  ssoSetupPageViewSchema,
 } from "./sso-setup.contract.ts";
 
 export const ssoSetupTrpc = defineTrpcContract("ssoSetup")
+  /**
+   * Everything the setup page renders, in one read.
+   *
+   * A query rather than a command that refuses, because an organization that
+   * cannot set single sign-on up still has to be TOLD why — the page has to
+   * render for the words on it to be readable. `sso:view`, so somebody who
+   * may look but not manage still sees where the setup stands.
+   */
+  .query("getSetup")
+  .withInput(ssoSetupOrganizationSchema)
+  .withOutput(ssoSetupPageViewSchema)
+
   /** What happened to this connection, newest first. A read, permanently. */
   .query("getHistory")
   .withInput(ssoSetupConnectionSchema)

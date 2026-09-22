@@ -150,4 +150,27 @@ export class ScimGrantsService {
 
     return { attached: toAttach.length, revoked: toRevoke.length };
   }
+
+  /**
+   * Group grants replace the direct membership grants older pushes minted, so
+   * the directory's own organization-scoped grants for these people go. Only
+   * the directory's: what an administrator gave by hand at the same scope is
+   * outside the slice a push is authoritative over. Answers how many went.
+   */
+  async retireMembershipGrants(input: {
+    organizationId: string;
+    userIds: string[];
+    actor: LedgerActor;
+  }): Promise<number> {
+    if (input.userIds.length === 0) {
+      return 0;
+    }
+
+    return this.grants.retireDirectoryGrants({
+      organizationId: input.organizationId,
+      userIds: input.userIds,
+      actor: input.actor,
+      reason: "directory access is supplied by group membership",
+    });
+  }
 }

@@ -8,6 +8,8 @@ import type {
   SsoHistoryActivity,
   SsoSetupConnectionInput,
   SsoSetupDomainInput,
+  SsoSetupOrganizationInput,
+  SsoSetupPageView,
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
@@ -84,6 +86,10 @@ export interface SsoApi {
   watchConnectionHistory(
     input: SsoSetupConnectionInput & { signal?: AbortSignal },
   ): AsyncGenerator<SsoHistoryActivity>;
+
+  /** Where this organization's setup stands, with the addresses this module
+   *  serves folded in beside identity's own reading of the journey. */
+  getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView>;
 
   /**
    * The domain ceremony the organization runs itself (ADR-123), where

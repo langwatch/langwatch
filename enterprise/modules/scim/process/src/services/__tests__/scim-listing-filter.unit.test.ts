@@ -151,6 +151,7 @@ describe("ScimDirectoryService.listGroups", () => {
     it("refuses with invalidFilter rather than listing every group", async () => {
       const repository = directoryRepository();
       const service = ScimDirectoryService.create({
+        provenOffboarding: false,
         prisma: repository,
         grants: ScimGrantsService.create({ repository, grants: new GrantsFake() }),
         identities: { assertWritable: vi.fn(async () => undefined) },

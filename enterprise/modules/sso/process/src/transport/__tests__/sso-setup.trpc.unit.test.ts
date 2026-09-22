@@ -4,7 +4,9 @@
  * What an organization's own administrator reads about its connection
  * (specs/identity/sso-connection-history.feature).
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -54,16 +56,33 @@ const ENTRY = {
   carriedOver: false,
 };
 
-async function harness(options: { permits?: (permission: string) => boolean } = {}) {
+async function harness(
+  options: {
+    permits?: (permission: string) => boolean;
+    setup?: SsoSetupView;
+  } = {},
+) {
   const connections = RecordingSsoConnectionLedger.create();
   const getHistory = vi.fn(async () => [ENTRY]);
   const ceremony = RecordingSsoDomainCeremony.create();
+  const journey = options.setup ?? {
+    connection: null,
+    claims: [],
+    record: null,
+    goLive: null,
+    legacyRoute: null,
+  };
   const auditLog = { record: vi.fn(async () => {}), listEntityHistory: vi.fn() };
   const app = await createSsoTestApp({
     connections,
     dependencies: {
       auditLog,
-      identity: createSsoTestIdentity(connections, { getHistory }, ceremony),
+      identity: createSsoTestIdentity(
+        connections,
+        { getHistory },
+        ceremony,
+        createApiFixture<SsoSetupApi>({ getSetup: async () => journey }),
+      ),
     },
   });
   const trpc = initTRPC.context<TestContext>().create();
@@ -86,7 +105,7 @@ const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 
 describe("the organization's own single sign-on surface", () => {
   describe("given the mounted router", () => {
-    it("exposes the history read, its signal, and the domain ceremony", async () => {
+    it("exposes the setup read, the history and its signal, and the domain ceremony", async () => {
       const { router } = await harness();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
@@ -94,6 +113,7 @@ describe("the organization's own single sign-on surface", () => {
         "checkDomainRecord",
         "claimDomain",
         "getHistory",
+        "getSetup",
         "onHistoryActivity",
         "proveDomain",
         "removeDomain",
@@ -129,6 +149,18 @@ describe("the organization's own single sign-on surface", () => {
   });
 
   describe("given a reader who may see single sign-on but not manage it", () => {
+    /** @scenario "Reading migration progress does not grant permission to change it" */
+    it("still reads where the setup stands, which is what the page renders", async () => {
+      const { caller } = await harness({
+        permits: (permission) => permission === "sso:view",
+        setup: { connection: null, claims: [], record: null, goLive: null, legacyRoute: null },
+      });
+
+      await expect(caller.getSetup({ organizationId: "org_acme" })).resolves.toMatchObject({
+        connection: null,
+      });
+    });
+
     /** @scenario "Seeing the history takes managing single sign-on, not only seeing it" */
     it("refuses, because the history is nearer an audit trail than a state", async () => {
       const { caller, getHistory } = await harness({

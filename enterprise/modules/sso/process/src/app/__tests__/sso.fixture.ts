@@ -9,6 +9,7 @@ import {
   type SsoConnectionBackofficeApi,
   type SsoConnectionHistoryApi,
   type SsoDomainCeremonyApi,
+  type SsoSetupApi,
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
@@ -173,11 +174,13 @@ export function createSsoTestIdentity(
   connections: SsoConnectionBackofficeApi,
   history?: SsoConnectionHistoryApi,
   ceremony?: SsoDomainCeremonyApi,
+  setup?: SsoSetupApi,
 ): IdentityApi {
   return createApiFixture<IdentityApi>({
     ssoBackoffice: () => connections,
     ...(history ? { ssoConnectionHistory: () => history } : {}),
     ...(ceremony ? { ssoDomainCeremony: () => ceremony } : {}),
+    ...(setup ? { ssoSetup: () => setup } : {}),
   });
 }
 

@@ -19,6 +19,8 @@ import type {
   SsoDomainProved,
   SsoDomainTarget,
   SsoSetupDomainInput,
+  SsoSetupOrganizationInput,
+  SsoSetupPageView,
 } from "@langwatch/enterprise-sso-contract";
 
 /** The operator a command is appended under. The ledger mints nothing itself. */
@@ -73,6 +75,18 @@ export interface SsoGateLogger {
 
 /** The one line the history signal ever writes: a poll that could not read. */
 export type SsoActivityLogger = Pick<SsoGateLogger, "warn">;
+
+/**
+ * Identity's own folding of where the setup stands — everything the page
+ * reads except the addresses this module serves, which is the half it adds.
+ * Demanded as exactly that half, so a field identity stops answering stops
+ * this from compiling rather than reaching a screen as undefined.
+ */
+export type SsoSetupJourney = Omit<SsoSetupPageView, "serviceProvider">;
+
+export interface SsoSetupReads {
+  getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupJourney>;
+}
 
 /**
  * The organization's own read of its connection's history. Identity owns the

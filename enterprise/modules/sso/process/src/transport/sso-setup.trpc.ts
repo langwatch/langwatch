@@ -23,6 +23,10 @@ function administratorOf(actor: TrpcHandlerActor): SsoAdministrator {
 }
 
 export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
+  .procedure("getSetup")
+  .withPermission("sso:view")
+  .handle(({ app, input }) => app.getSetup(input))
+
   .procedure("getHistory")
   .withPermission("sso:manage")
   .handle(({ app, input }) => app.findConnectionHistory(input))

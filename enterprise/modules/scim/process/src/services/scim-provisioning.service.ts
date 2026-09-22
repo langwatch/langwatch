@@ -123,6 +123,10 @@ export class ScimProvisioningService {
   /**
    * The organization-scoped membership grant a directory push asserts,
    * reconciled rather than written: re-pushing the same state emits nothing.
+   *
+   * With `SCIM_V2_GRANTS` on there is nothing to assert — a group's grant is
+   * what carries the access — so the push retires the duplicate an older one
+   * minted instead of restating it.
    */
   private async reconcileOrganizationMembership({
     userId,
@@ -131,6 +135,16 @@ export class ScimProvisioningService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    if (this.provenOffboarding) {
+      await this.grants.retireMembershipGrants({
+        organizationId,
+        userIds: [userId],
+        actor: ScimProvisioningService.ACTOR,
+      });
+
+      return;
+    }
+
     await this.grants.reconcile({
       scope: {
         kind: "organization-membership",

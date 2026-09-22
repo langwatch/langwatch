@@ -130,6 +130,7 @@ function serviceOver(
   identities: ScimGroupMemberAuthority = { assertWritable: vi.fn(async () => undefined) },
 ) {
   return ScimDirectoryService.create({
+    provenOffboarding: false,
     prisma: repository,
     grants: ScimGrantsService.create({ repository, grants: new GrantsFake() }),
     identities,

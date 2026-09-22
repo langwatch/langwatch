@@ -37,6 +37,8 @@ import {
   type SsoOperator,
   type SsoSetupConnectionInput,
   type SsoSetupDomainInput,
+  type SsoSetupOrganizationInput,
+  type SsoSetupPageView,
 } from "@langwatch/enterprise-sso-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -47,6 +49,7 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/better-auth-sso-adapter.rules.ts";
+import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import type {
@@ -57,6 +60,7 @@ import type {
   SsoDomainCeremonyLedger,
   SsoGateLogger,
   SsoSelfServeActor,
+  SsoSetupReads,
 } from "./sso.members.ts";
 
 /** Whether the configured provider can actually be mounted by BetterAuth. */
@@ -180,6 +184,9 @@ export class SsoApp implements SsoApiContract {
   readonly #connections: SsoConnectionLedger;
   readonly #ceremony: SsoDomainCeremonyLedger;
   readonly #history: SsoConnectionHistoryReads;
+  readonly #setup: SsoSetupReads;
+  /** The deployment an identity provider is pointed back at. */
+  readonly #baseUrl: string;
   readonly #historyActivity: SsoHistoryActivityService;
   readonly #operators: OpsApi;
   readonly #users: UserApi;
@@ -190,6 +197,8 @@ export class SsoApp implements SsoApiContract {
     connections: SsoConnectionLedger,
     ceremony: SsoDomainCeremonyLedger,
     history: SsoConnectionHistoryReads,
+    setup: SsoSetupReads,
+    baseUrl: string,
     logger: SsoActivityLogger,
     dependencies: SsoSetup["dependencies"],
   ) {
@@ -197,6 +206,8 @@ export class SsoApp implements SsoApiContract {
     this.#connections = connections;
     this.#ceremony = ceremony;
     this.#history = history;
+    this.#setup = setup;
+    this.#baseUrl = baseUrl;
     this.#historyActivity = SsoHistoryActivityService.create({ history, logger });
     this.#operators = dependencies.operators;
     this.#users = dependencies.users;
@@ -239,9 +250,28 @@ export class SsoApp implements SsoApiContract {
       connections,
       domains,
       { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
+      { getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input) },
+      configuration.baseUrl,
       members.logger,
       dependencies,
     );
+  }
+
+  /**
+   * Where this organization's setup stands. Identity folds the journey; the
+   * addresses an identity provider is pointed at are this module's, because
+   * this module is what answers them.
+   */
+  async getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView> {
+    const journey = await this.#setup.getSetup(input);
+
+    return {
+      ...journey,
+      serviceProvider: ssoServiceProviderAddresses({
+        baseUrl: this.#baseUrl,
+        connectionId: journey.connection?.connectionId ?? null,
+      }),
+    };
   }
 
   async findConnectionHistory(

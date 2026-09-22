@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
+import type { ScimGrantsService } from "./scim-grants.service.ts";
 
 const logger = createLogger("langwatch:scim:group");
+
+/** The one directory principal, whichever connection pushed the change. */
+const SCIM_ACTOR = { type: "system", id: SYSTEM_ACTORS.scim } as const;
 
 type MemberInstruction =
   | { kind: "list"; ids: string[] }
@@ -32,10 +37,24 @@ export type ScimGroupMembershipRepository = Pick<
 
 /** Owns SCIM Group membership diffs and their conservative PATCH interpretation. */
 export class ScimGroupMembershipService {
-  private constructor(private readonly repository: ScimGroupMembershipRepository) {}
+  private constructor(
+    private readonly repository: ScimGroupMembershipRepository,
+    private readonly grants: ScimGrantsService,
+    /** `SCIM_V2_GRANTS`: with it off, membership is still the directory's own
+     *  organization-scoped grant, so there is no duplicate to retire. */
+    private readonly provenOffboarding: boolean,
+  ) {}
 
-  static create(repository: ScimGroupMembershipRepository): ScimGroupMembershipService {
-    return new ScimGroupMembershipService(repository);
+  static create(options: {
+    repository: ScimGroupMembershipRepository;
+    grants: ScimGrantsService;
+    provenOffboarding: boolean;
+  }): ScimGroupMembershipService {
+    return new ScimGroupMembershipService(
+      options.repository,
+      options.grants,
+      options.provenOffboarding,
+    );
   }
 
   async uniqueSlug({
@@ -69,8 +88,27 @@ export class ScimGroupMembershipService {
     }
   }
 
-  async remove(input: { groupId: string; userIds: string[] }): Promise<void> {
-    await this.repository.removeGroupMembers(input);
+  /**
+   * Access goes before the membership does: whoever leaves a group keeps
+   * nothing the directory once gave them at the organization on the way out.
+   */
+  async remove(input: {
+    groupId: string;
+    organizationId: string;
+    userIds: string[];
+  }): Promise<void> {
+    if (this.provenOffboarding) {
+      await this.grants.retireMembershipGrants({
+        organizationId: input.organizationId,
+        userIds: input.userIds,
+        actor: SCIM_ACTOR,
+      });
+    }
+
+    await this.repository.removeGroupMembers({
+      groupId: input.groupId,
+      userIds: input.userIds,
+    });
   }
 
   async replace(input: {
@@ -94,7 +132,11 @@ export class ScimGroupMembershipService {
     }
 
     if (toRemove.length > 0) {
-      await this.remove({ groupId: input.group.id, userIds: toRemove });
+      await this.remove({
+        groupId: input.group.id,
+        organizationId: input.organizationId,
+        userIds: toRemove,
+      });
     }
   }
 
@@ -148,7 +190,11 @@ export class ScimGroupMembershipService {
     if (normalizedOp === "remove" && operation.path?.startsWith("members")) {
       const memberIds = this.memberIdsFromPath(operation.path, operation.value);
       if (memberIds.length > 0) {
-        await this.remove({ groupId: input.group.id, userIds: memberIds });
+        await this.remove({
+          groupId: input.group.id,
+          organizationId: input.organizationId,
+          userIds: memberIds,
+        });
       }
 
       return;
