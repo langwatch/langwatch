@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { type MutableRefObject, useCallback, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type InstantEvalChipTarget,
@@ -153,34 +153,29 @@ function typedEvalRunOf({
   };
 }
 
-/**
- * What Enter does with the text in the search bar.
- *
- * A text without bare words is a filter and is applied as typed. A text with
- * bare words is a sentence and goes to `tracesV2.routeSearch`, which answers
- * with one of four routes; each is applied here so the result is visible on
- * screen. A failure on the way is never an error state in the bar: the
- * sentence is searched as one quoted phrase instead.
- *
- * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
- */
-export function useSubmitSearch({
+/** Sends a sentence to the router and applies the route it answers with. */
+function useRouteSubmit({
   isLangyAvailable,
-  isSamplePreview,
   onLangy,
   onInstantEval,
-  onSupersede,
   onModelUnavailable,
-}: UseSubmitSearchOptions): {
-  submitSearch: (text: string, options?: SubmitSearchOptions) => void;
+  submitSeqRef,
+}: Pick<
+  UseSubmitSearchOptions,
+  "isLangyAvailable" | "onLangy" | "onInstantEval" | "onModelUnavailable"
+> & {
+  submitSeqRef: MutableRefObject<number>;
+}): {
+  route: (args: {
+    text: string;
+    seq: number;
+    projectId: string;
+    options: SubmitSearchOptions | undefined;
+  }) => void;
   isRouting: boolean;
 } {
-  const { project } = useOrganizationTeamProject();
   const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const routeSearch = api.tracesV2.routeSearch.useMutation();
-  // A second Enter before the first answer arrives supersedes it: only the
-  // latest submit may touch the store.
-  const submitSeqRef = useRef(0);
   const applyRoute = useApplyRoute({
     onLangy,
     onInstantEval,
@@ -197,7 +192,7 @@ export function useSubmitSearch({
       text: string;
       seq: number;
       projectId: string;
-      options?: SubmitSearchOptions;
+      options: SubmitSearchOptions | undefined;
     }) => {
       // Read at submit time: the range the user sees is the one the search
       // runs in, not the debounced copy a pending timer may still hold.
@@ -225,7 +220,66 @@ export function useSubmitSearch({
         },
       );
     },
-    [applyQueryText, applyRoute, isLangyAvailable, routeSearch],
+    [applyQueryText, applyRoute, isLangyAvailable, routeSearch, submitSeqRef],
+  );
+
+  return { route, isRouting: routeSearch.isPending };
+}
+
+/**
+ * What Enter does with the text in the search bar.
+ *
+ * A text without bare words is a filter and is applied as typed. A text with
+ * bare words is a sentence and goes to `tracesV2.routeSearch`, which answers
+ * with one of four routes; each is applied here so the result is visible on
+ * screen. A failure on the way is never an error state in the bar: the
+ * sentence is searched as one quoted phrase instead.
+ *
+ * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
+ */
+export function useSubmitSearch({
+  isLangyAvailable,
+  isSamplePreview,
+  onLangy,
+  onInstantEval,
+  onSupersede,
+  onModelUnavailable,
+}: UseSubmitSearchOptions): {
+  submitSearch: (text: string, options?: SubmitSearchOptions) => void;
+  isRouting: boolean;
+} {
+  const { project } = useOrganizationTeamProject();
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  // A second Enter before the first answer arrives supersedes it: only the
+  // latest submit may touch the store.
+  const submitSeqRef = useRef(0);
+  const { route, isRouting } = useRouteSubmit({
+    isLangyAvailable,
+    onLangy,
+    onInstantEval,
+    onModelUnavailable,
+    submitSeqRef,
+  });
+
+  // A query of explicit terms is applied as typed and needs no router, with
+  // one exception: an `eval` chip is a filter over the verdicts of a run, so
+  // a chip typed by hand filters on nothing until a run has answered it.
+  // Enter starts that run, under the same estimate and cost rule a routed
+  // sentence gets.
+  const applyFilter = useCallback(
+    ({
+      queryText,
+      projectId,
+    }: {
+      queryText: string;
+      projectId: string | null;
+    }) => {
+      applyQueryText(queryText);
+      if (!projectId) return;
+      const run = typedEvalRunOf({ queryText, projectId });
+      if (run) onInstantEval(run);
+    },
+    [applyQueryText, onInstantEval],
   );
 
   const submitSearch = useCallback(
@@ -239,42 +293,28 @@ export function useSubmitSearch({
         applyQueryText("");
         return;
       }
+      // The sample preview has no project to search or judge in.
+      const projectId = isSamplePreview ? null : (project?.id ?? null);
       const { sentence } = splitBareWords(trimmed);
       if (!sentence) {
-        applyQueryText(trimmed);
-        // A query of explicit terms is applied as typed and needs no router,
-        // with one exception: an `eval` chip is a filter over the verdicts of
-        // a run, so a chip typed by hand filters on nothing until a run has
-        // answered it. Enter starts that run, under the same estimate and
-        // cost rule a routed sentence gets.
-        if (!project?.id || isSamplePreview) return;
-        const run = typedEvalRunOf({
-          queryText: trimmed,
-          projectId: project.id,
-        });
-        if (run) onInstantEval(run);
+        applyFilter({ queryText: trimmed, projectId });
         return;
       }
-      if (!project?.id || isSamplePreview) {
+      if (!projectId) {
         applyQueryText(requoteBareTerms(trimmed));
         return;
       }
-      route({
-        text: trimmed,
-        seq,
-        projectId: project.id,
-        ...(options ? { options } : {}),
-      });
+      route({ text: trimmed, seq, projectId, options });
     },
     [
+      applyFilter,
       applyQueryText,
       isSamplePreview,
-      onInstantEval,
       onSupersede,
       project?.id,
       route,
     ],
   );
 
-  return { submitSearch, isRouting: routeSearch.isPending };
+  return { submitSearch, isRouting };
 }

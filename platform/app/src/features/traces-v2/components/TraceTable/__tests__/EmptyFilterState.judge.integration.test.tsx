@@ -56,9 +56,7 @@ function renderEmptyState() {
 describe("<EmptyFilterState /> under an eval chip no run has answered", () => {
   beforeEach(() => {
     useSearchSubmitRequestStore.getState().clear();
-    mockChips = [
-      { runId: null, question: "is the user annoyed", field: "eval" },
-    ] as typeof mockChips;
+    mockChips = [{ runId: null }];
   });
 
   afterEach(() => {
