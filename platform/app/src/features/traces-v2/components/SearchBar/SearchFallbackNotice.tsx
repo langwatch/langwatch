@@ -49,7 +49,19 @@ function writeDismissed(projectId: string): void {
   }
 }
 
-/** The line: what the search was read as, and why it was not sharpened. */
+/**
+ * The line: what the search was read as, and why it was not sharpened.
+ *
+ * The code is shown beside the sentence rather than resolved through the
+ * code-keyed copy registry, which is the exception rather than the rule here.
+ * The registry supplies the words a reader gets INSTEAD of a code, for a
+ * failure that stopped what they were doing; this search ran, the sentence
+ * beside the code already says what happened and what to do, and the entry
+ * for `ai_query_provider_error` ("Couldn't turn that into a search. Rephrase
+ * it, or pick a different model.") would contradict the judgement now
+ * running. What the code adds is a handle the reader can quote to support,
+ * and it is a handled code, which is written to be read by a customer.
+ */
 function line(notice: SearchNotice): React.ReactNode {
   const asTyped = AS_TYPED[notice.interpretedAs];
   const read = INTERPRETED_AS[notice.interpretedAs];
