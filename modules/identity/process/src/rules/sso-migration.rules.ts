@@ -1,3 +1,4 @@
+import { isSsoProviderMatch } from "@langwatch/auth-contract";
 import {
   qualifySsoDomainOwnership,
   type SsoConnectionState,
@@ -15,27 +16,6 @@ export interface MigrationIdentifierBinding {
   connectionId: string | null;
   providerId: string | null;
   providerAccountId: string | null;
-}
-
-/**
- * Whether the broker's subject names this connection. The same comparison
- * the sign-in path makes (`@langwatch/auth-contract`'s `isSsoProviderMatch`),
- * kept here because the pair is identity's own question.
- */
-function subjectNamesProvider({
-  providerId,
-  providerAccountId,
-  provider,
-}: {
-  providerId: string;
-  providerAccountId: string;
-  provider: string;
-}): boolean {
-  return (
-    providerAccountId === provider ||
-    providerAccountId.startsWith(`${provider}|`) ||
-    providerId === provider
-  );
 }
 
 /**
@@ -68,11 +48,12 @@ export function identifierBelongsToMigrationConnection({
     return false;
   }
 
-  return subjectNamesProvider({
-    providerId: identifier.providerId,
-    providerAccountId: identifier.providerAccountId,
-    provider: connection.idpMetadata.providerId,
-  });
+  // The same comparison the sign-in path makes, asked of the connection's own
+  // provider: identity's pair question and auth's enforcement are one rule.
+  return isSsoProviderMatch(
+    { ssoProvider: connection.idpMetadata.providerId },
+    { providerId: identifier.providerId, accountId: identifier.providerAccountId },
+  );
 }
 
 /** Whether directory provisioning still has to be repointed. */

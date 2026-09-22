@@ -407,6 +407,7 @@ export const createAuthOptions = ({
               providerId: account.providerId as string,
               accountId: account.accountId as string,
             },
+            collaborators: hooks,
           });
         },
       },
@@ -423,6 +424,7 @@ export const createAuthOptions = ({
               providerId: account.providerId as string,
               accountId: account.accountId as string,
             },
+            collaborators: hooks,
           });
         },
       },
@@ -504,6 +506,10 @@ export type BetterAuthTransportOptions = Readonly<{
   shadow: SignInRouterShadow;
   /** The grant ledger an SSO auto-join writes its membership through. */
   authzGrants: BetterAuthHookCollaborators["authzGrants"];
+  /** The connection's arrival door every federated sign-in is asked of. */
+  arrivals: BetterAuthHookCollaborators["arrivals"];
+  /** Where a sign-in through a connection is recorded as having happened. */
+  ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
   /**
    * Sends the password-reset link.
    */
@@ -520,6 +526,7 @@ export type BetterAuthTransportOptions = Readonly<{
  */
 export const createBetterAuthTransport = ({
   announcements,
+  arrivals,
   auth,
   authzGrants,
   database,
@@ -532,6 +539,7 @@ export const createBetterAuthTransport = ({
   sendResetPassword,
   shadow,
   signUpVerification,
+  ssoActivity,
   storage,
   users,
 }: BetterAuthTransportOptions) => {
@@ -542,7 +550,7 @@ export const createBetterAuthTransport = ({
     federation,
     identity,
     shadow,
-    hooks: { federation, invites, announcements, authzGrants },
+    hooks: { federation, invites, announcements, authzGrants, arrivals, ssoActivity },
   });
   return betterAuth({
     ...authOptions,

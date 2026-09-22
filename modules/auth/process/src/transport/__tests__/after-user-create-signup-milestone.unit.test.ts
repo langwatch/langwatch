@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The `signed_up` PostHog milestone fires for every new user, unconditionally, before the
  * SSO domain auto-join even looks at the email — the two user-creation choke points
@@ -25,6 +26,7 @@ import {
   type AuthzUpdateBindingInput,
   type AuthzUpdateGrantInput,
 } from "@langwatch/authz-contract";
+import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -131,6 +133,10 @@ describe("afterUserCreate", () => {
       invites: new StubInvites(),
       announcements,
       authzGrants: new StubAuthzGrantsService(),
+      arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+      ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+        record: async () => undefined,
+      }),
     };
   }
 

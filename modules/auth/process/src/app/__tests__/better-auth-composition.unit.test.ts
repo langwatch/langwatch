@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 /**
@@ -6,6 +7,7 @@ import { AuthUnavailableError } from "@langwatch/auth-contract";
  *
  * @see specs/auth/auth-rest-family-mounted.feature
  */
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
@@ -42,6 +44,7 @@ async function appFor(named = false): Promise<AuthApp> {
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
+      identity: createApiFixture<IdentityApi>(),
     },
     members: {
       logger: createLogger("langwatch:auth:test"),

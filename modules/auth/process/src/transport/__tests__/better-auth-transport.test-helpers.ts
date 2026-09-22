@@ -3,6 +3,8 @@
  * takes. Shared by the tests that read the instance's OPTIONS rather than call
  * it — the plugin list, the account-linking guard, the password verifier.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
 import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
@@ -66,6 +68,8 @@ export function betterAuthTransportFor(
       resolveAuthProvider: async () => "credential",
     } as never,
     authzGrants: {} as never,
+    arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+    ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     sendResetPassword: async () => undefined,
     redis: null,
     secondaryStorage: createSecondaryStorage(null),

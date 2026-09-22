@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
 /**
  * ADR-027 site #4: the ssoDomain auto-join `afterUserCreate` runs is
  * federation, and it rides the same platform SSO license gate as every other provider — a
@@ -77,6 +79,10 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         invites: new StubInvites(),
         announcements: new StubAnnouncements(),
         authzGrants: {} as never,
+        arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+        ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+          record: async () => undefined,
+        }),
       },
     });
 

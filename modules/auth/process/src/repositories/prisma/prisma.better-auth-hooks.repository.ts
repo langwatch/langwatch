@@ -20,7 +20,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
   async tryFindUserForHooks({ userId }: { userId: string }): Promise<BetterAuthHookUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, deactivatedAt: true, pendingSsoSetup: true },
+      select: { id: true, email: true, name: true, deactivatedAt: true, pendingSsoSetup: true },
     });
     if (user === null) return null;
 

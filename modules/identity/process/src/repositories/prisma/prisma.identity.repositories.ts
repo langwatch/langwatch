@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores/members";
 
+import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.rules.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
@@ -54,7 +55,10 @@ export class PostgresIdentityRepositories {
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
       ssoRegistrants: PrismaSsoRegistrantReadRepository.create(database),
-      ssoMigrationEvidence: PrismaSsoMigrationEvidenceRepository.create(database),
+      ssoMigrationEvidence: PrismaSsoMigrationEvidenceRepository.create(
+        database,
+        newSsoAuthenticationActivityId,
+      ),
     };
   }
 }

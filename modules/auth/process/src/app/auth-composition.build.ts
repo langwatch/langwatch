@@ -6,8 +6,10 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   SignInMethodPolicyService,
+  type IdentityApi,
   type RoutingDecision,
   type SignInMethodPolicy,
+  type SsoArrivalApi,
 } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -320,6 +322,22 @@ export function unconfiguredPasswordResetMail(): Promise<never> {
   );
 }
 
+/**
+ * The arrival door, asked of the identity module per sign-in rather than
+ * resolved once: the service reads the connection each time it decides.
+ */
+export class IdentitySsoArrivals implements SsoArrivalApi {
+  static create(identity: IdentityApi): IdentitySsoArrivals {
+    return new IdentitySsoArrivals(identity);
+  }
+
+  private constructor(private readonly identity: IdentityApi) {}
+
+  admit(args: Parameters<SsoArrivalApi["admit"]>[0]): Promise<void> {
+    return this.identity.ssoArrival().admit(args);
+  }
+}
+
 export type BuildBetterAuthOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no instance. */
   identity: BetterAuthDeploymentIdentity;
@@ -331,6 +349,8 @@ export type BuildBetterAuthOptions = Readonly<{
   auth: AuthApi;
   /** The same user directory the rest of this process serves from. */
   users: UserApi;
+  /** Whose connections decide what a federated sign-in arrives into. */
+  identityApi: IdentityApi;
   /** `"email"`, or the federated provider id this deployment mounted. */
   authProvider: string | undefined;
   /** Whether this is the hosted product rather than a self-hosted install. */
@@ -404,6 +424,10 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     announcements: LoggedBetterAuthAnnouncements.create(logger),
     shadow: OffSignInRouterShadow.create(),
     authzGrants: UnavailableBetterAuthGrants.create(),
+    arrivals: IdentitySsoArrivals.create(options.identityApi),
+    ssoActivity: {
+      record: (args) => options.identityApi.ssoActivity().record(args),
+    },
     signUpVerification: AbsentSignUpVerification.create(logger),
     sendResetPassword: () => unconfiguredPasswordResetMail(),
   });

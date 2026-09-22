@@ -19,7 +19,11 @@ import {
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
+import {
+  IdentityApi,
+  type IdentityEmailService,
+  type RoutingDecision,
+} from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -137,6 +141,8 @@ export class AuthApp implements AuthApiContract {
     apiKeys: ApiKeyApi,
     /** This deployment's flag store, for the born-finalized entrance. */
     featureFlags: FeatureFlagApi,
+    /** Whose connections decide what a federated sign-in arrives into. */
+    identity: IdentityApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -227,6 +233,7 @@ export class AuthApp implements AuthApiContract {
           redis: members.redis,
           auth: app,
           users: dependencies.users,
+          identityApi: dependencies.identity,
           authProvider: members.federatedProvider,
           isSaas: members.isSaas,
           logger: members.logger,

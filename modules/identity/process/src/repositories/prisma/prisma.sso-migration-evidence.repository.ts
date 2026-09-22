@@ -3,6 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   MigrationIdentifierHolding,
+  SsoAuthenticationRecord,
   SsoMigrationEvidenceRepository,
 } from "../sso-migration-evidence.repository.ts";
 
@@ -15,11 +16,27 @@ export type PrismaSsoMigrationEvidenceDatabase = Pick<
 export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenceRepository {
   static create(
     database: PrismaSsoMigrationEvidenceDatabase,
+    newActivityId: () => string,
   ): PrismaSsoMigrationEvidenceRepository {
-    return new PrismaSsoMigrationEvidenceRepository(database);
+    return new PrismaSsoMigrationEvidenceRepository(database, newActivityId);
   }
 
-  private constructor(private readonly database: PrismaSsoMigrationEvidenceDatabase) {}
+  private constructor(
+    private readonly database: PrismaSsoMigrationEvidenceDatabase,
+    private readonly newActivityId: () => string,
+  ) {}
+
+  async recordAuthentication(record: SsoAuthenticationRecord): Promise<void> {
+    await this.database.ssoAuthenticationActivity.create({
+      data: {
+        id: this.newActivityId(),
+        organizationId: record.organizationId,
+        connectionId: record.connectionId,
+        userId: record.userId,
+        authenticatedAt: new Date(record.authenticatedAtMs),
+      },
+    });
+  }
 
   async findLiveIdentifierHoldings({
     userIds,

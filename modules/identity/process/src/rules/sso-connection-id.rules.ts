@@ -43,3 +43,8 @@ export function grandfatheredSsoConnectionId({
 export function grandfatherCommandId({ organizationId }: { organizationId: string }): string {
   return `grandfather:${organizationId}`;
 }
+
+/** One recorded sign-in through a connection. */
+export function newSsoAuthenticationActivityId(): string {
+  return generate("ssoauth").toString();
+}

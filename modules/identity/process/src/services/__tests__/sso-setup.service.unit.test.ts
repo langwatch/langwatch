@@ -65,8 +65,15 @@ function binding(over: Partial<BreakGlassBinding> = {}): BreakGlassBinding {
   };
 }
 
-function scenario(rows: SsoConnectionState[], bindings: BreakGlassBinding[] = []) {
+function scenario(
+  rows: SsoConnectionState[],
+  bindings: BreakGlassBinding[] = [],
+  authentications: { connectionId: string; userId: string; authenticatedAtMs: number }[] = [],
+) {
   const store = MemoryIdentityStore.create();
+  for (const record of authentications) {
+    store.ssoAuthentications.push({ organizationId: ORG, ...record });
+  }
   for (const row of rows) store.ssoConnections.set(row.connectionId, row);
   for (const held of bindings) store.breakGlassBindings.set(held.bindingId, held);
   const repositories = MemoryIdentityRepositories.over(store);
@@ -74,6 +81,7 @@ function scenario(rows: SsoConnectionState[], bindings: BreakGlassBinding[] = []
   return SsoSetupService.create({
     connections: repositories.ssoConnections,
     breakGlass: repositories.ssoBreakGlass,
+    activity: repositories.ssoMigrationEvidence,
     migrations: SsoMigrationProgressService.create({
       connections: repositories.ssoConnections,
       evidence: repositories.ssoMigrationEvidence,
@@ -209,6 +217,18 @@ describe("given a connection waiting to go live", () => {
 
     await expect(service.getSetup({ organizationId: ORG })).resolves.toMatchObject({
       goLive: { ready: true, breakGlass: { inPlace: true, liveCount: 1 }, activated: false },
+    });
+  });
+
+  it("counts a sign-in the connection itself decided as the test sign-in", async () => {
+    const service = scenario(
+      [connection({ verifiedDomains: ["acme.com"], domainVerifications: [DNS_PROOF] })],
+      [],
+      [{ connectionId: CONNECTION_ID, userId: "user_ana", authenticatedAtMs: NOW - 60_000 }],
+    );
+
+    await expect(service.getSetup({ organizationId: ORG })).resolves.toMatchObject({
+      goLive: { testSignIn: { done: true } },
     });
   });
 

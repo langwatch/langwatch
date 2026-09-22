@@ -5,6 +5,7 @@ import {
   TeamUserRole,
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
+import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -30,6 +31,10 @@ export type BetterAuthHookCollaborators = Readonly<{
   announcements: BetterAuthAnnouncements;
   /** The grant ledger an auto-joined membership is written through. */
   authzGrants: AuthzGrantsService;
+  /** The connection's own arrival door, asked of every federated sign-in. */
+  arrivals: SsoArrivalApi;
+  /** Where a sign-in through a connection is recorded as having happened. */
+  ssoActivity: SsoAuthenticationActivityApi;
 }>;
 
 const logger = createLogger("langwatch:better-auth:hooks");
@@ -339,6 +344,35 @@ export const tryBeforeAccountCreate = async ({
 };
 
 /**
+ * The connection's own arrival door. The provider a sign-in arrived through
+ * names the connection: a grandfathered one is keyed by the provider this
+ * deployment mounted, a self-serve one by the connection the engine dialed.
+ */
+const admitArrival = async ({
+  collaborators,
+  user,
+  email,
+  account,
+  domain,
+}: {
+  collaborators: BetterAuthHookCollaborators;
+  user: { id: string; name: string | null };
+  email: string;
+  account: { providerId: string };
+  domain: string;
+}): Promise<void> => {
+  await collaborators.ssoActivity.record({
+    connectionId: account.providerId,
+    userId: user.id,
+  });
+  await collaborators.arrivals.admit({
+    user: { id: user.id, email, name: user.name ?? "" },
+    connectionId: account.providerId,
+    domain,
+  });
+};
+
+/**
  * Called after a new Account row is created. Runs the SSO reconciliation that
  * `tryBeforeAccountCreate` used to perform inline, but deferred to this hook so the cleanup
  * only commits once the new Account row exists.
@@ -346,18 +380,23 @@ export const tryBeforeAccountCreate = async ({
 export const afterAccountCreate = async ({
   repo,
   account,
+  collaborators,
 }: {
   repo: BetterAuthHooksRepository;
   account: { userId: string; providerId: string; accountId: string };
+  collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
   try {
     if (account.providerId === "credential") return;
 
     const user = await repo.tryFindUserForHooks({ userId: account.userId });
-    if (!user?.email) return;
+    const email = user?.email;
+    if (!user || !email) return;
 
-    const domain = extractEmailDomain(user.email);
+    const domain = extractEmailDomain(email);
     if (!domain) return;
+
+    await admitArrival({ collaborators, user, email, account, domain });
 
     const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;
@@ -389,16 +428,25 @@ export const afterAccountCreate = async ({
 export const afterAccountUpdate = async ({
   repo,
   account,
+  collaborators,
 }: {
   repo: BetterAuthHooksRepository;
   account: { userId: string; providerId: string; accountId: string };
+  collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
   try {
     const user = await repo.tryFindUserForHooks({ userId: account.userId });
-    if (!user?.email || !user.pendingSsoSetup) return;
+    const email = user?.email;
+    if (!user || !email) return;
 
-    const domain = extractEmailDomain(user.email);
+    const domain = extractEmailDomain(email);
     if (!domain) return;
+
+    // ASKED ON EVERY SIGN-IN. A returning member creates no account row, so
+    // this is the only hook a connection that went live after they first
+    // signed in ever gets to admit them through.
+    await admitArrival({ collaborators, user, email, account, domain });
+    if (!user.pendingSsoSetup) return;
 
     const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;

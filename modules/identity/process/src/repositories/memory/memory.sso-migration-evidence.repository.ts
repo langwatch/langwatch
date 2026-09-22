@@ -2,6 +2,7 @@ import { isLiveIdentifierState } from "@langwatch/identity-contract";
 
 import type {
   MigrationIdentifierHolding,
+  SsoAuthenticationRecord,
   SsoMigrationEvidenceRepository,
 } from "../sso-migration-evidence.repository.ts";
 import type { MemoryIdentityStore } from "./memory-identity.store.ts";
@@ -13,6 +14,10 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
   }
 
   private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async recordAuthentication(record: SsoAuthenticationRecord): Promise<void> {
+    this.store.ssoAuthentications.push({ ...record });
+  }
 
   async findLiveIdentifierHoldings({
     userIds,

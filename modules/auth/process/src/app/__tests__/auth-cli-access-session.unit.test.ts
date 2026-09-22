@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -36,6 +37,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       users: createApiFixture<UserApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      identity: createApiFixture<IdentityApi>(),
     },
     members: {
       logger: createLogger("langwatch:auth:test"),

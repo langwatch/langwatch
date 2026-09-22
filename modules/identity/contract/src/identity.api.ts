@@ -415,6 +415,15 @@ export interface SsoAssertionApi {
 }
 
 /**
+ * The trail a connection's sign-ins leave. Asked by whoever hosts the
+ * sign-in door, which knows the provider and the person and nothing else:
+ * a provider naming no connection records nothing.
+ */
+export interface SsoAuthenticationActivityApi {
+  record(args: { connectionId: string; userId: string }): Promise<void>;
+}
+
+/**
  * What a connection's arrival answer does once the session exists. The
  * account and session are already committed, so an admission that fails is
  * reported, never turned into a refused sign-in.
@@ -483,6 +492,7 @@ export interface IdentityApi {
   ssoDomainReproof(): SsoDomainReproofApi;
   ssoAssertion(): SsoAssertionApi;
   ssoArrival(): SsoArrivalApi;
+  ssoActivity(): SsoAuthenticationActivityApi;
   ssoSetup(): SsoSetupApi;
   ssoSetupCommands(): SsoSetupCommandsApi;
   scimSyncGuards(): ScimSyncGuardsApi;

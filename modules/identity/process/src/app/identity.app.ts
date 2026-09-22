@@ -44,6 +44,7 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
+import { SsoAuthenticationActivityService } from "../services/sso-authentication-activity.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
@@ -104,6 +105,7 @@ type IdentityAppParts = {
   ssoDomainReproof: SsoDomainReproofService | null;
   ssoAssertion: SsoAssertionService;
   ssoArrival: SsoArrivalService;
+  ssoActivity: SsoAuthenticationActivityService;
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
@@ -283,6 +285,10 @@ export class IdentityApp implements IdentityApi {
       authz: setup.dependencies.permissions,
       adoption: SsoArrivalAdoptionService.create(backfill),
     });
+    const ssoActivity = SsoAuthenticationActivityService.create({
+      connections: setup.repositories.ssoConnections,
+      activity: setup.repositories.ssoMigrationEvidence,
+    });
     // Q3(c) again: without the connection ledger there is nothing to press
     // against, so the journey's verbs refuse by name rather than half-work.
     const ssoSetupCommands = ssoConnections
@@ -311,6 +317,7 @@ export class IdentityApp implements IdentityApi {
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,
       breakGlass: setup.repositories.ssoBreakGlass,
+      activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
     });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
@@ -336,6 +343,7 @@ export class IdentityApp implements IdentityApi {
       ssoDomainReproof,
       ssoAssertion,
       ssoArrival,
+      ssoActivity,
       ssoSetup,
       ssoSetupCommands,
       scimSyncGuards,
@@ -472,6 +480,10 @@ export class IdentityApp implements IdentityApi {
 
   ssoArrival(): SsoArrivalService {
     return this.#parts.ssoArrival;
+  }
+
+  ssoActivity(): SsoAuthenticationActivityService {
+    return this.#parts.ssoActivity;
   }
 
   ssoSetup(): SsoSetupService {

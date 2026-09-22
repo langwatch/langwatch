@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",
+    "@better-auth/sso": "catalog:",
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",

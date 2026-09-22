@@ -837,6 +837,8 @@ model SsoAuthenticationActivity {
   connectionId    String
   userId          String
   authenticatedAt DateTime
+  /// The provider-side account the assertion named; null before #7633's arrival door recorded it.
+  providerAccountId String?
 
   @@index([organizationId, connectionId, authenticatedAt])
   @@index([organizationId, userId])

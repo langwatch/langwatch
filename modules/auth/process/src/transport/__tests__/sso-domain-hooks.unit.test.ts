@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { SsoArrivalApi, SsoAuthenticationActivityApi } from "@langwatch/identity-contract";
 /**
  * What signing in through an identity provider does to a domain-matched
  * organization: who joins it, whose account links, and who is flagged for
@@ -95,6 +97,10 @@ describe("signing in through a domain-matched organization's identity provider",
           invites: new NoInvites(),
           announcements: new RecordingAnnouncements(),
           authzGrants: { attachBindings } as never,
+          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+            record: async () => undefined,
+          }),
         },
       });
 
@@ -127,6 +133,10 @@ describe("signing in through a domain-matched organization's identity provider",
           invites: new NoInvites(),
           announcements: new RecordingAnnouncements(),
           authzGrants: { attachBindings } as never,
+          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+            record: async () => undefined,
+          }),
         },
       });
 
@@ -154,6 +164,10 @@ describe("signing in through a domain-matched organization's identity provider",
           invites,
           announcements: new RecordingAnnouncements(),
           authzGrants: { attachBindings } as never,
+          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+            record: async () => undefined,
+          }),
         },
       });
 

@@ -14,6 +14,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { SsoBreakGlassRepository } from "../repositories/sso-break-glass.repository.ts";
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
+import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migration-evidence.repository.ts";
 import type {
   SsoMigrationProgressService,
   SsoMigrationReading,
@@ -28,6 +29,9 @@ const MIGRATION_PAGE_SIZE = 25;
 export interface SsoSetupServiceDeps {
   connections: SsoConnectionReadRepository;
   breakGlass: SsoBreakGlassRepository;
+  /** The trail a sign-in through the connection leaves, which is what says
+   *  the test sign-in happened. */
+  activity: SsoMigrationEvidenceRepository;
   migrations: SsoMigrationProgressService;
   now?: () => number;
 }
@@ -133,12 +137,22 @@ export class SsoSetupService {
     connection: SsoConnectionState;
   }): Promise<SsoSetupGoLiveView> {
     const nowMs = this.now();
-    const bindings = await this.deps.breakGlass.findAllForOrganization({ organizationId });
+    const [bindings, lastAuthenticationAtMs] = await Promise.all([
+      this.deps.breakGlass.findAllForOrganization({ organizationId }),
+      this.deps.activity.findLastAuthenticationAtMs({
+        organizationId,
+        connectionId: connection.connectionId,
+      }),
+    ]);
     const liveCount = bindings.filter((binding) => breakGlassIsLive({ binding, nowMs })).length;
     const domainProved = connection.verifiedDomains.some(
       (domain) => qualifySsoDomainOwnership({ state: connection, domain }).status === "QUALIFIED",
     );
-    const testSignIn = { done: connection.testLoginAccountId !== null };
+    // Either half is evidence: the account activation recorded, or a sign-in
+    // this connection decided. Nothing writes the first one yet.
+    const testSignIn = {
+      done: connection.testLoginAccountId !== null || lastAuthenticationAtMs !== null,
+    };
     const arrivalsDecided = connection.arrivalPolicyDecidedAtMs !== null;
 
     return {

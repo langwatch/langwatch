@@ -4,6 +4,8 @@ import type { Instant } from "@langwatch/time";
 export type BetterAuthHookUser = {
   id: string;
   email: string | null;
+  /** What an admitted arrival is announced under; absent on older rows. */
+  name: string | null;
   deactivatedAt: Instant | null;
   pendingSsoSetup: boolean;
 };

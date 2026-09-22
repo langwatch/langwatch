@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 /**
  * The token check counts its callers: past the registry's per-minute ceiling
@@ -5,6 +6,7 @@ import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
  *
  * @see specs/auth/auth-rest-family-mounted.feature
  */
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -52,6 +54,7 @@ async function appFor(
         findResolvedToken: async () => ({ project: { slug: "acme" } }),
       } as never,
       featureFlags: {} as never,
+      identity: createApiFixture<IdentityApi>(),
     },
     members: {
       logger: createLogger("langwatch:auth:test"),

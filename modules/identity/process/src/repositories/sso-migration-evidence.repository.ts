@@ -7,12 +7,23 @@ export interface MigrationIdentifierHolding extends MigrationIdentifierBinding {
   state: string;
 }
 
+/** One sign-in a connection decided, as the trail records it. */
+export interface SsoAuthenticationRecord {
+  organizationId: string;
+  connectionId: string;
+  userId: string;
+  authenticatedAtMs: number;
+}
+
 /**
- * What the migration pair is judged on, over identity's own rows: which
- * identifiers each member holds, and when either connection last signed
- * somebody in. Membership is the organization module's and is asked there.
+ * The authentication trail a connection leaves, and what the migration pair
+ * is judged on over identity's own rows: which identifiers each member
+ * holds. Membership is the organization module's and is asked there.
  */
 export abstract class SsoMigrationEvidenceRepository {
+  /** One successful sign-in through a connection, as it happened. */
+  abstract recordAuthentication(record: SsoAuthenticationRecord): Promise<void>;
+
   /** Every live identifier held by any of these users. */
   abstract findLiveIdentifierHoldings(args: {
     userIds: string[];
