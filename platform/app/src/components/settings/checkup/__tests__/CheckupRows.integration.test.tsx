@@ -85,7 +85,7 @@ describe("CheckupRows", () => {
         email.querySelector("[data-outcome]")?.getAttribute("data-outcome"),
       ).toBe("refused");
       expect(email).toHaveTextContent("Fail");
-      expect(email).toHaveTextContent("Set EMAIL_PROVIDER.");
+      expect(email).toHaveTextContent("Set EMAIL_PROVIDER to smtp");
       expect(email.querySelector("a")?.getAttribute("href")).toBe(
         "https://docs.langwatch.ai/self-hosting/configuration/email",
       );

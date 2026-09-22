@@ -31,7 +31,7 @@ import { LWQL_PRISMA_MANIFEST } from "../prismaManifest";
 import type { PrismaManifest } from "../prismaSchema";
 
 const DERIVED_MODEL_COUNT = 87;
-const SKIPPED_MODEL_COUNT = 56;
+const SKIPPED_MODEL_COUNT = 66;
 
 /**
  * Organization/admin-tier models the application reads only behind a distinct
@@ -46,6 +46,10 @@ const PERMISSION_GATED_MODELS = [
   "Invoice",
   "InvoiceItem",
   "BillingMeterCheckpoint",
+  "IssuedLicense",
+  "ActivationCode",
+  "ConnectedBillingAccount",
+  "SelfHostedInstance",
 ] as const;
 
 const modelNames = LWQL_PRISMA_MANIFEST.models.map((model) => model.name);

@@ -638,7 +638,7 @@ const presentations = {
   checkup_email_not_configured: {
     title: "Email is not configured",
     describe: () =>
-      "Configure an email provider so invitations and alerts can be sent.",
+      "Set EMAIL_PROVIDER to smtp, ses, sendgrid or resend with its credentials, and restart.",
   },
   checkup_gateway_control_plane_mismatch: {
     title: "The AI Gateway reports another control plane",
