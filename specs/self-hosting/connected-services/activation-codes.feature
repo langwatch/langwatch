@@ -40,6 +40,18 @@ Feature: Activating a self-hosted install with a code
     Then every hosted service is included unless the operator unticks it
     And the license the code mints names those services, so the install syncs and refreshes on its own
 
+  @integration
+  Scenario: A list of codes that cannot be read says so
+    Given an operator on the activation-code list in the backoffice
+    When the list of codes cannot be read
+    Then the screen names the failure instead of reading as an empty registry
+
+  @integration
+  Scenario: A revoke that fails tells the operator who asked for it
+    Given an operator on the activation-code list in the backoffice
+    When revoking a code fails
+    Then the operator is told, rather than the click passing for done
+
   # ============================================================================
   # Redeeming
   # ============================================================================
