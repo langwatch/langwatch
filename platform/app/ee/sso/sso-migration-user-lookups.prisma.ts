@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
@@ -36,4 +37,30 @@ export async function findOtherOrganizationIds({
       ),
     ),
   ];
+}
+
+/**
+ * How many accounts hold each address, compared without case and keyed by the
+ * lowercased address. The one count both a real arrival and the progress page
+ * use, so the page never promises a match the arrival refuses.
+ */
+export async function countAccountsHoldingAddresses({
+  prisma,
+  addresses,
+}: {
+  prisma: Pick<PrismaClient, "$queryRaw">;
+  addresses: string[];
+}): Promise<Map<string, number>> {
+  const lowered = [
+    ...new Set(addresses.map((address) => address.toLowerCase())),
+  ];
+  if (lowered.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<{ address: string; holders: bigint }[]>`
+    -- @tenancy: an address names one account fleet-wide or it names nobody; only a migrating organization's members' addresses are counted
+    SELECT lower("email") AS "address", count(*) AS "holders"
+    FROM "User"
+    WHERE lower("email") = ANY(${lowered}::text[])
+    GROUP BY 1
+  `;
+  return new Map(rows.map((row) => [row.address, Number(row.holders)]));
 }

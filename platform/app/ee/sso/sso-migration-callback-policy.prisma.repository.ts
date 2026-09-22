@@ -9,6 +9,7 @@ import {
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type { DatabaseHookSsoMigrationPort } from "~/server/better-auth/hooks";
 import { arrivalMatchOf, replacementProvesDomain } from "./sso-migration.rules";
+import { countAccountsHoldingAddresses } from "./sso-migration-user-lookups.prisma";
 import type { SsoMigrationMemberMove } from "./sso-self-serve.types";
 
 const DIRECT_CALLBACK_MARKERS = ["/sso/callback/", "/sso/saml2/sp/acs/"];
@@ -447,9 +448,12 @@ export class PrismaSsoMigrationCallbackPolicy
     const match = arrivalMatchOf({
       email: user.email,
       accountsHoldingAddress: user.email
-        ? await reads.user.count({
-            where: { email: { equals: user.email, mode: "insensitive" } },
-          })
+        ? ((
+            await countAccountsHoldingAddresses({
+              prisma: reads,
+              addresses: [user.email],
+            })
+          ).get(user.email.toLowerCase()) ?? 0)
         : 0,
       provesDomain: (domain) => qualifiedPairs(domain).length > 0,
     });

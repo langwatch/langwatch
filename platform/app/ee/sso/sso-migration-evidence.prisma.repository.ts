@@ -28,7 +28,10 @@ import type {
   SsoMigrationFinalizationEvidence,
   SsoMigrationFinalizationReadPort,
 } from "./sso-migration-finalization.service";
-import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
+import {
+  countAccountsHoldingAddresses,
+  findOtherOrganizationIds,
+} from "./sso-migration-user-lookups.prisma";
 import type { SsoMigrationProgressReadPort } from "./sso-self-serve.service";
 import type {
   SelfServeMigrationView,
@@ -402,11 +405,10 @@ export class PrismaSsoMigrationEvidenceRepository
     { replacementRow }: MigrationPair,
     people: MemberRow[],
   ): Promise<Map<string, SsoMigrationMemberMove>> {
-    const holders = await this.#accountsHoldingAddresses(
-      people.flatMap(({ user }) =>
-        user.email ? [user.email.toLowerCase()] : [],
-      ),
-    );
+    const holders = await countAccountsHoldingAddresses({
+      prisma: this.#prisma,
+      addresses: people.flatMap(({ user }) => (user.email ? [user.email] : [])),
+    });
     return new Map(
       people.map(({ userId, user }) => [
         userId,
@@ -420,23 +422,6 @@ export class PrismaSsoMigrationEvidenceRepository
         }),
       ]),
     );
-  }
-
-  /** How many accounts hold each address, compared without case. */
-  async #accountsHoldingAddresses(
-    addresses: string[],
-  ): Promise<Map<string, number>> {
-    if (addresses.length === 0) return new Map();
-    const rows = await this.#prisma.$queryRaw<
-      { address: string; holders: bigint }[]
-    >`
-      -- @tenancy: an address names one account fleet-wide or it names nobody; only this organization's members' addresses are counted
-      SELECT lower("email") AS "address", count(*) AS "holders"
-      FROM "User"
-      WHERE lower("email") = ANY(${addresses}::text[])
-      GROUP BY 1
-    `;
-    return new Map(rows.map((row) => [row.address, Number(row.holders)]));
   }
 
   async #countUsableRecoveries(organizationId: string): Promise<number> {

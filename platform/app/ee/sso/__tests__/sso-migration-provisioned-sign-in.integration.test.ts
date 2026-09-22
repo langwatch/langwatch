@@ -32,6 +32,8 @@ const directId = `${namespace}-direct`;
 const domain = `${namespace.toLowerCase()}.test`;
 const provisionedId = `${namespace}-sam`;
 const unprovisionedId = `${namespace}-pat`;
+const underscoredId = `${namespace}-k_m`;
+const lookalikeId = `${namespace}-kxm`;
 const email = (user: string) => `${user}@${domain}`;
 
 const prisma = new PrismaClient({
@@ -140,7 +142,9 @@ afterAll(async () => {
   await prisma.scimDirectoryUser.deleteMany({ where: { organizationId } });
   await prisma.organizationUser.deleteMany({ where: { organizationId } });
   await prisma.user.deleteMany({
-    where: { id: { in: [provisionedId, unprovisionedId] } },
+    where: {
+      id: { in: [provisionedId, unprovisionedId, underscoredId, lookalikeId] },
+    },
   });
   await prisma.ssoConnection.deleteMany({ where: { organizationId } });
   await prisma.organization.delete({ where: { id: organizationId } });
@@ -173,6 +177,33 @@ describe("given a person the previous connection's sync provisioned, who has nev
         action: "continue",
       });
       await expect(decide(unprovisionedId)).resolves.toMatchObject({
+        kind: "allow_replacement_pair",
+        arrivalConnectionId: directId,
+      });
+    });
+  });
+
+  describe("when their address holds a character a pattern match would treat as a wildcard", () => {
+    beforeAll(async () => {
+      await prisma.user.create({
+        data: {
+          id: underscoredId,
+          name: underscoredId,
+          email: email(underscoredId),
+        },
+      });
+      await prisma.organizationUser.create({
+        data: { userId: underscoredId, organizationId, role: "MEMBER" },
+      });
+      // Another account whose address differs only where the underscore is.
+      await prisma.user.create({
+        data: { id: lookalikeId, name: lookalikeId, email: email(lookalikeId) },
+      });
+    });
+
+    /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+    it("counts only the accounts holding that exact address, the way the progress page does", async () => {
+      await expect(decide(underscoredId)).resolves.toMatchObject({
         kind: "allow_replacement_pair",
         arrivalConnectionId: directId,
       });

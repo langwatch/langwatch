@@ -432,7 +432,7 @@ describe("given an update under way", () => {
       );
 
       expect(container.textContent).toContain(
-        `You can finish from ${new Date(clearsAtMs).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. A sign-in through Auth0 before then moves this to seven days after it.`,
+        `You can finish from ${new Date(clearsAtMs).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. A sign-in through Auth0 moves this to seven days after it.`,
       );
     });
 

@@ -11,7 +11,7 @@ import {
   type SsoLegacyIdentityRetirementPort,
   SsoMigrationFinalizationBlockedError,
 } from "./sso-migration-finalization.service";
-import { findOtherOrganizationIds } from "./sso-other-organization-memberships.prisma";
+import { findOtherOrganizationIds } from "./sso-migration-user-lookups.prisma";
 
 /** Retires connection-scoped Auth0 identities through their ordinary ceremonies. */
 export class PrismaSsoLegacyIdentityRetirement

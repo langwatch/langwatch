@@ -370,6 +370,11 @@ export class ScimTokenService {
    * A person or external id the replacement already provisioned itself is
    * kept as the replacement's own; the previous connection's claim on them is
    * dropped rather than duplicated.
+   *
+   * Safe to run again after a crash at any point: the replacement's history
+   * is started before anything moves (starting it twice states nothing), only
+   * the tokens it was started for are moved, and the rows are re-read inside
+   * the transaction that moves them.
    */
   async moveToConnection({
     organizationId,
@@ -391,46 +396,6 @@ export class ScimTokenService {
       where: { organizationId, connectionId: fromConnectionId },
       select: { id: true },
     });
-    const [ownPeople, ownExternalIds] = await Promise.all([
-      this.prisma.scimDirectoryUser.findMany({
-        where: { organizationId, connectionId: toConnectionId },
-        select: { userId: true },
-      }),
-      this.prisma.scimExternalId.findMany({
-        where: { organizationId, connectionId: toConnectionId },
-        select: { externalId: true },
-      }),
-    ]);
-    await this.prisma.$transaction([
-      this.prisma.scimToken.updateMany({
-        where: { organizationId, connectionId: fromConnectionId },
-        data: { connectionId: toConnectionId },
-      }),
-      this.prisma.scimDirectoryUser.deleteMany({
-        where: {
-          organizationId,
-          connectionId: fromConnectionId,
-          userId: { in: ownPeople.map(({ userId }) => userId) },
-        },
-      }),
-      this.prisma.scimDirectoryUser.updateMany({
-        where: { organizationId, connectionId: fromConnectionId },
-        data: { connectionId: toConnectionId },
-      }),
-      this.prisma.scimExternalId.deleteMany({
-        where: {
-          organizationId,
-          connectionId: fromConnectionId,
-          externalId: {
-            in: ownExternalIds.map(({ externalId }) => externalId),
-          },
-        },
-      }),
-      this.prisma.scimExternalId.updateMany({
-        where: { organizationId, connectionId: fromConnectionId },
-        data: { connectionId: toConnectionId },
-      }),
-    ]);
     for (const token of tokens) {
       await this.syncLifecycle.tokenIssued({
         organizationId,
@@ -438,6 +403,50 @@ export class ScimTokenService {
         tokenId: token.id,
       });
     }
+    await this.prisma.$transaction(async (tx) => {
+      const [ownPeople, ownExternalIds] = await Promise.all([
+        tx.scimDirectoryUser.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { userId: true },
+        }),
+        tx.scimExternalId.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { externalId: true },
+        }),
+      ]);
+      await tx.scimToken.updateMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          id: { in: tokens.map(({ id }) => id) },
+        },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimDirectoryUser.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          userId: { in: ownPeople.map(({ userId }) => userId) },
+        },
+      });
+      await tx.scimDirectoryUser.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimExternalId.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          externalId: {
+            in: ownExternalIds.map(({ externalId }) => externalId),
+          },
+        },
+      });
+      await tx.scimExternalId.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
+        data: { connectionId: toConnectionId },
+      });
+    });
     await this.syncLifecycle.revoked({
       organizationId,
       connectionId: fromConnectionId,

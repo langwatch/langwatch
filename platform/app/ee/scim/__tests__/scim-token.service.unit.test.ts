@@ -6,9 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScimTokenService } from "../scim-token.service";
 
 function createMockPrisma() {
-  return {
-    $transaction: async (operations: Promise<unknown>[]) =>
-      Promise.all(operations),
+  const prisma = {
+    $transaction: async (
+      operations: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>),
+    ) =>
+      typeof operations === "function"
+        ? operations(prisma)
+        : Promise.all(operations),
     scimDirectoryUser: {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -32,7 +36,8 @@ function createMockPrisma() {
     ssoConnection: {
       findFirst: vi.fn(),
     },
-  } as unknown as Parameters<typeof ScimTokenService.create>[0];
+  };
+  return prisma as unknown as Parameters<typeof ScimTokenService.create>[0];
 }
 
 /** The directory-sync history a mint and a revoke state facts on (D08). */
@@ -310,8 +315,20 @@ describe("ScimTokenService", () => {
       });
 
       expect(result).toEqual({ moved: 1 });
+      // Only the tokens whose replacement history was started move, so a
+      // retry after a crash re-announces and moves whatever is still left.
+      expect(
+        syncLifecycle.tokenIssued.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (prisma.scimToken.updateMany as ReturnType<typeof vi.fn>).mock
+          .invocationCallOrder[0]!,
+      );
       expect(prisma.scimToken.updateMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1", connectionId: "conn-auth0" },
+        where: {
+          organizationId: "org-1",
+          connectionId: "conn-auth0",
+          id: { in: ["token-legacy"] },
+        },
         data: { connectionId: "conn-okta" },
       });
       // A person the replacement already provisioned itself stays its own;

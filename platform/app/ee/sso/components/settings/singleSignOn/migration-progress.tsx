@@ -152,7 +152,7 @@ const UPDATE_CHECKS: Record<
     act: ({ previous, clearsAtMs }) =>
       clearsAtMs === null
         ? `You can finish two days after switching over, or seven days after the last sign-in through ${previous} since then, whichever is later.`
-        : `You can finish from ${formatMoment(clearsAtMs)}. A sign-in through ${previous} before then moves this to seven days after it.`,
+        : `You can finish from ${formatMoment(clearsAtMs)}. A sign-in through ${previous} moves this to seven days after it.`,
     condition:
       "Two days have passed since switching over, and seven since anybody last signed in through the previous provider.",
   },

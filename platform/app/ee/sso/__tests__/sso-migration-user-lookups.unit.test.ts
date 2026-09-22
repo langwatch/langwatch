@@ -2,7 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "~/generated/prisma/client";
 import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
-import { findOtherOrganizationIds } from "../sso-other-organization-memberships.prisma";
+import { findOtherOrganizationIds } from "../sso-migration-user-lookups.prisma";
 
 /**
  * A client on a dead connection whose `OrganizationUser` reads run the real
