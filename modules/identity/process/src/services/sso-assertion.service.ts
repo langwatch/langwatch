@@ -3,6 +3,9 @@ import {
   isSsoConnectionInSetup,
   looksLikeSsoConnectionId,
   normalizeDomain,
+  type SsoAssertionDecision,
+  type SsoAssertionRefusal,
+  type SsoAssertionRefusalReason,
   type SsoAssertionRefusedError,
   SsoAssertionWithoutAddressError,
   type SsoConnectionState,
@@ -24,28 +27,6 @@ import type {
 } from "../rules/sso-assertion-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:sso-assertion");
-
-/** Internal reasons identify the failure; customer errors expose what is
- *  actionable. */
-export type SsoAssertionRefusalReason =
-  | "provider-is-not-a-connection"
-  | "assertion-carried-no-address"
-  | "connection-not-found"
-  | "connection-not-accepting-sign-in"
-  | "connection-has-no-registrant"
-  | "setup-address-mismatch"
-  | "domain-not-verified"
-  | "domain-proof-lapsed";
-
-export interface SsoAssertionRefusal {
-  action: "reject";
-  reason: SsoAssertionRefusalReason;
-  /** The refusal as the rest of the platform states one; the seam that
-   *  answers the provider plugin reads its `code`. */
-  error: SsoAssertionRefusedError;
-}
-
-export type SsoAssertionDecision = Readonly<{ action: "continue" }> | SsoAssertionRefusal;
 
 /**
  * The refusal each reason is answered with, and how loudly it is logged. A

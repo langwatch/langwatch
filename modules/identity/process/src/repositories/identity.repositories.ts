@@ -20,6 +20,7 @@ import type {
 } from "./sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
+import type { SsoRegistrantReadRepository } from "./sso-registrant.repository.ts";
 
 /**
  * The rows the identity module owns, chosen once at boot. One tier over
@@ -48,6 +49,8 @@ export interface IdentityRepositories {
   readonly ssoCredentials: SsoCredentialRepository;
   /** The ways back in a connection's activation depends on (D05). */
   readonly ssoBreakGlass: SsoBreakGlassRepository;
+  /** Who an asserted address and a connection subject belong to (ADR-117 §5). */
+  readonly ssoRegistrants: SsoRegistrantReadRepository;
   /**
    * Optional until `identity.app.ts` and the two aggregate backends wire a
    * concrete instance in (out of this lane's owned paths - see the

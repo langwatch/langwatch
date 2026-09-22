@@ -4,13 +4,6 @@
  * not own, named by the one question this service asks of it.
  */
 
-/** The person arriving, as every step of an admission names them. */
-export interface ArrivingUser {
-  id: string;
-  email: string;
-  name: string;
-}
-
 /** The organization they land in. */
 export interface JoinedOrganization {
   id: string;

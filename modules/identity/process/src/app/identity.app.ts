@@ -3,6 +3,7 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   IdentityApi,
   IdentityCapabilityUnavailableError,
@@ -10,6 +11,7 @@ import {
   type IdentityServerConfig,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
 
@@ -18,7 +20,9 @@ import {
   ssoDomainProofFileChannels,
 } from "../channels/sso-domain-proof-channels.registry.ts";
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
+import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -37,12 +41,19 @@ import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
+import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
+import { SsoArrivalService } from "../services/sso-arrival.service.ts";
+import { SsoAssertionService } from "../services/sso-assertion.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
+import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
+import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
+import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
+import { SsoSetupService } from "../services/sso-setup.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
@@ -61,7 +72,11 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
   Readonly<{ producesPipelines: boolean; adminEmails: readonly string[] }>;
 
-type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, IdentityServerConfig> &
+type IdentitySetup = FeatureSetup<
+  typeof IdentityApp.dependencies,
+  IdentityMembers,
+  IdentityServerConfig
+> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {
@@ -83,13 +98,38 @@ type IdentityAppParts = {
   ssoConnectionReads: OrganizationSsoConnectionsService;
   ssoDomainCeremony: SsoDomainCeremonyService | null;
   ssoDomainReproof: SsoDomainReproofService | null;
+  ssoAssertion: SsoAssertionService;
+  ssoArrival: SsoArrivalService;
+  ssoSetup: SsoSetupService;
+  ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
 };
+
+/**
+ * The membership half of an arrival, answered by the organization peer
+ * (ADR-129). Identity never writes an `OrganizationUser` row itself; it asks
+ * the module that owns one.
+ */
+function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMemberships {
+  return {
+    isMember: (args) => organizations.isMember(args),
+    createMembership: (args) => organizations.createMembership(args),
+    applyPendingInvite: (args) => organizations.applyPendingInvite(args),
+    /** Absent for an organization deleted between the decision and the join,
+     *  which admits nobody. */
+    findOrganization: async ({ organizationId }) => {
+      const summary = await organizations.findProvisioningSummary(organizationId);
+      return summary ? { id: summary.id, name: summary.name } : null;
+    },
+  };
+}
 
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
-  static readonly dependencies = {};
+  /** The two peers an admission orchestrates: the module that owns
+   *  membership rows, and the one that owns the pending-admission marker. */
+  static readonly dependencies = { organizations: OrganizationApi, permissions: AuthzApi };
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
   static readonly reads = [
@@ -150,9 +190,12 @@ export class IdentityApp implements IdentityApi {
           mail: infrastructure.mail,
         })
       : null;
+    // One answer to "is there a way back in", shared: activation's second
+    // precondition and the setup sign-in exemption must not disagree.
+    const breakGlass = LocalDoorBreakGlassBindingAdapter.create();
     const ssoConnectionGuards = SsoConnectionGuardsService.create({
       connections: setup.repositories.ssoConnections,
-      breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
+      breakGlass,
       stranding: setup.repositories.ssoStranding,
       platformOperators: infrastructure.ssoPlatformOperators,
     });
@@ -204,6 +247,43 @@ export class IdentityApp implements IdentityApi {
             ...domainProofChannels,
           })
         : null;
+    const ssoAssertion = SsoAssertionService.create({
+      connections: setup.repositories.ssoConnections,
+      registrants: SsoRegistrantReadsService.create({
+        registrants: setup.repositories.ssoRegistrants,
+        organizations: setup.dependencies.organizations,
+      }),
+      breakGlass,
+    });
+    // `joinRequests` and `notifications` are unanswered here on purpose: both
+    // are the composition root's (see the handoff), and an arrival on a
+    // connection that ASKS admits nobody until they are supplied.
+    const ssoArrival = SsoArrivalService.create({
+      connections: setup.repositories.ssoConnections,
+      memberships: arrivalMemberships(setup.dependencies.organizations),
+      authz: setup.dependencies.permissions,
+      adoption: SsoArrivalAdoptionService.create(backfill),
+    });
+    // Q3(c) again: without the connection ledger there is nothing to press
+    // against, so the journey's verbs refuse by name rather than half-work.
+    const ssoSetupCommands = ssoConnections
+      ? SsoSetupCommandsService.create({
+          connections: () => ssoConnections,
+          reads: setup.repositories.ssoConnections,
+          credentials: setup.repositories.ssoCredentials,
+          registrations: SsoIdpRegistrationService.create({
+            // The same fence the published-proof reads go through: an issuer
+            // is a string an administrator typed.
+            discovery: ssoIssuerDiscoveryChannels.live.create({
+              policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+            }),
+          }),
+        })
+      : null;
+    const ssoSetup = SsoSetupService.create({
+      connections: setup.repositories.ssoConnections,
+      breakGlass: setup.repositories.ssoBreakGlass,
+    });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
@@ -225,6 +305,10 @@ export class IdentityApp implements IdentityApi {
       ssoConnectionReads,
       ssoDomainCeremony,
       ssoDomainReproof,
+      ssoAssertion,
+      ssoArrival,
+      ssoSetup,
+      ssoSetupCommands,
       scimSyncGuards,
     });
   }
@@ -351,6 +435,26 @@ export class IdentityApp implements IdentityApi {
     }
 
     return this.#parts.ssoDomainReproof;
+  }
+
+  ssoAssertion(): SsoAssertionService {
+    return this.#parts.ssoAssertion;
+  }
+
+  ssoArrival(): SsoArrivalService {
+    return this.#parts.ssoArrival;
+  }
+
+  ssoSetup(): SsoSetupService {
+    return this.#parts.ssoSetup;
+  }
+
+  ssoSetupCommands(): SsoSetupCommandsService {
+    if (!this.#parts.ssoSetupCommands) {
+      throw new IdentityCapabilityUnavailableError("SSO setup commands");
+    }
+
+    return this.#parts.ssoSetupCommands;
   }
 
   scimSyncGuards(): ScimSyncGuardsService {

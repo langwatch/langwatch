@@ -3,13 +3,13 @@ import { type AuthzApi, AuthzGrantNotConfirmedError } from "@langwatch/authz-con
 import {
   looksLikeSsoConnectionId,
   type SsoArrivalPolicy,
+  type SsoArrivingUser,
   ssoDomainStanding,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
 import type {
-  ArrivingUser,
   JoinedOrganization,
   SsoArrivalIdentityAdoption,
   SsoArrivalJoinRequests,
@@ -26,9 +26,14 @@ export interface SsoArrivalServiceDeps {
   connections: SsoConnectionReadRepository;
   memberships: SsoArrivalMemberships;
   authz: AuthzApi;
-  joinRequests: SsoArrivalJoinRequests;
-  notifications: SsoArrivalNotifications;
   adoption: SsoArrivalIdentityAdoption;
+  /** Where a connection that ASKS raises its request. Absent, an arrival on
+   *  such a connection admits nobody and says so, which is the safe
+   *  direction for an unwired collaborator. */
+  joinRequests?: SsoArrivalJoinRequests;
+  /** Absent leaves an admission silent: it still happens, and the notice it
+   *  owes is logged rather than sent. */
+  notifications?: SsoArrivalNotifications;
 }
 
 /**
@@ -48,7 +53,7 @@ export class SsoArrivalService {
     connectionId,
     domain,
   }: {
-    user: ArrivingUser;
+    user: SsoArrivingUser;
     connectionId: string;
     domain: string;
   }): Promise<void> {
@@ -65,11 +70,15 @@ export class SsoArrivalService {
       if (decision.policy === "refuse") return;
 
       if (decision.policy === "request") {
-        await this.deps.joinRequests.requestFromSsoArrival({
-          userId: user.id,
-          organizationId,
-          domain,
-        });
+        const joinRequests = this.deps.joinRequests;
+        if (!joinRequests) {
+          logger.error(
+            { userId: user.id, connectionId, domain },
+            "an arrival through a connection that raises join requests had nowhere to raise one, so nobody was admitted",
+          );
+          return;
+        }
+        await joinRequests.requestFromSsoArrival({ userId: user.id, organizationId, domain });
         return;
       }
 
@@ -101,7 +110,7 @@ export class SsoArrivalService {
     org,
     domain,
   }: {
-    user: ArrivingUser;
+    user: SsoArrivingUser;
     org: JoinedOrganization;
     domain: string;
   }): Promise<void> {
@@ -129,7 +138,7 @@ export class SsoArrivalService {
     organizationId,
     domain,
   }: {
-    user: ArrivingUser;
+    user: SsoArrivingUser;
     organizationId: string;
     domain: string;
   }): Promise<void> {
@@ -150,7 +159,10 @@ export class SsoArrivalService {
 
     const org = await this.deps.memberships.findOrganization({ organizationId });
     if (!org) return;
-    await this.deps.notifications.joinedAutomatically({
+    // The notice is informational and the membership already landed, so an
+    // unwired notifier is logged rather than allowed to hold the marker open
+    // and re-run this admission on every later arrival.
+    await this.deps.notifications?.joinedAutomatically({
       organizationId,
       requesterUserId: user.id,
       domain,
@@ -237,7 +249,7 @@ export class SsoArrivalService {
     org,
     inviteId,
   }: {
-    user: ArrivingUser;
+    user: SsoArrivingUser;
     org: JoinedOrganization;
     inviteId: string | null;
   }): void {
@@ -248,13 +260,13 @@ export class SsoArrivalService {
         : "Auto-added new user to SSO organization (default MEMBER)",
     );
 
-    this.deps.notifications.announceSignup({
+    this.deps.notifications?.announceSignup({
       userName: user.name,
       userEmail: user.email,
       organizationName: org.name,
     });
 
-    this.deps.notifications.startNurturing({
+    this.deps.notifications?.startNurturing({
       userId: user.id,
       email: user.email,
       name: user.name,

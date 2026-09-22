@@ -47,7 +47,17 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
-  [DISCARD_CONNECTION_COMMAND_TYPE]: ["DRAFT"],
+  // Every state before the connection decides a sign-in: a setup nobody
+  // finished is abandoned outright, whatever step it reached. From ACTIVE
+  // onwards removal is teardown's, which owes people a grace.
+  [DISCARD_CONNECTION_COMMAND_TYPE]: [
+    "DRAFT",
+    "CLAIMED",
+    "APPROVED",
+    "REJECTED",
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+  ],
   // From CLAIMED, because the published record is what DECIDES a claim: the
   // customer is given a record the moment they claim, and the proof landing
   // states the approval and the verification together. From APPROVED for the
@@ -78,7 +88,9 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED"],
   [SUSPEND_CONNECTION_COMMAND_TYPE]: ["ACTIVE"],
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
-  [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED"],
+  // TEARDOWN_PENDING too: asking again brings the date forward, and runs the
+  // stranded-users check again on the way through.
+  [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED", "TEARDOWN_PENDING"],
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: ["TEARDOWN_PENDING"],
   // Decidable for as long as the connection can still admit anybody: before
   // it goes live, and after, because changing your mind is not a rebuild.

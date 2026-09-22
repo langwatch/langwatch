@@ -545,3 +545,29 @@ describe("an unfinished admission", () => {
     expect(parts.adopt).not.toHaveBeenCalled();
   });
 });
+
+describe("given a process that composed nowhere for a join request to be raised", () => {
+  it("admits nobody through a connection that asks, and records that it could not", async () => {
+    const tryFindConnection = vi.fn().mockResolvedValue(connection());
+    const isMember = vi.fn().mockResolvedValue(false);
+    const createMembership = vi.fn();
+    const adopt = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const service = SsoArrivalService.create({
+      connections: new OneConnectionReads(tryFindConnection),
+      authz: createApiFixture<AuthzApi>({}),
+      memberships: {
+        isMember,
+        createMembership,
+        applyPendingInvite: vi.fn(),
+        findOrganization: vi.fn(),
+      },
+      adoption: { adopt },
+    });
+
+    await service.admit({ user: USER, connectionId: CONNECTION_ID, domain: "acme.com" });
+
+    expect(createMembership).not.toHaveBeenCalled();
+    expect(adopt).not.toHaveBeenCalled();
+    expect(log.error).toHaveBeenCalledOnce();
+  });
+});

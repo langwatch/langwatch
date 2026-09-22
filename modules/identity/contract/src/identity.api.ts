@@ -60,6 +60,7 @@ import type {
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
 import type { ScimSyncFactInput } from "./scim-sync.ts";
+import type { SsoArrivingUser, SsoAssertionDecision } from "./sso-admission.ts";
 import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
@@ -69,6 +70,8 @@ import type {
   SelfServeIssuedDnsRecord,
   SsoDomainReproofOutcome,
 } from "./sso-domain-proof.ts";
+import type { SsoIdpRegistration } from "./sso-idp-registration.ts";
+import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
 export interface IdentityNewbornSweepSummary {
@@ -345,6 +348,57 @@ export interface SsoDomainReproofApi {
   sweep(): Promise<SsoDomainReproofOutcome>;
 }
 
+/**
+ * Where one organization's setup journey stands (D05, ADR-123). A read: every
+ * verb the journey presses is a command on one of the surfaces above.
+ */
+export interface SsoSetupApi {
+  getSetup(args: { organizationId: string }): Promise<SsoSetupView>;
+}
+
+/**
+ * The verbs the setup journey presses. Every one names the administrator it
+ * is for; none of them takes an actor the caller made up.
+ */
+export interface SsoSetupCommandsApi {
+  register(args: {
+    organizationId: string;
+    actor: SelfServeActor;
+    /** What the administrator calls this provider. */
+    providerId: string;
+    registration: SsoIdpRegistration;
+  }): Promise<{ connectionId: string }>;
+  setArrivals(args: SsoSetupCommand & { arrivalPolicy: SsoArrivalPolicy }): Promise<void>;
+  activate(args: SsoSetupCommand & { testLoginAccountId: string }): Promise<void>;
+  discardConnection(args: SsoSetupCommand): Promise<void>;
+  /** Which removal this is comes from where the connection stands. */
+  removeConnection(
+    args: SsoSetupCommand & { reason: string | null; graceMs: number },
+  ): Promise<{ removal: SsoConnectionRemoval }>;
+}
+
+/**
+ * Whether an assertion may become a session at all — asked BEFORE anything
+ * links it to a person, because deciding membership first was an account
+ * takeover (ADR-117 §5).
+ */
+export interface SsoAssertionApi {
+  decide(args: {
+    providerId: string;
+    accountId?: string;
+    email: string | null | undefined;
+  }): Promise<SsoAssertionDecision>;
+}
+
+/**
+ * What a connection's arrival answer does once the session exists. The
+ * account and session are already committed, so an admission that fails is
+ * reported, never turned into a refused sign-in.
+ */
+export interface SsoArrivalApi {
+  admit(args: { user: SsoArrivingUser; connectionId: string; domain: string }): Promise<void>;
+}
+
 /** The directory-sync guards. */
 export interface ScimSyncGuardsApi {
   issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
@@ -403,6 +457,10 @@ export interface IdentityApi {
   ssoConnectionReads(): SsoConnectionReadsApi;
   ssoDomainCeremony(): SsoDomainCeremonyApi;
   ssoDomainReproof(): SsoDomainReproofApi;
+  ssoAssertion(): SsoAssertionApi;
+  ssoArrival(): SsoArrivalApi;
+  ssoSetup(): SsoSetupApi;
+  ssoSetupCommands(): SsoSetupCommandsApi;
   scimSyncGuards(): ScimSyncGuardsApi;
 }
 

@@ -97,6 +97,12 @@ export {
   VERIFICATION_REQUESTED_EVENT_TYPE,
   verificationRequestedPayloadSchema,
 } from "./connection.ts";
+export {
+  type SsoArrivingUser,
+  type SsoAssertionDecision,
+  type SsoAssertionRefusal,
+  type SsoAssertionRefusalReason,
+} from "./sso-admission.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
   parseSamlIdpConfig,
@@ -109,6 +115,16 @@ export {
   type SsoSamlRegistration,
   ssoSamlRegistrationSchema,
 } from "./sso-idp-registration.ts";
+export {
+  type SsoConnectionRemoval,
+  type SsoSetupCommand,
+  type SsoSetupConnectionView,
+  type SsoSetupDomainClaimView,
+  type SsoSetupDomainProofView,
+  type SsoSetupGoLiveView,
+  type SsoSetupRecordView,
+  type SsoSetupView,
+} from "./sso-setup.ts";
 export {
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,

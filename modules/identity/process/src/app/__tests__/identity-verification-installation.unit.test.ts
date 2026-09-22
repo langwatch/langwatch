@@ -1,6 +1,8 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +16,10 @@ describe("identity verification installation", () => {
       .withConfig({ identity: { ssoDomainProofDnsServers: [] } })
       .withRelational(createApiFixture<PrismaClient>())
       .withEventing(new EventSourcing({ enabled: false }))
+      .provide({
+        organization: createApiFixture<OrganizationApi>(),
+        authz: createApiFixture<AuthzApi>(),
+      })
       .boot();
 
     try {
