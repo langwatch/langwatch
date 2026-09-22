@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.18.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.17.0...typescript-sdk@v1.18.0) (2026-09-22)
+
+
+### Features
+
+* webinar learnings, connected agent scope, scenario names, search hints, deep links, judge and Langy fixes ([#8236](https://github.com/langwatch/langwatch/issues/8236)) ([2054720](https://github.com/langwatch/langwatch/commit/2054720f391a2fcec60b86870a98d87345ccf6ee))
+
+
+### Bug Fixes
+
+* **cli:** say when a local instance takes over the machine's global wiring ([#8165](https://github.com/langwatch/langwatch/issues/8165)) ([afb3c61](https://github.com/langwatch/langwatch/commit/afb3c61b33d2c6e6f6cf04a1c1cdb77e6c6158a1))
+
 ## [1.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.16.0...typescript-sdk@v1.17.0) (2026-09-22)
 
 
