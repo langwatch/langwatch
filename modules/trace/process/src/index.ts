@@ -68,6 +68,16 @@ export {
   ProjectMetadataSync,
 } from "./eventing/project-metadata.subscriber.ts";
 export {
+  CIO_TRACE_SYNC_DEBOUNCE_MS,
+  createCustomerIoTraceSyncHandler,
+  customerIoTraceSyncJobId,
+  resetCustomerIoTraceSyncDebounceCache,
+} from "./eventing/customer-io-trace-sync.subscriber.ts";
+export type {
+  CustomerIoTraceSyncDeps,
+  CustomerIoTraceSyncSubscriberDeps,
+} from "./eventing/customer-io-trace-sync.subscriber.ts";
+export {
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
   createSimulationMetricsSyncHandler,

@@ -1,6 +1,10 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
+import {
+  LANGY_TRACE_ORIGIN,
+  type TraceSummaryData,
+  type TraceProcessingEvent,
+} from "@langwatch/trace-contract";
 
 import type { TraceProjectMetadata } from "../app/trace.members.ts";
 
@@ -32,6 +36,11 @@ export interface ProjectMetadataSubscriberDeps {
     properties?: Record<string, unknown>;
     projectId?: string;
   }) => void;
+  /**
+   * Marks the project active for the day of this trace, once a day. Injected
+   * so trace never imports billing's process package (structurally typed).
+   */
+  trackActiveDay?: (input: { projectId: string; occurredAt: number }) => Promise<void>;
 }
 
 /**
@@ -172,10 +181,12 @@ export class ProjectMetadataSync {
     return `project-metadata:${event.tenantId}`;
   }
 
-  // Skip sample traces from empty-state onboarding; they should not flip
-  // the integrated flag or dismiss the onboarding card.
+  // Skip sample traces from empty-state onboarding and Langy's own turns:
+  // neither should flip the integrated flag, dismiss the onboarding card,
+  // or reach a CRM milestone as the customer's own first trace.
   static isRealFirstIngest(foldState: TraceSummaryData): boolean {
-    return foldState.attributes?.["langwatch.origin"] !== "sample";
+    const origin = foldState.attributes?.["langwatch.origin"];
+    return origin !== "sample" && origin !== LANGY_TRACE_ORIGIN;
   }
 
   // Long dedup TTL ensures at most one database write per project window
@@ -183,10 +194,12 @@ export class ProjectMetadataSync {
   static createProjectMetadataHandler(
     deps: ProjectMetadataSubscriberDeps,
   ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
-    return async (_event, context) => {
+    return async (event, context) => {
       const { tenantId, state: foldState } = context;
 
       if (!ProjectMetadataSync.isRealFirstIngest(foldState)) return;
+
+      await deps.trackActiveDay?.({ projectId: tenantId, occurredAt: event.occurredAt });
 
       try {
         await ProjectMetadataSync.syncProjectMetadata(deps, tenantId, foldState);

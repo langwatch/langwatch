@@ -102,7 +102,7 @@ function createContext(
 
 function createMockProjectService() {
   return {
-    tryGetById: vi.fn(),
+    findById: vi.fn(),
     findWithTeam: vi.fn(),
     updateMetadata: vi.fn(),
     isFeatureEnabled: vi.fn(),
@@ -133,7 +133,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when project has not received first message", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -228,7 +228,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is python", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -255,7 +255,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is typescript", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -282,7 +282,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is not recognized", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -309,7 +309,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when project is already fully integrated", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: true,
@@ -336,7 +336,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when project is not found", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue(null);
+      mockProjects.findById.mockResolvedValue(null);
     });
 
     it("does not update the project", async () => {
@@ -352,7 +352,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
   describe("when platform is optimization_studio", () => {
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -392,7 +392,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     let context: TriggerContext<TraceSummaryData>;
 
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -421,7 +421,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -465,7 +465,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
         // established project returned early, so a project that lost its
         // schedule never got it back from ingest. Bootstrap is level-triggered
         // now, so every real trace re-asserts it.
-        mockProjects.tryGetById.mockResolvedValue({
+        mockProjects.findById.mockResolvedValue({
           id: tenantId,
           firstMessage: true,
           integrated: true,
@@ -528,7 +528,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     beforeEach(() => {
       // Not yet integrated, so the subscriber still writes metadata. The
       // bootstrap is no longer gated on the first-message transition.
-      mockProjects.tryGetById.mockResolvedValue({
+      mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: false,
@@ -571,7 +571,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     describe("when a trace arrives", () => {
       it("does not bootstrap clustering", async () => {
         const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
-        mockProjects.tryGetById.mockResolvedValue(null);
+        mockProjects.findById.mockResolvedValue(null);
         const subscriber = ProjectMetadataSync.createProjectMetadataHandler({
           projects: mockProjects as any,
           recordProductEvent: mockTrackServerEvent,
@@ -607,6 +607,73 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
 
         expect(ProjectMetadataSync.isRealFirstIngest(state)).toBe(false);
       });
+    });
+
+    describe("when the trace is one of Langy's own turns", () => {
+      it("returns false", () => {
+        const state = createFoldState({
+          attributes: { "langwatch.origin": "langy" },
+        });
+
+        expect(ProjectMetadataSync.isRealFirstIngest(state)).toBe(false);
+      });
+    });
+  });
+
+  describe("given an injected active-day tracker", () => {
+    beforeEach(() => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: true,
+      });
+    });
+
+    it("marks the project's active day before reading the project", async () => {
+      const calls: string[] = [];
+      const trackActiveDay = vi.fn(async () => {
+        calls.push("activeDay");
+      });
+      mockProjects.findById.mockImplementation(async () => {
+        calls.push("findById");
+        return { id: tenantId, firstMessage: true, integrated: true };
+      });
+      const subscriber = ProjectMetadataSync.createProjectMetadataHandler({
+        ...deps,
+        trackActiveDay,
+      });
+      const event = createEvent(tenantId);
+
+      await subscriber(event, createContext(tenantId, createFoldState()));
+
+      expect(trackActiveDay).toHaveBeenCalledWith({
+        projectId: tenantId,
+        occurredAt: event.occurredAt,
+      });
+      expect(calls).toEqual(["activeDay", "findById"]);
+    });
+
+    it("marks no active day for a seeded sample trace", async () => {
+      const trackActiveDay = vi.fn(async () => undefined);
+      const subscriber = ProjectMetadataSync.createProjectMetadataHandler({
+        ...deps,
+        trackActiveDay,
+      });
+
+      await subscriber(
+        createEvent(tenantId),
+        createContext(tenantId, createFoldState({ attributes: { "langwatch.origin": "sample" } })),
+      );
+
+      expect(trackActiveDay).not.toHaveBeenCalled();
+    });
+
+    it("completes without error when no tracker is wired", async () => {
+      const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
+
+      await expect(
+        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
+      ).resolves.toBeUndefined();
     });
   });
 });
