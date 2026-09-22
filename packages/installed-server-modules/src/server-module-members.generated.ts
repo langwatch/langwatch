@@ -30,7 +30,7 @@ export const serverModuleMembers = {
   github: ["redis", "secrets"],
   "hosted-mcp": ["encryption", "publicBaseUrl", "redis"],
   identity: ["eventing", "prisma"],
-  "instant-eval": [],
+  "instant-eval": ["clickhouse", "redis"],
   langy: ["eventing", "prisma", "rateLimiter", "redis"],
   log: [],
   metric: [],

@@ -1,8 +1,11 @@
 /**
- * Reading a judged cell as the verdict its question asked for: one reader per
- * `reads`, so a new question kind is one entry rather than a new branch.
+ * A judged cell and the verdict its question asked for, each read from the
+ * other: one entry per `reads`, so a new question kind is two table rows
+ * rather than two new branches.
  * @see specs/instant-evals/instant-eval-pipeline.feature
  */
+
+import type { InstantEvalVerdict } from "@langwatch/instant-eval-contract";
 
 import {
   INSTANT_EVAL_DEFAULT_THRESHOLD,
@@ -69,6 +72,42 @@ export function verdictOf({
   cell: unknown;
 }): InstantEvalVerdictColumns {
   return VERDICT_READERS[question.reads]({ cell, question });
+}
+
+/** One writer per `reads`: the same table, read the other way. */
+const VERDICT_WRITERS: Record<
+  InstantEvalRunQuestion["reads"],
+  (input: {
+    verdict: InstantEvalVerdict;
+    question: InstantEvalRunQuestion;
+  }) => string | number | null
+> = {
+  probability: ({ verdict }) => verdict.probability ?? null,
+  passed: ({ verdict, question }) => {
+    if (verdict.probability === undefined) return null;
+
+    return verdict.probability >= (question.threshold ?? INSTANT_EVAL_DEFAULT_THRESHOLD) ? 1 : 0;
+  },
+  score: ({ verdict }) => verdict.score ?? null,
+  label: ({ verdict }) => verdict.label ?? null,
+  probabilities: ({ verdict }) =>
+    verdict.probabilities ? JSON.stringify(verdict.probabilities) : null,
+};
+
+/**
+ * What a question's own column holds, given the verdict it got. A null cell is
+ * a value the row carries, not an absence, so it travels in a named field.
+ */
+export function instantEvalJudgedCellFor({
+  question,
+  verdict,
+}: {
+  question: InstantEvalRunQuestion;
+  verdict: InstantEvalVerdict | undefined;
+}): { cell: string | number | null } {
+  if (!verdict) return { cell: null };
+
+  return { cell: VERDICT_WRITERS[question.reads]({ verdict, question }) };
 }
 
 /**

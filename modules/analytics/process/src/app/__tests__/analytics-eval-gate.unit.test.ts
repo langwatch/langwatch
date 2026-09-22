@@ -14,6 +14,7 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { AnalyticsApp } from "../analytics.app.ts";
@@ -45,6 +46,7 @@ function harness(flagAnswer: boolean) {
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
       }),
+      traces: createApiFixture<TraceApi>(),
     },
     members: {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),

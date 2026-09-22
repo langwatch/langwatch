@@ -16,6 +16,7 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLRunCaller,
   LangWatchQLSchema,
+  LangWatchQLTextHydrationInput,
   LangWatchQLValidationInput,
 } from "./analytics.lwql.ts";
 import type {
@@ -122,6 +123,14 @@ export interface AnalyticsApi {
    */
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /**
+   * The extraction half of a judged plan: the same page with every judged
+   * column holding the text that would be judged rather than a verdict. No
+   * judge is called, so reading what a run judges costs nothing to judge.
+   */
+  hydrateLangWatchQLTexts(
+    input: LangWatchQLTextHydrationInput,
+  ): Promise<readonly Record<string, unknown>[]>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
   /** What one signed-in member may see of a project's content and spend. */

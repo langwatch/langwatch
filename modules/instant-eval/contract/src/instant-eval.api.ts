@@ -4,8 +4,10 @@ import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalJudgmentStatus } from "./instant-eval-limits.ts";
 import type {
+  InstantEvalEstimateWire,
   InstantEvalResultsWire,
   InstantEvalRunWire,
+  InstantEvalSampleWire,
   InstantEvalShorthandInput,
 } from "./instant-eval.schemas.ts";
 
@@ -66,6 +68,38 @@ export interface InstantEvalApi {
    * released project with no judge still gets the "configure a model" primer.
    */
   isReleased(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * Accepts a statement, holds its price against the free budget, records the
+   * run and queues it. Everything after this is the pipeline's.
+   */
+  createRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalRunWire>;
+
+  /** What the run would read and what judging it would cost, judging nothing. */
+  estimateRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalEstimateWire>;
+
+  /** Asks a run to stop. A run that already finished is refused by name. */
+  cancelRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId?: string;
+  }): Promise<InstantEvalRunWire>;
+
+  /** A few of a run's rows, with the text that was judged beside the verdict. */
+  getSample(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    runId: string;
+    rows: number;
+  }): Promise<InstantEvalSampleWire>;
 
   /** The project's runs, newest first. Empty when it has none. */
   findRuns(input: {

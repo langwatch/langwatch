@@ -62,6 +62,23 @@ export function instantEvalRowText(row: Record<string, unknown>, column: string)
 }
 
 /**
+ * The rows of a page read that the page owns. Its predicate names trace ids,
+ * so a trace straddling the boundary brings its other span rows along; those
+ * belong to the next page and are dropped before anything is paid for.
+ */
+export function instantEvalOwnedRows({
+  rows,
+  keys,
+}: {
+  readonly rows: readonly Record<string, unknown>[];
+  readonly keys: readonly InstantEvalRowKey[];
+}): readonly Record<string, unknown>[] {
+  const keysByRow = instantEvalKeyIndex(keys);
+
+  return rows.filter((row) => findInstantEvalRowKeys({ row, keysByRow }).length > 0);
+}
+
+/**
  * The page key a judged row belongs to — at most one, matched by the pair
  * first and the trace alone second. Empty for a row of a page it is not in.
  */

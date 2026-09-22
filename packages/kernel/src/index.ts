@@ -31,6 +31,7 @@ export {
   type DependencyToken,
   NO_TOKENS,
   type ResolvedTokens,
+  type TokenIdentity,
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";

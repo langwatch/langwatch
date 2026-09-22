@@ -22,6 +22,12 @@ export const instantEvalConfig = Config.define((c) => ({
     "INSTANT_EVAL_TENANT_TOKENS_PER_SECOND",
     z.coerce.number().positive().default(150_000),
   ),
+  /**
+   * Whether this deployment bills Instant Evals, which is what makes the free
+   * allowance a ceiling. An installation that does not bill bounds a run by
+   * its row cap alone. Off by default: only a billing deployment says so.
+   */
+  isBounded: c.env("INSTANT_EVAL_BOUNDED", z.stringbool().default(false)),
   /** Input tokens one synchronous query may send. */
   queryTokenBudget: c.env(
     "INSTANT_EVAL_QUERY_TOKEN_BUDGET",

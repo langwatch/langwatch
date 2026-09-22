@@ -27,6 +27,7 @@ import {
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
   type LangWatchQLService,
+  type LangWatchQLTextHydrationInput,
   type LangWatchQLValidationInput,
   type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
@@ -41,6 +42,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { TraceApi, type Trace } from "@langwatch/trace-contract";
 
 import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
@@ -60,6 +62,12 @@ import {
 } from "../rules/workbench-protections.rules.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
+import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
+import {
+  LangWatchQLHydrationReadService,
+  type LangWatchQLTraceSource,
+} from "../services/langwatch-ql-hydration-read.service.ts";
+import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /**
@@ -109,6 +117,8 @@ export interface AnalyticsAppDependencies {
   projects: ProjectApi;
   /** The per-project window every LangWatchQL execution is counted against. */
   lwqlBounds: LangWatchQLBoundsService;
+  /** The peer every app-function value is read and rendered through. */
+  traces: TraceApi;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -125,6 +135,8 @@ type AnalyticsDependencies = Readonly<{
   projects: typeof ProjectApi;
   /** The plan the LangWatchQL execution window resolves through. */
   plans: typeof EntitlementApi;
+  /** Every app-function value is one of this peer's traces, rendered by it. */
+  traces: typeof TraceApi;
 }>;
 
 /**
@@ -193,6 +205,34 @@ class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
 }
 
 /**
+ * The two reads hydration makes, in the Trace peer's own vocabulary: it names
+ * traces and threads where hydration names keys.
+ */
+class TraceApiHydrationSource implements LangWatchQLTraceSource {
+  constructor(private readonly traces: TraceApi) {}
+
+  readTraces({
+    projectId,
+    traceIds,
+    protections,
+  }: Parameters<LangWatchQLTraceSource["readTraces"]>[0]): Promise<readonly Trace[]> {
+    return this.traces.readTracesWithSpans({ projectId, traceIds: [...traceIds], protections });
+  }
+
+  readThreadTraces({
+    projectId,
+    threadKeys,
+    protections,
+  }: Parameters<LangWatchQLTraceSource["readThreadTraces"]>[0]): Promise<readonly Trace[]> {
+    return this.traces.readThreadsTraces({
+      projectId,
+      threadIds: [...threadKeys],
+      protections,
+    });
+  }
+}
+
+/**
  * Both doors' shapes are declared in the `implements` clause, not left to agree by
  * attention: a transport reaches this object through the operations-only feature-API
  * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
@@ -205,6 +245,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     dataPrivacy: DataPrivacyApi,
     projects: ProjectApi,
     plans: EntitlementApi,
+    /** Every app-function value is one of this peer's traces, rendered by it. */
+    traces: TraceApi,
   };
   static readonly config = analyticsServerConfig;
   /**
@@ -253,6 +295,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
           projects: setup.dependencies.projects,
           rateLimiter: setup.members.rateLimiter,
         }),
+        traces: setup.dependencies.traces,
       },
       setup.members.publicBaseUrl,
     );
@@ -261,11 +304,21 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   #dependencies: AnalyticsAppDependencies;
   #publicBaseUrl: string | undefined;
   #playgroundAccess: CustomChartPlaygroundAccessService;
+  #hydration: LangWatchQLHydrationService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
+    this.#hydration = LangWatchQLHydrationService.create({
+      reads: LangWatchQLHydrationReadService.create({
+        traces: new TraceApiHydrationSource(dependencies.traces),
+      }),
+      compute: LangWatchQLHydrationComputeService.create({ renderer: dependencies.traces }),
+      // The statement is run through this same door, so the hydration reaches
+      // it late: the bounds and the eval-function gate apply to it too.
+      runner: { executeLangWatchQL: (input) => this.executeLangWatchQL(input) },
+    });
   }
 
   /** The series behind every analytics chart and every dashboard graph card. */
@@ -386,6 +439,17 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     input: Parameters<AnalyticsService["appendEvaluationAnalyticsRollupBatch"]>[0],
   ): Promise<void> {
     return this.#dependencies.analytics.appendEvaluationAnalyticsRollupBatch(input);
+  }
+
+  /**
+   * The extraction half of a judged plan: the same rows with every judged
+   * column holding the text rather than a verdict. No judge is called, so
+   * reading what a run would judge never costs what judging it costs.
+   */
+  hydrateLangWatchQLTexts(
+    input: LangWatchQLTextHydrationInput,
+  ): Promise<readonly Record<string, unknown>[]> {
+    return this.#hydration.hydrateTexts(input);
   }
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {

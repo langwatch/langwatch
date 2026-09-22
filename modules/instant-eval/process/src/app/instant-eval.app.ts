@@ -1,9 +1,16 @@
+import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import {
+  type InstantEvalActor,
   type InstantEvalApi as InstantEvalApiContract,
   InstantEvalApi,
+  type InstantEvalRunInput,
   type InstantEvalJudgmentStatus,
+  type InstantEvalEstimateWire,
   type InstantEvalResultsWire,
+  type InstantEvalSampleWire,
   type InstantEvalRunProgress,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
@@ -12,23 +19,52 @@ import {
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import { HttpInstantEvalJudgeChannel } from "../channels/http/http.instant-eval-judge.channel.ts";
+import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import { MemoryInstantEvalBudgetReservationsChannel } from "../channels/memory/memory.instant-eval-budget-reservations.channel.ts";
+import { MemoryInstantEvalCancellationChannel } from "../channels/memory/memory.instant-eval-cancellation.channel.ts";
 import { MemoryInstantEvalJudgeChannel } from "../channels/memory/memory.instant-eval-judge.channel.ts";
+import { RedisInstantEvalBudgetReservationsChannel } from "../channels/redis/redis.instant-eval-budget-reservations.channel.ts";
+import { RedisInstantEvalCancellationChannel } from "../channels/redis/redis.instant-eval-cancellation.channel.ts";
 import {
   type InstantEvalRateLimiterRedis,
   RedisInstantEvalRateLimiterChannel,
 } from "../channels/redis/redis.instant-eval-rate-limiter.channel.ts";
+import type { InstantEvalRunExecutor } from "../eventing/instant-eval-processing.intent.ts";
+import {
+  InstantEvalProcessingPipelineAdapter,
+  type InstantEvalProcessingPipelineDefinition,
+} from "../eventing/instant-eval-processing.pipeline.ts";
+import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
 import { ClickHouseInstantEvalRepositories } from "../repositories/clickhouse/clickhouse.instant-eval.repositories.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import {
+  toInstantEvalEstimateWire,
   toInstantEvalJudgmentWire,
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
 import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
+import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
+import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
+import { InstantEvalCreateService } from "../services/instant-eval-create.service.ts";
+import {
+  InstantEvalEstimateService,
+  type InstantEvalTextSource,
+} from "../services/instant-eval-estimate.service.ts";
+import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
+import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
+import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
+import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
 import { InstantEvalReadsService } from "../services/instant-eval-reads.service.ts";
+import { InstantEvalRowSourceService } from "../services/instant-eval-row-source.service.ts";
+import { InstantEvalRunContextService } from "../services/instant-eval-run-context.service.ts";
+import { InstantEvalRunService } from "../services/instant-eval-run.service.ts";
+import { InstantEvalSampleService } from "../services/instant-eval-sample.service.ts";
+import { InstantEvalSpendService } from "../services/instant-eval-spend.service.ts";
+import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
 import type {
   InstantEvalClickHouseClient,
   InstantEvalClickHouseResolver,
@@ -56,15 +92,33 @@ type InstantEvalClickHouseMember = {
   }): Promise<unknown>;
 };
 
+/**
+ * The Redis surface this module uses: the judge's token bucket, the budget
+ * holds and the cancellation hint. Absent in a memory process, where each has
+ * its own twin.
+ */
+type InstantEvalRedis = InstantEvalRateLimiterRedis & {
+  del(key: string): Promise<unknown>;
+  srem(key: string, member: string): Promise<unknown>;
+  set(key: string, value: string, mode: "EX", seconds: number): Promise<unknown>;
+  exists(key: string): Promise<number>;
+};
+
 type InstantEvalMembers = Readonly<{
   clickhouse: InstantEvalClickHouseMember;
-  /** The shared token bucket the judge is paced by, absent in a memory process. */
-  redis: InstantEvalRateLimiterRedis | null;
+  /** The shared bucket, holds and cancel hints; absent in a memory process. */
+  redis: InstantEvalRedis | null;
 }>;
 
 type InstantEvalDependencies = Readonly<{
   featureFlags: typeof FeatureFlagApi;
   projects: typeof ProjectApi;
+  /** The query door: every statement is validated, run and extracted by it. */
+  analytics: typeof AnalyticsApi;
+  /** The plan that decides a run's row cap and whether the budget binds it. */
+  plans: typeof EntitlementApi;
+  /** The spend spine every judged token is filed on. */
+  gateway: typeof GatewayApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -126,6 +180,9 @@ export class InstantEvalApp implements InstantEvalApiContract {
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
     projects: ProjectApi,
+    analytics: AnalyticsApi,
+    plans: EntitlementApi,
+    gateway: GatewayApi,
   };
   static readonly config = instantEvalConfig;
   /** LangWatch's own judge credential; a deployment without one judges nothing. */
@@ -141,6 +198,9 @@ export class InstantEvalApp implements InstantEvalApiContract {
   private constructor(
     private readonly access: InstantEvalAccessService,
     private readonly reads: InstantEvalReadsService,
+    private readonly runs: InstantEvalRunService,
+    private readonly dispatcher: InstantEvalCommandDispatcherService,
+    private readonly pipeline: InstantEvalProcessingPipelineDefinition,
   ) {}
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalApp> {
@@ -154,17 +214,209 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const judge = InstantEvalApp.judgeOf(setup, apiKey);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
+    const { analytics, projects, plans, gateway } = setup.dependencies;
+    const access = InstantEvalAccessService.create({
+      flags: setup.dependencies.featureFlags,
+      projects,
+      isJudgeConfigured: () => judge instanceof HttpInstantEvalJudgeChannel,
+    });
+    const reads = InstantEvalReadsService.create({
+      runs: repositories.runs,
+      judgments: repositories.judgments,
+    });
+    const dispatcher = InstantEvalCommandDispatcherService.create();
+    const rowSource = InstantEvalRowSourceService.create({ analytics });
+    // The extraction half of a judged plan, which is Analytics' own: this
+    // module judges the texts it answers with and never the rows behind them.
+    const textSource = {
+      texts: (input: Parameters<AnalyticsApi["hydrateLangWatchQLTexts"]>[0]) =>
+        analytics.hydrateLangWatchQLTexts(input),
+    };
+    const cancellations = setup.members.redis
+      ? RedisInstantEvalCancellationChannel.create(setup.members.redis)
+      : MemoryInstantEvalCancellationChannel.create();
+    const budget = InstantEvalFreeBudgetService.create({
+      peers: {
+        findOrganizationId: ({ projectId }) => projects.findOrganizationId(projectId),
+        listProjectIds: ({ organizationId }) => projects.listIdsByOrganization({ organizationId }),
+        isFreePlan: async ({ organizationId }) =>
+          (await plans.getActivePlan({ organizationId })).free,
+        sumSpendNanoUsdByRequestType: (input) => gateway.sumSpendNanoUsdByRequestType(input),
+      },
+      reservations: setup.members.redis
+        ? RedisInstantEvalBudgetReservationsChannel.create({ redis: setup.members.redis })
+        : MemoryInstantEvalBudgetReservationsChannel.create(),
+      isBounded: setup.config.isBounded,
+    });
+    const context = InstantEvalRunContextService.create({
+      runs: repositories.runs,
+      peers: {
+        findProjectCaller: (input) => analytics.resolveApiKeyRunCaller(input),
+        resolveProjectProtections: (input) => analytics.resolveProjectProtections(input),
+        isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
+      },
+    });
+
     return new InstantEvalApp(
-      InstantEvalAccessService.create({
-        flags: setup.dependencies.featureFlags,
-        projects: setup.dependencies.projects,
-        isJudgeConfigured: () => judge instanceof HttpInstantEvalJudgeChannel,
+      access,
+      reads,
+      InstantEvalRunService.create({
+        units: {
+          statements: InstantEvalStatementService.create({ analytics, rowSource }),
+          creates: InstantEvalCreateService.create({
+            runs: repositories.runs,
+            commands: dispatcher,
+            now: () => nowInstant().epochMilliseconds,
+          }),
+          estimates: InstantEvalEstimateService.create({ rowSource, textSource, judge }),
+          cancellations: InstantEvalCancelService.create({
+            reads,
+            commands: dispatcher,
+            cancellations,
+            now: () => nowInstant().epochMilliseconds,
+          }),
+          reads,
+          samples: InstantEvalSampleService.create({
+            judgments: repositories.judgments,
+            textSource,
+          }),
+          budget,
+        },
+        peers: {
+          isEnabled: (input) => access.isEnabled(input),
+          isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
+          resolveCaller: (input) => InstantEvalApp.callerOf({ analytics, ...input }),
+          getPlan: async ({ projectId }) => {
+            const plan = await plans.getActivePlan({
+              organizationId: await projects.getOrganizationId(projectId),
+            });
+
+            return { name: plan.name, isFree: plan.free };
+          },
+          database: () => analytics.langWatchQLDatabase(),
+        },
       }),
-      InstantEvalReadsService.create({
-        runs: repositories.runs,
-        judgments: repositories.judgments,
+      dispatcher,
+      InstantEvalProcessingPipelineAdapter.create({
+        instantEvalRunStore: InstantEvalRunProjectionStore.create({ runs: repositories.runs }),
+        dispatch: {
+          executor: InstantEvalApp.executorOf({
+            context,
+            rowSource,
+            textSource,
+            judge,
+            judgments: repositories.judgments,
+            cancellations,
+            budget,
+            analytics,
+            projects,
+            gateway,
+          }),
+          commands: () => dispatcher.outcomeCommands(),
+        },
       }),
     );
+  }
+
+  /**
+   * The identity a run executes as: a member's own, or the project's where the
+   * asker is a credential, with that credential's protections either way.
+   */
+  private static async callerOf({
+    analytics,
+    projectId,
+    actor,
+  }: {
+    analytics: AnalyticsApi;
+    projectId: string;
+    actor: InstantEvalActor;
+  }): Promise<LangWatchQLRunCaller> {
+    if (actor.kind === "member") {
+      return analytics.resolveRunCaller({ userId: actor.userId, projectId });
+    }
+
+    return {
+      project: await analytics.resolveApiKeyRunCaller({ projectId }),
+      protections: await analytics.resolveApiKeyProtections({
+        projectId,
+        credential: actor.credential,
+      }),
+    };
+  }
+
+  /** The three steps the pipeline drives, each its own service. */
+  private static executorOf({
+    context,
+    rowSource,
+    textSource,
+    judge,
+    judgments,
+    cancellations,
+    budget,
+    analytics,
+    projects,
+    gateway,
+  }: {
+    context: InstantEvalRunContextService;
+    rowSource: InstantEvalRowSourceService;
+    textSource: InstantEvalTextSource;
+    judge: InstantEvalJudgeChannel;
+    judgments: InstantEvalRepositories["judgments"];
+    cancellations: InstantEvalCancellationChannel;
+    budget: InstantEvalFreeBudgetService;
+    analytics: AnalyticsApi;
+    projects: ProjectApi;
+    gateway: GatewayApi;
+  }): InstantEvalRunExecutor {
+    const plans = InstantEvalPlanService.create({
+      context,
+      rowSource,
+      textSource,
+      keyCaps: { langWatchQLKeyCapFor: (input) => analytics.langWatchQLKeyCapFor(input) },
+    });
+    const pages = InstantEvalJudgePageService.create({
+      context,
+      rowSource,
+      textSource,
+      judge,
+      judgments,
+      cancellation: cancellations,
+      budget,
+    });
+    const finishes = InstantEvalFinishService.create({
+      spend: InstantEvalSpendService.create({
+        peers: {
+          findSpendAttribution: async ({ projectId }) => {
+            const project = await projects.findWithTeam(projectId);
+
+            return project
+              ? { organizationId: project.team.organizationId, teamId: project.team.id }
+              : undefined;
+          },
+          recordPricedSpend: async (input) => {
+            await gateway.recordPricedSpend(input);
+          },
+        },
+      }),
+      budget,
+      pricing: judge.pricing,
+    });
+
+    return {
+      plan: (input) => plans.plan(input),
+      judgePage: (input) => pages.judgePage(input),
+      finish: (input) => finishes.finish(input),
+    };
+  }
+
+  /** The pipeline this module registers, built once by {@link create}. */
+  eventingPipeline(): InstantEvalProcessingPipelineDefinition {
+    return this.pipeline;
+  }
+
+  /** Binds the built pipeline's own senders; every write goes through them. */
+  connectCommands(commands: Readonly<Record<string, unknown>>): void {
+    this.dispatcher.connect(commands);
   }
 
   private static repositoriesOf(setup: InstantEvalSetup): InstantEvalRepositories {
@@ -237,6 +489,44 @@ export class InstantEvalApp implements InstantEvalApiContract {
     return {
       judgments: page.judgments.map(toInstantEvalJudgmentWire),
       ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
+    };
+  }
+
+  async createRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalRunWire> {
+    return toInstantEvalRunWire(await this.runs.createRun(input));
+  }
+
+  async estimateRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalEstimateWire> {
+    return toInstantEvalEstimateWire(await this.runs.estimateRun(input));
+  }
+
+  async cancelRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId?: string;
+  }): Promise<InstantEvalRunWire> {
+    return toInstantEvalRunWire(await this.runs.cancelRun(input));
+  }
+
+  async getSample(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    runId: string;
+    rows: number;
+  }): Promise<InstantEvalSampleWire> {
+    const sample = await this.runs.getSample(input);
+
+    return {
+      rows: [...sample.rows],
+      judgments: sample.judgments.map(toInstantEvalJudgmentWire),
     };
   }
 

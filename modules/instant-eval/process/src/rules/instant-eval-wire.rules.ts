@@ -4,6 +4,7 @@
  */
 
 import {
+  type InstantEvalEstimateWire,
   type InstantEvalJudgmentWire,
   type InstantEvalRunWire,
   instantEvalStoredParametersSchema,
@@ -35,6 +36,29 @@ export function toInstantEvalJudgmentWire(judgment: InstantEvalJudgment): Instan
 }
 
 /** One run, as a caller reads it. */
+/** An estimate as the wire carries it: the price, never our own cost. */
+export function toInstantEvalEstimateWire(estimate: {
+  rows: number;
+  isRowsCapped: boolean;
+  avgTokens: number;
+  totalTokens: number;
+  requests: number;
+  priceUsd: number;
+  freeBudgetRemainingUsd?: number;
+}): InstantEvalEstimateWire {
+  return {
+    rows: estimate.rows,
+    isRowsCapped: estimate.isRowsCapped,
+    avgTokens: estimate.avgTokens,
+    totalTokens: estimate.totalTokens,
+    requests: estimate.requests,
+    priceUsd: estimate.priceUsd,
+    ...(estimate.freeBudgetRemainingUsd === undefined
+      ? {}
+      : { freeBudgetRemainingUsd: estimate.freeBudgetRemainingUsd }),
+  };
+}
+
 export function toInstantEvalRunWire(row: InstantEvalRunRow): InstantEvalRunWire {
   return {
     id: row.id,

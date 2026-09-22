@@ -6,8 +6,10 @@
 
 import {
   defineAggregate,
+  defineEventingModule,
   defineEvents,
   definePipeline,
+  type EventingSetup,
   type Projection,
   type StateProjectionStore,
   type StaticPipelineDefinition,
@@ -19,6 +21,7 @@ import {
   type InstantEvalProcessingEvent,
 } from "@langwatch/instant-eval-contract";
 
+import type { InstantEvalApp } from "../app/instant-eval.app.ts";
 import { INSTANT_EVAL_PROCESS_NAME } from "./instant-eval-processing-data.process.ts";
 import {
   instantEvalPageDedupeId,
@@ -82,3 +85,16 @@ export class InstantEvalProcessingPipelineAdapter {
     return buildInstantEvalProcessingPipeline(deps);
   }
 }
+
+/**
+ * The registration: the app builds the definition, and the senders are bound
+ * back to it once the runtime has built them. Passive in the api process,
+ * which only sends; the worker drives the intents.
+ */
+export const instantEvalEventing = defineEventingModule({
+  pipeline: INSTANT_EVAL_PIPELINE_NAME,
+  // No repository registry: this module builds its own from the ClickHouse
+  // member, so the setup carries none.
+  build: ({ app }: EventingSetup<undefined, InstantEvalApp>) => app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

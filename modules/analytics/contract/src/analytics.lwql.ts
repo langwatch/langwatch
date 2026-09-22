@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";
-import type { LangWatchQLAcceptedStatement } from "./langwatch-ql-app-functions.ts";
+import type {
+  LangWatchQLAcceptedStatement,
+  LangWatchQLAppFunctionCall,
+} from "./langwatch-ql-app-functions.ts";
 
 /** One column in a LangWatchQL result. */
 export const langWatchQLColumnSchema = z
@@ -191,6 +194,20 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
   }>;
+
+/**
+ * What the extraction half of a judged plan is asked for: one page's traces,
+ * read back through the statement with the judged columns holding their text.
+ */
+export type LangWatchQLTextHydrationInput = Readonly<{
+  project: LangWatchQLCaller;
+  protections: LangWatchQLProtections;
+  sql: string;
+  parameters?: Readonly<Record<string, unknown>>;
+  /** The statement's app-function calls, as the validator recorded them. */
+  calls: readonly LangWatchQLAppFunctionCall[];
+  traceIds: readonly string[];
+}>;
 
 /**
  * The eval-function gate, which Analytics resolves from the project's rollout
