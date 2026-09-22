@@ -330,11 +330,7 @@ export const SearchBar: React.FC = () => {
   useEffect(() => {
     if (!submitRequest) return;
     clearSubmitRequest();
-    submitSearch(submitRequest.text, {
-      ...(submitRequest.forceKind
-        ? { forceKind: submitRequest.forceKind }
-        : {}),
-    });
+    submitSearch(submitRequest.text);
   }, [submitRequest, clearSubmitRequest, submitSearch]);
   const submitProgress = searchSubmitProgress({
     isRouting,

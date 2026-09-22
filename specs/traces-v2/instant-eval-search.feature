@@ -162,12 +162,6 @@ Feature: Instant Evals inside the Trace Explorer
       And "Judge these results" submits the question through the search bar, with the other chips kept
 
     @unit
-    Scenario: A search the page routed once is not classified again
-      Given a submit that names the route it already took
-      When the router receives it
-      Then the classifier is not asked and that route is built
-
-    @unit
     Scenario: An eval chip is green, whatever its target
       Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
       When the chips are drawn

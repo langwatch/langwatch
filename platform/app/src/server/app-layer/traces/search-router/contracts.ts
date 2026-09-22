@@ -30,15 +30,8 @@ export const SEARCH_ROUTE_KINDS = [
 
 export type SearchRouteKind = (typeof SEARCH_ROUTE_KINDS)[number];
 
-/**
- * Who made the call: the classifier, the FAST model, a fallback rule, or the
- * caller when it already knew the route.
- */
-export type SearchRouteDecidedBy =
-  | "classifier"
-  | "model"
-  | "fallback"
-  | "caller";
+/** Who made the call: the classifier, the FAST model, or a fallback rule. */
+export type SearchRouteDecidedBy = "classifier" | "model" | "fallback";
 
 export interface RouteSearchInput {
   projectId: string;
@@ -51,13 +44,6 @@ export interface RouteSearchInput {
   lensId?: string;
   /** Whether the Langy route is open to this user. Defaults to true. */
   isLangyAvailable?: boolean;
-  /**
-   * The route the caller already knows, which skips the classifier. Set when
-   * the text comes from a search that was routed once already, so re-running
-   * it cannot land somewhere else: the Explorer re-judges an `eval` chip this
-   * way.
-   */
-  forceKind?: SearchRouteKind;
 }
 
 /** Which of the optional routes this submit may be given. */
