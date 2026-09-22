@@ -146,6 +146,7 @@ function typedEvalRunOf({
     target,
     otherQuery: queryWithoutInstantEvalChip({
       queryText,
+      field: pending.field,
       question: pending.question,
     }),
     fallbackQuery: queryText,

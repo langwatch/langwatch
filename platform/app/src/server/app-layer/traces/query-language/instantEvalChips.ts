@@ -155,20 +155,26 @@ export function queryWithoutInstantEvalChips(queryText: string): string {
  * The scope a run judges carries no eval chip at all, which is what
  * {@link queryWithoutInstantEvalChips} answers. This is the other question:
  * what the bar holds beside one chip, so the chip's run can put it back next
- * to the terms it was typed with, other eval chips included.
+ * to the terms it was typed with, other eval chips included. The chip is
+ * named by its field and its question together: the same question under
+ * another target is another chip, and it stays.
  */
 export function queryWithoutInstantEvalChip({
   queryText,
+  field,
   question,
 }: {
   queryText: string;
+  field: string;
   question: string;
 }): string {
   const wanted = question.replace(/\s+/g, " ").trim();
   return queryWithoutEvalChips({
     queryText,
-    drop: ({ value }) =>
-      value !== null && value.replace(/\s+/g, " ").trim() === wanted,
+    drop: (chip) =>
+      chip.field === field &&
+      chip.value !== null &&
+      chip.value.replace(/\s+/g, " ").trim() === wanted,
   });
 }
 
