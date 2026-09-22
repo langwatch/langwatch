@@ -26,6 +26,17 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
   }),
 }));
 
+// The counts read: mocked out here so these render tests keep proving what the
+// discovery alone puts on the rail.
+vi.mock("../../hooks/use-filtered-trace-facets.ts", () => ({
+  useFilteredTraceFacets: () => ({
+    data: undefined,
+    isPlaceholderData: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>

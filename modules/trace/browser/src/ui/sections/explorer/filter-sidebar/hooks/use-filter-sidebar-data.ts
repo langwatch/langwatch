@@ -38,7 +38,9 @@ import {
 } from "../../../../../behavior/numeric-mode.store.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
+import { mergeFacetDescriptors } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
+import { useFilteredTraceFacets } from "../../hooks/use-filtered-trace-facets.ts";
 import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
@@ -98,7 +100,19 @@ export function useFilterSidebarData() {
     [storeRemoveRange],
   );
 
-  const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
+  // The vocabulary (attribute keys, the warm start) comes from the tenant's
+  // discovery; the counts come from the read under the active query. ADR-139.
+  const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
+  const filtered = useFilteredTraceFacets();
+  const { descriptors, countState } = useMemo(
+    () =>
+      mergeFacetDescriptors({
+        discovered,
+        filtered: filtered.data,
+        filteredIsPlaceholder: filtered.isPlaceholderData,
+      }),
+    [discovered, filtered.data, filtered.isPlaceholderData],
+  );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
@@ -394,6 +408,8 @@ export function useFilterSidebarData() {
     getValueStates,
     facetsLoading,
     descriptors,
+    /** What the counts beside the values mean while a query is in flight. */
+    countState,
     orderedKeys,
     sectionByKey,
     /** Effective presentation mode per discrete-eligible numeric facet

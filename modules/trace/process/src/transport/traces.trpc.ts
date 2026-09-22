@@ -21,7 +21,6 @@ import {
   TraceAiQueryUnavailableError,
   TraceApi,
   TraceNotFoundError,
-  traceListFacetCountsSchema,
   traceListPageSchema,
   traceSummaryDataSchema,
   tracesEvaluationRunsSchema,
@@ -420,28 +419,6 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     }),
   )
 
-  .procedure("facets")
-  .withPermission("traces:view")
-  .handle(async ({ app, input }) => {
-    const filterWhere = app.translateTraceFilter({
-      query: input.query ?? "",
-      tenantId: input.projectId,
-      timeRange: input.timeRange,
-      evalRuns: await app.findExplorerEvalRuns({
-        projectId: input.projectId,
-        evalRuns: input.evalRuns,
-      }),
-    });
-
-    return traceListFacetCountsSchema.parse(
-      await app.readFacets({
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        filterWhere: filterWhere ?? undefined,
-      }),
-    );
-  })
-
   .procedure("newCount")
   .withPermission("traces:view")
   .handle(async ({ app, input }) => {
@@ -525,11 +502,27 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("discover")
   .withPermission("traces:view")
-  .handle(({ app, input }) =>
-    discoverResultSchema.parse(
-      app.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange }),
-    ),
-  )
+  .handle(async ({ app, input }) => {
+    // No `query` field at all is the vocabulary read; a `query` field, empty
+    // string included, asks for counts under it (and the hidden origins).
+    if (input.query === null || input.query === undefined) {
+      return discoverResultSchema.parse(
+        await app.readDiscover({ tenantId: input.projectId, timeRange: input.timeRange }),
+      );
+    }
+
+    return discoverResultSchema.parse(
+      await app.readFilteredFacets({
+        projectId: input.projectId,
+        timeRange: input.timeRange,
+        query: input.query,
+        evalRuns: await app.findExplorerEvalRuns({
+          projectId: input.projectId,
+          evalRuns: input.evalRuns,
+        }),
+      }),
+    );
+  })
 
   /**
    * Pushes `discover_updated` when a tenant's facet payload finishes

@@ -24,10 +24,16 @@ export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt"
 
 export interface FacetQueryContext {
   tenantId: string;
-  timeRange: { from: number; to: number };
+  timeRange: { from: number; to: number; live?: boolean };
   limit: number;
   offset: number;
   prefix?: string;
+  /**
+   * The active trace filter as a predicate on this facet's own table (see
+   * `scopeTraceFilterToTable`), AND-ed into the query's window predicate.
+   * Absent for the unfiltered discover read and for value lookups.
+   */
+  traceScope?: { sql: string; params: Record<string, unknown> };
 }
 
 export interface FacetQuery {

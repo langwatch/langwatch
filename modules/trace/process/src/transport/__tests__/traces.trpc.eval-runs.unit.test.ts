@@ -23,31 +23,33 @@ const RESOLVED: ResolvedInstantEvalRun = {
   writtenUntil: 2_100,
 };
 const COMPILED = { sql: "1 = 1", params: {} };
-const FACET_COUNTS = {
-  origin: {},
-  status: {},
-  service: {},
-  model: {},
-  ranges: {
-    tokens: { min: 0, max: 0 },
-    cost: { min: 0, max: 0 },
-    latency: { min: 0, max: 0 },
-  },
+const FILTERED_FACETS = {
+  facets: [
+    {
+      key: "origin",
+      kind: "categorical" as const,
+      label: "Origin",
+      group: "trace" as const,
+      topValues: [{ value: "application", count: 2 }],
+      totalDistinct: 1,
+    },
+  ],
+  pending: false,
 };
 
 function harness() {
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => [RESOLVED]);
   const compileExplorerTraceFilter = vi.fn<TraceApi["compileExplorerTraceFilter"]>(() => COMPILED);
-  const translateTraceFilter = vi.fn<TraceApi["translateTraceFilter"]>(() => COMPILED);
+  const readFilteredFacets = vi.fn<TraceApi["readFilteredFacets"]>(async () => FILTERED_FACETS);
   const app = createApiFixture<TraceApi>({
     findExplorerEvalRuns,
     compileExplorerTraceFilter,
-    translateTraceFilter,
+    translateTraceFilter: () => COMPILED,
+    readFilteredFacets,
     resolveViewerProtections: async () => ({}),
     extractTraceFreeTextTerms: () => [],
     readTraceList: async () => ({ items: [], totalHits: 0, evaluations: {}, nextCursor: null }),
     readSessionGroups: async () => ({ sessions: [], totalHits: 0, nextCursor: null }),
-    readFacets: async () => FACET_COUNTS,
     readNewCount: async () => 3,
   });
 
@@ -82,7 +84,7 @@ function harness() {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     compileExplorerTraceFilter,
     findExplorerEvalRuns,
-    translateTraceFilter,
+    readFilteredFacets,
   };
 }
 
@@ -131,17 +133,17 @@ describe("given a read whose query carries an eval chip with a registered run", 
 
   describe("when the sidebar reads its facet counts", () => {
     it("counts over the same runs, so a chip does not empty the sidebar", async () => {
-      const { caller, translateTraceFilter } = harness();
+      const { caller, readFilteredFacets } = harness();
 
       await expect(
-        caller.facets({
+        caller.discover({
           projectId: PROJECT_ID,
           timeRange: TIME_RANGE,
           query: 'eval:"the user is annoyed"',
           evalRuns: claim,
         }),
-      ).resolves.toEqual(FACET_COUNTS);
-      expect(translateTraceFilter).toHaveBeenCalledWith(
+      ).resolves.toEqual(FILTERED_FACETS);
+      expect(readFilteredFacets).toHaveBeenCalledWith(
         expect.objectContaining({ evalRuns: [RESOLVED] }),
       );
     });

@@ -1,7 +1,6 @@
 import type {
   CategoricalFacetResult,
   DiscreteFacetResult,
-  FacetCountResult,
   TraceListRepositoryPage,
   TraceListRepository,
 } from "@langwatch/trace-contract";
@@ -15,14 +14,6 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
 
   async findAll(): Promise<TraceListRepositoryPage> {
     return { rows: [], totalHits: 0 };
-  }
-
-  async findFacetCounts(): Promise<FacetCountResult> {
-    return { values: {} };
-  }
-
-  async findRangeStats(): Promise<{ min: number; max: number }> {
-    return { min: 0, max: 0 };
   }
 
   async findCount(): Promise<number> {

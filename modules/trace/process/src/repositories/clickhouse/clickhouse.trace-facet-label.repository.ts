@@ -16,7 +16,7 @@ export class ClickHouseTraceFacetLabelRepository {
    * Discovers trace labels from the JSON-encoded langwatch.labels attribute.
    */
   buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("OccurredAt");
+    const where = this.facetQueries.buildTimeWhere("OccurredAt", ctx);
     const prefixFilter = ctx.prefix
       ? "AND lower(trim(BOTH '\"' FROM label)) ILIKE concat({prefix:String}, '%')"
       : "";

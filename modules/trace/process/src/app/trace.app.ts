@@ -39,6 +39,7 @@ import {
   type ElasticSearchEvent,
   type Evaluation,
   type DistinctFieldNamesResult,
+  type FacetDescriptor,
   type FacetValuesResult,
   type PromptStudioSpanResult,
   type SessionGroupsResult,
@@ -65,7 +66,6 @@ import {
   type TraceEditOverlayDto,
   type TraceEventRollup,
   type TraceLegacyFilterInput,
-  type TraceListFacetCounts,
   type TraceListPage,
   type TraceContentReadService,
   type TraceViewerService,
@@ -110,6 +110,10 @@ import { z } from "zod";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import {
+  createFacetFilterResolver,
+  type FacetFilterResolver,
+} from "../rules/trace-facet-filter.rules.ts";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
@@ -204,9 +208,9 @@ export type TracesListReader = Readonly<{
   }): Promise<TraceListPage>;
   getFacets(params: {
     tenantId: string;
-    timeRange: { from: number; to: number };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<TraceListFacetCounts>;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterFor: FacetFilterResolver;
+  }): Promise<FacetDescriptor[]>;
   getNewCount(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
@@ -227,7 +231,7 @@ export type TracesListReader = Readonly<{
   }): Promise<string[]>;
   getDiscover(params: {
     tenantId: string;
-    timeRange: { from: number; to: number };
+    timeRange: { from: number; to: number; live?: boolean };
   }): Promise<DiscoverResult>;
   getFacetValues(params: {
     tenantId: string;
@@ -1206,9 +1210,43 @@ export class TraceApp implements TraceApi, CollectorApp {
     return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
   }
 
-  /** The filter sidebar's counts. */
-  readFacets(params: Parameters<TracesListReader["getFacets"]>[0]): Promise<TraceListFacetCounts> {
-    return this.#dependencies.traces.list.getFacets(params);
+  /**
+   * The sidebar's facets under the active query: counted in the window the list
+   * reads, each exempt from its own terms, the hidden origins out of all but
+   * origin's own, uncached so a count answers the table's predicate (ADR-139).
+   */
+  async readFilteredFacets(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query: string;
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): Promise<DiscoverResult> {
+    const hiddenConditions = findHiddenOriginConditions({
+      hiddenOrigins: explorerHiddenOrigins(input.query),
+    });
+    const filterFor = createFacetFilterResolver({
+      queryText: input.query,
+      compile: (text) =>
+        this.translateTraceFilter({
+          query: text,
+          tenantId: input.projectId,
+          timeRange: input.timeRange,
+          ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+        }) ?? undefined,
+      hide: (filter) => {
+        const conditions = [...(filter ? [filter] : []), ...hiddenConditions];
+
+        return conditions.length === 0 ? undefined : andFilterConditions(conditions);
+      },
+    });
+
+    const facets = await this.#dependencies.traces.list.getFacets({
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      filterFor,
+    });
+
+    return { facets, pending: false };
   }
 
   /** How many traces have arrived since the grid last painted. */

@@ -21,7 +21,7 @@ export class ClickHouseTraceFacetEventAttributeKeysRepository {
    * Discovers event attribute keys by flattening per-event Maps.
    */
   buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("StartTime");
+    const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
     return {

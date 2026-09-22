@@ -17,11 +17,7 @@ import {
   explorerInstantEvalRunSchema,
   explorerInstantEvalRunsSchema,
 } from "./trace-instant-eval.schemas.ts";
-import {
-  discoverResultSchema,
-  facetValuesResultSchema,
-  traceListFacetCountsSchema,
-} from "./trace-list-view.ts";
+import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
@@ -281,17 +277,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(tracesListEventsSchema)
 
-  .query("facets")
-  .withInput(
-    z.object({
-      projectId: z.string(),
-      timeRange: timeRangeSchema,
-      query: z.string().nullish(),
-      evalRuns: explorerInstantEvalRunsSchema,
-    }),
-  )
-  .withOutput(traceListFacetCountsSchema)
-
   .query("newCount")
   .withInput(
     z.object({
@@ -329,11 +314,18 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(tracesConversationContextSchema)
 
+  /**
+   * The sidebar's facets: with no `query` field the tenant's cached snapped
+   * discovery, with one (empty string included) every facet counted under it in
+   * the window the list reads, each exempt from its own terms. ADR-139.
+   */
   .query("discover")
   .withInput(
     z.object({
       projectId: z.string(),
       timeRange: timeRangeSchema,
+      query: z.string().nullish(),
+      evalRuns: explorerInstantEvalRunsSchema,
     }),
   )
   .withOutput(discoverResultSchema)

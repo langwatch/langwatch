@@ -21,7 +21,7 @@ export class ClickHouseTraceFacetMetadataKeysRepository {
    * Discovers metadata attribute keys on the trace table.
    */
   buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("OccurredAt");
+    const where = this.facetQueries.buildTimeWhere("OccurredAt", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
     // Same I/O optimisation as `span-attribute-keys.ts`: stay entirely on the

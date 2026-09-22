@@ -23,6 +23,8 @@ import type {
 
 import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
+import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
   snapToWindowPreset,
@@ -81,29 +83,77 @@ const DISCRETE_VALUE_LIMIT = 50;
 
 type TaskTimer = <T>(label: string, p: Promise<T>) => Promise<T>;
 
-type BatchedRegistrySlots = Map<
-  FacetTable,
-  { categoricals: ExpressionCategoricalDef[]; ranges: RangeFacetDef[] }
->;
+/**
+ * One batch slot is one table under one predicate. Facets that share both
+ * share a scan, so an unfiltered run still reads each table once.
+ */
+interface BatchSlot {
+  table: FacetTable;
+  filterWhere: TraceFilterWhere | undefined;
+  categoricals: ExpressionCategoricalDef[];
+  ranges: RangeFacetDef[];
+}
+
+type BatchedRegistrySlots = Map<string, BatchSlot>;
 
 type Outcome =
-  | { kind: "batch"; table: FacetTable; result: BatchedFacetResult }
+  | { kind: "batch"; slotKey: string; result: BatchedFacetResult }
   | { kind: "standalone"; key: string; descriptor: FacetDescriptor }
   | { kind: "discrete"; key: string; result: DiscreteFacetResult };
+
+/** The predicate every facet is counted under, memoised per facet and per slot. */
+interface FacetFilters {
+  of: (def: FacetDefinition) => TraceFilterWhere | undefined;
+  slotKeyOf: (def: FacetDefinition) => string;
+}
+
+function facetFilters(filterFor: FacetFilterResolver): FacetFilters {
+  const byKey = new Map<string, TraceFilterWhere | undefined>();
+  const slotIds = new Map<TraceFilterWhere | undefined, number>();
+  const of = (def: FacetDefinition): TraceFilterWhere | undefined => {
+    if (!byKey.has(def.key)) {
+      byKey.set(def.key, filterFor({ key: def.key, table: def.table }));
+    }
+
+    return byKey.get(def.key);
+  };
+
+  return {
+    of,
+    slotKeyOf: (def) => {
+      const filter = of(def);
+      if (!slotIds.has(filter)) slotIds.set(filter, slotIds.size);
+
+      return `${def.table}#${slotIds.get(filter)}`;
+    },
+  };
+}
 
 /**
  * Splits the facet registry into the simple-expression facets that share one batched scan per
  * table and the arrayJoin, queryBuilder and dynamic-keys facets that must run alone.
  */
-function partitionFacetRegistry(): {
+function partitionFacetRegistry({
+  filters,
+  includeDynamicKeys,
+}: {
+  filters: FacetFilters;
+  includeDynamicKeys: boolean;
+}): {
   batched: BatchedRegistrySlots;
   standalone: FacetDefinition[];
 } {
   const batched: BatchedRegistrySlots = new Map();
   const standalone: FacetDefinition[] = [];
-  const slotFor = (table: FacetTable) => {
-    const slot = batched.get(table) ?? { categoricals: [], ranges: [] };
-    batched.set(table, slot);
+  const slotFor = (def: FacetDefinition) => {
+    const key = filters.slotKeyOf(def);
+    const slot = batched.get(key) ?? {
+      table: def.table,
+      filterWhere: filters.of(def),
+      categoricals: [],
+      ranges: [],
+    };
+    batched.set(key, slot);
 
     return slot;
   };
@@ -114,10 +164,10 @@ function partitionFacetRegistry(): {
       isExpressionCategorical(def) &&
       !def.expression.includes("arrayJoin");
     if (def.kind === "range") {
-      slotFor(def.table).ranges.push(def);
+      slotFor(def).ranges.push(def);
     } else if (isGroupableCategorical) {
-      slotFor(def.table).categoricals.push(def);
-    } else {
+      slotFor(def).categoricals.push(def);
+    } else if (def.kind !== "dynamic_keys" || includeDynamicKeys) {
       standalone.push(def);
     }
   }
@@ -127,11 +177,11 @@ function partitionFacetRegistry(): {
 
 /** Sorts settled task results into their three indexes; a failed task omits its facets. */
 function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
-  batchByTable: Map<FacetTable, BatchedFacetResult>;
+  batchBySlot: Map<string, BatchedFacetResult>;
   standaloneByKey: Map<string, FacetDescriptor>;
   discreteByKey: Map<string, DiscreteFacetResult>;
 } {
-  const batchByTable = new Map<FacetTable, BatchedFacetResult>();
+  const batchBySlot = new Map<string, BatchedFacetResult>();
   const standaloneByKey = new Map<string, FacetDescriptor>();
   const discreteByKey = new Map<string, DiscreteFacetResult>();
 
@@ -145,7 +195,7 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
     }
 
     if (result.value.kind === "batch") {
-      batchByTable.set(result.value.table, result.value.result);
+      batchBySlot.set(result.value.slotKey, result.value.result);
     } else if (result.value.kind === "discrete") {
       discreteByKey.set(result.value.key, result.value.result);
     } else {
@@ -153,7 +203,7 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
     }
   }
 
-  return { batchByTable, standaloneByKey, discreteByKey };
+  return { batchBySlot, standaloneByKey, discreteByKey };
 }
 
 export class TraceDiscoverService {
@@ -213,6 +263,21 @@ export class TraceDiscoverService {
     this.refreshDiscoverInBackground(snappedParams, cacheKey);
 
     return { facets: [], pending: true };
+  }
+
+  /**
+   * Every registry facet counted under the active query, in the window the list
+   * reads: uncached, and without the attribute keys, which are a vocabulary the
+   * sidebar keeps from the cached discovery. ADR-139.
+   */
+  getFilteredFacets({
+    params,
+    filterFor,
+  }: {
+    params: DiscoverParams;
+    filterFor: FacetFilterResolver;
+  }): Promise<FacetDescriptor[]> {
+    return this.computeFacets({ params, filterFor, includeDynamicKeys: false });
   }
 
   private refreshDiscoverInBackground(params: DiscoverParams, cacheKey: string): void {
@@ -276,8 +341,26 @@ export class TraceDiscoverService {
     })();
   }
 
-  private async computeDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
-    const { batched, standalone } = partitionFacetRegistry();
+  private computeDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
+    return this.computeFacets({ params, filterFor: () => undefined, includeDynamicKeys: true });
+  }
+
+  /**
+   * Every registry facet read over the window, each under the predicate
+   * `filterFor` answers for it (none for discover). Facets sharing a table and
+   * a predicate share one batched scan; the rest run on their own.
+   */
+  private async computeFacets({
+    params,
+    filterFor,
+    includeDynamicKeys,
+  }: {
+    params: DiscoverParams;
+    filterFor: FacetFilterResolver;
+    includeDynamicKeys: boolean;
+  }): Promise<FacetDescriptor[]> {
+    const filters = facetFilters(filterFor);
+    const { batched, standalone } = partitionFacetRegistry({ filters, includeDynamicKeys });
     const taskTimings: { label: string; durationMs: number }[] = [];
     const startedAt = nowInstant().epochMilliseconds;
     const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
@@ -290,8 +373,8 @@ export class TraceDiscoverService {
 
     const tasks: Promise<Outcome>[] = [
       ...this.batchTasks(params, batched, wrap),
-      ...this.standaloneTasks(params, standalone, wrap),
-      ...this.discreteTasks(params, wrap),
+      ...this.standaloneTasks({ params, standalone, filters, wrap }),
+      ...this.discreteTasks(params, filters, wrap),
     ];
 
     const settled = await Promise.allSettled(tasks);
@@ -302,18 +385,18 @@ export class TraceDiscoverService {
       taskTimings,
     });
 
-    const { batchByTable, standaloneByKey, discreteByKey } = collectDiscoverOutcomes(settled);
+    const { batchBySlot, standaloneByKey, discreteByKey } = collectDiscoverOutcomes(settled);
 
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
     for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
-      const descriptor = await this.descriptors.materializeDescriptor(
+      const descriptor = await this.descriptors.materializeDescriptor({
         def,
         params,
-        batchByTable,
+        batch: batchBySlot.get(filters.slotKeyOf(def)),
         standaloneByKey,
         discreteByKey,
-      );
+      });
       if (descriptor) {
         facets.push(descriptor);
       }
@@ -328,47 +411,68 @@ export class TraceDiscoverService {
     batched: BatchedRegistrySlots,
     wrap: TaskTimer,
   ): Promise<Outcome>[] {
-    return [...batched].map(([table, slot]) =>
+    return [...batched].map(([slotKey, slot]) =>
       wrap(
-        `batch:${table}`,
+        `batch:${slotKey}`,
         this.repository
           .findBatchedFacets({
             tenantId: params.tenantId,
             timeRange: params.timeRange,
-            table,
-            timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[table],
+            table: slot.table,
+            timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[slot.table],
             categoricalSpecs: slot.categoricals.map((d) => ({
               key: d.key,
               expression: d.expression,
             })),
             rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
             topN: DISCOVER_TOP_N,
+            ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
           })
-          .then((result): Outcome => ({ kind: "batch", table, result })),
+          .then((result): Outcome => ({ kind: "batch", slotKey, result })),
       ),
     );
   }
 
   /** arrayJoin, queryBuilder and dynamic-keys facets cannot share a scan. */
-  private standaloneTasks(
-    params: DiscoverParams,
-    standalone: FacetDefinition[],
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
+  private standaloneTasks({
+    params,
+    standalone,
+    filters,
+    wrap,
+  }: {
+    params: DiscoverParams;
+    standalone: FacetDefinition[];
+    filters: FacetFilters;
+    wrap: TaskTimer;
+  }): Promise<Outcome>[] {
     return standalone.map((def) =>
       wrap(
         `standalone:${def.kind}:${def.key}`,
         (async (): Promise<Outcome> => {
+          const filterWhere = filters.of(def);
           let descriptor: FacetDescriptor;
           switch (def.kind) {
             case "categorical":
-              descriptor = await this.descriptors.discoverCategorical(def, params, DISCOVER_TOP_N);
+              descriptor = await this.descriptors.discoverCategorical({
+                def,
+                params,
+                limit: DISCOVER_TOP_N,
+                ...(filterWhere ? { filterWhere } : {}),
+              });
               break;
             case "range":
-              descriptor = await this.descriptors.discoverRange(def, params);
+              descriptor = await this.descriptors.discoverRange({
+                def,
+                params,
+                ...(filterWhere ? { filterWhere } : {}),
+              });
               break;
             case "dynamic_keys":
-              descriptor = await this.descriptors.discoverDynamicKeys(def, params, DISCOVER_TOP_N);
+              descriptor = await this.descriptors.discoverDynamicKeys({
+                def,
+                params,
+                limit: DISCOVER_TOP_N,
+              });
               break;
           }
 
@@ -382,7 +486,11 @@ export class TraceDiscoverService {
    * Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as its own GROUP BY per
    * facet, since the batched range pass only yields min and max.
    */
-  private discreteTasks(params: DiscoverParams, wrap: TaskTimer): Promise<Outcome>[] {
+  private discreteTasks(
+    params: DiscoverParams,
+    filters: FacetFilters,
+    wrap: TaskTimer,
+  ): Promise<Outcome>[] {
     return ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
       (def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true,
     ).map((def) =>
@@ -396,6 +504,7 @@ export class TraceDiscoverService {
             timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
             column: def.expression,
             limit: DISCRETE_VALUE_LIMIT,
+            ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
           })
           .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
       ),

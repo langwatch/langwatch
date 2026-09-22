@@ -18,12 +18,13 @@ import type {
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
-  FacetTable,
   RangeFacetDef,
 } from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
 
 import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
+import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 
@@ -43,36 +44,47 @@ export class TraceFacetDescriptorService {
     return new TraceFacetDescriptorService(repository, topicNaming);
   }
 
-  async materializeDescriptor(
-    def: FacetDefinition,
-    params: DiscoverParams,
-    batchByTable: Map<FacetTable, BatchedFacetResult>,
-    standaloneByKey: Map<string, FacetDescriptor>,
-    discreteByKey: Map<string, DiscreteFacetResult>,
-  ): Promise<FacetDescriptor | null> {
+  async materializeDescriptor({
+    def,
+    params,
+    batch,
+    standaloneByKey,
+    discreteByKey,
+  }: {
+    def: FacetDefinition;
+    /** The batched result of the slot this facet was read in, when it had one. */
+    batch: BatchedFacetResult | undefined;
+    params: DiscoverParams;
+    standaloneByKey: Map<string, FacetDescriptor>;
+    discreteByKey: Map<string, DiscreteFacetResult>;
+  }): Promise<FacetDescriptor | null> {
     if (isExpressionCategorical(def)) {
-      return this.materializeCategorical(def, params, batchByTable, standaloneByKey);
+      return this.materializeCategorical({ def, params, batch, standaloneByKey });
     }
 
     if (def.kind === "range") {
-      return this.materializeRange(def, batchByTable, discreteByKey);
+      return this.materializeRange({ def, batch, discreteByKey });
     }
 
     return standaloneByKey.get(def.key) ?? null;
   }
 
   /** A categorical facet's descriptor: the batched top values, topic names resolved. */
-  private async materializeCategorical(
-    def: ExpressionCategoricalDef,
-    params: DiscoverParams,
-    batchByTable: Map<FacetTable, BatchedFacetResult>,
-    standaloneByKey: Map<string, FacetDescriptor>,
-  ): Promise<FacetDescriptor | null> {
+  private async materializeCategorical({
+    def,
+    params,
+    batch,
+    standaloneByKey,
+  }: {
+    def: ExpressionCategoricalDef;
+    params: DiscoverParams;
+    batch: BatchedFacetResult | undefined;
+    standaloneByKey: Map<string, FacetDescriptor>;
+  }): Promise<FacetDescriptor | null> {
     if (def.expression.includes("arrayJoin")) {
       return standaloneByKey.get(def.key) ?? null;
     }
 
-    const batch = batchByTable.get(def.table);
     const raw = batch?.categoricals[def.key];
     if (!raw) {
       return null;
@@ -94,12 +106,15 @@ export class TraceFacetDescriptorService {
   }
 
   /** A range facet's descriptor: the batched bounds, plus the discrete values when it has them. */
-  private materializeRange(
-    def: RangeFacetDef,
-    batchByTable: Map<FacetTable, BatchedFacetResult>,
-    discreteByKey: Map<string, DiscreteFacetResult>,
-  ): FacetDescriptor | null {
-    const batch = batchByTable.get(def.table);
+  private materializeRange({
+    def,
+    batch,
+    discreteByKey,
+  }: {
+    def: RangeFacetDef;
+    batch: BatchedFacetResult | undefined;
+    discreteByKey: Map<string, DiscreteFacetResult>;
+  }): FacetDescriptor | null {
     const range = batch?.ranges[def.key];
     if (!range) {
       return null;
@@ -118,11 +133,18 @@ export class TraceFacetDescriptorService {
     };
   }
 
-  async discoverCategorical(
-    def: FacetDefinition & { kind: "categorical" },
-    params: DiscoverParams,
-    limit: number,
-  ): Promise<CategoricalFacetDescriptor> {
+  async discoverCategorical({
+    def,
+    params,
+    limit,
+    filterWhere,
+  }: {
+    def: FacetDefinition & { kind: "categorical" };
+    params: DiscoverParams;
+    limit: number;
+    /** The predicate this facet is counted under; absent on the discover read. */
+    filterWhere?: TraceFilterWhere;
+  }): Promise<CategoricalFacetDescriptor> {
     let result: CategoricalFacetResult;
 
     if (isExpressionCategorical(def)) {
@@ -134,6 +156,7 @@ export class TraceFacetDescriptorService {
         facetExpression: def.expression,
         limit,
         offset: 0,
+        ...(filterWhere ? { filterWhere } : {}),
       });
     } else {
       const query = def.queryBuilder({
@@ -141,6 +164,15 @@ export class TraceFacetDescriptorService {
         timeRange: params.timeRange,
         limit,
         offset: 0,
+        ...(filterWhere
+          ? {
+              traceScope: scopeTraceFilterToTable({
+                table: def.table,
+                filterWhere,
+                isLiveWindow: params.timeRange.live === true,
+              }),
+            }
+          : {}),
       });
       result = await this.repository.findCategoricalFacetRaw({
         tenantId: params.tenantId,
@@ -162,13 +194,22 @@ export class TraceFacetDescriptorService {
     };
   }
 
-  async discoverRange(def: RangeFacetDef, params: DiscoverParams): Promise<RangeFacetDescriptor> {
+  async discoverRange({
+    def,
+    params,
+    filterWhere,
+  }: {
+    def: RangeFacetDef;
+    params: DiscoverParams;
+    filterWhere?: TraceFilterWhere;
+  }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       table: def.table,
       timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
       column: def.expression,
+      ...(filterWhere ? { filterWhere } : {}),
     });
 
     return {
@@ -181,11 +222,15 @@ export class TraceFacetDescriptorService {
     };
   }
 
-  async discoverDynamicKeys(
-    def: FacetDefinition & { kind: "dynamic_keys" },
-    params: DiscoverParams,
-    limit: number,
-  ): Promise<DynamicKeysFacetDescriptor> {
+  async discoverDynamicKeys({
+    def,
+    params,
+    limit,
+  }: {
+    def: FacetDefinition & { kind: "dynamic_keys" };
+    params: DiscoverParams;
+    limit: number;
+  }): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
       tenantId: params.tenantId,
       timeRange: params.timeRange,

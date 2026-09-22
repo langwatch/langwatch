@@ -24,7 +24,7 @@ export class ClickHouseTraceFacetEventsRepository {
    * Discovers event names and their metric value aggregates in one query.
    */
   buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("StartTime");
+    const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
     return {
       sql: `

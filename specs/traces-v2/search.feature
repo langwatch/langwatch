@@ -1002,7 +1002,11 @@ Rule: Two-way sync edge cases
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Facet count updates
-  Facet counts reflect the currently filtered dataset.
+  Facet counts reflect the currently filtered dataset: the active query, the
+  exact time window the table reads, and the same hidden origins. Each facet
+  is counted with its own field left out of the query, so it keeps listing
+  its other values and each value's count is what the table would show with
+  that value selected.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -1015,10 +1019,47 @@ Rule: Facet count updates
   Scenario: Facet counts show how many results another filter would yield
     Given the user has "Error" checked under Status
     Then the Model facet counts show how many error traces each model has
+    And the Status facet still lists "Ok" with its own count, because the facet's own field is left out
 
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
+
+  # A rolling "to" is the instant the request was built, and the table read
+  # drops it for that reason. A facet read on another table has to agree.
+  @unit
+  Scenario: A live window leaves the facet membership uncapped
+    Given the window is a rolling preset
+    When a facet on another table is counted under the active filter
+    Then the membership test carries no upper bound on the window
+    And an absolute window still carries both bounds
+
+  @unit
+  Scenario: A facet on spans or evaluations reads the listed traces once any filter is active
+    Given the query names only an evaluator facet
+    Then that facet counts the evaluations of the traces in the window, its own field left out
+    And Langy's own traces and traces outside the window are not counted
+
+  @unit
+  Scenario: Span and evaluation facets count the whole window while no filter is active
+    Given no query is active
+    Then the span and evaluation facets count every row in the window
+    And they are counted again through the listed traces as soon as a filter is applied
+
+  # The sidebar's numbers come from the same predicate the table runs, so the
+  # read is never served from the shared discover cache while a query is on.
+  @unit
+  Scenario: Facet counts are cached only per query and window
+    When the user changes the query or the time window
+    Then the counts are requested again for the new input
+    And a count kept for a previous input is never shown as the current one
+
+  Scenario: Facet counts leave out the hidden origin and the traces outside the window
+    Given the project has a trace from Langy's own origin in the window
+    And a trace outside the selected window
+    Then neither trace is counted in any facet but Origin
+    And the Origin facet still offers Langy with its count
+    And the counts read the window the table reads, never a rounded one
 
 
 # ─────────────────────────────────────────────────────────────────────────────

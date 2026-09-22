@@ -399,7 +399,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
   cleanupTenantEmitter(tenantId: string): void;
   readTraceList(params: unknown): Promise<unknown>;
   readSessionGroups(params: unknown): Promise<unknown>;
-  readFacets(params: unknown): Promise<unknown>;
+  /**
+   * The sidebar's facets under the active query: descriptors counted in the
+   * window the list reads, each facet exempt from its own terms (ADR-139).
+   */
+  readFilteredFacets(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query: string;
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
   readDiscover(params: unknown): Promise<unknown>;

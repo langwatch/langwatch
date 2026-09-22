@@ -21,7 +21,7 @@ export class ClickHouseTraceFacetSpanAttributeKeysRepository {
    * Discovers span attribute keys ordered by frequency, reading keys only.
    */
   buildSpanAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("StartTime");
+    const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
     return {

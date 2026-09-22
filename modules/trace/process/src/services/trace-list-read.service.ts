@@ -2,20 +2,20 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
   TRACE_LIST_MAX_OFFSET_ROWS,
   PageTooDeepError,
 } from "@langwatch/trace-contract";
 import type {
   DiscoverResult,
+  FacetDescriptor,
   FacetValuesResult,
   TraceListCursor,
-  TraceListFacetCounts,
   TraceListItem,
   TraceListPage,
   TraceListRead,
 } from "@langwatch/trace-contract";
 
+import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {
   cursorForTraceRow,
@@ -45,8 +45,10 @@ interface ListParams {
 
 interface FacetParams {
   tenantId: string;
-  timeRange: { from: number; to: number };
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  /** The exact window the list reads, never snapped. */
+  timeRange: { from: number; to: number; live?: boolean };
+  /** The predicate each facet is counted under. */
+  filterFor: FacetFilterResolver;
 }
 
 interface NewCountParams {
@@ -69,14 +71,6 @@ interface SuggestParams {
   prefix: string;
   limit?: number;
 }
-
-const FACET_EXPRESSIONS: Record<string, string> = {
-  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-  status: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
-  service: "Attributes['service.name']",
-};
-
-const MODEL_FACET_QUERY = "arrayJoin(Models)";
 
 const SUGGEST_COLUMN_MAP: Record<string, string> = {
   model: "arrayJoin(Models)",
@@ -202,70 +196,16 @@ export class TraceListService {
     };
   }
 
-  async getFacets(params: FacetParams): Promise<TraceListFacetCounts> {
-    const facetPromises = Object.entries(FACET_EXPRESSIONS).map(async ([name, expression]) => {
-      const result = await this.repository.findFacetCounts({
-        tenantId: params.tenantId,
-        timeRange: params.timeRange,
-        facetExpression: expression,
-        filterWhere: params.filterWhere,
-      });
-
-      return [name, result.values] as const;
+  /**
+   * The sidebar's counts under the active query, uncached: descriptors, each
+   * facet exempt from its own terms (ADR-139). The unfiltered vocabulary and
+   * warm start stay with `getDiscover`.
+   */
+  getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
+    return this.discover.getFilteredFacets({
+      params: { tenantId: params.tenantId, timeRange: params.timeRange },
+      filterFor: params.filterFor,
     });
-
-    const modelFacetPromise = this.repository.findFacetCounts({
-      tenantId: params.tenantId,
-      timeRange: params.timeRange,
-      facetExpression: MODEL_FACET_QUERY,
-      filterWhere: params.filterWhere,
-    });
-
-    const rangePromises = {
-      tokens: this.repository.findRangeStats({
-        tenantId: params.tenantId,
-        timeRange: params.timeRange,
-        column: "TotalPromptTokenCount + TotalCompletionTokenCount",
-        filterWhere: params.filterWhere,
-      }),
-      cost: this.repository.findRangeStats({
-        tenantId: params.tenantId,
-        timeRange: params.timeRange,
-        column: "TotalCost",
-        filterWhere: params.filterWhere,
-      }),
-      latency: this.repository.findRangeStats({
-        tenantId: params.tenantId,
-        timeRange: params.timeRange,
-        column: "TotalDurationMs",
-        filterWhere: params.filterWhere,
-      }),
-    };
-
-    const [facetResults, modelResult, tokensRange, costRange, latencyRange] = await Promise.all([
-      Promise.all(facetPromises),
-      modelFacetPromise,
-      rangePromises.tokens,
-      rangePromises.cost,
-      rangePromises.latency,
-    ]);
-
-    const facets: Record<string, Record<string, number>> = {};
-    for (const [name, values] of facetResults) {
-      facets[name] = values;
-    }
-
-    return {
-      origin: facets.origin ?? {},
-      status: facets.status ?? {},
-      service: facets.service ?? {},
-      model: modelResult.values,
-      ranges: {
-        tokens: tokensRange,
-        cost: costRange,
-        latency: latencyRange,
-      },
-    };
   }
 
   async getNewCount(params: NewCountParams): Promise<number> {

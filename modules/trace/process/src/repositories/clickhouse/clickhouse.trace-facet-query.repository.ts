@@ -24,11 +24,12 @@ export class ClickHouseTraceFacetQueryRepository {
   /**
    * WHERE predicate with tenant filtering and time window, per clickhouse-queries.md.
    */
-  buildTimeWhere(timeColumn: string): string {
+  buildTimeWhere(timeColumn: string, ctx?: Pick<FacetQueryContext, "traceScope">): string {
     return [
       "TenantId = {tenantId:String}",
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
       `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
+      ...(ctx?.traceScope ? [ctx.traceScope.sql] : []),
     ].join(" AND ");
   }
 
@@ -39,6 +40,7 @@ export class ClickHouseTraceFacetQueryRepository {
    */
   baseParams(ctx: FacetQueryContext): Record<string, unknown> {
     return {
+      ...ctx.traceScope?.params,
       tenantId: ctx.tenantId,
       timeFrom: ctx.timeRange.from,
       timeTo: ctx.timeRange.to,

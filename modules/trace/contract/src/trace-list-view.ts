@@ -84,21 +84,6 @@ export const traceListPageSchema = z.object({
 
 export type TraceListPage = z.infer<typeof traceListPageSchema>;
 
-/** The counts and ranges the list's own filter bar renders. */
-export const traceListFacetCountsSchema = z.object({
-  origin: z.record(z.string(), z.number()),
-  status: z.record(z.string(), z.number()),
-  service: z.record(z.string(), z.number()),
-  model: z.record(z.string(), z.number()),
-  ranges: z.object({
-    tokens: z.object({ min: z.number(), max: z.number() }),
-    cost: z.object({ min: z.number(), max: z.number() }),
-    latency: z.object({ min: z.number(), max: z.number() }),
-  }),
-});
-
-export type TraceListFacetCounts = z.infer<typeof traceListFacetCountsSchema>;
-
 export const categoricalFacetDescriptorSchema = z.object({
   key: z.string(),
   kind: z.literal("categorical"),

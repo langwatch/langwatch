@@ -23,7 +23,7 @@ export class ClickHouseTraceFacetEvaluatorRepository {
    * Discovers evaluators with label display and aggregated pass/fail/score stats.
    */
   buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("ScheduledAt");
+    const where = this.facetQueries.buildTimeWhere("ScheduledAt", ctx);
     const prefixFilter = ctx.prefix
       ? "AND lower(ifNull(EvaluatorName, '')) ILIKE concat({prefix:String}, '%')"
       : "";

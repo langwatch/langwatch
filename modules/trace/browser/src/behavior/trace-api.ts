@@ -38,6 +38,7 @@ import type {
   ConversationContext,
   DerivedTraceEvent,
   DiscoverResult,
+  ExplorerInstantEvalRuns,
   FacetValuesResult,
   RouteSearchInput,
   RouteSearchResult,
@@ -169,9 +170,19 @@ export type TraceApiMap = {
       };
     };
 
-    /** The facet descriptors a project's data supports. */
+    /**
+     * The sidebar's facets: the project's cached discovery with no `query`
+     * field, the counts under one when it carries it (empty string included).
+     */
     discover: {
-      query: { input: ProjectScope & { timeRange: TimeRange }; output: DiscoverResult };
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          query?: string | null;
+          evalRuns?: ExplorerInstantEvalRuns;
+        };
+        output: DiscoverResult;
+      };
     };
 
     /** Pushed when a tenant's facet payload finishes its background refresh. */

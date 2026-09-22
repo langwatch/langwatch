@@ -6,7 +6,7 @@
 
 export interface DiscoverParams {
   tenantId: string;
-  timeRange: { from: number; to: number };
+  timeRange: { from: number; to: number; live?: boolean };
 }
 
 export interface FacetValuesParams {

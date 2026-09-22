@@ -110,10 +110,6 @@ export interface TraceListRepositoryPage {
   totalHits: number;
 }
 
-export interface FacetCountResult {
-  values: Record<string, number>;
-}
-
 /**
  * Optional per-value aggregates the evaluator facet attaches alongside its row counts so the
  * sidebar drilldown can render verdict pills and a score range slider inline without firing a
@@ -180,20 +176,6 @@ export interface BatchedFacetResult {
 export interface TraceListRead {
   findAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
 
-  findFacetCounts(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    facetExpression: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<FacetCountResult>;
-
-  findRangeStats(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    column: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<{ min: number; max: number }>;
-
   findCount(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -219,15 +201,21 @@ export interface TraceListRead {
     limit: number;
   }): Promise<string[]>;
 
+  /**
+   * `filterWhere` on the facet reads below is the active trace filter, which
+   * every read scopes to its own table and applies after the version dedup.
+   * Absent for the unfiltered discover read.
+   */
   findCategoricalFacet(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     facetExpression: string;
     limit: number;
     offset: number;
     prefix?: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
@@ -238,9 +226,10 @@ export interface TraceListRead {
   findRangeStatsForTable(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     column: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }>;
 
   /**
@@ -254,6 +243,7 @@ export interface TraceListRead {
     timeColumn: string;
     column: string;
     limit: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<DiscreteFacetResult>;
 
   /**
@@ -269,6 +259,7 @@ export interface TraceListRead {
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<BatchedFacetResult>;
 
   /**

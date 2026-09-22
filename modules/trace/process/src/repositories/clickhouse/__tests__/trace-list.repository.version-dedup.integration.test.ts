@@ -172,25 +172,33 @@ describe.skipIf(!clickHouseConfigured)(
 
       /** @scenario "A filter reads only the latest version of each trace" */
       it("counts the trace exactly once, in the bucket its newest version is in", async () => {
-        const counts = await repo.findFacetCounts({
+        const counts = await repo.findCategoricalFacet({
           tenantId: versionTenant,
           timeRange,
+          table: "trace_summaries",
+          timeColumn: "OccurredAt",
           facetExpression: annotationFacetExpression,
+          limit: 100,
+          offset: 0,
         });
 
-        expect(counts.values).toEqual({ annotated: 1 });
+        expect(counts.values).toEqual([{ value: "annotated", count: 1 }]);
       });
 
       /** @scenario "A filter reads only the latest version of each trace" */
       it("counts nothing for the bucket only its older version is in", async () => {
-        const counts = await repo.findFacetCounts({
+        const counts = await repo.findCategoricalFacet({
           tenantId: versionTenant,
           timeRange,
+          table: "trace_summaries",
+          timeColumn: "OccurredAt",
           facetExpression: annotationFacetExpression,
+          limit: 100,
+          offset: 0,
           filterWhere: filterFor("annotation:unannotated"),
         });
 
-        expect(counts.values).toEqual({});
+        expect(counts.values).toEqual([]);
       });
     });
   },
