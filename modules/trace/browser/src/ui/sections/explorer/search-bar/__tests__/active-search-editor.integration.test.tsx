@@ -20,6 +20,9 @@ function renderEditor(queryText: string) {
         applyQueryText={() => {
           /* no-op for static-render test */
         }}
+        submitQueryText={() => {
+          /* no-op for static-render test */
+        }}
         autoFocus={false}
         onHasContentChange={() => {
           /* no-op */

@@ -1,5 +1,5 @@
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Drift guard between the CLI's real command surface and the capability catalog.
@@ -14,8 +14,9 @@ import {
 } from "../../../../../model/langy-capability-catalog.ts";
 import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry.ts";
 
-const CLI_PROGRAM_PATH = fileURLToPath(
-  new URL("../../../../../../../../../../sdks/typescript/src/cli/program.ts", import.meta.url),
+const CLI_PROGRAM_PATH = join(
+  import.meta.dirname,
+  "../../../../../../../../../sdks/typescript/src/cli/program.ts",
 );
 
 /**

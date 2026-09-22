@@ -9,6 +9,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
+// covered by use-submit-search.integration, so the submit is stubbed here
+// rather than mounting a tRPC provider.
+vi.mock("../use-submit-search.ts", () => ({
+  useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
+}));
+
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,

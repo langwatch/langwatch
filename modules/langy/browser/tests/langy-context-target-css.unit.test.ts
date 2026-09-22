@@ -3,13 +3,13 @@
  * property (`@property` + var() references inside keyframes).
  * Spec: specs/langy/langy-context-awareness.feature
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(
-  fileURLToPath(new URL("../src/behavior/langy-context-target.css", import.meta.url)),
+  join(import.meta.dirname, "../src/behavior/langy-context-target.css"),
   "utf8",
 );
 

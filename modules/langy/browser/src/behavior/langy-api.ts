@@ -125,7 +125,8 @@ export type LangyApiMap = {
   dashboards: { getAll: QL; create: M };
   /** The widgets a turn's dashboard mutation invalidates on completion. */
   dashboardWidgets: { list: QL };
-  graphs: { create: M };
+  /** The dashboard graphs a turn's widget mutation invalidates on completion. */
+  graphs: { create: M; getAll: QL };
   /** Whether the project has been connected to anything, for the panel's asks. */
   integrationsChecks: { getCheckStatus: Q };
   /** The connect-your-repository card the GitHub skill offers. */

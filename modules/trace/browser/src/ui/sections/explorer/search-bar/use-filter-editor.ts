@@ -19,7 +19,7 @@ import {
   PARAGRAPH_OFFSET,
   readEditorContext,
 } from "./editor-document.ts";
-import { searchBarPlaceholder } from "./placeholder-editor.tsx";
+import { SEARCH_BAR_PLACEHOLDER } from "./placeholder-editor.tsx";
 
 /** The chip sub-controls a click may land on inside the filter editor. */
 const FILTER_CHIP_CONTROL_SELECTORS = [
@@ -46,12 +46,6 @@ const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 // the bar grow tall enough to push the page around even with the CSS
 // height cap as a safety net.
 const PASTE_MAX_CHARS = 2000;
-
-// How long to wait after the last keystroke before pushing the typed text
-// into the global filter store (which re-renders the sidebar + chips and
-// arms the network debounce). Keeps fluent typing entirely local to the
-// editor; the rest of the page catches up once the user pauses.
-const COMMIT_SETTLE_MS = 250;
 
 /**
  * Removes `[start, end)` from `text` and any operator glue left behind, for when the X widget
@@ -140,7 +134,18 @@ export type ValueResolver = (field: string, query: string) => DynamicSuggestionI
 
 interface UseFilterEditorParams {
   queryText: string;
+  /**
+   * Applies a query the editor produced by a deliberate edit of an existing
+   * chip: the X widget, the AND/OR swap. Those search at once, like a facet
+   * click; typing never reaches this.
+   */
   applyQueryText: (text: string) => void;
+  /**
+   * Enter with no highlighted suggestion: the only path a typed text takes out
+   * of the editor. Blur is not a submit — the text stays typed and unsearched
+   * until Enter. @see ADR-144
+   */
+  submitQueryText: (text: string) => void;
   /**
    * Notifies the parent when the editor's empty/non-empty state flips. Wired through
    * directly instead of via a return value + parent effect so the parent's setState
@@ -167,11 +172,6 @@ interface UseFilterEditorParams {
    * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing.
    */
   onAiShortcut?: (currentText: string) => void;
-  /**
-   * Placeholder shown while the editor is empty. Defaults to the Ask AI wording; the
-   * SearchBar passes the Ask Langy variant when Langy owns the ask affordance.
-   */
-  placeholder?: string;
 }
 
 interface FilterEditorApi {
@@ -196,11 +196,11 @@ interface FilterEditorApi {
 export function useFilterEditor({
   queryText,
   applyQueryText,
+  submitQueryText,
   onHasContentChange,
   valueResolver,
   onTokenClick,
   onAiShortcut,
-  placeholder,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] = useState<SuggestionUIState>(CLOSED_SUGGESTION);
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
@@ -219,28 +219,32 @@ export function useFilterEditor({
   const isProgrammaticRef = useRef(false);
   const triggerPosRef = useRef<number | null>(null);
   const applyQueryTextRef = useLatestRef(applyQueryText);
+  const submitQueryTextRef = useLatestRef(submitQueryText);
   const onHasContentChangeRef = useLatestRef(onHasContentChange);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
   const valueResolverRef = useLatestRef(valueResolver);
   const onAiShortcutRef = useLatestRef(onAiShortcut);
-  // Read by the Placeholder extension through a function, so the label keeps
-  // up with the caller (Ask AI ↔ Ask Langy) without re-initialising TipTap.
-  const placeholderRef = useLatestRef(placeholder ?? searchBarPlaceholder("Ask AI"));
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
-  // Committing the typed text into the GLOBAL filter store (`applyQueryText`) re-parses
-  // + re-serialises AND re-renders every store subscriber — the whole facet sidebar,
-  // the query-breakdown chips, the page title, the URL sync.
-  const pendingCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastCommittedTextRef = useRef<string>("");
-  const scheduleCommit = useCallback(
-    () => armCommitTimer({ applyQueryTextRef, editorRef, lastCommittedTextRef, pendingCommitRef }),
-    [applyQueryTextRef],
+  // The text Enter last submitted. While the editor still holds exactly this,
+  // the applied query that answers the submit may replace it even though the
+  // editor has focus: nothing was typed since, so there is nothing to clobber.
+  const submittedTextRef = useRef<string | null>(null);
+  // The ProseMirror editor is the source of truth while the user types. The
+  // store (the sidebar, the chips, the URL, the network) only hears about the
+  // text on Enter, through `submitQueryText`: nothing commits on a timer or on
+  // blur, so typing and pausing never search.
+
+  // The end-of-content anchor, measured outside a suggestion refresh: a
+  // programmatic replace skips that refresh, and a bar that keeps focus keeps
+  // showing the hint, which would otherwise stay where the sentence ended.
+  const measureEndAnchor = useCallback(
+    (target: Editor, text: string) =>
+      setEndAnchorXFor({ editor: target, setEndAnchorX, textLength: text.length }),
+    [],
   );
-  // Cancel any pending commit on unmount so we don't write stale text.
-  useEffect(() => () => cancelPendingCommit(pendingCommitRef), []);
 
   const refreshSuggestion = useCallback(
     (editor: Editor, prereadText?: string) =>
@@ -263,9 +267,7 @@ export function useFilterEditor({
       Paragraph,
       TiptapText,
       History,
-      Placeholder.configure({
-        placeholder: () => placeholderRef.current ?? "",
-      }),
+      Placeholder.configure({ placeholder: SEARCH_BAR_PLACEHOLDER }),
       FilterHighlight,
       AutoUppercaseOperators,
     ],
@@ -275,11 +277,6 @@ export function useFilterEditor({
       const text = ed.getText();
       reportHasContent({ hasContent: text.length > 0, lastHasContentRef, onHasContentChangeRef });
       refreshSuggestion(ed, text);
-      // Live-commit, but deferred so the keystroke handler returns before liqe
-      // runs: multiple keystrokes coalesce into one parse+serialize pass. The
-      // sync effect tolerates NBSP/trim differences so the editor's trailing
-      // NBSP isn't clobbered.
-      scheduleCommit();
     },
     onSelectionUpdate: ({ editor: ed }) => {
       if (isProgrammaticRef.current) return;
@@ -289,14 +286,10 @@ export function useFilterEditor({
       setIsFocused(true);
       refreshSuggestion(ed);
     },
-    onBlur: ({ editor: ed }) => {
+    onBlur: () => {
       setIsFocused(false);
-      // Blur is an authoritative settle — flush the typed text now and drop
-      // any pending debounced commit so it can't fire a stale follow-up.
-      cancelPendingCommit(pendingCommitRef);
-      const finalText = ed.getText().trim();
-      lastCommittedTextRef.current = finalText;
-      applyQueryTextRef.current(finalText);
+      // Blur is not a submit: the typed text stays in the editor, unsearched,
+      // until Enter.
       setSuggestion(CLOSED_SUGGESTION);
       setDropdownDismissed(false);
       triggerPosRef.current = null;
@@ -318,14 +311,13 @@ export function useFilterEditor({
       handleClick: (view, _pos, event) => moveCaretToEndOnVoidClick(view, event),
       handleKeyDown: (view, event) =>
         handleEditorKeyDown({
-          applyQueryTextRef,
           dismissedRef,
           editorRef,
           event,
           isProgrammaticRef,
           onAiShortcutRef,
-          pendingCommitRef,
-          lastCommittedTextRef,
+          submitQueryTextRef,
+          submittedTextRef,
           refreshSuggestion,
           setDropdownDismissed,
           setSuggestion,
@@ -353,37 +345,47 @@ export function useFilterEditor({
         editor,
         event,
         isProgrammaticRef,
-        lastCommittedTextRef,
         onTokenClick,
       });
     dom.addEventListener("mousedown", handler);
     return () => dom.removeEventListener("mousedown", handler);
   }, [editor, applyQueryTextRef, onTokenClick]);
 
-  // Sync external query changes back into the editor. Only runs while the editor is NOT
-  // focused — while focused, the editor is the source of truth and clobbering its
-  // content (via setContent) would race with in-flight typing and drop characters.
+  // Sync external query changes back into the editor. A focused editor is the
+  // source of truth and setContent would race with in-flight typing, so it is
+  // left alone — with one exception: the answer to the user's own Enter, which
+  // the router writes a moment later and the bar must show.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || editor.isFocused) return;
-    if (editorTextMatches(editor, queryText)) return;
-    isProgrammaticRef.current = true;
-    editor.commands.setContent(buildDocument(queryText));
-    reportHasContent({
-      hasContent: queryText.length > 0,
+    if (!editor || editor.isDestroyed) return;
+    writeExternalQuery({
+      editor,
+      isProgrammaticRef,
       lastHasContentRef,
+      measureEndAnchor,
       onHasContentChangeRef,
+      queryText,
+      submittedTextRef,
+      triggerPosRef,
     });
-    triggerPosRef.current = null;
-    isProgrammaticRef.current = false;
-  }, [editor, queryText, onHasContentChangeRef]);
+  }, [editor, queryText, onHasContentChangeRef, measureEndAnchor]);
 
   const acceptSuggestion = useCallback(
     (label: string) => acceptSuggestionLabel({ editor, label, suggestionRef }),
     [editor, suggestionRef],
   );
 
+  /**
+   * Empties the editor on the user's own instruction, whatever the store
+   * holds. Clear keeps the caret in the bar, so the sync effect never sees it:
+   * text that was never submitted has nothing in the store to change.
+   */
   const reset = useCallback(() => {
-    editor?.commands.clearContent();
+    if (editor && !editor.isDestroyed) {
+      isProgrammaticRef.current = true;
+      editor.commands.clearContent();
+      isProgrammaticRef.current = false;
+    }
+    submittedTextRef.current = null;
     reportHasContent({ hasContent: false, lastHasContentRef, onHasContentChangeRef });
     setSuggestion(CLOSED_SUGGESTION);
     setDropdownDismissed(false);
@@ -521,21 +523,13 @@ function moveCaretToEndOnVoidClick(view: EditorView, event: MouseEvent): boolean
   return true;
 }
 
-/** Drops a pending debounced commit so it can't fire a stale follow-up. */
-function cancelPendingCommit(pendingCommitRef: { current: ReturnType<typeof setTimeout> | null }) {
-  if (pendingCommitRef.current === null) return;
-  clearTimeout(pendingCommitRef.current);
-  pendingCommitRef.current = null;
-}
-
 interface EditorKeyContext {
-  applyQueryTextRef: { current: (text: string) => void };
   dismissedRef: { current: boolean };
   editorRef: { current: Editor | null };
   isProgrammaticRef: { current: boolean };
-  lastCommittedTextRef: { current: string };
   onAiShortcutRef: { current: ((seed: string) => void) | undefined };
-  pendingCommitRef: { current: ReturnType<typeof setTimeout> | null };
+  submitQueryTextRef: { current: (text: string) => void };
+  submittedTextRef: { current: string | null };
   refreshSuggestion: (editor: Editor, prereadText?: string) => void;
   setDropdownDismissed: (dismissed: boolean) => void;
   setSuggestion: (
@@ -590,12 +584,9 @@ function submitAndOpenNewClause({
   view: EditorView;
 }): void {
   ctx.triggerPosRef.current = null;
-  // Apply immediately and cancel any pending debounced commit so the
-  // settle timer doesn't fire a redundant second apply afterward.
-  cancelPendingCommit(ctx.pendingCommitRef);
-  const committed = text.trim();
-  ctx.lastCommittedTextRef.current = committed;
-  ctx.applyQueryTextRef.current(committed);
+  const submitted = text.trim();
+  ctx.submittedTextRef.current = submitted;
+  ctx.submitQueryTextRef.current(submitted);
   ctx.isProgrammaticRef.current = true;
   let submitTr = view.state.tr.setSelection(TextSelection.atEnd(view.state.doc));
   const endsWithSpace = /\s$/.test(view.state.doc.textContent);
@@ -689,33 +680,6 @@ function handleEditorKeyDown({
 }
 
 /**
- * Committing the typed text into the global filter store re-parses, re-serialises
- * and re-renders every subscriber, so it waits for the typing to settle.
- */
-function armCommitTimer({
-  applyQueryTextRef,
-  editorRef,
-  lastCommittedTextRef,
-  pendingCommitRef,
-}: {
-  applyQueryTextRef: { current: (text: string) => void };
-  editorRef: { current: Editor | null };
-  lastCommittedTextRef: { current: string };
-  pendingCommitRef: { current: ReturnType<typeof setTimeout> | null };
-}): void {
-  cancelPendingCommit(pendingCommitRef);
-  pendingCommitRef.current = setTimeout(() => {
-    pendingCommitRef.current = null;
-    // Read the current editor text rather than the captured one — typing
-    // after the timer armed will have produced more characters.
-    const fresh = editorRef.current?.getText() ?? "";
-    if (fresh === lastCommittedTextRef.current) return;
-    lastCommittedTextRef.current = fresh;
-    applyQueryTextRef.current(fresh);
-  }, COMMIT_SETTLE_MS);
-}
-
-/**
  * Tells the caller about content only when it actually flips, not on every
  * keystroke that keeps the state.
  */
@@ -733,10 +697,88 @@ function reportHasContent({
   onHasContentChangeRef.current?.(hasContent);
 }
 
-/** Whether the editor already reads as the query, NBSP and trimming aside. */
-function editorTextMatches(editor: Editor, queryText: string): boolean {
-  const normalize = (value: string): string => value.replace(/\u00A0/g, " ").trim();
-  return normalize(editor.getText()) === normalize(queryText);
+/** Moves the end-of-content anchor, if the editor can be measured at all. */
+function setEndAnchorXFor({
+  editor,
+  setEndAnchorX,
+  textLength,
+}: {
+  editor: Editor;
+  setEndAnchorX: (update: (prev: number) => number) => void;
+  textLength: number;
+}): void {
+  const endX = anchorXAt(editor, PARAGRAPH_OFFSET + textLength);
+  if (endX === null) return;
+  setEndAnchorX((prev) => (prev === endX ? prev : endX));
+}
+
+/**
+ * Replaces the editor's document with a query applied from outside, when that
+ * query wins over what the editor holds.
+ */
+function writeExternalQuery({
+  editor,
+  isProgrammaticRef,
+  lastHasContentRef,
+  measureEndAnchor,
+  onHasContentChangeRef,
+  queryText,
+  submittedTextRef,
+  triggerPosRef,
+}: {
+  editor: Editor;
+  isProgrammaticRef: { current: boolean };
+  lastHasContentRef: { current: boolean };
+  measureEndAnchor: (editor: Editor, text: string) => void;
+  onHasContentChangeRef: { current: ((hasContent: boolean) => void) | undefined };
+  queryText: string;
+  submittedTextRef: { current: string | null };
+  triggerPosRef: { current: number | null };
+}): void {
+  const replaces = externalQueryReplacesEditor({
+    editorText: editor.getText(),
+    submittedText: submittedTextRef.current,
+    queryText,
+    isFocused: editor.isFocused,
+  });
+  if (!replaces) return;
+  submittedTextRef.current = null;
+  const keepFocus = editor.isFocused;
+  isProgrammaticRef.current = true;
+  editor.commands.setContent(buildDocument(queryText));
+  // `setContent` leaves a selection across the document it wrote, which an
+  // unfocused bar paints over its chips: park the caret at the end instead.
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  if (keepFocus) editor.commands.focus("end");
+  measureEndAnchor(editor, editor.getText());
+  reportHasContent({ hasContent: queryText.length > 0, lastHasContentRef, onHasContentChangeRef });
+  triggerPosRef.current = null;
+  isProgrammaticRef.current = false;
+}
+
+/** The editor's text as the query language reads it: NBSP and trimming aside. */
+const normalizeEditorText = (text: string): string => text.replace(/\u00A0/g, " ").trim();
+
+/**
+ * Whether a query applied from outside replaces what the editor holds. A
+ * focused editor keeps its text unless it still holds exactly what the user
+ * submitted, which is the router answering their own Enter.
+ */
+function externalQueryReplacesEditor({
+  editorText,
+  submittedText,
+  queryText,
+  isFocused,
+}: {
+  editorText: string;
+  submittedText: string | null;
+  queryText: string;
+  isFocused: boolean;
+}): boolean {
+  const current = normalizeEditorText(editorText);
+  const answersSubmit = submittedText !== null && current === normalizeEditorText(submittedText);
+  if (isFocused && !answersSubmit) return false;
+  return current !== normalizeEditorText(queryText);
 }
 
 /** Accepts a suggestion the reader clicked, as if they had pressed Enter on it. */
@@ -786,7 +828,6 @@ interface EditorMouseContext {
   applyQueryTextRef: { current: (text: string) => void };
   editor: Editor;
   isProgrammaticRef: { current: boolean };
-  lastCommittedTextRef: { current: string };
 }
 
 /**
@@ -798,7 +839,6 @@ function replaceEditorQuery(ctx: EditorMouseContext, next: string): void {
   ctx.isProgrammaticRef.current = true;
   ctx.editor.commands.setContent(buildDocument(next));
   ctx.isProgrammaticRef.current = false;
-  ctx.lastCommittedTextRef.current = next;
   ctx.applyQueryTextRef.current(next);
 }
 

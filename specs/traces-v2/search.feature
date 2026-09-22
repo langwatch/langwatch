@@ -73,7 +73,7 @@ Rule: Search bar layout and behavior
   Scenario: Search bar renders with placeholder text
     When the Observe page loads
     Then the search bar spans the full width below the nav bar
-    And the placeholder text reads "Search filters, free text, or Ask AI…"
+    And the placeholder text reads "Search filters or type what you are looking for"
 
   Scenario: Search bar shows the current active query
     Given the search bar contains "@status:error AND @model:gpt-4o"
@@ -90,10 +90,17 @@ Rule: Search bar layout and behavior
     And presses Enter
     Then the trace table filters to show only error traces
 
+  Scenario: The inline hint names Enter
+    Given the search bar is focused with text in it
+    Then the hint after the text reads "⏎ Enter to search"
+    And no other key submits the search
+
+  @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
     Then the trace table does not update
-    And only autocomplete suggestions update live
+    And the filter store does not change
+    And only autocomplete suggestions and chip highlighting update live
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -1262,11 +1269,13 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the project has traces
     And Langy is available to the user, with permission to start a conversation
 
+  @integration
   Scenario: The ask button reads Ask Langy
     When the Observe page loads
     Then the search bar's ask button reads "Ask Langy"
-    And the placeholder text reads "Search filters, free text, or Ask Langy…"
-    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+    And the placeholder and the inline hint are the same as without Langy
+    # The button is the way to Langy; typed text goes to the search router
+    # on Enter (see "Enter routes a sentence").
 
   Scenario: Clicking Ask Langy floats the ask surface over the search bar
     Given the Langy panel is closed
@@ -1702,11 +1711,11 @@ Rule: Escape is hierarchical
     And the editor is still focused
     And the text remains "@status:err"
 
-  Scenario: Escape with dropdown closed blurs the editor and submits
+  Scenario: Escape with dropdown closed blurs the editor without searching
     Given the search bar contains "@status:error" and the dropdown is closed
     When the user presses Escape
     Then the editor blurs
-    And the query "@status:error" is submitted
+    And the text "@status:error" stays in the bar, unsearched
 
   Scenario: Escape then Enter submits the literal typed text
     Given the search bar contains "@status:err" and the dropdown is open
@@ -1715,41 +1724,56 @@ Rule: Escape is hierarchical
     Then the query "@status:err" is submitted as typed
 
 
-Rule: Blur always submits
-  Any cause of blur — clicking out, tabbing out, programmatic focus change — submits the current text.
+Rule: Leaving the search bar is not a search
+  Blur, whatever caused it (clicking out, tabbing out, a programmatic focus
+  change), keeps the typed text where it is and searches nothing. Enter is
+  the one way out. A store change from outside while the bar is unfocused
+  (a facet click) replaces the unsent text with the applied query.
+  The answer to the user's own Enter is applied to the bar even while it
+  keeps focus, as long as the text is still what was submitted. Clear is the
+  user's own instruction rather than a store change, so it empties the bar
+  whether or not it has focus, and whether or not the text was submitted.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Clicking outside the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user clicks outside the search bar
-    Then the query "@status:error" is submitted
-
-  Scenario: Tabbing out of the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user presses Tab with the dropdown closed
-    Then the query "@status:error" is submitted
-
-  Scenario: Sidebar checkbox click after typing submits the typed text first
-    Given the search bar contains "@status:error" (unsubmitted) and is focused
-    When the user clicks a sidebar checkbox for "@model:gpt-4o"
-    Then the search bar text is committed first
-    And the resulting query contains both "@status:error" and "@model:gpt-4o"
-
-  Scenario: Blur with invalid syntax shows parse error but preserves text
-    Given the search bar contains "@status:" with no value
+  @integration
+  Scenario: Leaving the search bar keeps the text without searching
+    Given the search bar contains "annoyed users" and is focused
     When the user clicks outside the search bar
     Then the editor blurs
-    And the search bar shows a red outline with the parse error message
+    And the text "annoyed users" stays in the bar
+    And nothing is submitted or applied
+
+  Scenario: Tabbing out of the search bar keeps the text
+    Given the search bar contains "@status:error" and is focused
+    When the user presses Tab with the dropdown closed
+    Then the text stays in the bar, unsearched
+
+  Scenario: A sidebar click after typing applies the sidebar's query
+    Given the search bar contains "@status:error" (unsubmitted) and is focused
+    When the user clicks a sidebar checkbox for "@model:gpt-4o"
+    Then the applied query is "@model:gpt-4o"
+    And the bar shows "@model:gpt-4o": the unsent text is replaced by the applied query
+
+  Scenario: Enter with invalid syntax shows the parse error and preserves the text
+    Given the search bar contains "@status:" with no value
+    When the user presses Enter
+    Then the search bar shows a red outline with the parse error message
     And the text "@status:" is preserved for the user to fix
 
-  Scenario: Submit is idempotent across Enter and blur
+  Scenario: Enter is idempotent
     Given the search bar contains "@status:error" and is focused
-    When the user presses Enter
-    And then clicks outside the search bar
-    Then "applyQueryText" is invoked at most once with the same text
+    When the user presses Enter twice
+    Then the applied query is "@status:error" and the AST identity does not churn
+
+  @integration
+  Scenario: Clear empties the bar even while the bar has focus
+    Given the search bar contains "annoyed users" and is focused
+    When the user clicks Clear
+    Then the bar is empty
+    And text the user never submitted is emptied the same way, though the applied query was already empty
 
 
 Rule: Suggestion accept replaces only the active token

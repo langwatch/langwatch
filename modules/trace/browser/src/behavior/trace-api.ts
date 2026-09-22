@@ -39,6 +39,8 @@ import type {
   DerivedTraceEvent,
   DiscoverResult,
   FacetValuesResult,
+  RouteSearchInput,
+  RouteSearchResult,
   SessionGroupsResult,
   SharedTraceDto,
   SpanDetail,
@@ -189,6 +191,11 @@ export type TraceApiMap = {
         };
         output: FacetValuesResult;
       };
+    };
+
+    /** Where Enter on a sentence goes: a filter, a phrase, a judgement, Langy. */
+    routeSearch: {
+      mutation: { input: RouteSearchInput; output: RouteSearchResult };
     };
 
     /** The search bar's composer: filter, or save a lens. */

@@ -81,6 +81,13 @@ vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
+// covered by use-submit-search.integration, so the submit is stubbed here
+// rather than mounting a tRPC provider.
+vi.mock("../use-submit-search.ts", () => ({
+  useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
+}));
+
 // @paper-design/shaders-react requires WebGL, which jsdom does not provide.
 // The shader backdrop is decorative; rendering nothing keeps the SearchBar
 // mountable without crashing on an unhandled WebGL constructor rejection.
@@ -90,6 +97,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 
+import { SEARCH_BAR_PLACEHOLDER } from "../placeholder-editor.tsx";
 import { SearchBar } from "../search-bar.tsx";
 import { SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff.ts";
 
@@ -119,11 +127,16 @@ function renderSearchBar() {
 
 describe("<SearchBar /> wiring smoke", () => {
   describe("when the component mounts with no active query", () => {
-    it("renders the placeholder", () => {
+    /** @scenario "Search bar renders with placeholder text" */
+    it("renders the placeholder, which invites a filter or a sentence", () => {
       renderSearchBar();
 
-      const placeholder = document.querySelector("[data-placeholder]");
+      const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
       expect(placeholder).toBeInTheDocument();
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
+      expect(placeholder.dataset.placeholder).toBe(
+        "Search filters or type what you are looking for",
+      );
     });
 
     it("defers TipTap mount until interaction", () => {
@@ -180,11 +193,11 @@ describe("<SearchBar /> ask affordance", () => {
       expect(screen.queryByText("Ask Langy")).not.toBeInTheDocument();
     });
 
-    it("keeps the Ask AI placeholder wording", () => {
+    it("keeps the ask out of the placeholder: the button is the way to ask", () => {
       renderSearchBar();
 
       const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask AI");
+      expect(placeholder.dataset.placeholder).not.toContain("Ask");
     });
   });
 
@@ -193,18 +206,14 @@ describe("<SearchBar /> ask affordance", () => {
       langyMock.enabled = true;
     });
 
-    it("labels the affordance Ask Langy", () => {
+    /** @scenario "The ask button reads Ask Langy" */
+    it("labels the affordance Ask Langy and keeps the placeholder the same", () => {
       renderSearchBar();
 
       expect(screen.getByText("Ask Langy")).toBeInTheDocument();
       expect(screen.queryByText("Ask AI")).not.toBeInTheDocument();
-    });
-
-    it("swaps the placeholder wording to Ask Langy", () => {
-      renderSearchBar();
-
       const placeholder = document.querySelector("[data-placeholder]") as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask Langy");
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
     });
 
     describe("when Ask Langy is clicked with the panel closed", () => {
