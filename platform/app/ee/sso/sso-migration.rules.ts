@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { isSsoProviderMatch } from "@ee/sso/matching";
+import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import {
+  normalizeDomain,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
+  ssoDomainVerificationSchema,
 } from "@langwatch/identity";
-import type { SsoArrivalMatch } from "./sso-migration-arrival";
 import type { SsoMigrationFinalizationBlocker } from "./sso-migration-finalization.service";
 import type {
   SelfServeMigrationView,
@@ -100,65 +101,110 @@ export function quietPeriodOf({
 }
 
 /**
- * What moving one member across still needs, from whether the replacement
- * can match them and whether the previous provider is their only way in.
+ * How the replacement matches a person arriving through it to their existing
+ * account: by address, on a domain it has proved.
  *
- * A person the replacement can match still has to sign in once when the
- * previous provider is the only verified way in they hold and finishing
- * cannot confirm their address in its place (`addressFinishingConfirms`):
- * finishing takes that way in away, and nobody may be left with none.
+ * One answer for two callers: the link policy decides a real arrival with it,
+ * and the update's progress lists who will not be recognised. The replacement
+ * is the authority for addresses on a domain it proved, so an address nobody
+ * confirmed is matched there too; it cannot be trusted for any other domain,
+ * and an address two accounts hold names neither.
  */
-export function memberMoveOf({
-  arrival,
-  previousIsOnlyWayIn,
+export function arrivalMatchOf({
+  email,
+  accountsHoldingAddress,
+  provesDomain,
 }: {
-  arrival: SsoArrivalMatch;
-  previousIsOnlyWayIn: boolean;
+  email: string | null;
+  /** Accounts holding this address, compared without case. */
+  accountsHoldingAddress: number;
+  provesDomain: (domain: string) => boolean;
 }): SsoMigrationMemberMove {
-  if (arrival !== "matched") return arrival;
-  return previousIsOnlyWayIn ? "sign-in-once" : "next-sign-in";
+  const rawDomain = email ? extractEmailDomain(email) : null;
+  if (!rawDomain) return "no-address";
+  if (accountsHoldingAddress !== 1) return "shared-address";
+  return provesDomain(normalizeDomain(rawDomain))
+    ? "matched"
+    : "unproved-domain";
 }
 
 /**
- * The unconfirmed address finishing confirms for a person, and how it was
- * proven, or null.
+ * Whether the replacement's own evidence proves this email domain, read from
+ * the stored row the way a real arrival reads it.
  *
- * A verified identity on the previous provider proved its address when the
- * person signed in with it. When their own address identity holds that same
- * address, still unconfirmed, finishing confirms it on the previous
- * provider's word before taking the identity away, so the person keeps a way
- * in without having to sign in first. One answer for the progress and for
- * retirement, so the page never promises a move retirement then refuses.
+ * Verification rows that do not parse are dropped rather than trusted: a proof
+ * we cannot read is not a proof, and reading it as one would qualify a domain
+ * on the strength of a malformed row.
  */
-export function addressFinishingConfirms({
+export function replacementProvesDomain({
+  replacement,
+  domain,
+}: {
+  replacement: {
+    id: string;
+    organizationId: string;
+    replacesConnectionId: string | null;
+    verifiedDomains: string[];
+    domainVerifications: unknown;
+  };
+  domain: string;
+}): boolean {
+  const parsed = ssoDomainVerificationSchema
+    .array()
+    .safeParse(replacement.domainVerifications);
+  return (
+    qualifySsoDomainOwnership({
+      state: {
+        connectionId: replacement.id,
+        organizationId: replacement.organizationId,
+        replacesConnectionId: replacement.replacesConnectionId,
+        verifiedDomains: replacement.verifiedDomains,
+        domainVerifications: parsed.success ? parsed.data : [],
+      },
+      domain,
+    }).status === "QUALIFIED"
+  );
+}
+
+/**
+ * The people whose only verified way in is an identity on the previous
+ * provider.
+ *
+ * Finishing leaves their previous identity in place, since the identity
+ * guards refuse to take anybody's last way in; it stops working when the
+ * previous connection is torn down, and the replacement matches them by
+ * address at their next sign-in. A passkey is not another way in: it has no
+ * address behind it.
+ */
+export function strandedUserIdsOf({
   identifiers,
   legacyIdentifierIds,
 }: {
   identifiers: readonly {
     id: string;
-    provider: string;
+    userId: string;
     state: string;
-    value: string | null;
+    provider: string;
   }[];
   legacyIdentifierIds: ReadonlySet<string>;
-}): { identifierId: string; method: "oauth" | "saml" } | null {
-  const proofs = identifiers.filter(
-    ({ id, state, value }) =>
-      legacyIdentifierIds.has(id) &&
-      (state === "VERIFIED" || state === "PRIMARY") &&
-      value !== null,
+}): Set<string> {
+  const verified = identifiers.filter(
+    ({ state }) => state === "VERIFIED" || state === "PRIMARY",
   );
-  for (const address of identifiers) {
-    if (address.provider !== "email" || address.state !== "ATTACHED") continue;
-    const proof = proofs.find(({ value }) => value === address.value);
-    if (proof) {
-      return {
-        identifierId: address.id,
-        method: proof.provider === "saml" ? "saml" : "oauth",
-      };
-    }
-  }
-  return null;
+  const otherWayIn = new Set(
+    verified
+      .filter(
+        ({ id, provider }) =>
+          !legacyIdentifierIds.has(id) && provider !== "passkey",
+      )
+      .map(({ userId }) => userId),
+  );
+  return new Set(
+    verified
+      .filter(({ id }) => legacyIdentifierIds.has(id))
+      .map(({ userId }) => userId)
+      .filter((userId) => !otherWayIn.has(userId)),
+  );
 }
 
 type ConnectionState = SsoConnectionState;
@@ -190,23 +236,16 @@ export function scimStatusOf({
   return "moves-with-finish";
 }
 
-const members = (count: number, kind: string) =>
-  `${count} ${kind} member${count === 1 ? "" : "s"}`;
-
 export function migrationBlockers({
   selectedRoute,
   testSignInDone,
   liveRecoveryCount,
-  waitingCount,
-  deactivatedOnPreviousCount,
   quietComplete,
   sharedLegacyIdentifiers,
 }: {
   selectedRoute: SelfServeMigrationView["selectedRoute"];
   testSignInDone: boolean;
   liveRecoveryCount: number;
-  waitingCount: number;
-  deactivatedOnPreviousCount: number;
   quietComplete: boolean;
   sharedLegacyIdentifiers: boolean;
 }): SsoMigrationBlockerView[] {
@@ -228,18 +267,6 @@ export function migrationBlockers({
       code: "recovery-path-missing",
       message:
         "Keep at least one live way back in before finalizing. Grant it to somebody who has set a password — after the switch the old provider will not be there to sign them in, and a password can only be set while somebody is still signed in.",
-    });
-  }
-  if (waitingCount > 0) {
-    blockers.push({
-      code: "members-cannot-move-across",
-      message: `${members(waitingCount, "active")} cannot be moved across by address yet.`,
-    });
-  }
-  if (deactivatedOnPreviousCount > 0) {
-    blockers.push({
-      code: "deactivated-members-on-previous-provider",
-      message: `${members(deactivatedOnPreviousCount, "deactivated")} can only sign in through the legacy connection.`,
     });
   }
   if (!quietComplete) {
@@ -277,8 +304,6 @@ export function membersViewOf({
     activeCount: number;
     linkedCount: number;
     nextSignInCount: number;
-    waitingCount: number;
-    deactivatedOnPreviousCount: number;
     moves: Map<string, SsoMigrationMemberMove>;
     stragglerRows: { userId: string }[];
     pageRows: {
@@ -295,15 +320,13 @@ export function membersViewOf({
     activeCount: evidence.activeCount,
     linkedCount: evidence.linkedCount,
     nextSignInCount: evidence.nextSignInCount,
-    waitingCount: evidence.waitingCount,
-    deactivatedOnPreviousCount: evidence.deactivatedOnPreviousCount,
     stragglers: pageRows.map((row) => ({
       userId: row.userId,
       name: row.name,
       email: row.email,
       lastLegacyAuthenticationAtMs:
         evidence.legacyActivityByUser.get(row.userId)?.getTime() ?? null,
-      move: evidence.moves.get(row.userId) ?? "unverified-address",
+      move: evidence.moves.get(row.userId) ?? "no-address",
     })),
     nextCursor:
       stragglerRows.length > limit ? (pageRows.at(-1)?.userId ?? null) : null,

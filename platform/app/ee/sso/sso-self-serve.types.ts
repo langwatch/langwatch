@@ -75,14 +75,14 @@ export interface SelfServeGoLiveView {
 }
 
 /**
- * What moving one member across still needs. `next-sign-in` needs nothing
- * from anybody: the replacement matches them by address when they next sign
- * in, before or after the update finishes. Every other value holds the update.
+ * Whether the replacement recognises a member by address. `matched` members
+ * move across at their next sign-in, before or after the update finishes;
+ * every other value names why the replacement will not recognise them. None
+ * of them holds the update.
  */
 export type SsoMigrationMemberMove =
-  | "next-sign-in"
-  | "sign-in-once"
-  | "unverified-address"
+  | "matched"
+  | "no-address"
   | "shared-address"
   | "unproved-domain";
 
@@ -131,10 +131,6 @@ export interface SelfServeMigrationView {
     linkedCount: number;
     /** Members the replacement will match at their next sign-in. */
     nextSignInCount: number;
-    /** Active members holding the update: they must sign in once, or cannot be matched. */
-    waitingCount: number;
-    /** Deactivated members whose only way in is the previous provider. */
-    deactivatedOnPreviousCount: number;
     stragglers: SsoMigrationStragglerView[];
     nextCursor: string | null;
   };

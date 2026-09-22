@@ -8,11 +8,8 @@ import {
 } from "@langwatch/identity";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type { DatabaseHookSsoMigrationPort } from "~/server/better-auth/hooks";
-import {
-  arrivalMatchOf,
-  replacementProvesDomain,
-  type SsoArrivalMatch,
-} from "./sso-migration-arrival";
+import { arrivalMatchOf, replacementProvesDomain } from "./sso-migration.rules";
+import type { SsoMigrationMemberMove } from "./sso-self-serve.types";
 
 const DIRECT_CALLBACK_MARKERS = ["/sso/callback/", "/sso/saml2/sp/acs/"];
 
@@ -154,10 +151,10 @@ export function migrationAuthenticationDecision({
 
 /** What the link policy refuses with when the replacement cannot match a person. */
 const LINK_REFUSALS = {
-  "unverified-address": "SSO_MIGRATION_LINK_UNVERIFIED",
+  "no-address": "SSO_MIGRATION_LINK_UNVERIFIED",
   "shared-address": "SSO_MIGRATION_LINK_AMBIGUOUS",
   "unproved-domain": "SSO_MIGRATION_LINK_NOT_ALLOWED",
-} as const satisfies Record<Exclude<SsoArrivalMatch, "matched">, string>;
+} as const satisfies Record<Exclude<SsoMigrationMemberMove, "matched">, string>;
 
 const NOT_MIGRATING = {
   kind: "not_migrating",
@@ -432,7 +429,6 @@ export class PrismaSsoMigrationCallbackPolicy
       where: { id: userId },
       select: {
         email: true,
-        emailVerified: true,
         orgMemberships: { select: { organizationId: true } },
       },
     });
@@ -444,22 +440,17 @@ export class PrismaSsoMigrationCallbackPolicy
       ),
     });
     if (pairs.length === 0) return NOT_MIGRATING;
-    const vouchedFor =
-      !!user.email &&
-      (await this.addressIsVouchedFor({ reads, user, userId, pairs }));
     const qualifiedPairs = (domain: string) =>
       pairs.filter(({ replacement }) =>
         replacementProvesDomain({ replacement, domain }),
       );
     const match = arrivalMatchOf({
       email: user.email,
-      vouchedFor,
-      accountsHoldingAddress:
-        vouchedFor && user.email
-          ? await reads.user.count({
-              where: { email: { equals: user.email, mode: "insensitive" } },
-            })
-          : 0,
+      accountsHoldingAddress: user.email
+        ? await reads.user.count({
+            where: { email: { equals: user.email, mode: "insensitive" } },
+          })
+        : 0,
       provesDomain: (domain) => qualifiedPairs(domain).length > 0,
     });
     if (match !== "matched") {
@@ -476,46 +467,6 @@ export class PrismaSsoMigrationCallbackPolicy
       ),
       authenticationPairs: pairs,
     } as const;
-  }
-
-  /**
-   * Whether the user's address can be trusted to name them: verified, or
-   * provisioned by a directory sync of one of their migrating pairs.
-   *
-   * A person the identity provider pushed and who has never signed in holds
-   * no verified address: nobody has proved it, because the provider itself
-   * created them. The directory row is the provider's own statement that it
-   * means this person, on either side of the pair, since the previous
-   * connection's sync moves to the replacement when the update finishes.
-   * Refusing them as unverified would leave every provisioned member unable
-   * to sign in through the replacement until it finishes, and the update
-   * unable to finish until they had.
-   */
-  private async addressIsVouchedFor({
-    reads,
-    user,
-    userId,
-    pairs,
-  }: {
-    reads: PrismaClient | Prisma.TransactionClient;
-    user: { emailVerified: boolean };
-    userId: string;
-    pairs: { replacement: { id: string }; legacy: { id: string } }[];
-  }): Promise<boolean> {
-    if (user.emailVerified) return true;
-    const owner = await reads.scimDirectoryUser.findFirst({
-      where: {
-        userId,
-        connectionId: {
-          in: pairs.flatMap(({ replacement, legacy }) => [
-            replacement.id,
-            legacy.id,
-          ]),
-        },
-      },
-      select: { userId: true },
-    });
-    return owner !== null;
   }
 
   private async decideStandaloneLegacyConnection(args: {

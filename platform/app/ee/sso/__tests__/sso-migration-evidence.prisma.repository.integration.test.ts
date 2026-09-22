@@ -98,7 +98,6 @@ async function identifier({
   connectionId = directId,
   accountId = null,
   provider = "oidc",
-  value = null,
 }: {
   name: string;
   user: string;
@@ -106,14 +105,12 @@ async function identifier({
   connectionId?: string | null;
   accountId?: string | null;
   provider?: string;
-  value?: string | null;
 }) {
   await prisma.identifier.create({
     data: {
       id: `${namespace}-identifier-${name}`,
       userId: user,
       provider,
-      value,
       state,
       connectionId,
       accountId,
@@ -178,7 +175,6 @@ function retirementWithSpies() {
   const accounts = identityCeremonies();
   const detach = vi.spyOn(identity, "detachIdentifier").mockResolvedValue([]);
   const markPrimary = vi.spyOn(identity, "markPrimary").mockResolvedValue([]);
-  const verify = vi.spyOn(identity, "verifyIdentifier").mockResolvedValue([]);
   const beforeDelete = vi
     .spyOn(accounts, "beforeAccountDelete")
     .mockResolvedValue(void 0);
@@ -198,14 +194,7 @@ function retirementWithSpies() {
       replacementConnectionId: directId,
       actorUserId: userId("admin"),
     });
-  return {
-    retire,
-    detach,
-    markPrimary,
-    verify,
-    beforeDelete,
-    moveToConnection,
-  };
+  return { retire, detach, markPrimary, beforeDelete, moveToConnection };
 }
 
 async function sync(connectionId: string, state: string) {
@@ -331,8 +320,6 @@ describe("given persisted migration evidence", () => {
         activeCount: 1,
         linkedCount: 1,
         nextSignInCount: 0,
-        waitingCount: 0,
-        deactivatedOnPreviousCount: 0,
         stragglers: [],
         nextCursor: null,
       },
@@ -377,8 +364,6 @@ describe("given persisted migration evidence", () => {
       activeCount: 3,
       linkedCount: 1,
       nextSignInCount: 0,
-      waitingCount: 2,
-      deactivatedOnPreviousCount: 0,
       nextCursor: attached,
       stragglers: [
         {
@@ -386,7 +371,7 @@ describe("given persisted migration evidence", () => {
           name: "attached",
           email: `${attached}@example.test`,
           lastLegacyAuthenticationAtMs: null,
-          move: "unverified-address",
+          move: "unproved-domain",
         },
       ],
     });
@@ -397,78 +382,20 @@ describe("given persisted migration evidence", () => {
           userId: alpha,
           name: "straggler-a",
           lastLegacyAuthenticationAtMs: latest.getTime(),
-          move: "unverified-address",
+          move: "unproved-domain",
         },
       ],
     });
-    expect(codes((await inspect())?.blockers)).toEqual([
-      "members-cannot-move-across",
-    ]);
-    await identifier({ name: "attached-verified", user: attached });
-    await identifier({ name: "straggler-a", user: alpha });
-    expect((await progress())?.blockers).toEqual([]);
-    expect((await inspect())?.blockers).toEqual([]);
   });
 
   describe("when members have not signed in through the replacement", () => {
     beforeEach(proveDomainForArrivals);
 
-    /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
-    it("lists the ones it can match as moving at their next sign-in, finishes without them, and leaves each a way in", async () => {
-      const kim = await member("kim", {
-        verified: true,
-        email: addressOf("kim"),
-      });
-      const pat = await member("pat", { email: addressOf("pat") });
-      await prisma.scimDirectoryUser.create({
-        data: { organizationId, connectionId: legacyId, userId: pat },
-      });
-      await identifier({
-        name: "kim-legacy",
-        user: kim,
-        connectionId: legacyId,
-        state: "PRIMARY",
-      });
-      await identifier({
-        name: "kim-address",
-        user: kim,
-        connectionId: null,
-        provider: "email",
-      });
-
-      const view = await progress();
-      expect(view?.members).toMatchObject({
-        activeCount: 3,
-        linkedCount: 1,
-        nextSignInCount: 2,
-        waitingCount: 0,
-      });
-      expect(view?.members.stragglers.map(({ move }) => move)).toEqual([
-        "next-sign-in",
-        "next-sign-in",
-      ]);
-      expect(view?.blockers).toEqual([]);
-      expect((await inspect())?.blockers).toEqual([]);
-
-      const { retire, detach, markPrimary } = retirementWithSpies();
-      await retire();
-      expect(markPrimary).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          userId: kim,
-          identifierId: `${namespace}-identifier-kim-address`,
-        }),
-      );
-      expect(detach).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          userId: kim,
-          identifierId: `${namespace}-identifier-kim-legacy`,
-        }),
-      );
-    });
-
-    /** @scenario "A member the new connection cannot match holds the update until it can" */
-    it("lists the ones it cannot match with the reason, and holds the update", async () => {
-      await member("ann", { email: addressOf("ann") });
+    /** @scenario "Members never hold the update" */
+    /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+    it("lists whether it recognises each one, confirmed address or not, and holds the update for none of them", async () => {
+      await member("kim", { verified: true, email: addressOf("kim") });
+      await member("pat", { email: addressOf("pat") });
       await member("bo", { verified: true, email: addressOf("bo") });
       await prisma.user.create({
         data: {
@@ -488,152 +415,94 @@ describe("given persisted migration evidence", () => {
           view?.members.stragglers.map(({ name, move }) => [name, move]) ?? [],
         ),
       ).toEqual({
-        ann: "unverified-address",
+        kim: "matched",
+        pat: "matched",
         bo: "shared-address",
         cy: "unproved-domain",
       });
-      expect(view?.members.waitingCount).toBe(3);
-      expect(codes((await inspect())?.blockers)).toEqual([
-        "members-cannot-move-across",
-      ]);
-    });
-
-    /** @scenario "Finishing confirms the address the previous provider proved rather than asking the member to sign in first" */
-    /** @scenario "Native legacy retirement leaves every member a way in" */
-    it("confirms the address the previous identity proved when finishing, instead of asking the member to sign in once", async () => {
-      const flo = await member("flo", { email: addressOf("flo") });
-      await prisma.scimDirectoryUser.create({
-        data: { organizationId, connectionId: legacyId, userId: flo },
+      expect(view?.members).toMatchObject({
+        linkedCount: 1,
+        nextSignInCount: 2,
       });
+      expect(view?.blockers).toEqual([]);
+      expect((await inspect())?.blockers).toEqual([]);
+    });
+  });
+
+  describe("when a member's only way in is the previous provider", () => {
+    /** @scenario "Finishing leaves a member whose only way in is the previous provider on it rather than stopping" */
+    /** @scenario "Native legacy retirement leaves every member a way in" */
+    it("leaves theirs in place, takes everyone else's, and still counts the previous provider's access as retired", async () => {
+      const kim = await member("kim", { email: addressOf("kim") });
+      const dee = await member("dee", { email: addressOf("dee") });
+      const eve = await member("eve", { disabled: true });
       await identifier({
-        name: "flo-legacy",
-        user: flo,
+        name: "kim-legacy",
+        user: kim,
         connectionId: legacyId,
         state: "PRIMARY",
-        value: addressOf("flo"),
       });
       await identifier({
-        name: "flo-address",
-        user: flo,
+        name: "kim-address",
+        user: kim,
         connectionId: null,
         provider: "email",
-        state: "ATTACHED",
-        value: addressOf("flo"),
       });
-
-      expect((await progress())?.members.stragglers).toMatchObject([
-        { userId: flo, move: "next-sign-in" },
-      ]);
-      expect((await inspect())?.blockers).toEqual([]);
-
-      const { retire, verify, markPrimary, detach } = retirementWithSpies();
-      await retire();
-      const address = `${namespace}-identifier-flo-address`;
-      expect(verify).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          userId: flo,
-          identifierId: address,
-          verificationId: null,
-          method: "oauth",
-        }),
-      );
-      expect(markPrimary).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ userId: flo, identifierId: address }),
-      );
-      expect(detach).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          userId: flo,
-          identifierId: `${namespace}-identifier-flo-legacy`,
-        }),
-      );
-      expect(verify.mock.invocationCallOrder[0]).toBeLessThan(
-        detach.mock.invocationCallOrder[0] ?? 0,
-      );
-    });
-
-    /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
-    it("asks a member whose only way in is the previous provider to sign in once, and never retires it", async () => {
-      const dee = await member("dee", {
-        verified: true,
-        email: addressOf("dee"),
+      const deeAccount = `${namespace}-account-dee`;
+      await prisma.account.create({
+        data: {
+          id: deeAccount,
+          userId: dee,
+          provider: "auth0",
+          providerAccountId: "waad|acme|dee",
+        },
       });
       await identifier({
         name: "dee-legacy",
         user: dee,
         connectionId: legacyId,
-        state: "PRIMARY",
-        value: `${userId("dee")}@elsewhere.test`,
+        accountId: deeAccount,
       });
-      await identifier({
-        name: "dee-address",
-        user: dee,
-        connectionId: null,
-        provider: "email",
-        state: "ATTACHED",
-        value: addressOf("dee"),
-      });
-
-      expect((await progress())?.members.stragglers).toMatchObject([
-        { userId: dee, move: "sign-in-once" },
-      ]);
-      expect(codes((await inspect())?.blockers)).toEqual([
-        "members-cannot-move-across",
-      ]);
-      const { retire, detach } = retirementWithSpies();
-      await expect(retire()).rejects.toMatchObject({
-        code: "sso_migration_finalization_blocked",
-        meta: { blockerCodes: ["members-cannot-move-across"] },
-      });
-      expect(detach).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when a deactivated member still holds an identity on the previous provider", () => {
-    /** @scenario "A deactivated member left on the previous provider is named before finishing rather than halfway through it" */
-    it("asks for them to be removed when it is their only way in, and not otherwise", async () => {
-      const eve = await member("eve", { disabled: true });
       await identifier({
         name: "eve-legacy",
         user: eve,
         connectionId: legacyId,
       });
-      const gus = await member("gus", {
-        disabled: true,
-        email: addressOf("gus"),
-      });
-      for (const [name, provider, state, connectionId] of [
-        ["gus-legacy", "oidc", "VERIFIED", legacyId],
-        ["gus-address", "email", "ATTACHED", null],
-      ] as const) {
-        await identifier({
-          name,
-          user: gus,
-          provider,
-          state,
-          connectionId,
-          value: addressOf("gus"),
-        });
-      }
-
-      const view = await progress();
-      expect(view?.members).toMatchObject({
-        deactivatedOnPreviousCount: 1,
-        stragglers: [],
-      });
-      expect(codes(view?.blockers)).toEqual([
-        "deactivated-members-on-previous-provider",
-      ]);
-      expect(codes((await inspect())?.blockers)).toEqual([
-        "deactivated-members-on-previous-provider",
-      ]);
-
       await identifier({
-        name: "eve-address",
+        name: "eve-passkey",
         user: eve,
         connectionId: null,
-        provider: "email",
+        provider: "passkey",
       });
-      expect((await inspect())?.blockers).toEqual([]);
+
+      const { retire, detach, markPrimary, beforeDelete, moveToConnection } =
+        retirementWithSpies();
+      await retire();
+      expect(markPrimary).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          userId: kim,
+          identifierId: `${namespace}-identifier-kim-address`,
+        }),
+      );
+      expect(detach).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          userId: kim,
+          identifierId: `${namespace}-identifier-kim-legacy`,
+        }),
+      );
+      expect(beforeDelete).not.toHaveBeenCalled();
+      expect(moveToConnection).toHaveBeenCalledOnce();
+
+      // What retirement leaves behind: kim's previous identity gone, dee's
+      // and eve's still there by design.
+      await prisma.identifier.update({
+        where: { id: `${namespace}-identifier-kim-legacy` },
+        data: { state: "DETACHED" },
+      });
+      expect(await inspect()).toMatchObject({
+        blockers: [],
+        legacyAccessRetired: true,
+      });
     });
   });
 
@@ -880,9 +749,6 @@ describe("given persisted migration evidence", () => {
       data: { connectionId: "explicit-other-connection" },
     });
     expect((await progress())?.members.linkedCount).toBe(0);
-    expect((await inspect())?.blockers.map(({ code }) => code)).toContain(
-      "members-cannot-move-across",
-    );
   });
 
   /** @scenario "Legacy adoption evidence keeps sibling providers separate" */
@@ -925,7 +791,7 @@ describe("given persisted migration evidence", () => {
   for (const wayIn of ["replacement", "another", "passkey-only"] as const) {
     /** @scenario "Native legacy retirement leaves every member a way in" */
     /** @scenario "Finishing moves the previous connection's directory sync across" */
-    it(`${wayIn === "passkey-only" ? "refuses to retire" : "retires"} adopted legacy bindings when the member holds ${wayIn === "replacement" ? "a verified replacement" : wayIn === "another" ? "another verified way in" : "only a passkey besides"}`, async () => {
+    it(`${wayIn === "passkey-only" ? "leaves in place" : "retires"} adopted legacy bindings when the member holds ${wayIn === "replacement" ? "a verified replacement" : wayIn === "another" ? "another verified way in" : "only a passkey besides"}`, async () => {
       const ownerId = userId("admin");
       const foreignId = await member("foreign", {
         organizationId: otherOrganizationId,
@@ -981,21 +847,15 @@ describe("given persisted migration evidence", () => {
       });
       const { retire, detach, beforeDelete, moveToConnection } =
         retirementWithSpies();
-      const action = retire();
+      await retire();
 
       if (wayIn === "passkey-only") {
-        await expect(action).rejects.toMatchObject({
-          code: "sso_migration_finalization_blocked",
-          meta: { blockerCodes: ["members-cannot-move-across"] },
-        });
         expect(
           await prisma.account.findUnique({ where: { id: ownAccount.id } }),
         ).not.toBeNull();
         expect(beforeDelete).not.toHaveBeenCalled();
         expect(detach).not.toHaveBeenCalled();
-        expect(moveToConnection).not.toHaveBeenCalled();
       } else {
-        await action;
         expect(
           await prisma.account.findUnique({ where: { id: ownAccount.id } }),
         ).toBeNull();
@@ -1008,12 +868,12 @@ describe("given persisted migration evidence", () => {
             userId: ownerId,
           }),
         );
-        expect(moveToConnection).toHaveBeenCalledExactlyOnceWith({
-          organizationId,
-          fromConnectionId: legacyId,
-          toConnectionId: directId,
-        });
       }
+      expect(moveToConnection).toHaveBeenCalledExactlyOnceWith({
+        organizationId,
+        fromConnectionId: legacyId,
+        toConnectionId: directId,
+      });
       expect(
         await prisma.account.findUnique({ where: { id: foreignAccount.id } }),
       ).not.toBeNull();

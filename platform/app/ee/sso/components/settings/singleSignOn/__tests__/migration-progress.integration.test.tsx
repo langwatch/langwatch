@@ -65,8 +65,6 @@ function migrationWith(
       activeCount: 1,
       linkedCount: 0,
       nextSignInCount: 1,
-      waitingCount: 0,
-      deactivatedOnPreviousCount: 0,
       stragglers: [person(0)],
       nextCursor: null,
     },
@@ -90,7 +88,7 @@ function person(
     name: `Member ${index}`,
     email: `member${index}@acme.test`,
     lastLegacyAuthenticationAtMs: null,
-    move: "next-sign-in",
+    move: "matched",
   };
 }
 
@@ -237,8 +235,6 @@ describe("given more than one page of members still using the legacy provider", 
     activeCount: 51,
     linkedCount: 0,
     nextSignInCount: 51,
-    waitingCount: 0,
-    deactivatedOnPreviousCount: 0,
     stragglers: Array.from({ length: 25 }, (_, index) => person(index)),
     nextCursor: "user_024",
   };
@@ -394,22 +390,10 @@ describe("given an update under way", () => {
               activeCount: 4,
               linkedCount: 1,
               nextSignInCount: 1,
-              waitingCount: 2,
-              deactivatedOnPreviousCount: 1,
               stragglers: [],
               nextCursor: null,
             },
             blockers: [
-              {
-                code: "members-cannot-move-across",
-                message:
-                  "2 active members cannot be moved across by address yet.",
-              },
-              {
-                code: "deactivated-members-on-previous-provider",
-                message:
-                  "1 deactivated member can only sign in through the legacy connection.",
-              },
               {
                 code: "legacy-activity-not-quiet",
                 message:
@@ -420,12 +404,6 @@ describe("given an update under way", () => {
         }),
       );
 
-      expect(container.textContent).toContain(
-        "2 members cannot be moved across yet. The list above says what each one needs.",
-      );
-      expect(container.textContent).toContain(
-        "1 deactivated member can only sign in through Auth0. Remove them from the organization before you finish.",
-      );
       expect(container.textContent).toContain(
         "You can finish two days after switching over, or seven days after the last sign-in through Auth0 since then, whichever is later.",
       );
@@ -458,14 +436,11 @@ describe("given an update under way", () => {
       );
     });
 
-    /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
-    /** @scenario "A member the new connection cannot match holds the update until it can" */
-    /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
-    it("says beside each member what moving them across still needs", () => {
+    /** @scenario "Members never hold the update" */
+    it("says beside each member whether the new connection will recognise them", () => {
       const moves = [
-        "next-sign-in",
-        "sign-in-once",
-        "unverified-address",
+        "matched",
+        "no-address",
         "shared-address",
         "unproved-domain",
       ] as const;
@@ -473,11 +448,9 @@ describe("given an update under way", () => {
         migrationScreen({
           migration: migrationWith({
             members: {
-              activeCount: 6,
+              activeCount: 5,
               linkedCount: 1,
               nextSignInCount: 1,
-              waitingCount: 4,
-              deactivatedOnPreviousCount: 0,
               stragglers: moves.map((move, index) => ({
                 ...person(index),
                 move,
@@ -494,13 +467,12 @@ describe("given an update under way", () => {
           .map((row) => row.textContent),
       ).toEqual([
         "Member 0 · Moves across at their next sign-in",
-        "Member 1 · Has to sign in through the new connection once",
-        "Member 2 · Cannot be matched: their address is not confirmed",
-        "Member 3 · Cannot be matched: another account has the same address",
-        "Member 4 · Cannot be matched: their address is not on a domain you proved",
+        "Member 1 · Will not be recognized: their account has no email address",
+        "Member 2 · Will not be recognized: another account has the same address",
+        "Member 3 · Will not be recognized: their address is not on a domain you proved",
       ]);
       expect(
-        screen.getByText("1 of 6, 1 more at their next sign-in"),
+        screen.getByText("1 of 5, 1 more at their next sign-in"),
       ).toBeDefined();
     });
 
@@ -529,8 +501,6 @@ describe("given an update under way", () => {
           selectedRoute: "legacy",
           testSignInDone: false,
           liveRecoveryCount: 0,
-          waitingCount: 2,
-          deactivatedOnPreviousCount: 1,
           quietComplete: false,
           sharedLegacyIdentifiers: true,
         }).map((blocker) => blocker.code),

@@ -193,8 +193,6 @@ describe("given the migration is being checked for what is blocking it", () => {
   const settled = {
     selectedRoute: "direct" as const,
     testSignInDone: true,
-    waitingCount: 0,
-    deactivatedOnPreviousCount: 0,
     quietComplete: true,
     sharedLegacyIdentifiers: false,
   };

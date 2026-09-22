@@ -471,58 +471,36 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When they sign in through the replacement
     Then they are recognised as the person the directory means, on the previous connection's word
     And the update's link policy lets them through although their address was never verified
-    But an unverified member no directory of the pair vouches for is still not linked on address alone
 
-  # Finishing used to wait for every member to sign in through the replacement,
-  # although the replacement already recognises most of them by address. The
-  # update now waits only for the people it could not recognise, and for the
-  # people whose only way in is the provider being taken away and whose
-  # address that provider did not prove.
+  # Finishing never waits for members. An organization with hundreds of people
+  # will not get everyone to sign in again, and does not need to: the
+  # replacement recognises them by address at their next sign-in, before or
+  # after the update finishes. The update lists the few it will not recognise,
+  # so an administrator knows who will need a hand.
 
   @unit @integration
-  Scenario: Members the new connection can match do not have to sign in before the update finishes
+  Scenario: The new connection recognises members by address on a domain it proved, confirmed or not
     Given the update has switched sign-in over to the replacement
-    And a member has not signed in through the replacement yet
-    And their address is verified, or the directory sync provisioned them, on a domain the replacement proved, and no other account holds it
-    And they keep a way in other than the previous provider
-    When the administrator opens the update
-    Then the member is listed as moving across at their next sign-in
-    And they do not stop the update from finishing
-    And finishing takes their previous identity away without leaving them unable to sign in
+    And a member's address is on a domain the replacement proved, and no other account holds it
+    When they sign in through the replacement
+    Then they are linked to their existing account, whether or not their address was ever confirmed
+    But an address on a domain the replacement has not proved, or one another account also holds, is refused
 
-  @unit @integration
-  Scenario: A member the new connection cannot match holds the update until it can
-    Given a member has not signed in through the replacement
-    And their address is unverified with no directory vouching for it, is held by another account too, or is on a domain the replacement has not proved
+  @integration
+  Scenario: Members never hold the update
+    Given members have not signed in through the replacement
     When the administrator opens the update
-    Then the member is listed with the reason the new connection cannot match them
-    And finishing is refused with "members-cannot-move-across" until they sign in through the replacement or the reason is cleared
-
-  @unit @integration
-  Scenario: Finishing confirms the address the previous provider proved rather than asking the member to sign in first
-    Given a member can be matched by address but holds no verified way in other than the previous provider
-    And their identity on the previous provider proved the same address their account holds unconfirmed
-    And no other account holds that address
-    When the administrator opens the update
-    Then the member is listed as moving across at their next sign-in
-    And they do not stop the update from finishing
-    And finishing confirms their address, recorded as proven by the previous provider, before taking that identity away
-
-  @unit @integration
-  Scenario: A member whose only way in is the previous provider signs in once before the update finishes
-    Given a member can be matched by address but holds no verified way in other than the previous provider
-    And their identity on the previous provider did not prove the address their account holds
-    When the administrator opens the update
-    Then the member is listed as having to sign in through the replacement once
-    And finishing is refused with "members-cannot-move-across" rather than taking their only way in away
+    Then each is listed as moving across at their next sign-in, or with the reason the new connection will not recognise them
+    And none of them stops the update from finishing
 
   @integration @regression
-  Scenario: A deactivated member left on the previous provider is named before finishing rather than halfway through it
-    Given a deactivated member's only way in is the previous provider
-    And finishing cannot confirm their address in its place
-    When the administrator opens the update
-    Then the update asks for them to be removed from the organization before it can finish
-    And a deactivated member who keeps another way in, or whose address finishing confirms, does not hold the update
+  Scenario: Finishing leaves a member whose only way in is the previous provider on it rather than stopping
+    Given a member, active or deactivated, holds no verified way in other than the previous provider
+    When the update finishes
+    Then their previous identity is left in place, and stops working when the previous connection is torn down
+    And every other member's previous identity is taken away
+    And the update still counts access through the previous provider as retired
+
 
   @unit @integration
   Scenario: The quiet period counts from the switch-over and the last sign-in through the previous provider
@@ -724,7 +702,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   Scenario: Native legacy retirement leaves every member a way in
     Given a legacy identifier was adopted without a connection annotation
     When its legacy access is retired
-    Then retirement requires a verified replacement identifier, another verified way in, or an address the legacy identity proved, for that user
+    Then it is taken away from a user who keeps a verified replacement identifier or another verified way in, which becomes primary where the legacy one was
     And accounts belonging only to another organization remain untouched
 
   @unit @regression

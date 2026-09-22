@@ -166,14 +166,15 @@ describe("given a person the previous connection's sync provisioned, who has nev
     });
   });
 
-  describe("when an unverified person nobody's directory vouches for signs in", () => {
-    it("is still not linked on address alone", async () => {
+  describe("when an unconfirmed person nobody's directory vouches for signs in", () => {
+    /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+    it("is let through on the address, since the replacement proved its domain", async () => {
       await expect(resolve(unprovisionedId)).resolves.toEqual({
         action: "continue",
       });
-      await expect(decide(unprovisionedId)).resolves.toEqual({
-        kind: "reject",
-        code: "SSO_MIGRATION_LINK_UNVERIFIED",
+      await expect(decide(unprovisionedId)).resolves.toMatchObject({
+        kind: "allow_replacement_pair",
+        arrivalConnectionId: directId,
       });
     });
   });

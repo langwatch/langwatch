@@ -2,15 +2,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  addressFinishingConfirms,
+  arrivalMatchOf,
   MIGRATION_QUIET_FLOOR_MS,
   MIGRATION_QUIET_PERIOD_MS,
-  memberMoveOf,
-  migrationBlockers,
   quietPeriodOf,
   scimStatusOf,
+  strandedUserIdsOf,
 } from "../sso-migration.rules";
-import { arrivalMatchOf } from "../sso-migration-arrival";
 
 describe("scimStatusOf", () => {
   describe("given the previous connection's directory sync is pushing today", () => {
@@ -124,127 +122,45 @@ describe("arrivalMatchOf", () => {
   const arrival = (overrides: Partial<Parameters<typeof arrivalMatchOf>[0]>) =>
     arrivalMatchOf({
       email: "kim@Acme.test",
-      vouchedFor: true,
       accountsHoldingAddress: 1,
       provesDomain: provesAcme,
       ...overrides,
     });
 
-  /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
-  it("matches a vouched-for address held by one account on a proved domain", () => {
+  /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+  it("matches an address one account holds on a proved domain, and names why it matches no other", () => {
     expect(arrival({})).toBe("matched");
-  });
-
-  /** @scenario "A member the new connection cannot match holds the update until it can" */
-  it("names the reason a person cannot be matched", () => {
-    expect(arrival({ vouchedFor: false })).toBe("unverified-address");
-    expect(arrival({ email: null })).toBe("unverified-address");
+    expect(arrival({ email: null })).toBe("no-address");
     expect(arrival({ accountsHoldingAddress: 2 })).toBe("shared-address");
     expect(arrival({ email: "kim@elsewhere.test" })).toBe("unproved-domain");
   });
 });
 
-describe("memberMoveOf", () => {
-  /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
-  it("moves a matched person at their next sign-in when they keep another way in", () => {
+describe("strandedUserIdsOf", () => {
+  const legacyIdentifierIds = new Set([
+    "kim-legacy",
+    "lee-legacy",
+    "max-legacy",
+  ]);
+  const identifier = (
+    id: string,
+    userId: string,
+    overrides: { state?: string; provider?: string } = {},
+  ) => ({ id, userId, state: "VERIFIED", provider: "oidc", ...overrides });
+
+  /** @scenario "Finishing leaves a member whose only way in is the previous provider on it rather than stopping" */
+  it("names the people whose only verified way in is the previous provider", () => {
     expect(
-      memberMoveOf({ arrival: "matched", previousIsOnlyWayIn: false }),
-    ).toBe("next-sign-in");
-  });
-
-  /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
-  it("asks a matched person to sign in once when the previous provider is their only way in", () => {
-    expect(
-      memberMoveOf({ arrival: "matched", previousIsOnlyWayIn: true }),
-    ).toBe("sign-in-once");
-  });
-
-  /** @scenario "A member the new connection cannot match holds the update until it can" */
-  it("keeps the reason for a person the replacement cannot match", () => {
-    expect(
-      memberMoveOf({ arrival: "unproved-domain", previousIsOnlyWayIn: true }),
-    ).toBe("unproved-domain");
-  });
-});
-
-describe("addressFinishingConfirms", () => {
-  const legacyIdentifierIds = new Set(["legacy"]);
-  const legacy = {
-    id: "legacy",
-    provider: "oidc",
-    state: "PRIMARY",
-    value: "kim@acme.test",
-  };
-  const address = {
-    id: "address",
-    provider: "email",
-    state: "ATTACHED",
-    value: "kim@acme.test",
-  };
-
-  describe("when the previous identity proved the address the account holds unconfirmed", () => {
-    /** @scenario "Finishing confirms the address the previous provider proved rather than asking the member to sign in first" */
-    it("names the address to confirm, as proven by the previous provider's protocol", () => {
-      expect(
-        addressFinishingConfirms({
-          identifiers: [legacy, address],
-          legacyIdentifierIds,
-        }),
-      ).toEqual({ identifierId: "address", method: "oauth" });
-      expect(
-        addressFinishingConfirms({
-          identifiers: [{ ...legacy, provider: "saml" }, address],
-          legacyIdentifierIds,
-        }),
-      ).toEqual({ identifierId: "address", method: "saml" });
-    });
-  });
-
-  describe("when the previous identity did not prove that address", () => {
-    /** @scenario "A member whose only way in is the previous provider signs in once before the update finishes" */
-    it("confirms nothing", () => {
-      for (const identifiers of [
-        [{ ...legacy, value: "kim@elsewhere.test" }, address],
-        [{ ...legacy, value: null }, address],
-        [{ ...legacy, state: "ATTACHED" }, address],
-        [{ ...legacy, id: "not-legacy" }, address],
-        [legacy],
-      ]) {
-        expect(
-          addressFinishingConfirms({ identifiers, legacyIdentifierIds }),
-        ).toBeNull();
-      }
-    });
-  });
-});
-
-describe("migrationBlockers", () => {
-  const ready = {
-    selectedRoute: "direct" as const,
-    testSignInDone: true,
-    liveRecoveryCount: 1,
-    waitingCount: 0,
-    deactivatedOnPreviousCount: 0,
-    quietComplete: true,
-    sharedLegacyIdentifiers: false,
-  };
-
-  /** @scenario "Members the new connection can match do not have to sign in before the update finishes" */
-  it("does not wait for members the replacement will match at their next sign-in", () => {
-    expect(migrationBlockers(ready)).toEqual([]);
-  });
-
-  /** @scenario "A member the new connection cannot match holds the update until it can" */
-  it("waits for members who cannot be moved across, and for deactivated members left on the previous provider", () => {
-    expect(
-      migrationBlockers({
-        ...ready,
-        waitingCount: 2,
-        deactivatedOnPreviousCount: 1,
-      }).map(({ code }) => code),
-    ).toEqual([
-      "members-cannot-move-across",
-      "deactivated-members-on-previous-provider",
-    ]);
+      strandedUserIdsOf({
+        legacyIdentifierIds,
+        identifiers: [
+          identifier("kim-legacy", "kim", { state: "PRIMARY" }),
+          identifier("kim-passkey", "kim", { provider: "passkey" }),
+          identifier("lee-legacy", "lee"),
+          identifier("lee-address", "lee", { provider: "email" }),
+          identifier("max-legacy", "max", { state: "ATTACHED" }),
+        ],
+      }),
+    ).toEqual(new Set(["kim"]));
   });
 });

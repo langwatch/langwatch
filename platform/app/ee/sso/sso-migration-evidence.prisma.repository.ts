@@ -10,24 +10,20 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 import {
-  addressFinishingConfirms,
+  arrivalMatchOf,
   connectionRefOf,
   finalizationBlockers,
   identifierBelongsToMigrationConnection,
   inheritedDomainsOf,
   type LegacyAccountEvidence,
-  memberMoveOf,
   membersViewOf,
   migrationBlockers,
   quietPeriodOf,
+  replacementProvesDomain,
   routeOf,
   scimStatusOf,
+  strandedUserIdsOf,
 } from "./sso-migration.rules";
-import {
-  arrivalMatchOf,
-  replacementProvesDomain,
-  type SsoArrivalMatch,
-} from "./sso-migration-arrival";
 import type {
   SsoMigrationFinalizationEvidence,
   SsoMigrationFinalizationReadPort,
@@ -57,7 +53,7 @@ interface MigrationPair {
 interface MemberRow {
   userId: string;
   disabledAt: Date | null;
-  user: { email: string | null; emailVerified: boolean };
+  user: { email: string | null };
 }
 
 const isVerifiedState = ({ state }: { state: string }) =>
@@ -197,7 +193,7 @@ export class PrismaSsoMigrationEvidenceRepository
     const [qualifiedProofs, legacyAccounts, legacyDirectoryTokens, recovery] =
       await Promise.all([
         this.#qualifiedProofCount(pair),
-        this.#legacyAccounts(pair),
+        this.#legacyAccounts(pair, summary.strandedUserIds),
         this.#prisma.scimToken.count({
           where: { organizationId, connectionId: pair.legacy.connectionId },
         }),
@@ -319,23 +315,20 @@ export class PrismaSsoMigrationEvidenceRepository
         selectedRoute,
         testSignInDone: testSignIn.done,
         liveRecoveryCount,
-        waitingCount: members.view.waitingCount,
-        deactivatedOnPreviousCount: members.view.deactivatedOnPreviousCount,
         quietComplete: quiet.complete,
         sharedLegacyIdentifiers: members.sharedLegacyIdentifiers,
       }),
       legacyIdentifierCount: members.legacyIdentifierCount,
+      strandedUserIds: members.strandedUserIds,
       quietPeriod: { lastLegacyAuthenticationAtMs, ...quiet },
     };
   }
 
   /**
-   * Every member's standing on the replacement, and what moving each one
-   * still needs.
-   *
-   * Deactivated members are read too: they cannot sign in, so nobody has to
-   * match them, but finishing still takes their previous identity away and
-   * must not leave them with none.
+   * Every member's standing on the replacement: who has signed in through
+   * it, and whether it recognises the rest by address. Nobody here holds the
+   * update; the people it will not recognise are listed so an administrator
+   * knows who will need a hand.
    */
   async #memberEvidence(pair: MigrationPair) {
     const { organizationId, replacement, legacy } = pair;
@@ -344,10 +337,24 @@ export class PrismaSsoMigrationEvidenceRepository
       select: {
         userId: true,
         disabledAt: true,
-        user: { select: { email: true, emailVerified: true } },
+        user: { select: { email: true } },
       },
     });
-    const candidates = await this.#liveIdentifiersOf(members);
+    const candidates = await this.#prisma.identifier.findMany({
+      where: {
+        userId: { in: members.map(({ userId }) => userId) },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+      select: {
+        id: true,
+        userId: true,
+        state: true,
+        provider: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
     const belongsTo =
       (connection: SsoConnectionState) =>
       (identifier: (typeof candidates)[number]) =>
@@ -359,35 +366,23 @@ export class PrismaSsoMigrationEvidenceRepository
         .filter(isVerifiedState)
         .map(({ userId }) => userId),
     );
-    const previousIsOnlyWayIn = previousOnlyWayInOf({
-      candidates,
-      legacyIdentifiers,
-      confirmable: await this.#addressesFinishingConfirms({
-        members,
-        candidates,
-        legacyIdentifiers,
-      }),
+    const stranded = strandedUserIdsOf({
+      identifiers: candidates,
+      legacyIdentifierIds: new Set(legacyIdentifiers.map(({ id }) => id)),
     });
-    const unmoved = members.filter(({ userId }) => !linked.has(userId));
-    const moves = await this.#movesOf({
-      pair,
-      people: unmoved.filter(({ disabledAt }) => disabledAt === null),
-      previousIsOnlyWayIn,
-    });
-    const nextSignInCount = [...moves.values()].filter(
-      (move) => move === "next-sign-in",
-    ).length;
     const active = members.filter(({ disabledAt }) => disabledAt === null);
+    const moves = await this.#movesOf(
+      pair,
+      active.filter(({ userId }) => !linked.has(userId)),
+    );
     return {
       linkedUserIds: [...linked],
+      strandedUserIds: stranded,
       view: {
         activeCount: active.length,
         linkedCount: active.filter(({ userId }) => linked.has(userId)).length,
-        nextSignInCount,
-        waitingCount: moves.size - nextSignInCount,
-        deactivatedOnPreviousCount: unmoved.filter(
-          ({ userId, disabledAt }) =>
-            disabledAt !== null && previousIsOnlyWayIn.has(userId),
+        nextSignInCount: [...moves.values()].filter(
+          (move) => move === "matched",
         ).length,
         moves,
       },
@@ -395,80 +390,28 @@ export class PrismaSsoMigrationEvidenceRepository
         organizationId,
         legacyIdentifiers.map(({ userId }) => userId),
       ),
-      legacyIdentifierCount: legacyIdentifiers.length,
+      // What finishing leaves in place on purpose is not access left behind.
+      legacyIdentifierCount: legacyIdentifiers.filter(
+        ({ userId }) => !stranded.has(userId),
+      ).length,
     };
   }
 
-  #liveIdentifiersOf(members: readonly { userId: string }[]) {
-    return this.#prisma.identifier.findMany({
-      where: {
-        userId: { in: members.map(({ userId }) => userId) },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-      },
-      select: {
-        id: true,
-        userId: true,
-        state: true,
-        provider: true,
-        value: true,
-        connectionId: true,
-        providerId: true,
-        providerAccountId: true,
-      },
-    });
-  }
-
-  /** What moving each active member who has not moved across still needs. */
-  async #movesOf({
-    pair,
-    people,
-    previousIsOnlyWayIn,
-  }: {
-    pair: MigrationPair;
-    people: MemberRow[];
-    previousIsOnlyWayIn: ReadonlySet<string>;
-  }): Promise<Map<string, SsoMigrationMemberMove>> {
-    const arrivals = await this.#arrivalsOf(pair, people);
-    return new Map(
-      people.map(({ userId }) => [
-        userId,
-        memberMoveOf({
-          arrival: arrivals.get(userId) ?? "unverified-address",
-          previousIsOnlyWayIn: previousIsOnlyWayIn.has(userId),
-        }),
-      ]),
-    );
-  }
-
-  /** How the replacement would match each person arriving through it today. */
-  async #arrivalsOf(
-    { replacement, replacementRow, legacy }: MigrationPair,
+  /** Whether the replacement recognises each person by address, as a real arrival would be decided. */
+  async #movesOf(
+    { replacementRow }: MigrationPair,
     people: MemberRow[],
-  ): Promise<Map<string, SsoArrivalMatch>> {
-    if (people.length === 0) return new Map();
-    const [directoryRows, holders] = await Promise.all([
-      this.#prisma.scimDirectoryUser.findMany({
-        where: {
-          userId: { in: people.map(({ userId }) => userId) },
-          connectionId: {
-            in: [replacement.connectionId, legacy.connectionId],
-          },
-        },
-        select: { userId: true },
-      }),
-      this.#accountsHoldingAddresses(
-        people.flatMap(({ user }) =>
-          user.email ? [user.email.toLowerCase()] : [],
-        ),
+  ): Promise<Map<string, SsoMigrationMemberMove>> {
+    const holders = await this.#accountsHoldingAddresses(
+      people.flatMap(({ user }) =>
+        user.email ? [user.email.toLowerCase()] : [],
       ),
-    ]);
-    const provisioned = new Set(directoryRows.map(({ userId }) => userId));
+    );
     return new Map(
       people.map(({ userId, user }) => [
         userId,
         arrivalMatchOf({
           email: user.email,
-          vouchedFor: user.emailVerified || provisioned.has(userId),
           accountsHoldingAddress: user.email
             ? (holders.get(user.email.toLowerCase()) ?? 0)
             : 0,
@@ -476,61 +419,6 @@ export class PrismaSsoMigrationEvidenceRepository
             replacementProvesDomain({ replacement: replacementRow, domain }),
         }),
       ]),
-    );
-  }
-
-  /**
-   * The people whose address finishing confirms in place of their identity
-   * on the previous provider.
-   *
-   * Only where no other account holds the address: confirming an address
-   * somebody else holds is refused by the identity guards, and finishing
-   * would stop on it half way.
-   */
-  async #addressesFinishingConfirms({
-    members,
-    candidates,
-    legacyIdentifiers,
-  }: {
-    members: MemberRow[];
-    candidates: readonly {
-      id: string;
-      userId: string;
-      provider: string;
-      state: string;
-      value: string | null;
-    }[];
-    legacyIdentifiers: readonly { id: string }[];
-  }): Promise<Set<string>> {
-    const legacyIdentifierIds = new Set(legacyIdentifiers.map(({ id }) => id));
-    const confirmed = new Map<string, string>();
-    for (const [userId, identifiers] of Map.groupBy(
-      candidates,
-      (identifier) => identifier.userId,
-    )) {
-      const confirm = addressFinishingConfirms({
-        identifiers,
-        legacyIdentifierIds,
-      });
-      const address = identifiers.find(
-        ({ id }) => id === confirm?.identifierId,
-      )?.value;
-      if (address) confirmed.set(userId, address.toLowerCase());
-    }
-    const holders = await this.#accountsHoldingAddresses([
-      ...new Set(confirmed.values()),
-    ]);
-    const ownAddress = new Map(
-      members.map(({ userId, user }) => [userId, user.email?.toLowerCase()]),
-    );
-    return new Set(
-      [...confirmed]
-        .filter(
-          ([userId, address]) =>
-            (holders.get(address) ?? 0) ===
-            (ownAddress.get(userId) === address ? 1 : 0),
-        )
-        .map(([userId]) => userId),
     );
   }
 
@@ -612,16 +500,19 @@ export class PrismaSsoMigrationEvidenceRepository
     });
   }
 
-  async #legacyAccounts({
-    organizationId,
-    legacy,
-  }: MigrationPair): Promise<LegacyAccountEvidence> {
-    // Disabled members still own accounts that must be retired; only readiness counts exclude them.
+  async #legacyAccounts(
+    { organizationId, legacy }: MigrationPair,
+    strandedUserIds: ReadonlySet<string>,
+  ): Promise<LegacyAccountEvidence> {
+    // Disabled members still own accounts that must be retired; only readiness
+    // counts exclude them. Stranded members keep theirs by design.
     const members = await this.#prisma.organizationUser.findMany({
       where: { organizationId },
       select: { userId: true },
     });
-    const userIds = members.map(({ userId }) => userId);
+    const userIds = members
+      .map(({ userId }) => userId)
+      .filter((userId) => !strandedUserIds.has(userId));
     const [accounts, identifiers] = await Promise.all([
       this.#prisma.account.findMany({
         where: { userId: { in: userIds }, provider: { not: "credential" } },
@@ -704,48 +595,6 @@ export class PrismaSsoMigrationEvidenceRepository
       return parsed.success && parsed.data.providerId === providerId;
     });
   }
-}
-
-/**
- * The people whose only verified way in is an identity on the previous
- * provider, and whose address finishing cannot confirm in its place, so
- * finishing would leave them none.
- *
- * A passkey does not count as another way in: it has no address behind it,
- * and the identity guards refuse to leave anybody holding passkeys alone.
- */
-function previousOnlyWayInOf({
-  candidates,
-  legacyIdentifiers,
-  confirmable,
-}: {
-  confirmable: ReadonlySet<string>;
-  candidates: readonly {
-    id: string;
-    userId: string;
-    state: string;
-    provider: string;
-  }[];
-  legacyIdentifiers: readonly { id: string; userId: string; state: string }[];
-}): Set<string> {
-  const legacyIds = new Set(legacyIdentifiers.map(({ id }) => id));
-  const otherWayIn = new Set(
-    candidates
-      .filter(
-        (identifier) =>
-          isVerifiedState(identifier) &&
-          !legacyIds.has(identifier.id) &&
-          identifier.provider !== "passkey",
-      )
-      .map(({ userId }) => userId),
-  );
-  // An unconfirmed identity was never a way in, so taking it away strands nobody.
-  return new Set(
-    legacyIdentifiers
-      .filter(isVerifiedState)
-      .map(({ userId }) => userId)
-      .filter((userId) => !otherWayIn.has(userId) && !confirmable.has(userId)),
-  );
 }
 
 export async function countUsableWaysBackIn({

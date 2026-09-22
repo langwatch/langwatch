@@ -101,14 +101,15 @@ describe("legacy SSO migration finalization", () => {
   it("refuses operational blockers before persisting the callback gate", async () => {
     blockers = [
       {
-        code: "members-cannot-move-across",
-        message: "1 active member cannot be moved across by address yet.",
+        code: "legacy-activity-not-quiet",
+        message:
+          "Wait two days after the switch-over, and seven after the last legacy sign-in since then.",
       },
     ];
 
     await expect(run()).rejects.toMatchObject({
       code: "sso_migration_finalization_blocked",
-      meta: { blockerCodes: ["members-cannot-move-across"] },
+      meta: { blockerCodes: ["legacy-activity-not-quiet"] },
     });
     expect(commands).toHaveLength(0);
     expect(retirement.retire).not.toHaveBeenCalled();

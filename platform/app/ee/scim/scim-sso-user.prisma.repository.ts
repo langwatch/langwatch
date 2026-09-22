@@ -152,12 +152,11 @@ export class PrismaScimSsoUsers {
    * sync of the connection it is replacing did.
    *
    * A person the previous connection's sync pushed, who has never signed in,
-   * has no verified address and no account; the directory row is the only
-   * thing that says the identity provider means them. That row moves to the
-   * replacement when the update finishes, but the update cannot finish until
-   * every member has signed in through the replacement. Honouring the
-   * previous connection's ownership while the update is on is what lets them
-   * sign in at all; both connections belong to the same organization.
+   * has no verified address and no account; the directory row is what says
+   * the identity provider means them. That row moves to the replacement when
+   * the update finishes, and until then the previous connection's ownership
+   * is honoured, so they are recognised the same way before and after; both
+   * connections belong to the same organization.
    */
   async #directoryOwns(
     database: Prisma.TransactionClient,

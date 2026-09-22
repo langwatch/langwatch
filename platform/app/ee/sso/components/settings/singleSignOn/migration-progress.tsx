@@ -106,8 +106,6 @@ const PHASE_CHIP: Record<
 
 /** What the outstanding checks count, for the lines that say how many. */
 interface CheckFigures {
-  waiting: number;
-  deactivated: number;
   clearsAtMs: number | null;
 }
 
@@ -118,9 +116,6 @@ function formatMoment(ms: number): string {
     timeStyle: "short",
   });
 }
-
-const peopleCount = (count: number, kind = "") =>
-  `${count} ${kind}${count === 1 ? "member" : "members"}`;
 
 /**
  * What each outstanding check means to the person who has to clear it, and
@@ -152,17 +147,6 @@ const UPDATE_CHECKS: Record<
       "Give at least one person a way in that does not use your identity provider, and give it to somebody who has set a password. Once the update finishes your previous provider will not be there to sign them in, and a password can only be set while somebody is still signed in.",
     condition:
       "Somebody can still sign in without your identity provider, with a password set.",
-  },
-  "members-cannot-move-across": {
-    act: ({ waiting }) =>
-      `${peopleCount(waiting)} cannot be moved across yet. The list above says what each one needs.`,
-    condition: "Every member has moved across, or will at their next sign-in.",
-  },
-  "deactivated-members-on-previous-provider": {
-    act: ({ deactivated, previous }) =>
-      `${peopleCount(deactivated, "deactivated ")} can only sign in through ${previous}. Remove them from the organization before you finish.`,
-    condition:
-      "No deactivated member can only sign in through the previous provider.",
   },
   "legacy-activity-not-quiet": {
     act: ({ previous, clearsAtMs }) =>
@@ -226,14 +210,14 @@ function checkCopyFor({
   return check ? check.act({ ...names, ...figures }) : blocker.message;
 }
 
-/** What moving one member across still needs, beside their name. */
+/** Whether the new connection will recognise a member, beside their name. */
 const MEMBER_MOVE: Record<SsoMigrationMemberMove, string> = {
-  "next-sign-in": "Moves across at their next sign-in",
-  "sign-in-once": "Has to sign in through the new connection once",
-  "unverified-address": "Cannot be matched: their address is not confirmed",
-  "shared-address": "Cannot be matched: another account has the same address",
+  matched: "Moves across at their next sign-in",
+  "no-address": "Will not be recognized: their account has no email address",
+  "shared-address":
+    "Will not be recognized: another account has the same address",
   "unproved-domain":
-    "Cannot be matched: their address is not on a domain you proved",
+    "Will not be recognized: their address is not on a domain you proved",
 };
 
 /** How many members have moved across, and how many will without anybody acting. */
@@ -295,8 +279,6 @@ export function MigrationProgress({
     replacement: replacementName,
   };
   const figures: CheckFigures = {
-    waiting: migration.members.waitingCount,
-    deactivated: migration.members.deactivatedOnPreviousCount,
     clearsAtMs: migration.quietPeriod.clearsAtMs,
   };
   return (

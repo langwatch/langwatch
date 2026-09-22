@@ -163,23 +163,22 @@ connection.
   <img src="/images/access/sso-update-overview-switched-dark.png" alt="The Authentication overview after switching over, with the update status on the single sign-on card." className="hidden dark:block" />
 </Frame>
 
-Members do not need to do anything special. The next time each person signs
-in, they arrive through the new connection and are matched to their existing
-account by their email address. That works before and after you finish, so
-most members never hold the update up. The **Members moved across** row counts
-who has signed in through the new connection, and how many more will be moved
-across at their next sign-in.
+Members do not need to do anything, and you do not need to wait for them.
+The next time each person signs in, they arrive through the new connection and
+are matched to their existing account by their email address, on any domain
+you proved. That works before and after you finish. The **Members moved
+across** row counts who has signed in through the new connection, and how many
+more will be moved across at their next sign-in.
 
-Under **Not moved across yet**, each remaining member is listed with what
-moving them still needs:
+Under **Not moved across yet**, each remaining member is listed with whether
+the new connection will recognize them. None of these stops you finishing:
 
 | Beside a member | What to do |
 | --- | --- |
-| Moves across at their next sign-in | No action needed. The new connection recognizes them by their address. If your previous provider is their only way in, finishing confirms the address it signed them in with, so they keep a way in. |
-| Has to sign in through the new connection once | Ask them to sign in. Your previous provider is their only way in, and it signed them in with a different address from the one on their account, so finishing waits until they have another way in. |
-| Cannot be matched: their address is not confirmed | Ask them to confirm their email address in their account settings, or remove them from the organization if they have left. |
-| Cannot be matched: another account has the same address | Contact support. |
-| Cannot be matched: their address is not on a domain you proved | Prove that domain on the new connection, or remove them from the organization if they have left. |
+| Moves across at their next sign-in | No action needed. |
+| Will not be recognized: their account has no email address | Contact support if they still need access. |
+| Will not be recognized: another account has the same address | Contact support if they still need access. |
+| Will not be recognized: their address is not on a domain you proved | Prove that domain on the new connection, or they will need support to sign in after the update. |
 
 If something is wrong, **Switch back to _your previous provider_** returns
 everybody to it immediately. You can switch back and forth until you start
@@ -204,8 +203,6 @@ has passed**.
 | The new connection is on | Turn it on in the setup steps. |
 | The new connection holds a current proof of your domain | Prove the domain again if the proof lapsed. |
 | Somebody can still sign in without your identity provider, with a password set | Name a recovery administrator who has set a password. A password can only be set while somebody is still signed in, so do this before finishing. |
-| Every member has moved across, or will at their next sign-in | Deal with the members listed under **Not moved across yet**, as above. Members who have left can be removed in **Settings > Directory**. |
-| No deactivated member can only sign in through the previous provider, under an address finishing cannot confirm | Remove those members from the organization in **Settings > Directory**. |
 | Two days have passed since switching over, and seven since anybody last signed in through the previous provider | Wait. The page shows the time you can finish from. A sign-in through the previous provider after the switch moves that to seven days after the sign-in, and switching back starts the two days again. |
 | No account is shared with another organization, and no account is covered by another organization's provider | Contact support. These are cases LangWatch cannot resolve safely on its own. |
 
