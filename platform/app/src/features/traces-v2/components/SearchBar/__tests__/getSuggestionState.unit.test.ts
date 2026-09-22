@@ -296,15 +296,53 @@ describe("getSuggestionState", () => {
     });
 
     describe("when the cursor sits inside a quoted value after a space inside the quotes", () => {
-      it("opens passive field-mode for the post-space identifier (the active token is no longer the quoted value)", () => {
-        // The space terminates the value-mode token, leaving "po" as the new
-        // active word. Identifier-shape, so passive autocomplete opens —
-        // dropdown is invisible if no fields prefix-match.
+      /** @scenario "A space belongs to the question being typed" */
+      it("returns closed because everything inside the quotes is one value", () => {
+        // A word after a space inside the quotes is still part of the value.
+        // Reading it as a new token opened the field list halfway through a
+        // multi-word value, where Enter accepts a field rather than searching.
         expect(getSuggestionState('@status:"refund po', 18)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits after the closing quote", () => {
+      it("opens field-mode again, because the value ended", () => {
+        expect(getSuggestionState('status:"refund policy" mo', 25)).toEqual({
           open: true,
           mode: "field",
-          query: "po",
-          tokenStart: 16,
+          query: "mo",
+          tokenStart: 23,
+        });
+      });
+    });
+  });
+
+  describe("given the clauses are separated by a non-breaking space", () => {
+    describe("when a second field name is being typed", () => {
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens field mode on it, because U+00A0 ends a token as a space does", () => {
+        // The editor writes U+00A0 between clauses, and the browser turns a
+        // trailing typed space into one. Read as an ordinary character it
+        // glued the next clause onto the previous value, and the field list
+        // stopped opening after the first chip.
+        expect(getSuggestionState("status:error ser", 16)).toEqual({
+          open: true,
+          mode: "field",
+          query: "ser",
+          tokenStart: 13,
+        });
+      });
+
+      /** @scenario "The field list opens for every clause, not only the first" */
+      it("opens value mode on the second clause's own value", () => {
+        expect(getSuggestionState("status:error service:ap", 24)).toEqual({
+          open: true,
+          mode: "value",
+          field: "service",
+          query: "ap",
+          tokenStart: 13,
         });
       });
     });

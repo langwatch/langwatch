@@ -30,6 +30,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: project.current }),
 }));
 
+import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { useExplorerStore } from "../../../stores/explorerStore";
 import { useSubmitSearch } from "../useSubmitSearch";
 
@@ -278,6 +279,102 @@ describe("given the text has bare words", () => {
       act(() => result.current.submitSearch("annoyed users"));
       expect(mutation.mutate).not.toHaveBeenCalled();
       expect(useExplorerStore.getState().queryText).toBe('"annoyed users"');
+    });
+  });
+});
+
+describe("given the text is an eval chip typed by hand", () => {
+  describe("when no run has answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and hands the question, as written, to the Instant Eval handler", () => {
+      useExplorerStore
+        .getState()
+        .setTimeRange({ from: 1000, to: 2000, label: "Custom" });
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch(
+          'status:error AND eval:"the user is annoyed"',
+        ),
+      );
+      // The chip is on screen while the run is arranged, so the reader sees
+      // what they typed rather than an empty bar.
+      expect(useExplorerStore.getState().queryText).toBe(
+        'status:error AND eval:"the user is annoyed"',
+      );
+      // No router and no model between Enter and the estimate: the reader
+      // wrote the question, and the fallback keeps the chip where it is.
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sentence: "the user is annoyed",
+        question: { instructions: "the user is annoyed" },
+        target: "traces",
+        otherQuery: "status:error",
+        fallbackQuery: 'status:error AND eval:"the user is annoyed"',
+        timeRange: { from: 1000, to: 2000 },
+      });
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("judges the unit a target spelling asked for, whatever the lens shows", () => {
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch('eval.conversation:"the user is annoyed"'),
+      );
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({ target: "threads", otherQuery: "" }),
+      );
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("keeps the other eval chips beside the filter the run judges", () => {
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch('eval.llm:"wrong tool" AND eval:"annoyed"'),
+      );
+      // The llm chip is pending too, so it is the first one started; the
+      // annoyed chip stays in the other terms and is started on the next Enter.
+      expect(handlers.onInstantEval).toHaveBeenCalledTimes(1);
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "wrong tool" },
+          otherQuery: 'eval:"annoyed"',
+        }),
+      );
+    });
+
+    it("keeps the run out of the sample preview, which has nothing to judge", () => {
+      const { result } = renderSubmit({ isSamplePreview: true });
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a run already answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and calls nothing", () => {
+      const { timeRange } = useExplorerStore.getState();
+      useExplorerStore.getState().registerEvalRun({
+        key: instantEvalRunKey({
+          question: "the user is annoyed",
+          target: "traces",
+          otherQuery: "",
+          window: {
+            from: timeRange.from,
+            to: timeRange.to,
+            ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+          },
+        }),
+        runId: "run-1",
+      });
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useExplorerStore.getState().queryText).toBe(
+        'eval:"the user is annoyed"',
+      );
     });
   });
 });

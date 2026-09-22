@@ -14,11 +14,15 @@ import { useLicenseActions } from "../useLicenseActions";
 const {
   uploadMutationOptions,
   removeMutationOptions,
+  activateMutationOptions,
+  refreshMutationOptions,
   publicEnvData,
   invalidateMock,
 } = vi.hoisted(() => ({
   uploadMutationOptions: { current: null as null | Record<string, any> },
   removeMutationOptions: { current: null as null | Record<string, any> },
+  activateMutationOptions: { current: null as null | Record<string, any> },
+  refreshMutationOptions: { current: null as null | Record<string, any> },
   publicEnvData: {
     current: undefined as undefined | { IS_SAAS: boolean },
   },
@@ -30,7 +34,7 @@ const {
 // to read. `trpc.invalidate()` replaced it, and this keeps the regression
 // guarded: the hook must not reload.
 //
-// Guarded through the navigation seam rather than by spying on
+// Guarded through the navigation module rather than by spying on
 // `window.location.reload`, which is impossible — jsdom defines both `location`
 // and its methods as non-configurable and non-writable, so every form of spy,
 // stub and redefine throws in a VM realm.
@@ -55,6 +59,18 @@ vi.mock("~/utils/api", () => ({
       remove: {
         useMutation: (options: Record<string, any>) => {
           removeMutationOptions.current = options;
+          return { mutate: vi.fn(), isLoading: false };
+        },
+      },
+      activate: {
+        useMutation: (options: Record<string, any>) => {
+          activateMutationOptions.current = options;
+          return { mutate: vi.fn(), isLoading: false };
+        },
+      },
+      refresh: {
+        useMutation: (options: Record<string, any>) => {
+          refreshMutationOptions.current = options;
           return { mutate: vi.fn(), isLoading: false };
         },
       },
@@ -88,6 +104,26 @@ describe("useLicenseActions", () => {
     vi.clearAllMocks();
     uploadMutationOptions.current = null;
     removeMutationOptions.current = null;
+    activateMutationOptions.current = null;
+    refreshMutationOptions.current = null;
+  });
+
+  describe("when an activation code is redeemed on a self-hosted deployment", () => {
+    /** @scenario Activating a license takes effect at the next restart */
+    it("says the same thing as a pasted license, restart line included", () => {
+      publicEnvData.current = { IS_SAAS: false };
+
+      renderActions();
+      activateMutationOptions.current?.onSuccess();
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "License activated",
+          description: expect.stringContaining("restart the server"),
+          type: "success",
+        }),
+      );
+    });
   });
 
   describe("when a license is activated on a self-hosted deployment", () => {

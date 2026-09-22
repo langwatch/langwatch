@@ -61,6 +61,16 @@ export const LicenseDataSchema = z.object({
   issuedAt: z.string(), // ISO 8601 date string
   expiresAt: z.string(), // ISO 8601 date string
   plan: LicensePlanLimitsSchema,
+  /**
+   * The LangWatch-hosted services this license may call (ADR-141, section 2).
+   *
+   * Last in the schema and optional, so a license signed before it existed
+   * parses and re-serializes byte-identically: `z.object` drops the key when
+   * it is absent, and `JSON.stringify` drops it again. Absent means the
+   * install calls nothing, which is what an air-gapped operator proves from
+   * the license blob rather than from a deployment variable.
+   */
+  connectServices: z.array(z.string()).optional(),
 });
 
 export type LicenseData = z.infer<typeof LicenseDataSchema>;
@@ -132,6 +142,12 @@ type ValidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
+  /**
+   * True when the license names a hosted service and the deployment permits
+   * Connect, so this install syncs the license with LangWatch and an admin can
+   * refresh it on demand (ADR-141, section 6).
+   */
+  connected: boolean;
 } & LicenseResourceLimits;
 
 export type LicenseStatus =

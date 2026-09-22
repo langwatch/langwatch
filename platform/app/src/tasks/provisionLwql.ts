@@ -203,7 +203,7 @@ async function appFunctionsProvisionable(
   // A layout that could not be read has already been logged by the probe.
   if (probe === null) return false;
   logger.error(
-    { maxTotalReplicas: probe.maxTotalReplicas },
+    { maxTotalReplicas: probe?.maxTotalReplicas ?? null },
     "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
   );
   return false;

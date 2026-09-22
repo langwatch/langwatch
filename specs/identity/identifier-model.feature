@@ -139,6 +139,16 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When the next pass states the same attach again
     Then the guard emits it, because the projection has still never folded
 
+  @integration
+  Scenario: A user's hash key is minted once, whichever writer arrives first
+    Given a user with no hash key
+    When the creation ceremony and a backfill pass each mint one at the same moment
+    Then the key the first writer minted is the one stored
+    And the second writer changes nothing
+    # A key rewritten under a user orphans every identifier hash already
+    # computed with the old one, in an immutable log. The second write waits
+    # on the first's row lock and re-reads the key as the first left it.
+
   @unit
   Scenario: Every identity event rides the pipeline's declared aggregate type
     When each identity command emits its event

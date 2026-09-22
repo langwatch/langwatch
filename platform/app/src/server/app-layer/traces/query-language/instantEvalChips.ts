@@ -115,8 +115,18 @@ export function instantEvalChipsOf({
   return chips;
 }
 
-/** The query with every eval chip removed: the scope a run judges. */
-export function queryWithoutInstantEvalChips(queryText: string): string {
+/**
+ * The query with the eval chips `drop` names taken out, every other term left
+ * as typed. A query that does not parse is returned as it came: there is no
+ * chip to take out of it.
+ */
+function queryWithoutEvalChips({
+  queryText,
+  drop,
+}: {
+  queryText: string;
+  drop: (chip: { field: string; value: string | null }) => boolean;
+}): string {
   const trimmed = queryText.trim();
   if (!trimmed) return "";
   let ast: LiqeQuery;
@@ -125,16 +135,47 @@ export function queryWithoutInstantEvalChips(queryText: string): string {
   } catch {
     return trimmed;
   }
-  const next = filterAST(
-    ast,
-    (node) =>
-      !(
-        node.type === "Tag" &&
-        node.field.type !== "ImplicitField" &&
-        isInstantEvalField(node.field.name)
-      ),
-  );
+  const next = filterAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type === "ImplicitField") return true;
+    const field = node.field.name;
+    if (!isInstantEvalField(field)) return true;
+    return !drop({ field, value: chipValueOf(node as TagToken) });
+  });
   return isEmptyAST(next) ? "" : serialize(next);
+}
+
+/** The query with every eval chip removed: the scope a run judges. */
+export function queryWithoutInstantEvalChips(queryText: string): string {
+  return queryWithoutEvalChips({ queryText, drop: () => true });
+}
+
+/**
+ * The query with one eval chip removed, every other term left as typed.
+ *
+ * The scope a run judges carries no eval chip at all, which is what
+ * {@link queryWithoutInstantEvalChips} answers. This is the other question:
+ * what the bar holds beside one chip, so the chip's run can put it back next
+ * to the terms it was typed with, other eval chips included. The chip is
+ * named by its field and its question together: the same question under
+ * another target is another chip, and it stays.
+ */
+export function queryWithoutInstantEvalChip({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): string {
+  const wanted = question.replace(/\s+/g, " ").trim();
+  return queryWithoutEvalChips({
+    queryText,
+    drop: (chip) =>
+      chip.field === field &&
+      chip.value !== null &&
+      chip.value.replace(/\s+/g, " ").trim() === wanted,
+  });
 }
 
 /**

@@ -252,7 +252,7 @@ const TEST_CONNECTION_WINDOW_SECONDS = 60;
 const TEST_CONNECTION_PER_ORGANIZATION = 20;
 const TEST_CONNECTION_GLOBAL = 500;
 
-async function assertTestConnectionWithinBudget(
+export async function assertTestConnectionWithinBudget(
   organizationId: string,
 ): Promise<void> {
   const perOrganization = await rateLimit({

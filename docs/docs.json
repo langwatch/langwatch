@@ -977,6 +977,9 @@
             "pages": [
               "self-hosting/overview",
               "self-hosting/licensing",
+              "self-hosting/connect",
+              "self-hosting/data-and-telemetry",
+              "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]

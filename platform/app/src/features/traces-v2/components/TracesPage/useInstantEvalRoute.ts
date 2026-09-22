@@ -26,8 +26,12 @@ export interface InstantEvalRoutePayload {
   sentence: string;
   question: {
     instructions: string;
-    /** What counts as yes, and what counts as no, in that order. */
-    criteria: [string, string];
+    /**
+     * What counts as yes, and what counts as no, in that order. Written by
+     * the classifier for a routed sentence; absent for a question typed as
+     * a chip, which the judge reads as it is.
+     */
+    criteria?: [string, string];
   };
   target: InstantEvalSearchTarget;
   /** The explicit `field:value` terms typed alongside the sentence. */
@@ -105,7 +109,9 @@ function runInput(payload: InstantEvalRoutePayload) {
     window: { from: payload.timeRange.from, to: payload.timeRange.to },
     question: {
       instructions: payload.question.instructions,
-      criteria: payload.question.criteria,
+      ...(payload.question.criteria
+        ? { criteria: payload.question.criteria }
+        : {}),
     },
   };
 }
@@ -210,7 +216,9 @@ function confirmationOf({
 }): InstantEvalConfirmation {
   return {
     question: payload.question.instructions,
-    criteria: payload.question.criteria,
+    ...(payload.question.criteria
+      ? { criteria: payload.question.criteria }
+      : {}),
     rows: estimate.rows,
     isRowsCapped: estimate.isRowsCapped,
     priceUsd: estimate.priceUsd,

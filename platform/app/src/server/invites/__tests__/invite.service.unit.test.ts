@@ -167,6 +167,9 @@ describe("InviteService", () => {
         update: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      // The acceptance claim and the revoke are SQL; the resend and extend
+      // claims still go through `updateMany`.
+      $executeRaw: vi.fn().mockResolvedValue(1),
       organization: {
         findFirst: vi.fn(),
       },
@@ -929,16 +932,15 @@ describe("InviteService", () => {
         expect(teamBinding!.scopeId).toBe("team-1");
 
         // Verify: invite was claimed ACCEPTED — a conditional update on the
-        // PENDING status, recording who accepted.
-        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({ status: "PENDING" }),
-            data: expect.objectContaining({
-              status: "ACCEPTED",
-              acceptedByUserId: "user-flow-1",
-            }),
-          }),
+        // PENDING status, recording who accepted. The claim binds the
+        // acceptor first.
+        const claims = mockPrisma.$executeRaw.mock.calls.filter(
+          ([statement]: [TemplateStringsArray]) =>
+            statement.join("?").includes("'ACCEPTED'"),
         );
+        expect(claims).toHaveLength(1);
+        expect(claims[0]?.[0].join("?")).toMatch(/"status" = 'PENDING'/);
+        expect(claims[0]?.[1]).toBe("user-flow-1");
       });
     });
   });
@@ -957,9 +959,7 @@ describe("InviteService", () => {
 
       beforeEach(() => {
         (mockPrisma as any).organizationUser = { createMany: vi.fn() };
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 1,
-        });
+        mockPrisma.$executeRaw.mockResolvedValue(1);
         // The writer is module-level and shared, so what the previous test
         // sent it would otherwise be counted as this one's.
         ledger.attachBindings.mockClear();
@@ -974,9 +974,9 @@ describe("InviteService", () => {
       describe("when it is applied", () => {
         it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
           const order: string[] = [];
-          mockPrisma.organizationInvite.updateMany.mockImplementation(() => {
+          mockPrisma.$executeRaw.mockImplementation(() => {
             order.push("accepted");
-            return Promise.resolve({ count: 1 });
+            return Promise.resolve(1);
           });
           ledger.attachBindings.mockImplementation(() => {
             order.push("granted");
