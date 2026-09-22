@@ -694,6 +694,26 @@ describe("handledErrorFromThrown, given a fault in our own code", () => {
     expect(parsed.code).not.toBe("network_error");
   });
 
+  /** @scenario "a Node error code is not a transport code" */
+  it("keeps a Node ERR_ code a program fault, since only the transport's own codes count", () => {
+    const badUrl = Object.assign(new TypeError("Invalid URL"), {
+      code: "ERR_INVALID_URL",
+      input: "app.langwatch.ai/api",
+    });
+
+    expect(handledErrorFromThrown(badUrl).code).toBe("internal_error");
+  });
+
+  it("reads undici's own codes as the transport speaking", () => {
+    const socket = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("other side closed"), {
+        code: "UND_ERR_SOCKET",
+      }),
+    });
+
+    expect(handledErrorFromThrown(socket).code).toBe("network_error");
+  });
+
   /** @scenario "a request that never landed is still a network failure" */
   it("leaves a plain Error with no status a network failure", () => {
     expect(handledErrorFromThrown(new Error("something went wrong")).code).toBe(

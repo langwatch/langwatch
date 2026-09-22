@@ -115,6 +115,14 @@ Feature: CLI error handling
       And the sentence alone was not read as evidence of a transport
 
     @unit
+    Scenario: a Node error code is not a transport code
+      Given a TypeError carries Node's own ERR_INVALID_URL, thrown while
+        building a URL from a scheme-less endpoint
+      When the failure is read into the CLI's error structure
+      Then the code is internal_error
+      And the shape of the code was not read as the transport speaking
+
+    @unit
     Scenario: a body that would not parse stays a network failure
       Given a proxy answered with an HTML page and reading it as JSON threw
       When the failure is read into the CLI's error structure

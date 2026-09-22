@@ -504,12 +504,49 @@ const PROGRAM_FAULT_NAMES = new Set([
 ]);
 
 /**
- * The shape of a code libuv, OpenSSL and undici put on a transport failure:
- * `ECONNREFUSED`, `ENOTFOUND`, `CERT_HAS_EXPIRED`, `UND_ERR_SOCKET`. Nothing
- * the CLI throws sets a SCREAMING_SNAKE `code` on an Error, so the shape is
- * the discriminant a message cannot be.
+ * The codes a transport failure arrives with, as libuv and OpenSSL spell them.
+ *
+ * A named set rather than a SCREAMING_SNAKE shape, because Node writes its own
+ * PROGRAM-fault codes in that same style: `new URL("/api/x", endpoint)` with a
+ * scheme-less endpoint throws `TypeError [ERR_INVALID_URL]`, and a shape match
+ * would file that bug as a dead socket with "check your connection" as the way
+ * out.
  */
-const TRANSPORT_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$|^E[A-Z0-9]{2,}$/;
+const TRANSPORT_CODES = new Set([
+  // libuv, the codes a socket, a DNS lookup or a connection carries.
+  "EADDRNOTAVAIL",
+  "EAI_AGAIN",
+  "ECANCELED",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTDOWN",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "EPROTO",
+  "ETIMEDOUT",
+  // OpenSSL, verifying the certificate the other end presented.
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+]);
+
+/**
+ * True for a code the transport put there. `UND_ERR_` is undici's own prefix
+ * (`UND_ERR_SOCKET`, `UND_ERR_CONNECT_TIMEOUT`), and every code under it names
+ * something that happened to the request rather than to our code.
+ */
+const isTransportCode = (code: unknown): boolean =>
+  typeof code === "string" &&
+  (TRANSPORT_CODES.has(code) || code.startsWith("UND_ERR_"));
 
 /**
  * Evidence that the throw came from the TRANSPORT rather than from our code.
@@ -530,8 +567,7 @@ const hasTransportEvidence = (error: unknown): boolean => {
     (candidate) =>
       typeof candidate?.syscall === "string" ||
       typeof candidate?.errno === "number" ||
-      (typeof candidate?.code === "string" &&
-        TRANSPORT_CODE.test(candidate.code)),
+      isTransportCode(candidate?.code),
   );
 };
 
@@ -814,14 +850,24 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
     };
   }
 
-  if (parsed.isHandled) return parsed;
-
   // No status and a program fault: the request is not what failed, so do not
-  // send the reader to their network. Still `isHandled: false`, because the
-  // code is ours and the platform named nothing.
+  // send the reader to their network. Read BEFORE the envelope, because the
+  // runtime hangs codes of its own on these throws — `new URL(path, endpoint)`
+  // with a scheme-less endpoint raises `TypeError [ERR_INVALID_URL]` — and a
+  // code Node chose is not a discriminant the platform chose. Still
+  // `isHandled: false`, and with no meta, because both are ours.
   if (status === 0 && isProgramFault(error)) {
-    return { ...parsed, code: "internal_error", kind: "internal_error", message };
+    return {
+      ...parsed,
+      code: "internal_error",
+      kind: "internal_error",
+      message,
+      meta: {},
+      isHandled: false,
+    };
   }
+
+  if (parsed.isHandled) return parsed;
 
   return { ...parsed, message };
 };
