@@ -23,8 +23,22 @@ vi.mock("../codexGatewayModel", () => ({
     codexHandleMock(...(args as [])),
 }));
 
+const logInfoMock = vi.fn();
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    info: (...args: unknown[]) => logInfoMock(...args),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 import { CONNECTION_TEST_FEATURE_KEY } from "../codexRestrictions";
-import { pingModelOf, pingModelProvider } from "../providerPing";
+import {
+  pingModelOf,
+  pingModelProvider,
+  UNPINGABLE_CREDENTIALS,
+} from "../providerPing";
 import type { MaybeStoredModelProvider } from "../registry";
 
 const row = (
@@ -58,6 +72,7 @@ beforeEach(() => {
   generateTextMock.mockResolvedValue({ text: "ok" });
   nlpgoHandleMock.mockClear();
   codexHandleMock.mockClear();
+  logInfoMock.mockClear();
 });
 
 describe("given a chat provider", () => {
@@ -67,6 +82,25 @@ describe("given a chat provider", () => {
       const model = pingModelOf(row());
       expect(model).toBeTruthy();
       expect(model).not.toContain("/");
+    });
+
+    // A materialised row lists its models the way the pickers spell them,
+    // without the provider prefix the catalogue keys its entries by. Matching
+    // the two spellings against each other dropped every catalogue model and
+    // left the ping with nothing to send.
+    it("matches the bare model ids a row actually stores", () => {
+      expect(pingModelOf(row({ models: ["gpt-5-mini"] }))).toBe("gpt-5-mini");
+    });
+
+    it("matches a prefixed id too, for a row written the catalogue's way", () => {
+      expect(pingModelOf(row({ models: ["openai/gpt-5-mini"] }))).toBe(
+        "gpt-5-mini",
+      );
+    });
+
+    it("picks the cheapest of the models the row names", () => {
+      const model = pingModelOf(row({ models: ["gpt-5", "gpt-5-nano"] }));
+      expect(model).toBe("gpt-5-nano");
     });
 
     it("falls to the row's own custom model when the catalogue knows none", () => {
@@ -156,6 +190,32 @@ describe("given a chat provider", () => {
       expect(refusedCode(result)).toBe("provider_key_invalid");
       expect(JSON.stringify(result)).not.toContain("sk-secret-key");
     });
+
+    // The refusal body is the provider's own prose, and OpenAI answers a
+    // rejected key by quoting it back. The credential reaching the row from
+    // the host environment is not in `customKeys` to redact against, so the
+    // body never leaves this module at all.
+    it("logs the class of the refusal and never the provider's words", async () => {
+      generateTextMock.mockRejectedValue(
+        apiError({
+          statusCode: 401,
+          body: "Incorrect API key provided: sk-secret-key",
+        }),
+      );
+      await pingModelProvider({
+        modelProvider: row({ customKeys: {} }),
+        projectId: "project-1",
+      });
+      expect(logInfoMock).toHaveBeenCalledWith(
+        { provider: "openai", status: 401, classifiedAs: "auth" },
+        // The message carries the cause because the collector ships `msg` and
+        // drops the fields beside it.
+        "Connection ping refused (provider openai, as auth, HTTP 401, thrown as Error)",
+      );
+      expect(JSON.stringify(logInfoMock.mock.calls)).not.toContain(
+        "sk-secret-key",
+      );
+    });
   });
 
   describe("when the provider refuses for a reason we cannot place", () => {
@@ -199,6 +259,19 @@ describe("given the Codex provider, which has no listing endpoint", () => {
 });
 
 describe("given a row that cannot be pinged", () => {
+  describe("when the credential probe could not read a credential", () => {
+    /** @scenario "A row whose credential could not be read is not pinged" */
+    it("names both outcomes the caller must stop at", () => {
+      // The runtime falls back to the host environment key for a row that
+      // carries none, so a generation on either of these answers for a
+      // credential the row does not hold.
+      expect([...UNPINGABLE_CREDENTIALS].sort()).toEqual([
+        "credential_masked",
+        "no_credential",
+      ]);
+    });
+  });
+
   describe("when there is no project to run it in", () => {
     it("answers nothing, so the credential probe's verdict stands", async () => {
       expect(

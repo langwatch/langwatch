@@ -309,11 +309,14 @@ describe("given the classifier is configured", () => {
       expect(d.routeWithModel).toHaveBeenCalledWith(
         expect.objectContaining({ isInstantEvalAvailable: false }),
       );
+      // The phrase is what the model settles on once the closed route is off
+      // the table, so it is still the model's decision. Production never even
+      // reaches this guard: the decision reader downgrades a judgement answer
+      // to `free_text` before the router sees it.
       expect(result).toEqual({
         kind: "free_text",
         query: '"annoyed users"',
-        decidedBy: "fallback",
-        fellBackFrom: "instant_eval",
+        decidedBy: "model",
       });
     });
 

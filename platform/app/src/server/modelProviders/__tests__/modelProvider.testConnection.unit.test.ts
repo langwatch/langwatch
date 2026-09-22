@@ -23,6 +23,10 @@ vi.mock("../providerValidation", () => ({
 const pingMock = vi.fn(async () => null as unknown);
 vi.mock("../providerPing", () => ({
   pingModelProvider: (...args: unknown[]) => pingMock(...(args as [])),
+  // Spelled out rather than imported: the real module pulls the AI SDK and
+  // the gateway handle in behind it, which is why it is stubbed here at all.
+  // providerPing.unit.test.ts is what holds the list itself to its meaning.
+  UNPINGABLE_CREDENTIALS: ["no_credential", "credential_masked"],
 }));
 
 vi.mock("../../rateLimit", () => ({
@@ -45,13 +49,26 @@ import {
 import { ModelProviderService } from "../modelProvider.service";
 
 const ORGANIZATION_ID = "org_acme";
+const PROJECT_ID = "project_acme";
 
 const ctx = {
   prisma: {} as any,
   session: { user: { id: "u_1" } } as any,
 };
 
-const service = () => ModelProviderService.create({} as any);
+/**
+ * The project the row is tested from, as Prisma hands it back.
+ *
+ * A project-scoped test resolves the organization from it and materialises
+ * the row against it, so the ping runs on the real row-materialisation path
+ * rather than on a stub standing in for it.
+ */
+const projectFindUniqueMock = vi.fn();
+
+const service = () =>
+  ModelProviderService.create({
+    project: { findUnique: projectFindUniqueMock },
+  } as any);
 
 const orgScopedRow = (overrides: Record<string, unknown> = {}) => ({
   id: "mp_1",
@@ -74,6 +91,12 @@ const budgetAvailable = () =>
   });
 
 beforeEach(() => {
+  projectFindUniqueMock.mockReset();
+  projectFindUniqueMock.mockResolvedValue({
+    id: PROJECT_ID,
+    createdAt: new Date("2020-01-01T00:00:00Z"),
+    team: { organizationId: ORGANIZATION_ID },
+  });
   findByIdForOrganizationMock.mockReset();
   findByProviderMock.mockReset();
   validateProviderApiKeyMock.mockReset();
@@ -159,7 +182,7 @@ describe("testConnection", () => {
       });
 
       const result = await service().testConnection({
-        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        input: { modelProviderId: "mp_1", projectId: PROJECT_ID },
         ctx,
       });
 
@@ -169,6 +192,27 @@ describe("testConnection", () => {
         outcome: "refused",
         domainError: { code: "provider_out_of_credit" },
       });
+    });
+
+    /** @scenario "A chat provider is proven by a generation, not by a listing" */
+    it("pings the row the reader asked about, materialised for the runtime", async () => {
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+
+      await service().testConnection({
+        input: { modelProviderId: "mp_1", projectId: PROJECT_ID },
+        ctx,
+      });
+
+      // The row, not whatever a provider-key lookup would collapse to: with
+      // an org row and a project override in play those are two different
+      // credentials. Its catalogue models come from the materialisation, so
+      // the ping has a model to name.
+      const [args] = pingMock.mock.calls[0] as [
+        { modelProvider: { id: string; models: string[] }; projectId: string },
+      ];
+      expect(args.projectId).toBe(PROJECT_ID);
+      expect(args.modelProvider.id).toBe("mp_1");
+      expect(args.modelProvider.models.length).toBeGreaterThan(0);
     });
 
     /** @scenario "Testing an organization-scoped provider reaches its credential" */
@@ -311,6 +355,30 @@ describe("testConnection", () => {
       });
 
       expect(result.outcome).toBe("unchecked");
+    });
+
+    /** @scenario "A row whose credential could not be read is not pinged" */
+    it.each([
+      "no_credential",
+      "credential_masked",
+    ])("sends no generation when the probe reported %s", async (reason) => {
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+      validateProviderApiKeyMock.mockResolvedValueOnce({
+        outcome: "unchecked",
+        valid: true,
+        reason,
+      });
+
+      const result = await service().testConnection({
+        input: { modelProviderId: "mp_1", projectId: PROJECT_ID },
+        ctx,
+      });
+
+      // The runtime falls back to the host environment key for a row that
+      // carries none, so a generation here would report the row as working
+      // on a credential it does not hold.
+      expect(pingMock).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ outcome: "unchecked", reason });
     });
   });
 });

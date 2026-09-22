@@ -30,6 +30,7 @@ import {
   ProviderKeyInvalidError,
   ProviderRefusedError,
   ProviderUnreachableError,
+  type UncheckedReason,
   type ValidationResult,
 } from "./providerValidation";
 import type { MaybeStoredModelProvider } from "./registry";
@@ -42,6 +43,20 @@ const PING_BUDGET_MS = 20_000;
 
 /** The prompt. Short on purpose: this is a heartbeat, not a conversation. */
 const PING_PROMPT = "ping";
+
+/**
+ * The credential-probe outcomes a ping must not run after.
+ *
+ * Both mean the row's own credential could not be read, and the runtime falls
+ * back to the host environment key for a row that carries none. A generation
+ * would then answer for a credential this row does not hold and report the
+ * row as working, which is the exact confusion the third verdict exists to
+ * prevent.
+ */
+export const UNPINGABLE_CREDENTIALS: readonly UncheckedReason[] = [
+  "no_credential",
+  "credential_masked",
+];
 
 /** The account behind the credential cannot pay for a call. */
 export class ProviderOutOfCreditError extends HandledError {
@@ -67,6 +82,11 @@ export class ProviderUsageLimitError extends HandledError {
   }
 }
 
+/** A catalogue id without its provider prefix, the way a row spells it. */
+function bareModelId(id: string): string {
+  return id.split("/").slice(1).join("/");
+}
+
 /**
  * The model a ping runs.
  *
@@ -76,11 +96,6 @@ export class ProviderUsageLimitError extends HandledError {
  * first chat model the row itself names. Null when neither has one, which is
  * the one case that reports back as unchecked.
  */
-/** A catalogue id without its provider prefix, the way a row spells it. */
-function bareModelId(id: string): string {
-  return id.split("/").slice(1).join("/");
-}
-
 export function pingModelOf(
   modelProvider: MaybeStoredModelProvider,
 ): string | null {
@@ -163,6 +178,35 @@ function readFailure(error: unknown): {
 }
 
 /**
+ * The cause, in the log message itself.
+ *
+ * The log collector ships the `msg` field and drops everything beside it, so
+ * a cause carried only in structured fields never leaves the cluster. What
+ * goes in is the provider, the class of refusal, the HTTP status and the name
+ * the SDK threw under. The provider's own prose stays out: it is the one part
+ * of a refusal that can carry a key fragment.
+ */
+function describeRefusal({
+  provider,
+  error,
+  status,
+  classified,
+}: {
+  provider: string;
+  error: unknown;
+  status: number | undefined;
+  classified: string;
+}): string {
+  const name = error instanceof Error && error.name ? error.name : typeof error;
+  return [
+    `provider ${provider}`,
+    `as ${classified}`,
+    status === undefined ? "no HTTP status" : `HTTP ${status}`,
+    `thrown as ${name}`,
+  ].join(", ");
+}
+
+/**
  * The verdict a failed ping gives.
  *
  * Every branch answers a different thing the reader has to do: add credit,
@@ -187,7 +231,7 @@ function verdictOf({
       : classify({ status, body });
   logger.info(
     { provider, status, classifiedAs: classified },
-    "provider refused a connection ping",
+    `Connection ping refused (${describeRefusal({ provider, error, status, classified })})`,
   );
   if (classified === "unreachable") {
     return {

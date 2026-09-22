@@ -64,6 +64,54 @@ function interpretation(notice: {
 }
 
 /**
+ * Why no model shaped the search, and the way to fix that.
+ *
+ * Dismissible, and dismissed per project, so it is mounted under the
+ * project's own key: the remount is what re-reads storage for the project
+ * now on screen rather than leaving the previous one's answer in state.
+ */
+const ModelTroubleHint: React.FC<{
+  projectId: string;
+  modelTrouble: ModelTrouble;
+}> = ({ projectId, modelTrouble }) => {
+  const [isDismissed, setIsDismissed] = useState(() =>
+    readDismissed(projectId),
+  );
+  const dismiss = useCallback(() => {
+    setIsDismissed(true);
+    writeDismissed(projectId);
+  }, [projectId]);
+
+  if (isDismissed) return null;
+
+  return (
+    <HStack gap={2} paddingLeft={5}>
+      <Text textStyle="xs" color="fg.muted" flex={1}>
+        {HINT[modelTrouble]}
+      </Text>
+      <NextLink
+        href={MODEL_PROVIDERS_HREF}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Button size="2xs" variant="outline">
+          Configure models
+        </Button>
+      </NextLink>
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        color="fg.muted"
+        aria-label="Dismiss"
+        onClick={dismiss}
+      >
+        <X size={11} />
+      </IconButton>
+    </HStack>
+  );
+};
+
+/**
  * The strip under the bar after a search ran without the model that shapes
  * it.
  *
@@ -79,14 +127,6 @@ export const SearchFallbackNotice: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const queryText = useExplorerStore((s) => s.queryText);
   const notice = useExplorerStore((s) => s.searchNotice);
-  const [isDismissed, setIsDismissed] = useState(() =>
-    readDismissed(project?.id),
-  );
-
-  const dismiss = useCallback(() => {
-    setIsDismissed(true);
-    if (project?.id) writeDismissed(project.id);
-  }, [project?.id]);
 
   if (
     !notice ||
@@ -113,31 +153,11 @@ export const SearchFallbackNotice: React.FC = () => {
           {interpretation(notice)}
         </Text>
       </HStack>
-      {!isDismissed && (
-        <HStack gap={2} paddingLeft={5}>
-          <Text textStyle="xs" color="fg.muted" flex={1}>
-            {HINT[notice.modelTrouble]}
-          </Text>
-          <NextLink
-            href={MODEL_PROVIDERS_HREF}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button size="2xs" variant="outline">
-              Configure models
-            </Button>
-          </NextLink>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            aria-label="Dismiss"
-            onClick={dismiss}
-          >
-            <X size={11} />
-          </IconButton>
-        </HStack>
-      )}
+      <ModelTroubleHint
+        key={notice.projectId}
+        projectId={notice.projectId}
+        modelTrouble={notice.modelTrouble}
+      />
     </VStack>
   );
 };

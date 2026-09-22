@@ -36,7 +36,7 @@ import {
   type ModelProviderWithScopes,
   type ScopeInput,
 } from "./modelProvider.repository";
-import { pingModelProvider } from "./providerPing";
+import { pingModelProvider, UNPINGABLE_CREDENTIALS } from "./providerPing";
 import {
   type ValidationResult,
   validateProviderApiKey,
@@ -1353,8 +1353,20 @@ export class ModelProviderService {
       customKeys,
     );
     // A refused credential is the end of it: the provider has already said the
-    // key is wrong, and spending a generation to hear it again helps nobody.
+    // key is wrong, and spending a generation to hear it again tells us the
+    // same thing twice.
     if (credential.outcome === "refused") return credential;
+
+    // So is a row whose credential could not be read. The runtime falls back
+    // to the host environment key when a row carries none, so a generation
+    // here would pass on a credential this row does not hold and report the
+    // row as working. "We could not check this" is the true answer.
+    if (
+      credential.outcome === "unchecked" &&
+      UNPINGABLE_CREDENTIALS.includes(credential.reason)
+    ) {
+      return credential;
+    }
 
     // Everything else gets the real call. A listing that answered proves the
     // key reaches the vendor and nothing about whether the account can

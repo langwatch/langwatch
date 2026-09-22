@@ -499,6 +499,16 @@ Feature: Credential Validation
     Then no generation is sent
     And the verdict is whatever the credential probe said
 
+  # The runtime falls back to the host environment key for a row that carries
+  # none, so a generation on such a row would answer for a credential the row
+  # does not hold and report it as working.
+  @unit
+  Scenario: A row whose credential could not be read is not pinged
+    Given I have a provider row with no readable credential of its own
+    When I test the connection
+    Then no generation is sent
+    And I am told the connection could not be checked
+
   @unit
   Scenario: Testing an organization-scoped provider reaches its credential
     Given I have a provider configured at the organization scope
