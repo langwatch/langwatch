@@ -59,3 +59,11 @@ export const SSO_ANSWER_BY_POLICY: Record<SsoArrivalPolicy, ArrivalAnswer> = {
   request: "approve",
   admit: "open",
 };
+
+/**
+ * What a control hands back is a string, and a door is never widened by one
+ * we do not recognise: a caller that cannot narrow leaves its answer alone.
+ */
+export function isSsoArrivalPolicy(value: string | null | undefined): value is SsoArrivalPolicy {
+  return value === "refuse" || value === "request" || value === "admit";
+}

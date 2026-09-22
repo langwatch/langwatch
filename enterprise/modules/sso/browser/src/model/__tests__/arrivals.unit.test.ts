@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isSsoArrivalPolicy,
   ARRIVAL_ANSWERS,
   ARRIVAL_COPY,
   arrivalAnswerLabel,
@@ -55,5 +56,23 @@ describe("given the connection door's own three-valued policy", () => {
       expect(SSO_POLICY_BY_ANSWER.approve).toBe("request");
       expect(SSO_ANSWER_BY_POLICY.request).toBe("approve");
     });
+  });
+});
+
+describe("given a value a control handed back", () => {
+  it("recognises each of the three answers the connection door takes", () => {
+    for (const answer of ARRIVAL_ANSWERS) {
+      expect(isSsoArrivalPolicy(SSO_POLICY_BY_ANSWER[answer])).toBe(true);
+    }
+  });
+
+  // The narrowing replaced a cast that defaulted an unreadable value to
+  // "admit" — the one answer that lets a stranger in without being asked.
+  it("recognises nothing else, so an unreadable answer never widens a door", () => {
+    expect(isSsoArrivalPolicy(null)).toBe(false);
+    expect(isSsoArrivalPolicy(undefined)).toBe(false);
+    expect(isSsoArrivalPolicy("")).toBe(false);
+    expect(isSsoArrivalPolicy("ADMIT")).toBe(false);
+    expect(isSsoArrivalPolicy("allow")).toBe(false);
   });
 });
