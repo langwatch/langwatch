@@ -58,6 +58,7 @@ class StubAuthzGrantsService extends AuthzGrantsService {
     Promise.reject(new Error("unused")),
   );
   revokeBindings = vi.fn((_args: AuthzRevokeBindingsInput) => Promise.resolve());
+  retireDirectoryGrants = vi.fn(() => Promise.resolve(0));
   revokeBindingsWhere = vi.fn((_args: AuthzRevokeBindingsWhereInput) =>
     Promise.reject(new Error("unused")),
   );

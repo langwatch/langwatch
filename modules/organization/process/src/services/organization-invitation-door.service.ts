@@ -17,6 +17,7 @@ import {
   type OrganizationInviteCreated,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
+  type OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
 
 import type {
@@ -125,6 +126,16 @@ export class OrganizationInvitationDoorService {
 
   async list(input: Readonly<{ organizationId: string }>): Promise<OrganizationListedInvite[]> {
     return [...(await this.deps.invitations.list(input))];
+  }
+
+  /**
+   * Applies the PENDING invitation an arriving address already holds, for a
+   * caller that never saw an invitation code: the address IS the match.
+   */
+  applyPending(
+    input: Readonly<{ userId: string; organizationId: string; email: string }>,
+  ): Promise<OrganizationPendingInviteApplied> {
+    return this.deps.invitations.applyPending(input);
   }
 
   /**

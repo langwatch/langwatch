@@ -939,7 +939,7 @@ model JoinRequest {
   domain            String
   /// PENDING | APPROVED | REJECTED | EXPIRED | WITHDRAWN
   state             String
-  /// How the domain was matched; `verified-identifier-domain` today.
+  /// How the domain was matched: `verified-identifier-domain` or `sso-connection-domain`.
   matchedVia        String
   /// While PENDING: when the day-14 wake lapses it. Null once resolved.
   expiresAt         DateTime?

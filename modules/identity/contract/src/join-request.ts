@@ -36,11 +36,11 @@ export const joinResolverSchema = z.object({
 export type JoinResolver = z.infer<typeof joinResolverSchema>;
 
 /**
- * How the requester's domain was matched. One value today; the field exists
- * because a second rule (a claimed-and-verified connection domain, say) would
- * otherwise be indistinguishable on the audit page from this one.
+ * How the requester's domain was matched: an address they proved is theirs,
+ * or a domain the connection they signed in through proved is its. The two
+ * are different authorities and the audit page says which decided.
  */
-export const JOIN_MATCH_KINDS = ["verified-identifier-domain"] as const;
+export const JOIN_MATCH_KINDS = ["verified-identifier-domain", "sso-connection-domain"] as const;
 export const joinMatchKindSchema = z.enum(JOIN_MATCH_KINDS);
 export type JoinMatchKind = z.infer<typeof joinMatchKindSchema>;
 

@@ -354,6 +354,17 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
   }) => Promise<MemberTeamBinding[]>;
 
+  /**
+   * Makes somebody a MEMBER, carrying the grant intent an unfinished
+   * admission is resumed from (ADR-129). A row that is already there is
+   * `"already-present"` — a concurrent callback or a retry, not a failure.
+   */
+  abstract createMembership: (input: {
+    organizationId: string;
+    userId: string;
+    pendingAdmissionId: string;
+  }) => Promise<"created" | "already-present">;
+
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;

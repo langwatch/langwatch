@@ -1,6 +1,11 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
+import type {
+  AuthzAdmissionScope,
+  AuthzPendingAdmissionRead,
+  AuthzResolveAdmissionInput,
+} from "./authz.admission.ts";
 import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
 import type * as Queries from "./authz.queries.ts";
@@ -143,6 +148,14 @@ export interface AuthzApi {
   revokeBindingsWhere(
     args: Commands.AuthzRevokeBindingsWhereInput,
   ): Promise<Commands.AuthzRevokeBindingsWhereOutput>;
+  /**
+   * Retires the grants the directory itself wrote at the organization scope
+   * for these people, leaving an administrator's own grant at the same scope
+   * where it is. Answers how many it retired.
+   */
+  retireDirectoryGrants(
+    args: Commands.AuthzRetireDirectoryGrantsInput,
+  ): Promise<Commands.AuthzRetireDirectoryGrantsOutput>;
   offboardMember(
     args: Commands.AuthzOffboardMemberInput,
   ): Promise<Commands.AuthzOffboardMemberOutput>;
@@ -156,6 +169,16 @@ export interface AuthzApi {
   applyMemberBindings(
     args: Binding.AuthzApplyMemberBindingsInput,
   ): Promise<Binding.AuthzBindingMutationSuccess>;
+  /**
+   * Where this membership's automatic admission stands. The marker is minted
+   * with the membership row so a process that stopped before the grant landed
+   * still has a retry signal; the state is read off the ledger.
+   */
+  readPendingAdmission(args: AuthzAdmissionScope): Promise<AuthzPendingAdmissionRead>;
+  /** Clears the marker once the grant is confirmed. False means it no longer applied. */
+  completeAdmission(args: AuthzResolveAdmissionInput): Promise<boolean>;
+  /** Clears a revoked marker without treating the admission as successful. */
+  clearPendingAdmission(args: AuthzResolveAdmissionInput): Promise<boolean>;
   hasProjectPermission(input: {
     userId: string;
     projectId: string;

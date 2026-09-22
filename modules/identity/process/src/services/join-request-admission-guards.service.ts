@@ -106,22 +106,47 @@ export class JoinRequestAdmissionGuardsService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    const secondsLeft = await this.coolDownSecondsLeft({ userId, organizationId });
+    if (secondsLeft === 0) {
+      return;
+    }
+
+    // The throttle code, not a rejection code: see the cool-down constant.
+    throw new JoinRequestThrottledError(secondsLeft);
+  }
+
+  /**
+   * The same cool-down, answered rather than refused. An arrival through a
+   * connection makes a request because an account row appeared, not because
+   * anybody clicked, and no caller there is waiting for a reason.
+   */
+  async isInCoolDown(args: { userId: string; organizationId: string }): Promise<boolean> {
+    return (await this.coolDownSecondsLeft(args)) > 0;
+  }
+
+  /** How long a rejected person still waits, or zero when they do not. */
+  private async coolDownSecondsLeft({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<number> {
     const rejectedAt = await this.deps.reads.tryFindLastRejectionAt({
       userId,
       organizationId,
     });
     if (!rejectedAt) {
-      return;
+      return 0;
     }
 
     const clearsAt = rejectedAt.epochMilliseconds + JOIN_REJECTION_COOLDOWN_MS;
     const now = this.now();
     if (now >= clearsAt) {
-      return;
+      return 0;
     }
 
-    // The throttle code, not a rejection code: see the cool-down constant.
-    throw new JoinRequestThrottledError(Math.ceil((clearsAt - now) / 1000));
+    return Math.ceil((clearsAt - now) / 1000);
   }
 
   /**

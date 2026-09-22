@@ -25,6 +25,8 @@ import {
   type AuthzOffboardInput,
   type AuthzOffboardOutput,
   type AuthzReplaceGrantInput,
+  type AuthzRetireDirectoryGrantsInput,
+  type AuthzRetireDirectoryGrantsOutput,
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
   type AuthzRevokeBindingsWhereOutput,
@@ -294,6 +296,34 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     args: AuthzRevokeBindingsWhereInput,
   ): Promise<AuthzRevokeBindingsWhereOutput> {
     return this.options.ledger.revokeBindingsWhere(args);
+  }
+
+  /**
+   * The directory's own organization-scoped grants for these people, taken
+   * back in one revocation: group membership supplies their access now. An
+   * administrator's own grant at the same scope carries another source.
+   */
+  async retireDirectoryGrants({
+    organizationId,
+    userIds,
+    actor,
+    reason,
+  }: AuthzRetireDirectoryGrantsInput): Promise<AuthzRetireDirectoryGrantsOutput> {
+    if (userIds.length === 0) return 0;
+
+    const bindingIds = await this.options.repository.findDirectoryOrganizationGrantIds({
+      organizationId,
+      userIds,
+    });
+    if (bindingIds.length === 0) return 0;
+
+    await this.options.ledger.revokeBindings({
+      organizationId,
+      bindingIds,
+      actor,
+      ...(reason ? { reason } : {}),
+    });
+    return bindingIds.length;
   }
 
   async offboardMember(args: AuthzOffboardMemberInput): Promise<void> {

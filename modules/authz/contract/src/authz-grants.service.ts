@@ -27,6 +27,8 @@ import type {
   AuthzRevokeBindingsInput,
   AuthzRevokeBindingsOutput,
   AuthzRevokeBindingsWhereInput,
+  AuthzRetireDirectoryGrantsInput,
+  AuthzRetireDirectoryGrantsOutput,
   AuthzRevokeBindingsWhereOutput,
   AuthzRevokeGrantInput,
   AuthzRevokeResourceGrantsInput,
@@ -74,6 +76,10 @@ export abstract class AuthzGrantsService {
   abstract revokeBindingsWhere(
     args: AuthzRevokeBindingsWhereInput,
   ): Promise<AuthzRevokeBindingsWhereOutput>;
+
+  abstract retireDirectoryGrants(
+    args: AuthzRetireDirectoryGrantsInput,
+  ): Promise<AuthzRetireDirectoryGrantsOutput>;
 
   abstract offboardMember(args: AuthzOffboardMemberInput): Promise<AuthzOffboardMemberOutput>;
 

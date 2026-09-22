@@ -280,6 +280,30 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     );
   }
 
+  async findDirectoryOrganizationGrantIds({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+
+    const rows = await this.options.database.grant.findMany({
+      where: {
+        organizationId,
+        principalType: "USER",
+        principalId: { in: [...userIds] },
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        source: "scim",
+        revokedAt: null,
+      },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async offboardUser({
     userId,
     organizationId,

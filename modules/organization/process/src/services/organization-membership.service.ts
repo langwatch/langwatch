@@ -1,4 +1,4 @@
-import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import { newAuthzBindingId, type AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
@@ -394,12 +394,19 @@ export class OrganizationMembershipService {
     });
   }
 
-  /**
-   * Refuses when taking this member out would leave the organization with no
-   * administrator who can sign in — the one lockout nothing inside the
-   * product can undo. Asked by a caller whose own path writes the membership
-   * row (a directory deprovision), so the rule is stated once, here.
-   */
+  /** Makes somebody a MEMBER, minting the grant intent an unfinished
+   *  admission is resumed from into the same row, in the ledger's own
+   *  scheme because the intent's identity is the ledger's (ADR-129). */
+  async createMembership(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    return this.repo.createMembership({ ...params, pendingAdmissionId: newAuthzBindingId() });
+  }
+
+  /** Refuses when taking this member out would leave the organization with no
+   *  administrator who can sign in — the one lockout nothing inside the product
+   *  can undo. Asked by callers whose own path writes the membership row. */
   async assertRemovalKeepsAnAdministrator(params: {
     organizationId: string;
     userId: string;

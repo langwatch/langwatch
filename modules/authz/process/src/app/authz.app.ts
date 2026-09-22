@@ -24,6 +24,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
+import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { KsuidAuthzBindingIdAdapter } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import { EventingAuthzCommandDispatcherAdapter } from "../services/authz-grants-command-dispatcher.service.ts";
@@ -86,6 +87,11 @@ export class AuthzApp implements AuthzApi {
   #pipeline: AuthzPipeline | undefined;
   #demoProjectId: string | undefined;
   #demoProjectUserId: string | undefined;
+  /**
+   * Absent on an app built by {@link AuthzApp.fromServices}, which composes
+   * no repositories; the three admission verbs refuse by name there.
+   */
+  #admissions: AuthzAdmissionService | undefined;
 
   private constructor(
     permissions: AuthzService,
@@ -93,6 +99,7 @@ export class AuthzApp implements AuthzApi {
     options: Readonly<{
       demoProjectId?: string | undefined;
       demoProjectUserId?: string | undefined;
+      admissions?: AuthzAdmissionService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: EventingAuthzCommandDispatcherAdapter;
@@ -105,6 +112,7 @@ export class AuthzApp implements AuthzApi {
     this.#dispatcher = options.eventing?.dispatcher;
     this.#demoProjectId = options.demoProjectId;
     this.#demoProjectUserId = options.demoProjectUserId;
+    this.#admissions = options.admissions;
   }
 
   /**
@@ -141,7 +149,8 @@ export class AuthzApp implements AuthzApi {
     }).build();
     return new AuthzApp(built.authz, built.grants, {
       demoProjectId: config.demoProjectId(),
-      demoProjectUserId: config.demoProjectUserId,
+      demoProjectUserId: setup.config.demoProjectUserId,
+      admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -242,6 +251,12 @@ export class AuthzApp implements AuthzApi {
   isOnEngine: AuthzApi["isOnEngine"] = (a) => this.#permissions.isOnEngine(a);
   findEngineCutoverAt: AuthzApi["findEngineCutoverAt"] = (a) =>
     this.#permissions.findEngineCutoverAt(a);
+  readPendingAdmission: AuthzApi["readPendingAdmission"] = (a) =>
+    this.admissions().readPendingAdmission(a);
+  completeAdmission: AuthzApi["completeAdmission"] = (a) => this.admissions().completeAdmission(a);
+  clearPendingAdmission: AuthzApi["clearPendingAdmission"] = (a) =>
+    this.admissions().clearPendingAdmission(a);
+
   hasProjectPermission(a: { userId: string; projectId: string; permission: AuthzPermission }) {
     return this.#permissions.hasPermission(a);
   }
@@ -265,6 +280,8 @@ export class AuthzApp implements AuthzApi {
   changeBindingRole: AuthzApi["changeBindingRole"] = (a) => this.#grants.changeBindingRole(a);
   revokeBindings: AuthzApi["revokeBindings"] = (a) => this.#grants.revokeBindings(a);
   revokeBindingsWhere: AuthzApi["revokeBindingsWhere"] = (a) => this.#grants.revokeBindingsWhere(a);
+  retireDirectoryGrants: AuthzApi["retireDirectoryGrants"] = (a) =>
+    this.#grants.retireDirectoryGrants(a);
   offboardMember: AuthzApi["offboardMember"] = (a) => this.#grants.offboardMember(a);
   defineRole: AuthzApi["defineRole"] = (a) => this.#grants.defineRole(a);
   deleteRole: AuthzApi["deleteRole"] = (a) => this.#grants.deleteRole(a);
@@ -272,6 +289,16 @@ export class AuthzApp implements AuthzApi {
   updateBinding: AuthzApi["updateBinding"] = (a) => this.#grants.updateBinding(a);
   deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
+
+  private admissions(): AuthzAdmissionService {
+    if (!this.#admissions) {
+      throw new Error(
+        "This AuthzApp was composed from already-built services, so it holds no admission " +
+          "repository: compose it through AuthzApp.create to read or clear an admission.",
+      );
+    }
+    return this.#admissions;
+  }
 }
 
 function authzRuntimeConfig(config: AuthzServerConfig): {

@@ -657,3 +657,147 @@ export class SsoBreakGlassLastWayInError extends SsoConnectionCommandRefusedErro
     this.name = "SsoBreakGlassLastWayInError";
   }
 }
+
+/**
+ * The refusals the sign-in gate answers an assertion with. A cause is NAMED
+ * when it is a fact about the caller's own assertion or configuration; it
+ * stays opaque when naming it would say what exists here (ADR-117 §5).
+ */
+export abstract class SsoAssertionRefusedError extends HandledError {}
+
+/**
+ * The general refusal: we will not say which cause fired. Deliberately NOT
+ * `identity_sign_in_refused`, which is the CREDENTIAL refusal and has to keep
+ * meaning "that email or password is wrong" for exactly one thing.
+ */
+export class SsoSignInRefusedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_sign_in_refused", "sso_sign_in_refused", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSignInRefusedError";
+  }
+}
+
+/**
+ * The provider authenticated somebody and released no email address — the
+ * most common enterprise misconfiguration there is, and a fact about their
+ * own application rather than about ours.
+ */
+export class SsoAssertionWithoutAddressError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_assertion_without_address", "sso_assertion_without_address", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoAssertionWithoutAddressError";
+  }
+}
+
+/**
+ * The connection is not live and the address asserted is not the
+ * registrant's. Named for the ADDRESS, not the state: setup tells this
+ * administrator to sign in, so naming the state misdirects the one who can act.
+ */
+export class SsoSetupAddressMismatchError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_setup_address_mismatch", "sso_setup_address_mismatch", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSetupAddressMismatchError";
+  }
+}
+
+/**
+ * A live connection asserted an address on a domain it never proved. The
+ * proof is the entire basis for trusting the provider's `email_verified`; the
+ * remedy is a claim and a published record.
+ */
+export class SsoDomainNotVerifiedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_not_verified", "sso_domain_not_verified", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainNotVerifiedError";
+  }
+}
+
+/**
+ * The domain's record stayed missing through its grace window and this person
+ * is not already bound to the connection (ADR-123). Worth saying rather than
+ * leaving them to guess why a colleague can sign in and they cannot.
+ */
+export class SsoDomainProofLapsedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_lapsed", "sso_domain_proof_lapsed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofLapsedError";
+  }
+}
+
+/**
+ * A registration that named a protocol and then left out what that protocol
+ * cannot work without. Refused at COMMAND time, before a fact is written.
+ */
+export class SsoCredentialsRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_credentials_required", "sso_credentials_required", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoCredentialsRequiredError";
+  }
+}
+
+/**
+ * The issuer an administrator typed did not answer as one. `fault` is the
+ * customer's deliberately: the address is theirs and so is the fix, even
+ * though the failure happened on somebody else's server.
+ */
+export class SsoIssuerUnreachableError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_issuer_unreachable", "sso_issuer_unreachable", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoIssuerUnreachableError";
+  }
+}
+
+/** The document pasted in is not an identity provider descriptor, or carries
+ *  no signing certificate to trust assertions against. */
+export class SsoSamlMetadataInvalidError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_saml_metadata_invalid", "sso_saml_metadata_invalid", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSamlMetadataInvalidError";
+  }
+}
+
+/** The signing certificate's bytes could not be read. Says nothing about
+ *  whether the key inside signs anything — only a sign-in answers that. */
+export class SsoCertificateInvalidError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_certificate_invalid", "sso_certificate_invalid", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoCertificateInvalidError";
+  }
+}

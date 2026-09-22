@@ -71,6 +71,7 @@ function makeRepository(overrides: Partial<RepositoryStub> = {}): RepositoryStub
       await prove(makeReader());
       return OFFBOARD_COUNTS;
     }),
+    findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue([]),
     findOwnedApiKeys: vi.fn().mockResolvedValue([]),
     findPersonalTeams: vi.fn().mockResolvedValue([]),
     ...overrides,
@@ -880,6 +881,58 @@ describe("AuthzGrantsService compatibility operations", () => {
     for (const operation of Object.values(ledger)) {
       expect(operation).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("AuthzGrantsService.retireDirectoryGrants", () => {
+  const retire = {
+    organizationId: ORG,
+    userIds: ["alice", "bob"],
+    actor: { type: "user", id: "admin-1" },
+    reason: "directory access is supplied by group membership",
+  } as const;
+
+  it("revokes exactly the grants the directory wrote, and says how many", async () => {
+    const repository = makeRepository({
+      findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue(["rb-scim-1", "rb-scim-2"]),
+    });
+    const { service, ledger } = makeService(repository);
+
+    await expect(
+      service.retireDirectoryGrants({ ...retire, userIds: [...retire.userIds] }),
+    ).resolves.toBe(2);
+
+    expect(repository.findDirectoryOrganizationGrantIds).toHaveBeenCalledWith({
+      organizationId: ORG,
+      userIds: ["alice", "bob"],
+    });
+    expect(ledger.revokeBindings).toHaveBeenCalledWith({
+      organizationId: ORG,
+      bindingIds: ["rb-scim-1", "rb-scim-2"],
+      actor: retire.actor,
+      reason: retire.reason,
+    });
+  });
+
+  it("writes nothing when the directory wrote none of this organization's grants", async () => {
+    const repository = makeRepository({
+      findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue([]),
+    });
+    const { service, ledger } = makeService(repository);
+
+    await expect(
+      service.retireDirectoryGrants({ ...retire, userIds: [...retire.userIds] }),
+    ).resolves.toBe(0);
+    expect(ledger.revokeBindings).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing at all for an empty set of people", async () => {
+    const repository = makeRepository();
+    const { service, ledger } = makeService(repository);
+
+    await expect(service.retireDirectoryGrants({ ...retire, userIds: [] })).resolves.toBe(0);
+    expect(repository.findDirectoryOrganizationGrantIds).not.toHaveBeenCalled();
+    expect(ledger.revokeBindings).not.toHaveBeenCalled();
   });
 });
 

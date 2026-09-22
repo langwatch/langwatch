@@ -17,7 +17,10 @@ import {
 } from "@langwatch/entitlement-process";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
-import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
+import {
+  OrganizationCapabilityUnavailableError,
+  type OrganizationPendingInviteApplied,
+} from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -308,6 +311,12 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     }>,
   ): Promise<void> {
     return this.options.invites.applyInvite(input);
+  }
+
+  applyPending(
+    input: Readonly<{ userId: string; organizationId: string; email: string }>,
+  ): Promise<OrganizationPendingInviteApplied> {
+    return this.options.invites.applyPendingInvite(input);
   }
 
   findLandingProjectSlug(

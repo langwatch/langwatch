@@ -20,6 +20,7 @@ const mockRevokeAllBrowserSessions = vi.fn();
 
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
+    createMembership: vi.fn(),
     tryFindPersonalTeamInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
     findTeamRoleBindings: vi.fn(),
@@ -78,6 +79,28 @@ describe("OrganizationMembershipService", () => {
       seats,
       sessions,
       grantCache,
+    });
+  });
+
+  describe("createMembership()", () => {
+    it("mints one admission intent per membership, in the ledger's own scheme", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue("created");
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456" });
+      await service.createMembership({ organizationId: "org-123", userId: "user-789" });
+
+      const [first, second] = vi.mocked(mockRepo.createMembership).mock.calls;
+      expect(first?.[0]).toMatchObject({ organizationId: "org-123", userId: "user-456" });
+      expect(first?.[0].pendingAdmissionId).toMatch(/^rolebinding_/);
+      expect(second?.[0].pendingAdmissionId).not.toBe(first?.[0].pendingAdmissionId);
+    });
+
+    it("reports a row a concurrent callback already created rather than refusing", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue("already-present");
+
+      await expect(
+        service.createMembership({ organizationId: "org-123", userId: "user-456" }),
+      ).resolves.toBe("already-present");
     });
   });
 

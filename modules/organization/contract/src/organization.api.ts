@@ -36,6 +36,7 @@ import type {
   OrganizationInviteCreated,
   OrganizationInviteResent,
   OrganizationListedInvite,
+  OrganizationPendingInviteApplied,
 } from "./organization.responses.ts";
 import type {
   Organization,
@@ -243,6 +244,14 @@ export interface OrganizationApi {
       userEmail: string | null;
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
+  /**
+   * Makes somebody a MEMBER, carrying the grant intent an unfinished
+   * automatic admission is resumed from (ADR-129). `"already-present"` when a
+   * concurrent sign-in callback or a retry already created the row.
+   */
+  createMembership(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<"created" | "already-present">;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -422,6 +431,14 @@ export interface OrganizationApi {
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted>;
+  /**
+   * Applies the PENDING invitation this address already holds here, for a
+   * caller that never saw an invitation code. Its role and team assignments
+   * replace a default membership entirely.
+   */
+  applyPendingInvite(
+    input: Readonly<{ userId: string; organizationId: string; email: string }>,
+  ): Promise<OrganizationPendingInviteApplied>;
 
   /** One team-role change, with the personal-team, plan and seat guards. */
   changeTeamMemberRole(

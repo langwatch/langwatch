@@ -86,6 +86,7 @@ describe.each(tiers)("$name", ({ build }) => {
     });
   });
 
+  /** @scenario "A credential belongs to the organization that stored it" */
   it("refuses another organization's reference rather than trusting it to be unguessable", async () => {
     const credentials = build();
     const ref = await credentials.put({
@@ -137,6 +138,7 @@ describe.each(tiers)("$name", ({ build }) => {
 });
 
 describe("the Postgres vault's sealing", () => {
+  /** @scenario "A stored credential is unreadable without the deployment's key" */
   it("stores no plaintext, whatever the row is asked for afterwards", async () => {
     const rows: Row[] = [];
     const credentials = PrismaSsoCredentialRepository.create(stubDatabase(rows), reversingCipher);

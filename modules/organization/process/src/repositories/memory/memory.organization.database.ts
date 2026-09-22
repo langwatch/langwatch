@@ -47,6 +47,8 @@ export interface MemoryOrganizationUserRow {
   disabledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** The grant intent an unfinished automatic admission is resumed from. */
+  pendingSsoGrantId?: string | null;
 }
 
 /** One person, the fields the membership repository joins against. */

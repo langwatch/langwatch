@@ -312,6 +312,26 @@ export type AuthzRevokeBindingsInput = z.infer<typeof authzRevokeBindingsInputSc
 export const authzRevokeBindingsOutputSchema = z.void();
 export type AuthzRevokeBindingsOutput = z.infer<typeof authzRevokeBindingsOutputSchema>;
 
+/**
+ * Retires the grants the DIRECTORY itself wrote at the organization scope for
+ * these people; group membership supplies their access now. An
+ * administrator's own grant at the same scope carries another source.
+ */
+export const authzRetireDirectoryGrantsInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    userIds: z.array(z.string().min(1)),
+    actor: grantsLedgerActorSchema,
+    reason: z.string().min(1).optional(),
+  })
+  .strict();
+export type AuthzRetireDirectoryGrantsInput = z.infer<typeof authzRetireDirectoryGrantsInputSchema>;
+/** How many grants were retired. */
+export const authzRetireDirectoryGrantsOutputSchema = z.number().int().nonnegative();
+export type AuthzRetireDirectoryGrantsOutput = z.infer<
+  typeof authzRetireDirectoryGrantsOutputSchema
+>;
+
 const authzStringSetFilterSchema = z.object({ in: z.array(z.string().min(1)) }).strict();
 const authzBindingIdFilterSchema = z
   .object({

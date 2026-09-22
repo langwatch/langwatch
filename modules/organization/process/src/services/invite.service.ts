@@ -3,6 +3,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import {
   type OrganizationInvite,
+  type OrganizationPendingInviteApplied,
   OrganizationUserRole,
   InviteNotFoundError,
   TeamUserRole,
@@ -383,6 +384,27 @@ export class InviteService {
     params: Parameters<InviteLifecycleService["approvePaymentPendingInvites"]>[0],
   ): ReturnType<InviteLifecycleService["approvePaymentPendingInvites"]> {
     return this.lifecycle.approvePaymentPendingInvites(params);
+  }
+
+  /**
+   * ONE verb rather than find-then-apply, because the pair is one decision:
+   * an invitation that exists is the one that wins, and its role and team
+   * assignments replace a default membership entirely.
+   */
+  async applyPendingInvite({
+    userId,
+    organizationId,
+    email,
+  }: {
+    userId: string;
+    organizationId: string;
+    email: string;
+  }): Promise<OrganizationPendingInviteApplied> {
+    const pending = await this.tryFindPendingByOrgAndEmail({ organizationId, email });
+    if (!pending) return { applied: false };
+
+    await this.applyInvite({ userId, invite: pending });
+    return { applied: true, inviteId: pending.id };
   }
 
   async tryFindPendingByOrgAndEmail({

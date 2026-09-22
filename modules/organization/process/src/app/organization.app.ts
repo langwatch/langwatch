@@ -720,6 +720,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.deleteProvisionedOrganization(input);
   }
 
+  createMembership(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): ReturnType<OrganizationMembershipService["createMembership"]> {
+    return this.#dependencies.membership.createMembership(input);
+  }
+
   /** Whether a user is a member of an organization — a door the feature-flag resolver asks
    * on every organization-targeted read, to gate whether the caller may see a flag's answer. */
   isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
@@ -1206,6 +1212,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     by: OrganizationCaller,
   ): ReturnType<OrganizationInvitationDoorService["accept"]> {
     return this.#invitations.accept(input, by);
+  }
+
+  applyPendingInvite(
+    input: Readonly<{ userId: string; organizationId: string; email: string }>,
+  ): ReturnType<OrganizationInvitationDoorService["applyPending"]> {
+    return this.#invitations.applyPending(input);
   }
 
   /**

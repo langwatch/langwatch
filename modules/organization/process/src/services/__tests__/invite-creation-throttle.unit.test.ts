@@ -58,6 +58,7 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
     list: unreachable("list"),
     findByCode: unreachable("findByCode"),
     matchToAcceptor: unreachable("matchToAcceptor"),
+    applyPending: unreachable("applyPending"),
     apply: unreachable("apply"),
     findLandingProjectSlug: unreachable("findLandingProjectSlug"),
     acceptUrl: unreachable("acceptUrl"),

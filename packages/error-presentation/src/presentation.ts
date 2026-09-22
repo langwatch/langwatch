@@ -2639,6 +2639,51 @@ const presentations = {
     describe: () =>
       "You are already viewing the product as somebody else. Return to your own account, then start the new one.",
   },
+  sso_sign_in_refused: {
+    title: "Single sign-on refused this sign-in",
+    describe: () =>
+      "Your identity provider answered, but the answer did not match a connection this organization accepts. Sign in again through your organization's single sign-on link, or ask an administrator.",
+  },
+  sso_assertion_without_address: {
+    title: "Your identity provider sent no email address",
+    describe: () =>
+      "LangWatch needs the address your identity provider holds for you to find your organization. Ask your administrator to release the email attribute to LangWatch.",
+  },
+  sso_setup_address_mismatch: {
+    title: "That sign-in came from a different address",
+    describe: () =>
+      "The test sign-in used an address outside the domain this connection is being set up for. Sign in with an account on the connection's domain.",
+  },
+  sso_domain_not_verified: {
+    title: "This domain is not verified yet",
+    describe: () =>
+      "Single sign-on only admits people from a domain your organization has proven it owns. Finish the domain verification, then try again.",
+  },
+  sso_domain_proof_lapsed: {
+    title: "This domain's proof has lapsed",
+    describe: () =>
+      "The DNS record that proved ownership of this domain is no longer there. Restore it, or verify the domain again, to re-enable single sign-on for it.",
+  },
+  sso_credentials_required: {
+    title: "The connection needs its credentials",
+    describe: () =>
+      "Add the client ID and secret for OpenID Connect, or the signing certificate for SAML, before this connection can be registered.",
+  },
+  sso_issuer_unreachable: {
+    title: "The identity provider could not be reached",
+    describe: () =>
+      "LangWatch could not read the provider's discovery document at the issuer address you entered. Check the address, and that the provider is reachable from the internet.",
+  },
+  sso_saml_metadata_invalid: {
+    title: "The SAML metadata could not be read",
+    describe: () =>
+      "The metadata you provided is not a valid SAML identity provider document. Download it again from your provider and paste it whole.",
+  },
+  sso_certificate_invalid: {
+    title: "The signing certificate could not be read",
+    describe: () =>
+      "The certificate is not a valid X.509 certificate in PEM form. Copy it again from your identity provider, including the BEGIN and END lines.",
+  },
   sso_connection_invalid_transition: {
     title: "This single sign-on connection has moved on",
     describe: () =>

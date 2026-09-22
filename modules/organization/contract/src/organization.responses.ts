@@ -193,3 +193,12 @@ export const organizationAuditLogPageSchema = z
   })
   .strict();
 export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSchema>;
+
+/**
+ * Whether an arriving person already held a PENDING invitation here, and
+ * which one. `applied: false` is a fact the caller acts on — it falls back to
+ * a default membership — rather than an absence.
+ */
+export type OrganizationPendingInviteApplied =
+  | Readonly<{ applied: true; inviteId: string }>
+  | Readonly<{ applied: false }>;

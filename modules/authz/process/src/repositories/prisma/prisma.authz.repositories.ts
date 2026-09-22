@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AuthzRepositories } from "../authz.repositories.ts";
+import { PrismaAuthzAdmissionRepository } from "./prisma.authz-admission.repository.ts";
 import { PrismaAuthzBindingRepository } from "./prisma.authz-binding.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
 
@@ -18,6 +19,7 @@ export class PostgresAuthzRepositories {
     return {
       bindings: PrismaAuthzBindingRepository.create({ database }),
       cutover: PrismaAuthzCutoverRepository.create({ database }),
+      admissions: PrismaAuthzAdmissionRepository.create({ database }),
     };
   }
 }

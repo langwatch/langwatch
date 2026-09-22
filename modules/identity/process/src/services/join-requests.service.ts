@@ -21,6 +21,7 @@ import {
   newJoinRequestId,
 } from "../rules/join-request-id.rules.ts";
 import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
+import type { SsoArrivalJoinRequestRaised } from "../rules/sso-arrival-contract.rules.ts";
 import { JoinDomainSettingService } from "./join-domain-setting.service.ts";
 import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 
@@ -151,6 +152,49 @@ export class JoinRequestsService {
     });
 
     return { joinRequestId, state: "PENDING" };
+  }
+
+  /** Somebody arrived through a connection whose answer is that arrivals wait.
+   *  NOT `request()`: nobody typed an organization's name, so the offer is not
+   *  re-derived — the connection PROVED the domain (ADR-117 §3). */
+  async requestFromSsoArrival({
+    userId,
+    organizationId,
+    domain,
+  }: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+  }): Promise<SsoArrivalJoinRequestRaised> {
+    // The cool-down matters most here: a request is made because an account
+    // row appeared — a rotation, an unlink — so an administrator who denied
+    // somebody would otherwise watch them reappear for no reason they chose.
+    if (await this.guards.isInCoolDown({ userId, organizationId })) return { raised: false };
+
+    const joinRequestId = newJoinRequestId();
+    const occurredAtMs = this.now();
+    await this.deps.requests.requestJoin({
+      tenantId: organizationId,
+      organizationId,
+      joinRequestId,
+      commandId: newJoinRequestCommandId(),
+      occurredAtMs,
+      // The sign-in made this, not a person, and the audit page says so.
+      actor: { type: "system", id: null },
+      userId,
+      domain,
+      matchedVia: "sso-connection-domain",
+      expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+    });
+
+    await this.deps.notifier.requestArrived({
+      joinRequestId,
+      organizationId,
+      requesterUserId: userId,
+      domain,
+    });
+
+    return { raised: true, joinRequestId };
   }
 
   /**

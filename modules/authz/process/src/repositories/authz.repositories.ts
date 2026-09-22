@@ -1,3 +1,4 @@
+import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
 import type { AuthzBindingRepository } from "./authz-binding.repository.ts";
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 
@@ -9,4 +10,5 @@ import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 export interface AuthzRepositories {
   readonly bindings: AuthzBindingRepository;
   readonly cutover: AuthzCutoverRepository;
+  readonly admissions: AuthzAdmissionRepository;
 }

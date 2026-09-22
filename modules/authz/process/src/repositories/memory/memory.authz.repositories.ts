@@ -1,5 +1,6 @@
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "./authz-memory.store.ts";
+import { MemoryAuthzAdmissionRepository } from "./memory.authz-admission.repository.ts";
 import { MemoryAuthzBindingRepository } from "./memory.authz-binding.repository.ts";
 import { MemoryAuthzCutoverRepository } from "./memory.authz-cutover.repository.ts";
 
@@ -12,6 +13,7 @@ export class MemoryAuthzRepositories {
     return {
       bindings: MemoryAuthzBindingRepository.create({ memory }),
       cutover: MemoryAuthzCutoverRepository.create({ memory }),
+      admissions: MemoryAuthzAdmissionRepository.create({ memory }),
     };
   }
 }

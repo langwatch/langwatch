@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * In-memory fakes for the ports the invite services are composed from. Each
  * stores real state (a Map, a Set) rather than counting calls, so a test
@@ -21,7 +22,6 @@ import type {
   RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 
 import type {
   OrganizationInviteMail,
@@ -101,6 +101,11 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     }
 
     return { attached, duplicates };
+  }
+
+  /** Unreached here: this fake's ledger holds no writer for a grant. */
+  async retireDirectoryGrants(): Promise<number> {
+    return 0;
   }
 
   async revokeBindingsWhere(
@@ -443,9 +448,23 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   tryFindProjectSlugInOrganization = unsupported<
     OrganizationInviteRepository["tryFindProjectSlugInOrganization"]
   >("tryFindProjectSlugInOrganization");
-  tryFindPendingInviteForEmail = unsupported<
-    OrganizationInviteRepository["tryFindPendingInviteForEmail"]
-  >("tryFindPendingInviteForEmail");
+  async tryFindPendingInviteForEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<OrganizationInvite | null> {
+    const address = email.trim().toLowerCase();
+    return (
+      Array.from(this.invitesById.values()).find(
+        (invite) =>
+          invite.organizationId === organizationId &&
+          invite.status === "PENDING" &&
+          invite.email.trim().toLowerCase() === address,
+      ) ?? null
+    );
+  }
 }
 
 /** All roles named are assignable, unless a test seeds a narrower answer. */

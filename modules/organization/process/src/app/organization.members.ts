@@ -4,6 +4,7 @@ import type {
   OrganizationInvite,
   OrganizationInviteValidation,
   OrganizationListedInvite,
+  OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -294,6 +295,14 @@ export interface OrganizationInvitations {
       viaIdentifierId?: string | null;
     }>,
   ): Promise<void>;
+  /**
+   * Applies the PENDING invitation this address already holds here, as one
+   * decision: an invitation that exists wins, and its role and team
+   * assignments replace a default membership entirely.
+   */
+  applyPending(
+    input: Readonly<{ userId: string; organizationId: string; email: string }>,
+  ): Promise<OrganizationPendingInviteApplied>;
   findLandingProjectSlug(
     input: Readonly<{ invite: OrganizationInviteWithOrganization }>,
   ): Promise<string | null>;

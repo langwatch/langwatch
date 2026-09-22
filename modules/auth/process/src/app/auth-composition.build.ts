@@ -281,6 +281,9 @@ export class UnavailableBetterAuthGrants extends AuthzGrantsService {
   revokeBindingsWhere(): Promise<never> {
     return this.unavailable();
   }
+  retireDirectoryGrants(): Promise<never> {
+    return this.unavailable();
+  }
   offboardMember(): Promise<never> {
     return this.unavailable();
   }

@@ -116,6 +116,7 @@ describe("given an issuer an administrator typed", () => {
     });
   });
 
+  /** @scenario "An issuer that cannot be reached is refused in the customer's words" */
   it("carries the status of an issuer that answered something else", async () => {
     const { channel } = channelAnswering(async () => respond(404, {}));
 

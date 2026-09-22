@@ -7,6 +7,24 @@ import type {
   AuthzUserGroupRow,
 } from "../authz-binding.repository.ts";
 
+/** One membership's unfinished admission marker. */
+export type AuthzMemoryAdmissionRow = {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+  occurredAtMs: number;
+  disabled: boolean;
+  deactivated: boolean;
+};
+
+/** What the ledger says about the grant an admission marker named. */
+export type AuthzMemoryAdmissionGrantRow = {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+  revoked: boolean;
+};
+
 export type AuthzMemoryCutoverRow = {
   organizationId: string;
   status: MigrationTenantStatus;
@@ -21,6 +39,8 @@ export type AuthzMemoryCutoverRow = {
 export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
+  readonly admissions: AuthzMemoryAdmissionRow[] = [];
+  readonly admissionGrants: AuthzMemoryAdmissionGrantRow[] = [];
   readonly bindings: AuthzManagedBindingRow[] = [];
   readonly scopes: (AuthzBindingScopeRow & { organizationId: string })[] = [];
   readonly groupMemberships: ({ organizationId: string; userId: string } & AuthzUserGroupRow)[] =
@@ -41,6 +61,8 @@ export class AuthzMemoryStore {
     this.cutovers.clear();
     this.organizationRoles.clear();
     for (const rows of [
+      this.admissions,
+      this.admissionGrants,
       this.bindings,
       this.scopes,
       this.groupMemberships,

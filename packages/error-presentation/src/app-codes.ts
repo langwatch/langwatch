@@ -257,9 +257,6 @@ export const APP_ERROR_CODES = [
   "instant_eval_questions_too_long",
   "instant_eval_row_cap_exceeded",
   "insufficient_permissions",
-  // Also a Go code, with copy already written under the shared/transport
-  // heading — the REST boundary in `packages/api` puts it on the wire as the
-  // code for an unhandled failure, so the scan sees it here too.
   "internal_error",
   "invalid_action_params",
   "invalid_credentials",
@@ -381,10 +378,6 @@ export const APP_ERROR_CODES = [
   "migration_unknown",
   "missing_annotator",
   "missing_credentials",
-  // Not declared by a subclass anywhere: `nlpgo/goHandledError.ts` promotes a
-  // relayed Go error's `meta.reason` to the code, so this one is minted at the
-  // boundary rather than thrown. It still reaches a customer, so it still needs
-  // copy — see RELAYED_META_CODES in `__tests__/codes.unit.test.ts`.
   "missing_provider",
   "missing_slack_bot_token",
   "missing_slack_webhook",
@@ -412,9 +405,6 @@ export const APP_ERROR_CODES = [
   "monitor_source_project_forbidden",
   "no_admin_configured",
   "no_eligible_model_providers",
-  // Also a Go code, with copy already written under the shared/transport
-  // heading — the Ops admin transport raises it to hide the admin surface
-  // from a session that is no longer an admin.
   "not_found",
   "notification_delivery_error",
   "offboard_incomplete",
@@ -554,9 +544,11 @@ export const APP_ERROR_CODES = [
   "simulation_run_not_found",
   "span_not_found",
   "spend_source_unavailable",
+  "sso_assertion_without_address",
   "sso_break_glass_expiry_out_of_range",
   "sso_break_glass_holder_ineligible",
   "sso_break_glass_last_way_in",
+  "sso_certificate_invalid",
   "sso_connection_activation_blocked",
   "sso_connection_domain_taken",
   "sso_connection_invalid_transition",
@@ -564,11 +556,18 @@ export const APP_ERROR_CODES = [
   "sso_connection_operator_act_required",
   "sso_connection_string_edit_retired",
   "sso_connection_teardown_strands_users",
+  "sso_credentials_required",
   "sso_domain_claim_pending",
   "sso_domain_lookup_failed",
+  "sso_domain_not_verified",
   "sso_domain_proof_expired",
+  "sso_domain_proof_lapsed",
   "sso_domain_proof_not_found",
+  "sso_issuer_unreachable",
+  "sso_saml_metadata_invalid",
   "sso_saml_not_self_serve",
+  "sso_setup_address_mismatch",
+  "sso_sign_in_refused",
   "storage_not_writable",
   "subscription_ambiguous",
   "subscription_not_linked",
@@ -614,9 +613,6 @@ export const APP_ERROR_CODES = [
   "trace_sharing_disabled",
   "trigger_action_unsupported",
   "trigger_filters_required",
-  // Also a Go code, with copy already written under the shared/transport
-  // heading — an app-level subclass raises it too (the Ops admin transport),
-  // and the scan is right to insist it be listed here as well.
   "unauthorized",
   "unsubscribe_link_invalid",
   "unsubscribe_rate_limited",
@@ -624,9 +620,6 @@ export const APP_ERROR_CODES = [
   "user_not_in_organization",
   "user_to_impersonate_not_found",
   "user_token_required",
-  // Raised by the shared package rather than an app-level subclass:
-  // `ValidationError` (and `ValidationError.fromZodError`, which the tRPC
-  // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
   "virtual_key_expiry_in_past",
   "virtual_key_not_found",
@@ -639,10 +632,6 @@ export const APP_ERROR_CODES = [
   "voice_recording_key_missing",
   "voice_recording_unavailable",
   "voice_session_invalid",
-  // The webhook platform names its two endpoint failures itself, in
-  // `@langwatch/platform-api`'s `features/webhook/webhook-rest.ts`, rather
-  // than deriving them from the status: `not_found` alone would not say WHICH
-  // lookup missed, and an endpoint id is the only one those routes take.
   "webhook_endpoint_invalid",
   "webhook_endpoint_not_found",
   "webhook_event_not_found",

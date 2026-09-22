@@ -106,6 +106,15 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts>;
+  /**
+   * The organization-scoped grants the DIRECTORY itself wrote for these
+   * people. `source` names the writer, so an administrator's own grant at the
+   * same scope is never named; a legacy head records none.
+   */
+  abstract findDirectoryOrganizationGrantIds(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<string[]>;
   abstract findOwnedApiKeys(args: {
     userId: string;
     organizationId: string;

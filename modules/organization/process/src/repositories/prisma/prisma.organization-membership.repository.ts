@@ -809,6 +809,34 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
+   * One insert carrying its admission intent, so a process that stops before
+   * the grant lands still leaves the marker. P2002 HERE is a concurrent
+   * callback or a retry; any other constraint is a real failure.
+   */
+  async createMembership(input: {
+    organizationId: string;
+    userId: string;
+    pendingAdmissionId: string;
+  }): Promise<"created" | "already-present"> {
+    try {
+      await this.prisma.organizationUser.create({
+        data: {
+          userId: input.userId,
+          organizationId: input.organizationId,
+          role: OrganizationUserRole.MEMBER,
+          pendingSsoGrantId: input.pendingAdmissionId,
+        },
+      });
+      return "created";
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return "already-present";
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Removes a membership, and the personal workspace that came with it.
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {

@@ -237,6 +237,11 @@ class RecordingGrants extends AuthzGrantsService {
     this.revokedBindingInputs.push(input);
     return Promise.resolve();
   }
+
+  /** Unreached here: this fake's ledger holds no writer for a grant. */
+  retireDirectoryGrants(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }
 
 function unsupported<Method>(): Method {

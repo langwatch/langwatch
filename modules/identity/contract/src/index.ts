@@ -99,6 +99,28 @@ export {
 } from "./connection.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
+  parseSamlIdpConfig,
+  type SsoIdpRegistration,
+  ssoIdpRegistrationSchema,
+  type SsoOidcRegistration,
+  ssoOidcRegistrationSchema,
+  type SsoSamlIdpConfig,
+  ssoSamlIdpConfigSchema,
+  type SsoSamlRegistration,
+  ssoSamlRegistrationSchema,
+} from "./sso-idp-registration.ts";
+export {
+  isConfiguredLegacySsoRoute,
+  isSsoConnectionInSetup,
+  lapsedDomainsOf,
+  looksLikeSsoConnectionId,
+  type QualifiableConnection,
+  qualifySsoDomainOwnership,
+  type SsoDomainOwnershipQualification,
+  ssoDomainStanding,
+  ssoDomainVouchesForNewPeople,
+} from "./sso-domain-ownership.ts";
+export {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
@@ -211,6 +233,10 @@ export {
   SsoConnectionActivationBlockedError,
   SsoConnectionCommandRefusedError,
   SsoConnectionDomainTakenError,
+  SsoAssertionRefusedError,
+  SsoAssertionWithoutAddressError,
+  SsoCertificateInvalidError,
+  SsoCredentialsRequiredError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionNotFoundError,
   SsoConnectionOperatorActRequiredError,
@@ -218,9 +244,15 @@ export {
   SsoConnectionTeardownStrandsUsersError,
   SsoDomainClaimPendingError,
   SsoDomainLookupFailedError,
+  SsoDomainNotVerifiedError,
   SsoDomainProofExpiredError,
+  SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
+  SsoIssuerUnreachableError,
+  SsoSamlMetadataInvalidError,
   SsoSamlNotSelfServeError,
+  SsoSetupAddressMismatchError,
+  SsoSignInRefusedError,
 } from "./identity.errors.ts";
 export {
   BREAK_GLASS_MAX_WINDOW_DAYS,
