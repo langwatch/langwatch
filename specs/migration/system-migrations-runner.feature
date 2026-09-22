@@ -50,12 +50,65 @@ Feature: Running system migrations across organizations
     When a later pass runs
     Then it is skipped
 
+  # ═══ Who a pass visits at all ═════════════════════════════════════════
+  # Being skipped is not free. A skip is a claim taken, a state row read per
+  # migration and a claim released, and a fleet whose tenants have almost all
+  # finished pays that for every one of them on every pass, on every replica,
+  # before any of them may serve. A tenant that has finished EVERY migration a
+  # pass would drive over it has nothing left to do ever, so the pass does not
+  # enumerate it — while anything short of that is enumerated exactly as
+  # before, and what then happens to it is still the runner's decision.
+
+  @integration
+  Scenario: A tenant that has finished every migration a pass drives is not visited again
+    Given "org_acme" is finalized for every migration the pass drives
+    When a pass runs
+    Then it is not visited at all
+
+  @integration
+  Scenario: A tenant with one of a pass's migrations still to finish is visited
+    Given "org_acme" is finalized for one migration and parked for another
+    When a pass runs
+    Then it is visited
+
+  @integration
+  Scenario: A tenant no pass has ever touched is visited
+    Given "org_acme" has no record for any migration
+    When a pass runs
+    Then it is visited
+
+  @integration
+  Scenario: A tenant an operator rolled back is not visited again
+    Given "org_acme" is rolled back for every migration the pass drives
+    When a pass runs
+    Then it is not visited at all
+
+  @unit
+  Scenario: A pass with no migrations to drive visits nobody
+    Given an installation that runs none of the registered migrations
+    When a pass runs
+    Then no tenant is enumerated
+
+  @unit
+  Scenario: A migration that declares its own tenants keeps them
+    Given a migration that declares its own candidate tenants
+    And another migration driven over every tenant
+    When a pass runs
+    Then the declaring migration is driven over the tenants it declared
+    And the other is driven over the tenants with work left for it
+
+  @unit
+  Scenario: A pass may ask which tenants have work left across the whole installation
+    Given the question a tenant source asks is the tenant list itself
+    When the multitenancy guard reads it
+    Then it is admitted rather than refusing the pass
+
   # ═══ Converging ═══════════════════════════════════════════════════════
   # One pass is never enough on its own: a pass cannot observe its own
   # events, so an organization it adopts reads as held and only a LATER pass
-  # finalizes it. Starting the app therefore drives passes rather than one
-  # pass — nobody should have to restart the app, or click "run a pass",
-  # until the counts settle.
+  # finalizes it. Startup therefore runs a blocking preflight of passes rather
+  # than one background pass — nobody should receive traffic, have to restart
+  # the app, or click "run a pass" before the counts settle.
   #
   # It stops on NO PROGRESS, never on "everything is terminal": a held
   # organization is re-proved on every pass and may legitimately never reach
@@ -66,20 +119,88 @@ Feature: Running system migrations across organizations
     When the app starts
     Then passes run one after another while each one advances an organization
     And the first pass that advances nothing ends the run
+    And runtime processes start only after that run completes
 
   @unit
-  Scenario: A held tenant that never advances does not loop forever
-    Given an organization held with a disagreement nothing resolves
+  Scenario: Preflight projection work cannot consume application traffic
+    Given the preflight emits events while an existing worker is still running
+    When those events and application events are queued concurrently
+    Then the preflight uses the canonical queue and its aggregate locks
+    And it dispatches only groups registered by that preflight
+    And blocked or failed work the preflight itself caused in those groups prevents startup
+    And worker-scoped durable subscribers run for the preflight events
+    And schedulers, process-manager consumers, and general workers do not start
+
+  # A group's error marker has no expiry and is cleared only by a later success
+  # on that same group, so a failure ordinary traffic left before the upgrade —
+  # or one an earlier, crashed preflight left — would otherwise refuse every
+  # boot that followed, on every replica, forever. A group already wedged when
+  # the preflight adopted it was wedged under the previous release, and
+  # refusing to start fixes none of it.
+  @integration
+  Scenario: A group wedged before the preflight does not refuse startup
+    Given a group blocked with a failure from before the preflight adopted it
+    When the preflight settles its pass
+    Then that group neither holds the barrier open nor prevents startup
+    And it stays blocked, reported for operator triage
+    But a failure produced by the preflight's own work still prevents startup
+    And the refusal names the groups it refuses for, not a count of them
+
+  # The barrier's deadline is the one refusal a booting fleet cannot answer.
+  # Every replica runs this preflight BEFORE it starts consuming, so work the
+  # preflight queues drains only if some other process is already serving that
+  # queue. On a fleet booting together there is none, and a claim whose worker
+  # a previous crash-loop killed outlives it and blocks its group's head. Each
+  # boot then queues more behind that head and refuses over it, which is what
+  # keeps the consumer that would drain it from ever starting. Observed on the
+  # identity backfill: one group, `active: 1` with no owner alive, `pending`
+  # climbing 32 → 50 across boots, every replica crash-looping.
+  #
+  # Work that has not drained leaves its tenant HELD, and a held tenant already
+  # starts on the legacy path with its migration gate closed. Waiting for the
+  # drain is how a pass finalizes that tenant sooner, never how it stays safe —
+  # so giving up on the wait costs a later pass, not correctness. Work that
+  # actually FAILED is a different thing and still refuses: that is a fault a
+  # later pass will not clear, and it is the half of this barrier worth keeping.
+  @integration
+  Scenario: Work that never drains leaves its tenants held rather than refusing startup
+    Given the preflight's own work has not drained when the barrier's deadline passes
+    And none of that work has failed or blocked
+    When the barrier gives up waiting
+    Then startup continues rather than refusing
+    And the groups it stopped waiting for are named for operator triage
+    And their tenants stay held, to be re-proved by a later pass
+    But work that failed or blocked by the deadline still prevents startup
+
+  @unit
+  Scenario: A recurring reconciliation does not loop forever
+    Given a migration declares its held outcome to be recurring reconciliation
     When the app starts
     Then it is re-proved once and the run ends
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: Shutting down stops the loop between passes
+  Scenario: A held migration stays on the legacy path without preventing startup
+    Given a migration remains held after its pass, with nothing advancing
+    When the app starts
+    Then it is re-proved once and the run ends
+    And being re-proved into the same state does not count as progress
+    And its migration gate stays closed on the legacy path
+
+  @unit
+  Scenario: One tenant's parked migration does not stop the fleet starting
+    Given one tenant's migration parks on an error
+    When the app starts
+    Then the preflight still completes and runtime processes start
+    And that tenant stays on its legacy path, served as it was before
+    And the park is reported as an error against its tenant and migration
+
+  @unit
+  Scenario: Cancelling startup stops the loop between passes
     Given a run waiting between two passes
-    When the app shuts down
+    When startup is cancelled
     Then no further pass starts
-    And the shutdown does not wait out the interval
+    And runtime processes do not start
 
   # `lease.acquire` fails safe to false on contention AND on any Redis error,
   # and a tenant that cannot be claimed does no work — so a pass shut out of
@@ -88,24 +209,128 @@ Feature: Running system migrations across organizations
   # pod actually holding the claims is then evicted, nothing drives the rest.
   @unit
   Scenario: A pass shut out by another process is not convergence
-    Given every organization claimed by another process
+    Given any organization is claimed by another process
     When the pass advances nothing
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
 
+  # Every replica runs this preflight, so a rolling deploy has a dozen of them
+  # sweeping the same tenants at once and each reads the others' leases as
+  # claims. If a claim a peer holds prevented convergence, none of them could
+  # ever start: each would be waiting on peers who are waiting on it. So a
+  # process that has finished its OWN work starts, and leaves what it could
+  # not claim to the peer already driving it — the same bargain a held or
+  # parked tenant gets, and the re-drive cadence covers a peer that dies.
+  #
+  # Only PARTIAL contention counts. Being shut out of the whole fleet is what
+  # an unreachable Redis looks like too, and a process that learned nothing
+  # about any tenant has no grounds to call anything settled.
   @unit
-  Scenario: A loop that never converges stops at its cap and says so
-    Given passes that report progress every time
-    When the maximum number of passes is reached
-    Then the run stops
-    And it says how many passes it gave up after
+  Scenario: A peer's claims do not keep this process from starting
+    Given passes that advance nothing while a peer holds some of the fleet
+    When the same shape repeats pass after pass
+    Then the run ends and runtime processes start
+    And it says it is starting rather than waiting on a peer
+
+  # A pass now enumerates only the tenants with work left, so on a settled
+  # fleet that is a handful and a dozen replicas booting together can hold
+  # every one of them. "Shut out of everything" is therefore no longer proof
+  # of a broken lease store, and the proof has to be named instead: a tenant
+  # this process claimed is one Redis answered for, because a claim fails safe
+  # to "held" on every error.
+  @unit
+  Scenario: A shut-out from the last remaining tenants settles once a claim has been granted
+    Given an earlier pass claimed a tenant of its own
+    When every later pass finds the few remaining tenants held by a peer
+    Then the run ends and runtime processes start
 
   @unit
-  Scenario: A failed pass ends the loop rather than retrying it
+  Scenario: A process never granted a claim keeps trying rather than settling
+    Given no pass has ever been granted a claim
+    When every pass finds every tenant held
+    Then the preflight fails rather than starting
+
+  @unit
+  Scenario: A momentary overlap with a peer is still waited out
+    Given one pass that advances nothing while a peer holds part of the fleet
+    When the next pass reads every tenant and still advances nothing
+    Then that pass is what ends the run
+
+  @unit
+  Scenario: A loop that never converges prevents startup
+    Given passes that report progress every time
+    When the maximum number of passes is reached
+    Then the preflight fails
+    And it says how many passes it gave up after
+    And runtime processes do not start
+
+  @unit
+  Scenario: A failed pass prevents startup
     Given a pass that fails outright
     When the run reaches it
-    Then the run stops rather than retrying immediately
-    And the failure is recorded for the next start to retry
+    Then the preflight fails rather than retrying immediately
+    And runtime processes do not start
+    And the next start retries the pass
+
+  # ═══ Re-driving after startup ═════════════════════════════════════════
+  # The preflight converges once and then stops. Every stored status but
+  # `finalized` and `rolled_back` is re-entrant, so a tenant that parks an
+  # hour into a worker's life heals on the very next pass — except that on a
+  # fleet which stays up there WAS no next pass, only the next deploy or an
+  # operator clicking "run a pass". So a worker carries a cadence of its own,
+  # driving the same pass the preflight and that click drive. It converges on
+  # nothing and reads no progress count, so a tenant that parks again every
+  # time costs one attempt per cadence and wedges nothing.
+
+  @unit
+  Scenario: A worker re-drives a parked tenant without being asked
+    Given a tenant parked after startup had already finished
+    When the worker's re-drive cadence comes round
+    Then a pass runs and attempts that tenant again
+    And a tenant that parks again is simply attempted again next time
+
+  @unit
+  Scenario: A recurring reconciliation keeps running on a long-lived worker
+    Given a migration whose held outcome is recurring reconciliation
+    When the worker's re-drive cadence comes round
+    Then its tenants are re-proved again
+
+  @unit
+  Scenario: A fleet with nothing to re-drive does not sweep
+    Given every tenant is finalized or pinned to its legacy path
+    When the worker's re-drive cadence comes round
+    Then the stored state is asked whether anything could still move
+    And no pass runs
+
+  @unit
+  Scenario: Only a worker re-drives
+    Given a process that does not run the worker stack
+    When it starts
+    Then it never drives a migration pass of its own
+
+  @unit
+  Scenario: A re-drive that fails does not end the cadence
+    Given a pass that fails outright after startup
+    When the cadence comes round again
+    Then another pass is attempted
+
+  # D04 records the configured legacy route WITHOUT treating the old domain
+  # string as ownership evidence, which is what let it join the shared
+  # registry: existing sign-in stays compatible, while activation, linking and
+  # new-person trust still demand qualified proof. The registry is shared by
+  # the prestart, ordinary, targeted and enrollment paths, so declaring it here
+  # declares it for all four.
+  #
+  # This scenario used to say the opposite — that D04 stayed out of the
+  # registry until a later change — and it went on saying it after the
+  # registration landed. The test bound to it had been updated to assert the
+  # registration, so the pair read green while the words asserted the reverse.
+  @unit
+  Scenario: The D04 connection grandfather migration is declared in the shared registry
+    Given an organization has a staff-configured legacy SSO domain
+    When any system migration entry point reads the registry
+    Then the D04 connection grandfather migration is declared alongside the authorization engine migration
+    And the legacy SSO route is recorded without being treated as proof of ownership
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has

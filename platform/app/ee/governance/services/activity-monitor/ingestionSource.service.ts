@@ -23,6 +23,7 @@
 
 import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { readStoredCostCursor } from "@ee/governance/services/pullers/copilotStudioDataverse.puller";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import {
@@ -40,11 +41,34 @@ import {
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { resolveGovProjectId } from "../govProject";
+import { PrismaIngestionPullRunProjectionRepository } from "../pullers/repositories/ingestion-pull-run-projection.prisma.repository";
+import { withAzureBillIdentity } from "./azureBillIdentity";
+import {
+  type AzureBillReader,
+  assertAzureBillHasItsOwnCredential,
+  assertAzureBillNotAlreadyClaimed,
+  readClaimedSubscription,
+} from "./azureBillOwnership";
+import {
+  assertEnvironmentNotAlreadyClaimed,
+  type EnvironmentReader,
+  readClaimedEnvironment,
+} from "./environmentOwnership";
 import {
   encryptParserConfigCredentials,
   isEncryptedCredentials,
 } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
+import { lookUpProviderAccount as lookUpProviderAccountLive } from "./providerAccountLookup";
+import {
+  assertProviderAccountIsFree,
+  hasAdminCredentials,
+  type LookUpProviderAccount,
+  type ProviderAccountReader,
+  readsProviderAccount,
+} from "./providerAccountOwnership";
 import { assertPullDestinationAllowed } from "./pullDestination";
 import { unsupportedValue } from "./unsupportedValue";
 
@@ -349,6 +373,64 @@ export function assertReportUnchangedOncePulled({
   });
 }
 
+/**
+ * Refuse pointing a source at a different subscription's bill once one has
+ * been read.
+ *
+ * Everything the cost read records is filed under the source, not under the
+ * subscription: the cursor says how far THIS source's bill was priced, and
+ * the rollup rows carry the source id in their identity. Swap the claim and
+ * both keep answering for the old bill — the new one starts at the old
+ * trailing window instead of a first read, and the panel's "was this bill
+ * read" question finds the old bill's rows and says yes, showing one
+ * subscription's spend under another's name while suppressing the
+ * failed-read note that would have told the truth.
+ *
+ * So the same rule the report gets (`assertReportUnchangedOncePulled`), for
+ * the same recorded-spend-continuity reason: the claim is changeable until
+ * the bill has actually been read or attempted, and fixed after. Held state
+ * counts — a held window carried across would say "read failed" about a bill
+ * never tried. A claim can still be DROPPED at any time (stopping mixes
+ * nothing), but once cost memory exists no new claim may land on this source,
+ * not even the one that was dropped: nothing stored says which subscription
+ * the memory belongs to, so the guard cannot tell resuming from mixing.
+ */
+export function assertClaimedSubscriptionUnchangedOncePulled({
+  existing,
+  incoming,
+}: {
+  existing: Pick<IngestionSource, "parserConfig" | "pollerCursor">;
+  incoming: Record<string, unknown>;
+}): void {
+  const incomingClaim = readClaimedSubscription(incoming);
+  if (incomingClaim === null) return;
+
+  const storedClaim = readClaimedSubscription(
+    existing.parserConfig as Record<string, unknown> | null,
+  );
+  if (
+    storedClaim !== null &&
+    storedClaim.toLowerCase() === incomingClaim.toLowerCase()
+  ) {
+    return;
+  }
+
+  const cursor = readStoredCostCursor(existing.pollerCursor);
+  if (cursor.costPricedThroughDay === null && cursor.costHeldSinceMs === null) {
+    return;
+  }
+
+  const complaint =
+    "This source has already read the bill of the subscription it claimed, " +
+    "and the spend it recorded is filed under this source. Claiming a " +
+    "different subscription here would show one bill's spend under " +
+    "another's name. Archive this source and create a new one to read a " +
+    "different subscription's bill.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
 async function syncPullProcessBestEffort({
   prisma,
   source,
@@ -409,11 +491,67 @@ async function assertTraceDestinationIsOwnLiveProject({
   }
 }
 
-export class IngestionSourceService {
-  constructor(private readonly prisma: PrismaClient) {}
+/**
+ * The outside world this service reaches for while a connection is saved.
+ *
+ * One entry today, and it is here rather than called directly because the
+ * provider read decides whether a save is allowed: a test that cannot stand in
+ * front of it can only exercise the guard by reaching for the module loader,
+ * and the seam the service actually depends on stays invisible (ADR-047).
+ */
+export interface IngestionSourceServiceDependencies {
+  lookUpProviderAccount: LookUpProviderAccount;
+}
 
-  static create(prisma: PrismaClient): IngestionSourceService {
-    return new IngestionSourceService(prisma);
+const liveDependencies: IngestionSourceServiceDependencies = {
+  lookUpProviderAccount: lookUpProviderAccountLive,
+};
+
+/**
+ * Carry across every stored key a client is never shown, in place.
+ *
+ * `credentials` is one; the `_`-prefixed internals are the rest, and
+ * `_rotation` is the one that bites — it holds the previous secret's hash for
+ * the 24h window after a rotation, so an edit landing inside that window used
+ * to cut the grace short and start rejecting upstream clients that had not
+ * rolled over yet. A client cannot send back what it never received, so absent
+ * must mean "unchanged" for all of them, not just the secret.
+ *
+ * `adapter` and `schedule` join the list for the same reason: the composer
+ * deliberately renders neither, so a client cannot send them back and absent
+ * must mean unchanged. Dropping `adapter` leaves a pull source the worker can
+ * no longer dispatch — a rename would quietly stop the source pulling.
+ */
+function carryKeysHiddenFromClients({
+  stored,
+  incoming,
+}: {
+  stored: Record<string, unknown>;
+  incoming: Record<string, unknown>;
+}): void {
+  for (const key of Object.keys(stored)) {
+    const hiddenFromClients =
+      key === "credentials" ||
+      key === "adapter" ||
+      key === "schedule" ||
+      key.startsWith("_");
+    if (hiddenFromClients && incoming[key] === undefined) {
+      incoming[key] = stored[key];
+    }
+  }
+}
+
+export class IngestionSourceService {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly dependencies: IngestionSourceServiceDependencies = liveDependencies,
+  ) {}
+
+  static create(
+    prisma: PrismaClient,
+    dependencies?: IngestionSourceServiceDependencies,
+  ): IngestionSourceService {
+    return new IngestionSourceService(prisma, dependencies);
   }
 
   // ---------------------------------------------------------------------
@@ -425,6 +563,27 @@ export class IngestionSourceService {
       where: { organizationId, archivedAt: null },
       orderBy: [{ name: "asc" }],
     });
+  }
+
+  async lastPullRun({
+    sourceId,
+    organizationId,
+  }: {
+    sourceId: string;
+    organizationId: string;
+  }) {
+    const projectId = await resolveGovProjectId({
+      prisma: this.prisma,
+      organizationId,
+    });
+    if (!projectId) return null;
+    const projection = await new PrismaIngestionPullRunProjectionRepository(
+      this.prisma,
+    ).load(sourceId, {
+      tenantId: createTenantId(projectId),
+      aggregateId: sourceId,
+    });
+    return projection?.state ?? null;
   }
 
   /**
@@ -543,9 +702,316 @@ export class IngestionSourceService {
     return null;
   }
 
+  /**
+   * The config guards that run on an edit, in one place.
+   *
+   * The adapter comes from the stored row, not from `incoming`. The edit form
+   * sends back only the fields it renders and `adapter` is not one of them, so
+   * dispatching on the incoming value would make the destination check do
+   * nothing on precisely the request that repoints the host — leaving the
+   * destination pinned at create and free afterwards.
+   *
+   * `sourceId` is the row being edited, excluded from the bill check so that a
+   * source resending the subscription it already holds does not collide with
+   * itself.
+   */
+  /**
+   * The config guards that run on a create, in one place, and the account they
+   * resolve.
+   *
+   * The sibling of {@link assertEditedConfigAllowed}: the two identities an
+   * admin types are checked the same way on both paths, and the one the
+   * provider reports is asked for on both. Create and edit are two ways to
+   * reach the same forbidden state — two connections reading one account — so
+   * guarding only the first leaves the second as the way round it.
+   *
+   * A failed provider call fails the save. A connection stored without its
+   * account is one the next save has nothing to compare against, and the two
+   * of them then read the same bill for as long as they both live.
+   */
+  private async assertCreatedConfigAllowed(params: {
+    organizationId: string;
+    sourceType: string;
+    parserConfig: Record<string, unknown>;
+  }): Promise<{ providerAccountId?: string }> {
+    assertPullDestinationAllowed({ parserConfig: params.parserConfig });
+    await this.assertAzureBillIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.parserConfig,
+    });
+    await this.assertEnvironmentIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.parserConfig,
+    });
+    return await this.resolveProviderAccount({
+      organizationId: params.organizationId,
+      sourceType: params.sourceType,
+      parserConfig: params.parserConfig,
+    });
+  }
+
+  private async assertEditedConfigAllowed(params: {
+    organizationId: string;
+    incoming: Record<string, unknown>;
+    existing: Pick<
+      IngestionSource,
+      "id" | "sourceType" | "parserConfig" | "pollerCursor"
+    >;
+  }): Promise<{ providerAccountId?: string }> {
+    const stored =
+      (params.existing.parserConfig as Record<string, unknown>) ?? {};
+    assertPullDestinationAllowed({
+      parserConfig: params.incoming,
+      adapterId: stored.adapter as string,
+    });
+    // Before the bill-ownership check: this one costs no query.
+    assertClaimedSubscriptionUnchangedOncePulled({
+      existing: params.existing,
+      incoming: params.incoming,
+    });
+    await this.assertAzureBillIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.incoming,
+      sourceId: params.existing.id,
+      storedParserConfig: stored,
+    });
+    await this.assertEnvironmentIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.incoming,
+      sourceId: params.existing.id,
+    });
+    return await this.resolveProviderAccount({
+      organizationId: params.organizationId,
+      sourceType: params.existing.sourceType,
+      parserConfig: params.incoming,
+      sourceId: params.existing.id,
+    });
+  }
+
+  /**
+   * Refuse a write whose config names an environment another source reads.
+   *
+   * Gated on the claim being present for the same reason the bill check is: a
+   * config naming no environment is the common case by a wide margin and
+   * cannot collide with anything, so it must not cost a query on every write.
+   */
+  private async assertEnvironmentIsFree(params: {
+    organizationId: string;
+    parserConfig: Record<string, unknown>;
+    sourceId?: string;
+  }): Promise<void> {
+    if (readClaimedEnvironment(params.parserConfig) === null) return;
+    assertEnvironmentNotAlreadyClaimed({
+      parserConfig: params.parserConfig,
+      claimedBy: await this.environmentReaders(params.organizationId),
+      sourceId: params.sourceId,
+    });
+  }
+
+  /**
+   * Ask the provider whose account this connection reads, and refuse a second
+   * connection onto an account already read for the same report.
+   *
+   * Returns the account so the caller can store it, and the caller stores it on
+   * every save rather than only when it changes: an edit can swap the key for
+   * one belonging to a different account, and a stale stored account is one the
+   * next save would compare against a claim this connection no longer holds.
+   *
+   * Nothing is asked for a source type whose identity is not an account the
+   * provider reports — Azure and Power Platform name theirs in the config, and
+   * the compliance surfaces publish no organisation read at all.
+   */
+  private async resolveProviderAccount(params: {
+    organizationId: string;
+    sourceType: string;
+    parserConfig: Record<string, unknown>;
+    sourceId?: string;
+  }): Promise<{ providerAccountId?: string }> {
+    if (!readsProviderAccount({ sourceType: params.sourceType })) return {};
+    // Nothing to ask with, so nothing is claimed. Left undefined rather than
+    // null so an edit that omits the key does not wipe an account a previous
+    // save recorded.
+    if (!hasAdminCredentials(params.parserConfig)) return {};
+    const { providerAccountId } = await assertProviderAccountIsFree({
+      sourceType: params.sourceType,
+      parserConfig: params.parserConfig,
+      claimedBy: await this.providerAccountReaders(params.organizationId),
+      sourceId: params.sourceId,
+      lookUpProviderAccount: this.dependencies.lookUpProviderAccount,
+    });
+    return { providerAccountId };
+  }
+
+  /**
+   * Refuse a write whose config claims an Azure bill another source reads.
+   *
+   * The claim is read before anything is fetched. A config naming no
+   * subscription is the common case by a wide margin, and it cannot collide
+   * with anything, so it must not cost a query on every source write.
+   */
+  private async assertAzureBillIsFree(params: {
+    organizationId: string;
+    parserConfig: Record<string, unknown>;
+    sourceId?: string;
+    /** The stored config on an edit; absent on create. The credential guard
+     * needs it to tell a claim carried across from a claim newly made. */
+    storedParserConfig?: Record<string, unknown>;
+  }): Promise<void> {
+    if (readClaimedSubscription(params.parserConfig) === null) return;
+    // The bill's own credential first: it is a property of this save alone,
+    // so it must not wait on the cross-source read below.
+    assertAzureBillHasItsOwnCredential({
+      parserConfig: params.parserConfig,
+      storedParserConfig: params.storedParserConfig,
+    });
+    assertAzureBillNotAlreadyClaimed({
+      parserConfig: params.parserConfig,
+      claimedBy: await this.azureBillReaders(params.organizationId),
+      sourceId: params.sourceId,
+    });
+  }
+
+  /** Seal credentials after resolving the server-owned billing identity. */
+  private async prepareParserConfig(
+    params: Omit<Parameters<typeof withAzureBillIdentity>[0], "prisma">,
+  ): Promise<Prisma.InputJsonValue> {
+    return encryptParserConfigCredentials(
+      await withAzureBillIdentity({ ...params, prisma: this.prisma }),
+    ) as Prisma.InputJsonValue;
+  }
+
+  /**
+   * Every live source in the org that already reads an Azure bill.
+   *
+   * Archived sources are left out: they do not pull, so they read nothing, and
+   * holding a subscription against one would strand that bill behind a source
+   * nobody can see.
+   *
+   * The org's sources are read whole rather than filtered in the database. The
+   * comparison is case- and space-insensitive and a JSON-path filter is neither,
+   * so filtering there would quietly match nothing on exactly the input that
+   * needs catching. Admin writes are rare and an org's source count is small.
+   */
+  private async azureBillReaders(
+    organizationId: string,
+  ): Promise<AzureBillReader[]> {
+    const rows = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true, parserConfig: true },
+    });
+    return rows.flatMap((row) => {
+      const subscriptionId = readClaimedSubscription(
+        row.parserConfig as Record<string, unknown> | null,
+      );
+      return subscriptionId
+        ? [{ id: row.id, name: row.name, subscriptionId }]
+        : [];
+    });
+  }
+
+  /**
+   * Every live source in the org that already reads a conversation
+   * environment. Archived sources are left out for the same reason as the
+   * bill: they do not pull, so they read nothing, and holding an environment
+   * against one would strand it behind a source nobody can see.
+   */
+  private async environmentReaders(
+    organizationId: string,
+  ): Promise<EnvironmentReader[]> {
+    const rows = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true, parserConfig: true },
+    });
+    return rows.flatMap((row) => {
+      const environmentUrl = readClaimedEnvironment(
+        row.parserConfig as Record<string, unknown> | null,
+      );
+      return environmentUrl
+        ? [{ id: row.id, name: row.name, environmentUrl }]
+        : [];
+    });
+  }
+
+  /**
+   * Every source in the org that still holds a provider account.
+   *
+   * The list is "not archived", which is wider than the bill and environment
+   * lists on purpose: **only archiving gives an account up**. A source an admin
+   * switched off can be switched back on, and the day it is, both connections
+   * count the same spend — so a disabled source still holds its claim and the
+   * refusal tells the admin to archive it (00d claim C, settlement 8).
+   *
+   * `disabled` is the guard's own word, and the mapping to the real column is
+   * written out here rather than inferred: `status` is a free string whose
+   * values are `active`, `disabled` and `awaiting_first_event`, and only the
+   * middle one is an admin switching a connection off. `awaiting_first_event`
+   * sounds inactive and is not — it is a connection that has simply not
+   * received anything yet (00i settlement 5).
+   */
+  private async providerAccountReaders(
+    organizationId: string,
+  ): Promise<ProviderAccountReader[]> {
+    const rows = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        providerAccountId: true,
+        parserConfig: true,
+      },
+    });
+    return rows.flatMap((row) => {
+      if (!row.providerAccountId) return [];
+      const config = row.parserConfig as Record<string, unknown> | null;
+      const report = config?.report;
+      return [
+        {
+          id: row.id,
+          name: row.name,
+          providerAccountId: row.providerAccountId,
+          report: typeof report === "string" ? report : null,
+          disabled: row.status === "disabled",
+        },
+      ];
+    });
+  }
+
   // ---------------------------------------------------------------------
   // Writes
   // ---------------------------------------------------------------------
+
+  /**
+   * Defense-in-depth plan gate. Non-enterprise orgs can create up to
+   * NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer separately
+   * restricts source TYPE to otel_generic for them). This catches non-tRPC
+   * callers (background workers, webhook adapters) so the cap can't be
+   * bypassed regardless of entry point. Enterprise orgs are unbounded.
+   * Spec: specs/ai-gateway/license-gate-governance.feature.
+   *
+   * Its own method rather than a block inside `createSource` because it
+   * answers a different question from the rest of that function: whether this
+   * org may have another source at all, versus how this particular source is
+   * built and stored. The two get edited by different people for unrelated
+   * reasons -- a pricing change touches only this.
+   */
+  private async assertAnotherSourceIsAllowed({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    const plan = await getApp().planProvider.getActivePlan({ organizationId });
+    if (isEnterpriseTier(plan.type)) return;
+
+    const existing = await this.prisma.ingestionSource.count({
+      where: { organizationId, archivedAt: null },
+    });
+    if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
+      throw new IngestionSourceCapReachedError(
+        NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+      );
+    }
+  }
 
   async createSource(
     input: CreateIngestionSourceInput,
@@ -553,25 +1019,9 @@ export class IngestionSourceService {
     if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
       assertPullSchedule(input.pullSchedule);
     }
-    // Defense-in-depth plan gate. Non-enterprise orgs can create up to
-    // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
-    // separately restricts source TYPE to otel_generic for them). This
-    // catches non-tRPC callers (background workers, webhook adapters)
-    // so the cap can't be bypassed regardless of entry point. Enterprise
-    // orgs are unbounded. Spec: specs/ai-gateway/license-gate-governance.feature.
-    const plan = await getApp().planProvider.getActivePlan({
+    await this.assertAnotherSourceIsAllowed({
       organizationId: input.organizationId,
     });
-    if (!isEnterpriseTier(plan.type)) {
-      const existing = await this.prisma.ingestionSource.count({
-        where: { organizationId: input.organizationId, archivedAt: null },
-      });
-      if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        throw new IngestionSourceCapReachedError(
-          NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-        );
-      }
-    }
 
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       // The router's zod enum catches this before the service sees it; a
@@ -610,15 +1060,20 @@ export class IngestionSourceService {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
     };
-    assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
+    const { providerAccountId } = await this.assertCreatedConfigAllowed({
+      organizationId: input.organizationId,
+      sourceType: input.sourceType,
+      parserConfig: requestedParserConfig,
+    });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
-    const mergedParserConfig = encryptParserConfigCredentials(
-      requestedParserConfig,
-    )!;
+    const mergedParserConfig = await this.prepareParserConfig({
+      organizationId: input.organizationId,
+      parserConfig: requestedParserConfig,
+    });
 
     // The @@unique([organizationId, name]) constraint spans all rows
     // including archived ones. If an archived source holds the name,
@@ -637,6 +1092,10 @@ export class IngestionSourceService {
         description: input.description ?? null,
         ingestSecretHash,
         parserConfig: mergedParserConfig as Prisma.InputJsonValue,
+        // The account the provider itself named. Not a secret, and it cannot
+        // be turned back into a key — which is why it, and nothing derived
+        // from the key, is what the duplicate guard compares.
+        providerAccountId: providerAccountId ?? null,
         pullSchedule: input.pullSchedule ?? null,
         traceProjectId: input.traceProjectId ?? null,
         status: "awaiting_first_event",
@@ -685,46 +1144,27 @@ export class IngestionSourceService {
           "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.",
         );
       }
-      // Carry across every key a client is never shown. `credentials` is one;
-      // the `_`-prefixed internals are the rest, and `_rotation` is the one
-      // that bites — it holds the previous secret's hash for the 24h window
-      // after a rotation, so an edit landing inside that window used to cut the
-      // grace short and start rejecting upstream clients that had not rolled
-      // over yet. A client cannot send back what it never received, so absent
-      // must mean "unchanged" for all of them, not just the secret.
       const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
-      for (const key of Object.keys(stored)) {
-        // `adapter` and `schedule` join the list for the same reason as the
-        // rest: the composer deliberately renders neither, so a client cannot
-        // send them back and absent must mean unchanged. Dropping `adapter`
-        // leaves a pull source the worker can no longer dispatch — a rename
-        // would quietly stop the source pulling.
-        const hiddenFromClients =
-          key === "credentials" ||
-          key === "adapter" ||
-          key === "schedule" ||
-          key.startsWith("_");
-        if (hiddenFromClients && incoming[key] === undefined) {
-          incoming[key] = stored[key];
-        }
-      }
+      carryKeysHiddenFromClients({ stored, incoming });
       assertAdapterUnchanged({ stored, incoming });
       ({ cursorMustNotMove } = assertReportUnchangedOncePulled({
         existing,
         incoming,
       }));
-      // The adapter comes from the stored row, not from `incoming`. The edit
-      // form sends back only the fields it renders and `adapter` is not one of
-      // them, so dispatching on the incoming value would make this check do
-      // nothing on precisely the request that repoints the host — leaving the
-      // destination pinned at create and free afterwards.
-      assertPullDestinationAllowed({
-        parserConfig: incoming,
-        adapterId: stored.adapter as string,
-      });
-      data.parserConfig = encryptParserConfigCredentials(
+      const { providerAccountId } = await this.assertEditedConfigAllowed({
+        organizationId: input.organizationId,
         incoming,
-      ) as Prisma.InputJsonValue;
+        existing,
+      });
+      // Restated on every edit, for the reason on `resolveProviderAccount`.
+      if (providerAccountId !== undefined)
+        data.providerAccountId = providerAccountId;
+      data.parserConfig = await this.prepareParserConfig({
+        organizationId: input.organizationId,
+        parserConfig: incoming,
+        sourceId: existing.id,
+        storedConfig: stored,
+      });
     }
     if (input.status !== undefined) data.status = input.status;
     if (input.pullSchedule !== undefined)

@@ -244,8 +244,19 @@ const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_forbidden",
 ]);
 
+/**
+ * A rate limit, as the proxy's status fallback names it and as the providers
+ * name it in their own bodies: OpenAI and Azure OpenAI answer a 429 with
+ * `rate_limit_exceeded`, Anthropic with `rate_limit_error`, Google with
+ * `RESOURCE_EXHAUSTED`. The proxy carries the provider's code as the typed
+ * reason when the body has one, so the status fallback alone misses most
+ * real rate limits.
+ */
 const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "upstream_rate_limited",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
 ]);
 
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
@@ -328,6 +339,12 @@ const presentations = {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
   },
+  filter_too_complex: {
+    // fault: customer. The ceiling is deliberate; a sentence typed as bare
+    // words is one node per word, and quoting it makes it one node.
+    title: "Too many separate terms",
+    describe: () => "Put the sentence in quotes to search it as one phrase.",
+  },
   filter_field_unknown: {
     title: "Unknown filter field",
     describe: (error) => {
@@ -382,6 +399,11 @@ const presentations = {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
+  },
+  lwql_result_too_large: {
+    title: "This result is too large to return",
+    describe: () =>
+      "The answer is bigger than one response can carry. Select fewer columns, or use a smaller LIMIT, and run it again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -450,6 +472,137 @@ const presentations = {
     title: "This dashboard widget can't be opened",
     describe: () =>
       "We can't read what was stored for it. Rebuild the widget and save it again.",
+  },
+  instant_eval_query_budget_exceeded: {
+    title: "That's too much text to judge in one query",
+    describe: () =>
+      "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
+  },
+  instant_eval_questions_too_long: {
+    title: "Those questions leave no room for the text",
+    describe: () =>
+      "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
+  },
+  instant_eval_classifier_unavailable: {
+    title: "The judgements couldn't be made right now",
+    describe: () =>
+      "The query ran, but nothing could be judged. Try again in a moment.",
+  },
+  instant_eval_not_enabled: {
+    title: "Instant Evals aren't available yet",
+    describe: () =>
+      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+  },
+  instant_eval_not_found: {
+    title: "That run doesn't exist",
+    describe: () =>
+      "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_query_invalid: {
+    title: "That query can't run as a job",
+    describe: (error) => {
+      const parameters = error.meta.parameters;
+      // The named parameters are the whole of the fix, so the copy repeats them
+      // rather than sending the reader back to the statement to guess which
+      // ones a job cannot fill.
+      return Array.isArray(parameters) && parameters.length > 0
+        ? `Remove ${parameters.join(", ")} from the query and run it again.`
+        : "Edit the query and run it again.";
+    },
+  },
+  instant_eval_query_missing_columns: {
+    title: "That query is missing what a run needs",
+    describe: (error) =>
+      error.meta.isEvalFunctionMissing === true
+        ? "Add an eval function to the query's SELECT list, such as eval(...) over the text you want judged."
+        : "Add TraceId to the query's SELECT list so each judgement can be tied back to its trace.",
+  },
+  instant_eval_row_cap_exceeded: {
+    title: "That's more rows than one run may judge",
+    describe: (error) => {
+      const cap = error.meta.cap;
+      const maxCap = error.meta.maxCap;
+      if (typeof cap !== "number") return "Ask for fewer rows.";
+      // Two different asks: below the ceiling an upgrade lifts it, at the
+      // ceiling nothing does, and saying "upgrade" there would sell something
+      // that changes nothing.
+      return typeof maxCap === "number" && cap < maxCap
+        ? `This plan judges up to ${cap.toLocaleString()} rows in one run. Lower the limit, or upgrade to judge up to ${maxCap.toLocaleString()}.`
+        : `A run judges up to ${cap.toLocaleString()} rows. Split the selection across more than one run.`;
+    },
+  },
+  instant_eval_free_budget_exhausted: {
+    title: "Your free Instant Evals budget is used up",
+    // Both numbers are on the error, and the reader is deciding whether to
+    // upgrade, so the sentence says what the free allowance was and where
+    // upgrading is done rather than leaving them to find the plan page.
+    describe: (error) => {
+      const budget = error.meta.budgetUsd;
+      const allowance =
+        typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+    },
+  },
+  instant_eval_already_finished: {
+    title: "That run is already over",
+    describe: () => "There is nothing left to cancel.",
+  },
+  instant_eval_estimate_unavailable: {
+    title: "We couldn't work out the size of this run",
+    describe: () =>
+      "The estimate failed on our side. Try again, or start the run without one.",
+  },
+  instant_eval_stalled: {
+    title: "That run stopped making progress",
+    describe: () =>
+      "It was stopped after fifteen minutes without a judged page. Run it again, and narrow the query if it keeps happening.",
+  },
+  lwql_app_function_key_cap: {
+    title: "That's too many records to read at once",
+    describe: (error) => {
+      // The cap is per key kind, so the copy names the kind the run broke
+      // rather than always saying "conversations": a trace or span cap
+      // rejection that talks about conversations sends the reader looking in
+      // the wrong place.
+      const kind = error.meta.keyKind;
+      const noun =
+        kind === "thread"
+          ? "conversations"
+          : kind === "span"
+            ? "model calls"
+            : kind === "trace"
+              ? "traces"
+              : "records";
+      const cap = error.meta.cap;
+      const capped =
+        typeof cap === "number"
+          ? `A single run can read ${cap.toLocaleString()} ${noun}.`
+          : `A single run can only read so many ${noun}.`;
+      return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
+    },
+  },
+  lwql_app_function_read_budget: {
+    title: "That's too much trace content to read at once",
+    describe: (error) => {
+      const budget = error.meta.budgetBytes;
+      const sized =
+        typeof budget === "number"
+          ? `A single run can read ${Math.round(budget / 1_000_000).toLocaleString()} MB of trace content.`
+          : "A single run can only read so much trace content.";
+      return `${sized} Lower the row limit, or run the query in pages.`;
+    },
+  },
+  lwql_app_function_hydration_failed: {
+    // Deliberately says nothing about retrying a different way: the query
+    // itself was fine, so there is nothing for the reader to change.
+    title: "We couldn't read the trace content",
+    describe: () =>
+      "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
+  },
+  lwql_app_function_unavailable: {
+    title: "Extraction functions aren't available here yet",
+    describe: () =>
+      "This deployment hasn't finished setting up the functions this query uses. Ask your workspace administrator to redeploy, or contact support.",
   },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
@@ -587,7 +740,7 @@ const presentations = {
     // The function's own error text rides on `meta.message` for the CLI and
     // the run drawer's envelope; relayed prose is never rendered here.
     describe: () =>
-      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+      "The decorated function raised an error, or answered with something the platform cannot read. The process logs carry the stack, and the run shows what it said.",
   },
   agent_disconnected: {
     title: "The agent disconnected mid-call",
@@ -1511,13 +1664,22 @@ const presentations = {
     describe: () =>
       "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
   },
+  join_policy_not_licensed: {
+    // Read by an administrator opening the door, so it says what they can
+    // still do today as well as what the plan adds. Closing the door is
+    // never refused for this reason, so the copy never suggests they are
+    // stuck with a policy they cannot turn off.
+    title: "Choosing who can join needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. You can still invite people by email, and you can stop colleagues joining at any time. Talk to your account team about upgrading.",
+  },
   // Company domains only, and the copy stops there. Listing what counts as a
   // consumer mail provider would turn the refusal into a way to enumerate
   // the deny-list.
   join_auto_domain_unproven: {
-    title: "That domain is not proven yet",
+    title: "That domain is not verified yet",
     describe: () =>
-      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+      "Automatic joining works once you have verified the domain is yours — publish the record or serve the file from the Authentication page, then try again. Personal email domains are never eligible.",
   },
   join_auto_connection_admits: {
     title: "Your identity provider already admits that domain",
@@ -1609,6 +1771,31 @@ const presentations = {
     describe: () =>
       "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
   },
+  // ---- the sign-in and sign-up screens ----
+  auth_rate_limited: {
+    title: "Too many attempts",
+    // The countdown when the limit named one, the vague version when it did
+    // not. "A few minutes" is the honest floor rather than a guess dressed up
+    // as a number.
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Wait a few minutes, then try again.";
+      const minutes = Math.ceil(seconds / 60);
+      return minutes <= 1
+        ? "Wait a minute, then try again."
+        : `Wait ${minutes} minutes, then try again.`;
+    },
+  },
+  auth_no_address_to_confirm: {
+    title: "This account has no email address",
+    describe: () =>
+      "Add an email address in your account settings, then confirm it.",
+  },
+  auth_direct_registration_unavailable: {
+    title: "Accounts here are created by your identity provider",
+    describe: () =>
+      "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -1651,12 +1838,44 @@ const presentations = {
     describe: () =>
       "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
   },
+  scim_token_too_short: {
+    title: "That token is too short",
+    // The number is written here rather than read off the error: `meta` is a
+    // client contract of named fields, and adding one that only this sentence
+    // reads would be a field with no consumer. The service and this string
+    // are two lines apart in review, which is what keeps them in step.
+    describe: () =>
+      "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
+  },
+  scim_token_unavailable: {
+    title: "Choose a different token value",
+    // Says nothing about why it cannot be used. "Somebody else has it" would
+    // confirm to one customer that another customer holds a particular secret,
+    // which is a probe rather than an explanation.
+    describe: () =>
+      "That value cannot be used. Pick a different one, or let us generate a token for you.",
+  },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to
     // somebody else, on purpose: the copy must not confirm the second.
     title: "Connection not found",
     describe: () =>
       "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_apply_not_retired: {
+    // Read only by a platform operator on the oversight surface, so it may
+    // name the mechanism: they are the person who decides whether to wait.
+    title: "That operation is still being retried",
+    describe: () =>
+      "Only an operation that has stopped being retried can be sent through again. Wait for it to be retired, then re-drive it.",
+  },
+  scim_apply_not_redrivable: {
+    // The history keeps ids and reason codes, never the directory's payload
+    // (the D01 rule), so an addition or a group mapping cannot be
+    // reconstructed from it. Say what does put it right instead.
+    title: "That operation cannot be sent through again",
+    describe: () =>
+      "Only a removal can be re-driven. For anything the directory adds or maps, its next push re-asserts what it still believes.",
   },
   scim_write_outside_connection: {
     // The identity provider is pointed at the wrong connection. Nothing about
@@ -1746,6 +1965,15 @@ const presentations = {
     title: "This account is deactivated",
     describe: () =>
       "Its sessions were revoked on purpose. Reactivate the account first.",
+  },
+  cannot_reimpersonate_while_impersonating: {
+    // A deliberate denial: you are already impersonating an account, so the
+    // audit trail has to return to you before it can name you acting as
+    // somebody else. Stopping the current impersonation is the way to start
+    // another, so the copy names that action rather than inviting a retry.
+    title: "Stop impersonating first",
+    describe: () =>
+      "You are already impersonating an account. Stop before impersonating another.",
   },
   user_to_impersonate_not_found: {
     title: "User not found",
@@ -1852,6 +2080,11 @@ const presentations = {
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
   },
+  scenario_not_found: {
+    title: "That scenario isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a scenario again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {
@@ -1950,6 +2183,17 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  // ---- one-time secret reveal ----
+  // Both say the same thing to do, because the reader's next move is the
+  // same either way: the value is gone, so a new key is the only way to one.
+  secret_already_revealed: {
+    title: "This key was shown once and cannot be shown again",
+    describe: () => "Create a new key if you did not save it.",
+  },
+  secret_reveal_expired: {
+    title: "This key can no longer be shown",
+    describe: () => "Create a new key if you did not save it.",
+  },
   scenario_field_unknown: {
     // The names are our own identifiers, not free text: the editor shows the
     // refused name beside the ones the suite declares so the typo is visible.
@@ -2041,6 +2285,14 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  session_is_current: {
+    // fault: customer. Signing out of the browser you are reading this in is
+    // a different act with a different control, so the refusal points at it
+    // rather than just saying no.
+    title: "This is the browser you're using",
+    describe: () =>
+      "Signing out here would end this visit. Use the sign-out control instead.",
+  },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator
     // can have created and only an operator can resolve. Nothing was charged,
@@ -2090,6 +2342,15 @@ const presentations = {
     title: "That verification link has expired",
     describe: () => "Request a new verification email and use the newest link.",
   },
+  // Deliberately NOT "didn't work" and not "expired": the link is still good
+  // and the person did nothing wrong, so the copy asks for the one thing that
+  // actually resolves it rather than sending them back to their inbox for a
+  // new email they do not need.
+  identity_verification_not_settled: {
+    title: "We're still confirming that address",
+    describe: () =>
+      "Your confirmation went through and we're finishing up. Open the same link again in a moment.",
+  },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
     describe: () =>
@@ -2099,6 +2360,23 @@ const presentations = {
     title: "That sign-in method can't be verified right now",
     describe: () =>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  // ADR-128 §12. Both are races rather than mistakes: a review queue is read
+  // by people, and the world moves between reading it and clicking.
+  identity_match_suggestion_not_found: {
+    title: "That match suggestion is no longer there",
+    describe: () =>
+      "Somebody may have confirmed it already, or it stopped being suggested. Reload to see the current list.",
+  },
+  identity_already_linked: {
+    title: "This person is already linked to an account",
+    describe: () =>
+      "Someone linked them while this list was open. Reload to see who they are linked to.",
+  },
+  identity_erased: {
+    title: "This person has been erased",
+    describe: () =>
+      "Their details were removed at their request, so they can no longer be linked to an account. Reload to see the current list.",
   },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
@@ -2116,6 +2394,20 @@ const presentations = {
     title: "You'd have no way back into your account",
     describe: () =>
       "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
+  },
+  // better-auth's own codes, thrown by `LastWayInGuard`
+  // (`src/server/better-auth/last-way-in.ts`) on `/passkey/delete-passkey`
+  // and `/two-factor/disable`. See `codes.ts` for why these two are spelled
+  // SCREAMING_CASE rather than our usual snake_case.
+  LAST_WAY_IN: {
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "That is the only way into this account. Add another way to sign in first.",
+  },
+  MFA_REQUIRED_BY_ORGANIZATION: {
+    title: "Your organization requires two-step verification",
+    describe: () =>
+      "Your organization requires two-step verification, so this cannot be removed.",
   },
   identity_mfa_code_invalid: {
     // Deliberately says nothing about whether two-step verification is even
@@ -2140,10 +2432,30 @@ const presentations = {
     describe: () =>
       "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
   },
+  identity_mfa_password_invalid: {
+    // Named where the code refusal is not, and deliberately so: this says
+    // nothing the sign-in screen does not already say, and somebody who
+    // mistyped a password has to be sent to the right field.
+    title: "That password didn't match",
+    describe: () =>
+      "Enter the password you sign in to LangWatch with, then try again.",
+  },
   identity_mfa_required_by_organization: {
     title: "An organization you belong to requires two-step verification",
+    // The two honest ways out, and nothing else. An administrator's reset
+    // starts a fresh setup — it does not lift the requirement — so it is
+    // named as what it is.
     describe: () =>
-      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+      "You can't turn it off while you're a member. Leave that organization, or ask an administrator to reset two-step verification for you, which starts a fresh setup.",
+  },
+  identity_mfa_requirement_not_licensed: {
+    // Read by an administrator who is turning a security control on, so it
+    // says what they can still do today as well as what the plan adds.
+    // Turning the requirement OFF is never refused for this reason, so the
+    // copy never suggests they are stuck with it.
+    title: "Requiring two-step verification needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. Members can still set two-step verification up on their own accounts. Talk to your account team about upgrading to require it of everybody.",
   },
   identity_mfa_enrollment_required: {
     // Not an authentication failure: nobody is signed out and every other
@@ -2158,12 +2470,92 @@ const presentations = {
     describe: () =>
       "It may have been cancelled or timed out. Try again, or use another way to sign in.",
   },
+  identity_passkey_already_registered: {
+    title: "That passkey is already on your account",
+    describe: () =>
+      "You can sign in with it now. To add a different one, use another device or security key.",
+  },
+  identity_passkey_already_signed_in: {
+    // Creating an account with a passkey is a signed-out gesture. Run from a
+    // browser that already holds a session, it would attach the new address's
+    // passkey to the account already signed in, so it is refused with the one
+    // thing that resolves it.
+    title: "You're already signed in",
+    describe: () =>
+      "Sign out first to create a new account with a passkey, or add this passkey to the account you're in from your security settings.",
+  },
+  identity_password_rejected: {
+    // The policy is one module's (`passwordProblem`), and this says the same
+    // thing the field-level rejection says, for the case where the server was
+    // the first to see it.
+    title: "That password wasn't accepted",
+    describe: () =>
+      "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_reset_link_invalid: {
+    // Expired, already spent and never issued collapse to one answer on
+    // purpose: the remedy is the same for all three, and telling them apart
+    // would say whether a link had been used, which is not our news to give.
+    title: "That password reset link no longer works",
+    describe: () =>
+      "It may have expired or already been used. Request a new one and open the newest email.",
+  },
+  identity_session_max_lifetime_too_short: {
+    // The maximum length has to be readable ALONGSIDE the idle timeout, since
+    // that is the only way the mistake this refuses ever gets made — two
+    // numbers typed into the same form, one of which quietly disables the
+    // other.
+    title: "The maximum session length is shorter than the idle timeout",
+    describe: () =>
+      "A session would always hit the maximum before it could ever go idle. Raise the maximum, or lower the idle timeout, so both can apply.",
+  },
+  identity_sign_in_locked_out: {
+    // Deliberately says NOTHING about the account: not whether it exists, not
+    // whether the password was right, not how many attempts are left. An
+    // address nobody holds is answered with these exact words, which is what
+    // keeps a lock-out from naming the addresses worth attacking.
+    //
+    // It does say the two things the person needs — that waiting is the
+    // remedy, and that a reset is the shortcut — because somebody locked out
+    // of their own account with no idea what to do next simply contacts
+    // support, and the point of the copy is to prevent that.
+    title: "Too many sign-in attempts",
+    describe: () =>
+      "Wait a little while and try again. Resetting your password from the sign-in screen also lets you straight back in.",
+  },
+  identity_sign_in_refused: {
+    // Says nothing about which half was wrong, and nothing about whether the
+    // address has an account. The two are indistinguishable by design
+    // (specs/auth/sign-in-failure-messages.feature), and this copy is what
+    // keeps them that way once the wire carries a stable code.
+    title: "That email or password is wrong",
+    describe: () =>
+      "Check both and try again. If you have forgotten the password, reset it from the sign-in screen.",
+  },
+  identity_identifier_already_held: {
+    // Only ever raised for an address already on the CALLER'S OWN account, so
+    // it can say so plainly. An address somebody else holds is not refused
+    // here at all — that check belongs at verification, where it is not an
+    // existence oracle (`identity_email_in_use`).
+    title: "That address is already on your account",
+    describe: () =>
+      "You can already sign in with it. To add another way in, use a different address.",
+  },
   identity_passkey_not_recognized: {
     // Same answer whether the credential belongs to somebody else or to
     // nobody: this endpoint does not tell callers which passkeys exist.
-    title: "We couldn't use that passkey",
+    //
+    // Naming both ORDINARY reasons is not a leak and is the whole use of this
+    // sentence. The old copy said "check which passkeys are on your account",
+    // which assumes an account — and this is a SIGNED-OUT screen, where the
+    // two likely readers are somebody whose password manager offered a
+    // credential saved for a different site, and somebody who has not signed
+    // up yet. Neither could act on the old sentence. Saying "it may be" of
+    // both confirms nothing about the address in the field, so it is still no
+    // oracle.
+    title: "That passkey isn't one we recognize",
     describe: () =>
-      "Try again, or sign in another way and check which passkeys are on your account.",
+      "It may have been saved for another site, or belong to an account that doesn't exist here yet. Sign in with your email address instead, or create an account.",
   },
   cannot_impersonate_without_second_factor: {
     title: "Set up two-step verification first",
@@ -2174,6 +2566,11 @@ const presentations = {
     title: "This single sign-on connection has moved on",
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
+  },
+  sso_connection_not_found: {
+    title: "That single sign-on connection is not here any more",
+    describe: () =>
+      "It may have been removed while this page was open. Refresh to see what your organization has now.",
   },
   sso_connection_domain_taken: {
     // Says the domain is spoken for and stops there: which organization holds
@@ -2187,6 +2584,47 @@ const presentations = {
     title: "This connection isn't ready to go live",
     describe: () =>
       "Turning it on needs a verified domain, a successful test sign-in, and a way for someone to get in without the identity provider.",
+  },
+  // The same three preconditions as above, one code each. The one above is
+  // what the aggregate refuses with and it is right for an operator who
+  // commanded an activation directly; these are what somebody looking at
+  // their own setup screen gets, and each says which step to go back to.
+  sso_activation_domain_unproved: {
+    title: "Prove a domain first",
+    describe: () =>
+      "Nobody can be sent to your identity provider until a domain is proved to be yours. Claim the domain and publish the record we give you.",
+  },
+  sso_activation_test_sign_in_missing: {
+    title: "Sign in through it once first",
+    describe: () =>
+      "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
+  },
+  sso_break_glass_expiry_out_of_range: {
+    title: "Choose a date inside the allowed window",
+    describe: (error) => {
+      const days = num(error, "maxWindowDays", 90);
+      return `A way back in is temporary on purpose, so it can be granted for up to ${days} days at a time. Pick a date in the future and inside that window, and renew it if you still need it.`;
+    },
+  },
+  sso_break_glass_holder_ineligible: {
+    title: "Choose an administrator for the way back in",
+    describe: () =>
+      "The way back in has to belong to somebody who could actually use it, so it can only be granted to an administrator of this organization.",
+  },
+  sso_break_glass_last_way_in: {
+    title: "That grant is the only way back in",
+    describe: () =>
+      "While single sign-on decides who gets in, someone has to be able to sign in without it. Grant another person a way in first, or remove the connection itself.",
+  },
+  sso_activation_break_glass_missing: {
+    title: "Name someone who can still get in",
+    describe: () =>
+      "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
+  },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
   },
   sso_connection_string_edit_retired: {
     title: "Single sign-on is configured on the connection now",
@@ -2208,10 +2646,204 @@ const presentations = {
     describe: () =>
       "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
   },
-  sso_saml_not_self_serve: {
-    title: "SAML connections are set up with us",
+  sso_connection_issuer_not_public: {
+    title: "That issuer address cannot be reached from the internet",
+    // Says what to do and nothing about our network: the rejected string is
+    // the reader's own, and describing what it resolved to would tell a
+    // prober more than it tells an administrator.
     describe: () =>
-      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+      "Enter the issuer URL your identity provider publishes, starting with https. An address that only works inside a private network cannot be used here.",
+  },
+  sso_connection_already_registered: {
+    // Says there is one and what to do with it. Never says "rate limit": the
+    // bound is a rate limit in effect, but to the administrator reading this
+    // it is simply that they already did this.
+    title: "This organization already has an identity provider",
+    describe: () =>
+      "Only one can be set up at a time. Remove the one that is there before registering another, or add the domains you need to it.",
+  },
+  sso_credentials_required: {
+    // Names the two shapes rather than the field that was empty, because the
+    // form is what says which box is blank and the reader is looking at it.
+    title: "Some of the identity provider's details are missing",
+    describe: () =>
+      "For OpenID Connect we need the issuer address, the client id and the client secret. For SAML we need the sign-in address, and either your identity provider's metadata or its entity id and signing certificate.",
+  },
+  sso_issuer_unreachable: {
+    // Says the address did not answer and nothing about our side of the call.
+    // A timeout, a refused connection and a 404 are one thing to the person
+    // reading: the address is not the one to use.
+    title: "That address did not answer as an identity provider",
+    describe: () =>
+      "Check the issuer address with whoever administers your identity provider — it is usually the one its OpenID Connect settings call the issuer or the domain. Then try again.",
+  },
+  sso_saml_metadata_invalid: {
+    title: "That is not identity provider metadata",
+    describe: () =>
+      "Paste the metadata your identity provider publishes for itself. A file describing LangWatch, or an application's own settings, will not work here.",
+  },
+  sso_certificate_invalid: {
+    title: "The signing certificate could not be read",
+    describe: () =>
+      "Copy the whole certificate from your identity provider, including the BEGIN and END lines, and paste it again.",
+  },
+  sso_license_required: {
+    // Names activating a licence and nothing else. An environment variable,
+    // a hostname or a service name would be useless to whoever is reading
+    // and an internals leak on a screen an administrator opens.
+    title: "Single sign-on needs an active licence",
+    describe: () =>
+      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  sso_domain_claim_pending: {
+    // Reached by one claim only now: one on a domain somebody else already
+    // proved. Says the claim is being looked at and nothing about who is
+    // looking or who holds the domain — neither is the reader's to know.
+    title: "We're still reviewing this domain",
+    describe: () =>
+      "You can prove the domain as soon as the review is done. We'll let you know, and nothing else about your setup is waiting on it.",
+  },
+  sso_domain_not_eligible: {
+    // Names the shape of domain that works and lists nothing: printing the
+    // deny-list would turn the refusal into a way to read it back.
+    title: "That domain can't be used for single sign-on",
+    describe: () =>
+      "Use a domain your company owns, like the one in your work email addresses. Shared mail providers and domain endings can't be claimed by one company.",
+  },
+  sso_domain_claim_throttled: {
+    title: "You've claimed a lot of domains just now",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const unaffected = "The domains you've already claimed are unaffected.";
+      if (seconds <= 0) return `Try that again shortly. ${unaffected}`;
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}. ${unaffected}`;
+    },
+  },
+  sso_domain_proof_not_found: {
+    title: "We couldn't find that record yet",
+    describe: () =>
+      "Publish the record shown here on your domain, then check again. Changes to DNS can take a while to reach us.",
+  },
+  sso_domain_file_not_found: {
+    title: "We couldn't find that file yet",
+    describe: () =>
+      "Serve the value shown here as a plain-text file at the well-known address, then check again.",
+  },
+  sso_domain_fetch_failed: {
+    // Deliberately not the words above: we did not look and find nothing —
+    // we could not read the file at all. The domain may be mid-deploy or
+    // refusing us, so the only true instruction is to try again.
+    title: "We couldn't reach that file just now",
+    describe: () =>
+      "Fetching the file from your domain didn't work this time. Nothing about your setup changed — check the address is served over https and try again in a few minutes.",
+  },
+  sso_domain_lookup_failed: {
+    // Deliberately NOT the words above. We did not look and find nothing —
+    // we could not look, so "publish it and check again" would send an
+    // administrator to change a record that is already correct. The words
+    // say to try again and name no resolver, nameserver or timeout.
+    title: "We couldn't check your domain just now",
+    describe: () =>
+      "Looking your domain's records up didn't work this time. Nothing about your setup changed — try again in a few minutes, and tell us if it keeps happening.",
+  },
+  sso_domain_proof_expired: {
+    title: "That record has expired",
+    describe: () =>
+      "Ask for a fresh one and publish it — your approved domain is unaffected, and you don't start over.",
+  },
+  sso_self_serve_unavailable: {
+    // Offers a conversation and names no flag: a customer cannot act on a
+    // flag name, and printing one turns a rollback lever into something
+    // support has to explain away.
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    describe: () =>
+      "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+  // The single sign-on gate's refusals
+  // (specs/identity/sso-assertion-refusals.feature).
+  //
+  // WRITTEN FOR THE PERSON BOUNCED TO THE SIGN-IN SCREEN, who is usually not
+  // the person who can fix any of this — so each one says which kind of thing
+  // is wrong and who to ask, and none of them says "check your settings" to
+  // somebody with no settings to check. The administrator reads the same codes
+  // on the single sign-on settings screen, where they are rendered as the
+  // remedy instead; see `useTestSignIn`.
+  sso_sign_in_refused: {
+    // The general one, for the causes we will not name. It must not borrow a
+    // word from the credential refusal: nobody on this path typed a password,
+    // and `identity_sign_in_refused` has to keep meaning exactly one thing.
+    title: "Your sign-in wasn't accepted",
+    describe: () =>
+      "Your identity provider signed you in, but LangWatch would not accept it. Ask whoever manages single sign-on for your organization.",
+  },
+  sso_test_arrival_cannot_create_organization: {
+    // The reader is an administrator two steps from finishing their own
+    // setup, wearing somebody else's sign-in. What they need is to be told
+    // the test WORKED — the screen they landed on implies it did not — and
+    // that the way on is back to their own account, not forward into a new
+    // organization. Naming no mechanism: "the connection is not live yet" is
+    // the whole of the reason and the thing they are about to fix.
+    title: "That sign-in was a test, so there is nothing to set up here",
+    describe: () =>
+      "Your identity provider signed you in, which is what the test was for. It signed you in as someone who is not a member of your organization yet, because the connection is not turned on. Sign back in as yourself to finish turning it on — creating an organization here would leave your setup behind in the first one.",
+  },
+  sso_assertion_without_address: {
+    // Names the missing thing rather than the mechanism: "release the email
+    // claim" is what the administrator needs and what they will read on the
+    // settings screen, and it is not something this reader can act on.
+    title: "Your identity provider didn't send an email address",
+    describe: () =>
+      "It signed you in without one, and LangWatch has nothing to match to an account. Ask whoever manages single sign-on to include your email address.",
+  },
+  sso_setup_address_mismatch: {
+    // NAMES THE ADDRESS, NOT THE LIFECYCLE. The previous wording led with
+    // "single sign-on isn't finished being set up", which is true and useless
+    // — and actively confusing for the one reader most likely to see it, the
+    // administrator running the test sign-in that setup asked them for. They
+    // are told they cannot do the thing they are being told to do.
+    //
+    // Still names nobody: which address would have worked is not a fact this
+    // screen's reader is entitled to. The administrator gets that on the
+    // settings screen, where they are already signed in as the account that
+    // holds it.
+    title: "That address can't sign in through this connection yet",
+    describe: () =>
+      "Your organization is still setting single sign-on up, and until its domain is verified this connection only accepts the address of the person setting it up. Sign in the way you did before, or ask whoever is setting it up.",
+  },
+  sso_domain_not_verified: {
+    title: "That address isn't on a verified domain",
+    describe: () =>
+      "Your organization hasn't verified the domain of the address your identity provider sent. Ask whoever manages single sign-on to verify it.",
+  },
+  sso_domain_proof_lapsed: {
+    // Says why a colleague can sign in and this reader cannot, because that
+    // is the question a lapsed proof actually produces.
+    title: "Your organization's domain verification has lapsed",
+    describe: () =>
+      "People who already sign in this way are unaffected, but it can't vouch for a new account until the record is published again. Ask whoever manages single sign-on to republish it.",
+  },
+  identity_link_proposal_not_found: {
+    title: "That waiting sign-in is no longer there",
+    describe: () =>
+      "It was decided or withdrawn since this page was loaded. Reload the person and look at what is waiting now.",
+  },
+  identity_link_proposal_resolved: {
+    title: "Somebody already decided this sign-in",
+    // Names the decision and the hand that made it, because the way this
+    // refusal actually happens is two operators on the same support case —
+    // and "already decided" on its own sends the second one hunting for a
+    // bug instead of talking to the first.
+    describe: (error) => {
+      const outcome =
+        str(error, "decidedOutcome", "decided") === "confirmed"
+          ? "confirmed"
+          : "rejected";
+      const by = str(error, "decidedByActorId", "");
+      return by
+        ? `It was ${outcome} by ${by}. Reload the person to see what changed, and talk to them before deciding anything else here.`
+        : `It was ${outcome} already. Reload the person to see what changed.`;
+    },
   },
   identity_link_proposed: {
     title: "An administrator needs to confirm this sign-in",
@@ -2236,11 +2868,6 @@ const presentations = {
     describe: () =>
       "Another account already holds it. Sign in with that account, or use a different address here.",
   },
-  identity_engine_unavailable: {
-    title: "We couldn't finish creating your account",
-    describe: () =>
-      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
-  },
 
   // ---- governance ----
   anomaly_rule_not_found: {
@@ -2252,10 +2879,68 @@ const presentations = {
     describe: () =>
       "It may have been archived. Reload to see the current list.",
   },
+  impersonation_cannot_change_credentials: {
+    // A deliberate denial, like the admin-to-admin impersonation one: how an
+    // account signs in belongs to its owner, and support access must never
+    // mint or replace a credential on it.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. How this account signs in can only be changed by its owner.",
+  },
+  ingestion_key_not_found: {
+    title: "Ingestion key not found",
+    describe: () =>
+      "That key is not one of yours, or it was already removed. Refresh the list and try again.",
+  },
+  ingestion_key_revoke_incomplete: {
+    title: "Some keys could not be revoked",
+    describe: (error) => {
+      const survivors = error.meta.survivors;
+      const named =
+        Array.isArray(survivors) && survivors.length > 0
+          ? ` Still live: ${survivors.map((label) => String(label)).join(", ")}.`
+          : "";
+      return `No new key was minted because the previous keys for this source could not all be revoked.${named} Try again; keys already revoked stay revoked.`;
+    },
+  },
+  ingestion_key_session_revoked: {
+    title: "This device is signed out",
+    describe: () =>
+      "The CLI session on this machine was signed out, so it cannot mint an ingestion key. Run `langwatch login --device` and try again.",
+  },
+  ingestion_key_source_not_allowed: {
+    title: "This source is set up from the CLI",
+    describe: (error) => {
+      const sourceType = error.meta.sourceType;
+      const tool = typeof sourceType === "string" ? sourceType : "this tool";
+      return `A key for ${tool} is minted on the machine that runs it. Run \`langwatch instrument\` there, or connect a source a template names.`;
+    },
+  },
+  ingestion_key_workspace_missing: {
+    title: "Finish setting up your workspace",
+    describe: () =>
+      "Your personal workspace is not ready yet. Sign in again and retry the connection.",
+  },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  agent_listing_unavailable: {
+    // fault: platform, and the copy is written to match. Nothing reached a
+    // provider here — the ask could not be recorded at all — so there is no
+    // outcome landing later, no half-finished sync, and nothing already on
+    // the page is affected.
+    //
+    // It deliberately does not say "try again". Both causes are settings of
+    // the install rather than moments: this deployment does not run the
+    // pipeline that carries listings, or the organization has no governance
+    // project for the request to be tenanted to. Pressing the button a second
+    // time changes neither, and copy that implied otherwise would send an
+    // admin round a loop that cannot end.
+    title: "Agent sync isn't switched on for this organization",
+    describe: () =>
+      "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
   },
 
   // ---- datasets ----
@@ -2344,6 +3029,14 @@ const presentations = {
   },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
+  trace_attribute_values_withheld: {
+    title: "You cannot read the values behind this attribute",
+    // Two rules land here and they have different remedies, so the copy names
+    // both rather than sending half the readers to the wrong setting.
+    describe: () =>
+      "Attribute values can carry prompts and completions, so they are listed only where you can read captured content and where no attribute policy restricts this key. Ask a project admin about captured input and output, or about the attribute access policy. Filtering on a named field such as model or status works either way.",
+  },
+
   trace_sharing_disabled: {
     title: "Sharing is turned off for this project",
     describe: () =>
@@ -3137,6 +3830,11 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  guided_onboarding_path_unknown: {
+    title: "That onboarding path doesn't exist",
+    describe: () =>
+      "Pick one of Evals & LLM Ops, Coding Agent Tracking, Gateway or Governance.",
+  },
   github_not_connected: {
     title: "GitHub is not connected",
     describe: () =>
@@ -3199,6 +3897,11 @@ const presentations = {
   voice_name_required: {
     title: "A name is required to save the agent",
     describe: () => "",
+  },
+  voice_phone_transport_unavailable: {
+    title: "Phone targets have no browser call",
+    describe: () =>
+      "A phone target has no browser call. Run a scenario against the phone number instead.",
   },
   voice_recording_unavailable: {
     title: "The call recording is not available",
@@ -3441,7 +4144,7 @@ const presentations = {
         return "The model provider refused this key or its permissions. Check the credential configured for this model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
-        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+        return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";

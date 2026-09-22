@@ -12,7 +12,7 @@
  * suite does not have to mount a widget — and everything Chakra, tRPC and Vega
  * behind it — to read one sentence.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";

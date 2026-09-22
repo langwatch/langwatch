@@ -135,8 +135,10 @@ CRITICAL: Do NOT guess how to instrument. Different frameworks have different in
 
 ## Step 2: Install the LangWatch SDK
 
-For Python: `pip install langwatch` (or `uv add langwatch`).
-For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
+For Python, a ladder, stopping at the first that works, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line (a venv uv made has no pip in it); otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists, and only then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`. A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
+For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
+`uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `python -m pip show langwatch` gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
+Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require('langwatch')"` for TypeScript. A Python release below 1.3.0 has neither, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, and pip walks back to the last release with none. `pip install langwatch --upgrade` cannot help there. A failed check is a question about the interpreter, asked before giving up: "Install Python 3.13 with uv for me" or "I'll pick the interpreter myself".
 
 If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
@@ -164,6 +166,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -174,10 +203,14 @@ Do NOT consider the work complete without verifying. In order:
 4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
 5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
+This step only proves traces arrive. To find specific traces afterwards (a user, an error, a thumbs down), use the `find-traces` skill.
+
 ## Common Mistakes
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 ````
 
@@ -1728,7 +1761,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -1741,7 +1774,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -2106,6 +2139,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -2212,7 +2246,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -2247,7 +2281,7 @@ Report failures as they happened. If a CLI command failed or the platform was un
 A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
 
 1. Restart the service that holds the connect call, on the same port.
-2. Run `langwatch agent get <name>` and read the parameter list back.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
 3. Put that list in the pull request body, as the command printed it.
 
 When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
@@ -2378,6 +2412,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -3548,8 +3583,10 @@ CRITICAL: Do NOT guess how to instrument. Different frameworks have different in
 
 ## Step 2: Install the LangWatch SDK
 
-For Python: `pip install langwatch` (or `uv add langwatch`).
-For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
+For Python, a ladder, stopping at the first that works, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line (a venv uv made has no pip in it); otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists, and only then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`. A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
+For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
+`uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `python -m pip show langwatch` gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
+Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require('langwatch')"` for TypeScript. A Python release below 1.3.0 has neither, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, and pip walks back to the last release with none. `pip install langwatch --upgrade` cannot help there. A failed check is a question about the interpreter, asked before giving up: "Install Python 3.13 with uv for me" or "I'll pick the interpreter myself".
 
 If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
@@ -3577,6 +3614,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -3587,10 +3651,14 @@ Do NOT consider the work complete without verifying. In order:
 4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
 5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
+This step only proves traces arrive. To find specific traces afterwards (a user, an error, a thumbs down), use the `find-traces` skill.
+
 ## Common Mistakes
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 
 ---
@@ -4917,7 +4985,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -4930,7 +4998,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -5476,7 +5544,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -5488,11 +5558,13 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
-langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
+
+A search that names no origin counts what the Trace Explorer counts (every trace except Langy's own), so the numbers you report match the link on the card. When the ask is to find specific traces rather than to diagnose the agent ("show me the thumbs down ones", "filter to alice"), use the `find-traces` skill: it drives the Explorer and searches every form a concept can take.
 
 For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
@@ -5521,7 +5593,8 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure
 ````
 
@@ -5651,7 +5724,7 @@ Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactf
 After each improvement:
 
 1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run <id|name> --target <type:id> --wait`, etc.)
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run "<id|name>" --target <type:id> --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 
@@ -7104,6 +7177,430 @@ langwatch chart delete <chart-id>
         </div>
       </div>
       <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/lwql-charts/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Build a chart from a question and put it on my dashboard"} data-track-skill={"langwatch/skills/recipes/lwql-charts"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Build me a custom chart widget</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/dashboard-widgets"} data-track="docs_copy_skill_install" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+          <code>npx skills add langwatch/skills/recipes/dashboard-widgets</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/dashboard-widgets"} data-track="docs_copy_slash_command" data-track-title={"Build me a custom chart widget"} data-track-command={"/dashboard-widgets"}>
+          <code><span className="lw-slash-command">/dashboard-widgets</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Build me a custom chart widget
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Author a Dashboard Widget
+
+Turn a question ("show cost per model as a bar chart") into a saved dashboard widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
+
+Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
+
+Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+
+## Step 1: Discover the schema before writing any SQL
+
+Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+
+```bash
+langwatch dashboard-widget schema -f json
+```
+
+Read the datasets, their grain, their time column, and which columns are `available` to you.
+
+**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+
+## Step 2: Write the queries file
+
+`--queries-file` is a JSON array of named queries: `{ name, sql, parameters? }`. A widget's code calls a query by `name` — the two files are one unit.
+
+- `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
+- The reserved bound names `{dashboard_context_period_start:DateTime}`, `{dashboard_context_period_end:DateTime}`, `{dashboard_context_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. The `dashboard_context_` prefix is reserved — supplied by the dashboard, read-only; author-declared params are separate. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `dashboard_widget_query_reserved_param` / a schema validation error. On the dashboard-widgets authoring page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
+- Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
+
+```json
+[
+  {
+    "name": "cost_by_model",
+    "sql": "SELECT model, sum(costCents) / 100.0 AS cost FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "parameters": []
+  }
+]
+```
+
+## Step 3: Write the widget file
+
+One React/TSX file, default-exporting a component. **React and Recharts are available as globals** in the render iframe (`window.React`, `window.Recharts`) — no import needed, no build step (in-browser Babel compiles the file on load). You may also `import` from `"react"`, `"react-dom"`, `"react-dom/client"`, `"recharts"`, or `"@langwatch/charts"` if you prefer that style; these resolve to the same globals, and importing anything else is refused at compile time.
+
+Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches an entry in the queries file. It returns the same shape as TanStack Query's `useQuery` — same field names, on purpose:
+
+```jsx
+const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+```
+
+- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error; against stale seed data that is expected unless the SQL uses a wide window (see Step 1).
+- `isLoading` is `true` only for the first fetch, before any data has ever landed. `isFetching` is `true` for any fetch in flight, including a background refetch — use it if you want to show a subtle "updating" state without clearing the chart.
+- `isError` is `true` on failure; `error` is then an `Error` (`error.message`) — it never throws into the component. An undeclared param, a reserved-param misuse, or a SQL error all surface here instead of crashing the widget. `status` is `"pending" | "error" | "success"` if you prefer a single field to branch on.
+- The hook auto-refetches when the page's time window changes, and when `params` changes by value — pass a plain object, not one you rebuild with a different identity every render for no reason. Call the returned `refetch()` to re-run it manually (e.g. from a button).
+
+Always render all three branches (loading / error / data) — a widget that only handles the happy path shows nothing useful while data is stale-empty or a query is misconfigured.
+
+Params are validated against the query's declared `parameters` before anything is forwarded to LangWatchQL — an undeclared key, or a required parameter with no default that is omitted, comes back through `error` rather than firing the request.
+
+For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
+
+### Prebuilt charts: `@langwatch/charts`
+
+Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
+
+Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+
+```jsx
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+
+  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+
+  return <LwqlChart data={data} />;
+}
+```
+
+More worked examples: `platform/app/scripts/north-star-widgets/`.
+
+### Drill-down: `LW.navigate`
+
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+
+`Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
+
+## Step 4: Save the widget, then prove it renders
+
+```bash
+langwatch dashboard-widget create \
+  --name "Cost by model" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
+
+## Managing saved widgets
+
+```bash
+langwatch dashboard-widget list -f json
+langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
+langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard-widget delete <id>
+langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+```
+
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
+
+`update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+
+## Worked example: bar chart of daily trace counts
+
+`widget.tsx`:
+
+```jsx
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("daily_traces", {});
+
+  if (isError) {
+    return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  }
+  if (isLoading || data === null) {
+    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  }
+
+  const rows = data.map((row) => ({
+    day: String(row.day).slice(0, 10),
+    traces: Number(row.traces),
+  }));
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>{rows.length} rows</div>
+      <ResponsiveContainer width="100%" height={230}>
+        <BarChart data={rows}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Bar dataKey="traces" fill="#f97316" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
+`queries.json`:
+
+```json
+[
+  {
+    "name": "daily_traces",
+    "sql": "SELECT toStartOfDay(timestamp) AS day, count() AS traces FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY day ORDER BY day",
+    "parameters": []
+  }
+]
+```
+
+Create it:
+
+```bash
+langwatch dashboard-widget create \
+  --name "Daily traces" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+## Failure modes worth knowing
+
+- `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
+- `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
+- `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
+- "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
+- A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/dashboard-widgets/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Find the traces where users gave a thumbs down</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/find-traces"} data-track="docs_copy_skill_install" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
+          <code>npx skills add langwatch/skills/recipes/find-traces</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/find-traces"} data-track="docs_copy_slash_command" data-track-title={"Find the traces where users gave a thumbs down"} data-track-command={"/find-traces"}>
+          <code><span className="lw-slash-command">/find-traces</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Find the traces where users gave a thumbs down
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Find Traces
+
+A request to find traces names a concept ("thumbs down", "the angry ones", "alice's failures"), not a filter. This skill turns the concept into a filter in the trace filter language, runs it over the right window, and answers with the count and the traces.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Primary and secondary way of working
+
+Decide which one applies before you run anything.
+
+**Primary: finding traces is the ask.** "Show me the thumbs down traces", "which traces failed yesterday", "filter to alice". The user wants to look at traces, so put them in front of the user: open the Trace Explorer and drive it with `explorer.setTimeRange` and `explorer.setFilter`. The Explorer is the answer; your reply is the count and what stands out.
+
+**Secondary: traces are a means to another task.** "Build a dataset from the failed traces", "write a scenario from a bad conversation", "why is cost up" asked from another page. Stay on the page the user is on. Search with `langwatch trace search`, answer with its cards and the "View in Trace Explorer" link they carry, and continue the task. Do not navigate away from the user's work.
+
+When the turn context says the current page is the Trace Explorer, the primary way applies to any trace-finding ask, even a small one, because the user is already looking at the list.
+
+## Step 1: Take the window and the filter from the page
+
+The turn context of the Trace Explorer carries `from`, `to` and `search and attribute filters`. Those are the defaults:
+
+- Use that window. Pass it as `--start-date <from> --end-date <to>` on every `trace search` and `trace facets` call. With no page context, use the last 30 days, which is what the Explorer opens on.
+- Keep the filter the user already applied unless the ask replaces it. To narrow it, call `explorer.setFilter` with `"mode": "add"`.
+- Name no origin. A search that names no origin counts what the Explorer counts: every trace except Langy's own. Do not pass `--origin application`; it drops evaluation, simulation and playground traces the Explorer shows, and the two counts stop agreeing. Pass `--origin` or an `origin:` term only when the user names an origin.
+
+## Step 2: Learn the fields before writing a filter
+
+```bash
+langwatch query reference --section trace-filter     # the language: fields, operators, examples
+langwatch trace fields --format json                 # every field a filter can name
+langwatch trace facets <field> --start-date <from> --end-date <to> --format json   # the values a field holds in this project
+```
+
+Read the reference once per session. Use `trace facets` every time the concept maps to a field whose values you have not seen, because values differ per project: an event named `thumbs_up_down` in one project is `feedback` in another.
+
+If any of these three is refused as an unknown command or an unknown option, the CLI on this worker is older than this skill. Say that, name the command that was refused and the version `langwatch --version` reports, and stop: an older CLI cannot list the fields or filter the search, so a search that runs without them would answer "none found" for a project that has results.
+
+## Step 3: Search every form the concept can take
+
+A concept can be recorded in several places. One empty search says one form is empty, not that the traces do not exist. Before reporting that nothing was found, try each form that applies:
+
+1. **Events.** `langwatch trace facets event` lists the event names in the window. Thumbs down is the predefined event `thumbs_up_down` with a vote of `-1`: `event:thumbs_up_down AND event.attribute.event.metrics.vote:-1`. A custom event may carry the same meaning under another name or attribute, so read the facet values rather than assuming the predefined one.
+2. **Annotations.** Reviewers and end users also leave thumbs and comments as annotations: `langwatch trace facets annotation`, then `annotation:<value>`.
+3. **Evaluator results.** A sentiment, satisfaction or quality evaluator may already label the concept: `langwatch trace facets evaluatorLabel`, `evaluatorVerdict:fail`, `evaluator:<name>`.
+4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. Filter on one with `trace.attribute.<key>:<value>`.
+5. **The text itself.** A phrase search with `-q "<phrase>"` when the concept shows up in what the user or the agent wrote.
+6. **A wider window.** When every form is empty in the page's window, run the best form again over 90 days. If it matches there, say so and offer the wider window; do not change the page's window without saying it.
+
+Then check the result is what it claims to be: read three of the matched traces with `langwatch trace get <traceId>` and confirm they show the concept. A filter that matches the wrong thing is worse than an empty one.
+
+Ask the user only when two forms both match and mean different things (an end user's thumbs down event versus a reviewer's negative annotation). Say what each one counts and ask which they mean. When one form matches, use it and say which form it was.
+
+## Step 4a: Primary, drive the Explorer
+
+```bash
+langwatch navigate open traces                  # only when the user is on another page; run it alone
+langwatch ui actions                            # confirm the explorer.* kinds and read their payload schemas
+langwatch ui call explorer.setTimeRange --payload '{"preset":"30d"}'      # only when the window has to change
+langwatch ui call explorer.setFilter --payload-file filter.json
+langwatch ui call explorer.getState --payload '{}'
+```
+
+`filter.json` holds `{"query": "<the filter>"}`. Write it to a file: a filter has quotes and colons the shell would split.
+
+`explorer.getState` answers what the page shows: `query`, `timeRange`, `totalHits`, `pageTraceIds` and `source`. Report `totalHits`, because it is the number on the user's screen. When `isCountSettled` is `false` the list has not answered yet; read the state once more before you report a count.
+
+Read `executedVia` on every call. `"browser"` means the Explorer on screen changed. `"backend"` means no Explorer was open: the answer carries `href` and the card shows "View in Trace Explorer" on that filter, and the page did not change. In that case take the count from `langwatch trace search` with the same filter and window, and tell the user the link opens the Explorer on it.
+
+A state with `source: "saved"` carries a `note` and the Explorer's defaults, not the user's screen: do not quote its query, window or count as theirs. Say "this is not the page you are on" and give the link, rather than a number you did not read from a page. A call that fails with `langy_ui_page_not_ready` reached a page that was still loading. In both cases run the same call once more before you answer, and take the count from `langwatch trace search` with the same filter and window when the second call answers `saved` too.
+
+`explorer.setFilter` refuses a filter the language does not parse with `filter_invalid` and a position. Fix the filter and call once more.
+
+Other kinds, for follow-up asks: `explorer.setLens`, `explorer.setSort`, `explorer.setPage`, `explorer.select`, and `explorer.runInstantEval` for a judgement no field holds ("which of these sound annoyed"). `explorer.runInstantEval` spends the user's budget and needs an open Explorer, so use it when the fields and events above cannot express the concept.
+
+## Step 4b: Secondary, answer with cards
+
+```bash
+langwatch trace search --filter '<the filter>' --start-date <from> --end-date <to> --limit 25 --format json
+```
+
+The card lists the traces and links to the Explorer on the same filter and window, so the count the user sees after the click is the count you reported. Report `.pagination.totalHits`, not the number of rows on the page. Then continue the task the traces were for.
+
+## What to report
+
+- The count, the window it covers, and which form matched ("1,204 traces in the last 30 days carry a thumbs down event").
+- Two or three things the matched traces have in common, from the ones you read.
+- When nothing matched: every form you tried and the window, in one sentence, so the user knows the search was complete.
+
+## Common mistakes
+
+- Reporting "no traces found" after one empty search. Run the forms in Step 3 first.
+- Passing `--origin application` by habit. The count then disagrees with the Explorer.
+- Using the 24 hour CLI default while the user looks at 30 days. Pass the page's window.
+- Driving the Explorer away from a task the user is in the middle of. That is the secondary way: cards and a link.
+- Saying the page shows something when `executedVia` was `"backend"`.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/find-traces/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
         <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
         <span className="lw-accordion-action-text">
           <span className="lw-accordion-action-title">Download SKILL.md</span>

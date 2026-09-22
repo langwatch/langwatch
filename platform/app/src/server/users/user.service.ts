@@ -1,11 +1,22 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+
 import type { PrismaClient, User } from "~/generated/prisma/client";
-import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
+
+import { sessionRevocation } from "../app-layer/identity/runtime";
+import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
 export class UserService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly cliTokenRevocation: CliTokenRevocationService = CliTokenRevocationService.create(),
+    /**
+     * Composed over this service's OWN client rather than the app's, so a
+     * caller handing in a client — every test here does — revokes against the
+     * one it handed in.
+     */
+    private readonly sessions: SessionRevocationService = sessionRevocation({
+      prisma,
+    }),
   ) {}
 
   static create(prisma: PrismaClient): UserService {
@@ -23,11 +34,15 @@ export class UserService {
   async create({
     name,
     email,
+    active = true,
   }: {
     name: string;
     email: string;
+    active?: boolean;
   }): Promise<User> {
-    return this.prisma.user.create({ data: { name, email } });
+    return this.prisma.user.create({
+      data: { name, email, ...(!active && { deactivatedAt: new Date() }) },
+    });
   }
 
   /**
@@ -37,10 +52,8 @@ export class UserService {
    * remain stale until the cache TTL expires (up to 30 days). Stale
    * email matters for the invite-accept flow which compares
    * `session.user.email` to `invite.email`, and for any UI that relies
-   * on the displayed identity matching what's in the DB. SCIM-driven
-   * email changes (the only path that calls this method today) are
-   * always treated as a hard "re-authenticate as the new identity"
-   * event by the IdP, so revoking sessions is the right behavior.
+   * on the displayed identity matching what's in the DB. SCIM profiles are
+   * organization-local and do not use this global account mutation.
    *
    * Name-only changes do NOT trigger revocation — those are cosmetic
    * and don't warrant kicking the user out.
@@ -57,7 +70,7 @@ export class UserService {
     // Normalize the incoming email the same way BetterAuth does for
     // signup/signin (`findUserByEmail` in
     // node_modules/better-auth/dist/db/internal-adapter.mjs:
-    // `email.toLowerCase()`). Otherwise a SCIM-provisioned update from
+    // `email.toLowerCase()`). Otherwise an update from
     // "alice@acme.com" → "Alice@Acme.com" would (a) trigger an unneeded
     // session revocation and (b) desync the stored email from what
     // BetterAuth's signin lookup would find.
@@ -90,7 +103,7 @@ export class UserService {
     });
 
     if (emailChanged) {
-      await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+      await this.sessions.revokeAll({ userId: id });
     }
 
     return updated;
@@ -106,22 +119,6 @@ export class UserService {
       select: { createdAt: true },
     });
     return user ? { createdAt: user.createdAt } : null;
-  }
-
-  /**
-   * Whether this account can be signed into with a password.
-   *
-   * Not the same question as "does a credential row exist": a passkey sign-up
-   * creates one holding a NULL password, precisely so that password RESET has
-   * a row to update rather than silently matching none. So the password
-   * itself is what is asked about.
-   */
-  async hasPassword({ id }: { id: string }): Promise<boolean> {
-    const account = await this.prisma.account.findFirst({
-      where: { userId: id, provider: "credential" },
-      select: { password: true },
-    });
-    return !!account?.password;
   }
 
   async getSsoStatus({
@@ -145,7 +142,8 @@ export class UserService {
    * update alone is invisible to ongoing sessions for up to 30 days.
    * Every deactivation path (tRPC, SCIM webhook, SCIM provisioning
    * sync) routes through here so they all benefit from the cache
-   * invalidation. See `src/server/better-auth/revokeSessions.ts`.
+   * invalidation. See
+   * `src/server/app-layer/identity/session-revocation.service.ts`.
    *
    * CLI revocation: device-flow access + refresh tokens live in Redis
    * under `lwcli:access:*` / `lwcli:refresh:*` independently of
@@ -160,7 +158,7 @@ export class UserService {
       where: { id },
       data: { deactivatedAt: new Date() },
     });
-    await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+    await this.sessions.revokeAll({ userId: id });
     await this.cliTokenRevocation.revokeForUser({ userId: id });
     return user;
   }

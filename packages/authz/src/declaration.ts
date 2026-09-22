@@ -53,6 +53,13 @@ export type PlatformTierPermission = {
 /** Scope-tier fields present in input I at all (optional counts). */
 type FieldsIn<I> = Extract<keyof I, ScopeTierField>;
 
+/** Only an organization-scoped recovery read may bypass the MFA condition. */
+type MfaRecoveryDeclaration<I> = [FieldsIn<I>] extends [never]
+  ? { mfaRecovery?: never }
+  : Exclude<FieldsIn<I>, "organizationId"> extends never
+    ? { mfaRecovery?: { reason: string } }
+    : { mfaRecovery?: never };
+
 /** The tiers I is guaranteed to carry an id for — required, not optional. */
 type RequiredTiersIn<I> = {
   [K in FieldsIn<I>]: I extends Record<K, string>
@@ -155,12 +162,12 @@ export type AccessDeclaration =
 
 export type NoPermissionOptions<I> = I extends unknown
   ? [FieldsIn<I>] extends [never]
-    ? { reason: string; allow?: undefined }
+    ? { reason: string; allow?: undefined } & MfaRecoveryDeclaration<I>
     : {
         reason: string;
         /** Why each scope id in the input is safe to accept unchecked. */
         allow: { [K in FieldsIn<I>]: string };
-      }
+      } & MfaRecoveryDeclaration<I>
   : never;
 
 /**

@@ -207,6 +207,49 @@ def apply_gpt5_temperature_compatibility(
     return kwargs
 
 
+def is_claude_model(model: Optional[str]) -> bool:
+    """
+    Whether this model is a Claude model, whichever provider serves it:
+    `anthropic/claude-sonnet-4-5`, `bedrock/anthropic.claude-...`,
+    `vertex_ai/claude-...` all answer alike.
+    """
+    if not model:
+        return False
+    name = model.split("/")[-1]
+    return "claude" in name.lower()
+
+
+def apply_anthropic_sampling_compatibility(
+    kwargs: dict, requested_model: Optional[str] = None
+) -> dict:
+    """
+    Drop top_p when temperature is also set on a Claude model. From Opus 4.1,
+    Sonnet 4.5 and Haiku 4.5 onwards the API rejects the pair outright:
+    "`temperature` and `top_p` cannot both be specified for this model.
+    Please use only one."
+
+    drop_params cannot cover this: it strips parameters a model does not
+    support at all, and Claude supports each of the two on its own. The
+    evaluator model editor writes every parameter it shows, so a judge saved
+    through it names both at their defaults, and every call on such a model
+    fails before it starts.
+
+    Temperature wins, the same choice the AI gateway makes for the pair.
+    Applied to every Claude model rather than only the ones known to refuse,
+    since a model that accepts both still samples the same way with top_p at
+    its default, and a new refusing model should not need a list entry.
+
+    `requested_model` is the model the request named before any Azure
+    deployment rewrite, for the same reason as the gpt-5 rule above.
+    """
+    if not (is_claude_model(kwargs.get("model")) or is_claude_model(requested_model)):
+        return kwargs
+    if kwargs.get("temperature") is None or kwargs.get("top_p") is None:
+        return kwargs
+    del kwargs["top_p"]
+    return kwargs
+
+
 def convert_param_type(key: str, value: str):
     """Convert string env var value to proper type for litellm params."""
     if key in INT_PARAMS:
@@ -375,6 +418,11 @@ def patch_litellm_params(kwargs):
     # explicit X_LITELLM_temperature has landed — a value the model refuses
     # is normalized rather than sent to fail.
     kwargs = apply_gpt5_temperature_compatibility(
+        kwargs, requested_model=requested_model
+    )
+    # Same position again: the pair is only refused once both have landed,
+    # and X_LITELLM_top_p is one of the ways they land.
+    kwargs = apply_anthropic_sampling_compatibility(
         kwargs, requested_model=requested_model
     )
 

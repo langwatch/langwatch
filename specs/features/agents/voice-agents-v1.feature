@@ -14,6 +14,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC1, AC2, AC3, AC4, AC6, AC10, AC13, AC16, AC19, AC24
+  # Proven: run scenariorun_0002mz2FOX0FmRBTfPCRLLK23czeT after #8037 (no automated e2e binding yet)
   @e2e @unimplemented
   Scenario: First voice agent, from a blank project to a judged run
     Given a project with no ElevenLabs key configured
@@ -25,7 +26,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When I save the agent
     Then "Support line" appears in the agents list with the mic icon
     When I press "Talk to it", allow the microphone, say "I want to cancel my order" and hang up after the agent answers
-    Then the panel shows the transcript, a Play control and a link to a run with caller "You"
+    Then the panel shows the transcript and a Play control, and no run exists for that conversation id
     When I open New scenario, write the situation, the persona and the criteria for "Angry cancellation"
     And under Agent I pick "Support line", keep the project default caller voice and save
     And I press "Run"
@@ -33,6 +34,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And when the call ends the run shows a verdict, one chip per criterion and caller "Simulated"
 
   # AC5, AC10, AC13
+  # Proven: PR #8040 (c0996a92a7) (no automated e2e binding yet)
   @e2e @unimplemented
   Scenario: Talk to an existing agent from its drawer
     Given the voice agent "Support line" with a configured ElevenLabs key
@@ -40,8 +42,8 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the panel shows Connecting, then a running timer and a live two-speaker transcript
     When I say "I want to cancel my order" and the agent answers
     And I press "Hang up"
-    Then the panel shows the transcript, a Play control and a link to the run
-    And that run has caller "You", per-turn audio and the transcript
+    Then the panel shows the transcript and a Play control, and no run exists for that conversation id
+    And a trace exists for that conversation id with per-turn audio and the transcript
 
   # AC19, AC24
   @e2e @unimplemented
@@ -148,11 +150,19 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel shows "Recording could not be fetched from ElevenLabs" instead of a generic error
 
   # AC14
-  @integration
+  @unit @regression
   Scenario: Hanging up twice produces exactly one run
-    Given a live call against "Support line" with a known conversation id
+    Given a live "Call it myself" call against a scenario with a known conversation id
     When Hang up is pressed twice for that conversation id
     Then exactly one run exists for that conversation id
+
+  # #8020 AC1
+  @unit @regression
+  Scenario: Hanging up twice on a drawer call records traces and writes no run
+    Given a live drawer "Talk to it" call with a known conversation id and no scenario in scope
+    When Hang up is pressed twice for that conversation id
+    Then no run is ever written for that conversation id
+    And the call's traces are recorded, deduped by their deterministic ids
 
   # AC27
   @integration
@@ -163,6 +173,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel does not stay on "Connecting"
     And no run is created for that attempt
 
+  @integration
   Scenario: A page-level microphone block is named, not reported as a denial
     Given "Talk to it" was pressed
     And the page's Permissions-Policy does not allow the microphone
@@ -171,10 +182,18 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the browser is never asked for the microphone
     And no run is created for that attempt
 
+  @unit
   Scenario: The app's own headers allow the microphone and the ElevenLabs socket
     Given a production response from the LangWatch app
     Then its Permissions-Policy allows the microphone for the app's own origin
     And its Content-Security-Policy connect-src admits https://api.elevenlabs.io and wss://api.elevenlabs.io
+
+  @unit @regression
+  Scenario: The app's own headers allow the ElevenLabs audio worklets
+    Given a production response from the LangWatch app
+    And the ElevenLabs browser client registers its audio worklets from a blob: URL
+    Then its Content-Security-Policy script-src admits blob:
+    And "Talk to it" does not fail with "Failed to load the rawAudioProcessor worklet module"
 
   # ---------------------------------------------------------------------------
   # Scenario wiring and run surfaces (integration)
@@ -311,10 +330,11 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC15
   @integration
-  Scenario: The recording proxy refuses a conversation with no run in the project
+  Scenario: The recording proxy refuses a conversation that is neither a run nor a saved voice agent's call in the project
     Given a recording is requested for a conversation with no run in the authorised project
+    And the provider record's agent does not match any saved voice agent in the project
     When the proxy is handled
-    Then it answers "Recording unavailable" and never fetches the provider
+    Then it answers "Recording unavailable" without streaming the audio
 
   # AC13
   @integration
@@ -534,3 +554,254 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a suite run whose target is a voice agent and the project's flag is off
     When the run is prepared
     Then it is refused before anything is resolved or queued
+
+  # ---------------------------------------------------------------------------
+  # Empty transcript and Call it myself scenario scoping (#8019)
+  # ---------------------------------------------------------------------------
+
+  # #8019 AC1
+  @unit @regression
+  Scenario: An unfinished provider record keeps the live transcript
+    Given ElevenLabs answers the conversation read with status "processing" right after hang-up
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+
+  # #8019 AC2
+  @unit @regression
+  Scenario: A finished provider record with turns is written as the provider transcript
+    Given ElevenLabs answers the conversation read with status "done" and a non-empty transcript
+    When the call is finished
+    Then the run holds the provider turns
+    And the run source is "provider"
+
+  # #8019 AC3
+  @unit @regression
+  Scenario: A finished provider record with no turns keeps the live transcript
+    Given ElevenLabs answers the conversation read with status "done" but no turns
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+
+  # #8019 AC4
+  @unit @regression
+  Scenario: A failed provider record keeps the live transcript without a fetch-failed notice
+    Given ElevenLabs answers the conversation read with status "failed"
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+    And the finish does not report the fetch as failed
+
+  # #8019 AC5
+  @unit @regression
+  Scenario: The provider record is read only once the status is done
+    Given ElevenLabs answers the conversation read with a status
+    When the record is read
+    Then a "done" status returns the record
+    And a "processing" status, a "failed" status or a 404 returns nothing
+
+  # #8019 AC8
+  @unit @regression
+  Scenario: A single-scenario suite scores a Call it myself run under that scenario
+    Given a run dialog opened on a suite that holds exactly one scenario
+    When the voice-call target is resolved
+    Then it carries that scenario id so the call is scored under it
+
+  # #8019 AC9
+  @unit @regression
+  Scenario: Call it myself is offered only when one scenario is in scope
+    Given a run dialog opened on a subject with more than one scenario
+    When the dialog footer renders
+    Then it offers no "Call it myself" action
+
+  # #8019 AC10
+  @unit @regression
+  Scenario: Finish refuses an unresolvable scenario and writes nothing
+    Given a finish names a scenario that no longer resolves to a set
+    When the call is finished
+    Then it is refused with the scenario_not_found code
+    And no run is written
+
+  # ---------------------------------------------------------------------------
+  # A retried hang-up completes a half-written run (#7973)
+  # ---------------------------------------------------------------------------
+
+  # 7973 AC1
+  @unit @regression
+  Scenario: A retried hang-up leaves a terminal run untouched
+    Given a run for the session already reached a terminal status
+    When the call is finished again
+    Then no run is written
+    And the existing run id and agent id are returned unchanged
+
+  # 7973 AC2, AC3, AC4
+  @unit @regression
+  Scenario: A retried hang-up completes a half-written run
+    Given a run for the session is still in progress after a failed write
+    When the call is finished again
+    Then the run is re-driven under the same run id
+    And its finish is emitted exactly once
+    And the message ids are identical to the first attempt
+
+  # 7973 AC5
+  @e2e @unimplemented
+  Scenario: A retried hang-up completes an in-progress run end to end
+    Given a call left a run in progress
+    When the browser retries the finish
+    Then the run completes with no duplicate messages
+
+  # 7973 AC6
+  @unit @regression
+  Scenario: A re-driven finish keeps the first attempt's metadata
+    Given a run for the session was started twice with different metadata
+    When a snapshot and the finish are folded onto it
+    Then the run keeps the first attempt's metadata
+    And it reaches the finished status with the snapshot's messages
+
+  # ---------------------------------------------------------------------------
+  # Talk to it authorization and the cutoff marker (#8021)
+  # ---------------------------------------------------------------------------
+
+  # 8021 AC1
+  @integration @regression
+  Scenario: Talk to it without agent-management rights and no saved row is refused
+    Given a member with scenario rights but not agent-management rights
+    When they mint a Talk to it session without a saved agent row
+    Then the mint is refused for the evaluations:manage permission
+    And no session is minted
+
+  # 8021 AC2
+  @integration @regression
+  Scenario: Finishing an unsaved session without agent-management rights is refused
+    Given a member with scenario rights but not agent-management rights
+    And a session token that carries no saved agent id
+    When they finish the call with a name
+    Then the finish is refused
+    And no agent is created
+
+  # 8021 AC3
+  @integration @regression
+  Scenario: Talk to it against a saved agent needs only scenario rights
+    Given a member with scenario rights but not agent-management rights
+    When they mint and finish against a saved agent row
+    Then neither is refused for the evaluations:manage permission
+
+  # 8021 AC4
+  @integration @regression
+  Scenario: Talk to it with agent-management rights mints an unsaved session
+    Given a member with scenario rights and agent-management rights
+    When they mint a Talk to it session without a saved agent row
+    Then the session is minted so the agent is created on finish
+
+  # 8021 AC5
+  @unit @regression
+  Scenario: A simulated voice run cut at the call limit records the cutoff marker
+    Given a succeeded simulated voice run whose child was cut at the call limit
+    When the processor handles the result
+    Then the cutoff marker is recorded on the run
+    And the run read back has metadata.langwatch.isCutAtLimit true
+
+  # 8021 AC6
+  @unit @regression
+  Scenario: A simulated voice run that finished normally records no cutoff marker
+    Given a succeeded simulated voice run whose child was not cut at the limit
+    When the processor handles the result
+    Then no cutoff event is dispatched
+
+  # 8021 AC8
+  @unit @regression
+  Scenario: The cutoff marker folded twice sets the flag once
+    Given the cutoff marker is recorded twice for the same run
+    When the run state is folded
+    Then the flag is set once and the metadata is unchanged on the second fold
+
+  # 8021 AC7
+  @integration @regression
+  Scenario: A voice run stops at the maximum call duration and is marked as cut at the limit
+    Given a run whose metadata marks it cut at the call limit
+    When the run header renders
+    Then it shows the "Cut at the call limit" marker
+
+  # ---------------------------------------------------------------------------
+  # Every browser voice call writes a trace (3a)
+  # ---------------------------------------------------------------------------
+
+  # 3a AC1
+  @unit @regression
+  Scenario: A finished browser call writes one trace per exchange and every message links to its exchange's trace
+    Given a finished call whose turns group into exchanges
+    When the call is finished
+    Then one trace is recorded per exchange before the run is written
+    And every message carries the trace id of the exchange it belongs to
+    And a trace recording failure does not block the run write
+
+  # 3a AC2
+  @unit @regression
+  Scenario: A re-driven finish writes the same trace ids
+    Given a half-written run is re-driven for the same conversation
+    When the call is finished again
+    Then the recomputed trace ids are identical to the first attempt
+
+  # ---------------------------------------------------------------------------
+  # A drawer call is not persisted as a run (#8020)
+  # ---------------------------------------------------------------------------
+
+  # #8020 AC1
+  @unit @regression
+  Scenario: A drawer Talk to it call writes no run
+    Given a finish with no scenario id
+    When the call is finished
+    Then writeCallRun is never called
+    And findExistingRun is never called
+    And the call's traces are still recorded
+    And the finish result carries no run id and no scenario set id
+
+  # #8020 AC2
+  @unit @regression
+  Scenario: Call it myself still writes a run under its scenario after 8020
+    Given a "Call it myself" finish naming a resolvable scenario id
+    When the call is finished
+    Then writeCallRun is called with that scenario and its set
+    And the finish event names the scenario, so the run is judged
+
+  # #8020 AC3
+  @unit @regression
+  Scenario: A drawer finish never mints a synthetic scenario id
+    Given a finish with no scenario id
+    When the call is finished
+    Then writeCallRun is never called
+    And no scenarioId of the form "voiceagent_<agentId>" is ever produced
+
+  # #8020 decision 1
+  @unit @regression
+  Scenario: A retried drawer finish for an unsaved agent reuses the one agent row
+    Given two drawer finishes for the same never-saved voice agent
+    When each finish creates the voice agent row
+    Then the identity key folds them onto the same row rather than creating a second
+
+  # #8020 decision 2
+  @unit @regression
+  Scenario: The legacy voice-calls set is excluded from run listings
+    Given a run-listing query is built
+    When its set exclusion is applied
+    Then the "voice-calls" set is excluded alongside the agent-test set
+    And a run is still read by its own id
+
+  # #8020 decision 5
+  @unit @regression
+  Scenario: A human caller's turns render as You, not User Simulator
+    Given a scenario run whose caller kind is "human"
+    When the conversation body renders a caller turn
+    Then it reads "You" with a person icon, not "User Simulator" with a flask
+
+  # #8020 regression: a drawer call writes no run, so its recording must be
+  # authorized by matching the provider conversation to a saved voice agent.
+  @unit @regression
+  Scenario: A drawer call's recording still plays after hang-up
+    Given a finished drawer call whose conversation ran against a voice agent saved in the project
+    When the recording is requested and no run exists for that conversation id
+    Then playback is authorized by matching the provider agent id to the saved voice agent row
+    And the provider credential is returned only when the match holds

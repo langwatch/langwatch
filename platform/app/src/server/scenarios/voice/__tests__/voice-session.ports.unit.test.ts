@@ -11,7 +11,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Scenario } from "~/generated/prisma/client";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { createVoiceSessionPortsFromServices } from "../voice-session.ports";
+
+// findExistingRun reaches the app layer directly for the run row; the fake lets
+// each case hand back a run (or none) without a datastore.
+const { getScenarioRunData } = vi.hoisted(() => ({
+  getScenarioRunData: vi.fn(),
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ simulations: { runs: { getScenarioRunData } } }),
+}));
 
 function fakeAgentService(over: {
   getById?: (input: {
@@ -19,6 +29,8 @@ function fakeAgentService(over: {
     projectId: string;
   }) => Promise<AgentWithFields | null>;
   create?: (input: unknown) => Promise<AgentWithFields>;
+  createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
+  hasVoiceAgentForExternalId?: (input: unknown) => Promise<boolean>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
@@ -27,6 +39,13 @@ function fakeAgentService(over: {
       vi.fn(async () => {
         throw new Error("not stubbed");
       }),
+    createVoiceAgent:
+      over.createVoiceAgent ??
+      vi.fn(async () => {
+        throw new Error("not stubbed");
+      }),
+    hasVoiceAgentForExternalId:
+      over.hasVoiceAgentForExternalId ?? vi.fn(async () => false),
   };
 }
 
@@ -124,10 +143,12 @@ describe("Feature: voice-session ports composition", () => {
 
   describe("given createVoiceAgent", () => {
     describe("when a new voice agent is created", () => {
-      it("creates a voice-typed agent row through the service", async () => {
-        const create = vi.fn(async () => voiceAgentRow({ id: "agent_new" }));
+      it("creates the voice agent through the identity-key-deduped service method", async () => {
+        // The port delegates to AgentService.createVoiceAgent, which folds the
+        // row on its identity key so a retried finish reuses one row (#8020).
+        const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
         const ports = createVoiceSessionPortsFromServices({
-          agentService: fakeAgentService({ create }),
+          agentService: fakeAgentService({ createVoiceAgent }),
           scenarioService: fakeScenarioService({}),
         });
 
@@ -139,14 +160,39 @@ describe("Feature: voice-session ports composition", () => {
         });
 
         expect(created).toEqual({ id: "agent_new" });
-        expect(create).toHaveBeenCalledWith(
+        expect(createVoiceAgent).toHaveBeenCalledWith(
           expect.objectContaining({
             projectId: "project_1",
             name: "New agent",
-            type: "voice",
-            config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
+            transport: "elevenlabs_convai",
+            agentId: "el_agent_1",
           }),
         );
+      });
+    });
+  });
+
+  describe("given hasVoiceAgentForExternalId", () => {
+    describe("when the request carries a project, transport and vendor agent id", () => {
+      it("delegates the identity-key match to the service", async () => {
+        const hasVoiceAgentForExternalId = vi.fn(async () => true);
+        const ports = createVoiceSessionPortsFromServices({
+          agentService: fakeAgentService({ hasVoiceAgentForExternalId }),
+          scenarioService: fakeScenarioService({}),
+        });
+
+        const matched = await ports.hasVoiceAgentForExternalId({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent_1",
+        });
+
+        expect(matched).toBe(true);
+        expect(hasVoiceAgentForExternalId).toHaveBeenCalledWith({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent_1",
+        });
       });
     });
   });
@@ -206,6 +252,94 @@ describe("Feature: voice-session ports composition", () => {
         });
 
         expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given findExistingRun", () => {
+    const ports = () =>
+      createVoiceSessionPortsFromServices({
+        agentService: fakeAgentService({}),
+        scenarioService: fakeScenarioService({}),
+      });
+
+    describe("when the run carries well-formed metadata", () => {
+      it("maps agent id, source, recording and scenario set through", async () => {
+        getScenarioRunData.mockResolvedValueOnce({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioId: "scenario_1",
+          scenarioSetId: "set_1",
+          metadata: {
+            agentId: "agent_row",
+            source: "provider",
+            audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+          },
+        });
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "run_1",
+        });
+
+        expect(existing).toEqual({
+          agentId: "agent_row",
+          status: ScenarioRunStatus.SUCCESS,
+          source: "provider",
+          audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+          scenarioId: "scenario_1",
+          scenarioSetId: "set_1",
+        });
+      });
+    });
+
+    describe("when the metadata fields are the wrong type", () => {
+      it("narrows a non-source and a non-string recording to null", async () => {
+        getScenarioRunData.mockResolvedValueOnce({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioId: undefined,
+          scenarioSetId: undefined,
+          metadata: { agentId: 7, source: 42, audioUrl: {} },
+        });
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "run_1",
+        });
+
+        expect(existing).toEqual({
+          agentId: null,
+          status: ScenarioRunStatus.SUCCESS,
+          source: null,
+          audioUrl: null,
+          scenarioId: null,
+          scenarioSetId: null,
+        });
+      });
+    });
+
+    describe("when no run exists for the id", () => {
+      it("answers null", async () => {
+        getScenarioRunData.mockResolvedValueOnce(null);
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "missing",
+        });
+
+        expect(existing).toBeNull();
+      });
+    });
+  });
+
+  describe("given recordCallTraces", () => {
+    describe("when the ports are composed", () => {
+      it("binds the trace writer as the recordCallTraces port", () => {
+        const ports = createVoiceSessionPortsFromServices({
+          agentService: fakeAgentService({}),
+          scenarioService: fakeScenarioService({}),
+        });
+
+        expect(typeof ports.recordCallTraces).toBe("function");
       });
     });
   });

@@ -74,7 +74,7 @@ clickhouse:
   # (<release>-postgresql) into clickhouse.lwqlAccessModel.postgres.host — the
   # subchart never guesses one — with database defaulting to postgresql.auth.database
   # and user to the dedicated reader lwql_ro the app converges, so the lwql_postgres
-  # named collection the single-replica scenario asserts (specs/analytics/lwql-api.feature)
+  # named collection the single-replica scenario asserts (specs/lwql/api.feature)
   # renders from those DEFAULTS. Exercising the parent's default is the point — a
   # hand-wired override here would hide a regression in it. The e2e reads an approved view
   # through the collection after provisioning, so it dials PostgreSQL as lwql_ro

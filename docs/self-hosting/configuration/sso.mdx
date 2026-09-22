@@ -3,21 +3,56 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+Configure an organization's identity provider in **Settings > Authentication >
+Identity provider**. The setup walks you through provider details, domain
+verification, a test sign-in and a recovery administrator. See the
+[SSO setup guide](/platform/sso) for the full journey and screenshots.
 
-If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+This page also covers the deployment-wide provider configured through
+`NEXTAUTH_PROVIDER`. Keep the existing provider settings when upgrading an
+installation that already uses them. Changing an organization's connection
+and changing the deployment's default provider are separate actions.
+
+## Upgrading an existing installation
+
+Identity and access migrations run automatically as the app starts, one
+organization at a time. An organization that migrates cleanly is switched
+over immediately; one whose historical data needs attention is held on its
+existing sign-in path without blocking the deployment. Keep the current
+provider configuration and credentials during the upgrade. See the
+[upgrade guide](/self-hosting/upgrade#automatic-identity-and-access-migration)
+for what still blocks startup and how to check and retry a held organization.
+
+## Before you start
+
+- Activate an [Enterprise license](/self-hosting/licensing).
+- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
+  open LangWatch. Your provider's callback must use that address too.
+- Configure [outbound email](/self-hosting/configuration/email) and verify a
+  recovery administrator can receive a password-reset email.
+- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It protects
+  stored provider credentials; replacing it prevents existing values from
+  being decrypted.
+
+For organization-managed connections, follow the callback and SAML service
+provider details shown in the setup page. They identify that connection. The
+callback pattern below applies to the deployment-wide providers in this guide.
 
 <Warning>
-**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
+SSO requires an Enterprise license. A configured deployment-wide provider does
+not grant a license by itself. If the license gate refuses federation,
+LangWatch falls back to email sign-in. Existing users need working outbound
+email to recover through **Forgot password**.
 
-The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+Before upgrading an installation where everyone uses SSO, activate the license
+or verify email recovery works. See [Editions and licensing](/self-hosting/licensing).
 </Warning>
 
 ## Supported Providers
 
 | Provider | `NEXTAUTH_PROVIDER` value | Requires |
 |----------|--------------------------|----------|
-| Email/Password | `email` (default) | Nothing extra |
+| Email/Password | `email` (default) | No additional configuration |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
 | AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
 | Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
@@ -48,11 +83,20 @@ A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client cr
 
 The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
 
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive. With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
+A licensed deployment-wide provider normally owns sign-in, so local password
+sign-in and reset are unavailable. Set `LOCAL_PASSWORDS_ENABLED=on` only when
+you intend the deployment to offer local passwords alongside that provider.
+This does not bypass an organization's SSO policy: an address routed through
+an active connection still needs that connection, unless it has a valid
+recovery-administrator binding.
+
+When federation is unavailable because the deployment is unlicensed, email
+sign-in and password reset remain available. Test recovery before relying on
+it during an outage.
 
 ### Auth0
 

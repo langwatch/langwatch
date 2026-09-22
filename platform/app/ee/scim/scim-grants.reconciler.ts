@@ -16,15 +16,59 @@
  * Additions are plain queued commands.
  */
 import type { LedgerActor } from "@langwatch/actor";
+import { STORED_PRINCIPAL_KIND } from "@langwatch/authz";
+import {
+  grantFactToCompatBinding,
+  grantRowToFact,
+  isBindingGrant,
+} from "@langwatch/authz-server";
 import { bindingIdentityKey } from "@langwatch/authz-server/migration";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type {
   GrantsLedgerWriter,
   LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
+import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
 
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = Omit<LedgerBindingAttach, "bindingId">;
+
+/** Group grants replace the direct membership grants older SCIM pushes minted. */
+export async function retireScimMembershipGrants({
+  prisma,
+  writer,
+  organizationId,
+  userIds,
+  actor,
+}: {
+  prisma: PrismaClient;
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  userIds: string[];
+  actor: LedgerActor;
+}): Promise<void> {
+  if (userIds.length === 0) return;
+
+  const grants = await liveGrants(prisma).findMany({
+    where: {
+      organizationId,
+      principalType: "USER",
+      principalId: { in: userIds },
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+      source: "scim",
+    },
+    select: { id: true },
+  });
+  if (grants.length === 0) return;
+
+  await writer.revokeBindings({
+    organizationId,
+    bindingIds: grants.map(({ id }) => id),
+    actor,
+    reason: "directory access is supplied by group membership",
+  });
+}
 
 /**
  * A grant's identity as the projection's partial unique indexes define it -
@@ -61,6 +105,17 @@ function keyOfDesired(grant: DesiredScimGrant): string {
   });
 }
 
+type ScimGrantPrincipal = {
+  type: "user" | "group" | "apiKey";
+  id: string;
+};
+
+type ScimGrantFilter = {
+  principal: ScimGrantPrincipal;
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
+};
+
 /**
  * Bring the grants matching `where` in line with `desired`.
  *
@@ -86,23 +141,29 @@ export async function reconcileScimGrants({
   prisma: PrismaClient;
   writer: GrantsLedgerWriter;
   organizationId: string;
-  where: Prisma.RoleBindingWhereInput;
+  where: ScimGrantFilter;
   desired: DesiredScimGrant[];
   actor: LedgerActor;
   mintBindingId: () => string;
 }): Promise<{ attached: number; revoked: number }> {
-  const current = await prisma.roleBinding.findMany({
-    where: { ...where, organizationId },
-    select: {
-      id: true,
-      userId: true,
-      groupId: true,
-      apiKeyId: true,
-      scopeType: true,
-      scopeId: true,
-      role: true,
-      customRoleId: true,
+  const currentRows = await liveGrants(prisma).findMany({
+    where: {
+      organizationId,
+      principalType: STORED_PRINCIPAL_KIND[where.principal.type],
+      principalId: where.principal.id,
+      ...(where.scopeType !== undefined && { scopeType: where.scopeType }),
+      ...(where.scopeId !== undefined && { scopeId: where.scopeId }),
     },
+  });
+  const current = currentRows.flatMap((row) => {
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) return [];
+    return [
+      grantFactToCompatBinding({
+        grant,
+        organizationId: row.organizationId,
+      }),
+    ];
   });
 
   const desiredKeys = new Set(desired.map(keyOfDesired));

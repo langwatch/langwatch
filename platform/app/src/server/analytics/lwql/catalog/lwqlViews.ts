@@ -22,7 +22,7 @@
  * describes how a row got written or how long it is kept, which is not
  * something the API promises to keep stable.
  *
- * ## Two datasets over one trace, and why that is not two answers
+ * ## Two views over one trace, and why that is not two answers
  *
  * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
  * and `evaluation_metrics` are both one row per evaluation, because the write
@@ -53,7 +53,7 @@
  * of a row until merges catch up, so each view deduplicates and each entry
  * states two things about its rows. `dedup.keyColumns` is the source's whole
  * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
- * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
+ * promise and nothing more. `grainColumns` is what one row of the *view* is,
  * declared only where the two differ, which is where the sort key leads with a
  * business time so that range scans are monotonic. Both analytics projections
  * are sorted that way, and they answer it differently: `trace_analytics` freezes
@@ -70,10 +70,12 @@
  * measurement behind the default.
  *
  * @see ./types.ts — the shapes, and the derivations the validator reads
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { contentFilteredMapSql } from "./contentGating";
+import { LWQL_DERIVED_CATALOG } from "./derivedViews";
+import { CODING_TOOL_RESULTS } from "./overrides/coding";
 import { LWQL_POSTGRES_CATALOG } from "./postgresViews";
 import type { LangWatchQLViewDefinition } from "./types";
 
@@ -250,7 +252,7 @@ const TRACES: LangWatchQLViewDefinition = {
     // `HasAnnotation` is deliberately not exposed, and it is the one absence
     // here that is about agreement rather than about sensitivity. It is folded
     // from `trace_summaries.AnnotationIds`, a *best-effort* dual-write of the
-    // annotation ids, while the `annotations` dataset reads PostgreSQL
+    // annotation ids, while the `annotations` view reads PostgreSQL
     // directly. Publishing both would let one caller ask "how many traces were
     // annotated" two ways and get two answers, with nothing in the schema
     // saying which is authoritative. The authoritative one is `annotations`:
@@ -1340,7 +1342,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
  * straight into `OccurredAt`, so an evaluation that received a second lifecycle
  * event carries two sort keys. `FINAL` merges by the sort key and nothing else,
  * so it would keep both rows: not a visible duplicate, but every `count`, `sum`
- * and `avg` a caller writes over this dataset silently counting that evaluation
+ * and `avg` a caller writes over this view silently counting that evaluation
  * twice. The owning repository refuses `FINAL` on this table for the same
  * reason, and deduplicates the way this entry does — `max(UpdatedAt)` per
  * evaluation, whatever `OccurredAt` each version carries.
@@ -1671,11 +1673,1056 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
 };
 
 /**
+ * Coding-agent sessions: one row per coding-agent session, the aggregate the
+ * fold maintains (ADR-056, migration 00051 and its ALTERs).
+ *
+ * The source `coding_agent_sessions` sorts by `(TenantId, StartedAt, SessionId)`
+ * and `StartedAt` moves — an earlier signal arriving late shifts it — so the
+ * engine reads two `StartedAt`s for one session as two keys and `FINAL` keeps
+ * both, double-counting every aggregate. Migration 00051 spells this out and
+ * forbids `FINAL`; this entry pins `in-tuple` and is deduplicated by the session
+ * rather than by the engine's key, exactly like `evaluation_metrics`.
+ *
+ * Light by design: it carries no prompts, replies or tool output, only measured
+ * counts, durations and bounded low-cardinality maps. `Title` is the one
+ * conversation-derived value, so it is input-gated (migration 00075); `CostUsd`
+ * and `AgentReportedCostUsd` are costs-gated. Everything else is operational
+ * metadata. Event-sourcing bookkeeping (`Version`, `CreatedAt`, `UpdatedAt`,
+ * `_retention_days`) is off-catalog for the reason the file header gives.
+ */
+const CODING_AGENT_SESSIONS: LangWatchQLViewDefinition = {
+  name: "coding_sessions",
+  sourceTable: "coding_agent_sessions",
+  description:
+    "One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session.",
+  gates: [],
+  grain: "one row per (TenantId, SessionId), latest version only",
+  grainColumns: ["TenantId", "SessionId"],
+  joinKeys: ["TenantId", "SessionId"],
+  timeColumn: "StartedAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    strategy: "in-tuple",
+    keyColumns: ["TenantId", "StartedAt", "SessionId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the session belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "SessionId",
+      type: "String",
+      description: "The agent's own session id, the aggregate key.",
+      gates: [],
+      sourceColumns: ["SessionId"],
+    },
+    {
+      name: "SessionKeySource",
+      type: "LowCardinality(String)",
+      description:
+        "Whether the session id came from the agent or was the trace id in its absence.",
+      gates: [],
+      sourceColumns: ["SessionKeySource"],
+    },
+    {
+      name: "StartedAt",
+      type: "DateTime64(3)",
+      description:
+        "When the session started. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["StartedAt"],
+    },
+    {
+      name: "Agent",
+      type: "LowCardinality(String)",
+      description: "Which coding agent produced the session.",
+      gates: [],
+      sourceColumns: ["Agent"],
+    },
+    {
+      name: "AgentVersion",
+      type: "LowCardinality(String)",
+      description: "Version of the agent that ran the session.",
+      gates: [],
+      sourceColumns: ["AgentVersion"],
+    },
+    {
+      name: "TraceIds",
+      type: "Array(String)",
+      description: "Every trace that contributed to the session.",
+      gates: [],
+      sourceColumns: ["TraceIds"],
+    },
+    {
+      name: "FinalRequestId",
+      type: "String",
+      description: "Request id of the last model call, ending the session.",
+      gates: [],
+      sourceColumns: ["FinalRequestId"],
+    },
+    {
+      name: "UserId",
+      type: "String",
+      description: "User the session ran for.",
+      gates: [],
+      sourceColumns: ["UserId"],
+    },
+    {
+      name: "TerminalType",
+      type: "LowCardinality(String)",
+      description: "Terminal the session ran in.",
+      gates: [],
+      sourceColumns: ["TerminalType"],
+    },
+    {
+      name: "Entrypoint",
+      type: "LowCardinality(String)",
+      description: "How the agent was launched.",
+      gates: [],
+      sourceColumns: ["Entrypoint"],
+    },
+    {
+      name: "RepositoryHost",
+      type: "LowCardinality(String)",
+      description:
+        "Forge the checkout points at, empty when none was reported.",
+      gates: [],
+      sourceColumns: ["RepositoryHost"],
+    },
+    {
+      name: "RepositoryOwner",
+      type: "LowCardinality(String)",
+      description: "Owner of the repository the session ran against.",
+      gates: [],
+      sourceColumns: ["RepositoryOwner"],
+    },
+    {
+      name: "RepositoryName",
+      type: "LowCardinality(String)",
+      description: "Name of the repository the session ran against.",
+      gates: [],
+      sourceColumns: ["RepositoryName"],
+    },
+    {
+      name: "GitBranch",
+      type: "String",
+      description: "Branch the session ended on, empty when none was reported.",
+      gates: [],
+      sourceColumns: ["GitBranch"],
+    },
+    {
+      name: "GitBranches",
+      type: "Array(String)",
+      description: "Every branch the session drove, in first-seen order.",
+      gates: [],
+      sourceColumns: ["GitBranches"],
+    },
+    {
+      name: "GitWorktree",
+      type: "String",
+      description: "Working directory the session ran in.",
+      gates: [],
+      sourceColumns: ["GitWorktree"],
+    },
+    {
+      name: "Title",
+      type: "String",
+      description: "The conversation title generated for the session.",
+      // Conversation-derived content: migration 00075 gates the read path
+      // behind the viewer's captured-input visibility.
+      gates: ["input"],
+      sourceColumns: ["Title"],
+    },
+    {
+      name: "TitleSource",
+      type: "LowCardinality(String)",
+      description: "Which source named the session: prompt, generated or name.",
+      gates: [],
+      sourceColumns: ["TitleSource"],
+    },
+    {
+      name: "ParentSessionId",
+      type: "String",
+      description:
+        "Session that spawned this one, empty when no lineage was reported.",
+      gates: [],
+      sourceColumns: ["ParentSessionId"],
+    },
+    {
+      name: "IsFork",
+      type: "Bool",
+      description: "Whether the session forked its parent's context.",
+      gates: [],
+      sourceColumns: ["IsFork"],
+    },
+    {
+      name: "Auxiliary",
+      type: "Bool",
+      description:
+        "Whether the session was a helper thread the agent ran for itself, such as generating a conversation title or a recap. The sessions list omits these.",
+      gates: [],
+      sourceColumns: ["Auxiliary"],
+    },
+    {
+      name: "ModelCalls",
+      type: "UInt32",
+      description: "Model API calls made in the session.",
+      gates: [],
+      sourceColumns: ["ModelCalls"],
+    },
+    {
+      name: "ToolCalls",
+      type: "UInt32",
+      description: "Tool calls made in the session.",
+      gates: [],
+      sourceColumns: ["ToolCalls"],
+    },
+    {
+      name: "SubAgents",
+      type: "UInt32",
+      description: "Sub-agents the session spawned.",
+      gates: [],
+      sourceColumns: ["SubAgents"],
+    },
+    {
+      name: "Prompts",
+      type: "UInt32",
+      description: "Prompts the user issued in the session.",
+      gates: [],
+      sourceColumns: ["Prompts"],
+    },
+    {
+      name: "PromptChars",
+      type: "UInt64",
+      description: "Characters of prompt text, measured not carried.",
+      gates: [],
+      sourceColumns: ["PromptChars"],
+    },
+    {
+      name: "ResponseChars",
+      type: "UInt64",
+      description: "Characters of response text, measured not carried.",
+      gates: [],
+      sourceColumns: ["ResponseChars"],
+    },
+    {
+      name: "ToolCounts",
+      type: "Map(String, UInt32)",
+      description: "Calls per tool.",
+      gates: [],
+      sourceColumns: ["ToolCounts"],
+      expression: (source) => contentFilteredMapSql(source("ToolCounts")),
+    },
+    {
+      name: "ToolDurationMs",
+      type: "Map(String, UInt64)",
+      unit: "ms",
+      description: "Milliseconds spent per tool.",
+      gates: [],
+      sourceColumns: ["ToolDurationMs"],
+      expression: (source) => contentFilteredMapSql(source("ToolDurationMs")),
+    },
+    {
+      name: "FilesTouched",
+      type: "Array(String)",
+      description: "Files the session read or wrote.",
+      gates: [],
+      sourceColumns: ["FilesTouched"],
+    },
+    {
+      name: "Skills",
+      type: "Array(LowCardinality(String))",
+      description: "Skills the session invoked.",
+      gates: [],
+      sourceColumns: ["Skills"],
+    },
+    {
+      name: "SubAgentTypes",
+      type: "Array(LowCardinality(String))",
+      description: "Types of sub-agent the session spawned.",
+      gates: [],
+      sourceColumns: ["SubAgentTypes"],
+    },
+    {
+      name: "SlashCommands",
+      type: "Array(LowCardinality(String))",
+      description: "Slash commands the session ran.",
+      gates: [],
+      sourceColumns: ["SlashCommands"],
+    },
+    {
+      name: "Models",
+      type: "Array(LowCardinality(String))",
+      description: "Models the session used.",
+      gates: [],
+      sourceColumns: ["Models"],
+    },
+    {
+      name: "McpServers",
+      type: "Array(LowCardinality(String))",
+      description: "MCP servers the session reached.",
+      gates: [],
+      sourceColumns: ["McpServers"],
+    },
+    {
+      name: "McpTools",
+      type: "Array(LowCardinality(String))",
+      description: "MCP tools the session called.",
+      gates: [],
+      sourceColumns: ["McpTools"],
+    },
+    {
+      name: "InputTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Input tokens across the session.",
+      gates: [],
+      sourceColumns: ["InputTokens"],
+    },
+    {
+      name: "OutputTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Output tokens across the session.",
+      gates: [],
+      sourceColumns: ["OutputTokens"],
+    },
+    {
+      name: "CacheReadTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens served from the provider's prompt cache.",
+      gates: [],
+      sourceColumns: ["CacheReadTokens"],
+    },
+    {
+      name: "CacheCreationTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens written into the provider's prompt cache.",
+      gates: [],
+      sourceColumns: ["CacheCreationTokens"],
+    },
+    {
+      name: "CostUsd",
+      type: "Float64",
+      unit: "USD",
+      description: "Computed cost of the session, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostUsd"],
+    },
+    {
+      name: "AgentReportedCostUsd",
+      type: "Float64",
+      unit: "USD",
+      description: "Cost the agent reported for itself, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["AgentReportedCostUsd"],
+    },
+    {
+      name: "ModelCallMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Milliseconds spent in model calls.",
+      gates: [],
+      sourceColumns: ["ModelCallMs"],
+    },
+    {
+      name: "ToolMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Milliseconds spent running tools.",
+      gates: [],
+      sourceColumns: ["ToolMs"],
+    },
+    {
+      name: "TtftMsTotal",
+      type: "UInt64",
+      unit: "ms",
+      description:
+        "Summed milliseconds to first token, the numerator for a mean.",
+      gates: [],
+      sourceColumns: ["TtftMsTotal"],
+    },
+    {
+      name: "TtftSamples",
+      type: "UInt32",
+      description:
+        "Calls that recorded a time to first token, the denominator.",
+      gates: [],
+      sourceColumns: ["TtftSamples"],
+    },
+    {
+      name: "BlockedOnUserMs",
+      type: "UInt64",
+      unit: "ms",
+      description:
+        "Milliseconds the agent waited for a human to approve a tool.",
+      gates: [],
+      sourceColumns: ["BlockedOnUserMs"],
+    },
+    {
+      name: "ActiveTimeUserSec",
+      type: "UInt64",
+      description: "Seconds of active user time in the session.",
+      gates: [],
+      sourceColumns: ["ActiveTimeUserSec"],
+    },
+    {
+      name: "ActiveTimeCliSec",
+      type: "UInt64",
+      description: "Seconds of active CLI time in the session.",
+      gates: [],
+      sourceColumns: ["ActiveTimeCliSec"],
+    },
+    {
+      name: "ToolResultBytes",
+      type: "UInt64",
+      description: "Bytes of tool output fed back into the context.",
+      gates: [],
+      sourceColumns: ["ToolResultBytes"],
+    },
+    {
+      name: "ToolInputBytes",
+      type: "UInt64",
+      description: "Bytes of tool input the session sent.",
+      gates: [],
+      sourceColumns: ["ToolInputBytes"],
+    },
+    {
+      name: "Compactions",
+      type: "UInt32",
+      description: "Times the session's context was compacted.",
+      gates: [],
+      sourceColumns: ["Compactions"],
+    },
+    {
+      name: "CompactionTriggers",
+      type: "Map(String, UInt32)",
+      description: "Compactions by trigger kind.",
+      gates: [],
+      sourceColumns: ["CompactionTriggers"],
+      expression: (source) =>
+        contentFilteredMapSql(source("CompactionTriggers")),
+    },
+    {
+      name: "CompactionTokensBefore",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens in context before compaction.",
+      gates: [],
+      sourceColumns: ["CompactionTokensBefore"],
+    },
+    {
+      name: "CompactionTokensAfter",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens in context after compaction.",
+      gates: [],
+      sourceColumns: ["CompactionTokensAfter"],
+    },
+    {
+      name: "PeakContextTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Largest single call's context, at its worst.",
+      gates: [],
+      sourceColumns: ["PeakContextTokens"],
+    },
+    {
+      name: "CacheRebuildCount",
+      type: "UInt32",
+      description:
+        "Calls that re-created most of the context instead of reading cache.",
+      gates: [],
+      sourceColumns: ["CacheRebuildCount"],
+    },
+    {
+      name: "LargestCacheRebuildTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "The single worst cache rebuild's tokens.",
+      gates: [],
+      sourceColumns: ["LargestCacheRebuildTokens"],
+    },
+    {
+      name: "FailedTools",
+      type: "UInt32",
+      description: "Tool calls that failed.",
+      gates: [],
+      sourceColumns: ["FailedTools"],
+    },
+    {
+      name: "ErrorTypes",
+      type: "Map(String, UInt32)",
+      description: "Failures by error class.",
+      gates: [],
+      sourceColumns: ["ErrorTypes"],
+      expression: (source) => contentFilteredMapSql(source("ErrorTypes")),
+    },
+    {
+      name: "ApiErrors",
+      type: "UInt32",
+      description: "API errors the session hit.",
+      gates: [],
+      sourceColumns: ["ApiErrors"],
+    },
+    {
+      name: "RateLimited",
+      type: "UInt32",
+      description: "Times the session was rate limited, inferred from 429s.",
+      gates: [],
+      sourceColumns: ["RateLimited"],
+    },
+    {
+      name: "RateLimitEvents",
+      type: "UInt32",
+      description: "Rate-limit events the agent reported.",
+      gates: [],
+      sourceColumns: ["RateLimitEvents"],
+    },
+    {
+      name: "RetriesExhausted",
+      type: "UInt32",
+      description: "Calls that exhausted their retries.",
+      gates: [],
+      sourceColumns: ["RetriesExhausted"],
+    },
+    {
+      name: "RetryMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Milliseconds spent retrying.",
+      gates: [],
+      sourceColumns: ["RetryMs"],
+    },
+    {
+      name: "Attempts",
+      type: "UInt32",
+      description: "Call attempts, including retries.",
+      gates: [],
+      sourceColumns: ["Attempts"],
+    },
+    {
+      name: "Refusals",
+      type: "UInt32",
+      description: "Times the model refused.",
+      gates: [],
+      sourceColumns: ["Refusals"],
+    },
+    {
+      name: "RefusalCategories",
+      type: "Array(LowCardinality(String))",
+      description: "Categories of the refusals.",
+      gates: [],
+      sourceColumns: ["RefusalCategories"],
+    },
+    {
+      name: "InternalErrors",
+      type: "UInt32",
+      description: "Internal errors during the session.",
+      gates: [],
+      sourceColumns: ["InternalErrors"],
+    },
+    {
+      name: "ToolsDenied",
+      type: "UInt32",
+      description: "Tool calls a guardrail denied, so they never ran.",
+      gates: [],
+      sourceColumns: ["ToolsDenied"],
+    },
+    {
+      name: "ToolsAborted",
+      type: "UInt32",
+      description: "Tool calls the human aborted.",
+      gates: [],
+      sourceColumns: ["ToolsAborted"],
+    },
+    {
+      name: "PermissionMode",
+      type: "LowCardinality(String)",
+      description: "Permission mode the session ran under.",
+      gates: [],
+      sourceColumns: ["PermissionMode"],
+    },
+    {
+      name: "PermissionChanges",
+      type: "UInt32",
+      description: "Times the permission mode changed.",
+      gates: [],
+      sourceColumns: ["PermissionChanges"],
+    },
+    {
+      name: "HooksBlocked",
+      type: "UInt32",
+      description: "Times a hook blocked an action.",
+      gates: [],
+      sourceColumns: ["HooksBlocked"],
+    },
+    {
+      name: "HooksCancelled",
+      type: "UInt32",
+      description: "Times a hook cancelled an action.",
+      gates: [],
+      sourceColumns: ["HooksCancelled"],
+    },
+    {
+      name: "HookMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Milliseconds spent in hooks.",
+      gates: [],
+      sourceColumns: ["HookMs"],
+    },
+    {
+      name: "LinesAdded",
+      type: "UInt64",
+      description: "Lines of code the session added.",
+      gates: [],
+      sourceColumns: ["LinesAdded"],
+    },
+    {
+      name: "LinesRemoved",
+      type: "UInt64",
+      description: "Lines of code the session removed.",
+      gates: [],
+      sourceColumns: ["LinesRemoved"],
+    },
+    {
+      name: "Commits",
+      type: "UInt32",
+      description: "Commits the session made.",
+      gates: [],
+      sourceColumns: ["Commits"],
+    },
+    {
+      name: "PullRequests",
+      type: "UInt32",
+      description: "Pull requests the session opened.",
+      gates: [],
+      sourceColumns: ["PullRequests"],
+    },
+    {
+      name: "EditsAccepted",
+      type: "UInt32",
+      description: "Edits the user accepted.",
+      gates: [],
+      sourceColumns: ["EditsAccepted"],
+    },
+    {
+      name: "EditsRejected",
+      type: "UInt32",
+      description: "Edits the user rejected.",
+      gates: [],
+      sourceColumns: ["EditsRejected"],
+    },
+    {
+      name: "LanguagesEdited",
+      type: "Array(LowCardinality(String))",
+      description: "Languages the session edited.",
+      gates: [],
+      sourceColumns: ["LanguagesEdited"],
+    },
+    {
+      name: "AtMentions",
+      type: "UInt32",
+      description: "At-mentions the user made.",
+      gates: [],
+      sourceColumns: ["AtMentions"],
+    },
+    {
+      name: "StopReason",
+      type: "LowCardinality(String)",
+      description: "How the session ended.",
+      gates: [],
+      sourceColumns: ["StopReason"],
+    },
+    {
+      name: "Truncated",
+      type: "Bool",
+      description: "Whether the final reply was cut off rather than finished.",
+      gates: [],
+      sourceColumns: ["Truncated"],
+    },
+  ],
+};
+
+/**
+ * Coding-agent session events: one row per per-call fact of a session (ADR-056,
+ * migration 00073 and 00087) — a model call, compaction, rate limit, API error,
+ * tool run, prompt or sub-agent completion.
+ *
+ * The interleaved sequence the session aggregate erases: an ordered scan per
+ * session yields calls between compactions, the tool mix around a rate limit,
+ * the cost curve. Typed scalar columns only — the table has no free-form
+ * attribute map by design (the wire rides user identity on nearly every event,
+ * and content stays in the canonical span and log rows) — so only `CostUsd` is
+ * gated, on costs. Its sort key `(TenantId, SessionId, TimeUnixMs, RecordId)`
+ * holds still — `RecordId` is the record's content hash and `TimeUnixMs` the
+ * event's own time — so it takes the shipped `final` strategy.
+ */
+const CODING_AGENT_SESSION_EVENTS: LangWatchQLViewDefinition = {
+  name: "coding_session_events",
+  sourceTable: "coding_agent_session_events",
+  description:
+    "One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order.",
+  gates: [],
+  grain: "one row per (TenantId, SessionId, TimeUnixMs, RecordId)",
+  joinKeys: ["TenantId", "SessionId"],
+  timeColumn: "TimeUnixMs",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "SessionId", "TimeUnixMs", "RecordId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the event belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "SessionId",
+      type: "String",
+      description: "Session the event belongs to.",
+      gates: [],
+      sourceColumns: ["SessionId"],
+    },
+    {
+      name: "TimeUnixMs",
+      type: "DateTime64(3)",
+      unit: "ms",
+      description:
+        "When the event happened. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["TimeUnixMs"],
+    },
+    {
+      name: "RecordId",
+      type: "FixedString(64)",
+      description:
+        "The canonical log record's content hash, the dedup identity.",
+      gates: [],
+      sourceColumns: ["RecordId"],
+    },
+    {
+      name: "EventKind",
+      type: "LowCardinality(String)",
+      description: "What kind of event this row is.",
+      gates: [],
+      sourceColumns: ["EventKind"],
+    },
+    {
+      name: "Agent",
+      type: "LowCardinality(String)",
+      description: "Which coding agent produced the event.",
+      gates: [],
+      sourceColumns: ["Agent"],
+    },
+    {
+      name: "SessionKeySource",
+      type: "LowCardinality(String)",
+      description:
+        "Whether the session id came from the agent or was the trace id in its absence.",
+      gates: [],
+      sourceColumns: ["SessionKeySource"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description:
+        "Trace the event correlated to, empty when none was resolved.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "SpanId",
+      type: "String",
+      description:
+        "Span the event correlated to, empty when none was resolved.",
+      gates: [],
+      sourceColumns: ["SpanId"],
+    },
+    {
+      name: "PromptId",
+      type: "String",
+      description: "Per-prompt turn id, empty when the agent emits none.",
+      gates: [],
+      sourceColumns: ["PromptId"],
+    },
+    {
+      name: "QuerySource",
+      type: "LowCardinality(String)",
+      description: "Who issued the call, the per-call sub-agent attribution.",
+      gates: [],
+      sourceColumns: ["QuerySource"],
+    },
+    {
+      name: "AgentType",
+      type: "LowCardinality(String)",
+      description: "Sub-agent type when the event carries one.",
+      gates: [],
+      sourceColumns: ["AgentType"],
+    },
+    {
+      name: "EventSequence",
+      type: "Int64",
+      description: "Ordering tie-break within one TimeUnixMs, -1 when absent.",
+      gates: [],
+      sourceColumns: ["EventSequence"],
+    },
+    {
+      name: "RequestId",
+      type: "String",
+      description: "Request id of a model call.",
+      gates: [],
+      sourceColumns: ["RequestId"],
+    },
+    {
+      name: "Model",
+      type: "LowCardinality(String)",
+      description: "Model a model-call event used.",
+      gates: [],
+      sourceColumns: ["Model"],
+    },
+    {
+      name: "InputTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Input tokens of a model call.",
+      gates: [],
+      sourceColumns: ["InputTokens"],
+    },
+    {
+      name: "OutputTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Output tokens of a model call.",
+      gates: [],
+      sourceColumns: ["OutputTokens"],
+    },
+    {
+      name: "CacheReadTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Cache-read tokens of a model call.",
+      gates: [],
+      sourceColumns: ["CacheReadTokens"],
+    },
+    {
+      name: "CacheCreationTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Cache-creation tokens of a model call.",
+      gates: [],
+      sourceColumns: ["CacheCreationTokens"],
+    },
+    {
+      name: "CostUsd",
+      type: "Float64",
+      unit: "USD",
+      description: "Cost of a model call, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostUsd"],
+    },
+    {
+      name: "DurationMs",
+      type: "UInt32",
+      unit: "ms",
+      description: "Duration of a model call, in milliseconds.",
+      gates: [],
+      sourceColumns: ["DurationMs"],
+    },
+    {
+      name: "TtftMs",
+      type: "UInt32",
+      unit: "ms",
+      description: "Milliseconds to first token of a model call.",
+      gates: [],
+      sourceColumns: ["TtftMs"],
+    },
+    {
+      name: "Attempt",
+      type: "UInt16",
+      description: "Attempt number of a model call.",
+      gates: [],
+      sourceColumns: ["Attempt"],
+    },
+    {
+      name: "Speed",
+      type: "LowCardinality(String)",
+      description: "Speed tier of a model call.",
+      gates: [],
+      sourceColumns: ["Speed"],
+    },
+    {
+      name: "StopReason",
+      type: "LowCardinality(String)",
+      description: "Stop reason of a model call.",
+      gates: [],
+      sourceColumns: ["StopReason"],
+    },
+    {
+      name: "PreTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens in context before a compaction.",
+      gates: [],
+      sourceColumns: ["PreTokens"],
+    },
+    {
+      name: "PostTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Tokens in context after a compaction.",
+      gates: [],
+      sourceColumns: ["PostTokens"],
+    },
+    {
+      name: "CompactionTrigger",
+      type: "LowCardinality(String)",
+      description: "What triggered a compaction.",
+      gates: [],
+      sourceColumns: ["CompactionTrigger"],
+    },
+    {
+      name: "PrecomputeReuse",
+      type: "LowCardinality(String)",
+      description: "Precompute reuse of a compaction.",
+      gates: [],
+      sourceColumns: ["PrecomputeReuse"],
+    },
+    {
+      name: "StatusCode",
+      type: "LowCardinality(String)",
+      description:
+        "Status code of an API error, rate limit or exhausted retry.",
+      gates: [],
+      sourceColumns: ["StatusCode"],
+    },
+    {
+      name: "ErrorType",
+      type: "LowCardinality(String)",
+      description: "Error class of an API error.",
+      gates: [],
+      sourceColumns: ["ErrorType"],
+    },
+    {
+      name: "RateLimitCarrier",
+      type: "LowCardinality(String)",
+      description: "Which carrier reported a rate limit: event or info.",
+      gates: [],
+      sourceColumns: ["RateLimitCarrier"],
+    },
+    {
+      name: "RetryDurationMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Milliseconds a retry waited.",
+      gates: [],
+      sourceColumns: ["RetryDurationMs"],
+    },
+    {
+      name: "ToolName",
+      type: "LowCardinality(String)",
+      description: "Tool a tool event ran.",
+      gates: [],
+      sourceColumns: ["ToolName"],
+    },
+    {
+      name: "Success",
+      type: "LowCardinality(String)",
+      description: "Whether a tool run or compaction succeeded.",
+      gates: [],
+      sourceColumns: ["Success"],
+    },
+    {
+      name: "Decision",
+      type: "LowCardinality(String)",
+      description: "The decision on a tool run.",
+      gates: [],
+      sourceColumns: ["Decision"],
+    },
+    {
+      name: "DecisionSource",
+      type: "LowCardinality(String)",
+      description: "What made the decision on a tool run.",
+      gates: [],
+      sourceColumns: ["DecisionSource"],
+    },
+    {
+      name: "ToolInputBytes",
+      type: "UInt64",
+      description: "Bytes of a tool's input.",
+      gates: [],
+      sourceColumns: ["ToolInputBytes"],
+    },
+    {
+      name: "ToolResultBytes",
+      type: "UInt64",
+      description: "Bytes of a tool's output.",
+      gates: [],
+      sourceColumns: ["ToolResultBytes"],
+    },
+    {
+      name: "PromptChars",
+      type: "UInt32",
+      description: "Characters of a user prompt, measured not carried.",
+      gates: [],
+      sourceColumns: ["PromptChars"],
+    },
+    {
+      name: "TotalTokens",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Total tokens of a sub-agent completion.",
+      gates: [],
+      sourceColumns: ["TotalTokens"],
+    },
+    {
+      name: "RepositoryHost",
+      type: "LowCardinality(String)",
+      description: "Forge active when the event happened.",
+      gates: [],
+      sourceColumns: ["RepositoryHost"],
+    },
+    {
+      name: "RepositoryOwner",
+      type: "LowCardinality(String)",
+      description: "Repository owner active when the event happened.",
+      gates: [],
+      sourceColumns: ["RepositoryOwner"],
+    },
+    {
+      name: "RepositoryName",
+      type: "LowCardinality(String)",
+      description: "Repository name active when the event happened.",
+      gates: [],
+      sourceColumns: ["RepositoryName"],
+    },
+    {
+      name: "Branch",
+      type: "String",
+      description: "Branch active when the event happened.",
+      gates: [],
+      sourceColumns: ["Branch"],
+    },
+  ],
+};
+
+/**
  * The LangWatchQL schema, in the order the schema endpoint should publish it:
  * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
  * dimensions that name them.
  *
- * One catalog rather than two, because residence is a property of a dataset and
+ * One catalog rather than two, because residence is a property of a view and
  * not a property of the schema. Every consumer — the schema endpoint, the
  * validator, the diagnostics — reads this list and needs no idea which half an
  * entry came from; only the provisioning generators in `../provisioning/catalogStatements.ts` and
@@ -1686,6 +2733,165 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
  * and `traces` rather than resident anywhere of their own, so each needs a
  * derived view over tables already here, not a mapping.
  */
+/**
+ * Judgments: one row per Instant Eval run, trace and question.
+ *
+ * The only dataset in the catalog with no content gate at all, and that is a
+ * property of what it holds rather than an omission: a judgement is a
+ * probability, a score or a label, and the text it was formed from is never
+ * copied here. There is nothing for the input or output permission to withhold,
+ * so declaring one would gate a column that carries no content.
+ *
+ * It is also the only dataset the *caller* caused to exist. Every other one is
+ * a projection of traffic; this one holds the answers to a question the caller
+ * asked, which is why the follow-up is an ordinary join back to `traces` rather
+ * than a second product surface.
+ *
+ * The table's `Error` column is off-catalog, like every other free-text error
+ * carrier here. `Status` says whether a row was judged, and the run's own
+ * results endpoint is where the reason for a skip is read.
+ */
+const JUDGMENTS: LangWatchQLViewDefinition = {
+  name: "judgments",
+  sourceTable: "instant_eval_judgments",
+  description:
+    "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
+  gates: [],
+  grain:
+    "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "CreatedAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "RunId", "TraceId", "SpanId", "QuestionId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the judgement belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "RunId",
+      type: "String",
+      description: "The Instant Eval run that asked the question.",
+      gates: [],
+      sourceColumns: ["RunId"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description: "Trace whose text was judged.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "QuestionId",
+      type: "String",
+      description:
+        "The question, named by the output column the run's statement aliased it to.",
+      gates: [],
+      sourceColumns: ["QuestionId"],
+    },
+    {
+      name: "ThreadId",
+      type: "String",
+      description:
+        "Conversation the judged text came from, empty when the statement judged a trace rather than a thread.",
+      gates: [],
+      sourceColumns: ["ThreadId"],
+    },
+    {
+      name: "SpanId",
+      type: "String",
+      description:
+        "Span the judged text came from, empty unless the statement judged one span.",
+      gates: [],
+      sourceColumns: ["SpanId"],
+    },
+    {
+      name: "Kind",
+      type: "LowCardinality(String)",
+      description: "What was asked: boolean, score or category.",
+      gates: [],
+      sourceColumns: ["Kind"],
+    },
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description:
+        "Whether it was answered: judged, skipped or failed. A skip is an answer of `we did not judge this`.",
+      gates: [],
+      sourceColumns: ["Status"],
+    },
+    {
+      name: "Passed",
+      type: "Nullable(UInt8)",
+      description:
+        "Whether a boolean question's probability cleared its threshold. Null for the other kinds.",
+      gates: [],
+      sourceColumns: ["Passed"],
+    },
+    {
+      name: "Score",
+      type: "Nullable(Float64)",
+      description:
+        "The probability-weighted mean inside the declared range, for a score question.",
+      gates: [],
+      sourceColumns: ["Score"],
+    },
+    {
+      name: "Label",
+      type: "String",
+      description: "The most likely option, for a category question.",
+      gates: [],
+      sourceColumns: ["Label"],
+    },
+    {
+      name: "Probability",
+      type: "Nullable(Float64)",
+      description:
+        "Probability of yes for a boolean question, or of the chosen label for a category one. The judge is calibrated, so 0.9 means nine times in ten.",
+      gates: [],
+      sourceColumns: ["Probability"],
+    },
+    {
+      name: "Probabilities",
+      type: "String",
+      description:
+        "Every option's probability for a category question, as a JSON object of option name to probability. Empty for the other kinds.",
+      gates: [],
+      sourceColumns: ["Probabilities"],
+    },
+    {
+      name: "OccurredAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judged row happened, carried from the statement so a judgement can be joined to a trace inside a bounded period.",
+      gates: [],
+      sourceColumns: ["OccurredAt"],
+    },
+    {
+      name: "CreatedAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judgement was written. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["CreatedAt"],
+    },
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the judgement was written.",
+      gates: [],
+      sourceColumns: ["UpdatedAt"],
+    },
+  ],
+};
+
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   TRACES,
   SPANS,
@@ -1696,6 +2902,11 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   MODEL_USAGE_BY_MINUTE,
   EVALUATION_METRICS,
   EVALUATION_METRICS_BY_MINUTE,
+  CODING_AGENT_SESSIONS,
+  CODING_AGENT_SESSION_EVENTS,
+  CODING_TOOL_RESULTS,
+  JUDGMENTS,
+  ...LWQL_DERIVED_CATALOG,
   ...LWQL_POSTGRES_CATALOG,
 ];
 

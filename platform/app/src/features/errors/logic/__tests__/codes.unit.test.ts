@@ -105,6 +105,12 @@ const CLIENT_MINTED_CODES = new Set([
   // model came from a menu, so the remediation is a different one and needs
   // its own words.
   "langy_model_unavailable",
+  // Minted by `PasskeySignUpButton` from better-auth's transport-level
+  // `ALREADY_SIGNED_IN` (a sign-up ceremony run with a session already open,
+  // refused server-side in `passkey-signup.ts`). The button translates it to
+  // this registry code for copy, the same way it maps a status to
+  // `identity_passkey_not_recognized`; nothing throws it as a HandledError.
+  "identity_passkey_already_signed_in",
 ]);
 
 /**
@@ -129,6 +135,42 @@ const PARAMETERIZED_CODES = new Set([
   "langy_api_key_unowned",
   "langy_api_key_no_langy_access",
   "langy_api_actor_missing",
+]);
+
+/**
+ * Codes RECORDED ON A ROW rather than thrown, and read back later.
+ *
+ * `instant_eval_stalled` is the reason an Instant Eval run ended without
+ * finishing: the process manager's wake handler discovers a run that went
+ * fifteen minutes without a judged page, and the run's own `error` column
+ * carries the code from then on. Nothing throws it, because by the time it is
+ * known there is no request to refuse: the caller left when the job was
+ * accepted, and they read the code off the run.
+ *
+ * It still reaches a customer and still needs copy, keyed by the same code the
+ * column holds, so the orphan check must not call that copy dead. The bar for
+ * adding one: a durable column holds the code, and a surface renders the
+ * registry entry from it. A code that only ever appears in a log line is not
+ * one of these and should not be in `APP_ERROR_CODES` at all.
+ */
+const RUN_STATUS_CODES = new Set(["instant_eval_stalled"]);
+
+/**
+ * Codes MINTED BY BETTER-AUTH ITSELF, not by a `HandledError` subclass.
+ *
+ * `LastWayInGuard` (`src/server/better-auth/last-way-in.ts`) throws
+ * better-auth's own `APIError.from("BAD_REQUEST", { code: "LAST_WAY_IN", … })`
+ * on the mounted `/passkey/delete-passkey` and `/two-factor/disable` routes.
+ * Neither code passes through `HANDLED_BY_BETTER_AUTH_CODE`
+ * (`src/server/better-auth/handled-errors.ts`), so nothing in these trees
+ * writes `super("LAST_WAY_IN", …)` for `CODE_PATTERNS` to find — the throw
+ * site is better-auth's `APIError`, never ours. They still reach a customer,
+ * spelled exactly as better-auth sends them (SCREAMING_CASE, not our usual
+ * snake_case), so the orphan check must not call their copy dead.
+ */
+const BETTER_AUTH_PASSTHROUGH_CODES = new Set([
+  "LAST_WAY_IN",
+  "MFA_REQUIRED_BY_ORGANIZATION",
 ]);
 
 /**
@@ -284,7 +326,9 @@ describe("APP_ERROR_CODES", () => {
           !PACKAGE_OWNED_CODES.has(code) &&
           !RELAYED_META_CODES.has(code) &&
           !CLIENT_MINTED_CODES.has(code) &&
-          !PARAMETERIZED_CODES.has(code),
+          !PARAMETERIZED_CODES.has(code) &&
+          !RUN_STATUS_CODES.has(code) &&
+          !BETTER_AUTH_PASSTHROUGH_CODES.has(code),
       );
 
       expect(

@@ -38,9 +38,20 @@ export interface VoiceTransportClient {
   }): Promise<VoiceCallSession>;
 }
 
-export const voiceTransportClientRegistry: Record<
-  VoiceTransport,
-  VoiceTransportClient
+/**
+ * Not every transport has a browser client: a phone target is dialled from the
+ * voice worker, not the browser, so it has no "Talk to it" client at all. The
+ * registry is a partial map, and {@link getVoiceTransportClient} returns
+ * `undefined` for a transport with no browser call.
+ */
+export const voiceTransportClientRegistry: Partial<
+  Record<VoiceTransport, VoiceTransportClient>
 > = {
   elevenlabs_convai: elevenLabsConvaiClient,
 };
+
+/** The browser client for a transport, or `undefined` when it has none (phone
+ *  targets are called from a scenario run, never from the browser). */
+export const getVoiceTransportClient = (
+  transport: VoiceTransport,
+): VoiceTransportClient | undefined => voiceTransportClientRegistry[transport];

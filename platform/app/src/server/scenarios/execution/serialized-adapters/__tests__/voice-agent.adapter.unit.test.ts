@@ -1,5 +1,6 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
+import { phoneTransport } from "../../../voice/transports/phone.transport";
 import type { voiceTransportRegistry } from "../../../voice/voice-transport.registry";
 import type { VoiceAgentData } from "../../types";
 import {
@@ -20,6 +21,7 @@ function fakeRegistry(
       fetchCallRecord: vi.fn(),
       endCall: vi.fn(),
     },
+    phone: phoneTransport,
   };
 }
 
@@ -27,7 +29,7 @@ function voiceData({
   credential,
   callerEnv = { OPENAI_API_KEY: "sk-openai" },
 }: {
-  credential: { apiKey: string; baseUrl: string } | null;
+  credential: { kind: "elevenlabs"; apiKey: string; baseUrl: string } | null;
   callerEnv?: Record<string, string>;
 }): VoiceAgentData {
   return {
@@ -64,6 +66,7 @@ describe("createSerializedVoiceAgentAdapter", () => {
           createSerializedVoiceAgentAdapter({
             data: voiceData({
               credential: {
+                kind: "elevenlabs",
                 apiKey: "xi-key",
                 baseUrl: "https://api.elevenlabs.io",
               },
@@ -81,6 +84,7 @@ describe("createSerializedVoiceAgentAdapter", () => {
         const adapter = createSerializedVoiceAgentAdapter({
           data: voiceData({
             credential: {
+              kind: "elevenlabs",
               apiKey: "xi-key",
               baseUrl: "https://api.elevenlabs.io",
             },
@@ -92,6 +96,7 @@ describe("createSerializedVoiceAgentAdapter", () => {
         expect(createAgentAdapter).toHaveBeenCalledWith({
           agentId: "el-agent-abc",
           credential: {
+            kind: "elevenlabs",
             apiKey: "xi-key",
             baseUrl: "https://api.elevenlabs.io",
           },

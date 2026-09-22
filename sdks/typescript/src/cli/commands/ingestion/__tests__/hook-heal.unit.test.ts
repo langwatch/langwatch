@@ -117,6 +117,31 @@ describe("the session context hook's self-heal", () => {
     });
   });
 
+  describe("given a rejected key on a tool pinned to a project", () => {
+    /** @scenario "A rejected pinned key is reported rather than healed" */
+    it("tells the user the pinned key was rejected and mints nothing", async () => {
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
+
+      await hook.runHook({
+        shouldOmitExporterEnv: true,
+        fetchImpl: hook.collector(401),
+        healRevokedKey,
+        readCliConfig: () => ({
+          control_plane_url: "https://app.example.com",
+          tool_project_keys: { claude: { secret: "sk-lw-pinned_secret" } },
+        }),
+      });
+
+      expect(healRevokedKey).not.toHaveBeenCalled();
+      expect(posted).toHaveLength(1);
+      expect(hook.stdout).toHaveLength(1);
+      expect(JSON.parse(hook.stdout[0]!)).toEqual({
+        systemMessage: expect.stringContaining("pinned"),
+      });
+      expect(hook.exits).toEqual([]);
+    });
+  });
+
   describe("given a heal attempted minutes ago", () => {
     /** @scenario "A second rejection inside the throttle window does not re-mint" */
     it("does not ask the healer again inside the throttle window", async () => {

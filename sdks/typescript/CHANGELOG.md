@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.14.0...typescript-sdk@v1.15.0) (2026-09-13)
+
+
+### Features
+
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([2877be0](https://github.com/langwatch/langwatch/commit/2877be087bf9da0726b5c10d79c01a825080ed38))
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([e9d9ea0](https://github.com/langwatch/langwatch/commit/e9d9ea025d4daa61418e49ff2b051558d76d817b))
+
+
+### Bug Fixes
+
+* **cli:** session context hooks report for a tool pinned with instrument --key ([#8102](https://github.com/langwatch/langwatch/issues/8102)) ([2e7ab41](https://github.com/langwatch/langwatch/commit/2e7ab4118395a3a3eeb82c4123f7982f10ccedbd))
+* **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
+
+## [1.14.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.13.0...typescript-sdk@v1.14.0) (2026-09-12)
+
+
+### Features
+
+* **analytics:** sandboxed custom chart widgets over LWQL ([#7870](https://github.com/langwatch/langwatch/issues/7870)) ([279b657](https://github.com/langwatch/langwatch/commit/279b6572ce15d9c0d6f791ed7e95afb469be2765))
+* **api-keys:** personal ingest keys live and die with the CLI session that minted them ([#7960](https://github.com/langwatch/langwatch/issues/7960)) ([2e69cff](https://github.com/langwatch/langwatch/commit/2e69cff13143b6f0aa51c021af944db1ba39bd93))
+
+
+### Bug Fixes
+
+* **api-keys:** every door to a personal key stops revoking the other machines', and a signed-out device says so ([#7918](https://github.com/langwatch/langwatch/issues/7918)) ([a6da084](https://github.com/langwatch/langwatch/commit/a6da084777832c759cfb1b7aa4f3b01d2f998ec6))
+* **cli:** suggest restarting active code launchers after telemetry changes ([#7946](https://github.com/langwatch/langwatch/issues/7946)) ([0b6e7af](https://github.com/langwatch/langwatch/commit/0b6e7afefaa916e0eba460e14c2f02f38595cdcc))
+* **sdk-js:** the langy control calls use the shared transport, and the tunnel probe allowance follows its file ([#7915](https://github.com/langwatch/langwatch/issues/7915)) ([7734bdb](https://github.com/langwatch/langwatch/commit/7734bdb1206c9a76390312f242907e369831528f))
+* **security:** move the connected-agent example onto the ai 6 line ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
+* **security:** move the connected-agent example onto the ai 6 line (13 alerts, 3 HIGH) ([#7722](https://github.com/langwatch/langwatch/issues/7722)) ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
+
 ## [1.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.1...typescript-sdk@v1.13.0) (2026-09-06)
 
 

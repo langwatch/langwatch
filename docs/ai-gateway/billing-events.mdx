@@ -24,6 +24,8 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `jev`, an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count. A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
+
 Event ids are stable: `<gateway_request_id>:<completed|settled|admitted>`. A retried or replayed delivery carries the same id, so you can dedupe on it. Recorded spend never changes: a budget reset moves a period boundary and leaves every event as it was.
 
 ## The event payload
@@ -38,8 +40,8 @@ Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type",
 | `organization_id`, `project_id` | The organization, and the trace project of the virtual key. |
 | `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`. |
 | `trace_id` | The trace in Trace Explorer. |
-| `model`, `model_provider_id`, `request_type` | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `realtime_session` or `passthrough`. |
-| `usage` | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`. `input_tokens` excludes the cached and audio tokens. `reasoning_tokens` is a subset of `output_tokens`. `null` on `settled` and `admitted`. |
+| `model`, `model_provider_id`, `request_type` | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session` or `passthrough`. |
+| `usage` | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens`, `image_count`, always present and 0 when unused. Each priced quantity is charged once at its own rate, and `input_tokens` excludes the cached, audio and image tokens. `reasoning_tokens` is a subset of `output_tokens`, and `image_count` counts images, so no rate prices either and neither belongs in a cost sum. An `image_generation` row reports `output_tokens` 0 with its render under `output_image_tokens`. `null` on `settled` and `admitted`. |
 | `cost` | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`. |
 | `status` | `success`, `error`, `settled` or `admitted`. |
 | `needs_reconciliation`, `settle_reason` | `true` and `confirmation_deadline_expired` on `settled`. |

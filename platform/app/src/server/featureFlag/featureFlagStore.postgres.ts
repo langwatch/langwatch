@@ -89,9 +89,12 @@ export class FeatureFlagStorePostgres {
   ): Promise<boolean | null> {
     const row = await this.getRow(key);
     if (row === null) return null;
+    // The flag key salts the percentage rollout bucket, so the same user is
+    // not in the same half of every experiment.
+    const keyedCtx = { ...ctx, flagKey: key };
     const ruleHit = evaluateRules(
       row.rules,
-      await this.withOrganizationAge(row.rules, ctx),
+      await this.withOrganizationAge(row.rules, keyedCtx),
     );
     return ruleHit ?? row.enabled;
   }

@@ -33,6 +33,10 @@ import {
 } from "../voice/caller-voice.config";
 import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
 import { voiceTransportRegistry } from "../voice/voice-transport.registry";
+import {
+  agentGreetsFirst,
+  buildAgentGreetsFirstScript,
+} from "./agent-first-script";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
@@ -276,7 +280,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           langwatchEndpoint,
           langwatchApiKey,
         }),
-        ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+        ...buildMaxTurnsRunConfig({
+          jobData,
+          scenarioMaxTurns: scenario.maxTurns,
+        }),
         ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
         metadata: {
           langwatch: {
@@ -325,6 +332,33 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 }
 
 /**
+ * The `maxTurns` override to pass to `ScenarioRunner.run`, if any.
+ *
+ * An agent-first run (agent-first-script.ts) spends its first turn on the
+ * greeting and the caller's opening reply — a turn the judge is never asked
+ * about — so it needs one more turn than usual to keep the same judged-turn
+ * budget as every other run. Only the non-scripted (judge-driven) cast pays
+ * that cost: an agent test's script ends in `succeed()` and never consults
+ * `maxTurns` at all.
+ */
+function buildMaxTurnsRunConfig({
+  jobData,
+  scenarioMaxTurns,
+}: {
+  jobData: ChildProcessJobData;
+  scenarioMaxTurns: number | null | undefined;
+}): { maxTurns?: number } {
+  const bumpForGreeting =
+    !jobData.script && agentGreetsFirst(jobData.adapterData);
+  if (scenarioMaxTurns == null && !bumpForGreeting) return {};
+  return {
+    maxTurns:
+      (scenarioMaxTurns ?? ScenarioRunner.DEFAULT_MAX_TURNS) +
+      (bumpForGreeting ? 1 : 0),
+  };
+}
+
+/**
  * Who takes part in the run, and whether the conversation is written down.
  *
  * A scripted run (an agent test) carries its user's lines and decides its
@@ -345,7 +379,11 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return buildAgentTestRun({ adapter, script: jobData.script });
+    return buildAgentTestRun({
+      adapter,
+      script: jobData.script,
+      doesAgentGreetFirst: agentGreetsFirst(jobData.adapterData),
+    });
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
@@ -368,6 +406,14 @@ function buildRunCast({
         )
       : null;
 
+  // An inbound phone agent that greets on connect opens the run with its own
+  // turn (so the greeting is captured first), then hands over to the
+  // simulator/judge loop; every other run keeps the default cast, which opens
+  // with the caller.
+  const agentGreetsFirstScript = buildAgentGreetsFirstScript(
+    jobData.adapterData,
+  );
+
   return {
     agents: [
       adapter,
@@ -380,6 +426,7 @@ function buildRunCast({
         model: judgeModel,
       }),
     ],
+    ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
   };
 }
 

@@ -1,6 +1,9 @@
 import { TRPCError } from "@trpc/server";
 
-import { isDemoProjectId, type PermissionMiddleware } from "~/server/api/rbac";
+import {
+  isDemoProjectId,
+  type PermissionMiddleware,
+} from "~/server/app-layer/authz/permission-adapters";
 import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";

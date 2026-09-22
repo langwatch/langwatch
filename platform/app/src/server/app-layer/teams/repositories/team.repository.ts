@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/actor";
 import type { Team, TeamUserRole } from "~/generated/prisma/client";
+import type { TeamScopedMemberBinding } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 export interface CreateTeamInput {
   id: string;
@@ -17,8 +18,30 @@ export interface PaginatedResult<T> {
   pagination: { page: number; limit: number; total: number };
 }
 
+/** One project of a team, as the REST listing hands it back. */
+export interface TeamProjectListing {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface TeamRepository {
   findById(id: string): Promise<Team | null>;
+  /**
+   * The team's projects a member may see — the organization's hidden
+   * `internal_governance` home excluded, per ADR-128.
+   *
+   * A repository method rather than a query in the route so the leak gate
+   * (`src/server/__tests__/projectFilter.invariant.integration.test.ts`) can
+   * drive this listing the way it drives every other one.
+   */
+  findProjectsInTeam(params: { teamId: string }): Promise<TeamProjectListing[]>;
+  listMembers(params: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<TeamScopedMemberBinding[]>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;

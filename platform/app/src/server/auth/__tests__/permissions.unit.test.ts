@@ -3,7 +3,7 @@ import { OrganizationUserRole } from "~/generated/prisma/client";
 
 const resolveProjectPermissionMock = vi.fn();
 
-vi.mock("~/server/api/rbac", () => ({
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
   resolveProjectPermission: (...args: unknown[]) =>
     resolveProjectPermissionMock(...args),
 }));

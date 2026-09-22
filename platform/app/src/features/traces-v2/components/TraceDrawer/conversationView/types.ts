@@ -1,4 +1,4 @@
-import type { MediaPartData } from "~/shared/traces/mediaParts";
+import type { ParsedTurn as SharedParsedTurn } from "~/shared/traces/conversation/parsedTurns";
 import type { TraceListItem } from "../../../types/trace";
 
 export type Mode = "thread" | "bubbles" | "markdown";
@@ -6,26 +6,12 @@ export type Mode = "thread" | "bubbles" | "markdown";
 /** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
 export type TurnLayout = "thread" | "bubbles";
 
-export interface ParsedTurn {
-  turn: TraceListItem;
-  userText: string;
-  /**
-   * Pre-extracted assistant prose for the bubble. Strips Anthropic-style
-   * `{role:"assistant",content:[{type:"thinking"…},…]}` envelopes and
-   * pulls just the text blocks, so we don't dump raw JSON in the bubble.
-   */
-  assistantText: string;
-  assistantReasoning: string;
-  /**
-   * Media recorded on the turn's input side, rendered under the user message.
-   * The caller's own media only: a reply recording that rode along in the
-   * turn's input belongs to the assistant and is not repeated here.
-   */
-  userMedia: MediaPartData[];
-  /** Media recorded on the turn's output side, rendered under the reply. */
-  assistantMedia: MediaPartData[];
-  gapSecs: number;
-  showGap: boolean;
-}
+/**
+ * A parsed turn as the drawer holds one: the shared parse bound to the trace
+ * list item the rows render from. The rows read far more of the turn than the
+ * parse itself does (status, evaluations, annotations), so the binding lives
+ * here rather than in the shared module.
+ */
+export type ParsedTurn = SharedParsedTurn<TraceListItem>;
 
 export const EMPTY_TURNS: TraceListItem[] = [];

@@ -46,6 +46,17 @@
  * because a name reaches the walk in two shapes — a `Function` node, and the
  * bare `func_name` string of an `APPLY` column transformer.
  *
+ * ## App functions are a fourth list, and their rule is positional
+ *
+ * `../appFunctions/catalog.ts` names the functions whose value the
+ * *application* computes after the query. They are deliberately absent from
+ * the allowlist above: they are admitted only as direct elements of the
+ * outermost `SELECT` list, with an alias, and refused everywhere else. That is
+ * a correctness rule rather than a policy one — the database holds each of them
+ * as a projection UDF over its key, so `WHERE conversation(x) = 'y'` compares
+ * the raw key and answers with the wrong rows and no error. The validator is
+ * the only layer that can see the difference.
+ *
  * ## Table functions
  *
  * Refused **positionally**: a `TableExpression` carrying a `table_function` is
@@ -64,13 +75,27 @@
  * the reachable surface uniform and small, so that "which table functions are
  * safe today" never becomes a question anyone has to re-answer.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ../provisioning/accessModel.ts — the database-layer isolation this backs up
  */
 
 import {
+  type LangWatchQLAppFunctionDefinition,
+  lwqlAppFunction,
+  lwqlAppFunctionSignature,
+} from "../appFunctions/catalog";
+import { isEvalFunctionName } from "../appFunctions/evalCatalog";
+import type {
+  LangWatchQLAppFunctionCall,
+  LangWatchQLAppFunctionOption,
+  LangWatchQLAppFunctionSource,
+} from "../appFunctions/plan";
+import { LWQL_MAX_RESULT_ROWS } from "../limits";
+import { readAppFunctionArguments } from "./appFunctionArguments";
+import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
+  LWQL_ALLOWED_FUNCTION_NAMES,
 } from "./functions";
 import {
   clickHouseSqlParser,
@@ -110,7 +135,7 @@ export interface LangWatchQLTableReference {
  * One equality a `JOIN` was written on, with each side exactly as the caller
  * wrote it — `t.TraceId`, not a resolved column.
  *
- * Resolving a side to a dataset is the reader's job, and
+ * Resolving a side to a view is the reader's job, and
  * {@link LangWatchQLQueryBlock.tables} is what it takes to do it: the qualifier
  * is either an alias or a table name from that same list. The walk deliberately
  * does not do it here, because doing so would mean deciding what an ambiguous
@@ -156,7 +181,7 @@ export interface LangWatchQLQueryBlock {
    * what a read touches. A join condition is deliberately absent: it says which
    * rows line up, not which rows are read.
    *
-   * Recorded because "this query has no predicate on the dataset's partitioning
+   * Recorded because "this query has no predicate on the view's partitioning
    * column" is a question about the query's shape, and the walk is the only
    * pass that ever looks at the tree. It reads the name as written, so a filter
    * written against a *projection alias* (`SELECT toStartOfHour(t) AS b … WHERE
@@ -199,6 +224,41 @@ export interface AcceptedLangWatchQL {
    * outermost query first, then what it contains.
    */
   readonly blocks: readonly LangWatchQLQueryBlock[];
+  /**
+   * Whether the service should append the default `LIMIT` before executing.
+   *
+   * `true` for a single top-level `SELECT` that names no `LIMIT` of its own —
+   * an `OFFSET` alone does not count as bounding, since `OFFSET 5` with no
+   * `LIMIT` still returns every remaining row. Always `false` for a `UNION`:
+   * each branch runs and returns independently, so a `LIMIT` appended once to
+   * the whole statement cannot bound a branch that lacks one — every branch of
+   * an accepted `UNION` already names its own bounded `LIMIT`, or the
+   * statement was refused (`LIMIT_REQUIRED_PER_BRANCH`). A too-high `LIMIT` is
+   * refused before it gets here (`LIMIT_TOO_HIGH`).
+   */
+  readonly appendRowLimit: boolean;
+  /**
+   * Where the appended default `LIMIT` must be inserted, when the statement
+   * this bounds also names an `OFFSET`.
+   *
+   * ClickHouse only accepts `LIMIT n OFFSET m` in that order, so a caller who
+   * wrote `SELECT … OFFSET 5` with no `LIMIT` needs the default inserted
+   * before its `OFFSET`, not appended after it. Present only alongside
+   * `appendRowLimit: true`, and only when that statement also has an `OFFSET`.
+   */
+  readonly appendRowLimitBeforeOffset?: SqlSourcePosition;
+  /**
+   * The app-function calls the outermost projection makes, in the order they
+   * appear — the hydration plan.
+   *
+   * Empty for every statement that calls none, which is what makes the
+   * hydration stage free for the queries that existed before app functions.
+   * Recorded by this walk rather than re-read later for the reason ADR-083
+   * gives about the diagnostics: a second parse is a second answer waiting to
+   * disagree with the first, and here the two answers would be what a column
+   * means.
+   */
+  readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -232,10 +292,21 @@ const METADATA_FIELDS: ReadonlySet<string> = new Set([
 /**
  * Column-set constructs whose members the walk cannot enumerate.
  *
- * Refused in a projection when the caller has restricted fields, because there
- * is no way to prove the expansion excludes them without the table's columns —
- * which this layer deliberately does not have. `COLUMNS(a, b)` is absent on
- * purpose: it names its columns, so they are checked like any other reference.
+ * Refused *wherever they appear* when the caller has restricted fields — not
+ * only as a direct projection element — because there is no way to prove the
+ * expansion excludes a withheld field without the table's columns, which this
+ * layer deliberately does not have. Wrapping one in a function or burying it in
+ * a clause (`toString(COLUMNS('…'))`, `tuple(*)`, `WHERE COLUMNS('…') = 1`)
+ * changes nothing about that, so the refusal is attached to the node kind (see
+ * {@link enterColumnSet}) rather than to the projection list. `COLUMNS(a, b)`
+ * is absent on purpose: it names its columns, so they are checked like any other
+ * reference — but only when every member parses as an identifier; a member
+ * written as a string literal names nothing the walk can check, so
+ * {@link enterColumnListMatcher} refuses that shape the same way. The one
+ * exemption is a bare `count(*)`, resolved in
+ * {@link walkFunctionArguments}, where the star is a row count and names no
+ * column — and only for that call's own `arguments`, never its window
+ * definition.
  */
 const UNRESOLVABLE_COLUMN_SETS: ReadonlySet<string> = new Set([
   "Asterisk",
@@ -271,6 +342,52 @@ interface Frame {
   readonly ctes: ReadonlySet<string>;
   /** The `SELECT` block this node sits in. Absent above the outermost one. */
   readonly block?: BlockAccumulator;
+  /**
+   * Set on the children of the root `SelectWithUnionQuery` when it holds
+   * exactly one `SELECT`, and cleared everywhere below.
+   *
+   * A `UNION` deliberately clears it. Two branches projecting the same output
+   * column would put two different meanings in it — one branch's keys and the
+   * other branch's plain values — and hydration works per column, so it could
+   * not tell them apart.
+   */
+  readonly isRootSelect?: boolean;
+  /**
+   * Set on the frame of the one `SELECT` whose projection may call an app
+   * function. Read by {@link walkProjection} and by nothing else.
+   */
+  readonly isOutermostSelect?: boolean;
+  /**
+   * Set on the frame a bare `count(*)` walks its `arguments` field in — via
+   * {@link walkFunctionArguments} — and only that frame, so the one exempt
+   * `Asterisk` (a row count, not a column set) passes while every other star
+   * is refused. It does not reach the same call's `window_definition` or
+   * `parameters`, which are walked under the frame {@link enterFunction}
+   * returns instead, so `count(*) OVER (PARTITION BY COLUMNS('…'))` still
+   * refuses the matcher in the window definition. {@link enterFunction} also
+   * resets it `false` on every call, so it can never leak into a nested one
+   * such as `count(tuple(*))`.
+   */
+  readonly isBareCountStarArgument?: boolean;
+}
+
+/** What a top-level `SELECT` declared about how many rows it returns. */
+interface TopLevelLimit {
+  /**
+   * Whether it named its own `LIMIT` — the only clause that bounds a row
+   * count. `OFFSET` alone does not: `SELECT … OFFSET 5` with no `LIMIT` is
+   * still unbounded, so `OFFSET` is tracked separately below rather than
+   * folded into this flag.
+   */
+  readonly hasLimit: boolean;
+  /** Whether it named an `OFFSET`, so the default `LIMIT` is inserted before it, not after. */
+  readonly hasOffset: boolean;
+  /** The `LIMIT` row count when it is a plain non-negative integer literal, else `null`. */
+  readonly staticRows: number | null;
+  /** Where the `LIMIT` sits, for the refusal that names a too-high one. */
+  readonly at?: SqlSourcePosition;
+  /** Where the `OFFSET` sits, so an appended default `LIMIT` can be inserted before it. */
+  readonly offsetAt?: SqlSourcePosition;
 }
 
 /** Everything the walk accumulates. */
@@ -280,6 +397,15 @@ interface WalkContext {
   readonly tables: Set<string>;
   readonly parameters: Map<string, string>;
   readonly blocks: BlockAccumulator[];
+  /**
+   * One entry per top-level `SELECT` (a bare query, or each branch of a
+   * `UNION`). Subquery limits are excluded — they bound an inner read, not the
+   * response — so this is what decides the appended default `LIMIT` and the
+   * `LIMIT_TOO_HIGH` refusal.
+   */
+  readonly topLevelLimits: TopLevelLimit[];
+  /** The hydration plan, in projection order. Only admitted calls are here. */
+  readonly appFunctions: LangWatchQLAppFunctionCall[];
 }
 
 interface NodeArgs {
@@ -346,18 +472,85 @@ function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
   return { line, column };
 }
 
+/**
+ * The floor every violation code clears: a corrective sentence, keyed on the
+ * code alone. A code with a sharper, context-derived field (`allowedFunctions`,
+ * `availableViews`, `view`/`availableColumns`) still carries this — the
+ * sharper field is the better answer, `hint` is what a caller falls back to
+ * when it only reads one field, and what every other code has instead of a
+ * sharper one.
+ *
+ * `Record` over the full union rather than a partial map: a code added to
+ * {@link LWQL_VIOLATION_CODES} without an entry here fails the build, not a
+ * customer's refusal.
+ */
+const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
+  EMPTY_QUERY: "Submit a single SELECT statement.",
+  PARSE_FAILED:
+    "Check the SQL against standard ClickHouse SELECT syntax and try again.",
+  MULTIPLE_STATEMENTS: "Submit exactly one SELECT statement per request.",
+  STATEMENT_NOT_ALLOWED:
+    "Rewrite the request as a single SELECT (or WITH … SELECT) statement.",
+  SETTINGS_CLAUSE:
+    "Remove the SETTINGS clause — result limits are applied automatically.",
+  OUTPUT_CLAUSE:
+    "Remove the output/format clause — this API controls the response format.",
+  SCHEMA_NOT_ALLOWED:
+    "Query one of the analytics views listed by GET /api/v1/query/schema instead.",
+  TABLE_NOT_ALLOWED:
+    "Use one of the views named in this violation's availableViews, or listed by GET /api/v1/query/schema.",
+  TABLE_FUNCTION:
+    "Read from one of the analytics views listed by GET /api/v1/query/schema instead of a table function.",
+  FUNCTION_NOT_ALLOWED:
+    "Rewrite the expression using one of the functions named in this violation's allowedFunctions.",
+  LIMIT_TOO_HIGH: `Lower the LIMIT to ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+    "en-US",
+  )} rows or fewer, and page the rest with LIMIT/OFFSET and an ORDER BY.`,
+  LIMIT_REQUIRED_PER_BRANCH: `Add a LIMIT of ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+    "en-US",
+  )} rows or fewer to every branch of the UNION.`,
+  GATED_COLUMN:
+    "Remove the field, or use one of the columns named in this violation's availableColumns.",
+  WILDCARD_NOT_ALLOWED:
+    "List the fields you need by name instead of using a wildcard.",
+  NESTING_TOO_DEEP:
+    "Flatten the query — reduce subquery, CTE, or expression nesting.",
+  UNSUPPORTED_SYNTAX:
+    "Rewrite the query as a plain read query over the analytics views.",
+  APP_FUNCTION_POSITION:
+    "Call the function as an aliased entry of the top-level SELECT list, and filter or group on the key column instead.",
+  APP_FUNCTION_ALIAS_REQUIRED:
+    "Give the call an alias, for example conversation(ConversationId) AS transcript.",
+  APP_FUNCTION_ARGUMENT:
+    "Match the signature listed for this function by GET /api/v1/query/schema.",
+  APP_FUNCTION_GATED:
+    "Remove the call, or use a key that holds the permissions this function names.",
+  APP_FUNCTION_NAME_CASE:
+    "Write the function name exactly as GET /api/v1/query/schema spells it.",
+};
+
+/** The sharper fields a call site can attach on top of the {@link DEFAULT_VIOLATION_HINTS} floor. */
+type ViolationExtra = Partial<
+  Pick<
+    LangWatchQLViolation,
+    "availableViews" | "view" | "availableColumns" | "maxRows"
+  >
+>;
+
 function report({
   ctx,
   frame,
   code,
   message,
   node,
+  extra,
 }: {
   ctx: WalkContext;
   frame: Frame;
   code: LangWatchQLViolationCode;
   message: string;
   node?: SqlAstNode;
+  extra?: ViolationExtra;
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
   const at = node ? positionOf(node) : undefined;
@@ -365,12 +558,20 @@ function report({
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
+    hint: DEFAULT_VIOLATION_HINTS[code],
     ...(at ? { at } : {}),
+    // The allowlist rides on exactly the one code that means "you called
+    // something off it", derived from the code here rather than passed in — so
+    // it cannot be attached to another code, nor forgotten on this one.
+    ...(code === "FUNCTION_NOT_ALLOWED"
+      ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES }
+      : {}),
+    ...extra,
   });
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
-  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics datasets.";
+  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics views.";
 
 /**
  * The default-deny fallthrough.
@@ -427,6 +628,26 @@ function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
   if (childFrame) walkFields({ rule, node, frame: childFrame, ctx });
 }
 
+/**
+ * `from` first, everything else in the order the parser wrote it.
+ *
+ * The parser's own field order is `select` before `from` — a `SelectQuery`
+ * node lists its projection first — so walking fields as written would check
+ * a column reference in the projection before the block has recorded which
+ * table it was read from. A gated-column refusal wants that table (to name
+ * its view and columns; see `resolveGatedColumnView`), so `from` has to
+ * be walked, and its table recorded on the block, before any other field of
+ * the same `SELECT` is. `Array.prototype.sort` is stable, so this reorders
+ * nothing else.
+ */
+function fieldsInWalkOrder(node: SqlAstNode): [string, unknown][] {
+  return Object.entries(node).sort(([left], [right]) => {
+    if (left === "from") return right === "from" ? 0 : -1;
+    if (right === "from") return 1;
+    return 0;
+  });
+}
+
 /** Every field the node carries, each against the rule that names it — or none. */
 function walkFields({
   rule,
@@ -434,7 +655,7 @@ function walkFields({
   frame,
   ctx,
 }: NodeArgs & { rule: NodeRule }): void {
-  for (const [field, value] of Object.entries(node)) {
+  for (const [field, value] of fieldsInWalkOrder(node)) {
     if (METADATA_FIELDS.has(field) || value === undefined) continue;
     const fieldRule = Object.hasOwn(rule.fields, field)
       ? rule.fields[field]
@@ -536,36 +757,102 @@ function walkChildNodes({
 // Custom field walkers
 // ---------------------------------------------------------------------------
 
-/** The columns a caller may not reference, matched on the reference's last segment. */
+/**
+ * Which view a gated reference's columns should be listed against, when the
+ * walk can tell.
+ *
+ * The qualifier is the segment just before the gated one — `t` in `t.body`,
+ * `traces` in `traces.body.null` — and resolves through the block's
+ * alias/table list. With no qualifier (`body`, `body.null`), or one that names
+ * nothing in scope, the view resolves only when the block reads exactly one
+ * table — with two tables in scope the name is ambiguous between them, and
+ * guessing would risk naming the wrong view's columns.
+ *
+ * The columns listed are the ones the caller may actually use: the gated
+ * names are subtracted, so a refusal never echoes a withheld field back as a
+ * suggestion.
+ */
+function resolveGatedColumnView({
+  segments,
+  gatedIndex,
+  frame,
+  ctx,
+}: {
+  segments: readonly string[];
+  gatedIndex: number;
+  frame: Frame;
+  ctx: WalkContext;
+}): ViolationExtra {
+  const tables = frame.block?.tables ?? [];
+  const qualifier =
+    gatedIndex > 0 ? segments[gatedIndex - 1]?.trim().toLowerCase() : undefined;
+  const byQualifier = qualifier
+    ? tables.find(
+        (entry) =>
+          entry.alias === qualifier ||
+          entry.table.split(".").at(-1) === qualifier,
+      )
+    : undefined;
+  const matched = byQualifier ?? (tables.length === 1 ? tables[0] : undefined);
+  if (!matched) return {};
+  const availableColumns = ctx.policy.viewColumns
+    .get(matched.table)
+    ?.filter(
+      (column) => !ctx.policy.gatedColumns.has(column.trim().toLowerCase()),
+    );
+  return {
+    view: matched.table,
+    ...(availableColumns ? { availableColumns } : {}),
+  };
+}
+
+/**
+ * The columns a caller may not reference, matched against *every* segment of a
+ * dotted name.
+ *
+ * A qualified path can reach a gated field through a segment that is not the
+ * last one: `body.null` and `traces.body.null` both read the withheld `body`
+ * and then a subfield of it, so matching only the leaf would wave them through.
+ * The segments come from `name_parts` when the parse split them out, and from
+ * splitting `name` on `.` otherwise.
+ */
 function gateColumnReference({
   name,
+  nameParts,
   ctx,
   frame,
   node,
 }: {
   name: string;
+  nameParts?: readonly string[];
   ctx: WalkContext;
   frame: Frame;
   node: SqlAstNode;
 }): void {
-  const leaf = name.split(".").at(-1)?.trim().toLowerCase() ?? "";
-  if (!ctx.policy.gatedColumns.has(leaf)) return;
+  const segments = nameParts ?? name.split(".");
+  const gatedIndex = segments.findIndex((segment) =>
+    ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
+  );
+  if (gatedIndex === -1) return;
   report({
     ctx,
     frame,
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
+    extra: resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
   });
 }
 
 /**
- * A projection list. Each direct element is checked for an unresolvable column
- * set before it is walked.
+ * A projection list, walked like any other node list except for one
+ * interception: a direct element that calls an app function.
  *
- * The check is on the *direct* elements on purpose: `count(*)` puts an
- * `Asterisk` inside a function's arguments, where it names a row count rather
- * than a column set and reveals nothing.
+ * That position is the only one an app function is allowed in, so it is
+ * recognised here rather than by the ordinary function walk — which is what
+ * lets {@link enterFunction} refuse the name unconditionally wherever else it
+ * turns up. Everything else, wildcards included, goes through the same
+ * `walkChildNode` every other list uses.
  */
 function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   if (!Array.isArray(value)) {
@@ -574,26 +861,446 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   }
   const projection: Frame = { ...frame, clause: "projection" };
   for (const element of value) {
-    if (!isNode(element)) {
-      refuseUnrecognised({ node, frame: projection, ctx });
-      continue;
-    }
-    if (
-      ctx.policy.gatedColumns.size > 0 &&
-      UNRESOLVABLE_COLUMN_SETS.has(element.type)
-    ) {
-      report({
-        ctx,
-        frame: projection,
-        code: "WILDCARD_NOT_ALLOWED",
-        message:
-          "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.",
+    const appFunction = isNode(element)
+      ? directAppFunctionCall(element)
+      : undefined;
+    if (appFunction) {
+      walkAppFunctionCall({
         node: element,
+        definition: appFunction,
+        frame: projection,
+        ctx,
       });
       continue;
     }
-    walkNode(element, projection, ctx);
+    walkChildNode({ value: element, node, frame: projection, ctx });
   }
+}
+
+/** The catalog entry a direct projection element calls, or `undefined`. */
+function directAppFunctionCall(
+  element: SqlAstNode,
+): LangWatchQLAppFunctionDefinition | undefined {
+  if (element.type !== "Function") return undefined;
+  if (typeof element.name !== "string") return undefined;
+  return lwqlAppFunction(element.name);
+}
+
+// ---------------------------------------------------------------------------
+// App functions
+//
+// The one rule here that is about correctness rather than policy: an app
+// function may appear only as a direct element of the outermost projection.
+// ClickHouse holds each one as a projection UDF over its key, so it will
+// happily evaluate `WHERE conversation(ConversationId) = 'x'` and compare the
+// raw conversation id, answering with the wrong rows and no error at all.
+// Measured on 25.8, in `WHERE`, `GROUP BY`, `ORDER BY`, a join condition, a
+// CTE, a subquery and inside `arrayMap`. Nothing downstream can detect it, so
+// the refusal has to happen here.
+// ---------------------------------------------------------------------------
+
+const APP_FUNCTION_POSITION_PLACE =
+  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias.";
+
+/**
+ * What to do instead, which depends on what the function returns.
+ *
+ * An extraction function hands back a value the caller can project and then
+ * filter, group or sort on. An eval function does not: its answer is decided
+ * after the query has run, so there is no column in the same statement to put
+ * in a WHERE. Telling the caller to "filter on a plain column instead" sends
+ * them looking for a column that cannot exist, so they are pointed at the two
+ * things that do work.
+ */
+const APP_FUNCTION_POSITION_EXTRACTION_ADVICE =
+  "Project it there and filter, group or sort on a plain column instead.";
+
+const APP_FUNCTION_POSITION_EVAL_ADVICE =
+  "Its answer is decided after the query runs, so there is no column in this statement to filter on. " +
+  "To keep only the matches, filter the rows it returns, " +
+  "or run the statement as an Instant Eval and read `instant-eval results <run-id> --matched`.";
+
+function appFunctionPositionMessage(name: string): string {
+  const advice = isEvalFunctionName(name)
+    ? APP_FUNCTION_POSITION_EVAL_ADVICE
+    : APP_FUNCTION_POSITION_EXTRACTION_ADVICE;
+  return `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_PLACE} ${advice}`;
+}
+
+function reportAppFunctionPosition({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_POSITION",
+    message: appFunctionPositionMessage(name),
+    node,
+  });
+}
+
+/**
+ * Whether the call was written in ClickHouse's parametric form,
+ * `f(params)(args)`: the parser keeps the first list under `parameters` and
+ * the second under `arguments`.
+ */
+function isParametricCall(node: SqlAstNode): boolean {
+  return Array.isArray(node.parameters);
+}
+
+/**
+ * An app function is a lambda with one argument list. The parametric form
+ * would pass validation on its `arguments` alone and then reach ClickHouse,
+ * which has no parametric UDF of that name to run, so it is refused here where
+ * the refusal can name the function.
+ */
+function reportParametricAppFunctionCall({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_ARGUMENT",
+    message: `The function "${echoIdentifier(name)}" takes one list of arguments, not a parameter list followed by one: write it as ${name}(...) rather than ${name}(...)(...).`,
+    node,
+  });
+}
+
+/**
+ * One app-function call in the projection: every rule that governs it, then the
+ * plan entry.
+ *
+ * Reports and keeps going wherever it can, like the rest of the walk, so a
+ * caller who wrote a call in the wrong place *and* referenced a restricted
+ * field hears about both in one round trip. The plan entry is recorded only
+ * when every rule passed — a refused query has no plan, and a half-recorded one
+ * would be a plan for a statement that never runs.
+ */
+function walkAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  if (isParametricCall(node)) {
+    reportParametricAppFunctionCall({
+      name: definition.name,
+      node,
+      frame,
+      ctx,
+    });
+    return;
+  }
+
+  const args = Array.isArray(node.arguments) ? node.arguments : [];
+  const source = walkAppFunctionArguments({
+    node,
+    definition,
+    args,
+    frame,
+    ctx,
+  });
+
+  if (frame.isOutermostSelect !== true) {
+    reportAppFunctionPosition({ name: definition.name, node, frame, ctx });
+    return;
+  }
+
+  const column = admitAppFunctionCall({ node, definition, frame, ctx });
+  if (column === null) return;
+
+  const options = readAppFunctionOptions({
+    definition,
+    args,
+    node,
+    frame,
+    ctx,
+  });
+  if (options === null) return;
+
+  // A nested call that was itself refused leaves no plan: the statement is
+  // already rejected, and half a plan is a plan for a query that never runs.
+  if (source !== null && source.source === null) return;
+
+  ctx.appFunctions.push({
+    column,
+    function: definition.name,
+    options,
+    ...(source?.source ? { source: source.source } : {}),
+  });
+}
+
+/**
+ * Walks a call's arguments, and reads the nested extraction out of the first
+ * one where there is one.
+ *
+ * The arguments are walked whatever else fails, so a gated column or a refused
+ * function inside the key is reported too. The frame drops `isOutermostSelect`,
+ * which is what refuses a nested app function everywhere except the one place
+ * nesting is allowed: the key of an eval function, read here before the
+ * ordinary walk can get to it and refuse it.
+ */
+function walkAppFunctionArguments({
+  node,
+  definition,
+  args,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  frame: Frame;
+  ctx: WalkContext;
+}): { readonly source: LangWatchQLAppFunctionSource | null } | null {
+  const inside: Frame = { ...frame, isOutermostSelect: false };
+  const source =
+    definition.kind === "eval"
+      ? readNestedSource({ key: args[0], frame: inside, ctx })
+      : null;
+  for (const [index, argument] of args.entries()) {
+    if (source !== null && index === 0) continue;
+    walkChildNode({ value: argument, node, frame: inside, ctx });
+  }
+  return source;
+}
+
+/**
+ * Whether a nested call has the shape a source may take at all: one argument
+ * list, and an extraction rather than another eval. Reports the refusal when
+ * it does not.
+ */
+function isNestedCallAdmitted({
+  nested,
+  key,
+  frame,
+  ctx,
+}: {
+  nested: LangWatchQLAppFunctionDefinition;
+  key: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): boolean {
+  if (isParametricCall(key)) {
+    reportParametricAppFunctionCall({
+      name: nested.name,
+      node: key,
+      frame,
+      ctx,
+    });
+    return false;
+  }
+  if (nested.kind !== "extraction") {
+    reportAppFunctionPosition({ name: nested.name, node: key, frame, ctx });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The extraction call an eval function reads its text from, when it has one.
+ *
+ * `null` means the key is not an app-function call at all, so the ordinary walk
+ * should handle it — a column, a `concat`, anything the policy already admits.
+ * A returned object means this module has dealt with the key, whether or not it
+ * admitted it, so the caller must not walk it a second time and report
+ * everything twice.
+ *
+ * Only one level, and only an extraction function. Deeper nesting has nowhere
+ * to run: hydration reads one key out of the column and computes one value from
+ * it, so a second extraction inside the first would have no key of its own. An
+ * eval inside an eval is worse than unsupported — it would ask the classifier
+ * about a probability.
+ */
+function readNestedSource({
+  key,
+  frame,
+  ctx,
+}: {
+  key: unknown;
+  frame: Frame;
+  ctx: WalkContext;
+}): { readonly source: LangWatchQLAppFunctionSource | null } | null {
+  if (!isNode(key) || key.type !== "Function") return null;
+  if (typeof key.name !== "string") return null;
+  const nested = lwqlAppFunction(key.name);
+  if (!nested) return null;
+  if (!isNestedCallAdmitted({ nested, key, frame, ctx })) {
+    return { source: null };
+  }
+
+  // Its own arguments, under a frame that is still not the outermost select,
+  // so anything nested inside *it* is refused by the ordinary function walk.
+  const args = Array.isArray(key.arguments) ? key.arguments : [];
+  for (const argument of args) {
+    walkChildNode({ value: argument, node: key, frame, ctx });
+  }
+
+  if (key.name.trim() !== nested.name) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_NAME_CASE",
+      message: `Write "${echoIdentifier(key.name.trim())}" as "${nested.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
+      node: key,
+    });
+    return { source: null };
+  }
+
+  if (!holdsAppFunctionGates({ definition: nested, ctx })) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_GATED",
+      message: `The function "${echoIdentifier(nested.name)}" is not available to you. It needs the ${nested.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
+      node: key,
+    });
+    return { source: null };
+  }
+
+  const options = readAppFunctionOptions({
+    definition: nested,
+    args,
+    node: key,
+    frame,
+    ctx,
+  });
+  if (options === null) return { source: null };
+  return { source: { function: nested.name, options } };
+}
+
+/**
+ * The three rules a call in the right place still has to pass, and the output
+ * column it earns by passing them.
+ *
+ * `null` means one of them failed and was reported. Spelling comes first: the
+ * query reaches the database verbatim and ClickHouse resolves a SQL UDF by its
+ * exact name, so admitting a mis-cased call would build a plan for a statement
+ * that cannot run.
+ */
+function admitAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): string | null {
+  const refuse = (code: LangWatchQLViolationCode, message: string): null => {
+    report({ ctx, frame, code, message, node });
+    return null;
+  };
+
+  const written = typeof node.name === "string" ? node.name.trim() : "";
+  if (written !== definition.name) {
+    return refuse(
+      "APP_FUNCTION_NAME_CASE",
+      `Write "${echoIdentifier(written)}" as "${definition.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
+    );
+  }
+
+  const column = aliasOf(node);
+  if (column === null) {
+    return refuse(
+      "APP_FUNCTION_ALIAS_REQUIRED",
+      `The function "${echoIdentifier(definition.name)}" needs an alias: write it as "${lwqlAppFunctionSignature(definition)} AS my_column".`,
+    );
+  }
+
+  if (!holdsAppFunctionGates({ definition, ctx })) {
+    return refuse(
+      "APP_FUNCTION_GATED",
+      `The function "${echoIdentifier(definition.name)}" is not available to you. It needs the ${definition.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
+    );
+  }
+
+  if (definition.kind === "eval" && !ctx.policy.instantEvalsEnabled) {
+    return refuse(
+      "APP_FUNCTION_GATED",
+      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.`,
+    );
+  }
+
+  return column;
+}
+
+/** The alias a projection element was written with, or `null`. */
+function aliasOf(node: SqlAstNode): string | null {
+  const { alias } = node;
+  if (typeof alias !== "string") return null;
+  const trimmed = alias.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/** Whether the caller holds every permission this function requires. */
+function holdsAppFunctionGates({
+  definition,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  ctx: WalkContext;
+}): boolean {
+  return definition.gates.every((gate) => ctx.policy.heldPermissions.has(gate));
+}
+
+/**
+ * The literal option values, or `null` when the arguments do not match the
+ * signature.
+ *
+ * The rules themselves live in `./appFunctionArguments.ts`, which is pure and
+ * has no opinion about how a refusal is reported; this is the half that reports
+ * one. Arity is exact and there is one signature per function, because a
+ * ClickHouse SQL UDF is a lambda with a fixed parameter list and calling one
+ * with any other count is `BAD_ARGUMENTS` — so "which overload did they mean"
+ * is never a question the validator has to answer.
+ */
+function readAppFunctionOptions({
+  definition,
+  args,
+  node,
+  frame,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): LangWatchQLAppFunctionOption[] | null {
+  const outcome = readAppFunctionArguments({ definition, args });
+  if (outcome.ok) return outcome.options;
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_ARGUMENT",
+    message: outcome.message,
+    node,
+  });
+  return null;
 }
 
 /**
@@ -649,7 +1356,66 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
  * Opens this SELECT's block and brings its CTE names into scope, before
  * anything else is walked.
  */
+/**
+ * Marks the one `SELECT` whose projection may call an app function.
+ *
+ * Only when the root union holds exactly one of them: see
+ * {@link Frame.isRootSelect} for why a `UNION` disqualifies both branches.
+ * Returning a frame with `isRootSelect` cleared is what stops anything nested
+ * inside from re-qualifying itself.
+ */
+function enterSelectWithUnionQuery({ node, frame }: NodeArgs): Frame {
+  const isRoot =
+    frame.clause === "statement" &&
+    frame.subqueryDepth === 0 &&
+    frame.block === undefined;
+  const single = Array.isArray(node.selects) && node.selects.length === 1;
+  return { ...frame, isRootSelect: isRoot && single };
+}
+
+/**
+ * The row count a `LIMIT` names, when it is a plain non-negative integer
+ * literal — the only shape whose value is knowable before execution.
+ *
+ * A `LIMIT` that is an expression or a bound parameter reads back `null`: its
+ * value is decided at run time, so it is neither refused as too high nor
+ * counted as absent. The byte ceiling still bounds what such a query returns.
+ */
+function readStaticLimitRows(limit: unknown): number | null {
+  if (!isNode(limit) || limit.type !== "Literal") return null;
+  const { value } = limit;
+  const rows =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isInteger(rows) && rows >= 0 ? rows : null;
+}
+
+/**
+ * Records how a top-level `SELECT` bounds its own result, so the entry point can
+ * decide the appended default `LIMIT` and refuse a too-high one. A `SELECT`
+ * inside a subquery bounds an inner read, not the response, and is skipped.
+ */
+function recordTopLevelLimit({ node, frame, ctx }: NodeArgs): void {
+  if (frame.isInSubquery) return;
+  const limitNode = node.limit;
+  const offsetNode = node.offset;
+  const at = isNode(limitNode) ? positionOf(limitNode) : undefined;
+  const offsetAt = isNode(offsetNode) ? positionOf(offsetNode) : undefined;
+  ctx.topLevelLimits.push({
+    hasLimit: limitNode !== undefined,
+    hasOffset: offsetNode !== undefined,
+    staticRows: readStaticLimitRows(limitNode),
+    ...(at ? { at } : {}),
+    ...(offsetAt ? { offsetAt } : {}),
+  });
+}
+
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  recordTopLevelLimit({ node, frame, ctx });
+  const isOutermostSelect = frame.isRootSelect === true;
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
@@ -662,7 +1428,11 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   };
   ctx.blocks.push(block);
 
-  if (!Array.isArray(node.with)) return { ...frame, block };
+  // `isRootSelect` is spent here: it marked this SELECT as the outermost one,
+  // and clearing it is what stops a nested SELECT — a subquery, a CTE's body —
+  // from claiming the same standing.
+  const here = { ...frame, block, isOutermostSelect, isRootSelect: false };
+  if (!Array.isArray(node.with)) return here;
   const ctes = new Set(frame.ctes);
   for (const item of node.with) {
     if (
@@ -673,7 +1443,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
       ctes.add(item.name.trim().toLowerCase());
     }
   }
-  return { ...frame, ctes, block };
+  return { ...here, ctes };
 }
 
 /** Descends one query level, or refuses when that would pass the ceiling. */
@@ -729,7 +1499,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       frame,
       code: "TABLE_NOT_ALLOWED",
       message:
-        "Name the dataset directly — a table cannot be chosen by a bound parameter.",
+        "Name the view directly — a table cannot be chosen by a bound parameter.",
       node,
     });
     return null;
@@ -742,7 +1512,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       frame,
       code: "SCHEMA_NOT_ALLOWED",
       message:
-        "Server metadata is not readable through this API. Query the analytics datasets instead.",
+        "Server metadata is not readable through this API. Query the analytics views instead.",
       node,
     });
     return null;
@@ -770,8 +1540,9 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
-      message: `The dataset "${echoIdentifier(written)}" is not available to you. Use one of the datasets from the schema endpoint.`,
+      message: `The view "${echoIdentifier(written)}" is not available to you. Use one of the views from the schema endpoint.`,
       node,
+      extra: { availableViews: ctx.policy.availableViews },
     });
     return null;
   }
@@ -805,7 +1576,7 @@ function joinSideName(value: unknown): string | null {
  *
  * Descends `AND` only. An equality reached through an `OR`, a `NOT`, or any
  * other function is not a key the join is guaranteed to have matched on, and
- * recording it would tell a diagnostic that two datasets line up on a column
+ * recording it would tell a diagnostic that two views line up on a column
  * when they may not.
  */
 function collectJoinEdges({
@@ -880,7 +1651,7 @@ function conjunctArguments(node: unknown): unknown[] | null {
  * The join edge an `a = b` node names, or `null` for anything else.
  *
  * Both sides have to resolve to a name: an equality against an expression is
- * not a key two datasets line up on, and recording half of one would claim a
+ * not a key two views line up on, and recording half of one would claim a
  * match that was never written.
  */
 function readEqualityEdge(
@@ -913,18 +1684,130 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
+  // Reset on every call so an outer isBareCountStarArgument can never leak into this
+  // one's fields. The exemption itself is set back on, narrowly, only for the
+  // `arguments` field by {@link walkFunctionArguments} — never here, and never
+  // for `window_definition` or `parameters`.
+  const childFrame: Frame = { ...frame, isBareCountStarArgument: false };
+  // Reaching `enterFunction` at all means this call is not a direct element of
+  // the outermost projection: `walkProjection` intercepts those before the
+  // ordinary walk sees them. So an app-function name here is always a position
+  // violation, and saying so is what keeps the refusal actionable — the
+  // allowlist check below would otherwise report a catalogued function as
+  // "not allowed", sending the caller to look for a name the schema lists.
+  const appFunction = lwqlAppFunction(name);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
+    return childFrame;
+  }
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
-    return frame;
+    return childFrame;
   }
   if (
-    frame.block &&
+    childFrame.block &&
     isLangWatchQLAggregateFunction(name) &&
     !isWindowCall(node)
   ) {
-    frame.block.isAggregated = true;
+    childFrame.block.isAggregated = true;
   }
-  return frame;
+  return childFrame;
+}
+
+/**
+ * A `Function` node's `arguments` field, walked with the bare-`count(*)`
+ * exemption scoped to exactly this field.
+ *
+ * The exemption cannot live on the frame {@link enterFunction} returns for the
+ * whole node, because that same frame also reaches `window_definition` and
+ * `parameters` — and `count(*) OVER (PARTITION BY COLUMNS('…'))` must still
+ * refuse the matcher in the window definition. Computing it here, from the
+ * `Function` node passed in as `node`, keeps it off every other field.
+ */
+function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
+  walkChildNodes({
+    value,
+    node,
+    frame: { ...frame, isBareCountStarArgument: isBareCountStar(node) },
+    ctx,
+  });
+}
+
+/**
+ * Whether this call is a bare `count(*)`: the one place a star is a row count
+ * rather than a column set, and so stays exempt from {@link enterColumnSet}.
+ *
+ * `count(DISTINCT *)` is deliberately excluded — the parser gives it a distinct
+ * function name (`countDistinct`) — as is `count(t.*)` (a `QualifiedAsterisk`),
+ * `count(* EXCEPT (…))` (an `Asterisk` carrying transformers), `count(*, x)`
+ * (two arguments) and any other aggregate over a star.
+ */
+function isBareCountStar(node: SqlAstNode): boolean {
+  const { name, arguments: args } = node;
+  if (typeof name !== "string" || name.toLowerCase() !== "count") return false;
+  if (!Array.isArray(args) || args.length !== 1) return false;
+  const arg = args[0];
+  return (
+    isNode(arg) &&
+    arg.type === "Asterisk" &&
+    arg.transformers === undefined &&
+    arg.expression === undefined
+  );
+}
+
+const WILDCARD_NOT_ALLOWED_MESSAGE =
+  "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.";
+
+/**
+ * Refuses an unresolvable column set — a wildcard or a regexp `COLUMNS()`
+ * matcher — for a caller with restricted fields, and returns `null` so the
+ * subtree is not walked.
+ *
+ * Attached to each of the four {@link UNRESOLVABLE_COLUMN_SETS} node kinds, so
+ * the refusal holds in every position rather than only the projection. With no
+ * restricted fields there is nothing to withhold and the node is walked
+ * normally; the sole exemption is the `Asterisk` of a bare `count(*)`, which
+ * {@link walkFunctionArguments} marks on the frame.
+ */
+function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (!UNRESOLVABLE_COLUMN_SETS.has(node.type)) return frame;
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  if (frame.isBareCountStarArgument === true) return frame;
+  report({
+    ctx,
+    frame,
+    code: "WILDCARD_NOT_ALLOWED",
+    message: WILDCARD_NOT_ALLOWED_MESSAGE,
+    node,
+  });
+  return null;
+}
+
+/**
+ * A `COLUMNS(a, b)` / `t.COLUMNS(a, b)` list matcher: walked normally when
+ * every member is an identifier, so each is gated like any other reference;
+ * refused like a wildcard when any member is not.
+ *
+ * The parser accepts `COLUMNS('a', 'b')` and emits the members as literals,
+ * which {@link gateColumnReference} never sees. ClickHouse itself rejects that
+ * spelling today, but the gate does not lean on that: a member the walk cannot
+ * check is treated as a column set it cannot enumerate.
+ */
+function enterColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  const members = node.columns;
+  const isEveryMemberNamed =
+    Array.isArray(members) &&
+    members.every((member) => isNode(member) && member.type === "Identifier");
+  if (isEveryMemberNamed) return frame;
+  report({
+    ctx,
+    frame,
+    code: "WILDCARD_NOT_ALLOWED",
+    message: WILDCARD_NOT_ALLOWED_MESSAGE,
+    node,
+  });
+  return null;
 }
 
 /** Whether this call is a window function rather than a row-collapsing aggregate. */
@@ -952,8 +1835,11 @@ function reportRefusedFunction({
     ctx,
     frame,
     code: "FUNCTION_NOT_ALLOWED",
-    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using the functions this API supports.`,
+    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using one of the supported functions, listed under \`functions\` on GET /api/v1/query/schema and carried on this violation as \`allowedFunctions\`.`,
     node,
+    // The complete list travels with the refusal — see {@link report}, which
+    // attaches it structurally to this code so the caller (usually an agent
+    // with no UI) recovers without a second round trip to the schema.
   });
 }
 
@@ -965,6 +1851,11 @@ function reportRefusedFunction({
 function walkApplyFunctionName({ value, node, frame, ctx }: FieldArgs): void {
   if (typeof value !== "string") {
     refuseUnrecognised({ node, frame, ctx });
+    return;
+  }
+  const appFunction = lwqlAppFunction(value);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
     return;
   }
   if (isAllowedLangWatchQLFunction(value)) return;
@@ -997,7 +1888,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       return null;
     }
   }
-  gateColumnReference({ name, ctx, frame, node });
+  gateColumnReference({ name, nameParts, ctx, frame, node });
   noteColumnPosition({ name, frame });
   return frame;
 }
@@ -1006,7 +1897,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
  * Records a column named in a filter or grouping position on the block it sits
  * in.
  *
- * The leaf segment only: what a diagnostic asks is "was this dataset's time
+ * The leaf segment only: what a diagnostic asks is "was this view's time
  * column filtered", and `t.OccurredAt`, `OccurredAt` and
  * `analytics.traces.OccurredAt` are all the same answer to it.
  */
@@ -1101,6 +1992,7 @@ const REFUSE_OUTPUT: FieldRule = {
 const NODE_RULES: Readonly<Record<string, NodeRule>> = {
   // ---- query structure ----
   SelectWithUnionQuery: {
+    enter: enterSelectWithUnionQuery,
     fields: {
       selects: { kind: "nodes" },
       // Both modes are read-only set operations, and the row policy applies to
@@ -1170,7 +2062,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
         kind: "refuse",
         code: "TABLE_FUNCTION",
         message:
-          "Table functions cannot be used here. Read from the analytics datasets listed by the schema endpoint.",
+          "Table functions cannot be used here. Read from the analytics views listed by the schema endpoint.",
       },
       subquery: { kind: "node" },
       final: SCALAR,
@@ -1268,7 +2160,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     enter: enterFunction,
     fields: {
       name: SCALAR,
-      arguments: { kind: "nodes" },
+      arguments: { kind: "custom", walk: walkFunctionArguments },
       parameters: { kind: "nodes" },
       is_operator: SCALAR,
       is_lambda_function: SCALAR,
@@ -1298,12 +2190,14 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
 
   // ---- column sets ----
   Asterisk: {
+    enter: enterColumnSet,
     fields: {
       transformers: { kind: "nodes" },
       expression: { kind: "node" },
     },
   },
   QualifiedAsterisk: {
+    enter: enterColumnSet,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
@@ -1311,12 +2205,15 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   ColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: { pattern: SCALAR, transformers: { kind: "nodes" } },
   },
   ColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: { columns: { kind: "nodes" }, transformers: { kind: "nodes" } },
   },
   QualifiedColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: {
       pattern: SCALAR,
       qualifier: { kind: "identifierRef" },
@@ -1324,6 +2221,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QualifiedColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
@@ -1419,9 +2317,25 @@ export function validateLangWatchQL({
 
   const ctx = createWalkContext(resolveLangWatchQLPolicy(policy));
   walkNode(screened.statement, ROOT_FRAME, ctx);
+  reportTooHighLimits(ctx);
+  reportMissingBranchLimits(ctx);
 
   if (ctx.violations.length > 0)
     return { ok: false, violations: ctx.violations };
+
+  // A single top-level SELECT is unbounded — and gets the default appended —
+  // when it names no LIMIT of its own. OFFSET alone does not bound it: `SELECT
+  // … OFFSET 5` with no LIMIT still returns every row from 5 on, so it is
+  // still unbounded here, and the default LIMIT is inserted before that
+  // OFFSET rather than after (ClickHouse requires `LIMIT n OFFSET m` order).
+  // A UNION (more than one top-level branch) is never appended-to here: each
+  // branch runs and returns independently, so `reportMissingBranchLimits`
+  // above already refused any statement where a branch lacks its own LIMIT,
+  // and every accepted UNION is bounded branch-by-branch already.
+  const [singleBranch] =
+    ctx.topLevelLimits.length === 1 ? ctx.topLevelLimits : [];
+  const appendRowLimit = singleBranch !== undefined && !singleBranch.hasLimit;
+
   return {
     ok: true,
     tables: [...ctx.tables],
@@ -1434,7 +2348,69 @@ export function validateLangWatchQL({
       hasGroupBy: block.hasGroupBy,
       isAggregated: block.isAggregated,
     })),
+    appendRowLimit,
+    ...(appendRowLimit && singleBranch?.hasOffset && singleBranch.offsetAt
+      ? { appendRowLimitBeforeOffset: singleBranch.offsetAt }
+      : {}),
+    appFunctions: [...ctx.appFunctions],
   };
+}
+
+/**
+ * Refuses a statement whose own top-level `LIMIT` asks for more than the row
+ * cap. A dynamic `LIMIT` (an expression or a bound parameter) is not refused —
+ * its value is not knowable here, and the byte ceiling still bounds the result.
+ */
+function reportTooHighLimits(ctx: WalkContext): void {
+  for (const limit of ctx.topLevelLimits) {
+    if (ctx.violations.length >= MAX_VIOLATIONS) return;
+    if (limit.staticRows === null || limit.staticRows <= LWQL_MAX_RESULT_ROWS)
+      continue;
+    ctx.violations.push({
+      code: "LIMIT_TOO_HIGH",
+      clause: "limit",
+      message:
+        `The LIMIT of ${limit.staticRows.toLocaleString("en-US")} rows is above the maximum of ` +
+        `${LWQL_MAX_RESULT_ROWS.toLocaleString("en-US")} rows this API returns per request. ` +
+        `Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.`,
+      hint: DEFAULT_VIOLATION_HINTS.LIMIT_TOO_HIGH,
+      maxRows: LWQL_MAX_RESULT_ROWS,
+      ...(limit.at ? { at: limit.at } : {}),
+    });
+  }
+}
+
+/**
+ * Refuses a `UNION` (more than one top-level branch) where any branch names no
+ * `LIMIT` of its own.
+ *
+ * Each branch of a `UNION` runs and returns independently — the default
+ * `LIMIT` this API appends to an unbounded single `SELECT` cannot bound one
+ * branch of many without bounding all of them, and rewriting every branch's
+ * text from here would mean reasoning about each branch's own trailing
+ * `OFFSET` with no printer to verify the result stays valid SQL. Refusing and
+ * naming the gap is the safe alternative: the caller adds a `LIMIT` to the
+ * branch itself. A single `SELECT` (no `UNION`) is unaffected — that case is
+ * still bounded by the appended default.
+ */
+function reportMissingBranchLimits(ctx: WalkContext): void {
+  if (ctx.topLevelLimits.length <= 1) return;
+  for (const limit of ctx.topLevelLimits) {
+    if (ctx.violations.length >= MAX_VIOLATIONS) return;
+    if (limit.hasLimit) continue;
+    ctx.violations.push({
+      code: "LIMIT_REQUIRED_PER_BRANCH",
+      clause: "limit",
+      message:
+        "This UNION has a branch with no LIMIT of its own. Each branch runs and " +
+        `returns independently, so every branch needs its own LIMIT of ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+          "en-US",
+        )} rows or fewer.`,
+      hint: DEFAULT_VIOLATION_HINTS.LIMIT_REQUIRED_PER_BRANCH,
+      maxRows: LWQL_MAX_RESULT_ROWS,
+      ...(limit.at ? { at: limit.at } : {}),
+    });
+  }
 }
 
 const NO_CTES: ReadonlySet<string> = new Set<string>();
@@ -1459,7 +2435,15 @@ function statementRejection({
 }): RejectedLangWatchQL {
   return {
     ok: false,
-    violations: [{ code, clause: "statement", message, ...(at ? { at } : {}) }],
+    violations: [
+      {
+        code,
+        clause: "statement",
+        message,
+        hint: DEFAULT_VIOLATION_HINTS[code],
+        ...(at ? { at } : {}),
+      },
+    ],
   };
 }
 
@@ -1525,5 +2509,7 @@ function createWalkContext(policy: ResolvedLangWatchQLPolicy): WalkContext {
     tables: new Set<string>(),
     parameters: new Map<string, string>(),
     blocks: [],
+    topLevelLimits: [],
+    appFunctions: [],
   };
 }

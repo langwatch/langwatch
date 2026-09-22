@@ -19,6 +19,7 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And the organization's required sign-in method is that connection's identity provider
     And a user "andrei@acme.com" whose account is linked to that connection
 
+  @integration
   Scenario: Signing in with the wrong method explains what to do and names the right method
     When the user completes an OAuth sign-in with a different method for the same email
     Then linking is refused and they land on the sign-in error page
@@ -26,23 +27,27 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And the page tells them to sign in with their organization's required method
     And the page does not tell SSO-enforced users to link the method in settings
 
+  @integration
   Scenario: The error page does not auto-redirect back to the identity provider
     Given the user is on the "account already exists" sign-in error page
     Then they remain on that page
     And they are not automatically redirected back to the identity provider
 
+  @integration
   Scenario: Recovery signs the user out of the identity provider before trying again
     Given the user is on the "account already exists" sign-in error page
     When they choose to sign out and try again
     Then their identity-provider session is cleared, not only the app session
     And they return to the sign-in screen able to choose a different method
 
+  @integration
   Scenario: A blocked returning user is not trapped bouncing between the app and the IdP
     Given the user's only live identity-provider session authenticates an identity that cannot sign in
     When they open a protected page
     Then they are not repeatedly redirected between the app and the identity provider
     And they reach a stable error page with a clear recovery action
 
+  @integration
   Scenario: Recovery works the same when the org's required method is not yet known
     Given a user whose email domain no ACTIVE connection has verified
     When they hit the same wrong-method sign-in error

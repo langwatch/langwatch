@@ -812,7 +812,7 @@ export const assertFormatIsSupported = async (
   // Auto-detected agent mode: keep the human table, but never let a caller
   // believe it is parsing structured output.
   process.stderr.write(
-    `note: \`${name}\` does not emit structured output yet — the table below is not machine-readable.\n`,
+    `note: \`${name}\` does not emit structured output yet. The table below is not machine-readable.\n`,
   );
   return { ...resolved, format: "table" };
 };

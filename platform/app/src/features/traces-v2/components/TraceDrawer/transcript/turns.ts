@@ -1,5 +1,12 @@
-import { getReasoning, parseContentBlocks } from "./parsing";
-import type { ChatMessage, ContentBlock, ConversationTurn } from "./types";
+import {
+  getReasoning,
+  parseContentBlocks,
+} from "~/shared/traces/transcript/parsing";
+import type {
+  ChatMessage,
+  ContentBlock,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
 
 /**
  * Group raw chat messages into logical turns. Each message stays as its

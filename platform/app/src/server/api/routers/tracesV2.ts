@@ -23,6 +23,8 @@ import {
 
 const logger = createLogger("langwatch:api:traces-v2");
 
+import { getInstantEvalRunService } from "~/server/app-layer/instant-evals/run";
+import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -32,18 +34,23 @@ import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-tim
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
-  translateFilterToClickHouse,
+  type ResolvedInstantEvalRun,
+  translateFilterWithEvalRuns,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
+import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import type {
   SpanSummaryPage,
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { routeSearch } from "~/server/app-layer/traces/search-router";
+import { SEARCH_ROUTE_KINDS } from "~/server/app-layer/traces/search-router/contracts";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
@@ -104,6 +111,7 @@ import {
   gateSessionTitle,
   gateTreeCost,
 } from "./tracesV2.gates";
+import { tracesV2InstantEvalRouter } from "./tracesV2.instantEval";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
@@ -146,21 +154,58 @@ function occurredAtFromInput(input: {
 }
 
 /**
+ * The Instant Eval runs the Explorer registered for the query's `eval`
+ * chips: one entry per chip key, naming the question, the unit judged and
+ * the run. Checked against the project before the compiler reads them.
+ * Spec: specs/traces-v2/instant-eval-search.feature.
+ */
+const evalRunsSchema = z
+  .record(
+    z.string().min(1).max(64),
+    z.object({
+      question: z.string().min(1).max(2_000),
+      target: z.enum(INSTANT_EVAL_TARGETS),
+      runId: z.string().min(1).max(200),
+    }),
+  )
+  .refine((runs) => Object.keys(runs).length <= 8, {
+    message: "At most eight Instant Eval runs may be registered on one query.",
+  })
+  .optional();
+
+/** The registered runs resolved against the project, or none. */
+async function resolveEvalRuns(input: {
+  projectId: string;
+  evalRuns?: Record<string, InstantEvalRunReference>;
+}): Promise<readonly ResolvedInstantEvalRun[] | undefined> {
+  if (!input.evalRuns || Object.keys(input.evalRuns).length === 0) {
+    return undefined;
+  }
+  return await getInstantEvalRunService().resolveForExplorer({
+    projectId: input.projectId,
+    evalRuns: input.evalRuns,
+  });
+}
+
+/**
  * Shared filter-translation step for the list/facets/newCount procedures.
  * Each one accepts the same `query` text + `projectId` + `timeRange` and
  * needs the same null-coalesce → call → ?? undefined sequence.
  */
-function buildFilterWhere(input: {
+async function buildFilterWhere(input: {
   projectId: string;
   timeRange: { from: number; to: number; live?: boolean };
   query?: string | null;
+  evalRuns?: Record<string, InstantEvalRunReference>;
 }) {
+  const evalRuns = await resolveEvalRuns(input);
   return (
-    translateFilterToClickHouse(
-      input.query ?? "",
-      input.projectId,
-      input.timeRange,
-    ) ?? undefined
+    translateFilterWithEvalRuns({
+      queryText: input.query ?? "",
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      ...(evalRuns ? { evalRuns } : {}),
+    }) ?? undefined
   );
 }
 
@@ -1154,6 +1199,7 @@ export const tracesV2Router = createTRPCRouter({
           })
           .optional(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1169,7 +1215,8 @@ export const tracesV2Router = createTRPCRouter({
         page: input.page,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),
@@ -1198,6 +1245,7 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: z.number().int().min(1).max(100).default(50),
         cursor: z.string().optional(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1212,7 +1260,8 @@ export const tracesV2Router = createTRPCRouter({
         sort: input.sort,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
         contentTerms: contentSearchTermsForViewer({
           terms: extractFreeTextTerms(input.query ?? ""),
           protections,
@@ -1264,21 +1313,33 @@ export const tracesV2Router = createTRPCRouter({
         }),
     ),
 
+  /**
+   * The sidebar's counts for the active query and the exact window the list
+   * reads (specs/traces-v2/search.feature, "Facet count updates"). The
+   * service compiles the query once per facet whose field it names, so a
+   * facet keeps its other values while the rest of the query applies; the
+   * hidden-origins rule is the list's. Nothing is cached server side: a count
+   * shown next to a value has to answer the same predicate as the table.
+   */
   facets: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         timeRange: timeRangeSchema,
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
+      const evalRuns = await resolveEvalRuns(input);
       return app.traces.list.getFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        filterWhere: buildFilterWhere(input),
+        query: input.query,
+        hiddenOrigins: explorerHiddenOrigins(input.query),
+        ...(evalRuns ? { evalRuns } : {}),
       });
     }),
 
@@ -1289,6 +1350,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
         since: z.number(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1298,10 +1360,15 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         since: input.since,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
       });
       return { count };
     }),
+
+  // The Instant Eval run behind an `eval:"question"` chip.
+  // Spec: specs/traces-v2/instant-eval-search.feature.
+  instantEval: tracesV2InstantEvalRouter,
 
   suggest: protectedProcedure
     .input(
@@ -1475,6 +1542,36 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      });
+    }),
+
+  // Enter on a sentence. The client calls this only when the submitted text
+  // has bare words; a pure `field:value` query is applied without a call.
+  // Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
+  routeSearch: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        text: z.string().min(1).max(2000),
+        timeRange: timeRangeSchema,
+        activeQuery: z.string().max(2000).default(""),
+        lensId: z.string().max(200).optional(),
+        isLangyAvailable: z.boolean().optional(),
+        // The page re-running a search it already routed once names the
+        // route, so the answer cannot land somewhere else this time.
+        forceKind: z.enum(SEARCH_ROUTE_KINDS).optional(),
+      }),
+    )
+    .permission("traces:view")
+    .mutation(async ({ input }) => {
+      return routeSearch({
+        projectId: input.projectId,
+        text: input.text,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+        activeQuery: input.activeQuery,
+        lensId: input.lensId,
+        isLangyAvailable: input.isLangyAvailable,
+        forceKind: input.forceKind,
       });
     }),
 

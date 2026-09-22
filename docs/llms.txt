@@ -40,7 +40,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Scenarios](https://langwatch.ai/docs/agent-testing/scenarios.md): A scenario is a situation a simulated user acts out against your agent, and the criteria a judge scores the conversation against.
 - [Test Suites](https://langwatch.ai/docs/agent-testing/test-suites.md): A test suite is a named group of scenarios you run together. It defines the fields a scenario may carry a value for and the evaluators that run after each scenario. The targets, the models and the repeat count are set on the run plan.
-- [Evaluators](https://langwatch.ai/docs/agent-testing/evaluators.md): An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required pass or fail evaluator fails the scenario when it fails, and a score-only evaluator never gates.
+- [Evaluators](https://langwatch.ai/docs/agent-testing/evaluators.md): An evaluator attached to a test suite runs after every scenario run and reports beside the judge's verdict, such as a faithfulness check on a RAG agent, an answer clarity score, a PII scan, or a comparison against a golden answer the scenario carries. A required evaluator fails the run when it fails.
 - [Scenario Run Parameters](https://langwatch.ai/docs/agent-testing/run-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 
 ### Runs and results
@@ -77,6 +77,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Selected Text Events](https://langwatch.ai/docs/user-events/selected-text.md): Track selected text events in LangWatch to understand user behavior and improve LLM performance across AI agent evaluations.
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
+- [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Exporting Analytics](https://langwatch.ai/docs/features/embedded-analytics.md): Export LangWatch analytics into your own dashboards to monitor LLM quality, agent testing metrics, and evaluation performance.
 
@@ -102,6 +103,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Score your production traffic as it arrives with monitors that run an evaluator on every matching trace or thread, and read the results on the trace, in the list and in analytics.
 - [Online Evaluations: set up a monitor on your production traffic](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
+
+### Instant Evals
+
+- [Instant Evals](https://langwatch.ai/docs/features/instant-evals/overview.md): Ask up to ten questions of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
+- [Instant Evals questions](https://langwatch.ai/docs/features/instant-evals/questions.md): The three kinds of question a run can ask, how to sharpen a yes or no with criteria and a threshold, and how to ask up to ten questions of the same text in one run.
+- [Instant Evals targets and statements](https://langwatch.ai/docs/features/instant-evals/targets.md): What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
+- [Reading Instant Eval results](https://langwatch.ai/docs/features/instant-evals/results.md): Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.
+- [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+- [Instant Evals CLI reference](https://langwatch.ai/docs/features/instant-evals/cli.md): Every langwatch instant-eval subcommand and flag, what each prints, and the exit codes a script can read.
 
 ### Guardrails
 
@@ -161,10 +171,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Platform
 
+- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
+
 ### Administration
 
 - [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
+- [Single sign-on and provisioning](https://langwatch.ai/docs/platform/sso.md): Set up your identity provider, directory provisioning and sign-in policies in LangWatch.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
 - [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed.
 - [Data Privacy](https://langwatch.ai/docs/platform/data-privacy.md): One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level.
@@ -173,7 +186,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Provision and deprovision LangWatch users from your identity provider (Okta, Entra ID and others) over SCIM 2.0.
 - [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Bind roles to the groups your identity provider pushes over SCIM, so every member of a group holds the same access.
 - [Model Providers](https://langwatch.ai/docs/platform/model-providers.md): Store the LLM credentials that LangWatch uses for evaluators, Workflows, the playground, Agent Testing and Langy once, at the organization, team or project scope.
-- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
 
 ## Examples & Cookbooks
 
@@ -509,9 +521,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, the agents they run, and a personal home page for each developer.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
-- [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
+- [From zero to your first governed request (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough to publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
 
 ## Personal Portal
@@ -528,7 +540,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
+- [The /governance overview](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): What the /governance page shows today, where each governance number actually lives, and the setup-state signal behind the section.
 - [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
 ## Privacy
@@ -549,7 +561,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): What the anomaly detector evaluates, what a rule is made of, how a fired alert reaches you, and why rules cannot be created in the app today.
 
 ## Compliance & Architecture
 
@@ -697,7 +709,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Ops Console
 
-- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from one interface
+- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Run your LangWatch installation: inspect queues, recover processing and support identity or directory issues.
 - [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
 - [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
 - [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
@@ -722,6 +734,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Traces
 
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
+- [Discover what the trace filter fields hold](https://langwatch.ai/docs/api-reference/traces/discover-what-the-trace-filter-fields-ho.md)
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
 - [Get Transcript](https://langwatch.ai/docs/api-reference/traces/get-transcript.md)
@@ -902,6 +915,18 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Get a single simulation run by its ID](https://langwatch.ai/docs/api-reference/simulation-runs/get-simulation-runs.md)
 - [Get Batches](https://langwatch.ai/docs/api-reference/simulation-runs/get-batches.md)
 
+## Instant Evals
+
+- [Overview](https://langwatch.ai/docs/api-reference/instant-evals/overview.md): Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going.
+- [Estimate a run](https://langwatch.ai/docs/api-reference/instant-evals/estimate-a-run.md)
+- [Start a run](https://langwatch.ai/docs/api-reference/instant-evals/create-instant-evals.md)
+- [List the project's runs, newest first](https://langwatch.ai/docs/api-reference/instant-evals/list-instant-evals.md)
+- [Get Instant Evals](https://langwatch.ai/docs/api-reference/instant-evals/get-instant-evals.md)
+- [Read a run's results](https://langwatch.ai/docs/api-reference/instant-evals/read-a-run-s-results.md)
+- [Sample a run](https://langwatch.ai/docs/api-reference/instant-evals/sample-a-run.md)
+- [Cancel a run](https://langwatch.ai/docs/api-reference/instant-evals/cancel-a-run.md)
+- [Running An Instant Eval](https://langwatch.ai/docs/api-reference/instant-evals/running-an-instant-eval.md): Take a LangWatchQL statement that judges rows and run it as a job across your history, with progress, judgements you can page through, and a price you can see before you start.
+
 ## Run Plans
 
 - [Overview](https://langwatch.ai/docs/api-reference/run-plans/overview.md): Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.
@@ -1009,9 +1034,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Query
 
-- [Overview](https://langwatch.ai/docs/api-reference/query/overview.md): Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.
+- [Overview](https://langwatch.ai/docs/api-reference/query/overview.md): Run a read-only LangWatchQL SELECT over your project's analytics views, or discover which views and columns your key can query.
+- [Discover both query languages](https://langwatch.ai/docs/api-reference/query/discover-both-query-languages.md)
 - [Discover the queryable LangWatchQL schema](https://langwatch.ai/docs/api-reference/query/discover-the-queryable-langwatchql-schema.md)
 - [Run a LangWatchQL query](https://langwatch.ai/docs/api-reference/query/run-a-langwatchql-query.md)
+- [Extraction And Eval Functions](https://langwatch.ai/docs/api-reference/query/extraction-functions.md): Project the text of a conversation, a trace or an LLM call straight out of a LangWatchQL query, and ask a question about it.
 
 ## Secrets
 

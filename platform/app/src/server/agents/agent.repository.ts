@@ -121,6 +121,13 @@ export type CreateAgentInput = {
   copiedFromAgentId?: string;
   /** The identity of a connected agent (ADR-128); unset for every other type. */
   identity?: ConnectedAgentIdentity;
+  /** The natural key a non-connected agent dedups on, sharing the same
+   *  `(projectId, identityKey)` unique constraint as a connected agent's
+   *  {@link ConnectedAgentIdentity.identityKey}. Voice agents set it so a first
+   *  hang-up before the row is saved cannot create a second row on a retry
+   *  (#8020). Distinct from `identity`, which also carries the connected-only
+   *  environment/scope/lastSeenAt fields; unset for a connected agent. */
+  identityKey?: string;
 };
 
 /**
@@ -338,6 +345,12 @@ export class AgentRepository {
           identityKey: input.identity.identityKey,
           lastSeenAt: new Date(),
         }),
+        // A non-connected agent's natural key, without the connected-only
+        // environment/scope/lastSeenAt fields. Mutually exclusive with
+        // `identity` in practice, so this never overrides that block's key.
+        ...(input.identityKey && !input.identity
+          ? { identityKey: input.identityKey }
+          : {}),
       },
     });
 
@@ -345,8 +358,9 @@ export class AgentRepository {
   }
 
   /**
-   * Finds a connected agent by its identity key, whatever its state, so a
-   * process that registers the same identity writes the row it already has.
+   * Finds an agent by its natural key (identity key), whatever its state, so
+   * a process that registers the same identity writes the row it already
+   * has. Used by both connected agents and voice agents.
    */
   async findByIdentityKey(input: {
     projectId: string;

@@ -27,7 +27,7 @@
  *   composition this orchestrates
  * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the self-hosted extras
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -35,6 +35,7 @@ import { createLogger } from "@langwatch/observability";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
+  canProvisionAppFunctions,
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   type LwqlKeyMapBackfillPlan,
@@ -46,6 +47,7 @@ import {
   lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
   postgresReaderStatementsFor,
+  probeAppFunctionStore,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
@@ -230,6 +232,30 @@ async function runClickHouseStatements({
 }
 
 /**
+ * Whether this server can hold the app functions on every replica. A server
+ * that cannot is provisioned without them, with the setting named in the log:
+ * half the replicas answering UNKNOWN_FUNCTION is worse than none of them.
+ */
+async function appFunctionsProvisionable(
+  client: ClickHouseClient,
+): Promise<boolean> {
+  const probe = await probeAppFunctionStore({
+    query: async (sql) =>
+      (await (
+        await client.query({ query: sql, format: "JSONEachRow" })
+      ).json()) as Record<string, string>[],
+  });
+  if (canProvisionAppFunctions(probe)) return true;
+  // A layout that could not be read has already been logged by the probe.
+  if (probe === null) return false;
+  logger.error(
+    { maxTotalReplicas: probe.maxTotalReplicas },
+    "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
+  );
+  return false;
+}
+
+/**
  * The `LWQL_SELF_PROVISION=true` path: the whole model, and never a thrown
  * error. This mode ships default-on in the Helm chart, so a ClickHouse server
  * that refuses access-model DDL (say, an external one without
@@ -295,6 +321,7 @@ async function selfProvisionAll({
       ]);
 
       await withAdminClickHouseClient(async (client) => {
+        const includeAppFunctions = await appFunctionsProvisionable(client);
         await runClickHouseStatements({
           client,
           secrets,
@@ -306,6 +333,7 @@ async function selfProvisionAll({
               endpoint,
               readerPassword: selfProvision.postgresReaderPassword,
             },
+            includeAppFunctions,
           }),
         });
 

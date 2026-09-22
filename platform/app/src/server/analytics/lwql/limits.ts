@@ -38,6 +38,33 @@
 export const MAX_LWQL_LENGTH = 50_000;
 
 /**
+ * The row cap this API enforces, in one place.
+ *
+ * Two seams read it and must not disagree. The validator refuses a statement
+ * whose own top-level `LIMIT` asks for more than this (`LIMIT_TOO_HIGH`), and
+ * the service appends `LIMIT {this}` to a statement that names none — so "the
+ * most rows a request may ask for" and "the ceiling a bare query is capped at"
+ * are the same number by construction rather than by coincidence. A caller who
+ * needs more pages with `LIMIT`/`OFFSET` and an `ORDER BY`, which is what the
+ * refusal's remediation tells them.
+ *
+ * Kept here rather than in `./executor.ts` because the validator resolves the
+ * cap on the save path too, where no executor exists, and pulling it from
+ * `executor.ts` would drag the ClickHouse client into that path.
+ */
+export const LWQL_MAX_RESULT_ROWS = 10_000;
+
+/**
+ * The byte ceiling a finished result may not exceed, in one place.
+ *
+ * A hard error rather than a silent cut: a JSON body larger than this fails
+ * with `lwql_result_too_large` naming the cap, because a partial result that
+ * looks whole is the worse failure for an analytics caller. Read by the service
+ * after the rows come back.
+ */
+export const LWQL_MAX_RESULT_BYTES = 8_000_000;
+
+/**
  * Ceilings pinned `CONST` by the profile.
  *
  * Belt and braces rather than the load-bearing control: `readonly = 1` already
@@ -71,6 +98,20 @@ export interface LangWatchQLResourceLimits {
    */
   maxRowsToRead: number;
   maxBytesToRead: number;
+  /**
+   * The *output* ceiling, enforced with `result_overflow_mode = 'throw'`: the
+   * server-side backstop for the row cap the validator and service already
+   * enforce in TypeScript ({@link LWQL_MAX_RESULT_ROWS}). A statement whose
+   * `LIMIT` is a bound parameter (`LIMIT {n:UInt64}`) is not a value the
+   * static validator can read, so it passes both the append decision and the
+   * `LIMIT_TOO_HIGH` refusal — this is what still catches it, distinct from
+   * `maxRowsToRead`/`maxBytesToRead` above (which bound how much the query
+   * may *read*, not how much it may *return*). The breach reaches the caller
+   * as `lwql_result_too_large`, mapped from TOO_MANY_ROWS_OR_BYTES (396) by
+   * `~/server/app-layer/clients/clickhouse/translate-query-error`.
+   */
+  maxResultRows: number;
+  maxResultBytes: number;
 }
 
 /**
@@ -91,4 +132,6 @@ export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
   maxConcurrentQueriesForUser: 10,
   maxRowsToRead: 1_000_000_000,
   maxBytesToRead: 10_000_000_000,
+  maxResultRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
 };

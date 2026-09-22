@@ -51,6 +51,20 @@ Feature: Reconciling an organization down to its licensed seats
     Then the organization is within its seat count
     And inviting another member is refused again only once 10 seats are in use
 
+  # Disabling a membership is how an ADMIN returns a seat; deactivating the
+  # person is how a DIRECTORY does it, and `active: false` is what Okta and
+  # Entra send when somebody leaves rather than `DELETE`. Both mean the same
+  # thing here - the person cannot sign in and holds nothing - but only the
+  # first was taken out of the pool, so an organization went on paying for
+  # everybody its identity provider had already offboarded. "Never bills me
+  # for people I removed" is this feature's own promise, in its own words.
+
+  @unit
+  Scenario: A deactivated person does not hold a seat
+    Given a member of the organization whose account has been deactivated
+    When the seats in use are counted
+    Then they are not counted, exactly as a disabled membership is not
+
   @integration
   Scenario: A disabled member loses access but keeps their record
     Given a member of the organization has been disabled
@@ -141,6 +155,13 @@ Feature: Reconciling an organization down to its licensed seats
     When an admin opens the member list
     Then the full member seats in use are shown against what the license covers
     And the Lite Member seats in use are shown the same way
+
+  @integration @regression
+  Scenario: Invitation changes refresh the visible seat usage
+    Given an admin has the directory open with its current seat usage
+    When the admin creates, revokes, or reissues an invitation
+    Then the visible seat usage reflects the current reservation without reloading
+    And another organization's cached seat usage is not refreshed
 
   @integration
   Scenario: Running out of Lite Member seats names that allowance

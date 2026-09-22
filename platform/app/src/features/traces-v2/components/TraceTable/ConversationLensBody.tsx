@@ -10,8 +10,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
-import type { LensConfig } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { LensConfig } from "../../stores/viewSlice";
 import { mapTraceListPayload } from "../../utils/mapTraceListPayload";
 import { buildConversationColumns } from "./columns";
 import type { ConversationGroup } from "./conversationGroups";
@@ -50,8 +50,12 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   lens,
   isLoading = false,
 }) => {
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  // One conversation open at a time: the store keeps the open row exclusive.
+  const expandedKey = useExplorerStore(
+    (s) => s.expandedRows.values().next().value ?? null,
+  );
+  const toggleExpandedRow = useExplorerStore((s) => s.toggleExpandedRow);
   const openLatestTrace = useOpenLatestTrace();
 
   // Turn rows for the one expanded conversation, fetched on demand: the
@@ -118,7 +122,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
 
   const toggleExpanded = (id: string) =>
-    setExpandedKey((prev) => (prev === id ? null : id));
+    toggleExpandedRow({ key: id, exclusive: true });
 
   return (
     <TraceTableShell

@@ -20,3 +20,15 @@ Feature: The wrapper shows progress while it sets up telemetry
       Given `langwatch claude` setting up telemetry for the tool
       When the setup fails
       Then the spinner is stopped before the failure is printed
+
+  Rule: a wrapper prints no note about output it does not have
+
+    # A coding agent sets a variable such as CLAUDECODE in its children, and
+    # the CLI reads that as agent mode. A command that still prints a human
+    # table then notes on stderr that the table is not machine-readable. A
+    # wrapper prints no table, it hands the terminal to the tool it runs.
+    @unit
+    Scenario: A wrapper run inside a coding agent prints no table note
+      Given the CLI detects agent mode from the environment
+      When `langwatch claude`, `codex`, `copilot`, `code`, `cursor`, `gemini` or `opencode` runs
+      Then nothing about a table that is not machine-readable is printed

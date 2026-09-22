@@ -13,7 +13,7 @@
  *
  * @see ../productionProvisioning.ts — the composition under test
  * @see ../../clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

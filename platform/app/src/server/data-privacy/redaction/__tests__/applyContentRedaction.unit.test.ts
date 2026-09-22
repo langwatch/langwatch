@@ -498,6 +498,105 @@ describe("redactAttributeNative on identifier-shaped values", () => {
   });
 });
 
+/**
+ * The reserved trace and span names buy an exemption the `_id` suffix rule
+ * cannot give, because `traceid` and `spanid` carry no underscore. That
+ * exemption has to read the VALUE for the same reason the personal-data
+ * exemption does: the OTLP endpoint forwards caller-written attribute names
+ * verbatim, so the name is an assertion by whoever sent the span and nothing
+ * more. A reserved name over a credential is not a trace address.
+ *
+ * The `_id` names below are the control. They are exempt by suffix, which is
+ * behaviour that predates the reserved list and is not what these assert.
+ */
+describe("redacting an attribute under a reserved trace identifier name", () => {
+  const DECIMAL_TRACE_ADDRESS = "1757500123454000091";
+
+  describe("given a value shaped like the address the name promises", () => {
+    /** @scenario "A reserved trace identifier name keeps the address it promises" */
+    it.each([
+      "metadata.traceid",
+      "langwatch.metadata.traceid",
+    ])("keeps it under %s", (key) => {
+      expect(
+        redactAttributeNative({
+          key,
+          value: DECIMAL_TRACE_ADDRESS,
+          policy: policy({}),
+        }).text,
+      ).toBe(DECIMAL_TRACE_ADDRESS);
+    });
+  });
+
+  describe("given a value that is not an address at all", () => {
+    /** @scenario "A reserved trace identifier name does not exempt a credential" */
+    it.each([
+      "metadata.traceid",
+      "langwatch.metadata.traceid",
+    ])("still runs the shape rules under %s", (key) => {
+      expect(
+        redactAttributeNative({
+          key,
+          value: SHAPED_TOKEN,
+          policy: policy({}),
+        }).text,
+      ).toBe("[SECRET]");
+    });
+
+    // The suffix rule is older than the reserved list and unchanged by it, so
+    // an `_id` name keeps its exemption whatever the value is. Asserting it
+    // here is what stops the value gate above being read as a change to that.
+    it("leaves the suffix rule's own exemption alone", () => {
+      expect(
+        redactAttributeNative({
+          key: "metadata.trace_id",
+          value: SHAPED_TOKEN,
+          policy: policy({}),
+        }).text,
+      ).toBe(SHAPED_TOKEN);
+    });
+  });
+
+  /**
+   * This is the one thing the reserved list does that nothing else does, so it
+   * is worth a test that fails if the list stops being consulted.
+   *
+   * The value is a decimal address short enough that the shape rule rejects it
+   * and a phone recognizer claims it, and the name carries no `_id` suffix, so
+   * neither of the two older exemptions can be what keeps it. The unreserved
+   * control is the same value under a name nobody reserved: it is redacted, so
+   * the difference measured here is the name and not the value.
+   */
+  describe("given a short decimal address no shape rule would hold back", () => {
+    const PHONE_SHAPED_ADDRESS = "12515420585";
+
+    /** @scenario "A reserved name keeps an address the shape rule is too short to see" */
+    it.each([
+      "metadata.traceid",
+      "langwatch.metadata.traceid",
+      "traceid",
+    ])("keeps it under %s", (key) => {
+      expect(
+        redactAttributeNative({
+          key,
+          value: PHONE_SHAPED_ADDRESS,
+          policy: policy({}),
+        }).text,
+      ).toBe(PHONE_SHAPED_ADDRESS);
+    });
+
+    it("redacts the same value under a name nobody reserved", () => {
+      expect(
+        redactAttributeNative({
+          key: "app.note",
+          value: PHONE_SHAPED_ADDRESS,
+          policy: policy({}),
+        }).text,
+      ).toBe("[PHONE_NUMBER]");
+    });
+  });
+});
+
 describe("redactStringNative with policy PII exceptions", () => {
   it("keeps a fully matched value and redacts everything else", () => {
     const p = policy({ exceptPatterns: ["00\\d{12}"] });

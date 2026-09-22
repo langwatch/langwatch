@@ -29,6 +29,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { z } from "zod";
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
@@ -49,7 +50,7 @@ vi.mock("~/server/auth", () => ({
     user: { id: ids.USER_ID, email: ids.EMAIL, name: ids.NAME },
   }),
 }));
-// The picked shared project's key requires project:update; that RBAC decision
+// The picked shared project's key requires project:manage; that RBAC decision
 // is covered elsewhere. Grant it so the gate logic is what's under test.
 // The approval route reads probeProjectPermission from the app-layer
 // imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
@@ -94,6 +95,21 @@ const OTHER_PERSONAL_API_KEY = `sk-lw-personal-o-${suffix}-${"d".repeat(34)}`;
 const OTHER_TEAM_API_KEY = `sk-lw-other-${suffix}-${"c".repeat(36)}`;
 
 const GOV_FLAG = "release_ui_ai_governance_enabled";
+const errorResponseSchema = z.object({
+  error: z.string(),
+  error_description: z.string().optional(),
+});
+const apiKeyExchangeResponseSchema = z
+  .object({
+    kind: z.literal("api_key"),
+    api_key: z.string(),
+    project: z.object({
+      id: z.string(),
+      slug: z.string(),
+      name: z.string(),
+    }),
+  })
+  .passthrough();
 
 async function mintDeviceCode(credentialType: string): Promise<string> {
   const res = await app.request("/api/auth/cli/device-code", {
@@ -103,6 +119,20 @@ async function mintDeviceCode(credentialType: string): Promise<string> {
   });
   const dc = (await res.json()) as { user_code: string };
   return dc.user_code;
+}
+
+async function mintDeviceCodePair(
+  credentialType: string,
+): Promise<{ deviceCode: string; userCode: string }> {
+  const res = await app.request("/api/auth/cli/device-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ credential_type: credentialType }),
+  });
+  const deviceCode = z
+    .object({ device_code: z.string(), user_code: z.string() })
+    .parse(await res.json());
+  return { deviceCode: deviceCode.device_code, userCode: deviceCode.user_code };
 }
 
 async function approve(body: Record<string, unknown>) {
@@ -282,6 +312,8 @@ describe("CLI login personal-project guards", () => {
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
+    vi.mocked(probeProjectPermission).mockReset();
+    vi.mocked(probeProjectPermission).mockResolvedValue(true);
   });
 
   // Deletes are org-scoped rather than keyed on the fixture ids because the
@@ -460,6 +492,20 @@ describe("CLI login personal-project guards", () => {
         expect(status).toBe(200);
         expect((json.project as { id: string }).id).toBe(PERSONAL_PROJECT_ID);
       });
+
+      /** @scenario owning a personal project does not replace project administration */
+      it("refuses the owner when canonical project administration is absent", async () => {
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+        const userCode = await mintDeviceCode("project_api_key");
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: PERSONAL_PROJECT_ID,
+        });
+        const error = errorResponseSchema.parse(json);
+        expect(status).toBe(403);
+        expect(error.error).toBe("forbidden");
+        expect(JSON.stringify(error)).not.toContain(PERSONAL_API_KEY);
+      });
     });
 
     describe("when the approval targets a shared team project id", () => {
@@ -582,11 +628,76 @@ describe("CLI login personal-project guards", () => {
       });
     });
 
-    describe("when the caller lacks write access to the picked project", () => {
-      /** @scenario project-login approval denies a project the caller cannot write */
+    describe("when administration is removed between approval and exchange", () => {
+      /** @scenario project-login exchange rechecks administration after approval */
+      it("denies without returning the key and consumes every polling record", async () => {
+        const dc = await mintDeviceCodePair("project_api_key");
+        const approved = await approve({
+          user_code: dc.userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+        const exchange = await app.request("/api/auth/cli/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_code: dc.deviceCode }),
+        });
+        expect(exchange.status).toBe(410);
+        const error = errorResponseSchema.parse(await exchange.json());
+        expect(error.error).toBe("access_denied");
+        expect(JSON.stringify(error)).not.toContain(SHARED_API_KEY);
+        expect(await redisConnection!.keys(`*${dc.deviceCode}*`)).toEqual([]);
+        expect(await redisConnection!.keys(`*${dc.userCode}*`)).toEqual([]);
+        const second = await app.request("/api/auth/cli/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_code: dc.deviceCode }),
+        });
+        expect(second.status).toBe(408);
+      });
+    });
+
+    describe("when the base key rotates between approval and exchange", () => {
+      /** @scenario project-login exchange returns a key rotated after approval */
+      it("returns the current key rather than the cached approval secret", async () => {
+        const rotatedKey = `sk-lw-rotated-${suffix}-${"r".repeat(34)}`;
+        const dc = await mintDeviceCodePair("project_api_key");
+        const approved = await approve({
+          user_code: dc.userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+        await prisma.project.update({
+          where: { id: SHARED_PROJECT_ID },
+          data: { apiKey: rotatedKey },
+        });
+        try {
+          const exchange = await app.request("/api/auth/cli/exchange", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ device_code: dc.deviceCode }),
+          });
+          expect(exchange.status).toBe(200);
+          const body = apiKeyExchangeResponseSchema.parse(
+            await exchange.json(),
+          );
+          expect(body.api_key).toBe(rotatedKey);
+          expect(body.api_key).not.toBe(SHARED_API_KEY);
+        } finally {
+          await prisma.project.update({
+            where: { id: SHARED_PROJECT_ID },
+            data: { apiKey: SHARED_API_KEY },
+          });
+        }
+      });
+    });
+
+    describe("when the caller lacks admin access to the picked project", () => {
+      /** @scenario project-login approval denies a project the caller cannot manage */
       it("returns forbidden and never the project's API key", async () => {
         // probeProjectPermission is the source of truth: a caller without
-        // project:update is denied even though the project is in their org.
+        // project:manage is denied even though the project is in their org.
         vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
         const userCode = await mintDeviceCode("project_api_key");
 

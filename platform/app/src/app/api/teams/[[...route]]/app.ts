@@ -1,18 +1,13 @@
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import {
-  type Organization,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { type Organization, TeamUserRole } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
-import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
@@ -199,29 +194,16 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.getById({
+      const bindings = await service.listMembers({
         id,
         organizationId: organization.id,
-      });
-      if (!team) throw new TeamNotFoundError(id);
-
-      const bindings = await prisma.roleBinding.findMany({
-        where: {
-          organizationId: organization.id,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: id,
-          userId: { not: null },
-        },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
       });
 
       return c.json({
         data: bindings.map((b) => ({
           userId: b.userId,
-          name: b.user?.name ?? null,
-          email: b.user?.email ?? null,
+          name: b.user.name,
+          email: b.user.email,
           role: b.role,
         })),
       });
@@ -294,21 +276,7 @@ secured
       });
       if (!team) throw new TeamNotFoundError(id);
 
-      const projects = await prisma.project.findMany({
-        where: {
-          teamId: id,
-          archivedAt: null,
-          kind: { not: "internal_governance" },
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      const projects = await service.listProjects({ teamId: id });
 
       return c.json({ data: projects });
     },

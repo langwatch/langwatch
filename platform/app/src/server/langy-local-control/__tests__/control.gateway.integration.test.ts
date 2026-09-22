@@ -15,6 +15,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { generate } from "@langwatch/ksuid";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import {
   type RedisConnection,
   RedisConnectionService,
@@ -39,6 +40,7 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { LangyTurnInProgressError } from "~/server/app-layer/langy/errors";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -46,9 +48,13 @@ import {
   createRedisStateStore,
 } from "~/server/connected-agents/state-store";
 import { prisma } from "~/server/db";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { createUpgradeRouter } from "~/server/websockets/upgrade-router";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { createLocalConnectTurnSubscriber } from "../connect-turn.subscriber";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../control.gateway";
 import { LocalControlLongPoll } from "../control.long-poll";
 import { presenceKey } from "../keys";
@@ -57,7 +63,10 @@ import {
   createLocalControlRuntime,
   type LocalControlRuntime,
 } from "../runtime";
-import { LocalControlSessionCore } from "../session.core";
+import {
+  type ControlTurnStarter,
+  LocalControlSessionCore,
+} from "../session.core";
 
 const ns = `local-control-${nanoid(8)}`;
 
@@ -111,6 +120,16 @@ type Pod = {
 
 let podA: Pod;
 let podB: Pod;
+
+/** The turn start the core and the owed-turn subscriber share. */
+const turnStarter: ControlTurnStarter = {
+  async start({ text, idempotencyKey }) {
+    if (turnStartOutcome === "in_progress") {
+      throw new LangyTurnInProgressError();
+    }
+    startedTurns.push({ text, idempotencyKey });
+  },
+};
 
 function testPorts(store: AgentStateStore) {
   const runtime = createLocalControlRuntime({
@@ -180,14 +199,7 @@ function testPorts(store: AgentStateStore) {
       },
     },
     skipGate: async () => ({ allowed: skipAllowed }),
-    turns: {
-      async start({ text, idempotencyKey }) {
-        if (turnStartOutcome === "in_progress") {
-          throw new LangyTurnInProgressError();
-        }
-        startedTurns.push({ text, idempotencyKey });
-      },
-    },
+    turns: turnStarter,
   });
   return { runtime, core };
 }
@@ -397,7 +409,11 @@ beforeAll(async () => {
   })!;
   if (!connection) throw new Error("These tests need a real Redis");
   await resetApp();
-  globalForApp.__langwatch_app = createTestApp({ redis: connection });
+  resetAuthzGrantsCommandsForTests();
+  globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: createAuthzTestEventSourcing(prisma),
+    redis: connection,
+  });
 
   organization = await prisma.organization.create({
     data: { name: "Local Control Org", slug: `--test-org-${ns}` },
@@ -423,15 +439,13 @@ beforeAll(async () => {
   await prisma.teamUser.create({
     data: { userId, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
   projectApiKey = `sk-lw-${nanoid(48)}`;
   const project = await prisma.project.create({
@@ -489,6 +503,7 @@ afterAll(async () => {
   await stopPod(podA);
   await stopPod(podB);
   await cleanupTestRows(prisma, [
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["customRole", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],
@@ -500,6 +515,7 @@ afterAll(async () => {
     ["user", { id: userId }],
   ]);
   await resetApp();
+  resetAuthzGrantsCommandsForTests();
   connection.disconnect();
 });
 
@@ -605,6 +621,66 @@ describe("given an approved control request", () => {
 
       expect(startedTurns).toEqual([]);
       expect(await podA.runtime.presence.read(conversationId)).not.toBeNull();
+      // The running turn picks the folder up on its next call; should it end
+      // without one, the connect turn is owed.
+      expect(
+        await podA.runtime.presence.readOwedConnectTurn(conversationId),
+      ).toMatchObject({ projectId, userId });
+
+      cli.close();
+      await cli.closed();
+    });
+
+    /** @scenario "A folder connected as a turn ends is answered once the turn's end is folded" */
+    it("starts the owed turn from the fold of the turn's end, on any replica, once", async () => {
+      // The turn ended, but its end is still being folded when the terminal
+      // connects, so the turn start reads it as in flight.
+      turnStartOutcome = "in_progress";
+      const key = await approvedSessionKey(podA);
+      const { cli } = await shareFolder(podA, key);
+      await expect
+        .poll(() => podA.runtime.presence.readOwedConnectTurn(conversationId), {
+          timeout: 5_000,
+        })
+        .not.toBeNull();
+      expect(startedTurns).toEqual([]);
+
+      // The end reaches the fold, and the admission row is released with it.
+      turnStartOutcome = "ok";
+      const ended = {
+        id: `evt_${nanoid(10)}`,
+        aggregateId: conversationId,
+        aggregateType: "langy_conversation",
+        tenantId: projectId,
+        createdAt: Date.now(),
+        occurredAt: Date.now(),
+        type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+        version: "1",
+        data: { conversationId, turnId, parts: [] },
+      } as unknown as LangyConversationProcessingEvent;
+      const subscriber = createLocalConnectTurnSubscriber({
+        presence: () => podB.runtime.presence,
+        conversations: {
+          read: async () => ({
+            cursor: { acceptedAt: ended.createdAt, eventId: ended.id },
+            status: "idle",
+          }),
+        },
+        turns: turnStarter,
+      });
+      const context = { tenantId: projectId, aggregateId: conversationId };
+      await subscriber.handle(ended, context);
+      await subscriber.handle(ended, context);
+
+      expect(startedTurns).toEqual([
+        {
+          text: "Local folder connected",
+          idempotencyKey: expect.stringMatching(/^local-connect:lcr_/),
+        },
+      ]);
+      expect(
+        await podA.runtime.presence.readOwedConnectTurn(conversationId),
+      ).toBeNull();
 
       cli.close();
       await cli.closed();
@@ -801,7 +877,7 @@ describe("given a folder shared with the conversation", () => {
         call: {
           tool: "local_bash",
           params: {
-            command: "git fetch origin && git checkout -b langy/x origin/main",
+            command: "uv sync && uv run pytest -s",
           },
         },
         timeoutMs: 30_000,
@@ -810,20 +886,20 @@ describe("given a folder shared with the conversation", () => {
       cli.send({
         type: "permission_required",
         callId: call.callId,
-        summary: "git fetch origin && git checkout -b langy/x origin/main",
-        pattern: "git fetch",
-        reason: "changes the git repository and reaches the network",
+        summary: "uv sync && uv run pytest -s",
+        pattern: "uv sync",
+        reason: "installs packages and runs the project's own checks",
         skipOffered: true,
         timeoutSeconds: 300,
         segments: [
           {
-            command: "git fetch origin",
-            pattern: "git fetch",
+            command: "uv sync",
+            pattern: "uv sync",
             readOnly: false,
           },
           {
-            command: "git checkout -b langy/x origin/main",
-            pattern: "git checkout",
+            command: "uv run pytest -s",
+            pattern: "uv run",
             readOnly: false,
           },
         ],
@@ -837,7 +913,7 @@ describe("given a folder shared with the conversation", () => {
       expect(
         liveEntries.find((e) => e.kind === "local_permission")?.payload,
       ).toMatchObject({
-        patterns: ["git fetch", "git checkout"],
+        patterns: ["uv sync", "uv run"],
         timeoutSeconds: 300,
       });
     });

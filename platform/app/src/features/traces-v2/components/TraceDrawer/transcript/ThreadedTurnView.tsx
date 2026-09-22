@@ -1,12 +1,13 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuUser } from "react-icons/lu";
+import type { ConversationTurn } from "~/shared/traces/transcript/types";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { FlatTurnView } from "./FlatTurnView";
 import { getRolePalette, ROLE_ICONS, ROLE_LABELS } from "./RoleChip";
 import { TurnView } from "./TurnView";
 import { summarizeTurn } from "./turns";
-import type { ChatLayout, ConversationTurn } from "./types";
+import type { ChatLayout } from "./types";
 
 /**
  * Collapsible Gmail-style turn row.

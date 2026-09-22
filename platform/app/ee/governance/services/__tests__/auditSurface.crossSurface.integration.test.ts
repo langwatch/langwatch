@@ -41,12 +41,15 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 
 import { FREE_PLAN } from "../../../licensing/constants";
 
@@ -79,7 +82,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
 
   beforeEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -132,14 +137,12 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     // across surfaces and the user genuinely has organization:manage at
     // the org scope (not strictly required for service-direct calls, but
     // mirrors a realistic admin caller).
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: testOrg.id,
-        userId: testUser.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrg.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrg.id,
+      userId: testUser.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrg.id,
     });
 
     const apiKeyResult = await ApiKeyService.create(prisma).create({
@@ -166,6 +169,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       templateIds.length = 0;
     }
     await prisma.auditLog
+      .deleteMany({ where: { organizationId: { in: orgIds } } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: { in: orgIds } } })
       .catch(() => undefined);
     // RoleBindings carry the required relation to the PAT's ApiKey, so they
@@ -392,11 +398,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     expect(service).toBeDefined();
   });
 
-  it("the CLI surface case is staged for fold once Lane-B `langwatch governance` ships", () => {
-    // Placeholder anchor so reviewers know the four-surface uniformity
-    // is the intended terminal shape; the CLI assertion will land with
-    // Alexis's CLI scaffold SHA. Until then, the three-surface case
-    // above is the active lock.
-    expect(true).toBe(true);
-  });
+  it.todo(
+    "attributes governance changes made through the CLI to the CLI audit surface",
+  );
 });

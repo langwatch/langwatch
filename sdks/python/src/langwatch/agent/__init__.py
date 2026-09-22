@@ -14,7 +14,7 @@ See ADR-128 and `specs/python-sdk/agent-decorator.feature`.
 from .client import AgentClient, default_client, serve
 from .decorator import AgentCall, AgentReply, ConnectedAgent, connect_agent
 from .protocol import PROTOCOL_VERSION, Message
-from .schema import AgentParameterInvalid, Param
+from .schema import AgentParameterInvalid, AgentReplyInvalid, Param
 
 __all__ = [
     "PROTOCOL_VERSION",
@@ -22,6 +22,7 @@ __all__ = [
     "AgentClient",
     "AgentParameterInvalid",
     "AgentReply",
+    "AgentReplyInvalid",
     "ConnectedAgent",
     "Message",
     "Param",

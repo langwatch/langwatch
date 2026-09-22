@@ -29,12 +29,19 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { createUpgradeRouter } from "~/server/websockets/upgrade-router";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { CONNECT_PATH, ConnectGateway } from "../connect.gateway";
+import {
+  CONNECT_PATH,
+  ConnectGateway,
+  UNREADABLE_RESULT_MESSAGE,
+} from "../connect.gateway";
 import { PRESENCE_TTL_SECONDS } from "../constants";
 import { instanceChannel, instanceSetKey } from "../keys";
 import { touchAgentLastSeen } from "../presence.projection";
@@ -260,7 +267,11 @@ beforeAll(async () => {
   })!;
   if (!connection) throw new Error("These tests need a real Redis");
   await resetApp();
-  globalForApp.__langwatch_app = createTestApp({ redis: connection });
+  resetAuthzGrantsCommandsForTests();
+  globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: createAuthzTestEventSourcing(prisma),
+    redis: connection,
+  });
 
   organization = await prisma.organization.create({
     data: { name: "Connected Org", slug: `--test-org-${ns}` },
@@ -286,15 +297,13 @@ beforeAll(async () => {
   await prisma.teamUser.create({
     data: { userId, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
   projectApiKey = `sk-lw-${nanoid(48)}`;
   const project = await prisma.project.create({
@@ -392,6 +401,7 @@ afterAll(async () => {
   await stopPod(podB);
   await cleanupTestRows(prisma, [
     ["agent", { projectId }],
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],
     ["project", { teamId: team.id }],
@@ -402,6 +412,7 @@ afterAll(async () => {
     ["user", { id: userId }],
   ]);
   await resetApp();
+  resetAuthzGrantsCommandsForTests();
   connection.disconnect();
 });
 
@@ -777,6 +788,105 @@ describe("dispatch across replicas", () => {
         code: "agent_disconnected",
       });
       expect(Date.now() - started).toBeLessThan(5_000);
+    });
+  });
+
+  describe("when the instance answers with a result the platform cannot read", () => {
+    /** @scenario "A result the platform cannot read fails the call at once" */
+    it("fails the call with agent_call_failed naming the field, before the deadline", async () => {
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
+      const pending = podB.runtime.dispatcher.dispatch({
+        projectId,
+        agent: {
+          id: agentId,
+          name: "support-agent",
+          environment: "production",
+          timeoutMs: 20_000,
+          isSticky: false,
+        },
+        call: {
+          threadId: "thread_dict",
+          messages: [{ role: "user", content: "where is my order?" }],
+          newMessages: [{ role: "user", content: "where is my order?" }],
+          params: {},
+          session: undefined,
+          traceparent: null,
+          run: {},
+        },
+      });
+      const call = await sdk.next("call");
+      sdk.send({ type: "ack", callId: call.callId });
+      sdk.send({
+        type: "result",
+        callId: call.callId,
+        output: {
+          output: "Order 42 ships today",
+          thread_id: "t1",
+          order_number: null,
+        },
+      });
+
+      const started = Date.now();
+      await expect(pending).rejects.toMatchObject({
+        code: "agent_call_failed",
+        meta: {
+          remoteCode: "agent_call_failed",
+          message: `${UNREADABLE_RESULT_MESSAGE}: output.role: Required`,
+        },
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      sdk.close();
+      await sdk.closed();
+    });
+  });
+
+  describe("when an unreadable result names a call the instance does not hold", () => {
+    /** @scenario "An unreadable result for a call the instance does not hold is dropped" */
+    it("leaves the held call waiting for its real answer", async () => {
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
+      const pending = podB.runtime.dispatcher.dispatch({
+        projectId,
+        agent: {
+          id: agentId,
+          name: "support-agent",
+          environment: "production",
+          timeoutMs: 20_000,
+          isSticky: false,
+        },
+        call: {
+          threadId: "thread_stray",
+          messages: [{ role: "user", content: "hi" }],
+          newMessages: [{ role: "user", content: "hi" }],
+          params: {},
+          session: undefined,
+          traceparent: null,
+          run: {},
+        },
+      });
+      const call = await sdk.next("call");
+      sdk.send({ type: "ack", callId: call.callId });
+      sdk.send({
+        type: "result",
+        callId: "call_nobody_asked_for",
+        output: { output: "stray" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      sdk.send({
+        type: "result",
+        callId: call.callId,
+        output: "the real answer",
+      });
+
+      const outcome = await pending;
+      expect(outcome.output).toBe("the real answer");
+      sdk.close();
+      await sdk.closed();
     });
   });
 

@@ -32,8 +32,35 @@ describe("buildSecurityHeaders", () => {
     expect(headers["Strict-Transport-Security"]).toBeUndefined();
   });
 
+  describe("given a development response", () => {
+    describe("when the CSP is built", () => {
+      /** @scenario Development responses report the production CSP without enforcing it */
+      it("reports the production policy instead of enforcing it", () => {
+        const dev = buildSecurityHeaders({ dev: true, environment: {} });
+        const prod = buildSecurityHeaders({ dev: false, environment: {} });
+
+        expect(dev["Content-Security-Policy"]).toBeUndefined();
+        expect(dev["Content-Security-Policy-Report-Only"]).toBe(
+          prod["Content-Security-Policy"]?.replace(
+            "upgrade-insecure-requests; ",
+            "",
+          ),
+        );
+      });
+    });
+  });
+
   describe("given the voice agents panel (#7947)", () => {
     describe("when building production headers", () => {
+      /** @scenario The app's own headers allow the ElevenLabs audio worklets */
+      it("admits blob: script modules so AudioWorklet.addModule can load them", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+
+        expect(csp).toMatch(/script-src [^;]*\bblob:/);
+      });
+
       /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
       it("allows the microphone for the app's own origin", () => {
         const headers = buildSecurityHeaders({ dev: false, environment: {} });
@@ -49,6 +76,22 @@ describe("buildSecurityHeaders", () => {
 
         expect(csp).toMatch(/connect-src [^;]*wss:\/\/api\.elevenlabs\.io/);
         expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.elevenlabs\.io/);
+      });
+    });
+  });
+
+  describe("given the chart sandbox ships its own frame policy", () => {
+    describe("when the app's production headers are built", () => {
+      /** @scenario "The app's own policy is unchanged by the sandbox" */
+      it("does not admit unpkg.com or esm.sh into the app's script-src", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+        const scriptSrc = csp
+          ?.split("; ")
+          .find((d) => d.startsWith("script-src "));
+
+        expect(scriptSrc).not.toMatch(/unpkg\.com|esm\.sh/);
       });
     });
   });

@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import {
@@ -62,11 +63,13 @@ const RUNNING_STATUSES =
   "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
 
 /**
- * Leaves the "Test agent" runs out of a list. They are one-off checks of an
- * agent, not results of a scenario, so no set list, batch list or last-result
- * summary shows them. A run is still read by its own id.
+ * Leaves out runs that are not results of a scenario: the "Test agent" one-off
+ * checks, and the legacy `voice-calls` set that pre-#8020 drawer "Talk to it"
+ * calls landed in (a drawer call no longer writes a run at all). No set list,
+ * batch list or last-result summary shows them. A run is still read by its own
+ * id, so a direct link to an old voice-call run still opens.
  */
-const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`;
+const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 
 /**
  * Batch-level aggregate SELECT list, shared by the batch history page and the
@@ -1433,7 +1436,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const wherePredicate =
       filter === "external"
-        ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+        ? `AND NOT startsWith(ScenarioSetId, '__internal__') ${AGENT_TEST_SET_EXCLUSION}`
         : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
 
     // External sets normalize empty ScenarioSetId to 'default'
@@ -1647,6 +1650,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId IN ({projectIds:Array(String)})
            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+           ${AGENT_TEST_SET_EXCLUSION}
          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE latestIsActive`,

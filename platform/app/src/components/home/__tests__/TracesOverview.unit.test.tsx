@@ -25,7 +25,7 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
     input,
   }: {
     emptyState?: React.ReactNode;
-    input?: { graphType?: string };
+    input?: { graphType?: string; excludeOrigins?: string[] };
   }) => (
     <div
       data-testid={
@@ -33,6 +33,7 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
           ? "traces-overview-trend"
           : "traces-overview-graph"
       }
+      data-exclude-origins={(input?.excludeOrigins ?? []).join(",")}
     >
       {emptyState}
     </div>
@@ -53,6 +54,17 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe("<TracesOverview />", () => {
   afterEach(cleanup);
+
+  /** @scenario "The home figures leave out Langy's own turns" */
+  it("leaves Langy's own turns out of the figures", () => {
+    renderWithProviders(<TracesOverview />);
+
+    expect(
+      screen
+        .getByTestId("traces-overview-graph")
+        .getAttribute("data-exclude-origins"),
+    ).toBe("langy");
+  });
 
   it("renders the figures", () => {
     renderWithProviders(<TracesOverview />);

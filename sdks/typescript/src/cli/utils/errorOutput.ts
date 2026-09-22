@@ -241,6 +241,30 @@ export const commandValidationError = (
 });
 
 /**
+ * A local "you need to sign in first" failure — checked by the CLI itself
+ * (e.g. `whoami` reading the persisted login) before any request goes out.
+ *
+ * Distinct from `unauthorized`, which names a real 401/403 the SERVER sent:
+ * this fires with no request in flight, so `httpStatus` stays 0 the same way
+ * `commandValidationError`'s does. Without it, a missing login fell through
+ * `handledErrorFromThrown`'s "not the platform's shape" branch and came out
+ * as `network_error` — a wrong code with wrong (connectivity) suggestions for
+ * a precondition failure that has nothing to do with the network.
+ */
+export const commandAuthError = (
+  message: string,
+  meta: Record<string, unknown> = {},
+): CliHandledError & { isLangWatchHandledError: true } => ({
+  isLangWatchHandledError: true,
+  code: "not_authenticated",
+  kind: "not_authenticated",
+  message,
+  httpStatus: 0,
+  meta,
+  isHandled: true,
+});
+
+/**
  * Report a failure from a command path that has no spinner — argument
  * validation, missing credentials, filesystem preconditions. The same two
  * renderings `failSpinner` produces, minus the spinner:

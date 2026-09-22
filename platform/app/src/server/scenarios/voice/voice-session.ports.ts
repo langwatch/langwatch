@@ -18,6 +18,8 @@ import type { AgentWithFields } from "~/server/agents/agent-fields";
 import {
   parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
+  type VoiceTransport,
+  voiceAgentExternalId,
 } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -28,6 +30,7 @@ import {
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { recordVoiceCallTraces } from "./voice-call-trace-writer";
 import { writeVoiceCallRun } from "./voice-run-writer";
 import type { VoiceSessionPorts } from "./voice-session.service";
 import { signVoiceSessionToken } from "./voice-session-token";
@@ -45,9 +48,46 @@ export interface VoiceSessionServices {
       projectId: string;
     }): Promise<AgentWithFields | null>;
     create(input: CreateAgentInput): Promise<AgentWithFields>;
+    /** Creates the voice agent row deduped by its identity key, so a retried
+     *  finish for a not-yet-saved agent reuses the one row (#8020). */
+    createVoiceAgent(input: {
+      id: string;
+      projectId: string;
+      name: string;
+      transport: VoiceTransport;
+      agentId: string;
+    }): Promise<{ id: string }>;
+    /** Whether this project saved a voice agent for the given vendor agent id.
+     *  Authorizes drawer recording playback, which writes no run (#8020). */
+    hasVoiceAgentForExternalId(input: {
+      projectId: string;
+      transport: VoiceTransport;
+      agentExternalId: string;
+    }): Promise<boolean>;
   };
   scenarioService: {
     getById(input: { id: string; projectId: string }): Promise<Scenario | null>;
+  };
+}
+
+/** The terminal-retry fields a finished run persisted, narrowed from the loose
+ *  run metadata to the shapes {@link VoiceSessionPorts.findExistingRun}
+ *  promises. The persisted audioUrl is already the same-origin proxy url the
+ *  transport wrote (fetchCallRecord sets it from audioProxyUrl), so it is kept
+ *  as-is. */
+function narrowPersistedRunFields(rawMetadata: unknown): {
+  agentId: string | null;
+  source: "provider" | "browser" | null;
+  audioUrl: string | null;
+} {
+  const metadata = rawMetadata as
+    | { agentId?: unknown; source?: unknown; audioUrl?: unknown }
+    | undefined;
+  const { agentId, source, audioUrl } = metadata ?? {};
+  return {
+    agentId: typeof agentId === "string" ? agentId : null,
+    source: source === "provider" || source === "browser" ? source : null,
+    audioUrl: typeof audioUrl === "string" ? audioUrl : null,
   };
 }
 
@@ -71,7 +111,10 @@ export function createVoiceSessionPortsFromServices({
       if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
       const provider = await findElevenLabsProviderForProject({ projectId });
       if (!provider) return null;
-      return getElevenLabsApiCredential({ modelProviderId: provider.id });
+      const credential = await getElevenLabsApiCredential({
+        modelProviderId: provider.id,
+      });
+      return credential ? { kind: "elevenlabs", ...credential } : null;
     },
 
     /** Looks up the vendor agent id off a saved voice agent row: when a mint
@@ -82,7 +125,18 @@ export function createVoiceSessionPortsFromServices({
       const agent = await agentService.getById({ id: agentRowId, projectId });
       if (agent?.type !== "voice") return null;
       const config = parseVoiceAgentConfig(agent.config);
-      return { id: agent.id, agentExternalId: config.agentId };
+      return { id: agent.id, agentExternalId: voiceAgentExternalId(config) };
+    },
+
+    /** Whether the project saved a voice agent for this vendor agent id: the
+     *  provider conversation's agent id is matched to the row a drawer hang-up
+     *  created, so its recording plays back without a run to check (#8020). */
+    hasVoiceAgentForExternalId({ projectId, transport, agentExternalId }) {
+      return agentService.hasVoiceAgentForExternalId({
+        projectId,
+        transport,
+        agentExternalId,
+      });
     },
 
     async findExistingRun({ projectId, scenarioRunId }) {
@@ -91,21 +145,35 @@ export function createVoiceSessionPortsFromServices({
         scenarioRunId,
       });
       if (!run) return null;
-      const agentId = (run.metadata as { agentId?: unknown } | undefined)
-        ?.agentId;
-      return { agentId: typeof agentId === "string" ? agentId : null };
+      // The status decides whether a retried finish short-circuits (written)
+      // or re-drives a half-written run (#7973). The persisted source,
+      // recording and set let a terminal retry report the original run's
+      // transcript origin, Play control and deep link (AC14).
+      return {
+        ...narrowPersistedRunFields(run.metadata),
+        status: run.status,
+        // The scenario and set the run landed under, reused on a re-drive so a
+        // scenario archived between attempts cannot break the retry (#7973 AC1).
+        scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
+        scenarioSetId:
+          typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
+      };
     },
 
     async createVoiceAgent({ projectId, name, transport, agentId }) {
-      const created = await agentService.create({
+      // Deduped by identity key inside the service, so a retried finish for a
+      // not-yet-saved agent reuses the one row (#8020, decision 1).
+      const created = await agentService.createVoiceAgent({
         id: `agent_${nanoid()}`,
         projectId,
         name,
-        type: "voice",
-        config: { transport, agentId },
+        transport,
+        agentId,
       });
       return { id: created.id };
     },
+
+    recordCallTraces: recordVoiceCallTraces,
 
     writeCallRun: writeVoiceCallRun,
 

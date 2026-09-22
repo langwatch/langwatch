@@ -20,7 +20,7 @@
  * approved views ({@link productionPostgresApprovedViewStatements}), and the
  * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { lwqlTenantCapability } from "../capability";
@@ -34,6 +34,7 @@ import {
   type LangWatchQLNames,
   qualified,
 } from "./accessModel";
+import { lwqlAppFunctionStatements } from "./appFunctionStatements";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
@@ -124,10 +125,16 @@ export function lwqlKeyMapTableQualifiedName({
 }
 
 /**
- * ClickHouse-native views only. Never grants, policies, a user, a profile, or
- * the key-map table (migration 00084 already created it) — the ClickHouse
- * access model and the PostgreSQL-mapped views are infra's job, provisioned
- * out of band (see the module doc comment).
+ * ClickHouse-native views, and the app functions' projection UDFs. Never
+ * grants, policies, a user, a profile, or the key-map table (migration 00084
+ * already created it) — the ClickHouse access model and the PostgreSQL-mapped
+ * views are infra's job, provisioned out of band (see the module doc comment).
+ *
+ * The app functions are here rather than left to infra because they are not
+ * part of the access model: they are catalog objects, like the views beside
+ * them, generated from the same application catalog and applied by the same
+ * administrative connection. There is also no config form for a SQL UDF for
+ * terraform to render — see `./appFunctionStatements.ts`.
  */
 export function productionClickHouseObjectStatements({
   names,
@@ -140,6 +147,7 @@ export function productionClickHouseObjectStatements({
 }): string[] {
   return [
     `CREATE DATABASE IF NOT EXISTS ${names.database}`,
+    ...lwqlAppFunctionStatements(),
     ...views
       .filter((view) => !isPostgresResident(view))
       .map((view) =>

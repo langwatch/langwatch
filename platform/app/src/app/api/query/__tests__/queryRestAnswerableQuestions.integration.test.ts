@@ -30,7 +30,7 @@
  * which rounding convention ClickHouse picked, and the case would be pinning
  * the implementation rather than the answer.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ~/server/analytics/lwql — the service under test
  * @see ./queryRestApi.integration.test.ts — the request/isolation proof for this door
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
@@ -66,6 +66,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -791,7 +792,9 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     );
 
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -1165,8 +1168,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // the reader rather than making itself.
       expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(diagnostic(result, "POSSIBLE_FANOUT").meta).toMatchObject({
-        dataset: `${database}.traces`,
-        multipliedBy: `${database}.evaluations`,
+        view: `${database}.traces`,
+        multipliedByView: `${database}.evaluations`,
       });
     });
   });
@@ -1364,8 +1367,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       const fanout = diagnostic(result, "POSSIBLE_FANOUT");
       expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout.meta).toMatchObject({
-        dataset: `${database}.traces`,
-        multipliedBy: `${database}.spans`,
+        view: `${database}.traces`,
+        multipliedByView: `${database}.spans`,
         unmatchedGrainColumns: ["SpanId"],
         aggregated: true,
       });
@@ -1470,7 +1473,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     });
   });
 
-  describe("when a dataset is read with no condition on its time column", () => {
+  describe("when a view is read with no condition on its time column", () => {
     /** @scenario "An unbounded read is reported as covering the whole history" */
     it("answers, says the read covered the whole history, and stays quiet once it is bounded", async () => {
       const result = await ask(
@@ -1480,7 +1483,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       expect(Number(result.rows[0].value)).toBeGreaterThan(0);
       expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(diagnostic(result, "UNBOUNDED_TIME_RANGE").meta).toEqual({
-        dataset: `${database}.traces`,
+        view: `${database}.traces`,
         timeColumn: "OccurredAt",
       });
 

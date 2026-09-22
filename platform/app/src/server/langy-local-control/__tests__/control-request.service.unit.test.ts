@@ -29,7 +29,10 @@ let service: ControlRequestService;
 /** The one project read the service makes, and nothing else. */
 const prisma = {
   project: {
-    findUnique: async () => ({ team: { organizationId: "org_1" } }),
+    findUnique: async () => ({
+      slug: "acme-shop",
+      team: { organizationId: "org_1" },
+    }),
   },
 } as unknown as PrismaClient;
 
@@ -97,6 +100,42 @@ describe("given a code access card that asked for a folder", () => {
       expect(await service.read(first.id)).toBeNull();
       await expect(
         service.approve({ requestId: first.id, userId, projectId }),
+      ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
+    });
+  });
+
+  describe("when the login is on another project than the conversation", () => {
+    /** @scenario "A login on my personal project lists a request raised on a team project" */
+    it("lists the request by the person, and approves it for the request's own project", async () => {
+      const request = await create();
+
+      const mine = await service.listOpen({ userId });
+      expect(mine.map((row) => row.id)).toEqual([request.id]);
+      expect(
+        await service.listOpen({ userId, projectId: "proj_personal" }),
+      ).toEqual([]);
+
+      const approved = await service.approve({ requestId: request.id, userId });
+      expect(mint).toHaveBeenCalledWith({
+        userId,
+        projectId,
+        organizationId: "org_1",
+      });
+      expect(await service.readKeyBinding(approved.apiKeyId)).toMatchObject({
+        projectId,
+      });
+      expect(approved.projectSlug).toBe("acme-shop");
+    });
+
+    it("refuses the approval when a named project is not the request's", async () => {
+      const request = await create();
+
+      await expect(
+        service.approve({
+          requestId: request.id,
+          userId,
+          projectId: "proj_personal",
+        }),
       ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
     });
   });

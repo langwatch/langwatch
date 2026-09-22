@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "./api-key-grant-fixture";
 
 // Mock the token generator to produce deterministic values
 vi.mock("../api-key-token.utils", () => ({
@@ -14,25 +18,25 @@ vi.mock("../api-key-token.utils", () => ({
 }));
 
 // Mock the role binding permission check
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock the custom role permissions module
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
-    MalformedCustomRolePermissionsError: class extends Error {},
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
+      MalformedCustomRolePermissionsError: class extends Error {},
+    };
+  },
+);
 
 // Grants and role definitions are ledger commands since ADR-092
 // delivery-plan PR 2, so the writer is the seam these cases observe.
@@ -112,6 +116,11 @@ function createMockPrisma() {
       // Nothing but this key holds the key's private role.
       count: vi.fn().mockResolvedValue(0),
     },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue({ organizationId: "org_1" }),
+    },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
     project: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -124,6 +133,13 @@ function createMockPrisma() {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
   };
+
+  client.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const lastResult = client.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(lastResult, args);
+    },
+  );
 
   return { ...client, _mockTx: client } as any;
 }
@@ -164,7 +180,11 @@ describe("ApiKeyService", () => {
         expect(result.apiKey.id).toBe("ak_1");
         expect(prisma.organizationUser.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { userId: "user_1", organizationId: "org_1" },
+            where: {
+              userId: "user_1",
+              organizationId: "org_1",
+              disabledAt: null,
+            },
           }),
         );
       });
@@ -261,11 +281,11 @@ describe("ApiKeyService", () => {
   describe("create() ceiling validation ordering", () => {
     describe("when ceiling check rejects permissions", () => {
       it("does not create a CustomRole", async () => {
-        const { checkRoleBindingPermission } = await import(
-          "~/server/rbac/role-binding-resolver"
+        const { checkPrincipalPermission } = await import(
+          "~/server/app-layer/authz/credential-permissions"
         );
         (
-          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+          checkPrincipalPermission as ReturnType<typeof vi.fn>
         ).mockResolvedValue(false);
 
         await expect(
@@ -288,7 +308,7 @@ describe("ApiKeyService", () => {
         expect(ledger.defineRole).not.toHaveBeenCalled();
 
         (
-          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+          checkPrincipalPermission as ReturnType<typeof vi.fn>
         ).mockResolvedValue(true);
       });
     });

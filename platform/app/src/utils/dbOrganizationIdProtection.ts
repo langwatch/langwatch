@@ -1,4 +1,10 @@
-import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
+import { z } from "zod";
+
+import {
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+} from "~/server/api-key/reserved-names";
+
 import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
@@ -11,13 +17,10 @@ import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
  * secret column, or a parent foreign key that itself belongs to exactly one
  * org). A bare `findMany()` throws instead of returning every tenant's rows.
  *
- * Single-organization invariant (ADR-021): scoping is always within ONE org.
- * No query may target two organizations at once, so if more than one distinct
- * `organizationId` literal appears anywhere in the WHERE tree (typically across
- * OR branches) the query is rejected. The middleware has no auth context and
- * cannot verify the org belongs to the caller (that is the tRPC layer's job),
- * but it can and does reject a WHERE that spans two organizations, which closes
- * the documented `{ OR: [{ projectId }, { organizationId: "other" }] }` gap.
+ * Scalar organization predicates cannot smuggle another organization into an
+ * OR branch. Maintenance queries may explicitly name a finite `in` list; every
+ * value must be a nonempty ID. The middleware has no authorization context, so
+ * callers remain responsible for authorization of every organization named.
  */
 
 type OrgScopedModelConfig = {
@@ -79,6 +82,20 @@ const clauseField = (clause: unknown, key: string): unknown =>
   clause && typeof clause === "object"
     ? (clause as Record<string, unknown>)[key]
     : undefined;
+
+/**
+ * Whether a clause names specific rows by id — either one, or a list of them.
+ *
+ * A delete bounded by ids the caller already read is bounded, whatever
+ * organizations those rows turn out to span; a delete bounded by nothing is
+ * the sweep the regime exists to refuse.
+ */
+const idPredicate = (value: unknown): boolean => {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object") return false;
+  const inList = (value as { in?: unknown }).in;
+  return Array.isArray(inList) && inList.length > 0;
+};
 
 /**
  * A reserved, system-managed API-key name. Only the platform can create or
@@ -145,6 +162,36 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
 };
 
 /**
+ * The shape of the sweep over CLI login keys whose session ran out: the login
+ * key name PREFIX (matched as exactly `{ startsWith: <the prefix> }`),
+ * `revokedAt: null`, and the same elapsed-expiry bound the reserved-name
+ * sweep carries. Exactly those three clauses and nothing else.
+ *
+ * Unlike the reserved names, a customer can name a key this way, so the
+ * prefix alone bounds nothing. What bounds this read is the expiry: a key
+ * whose `expiresAt` has passed cannot authenticate (`ApiKeyService.verify`
+ * refuses it), so the rows it reaches are dead credentials, and what the
+ * sweep does with them is revoke each through the tenant-scoped path, one
+ * organization at a time. Granted to `findMany` only, and the sweep selects
+ * ids and owners, never secrets.
+ */
+const isCliLoginKeySweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  const name = where.name;
+  return (
+    Object.keys(where).length === 3 &&
+    !!name &&
+    typeof name === "object" &&
+    Object.keys(name).length === 1 &&
+    (name as Record<string, unknown>).startsWith ===
+      CLI_LOGIN_KEY_NAME_PREFIX &&
+    where.revokedAt === null &&
+    isElapsedExpiryBound(where.expiresAt)
+  );
+};
+
+/**
  * The shape of the branch-recheck sweep: a branch that resolved to no pull
  * request (`notFoundAt: { not: null }`), whose backoff has elapsed
  * (`recheckAfter: { lte: <now> }`), and that a reader has asked about recently
@@ -197,12 +244,20 @@ const isNonEmptyStringList = (value: any): boolean =>
   value.in.length > 0 &&
   value.in.every((v: any) => typeof v === "string");
 
-// A single organizationId literal is the canonical single-org predicate. We
-// deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
-// org ids would target several organizations, which the single-organization
-// invariant forbids, and no call-site needs it.
-const hasOrganizationId = (clause: any): boolean =>
-  typeof clause?.organizationId === "string";
+// Maintenance queries may name an explicit finite set of organizations.
+// Missing values and open-ended operators must never count as tenant scope.
+const organizationIdSchema = z.string().trim().min(1);
+const organizationScopeSchema = z.object({
+  organizationId: organizationIdSchema,
+});
+const organizationQueryScopeSchema = z.object({
+  organizationId: z.union([
+    organizationIdSchema,
+    z.strictObject({ in: z.array(organizationIdSchema).min(1) }),
+  ]),
+});
+const hasOrganizationId = (clause: unknown): boolean =>
+  organizationQueryScopeSchema.safeParse(clause).success;
 
 const hasRowId = (clause: any): boolean =>
   typeof clause?.id === "string" ||
@@ -211,16 +266,14 @@ const hasRowId = (clause: any): boolean =>
 // Prisma names a compound unique key by joining its field names with "_"
 // (e.g. `userId_organizationId`, `organizationId_name`). A WHERE that targets
 // such a key embeds organizationId and therefore bounds to one org + one row.
-const hasCompositeOrgKey = (clause: any): boolean => {
-  if (!clause || typeof clause !== "object") return false;
-  return Object.keys(clause).some((key) => {
-    const value = (clause as any)[key];
-    return (
-      value &&
-      typeof value === "object" &&
-      key.split("_").includes("organizationId")
-    );
-  });
+const hasCompositeOrgKey = (clause: unknown): boolean => {
+  const parsed = z.record(z.string(), z.unknown()).safeParse(clause);
+  if (!parsed.success) return false;
+  return Object.entries(parsed.data).some(
+    ([key, value]) =>
+      key.split("_").includes("organizationId") &&
+      organizationScopeSchema.safeParse(value).success,
+  );
 };
 
 // An inline (scopeType, scopeId) target. scopeId is a globally-unique entity
@@ -256,18 +309,103 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
-  // A request to join one organization (D12). It carries `organizationId`, and
-  // every read is either an admin listing that organization's queue or a
-  // lookup of one request by its own id — so the ordinary guard fits, and a
-  // bare `findMany()` over everybody's pending requests is exactly what it
-  // should refuse.
-  JoinRequest: {},
+  // A request to join one organization (D12). It carries `organizationId`,
+  // and most reads are an admin listing that organization's queue or a lookup
+  // of one request by its own id — the ordinary guard, and a bare
+  // `findMany()` over everybody's pending requests is exactly what it should
+  // refuse.
+  //
+  // ONE READ IS BOUNDED BY SUBJECT RATHER THAN BY TENANT, and it has to be:
+  // "what am I waiting on" spans every organization this person asked, which
+  // is the whole question. It is still BOUNDED — to one user, named in the
+  // clause — so it is not the unbounded sweep the regime exists to stop.
+  // Without this the screen that answers it degraded to an unknown error, and
+  // nobody could see a request they had made.
+  JoinRequest: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "userId") === "string",
+  },
+  // One row per SCIM request a customer's directory made (ADR-126). It
+  // carries `organizationId`, and the surface that reads it is an
+  // organization's own oversight screen — which names both the organization
+  // and the connection, because a connection id is not a tenant.
+  //
+  // The RETENTION SWEEP is the exception and the action gate is what keeps it
+  // honest. Dropping what has aged out is the platform's job and spans every
+  // tenant by definition, so its scan is admitted; the delete that follows it
+  // is bounded to the row ids that scan returned, and an unbounded
+  // `deleteMany` — which would drop every tenant's log at once — has no
+  // admitted shape.
+  ScimRequestLog: {
+    platformScopeActions: ["findMany"],
+    extraBound: ({ clause }) => idPredicate(clauseField(clause, "id")),
+  },
+  // The credential vault behind an SSO connection's references (D09). Every
+  // read names either the organization or one reference's own id, and there
+  // is no query in the product that wants somebody else's — so the ordinary
+  // guard is exactly right, and a bare `findMany()` over every tenant's
+  // client secrets is what it must refuse.
+  SsoCredential: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "connectionId") === "string",
+  },
+  SsoConnectionRegistrationSlot: {},
+  SsoActivationRecoveryReservation: {},
+  // One globally unique organization owner per proved domain. Reads and
+  // writes name the domain primary key; individual connection entitlement is
+  // guarded separately on `SsoVerifiedDomainHolder` below.
+  //
+  // `SsoConnection` itself is EXEMPT because that ownership read is
+  // cross-organization by design. Here it does not have to be: the read names
+  // the domains it is asking about, and `domain` is the primary key, so a
+  // clause naming them reaches exactly those rows however many organizations
+  // they span — which is the answer the ownership rule wants. The fold's
+  // other writes name `organizationId`. This leaves a bare `findMany()` over
+  // every tenant's domain ownership with no admitted form.
+  SsoVerifiedDomain: {
+    extraBound: ({ clause }) => idPredicate(clauseField(clause, "domain")),
+  },
+  SsoVerifiedDomainHolder: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      idPredicate(clauseField(clause, "domain")),
+  },
+  SsoAuthenticationActivity: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      idPredicate(clauseField(clause, "userId")),
+  },
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.
+  //
+  // `findMany` and `count` are platform-scoped for the operator's
+  // directory-sync list (ADR-122), which reads every customer's sync at once
+  // and so has no organization to name; the router behind it gates on the
+  // staff list and records each read. The row is a state, reason codes, ids
+  // and timestamps, never directory content. Every write still has to name
+  // its organization or its connection.
   ScimSyncState: {
+    platformScopeActions: ["findMany", "count"],
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "connectionId") === "string",
+  },
+  ScimUserResource: {},
+  ScimDirectoryUser: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      typeof clauseField(
+        clauseField(clause, "connectionId_userId"),
+        "connectionId",
+      ) === "string",
+  },
+  ScimExternalId: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      typeof clauseField(
+        clauseField(clause, "connectionId_externalId"),
+        "connectionId",
+      ) === "string",
   },
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
@@ -299,11 +437,57 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // neither of which is a sweep, and both of which this bound would otherwise
     // have authorised. A new platform maintenance query does not inherit the
     // hatch; it is a deliberate widening here, with its own shape and action.
+    //
+    // The sweep over elapsed CLI login keys is the third bounded predicate,
+    // on its own terms too (see isCliLoginKeySweep): a read of the dead
+    // login keys, admitted to `findMany` only. The revokes that follow name
+    // each row's organization and go through the ordinary guard.
     extraBound: ({ clause, action }) =>
       typeof clauseField(clause, "lookupId") === "string" ||
-      (action === "updateMany" && isSystemManagedKeySweep(clause)),
+      (action === "updateMany" && isSystemManagedKeySweep(clause)) ||
+      (action === "findMany" && isCliLoginKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // Governance identity (ADR-128 §11). Every read and write names its
+  // organization: these are admin-curated rows about people a provider put on a
+  // cost row, and there is no query shape that wants more than one tenant's.
+  DiscoveredPerson: {},
+  DiscoveredAgent: {},
+  IdentityMatch: {},
+  // Candidate matches the suggestion job computed (ADR-128 §12). The job
+  // rewrites one organization's rows per pass and the review surface reads one
+  // organization's queue, so organizationId covers every access — there is no
+  // cross-tenant shape here, unlike the two snapshot loaders below.
+  IdentityMatchSuggestion: {},
+  // Dated department links (ADR-128 §13). Assignment writes, the
+  // department-on-day read, and the directory-sync open-links read all name
+  // their organization; the one update that closes an open link addresses it
+  // by row id. No shape wants more than one tenant's history, so a bare
+  // findMany over everyone's links is exactly what the guard should refuse.
+  DepartmentMembershipHistory: {},
+  // Which governance tenants an organization has ever written rows under.
+  //
+  // Two shapes need more than organizationId. `tenantId` is a project id —
+  // globally unique, so it resolves to exactly one organization, which is the
+  // whole reason this table exists: it translates a tenant back to its owner
+  // AFTER the project has been archived, when the live resolver has gone blind
+  // to it. And the fold's suppression snapshot loads the tenant→organization map
+  // for the whole process in one pass, which is across-organizations by design
+  // and has no predicate to offer. Granted on `findMany` only, and the rows are
+  // two opaque ids and two timestamps — platform bookkeeping, no customer data.
+  GovernanceTenantHistory: {
+    platformScopeActions: ["findMany"],
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "tenantId") === "string",
+  },
+  // Digests of erased identifiers (ADR-128 §9). Same snapshot read, same
+  // reasoning, and this table is the one place in the codebase that holds no
+  // customer data BY CONSTRUCTION: it stores hashes precisely so it is not a
+  // copy of the identifiers it exists to keep out. Every other access names its
+  // organization.
+  ErasedIdentifierSuppression: {
+    platformScopeActions: ["findMany"],
+  },
   // The grants ledger's projection tables (ADR-092 §13). Written only by
   // the authz_grants fold (plus revocation enforcement); read by the engine
   // per organization. Row id / organizationId cover every access pattern.
@@ -468,6 +652,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
+  // A way back in and its expiry (D05). Org-bearing, and one of its reads is
+  // cross-organization on purpose: the sweep that sends the fourteen, seven
+  // and one day warnings scans every organization's bindings that are about
+  // to end, exactly as the realtime-session poller does above. A guard
+  // demanding organizationId would refuse the sweep and leave every warning
+  // unsent. Every other read names its organization. It holds ids and dates.
+  "SsoBreakGlassBinding",
   // The D04 SSO connection projection (ADR-117 §5). Org-bearing, and
   // deliberately not org-CONSTRAINED: it is addressed by connection id (the
   // fold's load and store), and two of its reads are cross-organization on
@@ -477,6 +668,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // ownership rule is made of. It holds no customer content: ids, domains,
   // enums and credential references.
   "SsoConnection",
+  // The engine's provider table (D09), org-bearing and deliberately not
+  // org-CONSTRAINED for the same reason `SsoConnection` is not: better-auth's
+  // single sign-on plugin addresses a provider by its globally-unique
+  // `providerId` and matches an email domain across every row, both BEFORE
+  // any organization is in hand — which is what resolving a sign-in means. A
+  // guard demanding organizationId would refuse exactly the lookups the
+  // sign-in path is made of. It holds endpoints and dialing configuration,
+  // no customer content.
+  "SsoProvider",
   "Subscription",
 ];
 
@@ -541,7 +741,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
     const data = params.args?.data;
     const records = Array.isArray(data) ? data : [data];
     const everyRecordHasOrg = records.every(
-      (record) => record && typeof record.organizationId === "string",
+      (record) => organizationScopeSchema.safeParse(record).success,
     );
     if (!everyRecordHasOrg) {
       throw new Error(
@@ -587,7 +787,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   // the same "every create declares its owning organization" invariant.
   if (action === "upsert") {
     const createData = params.args?.create;
-    if (!createData || typeof createData.organizationId !== "string") {
+    if (!organizationScopeSchema.safeParse(createData).success) {
       throw new Error(
         `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
       );

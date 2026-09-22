@@ -20,12 +20,20 @@ A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI a
 | **Run a scenario** | Normal scenario run | A simulated caller, speaking the scenario with a caller voice |
 
 <Note>
-  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up, and the call is stored as a run in the **voice-calls** set with caller `human`, a transcript and a link to the recording.
+  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up. The panel then shows the transcript and, when the recording is ready, a Play control. The call is not stored as a run; instead each exchange is recorded as a trace, so the conversation stays queryable in the Trace Explorer without a run.
+
+  To score a call against a scenario, use **Call it myself**. That writes a run under the scenario, scored the same way a simulated run is.
 </Note>
 
 **Call it myself** opens the same panel from the Run dialog of a scenario, in scenario mode. The run is named after the scenario.
 
 A normal scenario run needs no manual call: the simulated caller speaks the scenario using the caller voice configured on it.
+
+**Phone number targets** dial the agent over the phone. A scenario run places an outbound call to the target number through your Twilio account, and the simulated caller speaks to whoever answers.
+
+The Phone number option appears in the agent drawer once your project has a Twilio provider in **Settings > Model Providers** (account SID, auth token and from-number); until then the drawer points you there. A phone target supports **Run a scenario** only. **Talk to it** and **Call it myself** are not available for it, because a phone call has no browser leg. See [issue #8014](https://github.com/langwatch/langwatch/issues/8014).
+
+On a self-hosted deployment, set `VOICE_PUBLIC_BASE_URL` only when the voice worker has its own hostname; when it is unset the app's own public base host is used. Set `VOICE_WS_PORT` to pin the port the phone transport listens on, so your public origin can route to it; it defaults to an ephemeral port.
 
 ## Turn it on
 

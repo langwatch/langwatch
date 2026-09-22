@@ -27,6 +27,44 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     Given an organization "acme" with an admin "ana"
     And "ana" invited "sam@acme.com" with role MEMBER
 
+  @unit @regression
+  Scenario: Accepted invitation grants name the original sender
+    Given an invitation records its authenticated sender
+    When the invitee accepts
+    Then the access grants name the sender as their actor
+    And an older invitation with no recorded sender uses the service actor
+
+  @integration @regression
+  Scenario: Admin invitations retain the authenticated sender across resend
+    When an authenticated administrator creates an invitation
+    Then the stored sender is that administrator
+    And resending rotates the code without changing the sender
+    And invitations created by a service without a user keep a null sender
+
+  @integration
+  Scenario: Organization-only member invitations persist without a team assignment
+    When an authenticated administrator invites a member without naming a team
+    Then one pending organization invitation is created
+    And the invitation carries no team assignment
+
+  @integration
+  Scenario: Teamless external invitations are refused
+    When an authenticated administrator invites an external member without naming a team
+    Then no invitation is created
+
+  @unit @regression
+  Scenario: Invitations use the configured email provider
+    Given SMTP is configured without a SendGrid key
+    When invitations become ready to send
+    Then the configured mail provider receives each invitation
+
+  @unit
+  Scenario: Invitation RPCs have one dedicated namespace
+    When a client discovers the invitation procedures
+    Then create, revoke, resend, list, and accept are available under "invite"
+    And those procedures are not available under "organization"
+    And the retired approval-request procedures are not restored
+
   # ── Identifier-aware acceptance ────────────────────────────────────────
 
   @integration
@@ -105,6 +143,45 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
   # specs/licensing/enforcement-members.feature, which D11 aligns to the
   # new state model (delivery-plan amendment table).
 
+  # ── Buying time without minting a link ─────────────────────────────────
+
+  # Extending and resending both keep an invitation usable, and they are not
+  # the same act. A resend ROTATES the code, which is what kills a link that
+  # leaked. An extension deliberately does not: it moves the deadline on the
+  # link already in somebody's inbox, so the person who has been waiting does
+  # not have to be sent anything new. Because the old link stays live, an
+  # administrator reaching for this to deal with a leak has reached for the
+  # wrong verb — so the difference is written down rather than left for
+  # somebody to infer from an expiry date.
+
+  @unit
+  Scenario: Extending an invitation moves the deadline and leaves the link alone
+    Given "sam" holds a pending invitation that runs out tomorrow
+    When "ana" extends it
+    Then the invitation runs for the full fourteen days again
+    And the link already in "sam"'s inbox still works, because no new code was minted
+
+  @unit
+  Scenario: Extending is not how a leaked link is dealt with
+    Given an invitation whose link has leaked
+    When "ana" extends it
+    Then the leaked link is still live, because extending mints nothing
+    And killing it takes a resend, which rotates the code
+
+  @unit
+  Scenario: Only an invitation still waiting can be extended
+    Given an invitation that was already accepted, revoked or expired
+    When "ana" tries to extend it
+    Then it answers as though there were no such invitation
+    And which of the three it was is not revealed
+
+  @unit
+  Scenario: Two administrators extending at once extend it once
+    Given "ana" and a colleague extend the same invitation at the same moment
+    When the second one lands after the first has already changed it
+    Then the second is refused rather than overwriting what the first did
+    And the invitation carries one deadline, not the last one written
+
   # ── Signed in as somebody else ─────────────────────────────────────────
 
   # An invitation names an address. Somebody already signed in as a
@@ -131,7 +208,7 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
   Scenario: Signing out from the mismatch returns to the same invitation
     Given "sam" is signed in as the wrong account and sees the mismatch
     When "sam" takes the offered way out
-    Then "sam" arrives at the front door with the invitation still in hand
+    Then "sam" arrives at the auth screens with the invitation still in hand
     And accepting as the invited account makes "sam" a member
 
   # ── Asking again ───────────────────────────────────────────────────────
@@ -170,3 +247,19 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     Given the production case: an invite expiring while an account-linking loop was being debugged
     When the inviter resends in one click and the invitee accepts via any verified method
     Then they become a member without an ops action
+
+  # ── Two addresses, one person ──────────────────────────────────────────
+  #
+  # Somebody invites their own work address to the organization their
+  # personal account founded, or the other way round. The two addresses are
+  # one person the moment both are proven, so an invitation is matched
+  # against every proven identifier the account holds rather than against
+  # the one column a User row happens to carry. Nobody merges two accounts:
+  # there was only ever one.
+
+  @unit
+  Scenario: An invitation reaches the person, not the address
+    Given somebody holds more than one proven address
+    When an invitation is sent to any one of them
+    Then it matches that person
+    And accepting it needs no second account and no merge

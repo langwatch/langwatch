@@ -44,6 +44,9 @@ describe("handleFailedJobResult", () => {
       agentInstanceRecorder: {
         recordAgentInstance: vi.fn().mockResolvedValue(undefined),
       },
+      cutAtLimitRecorder: {
+        recordCutAtLimit: vi.fn(async () => {}),
+      },
     };
   });
 
