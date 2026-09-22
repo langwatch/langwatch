@@ -154,6 +154,13 @@ export function startUsageStatsWorker(): UsageStatsWorkerHandle | undefined {
     logger.info("usage stats disabled, skipping usage stats worker");
     return undefined;
   }
+  // LANGWATCH_CONNECT_DISABLED is the switch for an audit that has to prove
+  // the install opens no connection to LangWatch at all, so it stops the
+  // report the same way it stops the license sync.
+  if (!readConnectConfig().permitted) {
+    logger.info("connect is disabled, skipping usage stats worker");
+    return undefined;
+  }
 
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;

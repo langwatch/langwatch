@@ -1,6 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
+import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { BillingSection } from "./BillingSection";
 import { ChangeSeatsSection } from "./ChangeSeatsSection";
@@ -42,7 +43,12 @@ export function LicenseDrawer({
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
-          {license ? (
+          {query.error ? (
+            <HandledErrorAlert
+              error={query.error}
+              fallbackTitle="Couldn't load this license"
+            />
+          ) : license ? (
             <LicenseDrawerBody license={license} onRevoke={onRevoke} />
           ) : (
             <Text color="fg.muted">Loading...</Text>

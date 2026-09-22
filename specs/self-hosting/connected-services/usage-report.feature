@@ -73,6 +73,13 @@ Feature: The usage report a self-hosted install sends
     Then the hostname is absent
     And the rest of the optional category is still there
 
+  @unit
+  Scenario: An install told to reach LangWatch for nothing sends no report either
+    Given a deployment that sets LANGWATCH_CONNECT_DISABLED
+    When the install boots
+    Then no scheduler for the daily report is started
+    And nothing is posted to LangWatch for any reason
+
   # ============================================================================
   # Identity
   # ============================================================================

@@ -23,13 +23,14 @@ const PAGE_SIZE = 25;
 export default function LicensesView() {
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<License | null>(null);
 
   const list = api.licenseRegistry.getAll.useQuery({
-    page,
+    // PaginationBar counts from 1; the route from 0.
+    page: page - 1,
     pageSize: PAGE_SIZE,
     search: debouncedSearch || undefined,
   });
@@ -41,7 +42,7 @@ export default function LicensesView() {
         searchValue={search}
         onSearchChange={(value) => {
           setSearch(value);
-          setPage(0);
+          setPage(1);
         }}
         searchPlaceholder="Search by customer, email or license id"
         isLoading={list.isLoading}

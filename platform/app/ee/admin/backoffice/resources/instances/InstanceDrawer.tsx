@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Drawer } from "~/components/ui/drawer";
+import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { EmptyCell, formatDate, formatDateTime } from "../../BackofficeTable";
 import { Detail, Section } from "../licenses/DrawerSection";
@@ -17,7 +18,6 @@ import {
   ACTIVITY_COLORS,
   ACTIVITY_LABELS,
   ONBOARDING_LADDER,
-  reportDate,
   reportNumber,
   reportText,
   type SelfHostedInstance,
@@ -56,7 +56,12 @@ export function InstanceDrawer({
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
-          {instance ? (
+          {query.error ? (
+            <HandledErrorAlert
+              error={query.error}
+              fallbackTitle="Couldn't load this install"
+            />
+          ) : instance ? (
             <VStack align="start" gap={6} width="full">
               <InstanceDetails instance={instance} />
               <DomainsSection instance={instance} />
@@ -182,7 +187,7 @@ function LadderSection({ instance }: { instance: SelfHostedInstance }) {
     <Section title="Getting started">
       <VStack align="start" gap={1} width="full">
         {ONBOARDING_LADDER.map(({ field, label }) => {
-          const reached = reportDate(instance.latestReport, field);
+          const reached = reportText(instance.latestReport, field);
           return (
             <HStack key={field} gap={3} width="full">
               <Box

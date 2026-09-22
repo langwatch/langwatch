@@ -1,5 +1,6 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { BillingFields } from "./BillingFields";
 import { BillingState, OpenInvoices } from "./BillingState";
@@ -26,7 +27,12 @@ export function BillingSection({ license }: { license: License }) {
   if (!organizationId) return null;
   return (
     <Section title="Billing">
-      {query.data ? (
+      {query.error ? (
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Couldn't load billing for this license"
+        />
+      ) : query.data ? (
         <BillingPanel license={license} overview={query.data} />
       ) : (
         <Text color="fg.muted">Loading...</Text>

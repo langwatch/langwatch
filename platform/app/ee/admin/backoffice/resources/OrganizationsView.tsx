@@ -207,11 +207,7 @@ type SetOrganizationField = <K extends keyof FormState>(
   value: FormState[K],
 ) => void;
 
-/**
- * What the operator actually changed. Credentials and the license key are
- * write-only: the form starts them empty because the server never echoes the
- * stored value, so an empty input means leave it alone rather than clear it.
- */
+/** The form as it stands, beside the organization it was opened on. */
 interface FormDiff {
   form: FormState;
   organization: AdminOrganization;

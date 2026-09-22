@@ -126,13 +126,17 @@ function readSeatState({
     (license) => statusOfIssuedLicense(license, now) === "active",
   );
   const synced = active.filter((license) => license.lastSyncAt);
+  // A reissue leaves both rows active until the install presents the new
+  // license, so summing them would count the same seats twice. The seats a
+  // customer holds are the seats of the license that runs longest, which is
+  // what the monthly statement reads too.
+  const current = [...active].sort(
+    (a, b) => b.expiresAt.getTime() - a.expiresAt.getTime(),
+  )[0];
 
   return {
-    licensed: sum(active.map((license) => license.maxMembers)),
-    reported:
-      synced.length > 0
-        ? sum(synced.map((license) => license.reportedMembers ?? 0))
-        : null,
+    licensed: current?.maxMembers ?? 0,
+    reported: current?.lastSyncAt ? (current.reportedMembers ?? 0) : null,
     lastSyncAt: latest(synced.map((license) => license.lastSyncAt)),
   };
 }
@@ -193,10 +197,6 @@ export async function readConnectedBillingOverview({
       stripeInvoiceId: row.stripeInvoiceId,
     })),
   };
-}
-
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
 }
 
 function latest(dates: (Date | null)[]): Date | null {

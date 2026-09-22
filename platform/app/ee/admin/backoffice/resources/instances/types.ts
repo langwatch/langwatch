@@ -67,16 +67,11 @@ export function reportNumber(
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** A date a report carried, or null when the rung was never reached. */
-export function reportDate(
-  report: SelfHostedInstance["latestReport"],
-  field: string,
-): string | null {
-  const value = report?.[field];
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-/** A string a report carried, or null. */
+/**
+ * A string field a report carried, or null when it carried none. Dates come
+ * back as the string the report sent, so the ladder reads them through here
+ * too.
+ */
 export function reportText(
   report: SelfHostedInstance["latestReport"],
   field: string,

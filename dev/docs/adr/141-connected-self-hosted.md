@@ -302,8 +302,7 @@ verify is not applied and the failure is shown in Settings, Connect.
 
 The install reports its version from `SERVICE_VERSION`, then `service.version`
 in `OTEL_RESOURCE_ATTRIBUTES`, then the package version, and `unknown` when none
-is set. The chart sets `SERVICE_VERSION` from the app image tag when Connect is
-on.
+is set. The chart always sets `SERVICE_VERSION` from the app image tag.
 
 `POST /api/connect/v1/stats` and `POST /api/track_usage` are one handler behind
 two routes, so switching Connect on changes the host the statistics report
