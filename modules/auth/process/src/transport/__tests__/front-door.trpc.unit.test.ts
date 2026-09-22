@@ -40,6 +40,8 @@ const door: AuthApi = {
   revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
   revokeBrowserSession: () => unreached("revokeBrowserSession"),
   revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),
+  retireLegacySsoAccess: () => unreached("retireLegacySsoAccess"),
+  countLegacySsoAccess: () => unreached("countLegacySsoAccess"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */

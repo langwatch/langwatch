@@ -5,6 +5,7 @@ import {
   BetterAuthHooksRepository,
   type BetterAuthHookOrganization,
   type BetterAuthHookUser,
+  type FederatedAccountRow,
 } from "../better-auth-hooks.repository.ts";
 
 /** The Prisma-backed {@link BetterAuthHooksRepository}. */
@@ -58,6 +59,36 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
       providerId: provider,
       accountId: providerAccountId,
     }));
+  }
+
+  async findFederatedAccountsForUsers({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<FederatedAccountRow[]> {
+    if (userIds.length === 0) return [];
+
+    const accounts = await this.prisma.account.findMany({
+      where: { userId: { in: [...userIds] }, provider: { not: "credential" } },
+      select: { id: true, userId: true, provider: true, providerAccountId: true },
+    });
+
+    return accounts.map(({ id, userId, provider, providerAccountId }) => ({
+      rowId: id,
+      userId,
+      providerId: provider,
+      accountId: providerAccountId,
+    }));
+  }
+
+  async deleteAccounts({ accountRowIds }: { accountRowIds: readonly string[] }): Promise<number> {
+    if (accountRowIds.length === 0) return 0;
+
+    const { count } = await this.prisma.account.deleteMany({
+      where: { id: { in: [...accountRowIds] } },
+    });
+
+    return count;
   }
 
   async flagPendingSsoSetup({ userId }: { userId: string }): Promise<void> {

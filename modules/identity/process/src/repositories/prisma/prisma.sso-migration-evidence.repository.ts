@@ -46,16 +46,24 @@ export class PrismaSsoMigrationEvidenceRepository implements SsoMigrationEvidenc
   }): Promise<MigrationIdentifierHolding[]> {
     if (userIds.length === 0) return [];
 
-    return this.database.identifier.findMany({
+    const rows = await this.database.identifier.findMany({
       where: { userId: { in: userIds }, state: { in: [...LIVE_IDENTIFIER_STATES] } },
       select: {
+        id: true,
         userId: true,
         state: true,
         connectionId: true,
         providerId: true,
         providerAccountId: true,
+        verifiedAt: true,
       },
     });
+
+    return rows.map(({ id, verifiedAt, ...row }) => ({
+      ...row,
+      identifierId: id,
+      verifiedAtMs: verifiedAt?.getTime() ?? null,
+    }));
   }
 
   async findRecentAuthentications({

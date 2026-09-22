@@ -106,6 +106,25 @@ export interface AuthApi {
    * to a disabled identity provider. Single source of truth.
    */
   resolveAuthProvider(): Promise<string>;
+  /**
+   * Retires the federated accounts a retiring SSO connection minted, and says
+   * how many still stand. Auth owns every `Account` row, so a cutover asks
+   * rather than deleting them itself (ADR-129).
+   */
+  retireLegacySsoAccess(
+    input: LegacySsoAccessQuery,
+  ): Promise<{ retired: number; remaining: number }>;
+  /** The same reading, retiring nothing: what a finalization re-reads between
+   *  its steps to see whether legacy access is actually gone. */
+  countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number>;
+}
+
+/** Which accounts a legacy-access question is about. */
+export interface LegacySsoAccessQuery {
+  /** The organization's members, from the module that owns membership. */
+  userIds: readonly string[];
+  /** The connection's provider, as the module that owns it recorded it. */
+  providerId: string;
 }
 
 /**

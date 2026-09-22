@@ -2,9 +2,14 @@ import type { MigrationIdentifierBinding } from "../rules/sso-migration.rules.ts
 
 /** One live identifier, with who holds it. */
 export interface MigrationIdentifierHolding extends MigrationIdentifierBinding {
+  /** The row's own id: what a retirement detaches, and what the way-in check
+   *  promotes when the legacy half was primary. */
+  identifierId: string;
   userId: string;
   /** VERIFIED and PRIMARY are the two that count as proved. */
   state: string;
+  /** When it was last proved; null for one nothing proved. */
+  verifiedAtMs: number | null;
 }
 
 /** One sign-in a connection decided, as the trail records it. */

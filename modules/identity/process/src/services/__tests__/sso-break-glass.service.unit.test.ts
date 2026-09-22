@@ -45,6 +45,9 @@ function serviceFor({ eligible = true }: { eligible?: boolean } = {}) {
     bindings: MemorySsoBreakGlassRepository.create(store),
     warnings,
     newBindingId: () => `bgb_${(minted += 1)}`,
+    directory: {
+      findAdministrators: async () => [{ userId: "user_ada", name: "Ada", email: "ada@acme.com" }],
+    },
     holderIsEligible: async () => eligible,
     now: () => NOW,
   });
@@ -90,7 +93,7 @@ const grant = (service: SsoBreakGlassService, expiresAtMs = NOW + 30 * DAY_MS) =
   service.grant({
     organizationId: ORGANIZATION,
     userId: "user_ada",
-    grantedByUserId: "user_grace",
+    actor: { userId: "user_grace" },
     expiresAtMs,
   });
 
@@ -145,7 +148,7 @@ describe("SsoBreakGlassService", () => {
       const { renewed, replaced } = await service.renew({
         bindingId: first.bindingId,
         organizationId: ORGANIZATION,
-        grantedByUserId: "user_grace",
+        actor: { userId: "user_grace" },
         expiresAtMs: NOW + 60 * DAY_MS,
       });
 
@@ -166,7 +169,7 @@ describe("SsoBreakGlassService", () => {
         service.renew({
           bindingId: first.bindingId,
           organizationId: ORGANIZATION,
-          grantedByUserId: "user_grace",
+          actor: { userId: "user_grace" },
           expiresAtMs: NOW + BREAK_GLASS_MAX_WINDOW_MS + DAY_MS,
         }),
       ).rejects.toBeInstanceOf(SsoBreakGlassExpiryOutOfRangeError);
@@ -224,6 +227,39 @@ describe("SsoBreakGlassService", () => {
 
       await expect(service.sweepWarnings()).resolves.toEqual({ warned: 0 });
       expect(warnings.sent).toEqual([]);
+    });
+  });
+
+  describe("when the organization's page reads its ways back in", () => {
+    it("names who holds each grant and who gave it, with how long is left", async () => {
+      const service = serviceFor();
+      await grant(service);
+
+      const [view] = await service.findGrants({ organizationId: ORGANIZATION });
+
+      expect(view).toMatchObject({
+        userId: "user_ada",
+        name: "Ada",
+        email: "ada@acme.com",
+        grantedByUserId: "user_grace",
+        live: true,
+        daysRemaining: 30,
+      });
+    });
+
+    it("leaves a grantor who is no longer an administrator unnamed rather than absent", async () => {
+      const service = serviceFor();
+      await grant(service);
+
+      const [view] = await service.findGrants({ organizationId: ORGANIZATION });
+
+      expect(view?.grantedByName).toBeNull();
+    });
+
+    it("offers the administrators as who one can be granted to", async () => {
+      await expect(serviceFor().findCandidates({ organizationId: ORGANIZATION })).resolves.toEqual([
+        { userId: "user_ada", name: "Ada", email: "ada@acme.com" },
+      ]);
     });
   });
 

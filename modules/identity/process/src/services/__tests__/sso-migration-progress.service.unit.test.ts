@@ -122,6 +122,7 @@ function scenario({
   members = [ANA],
   bindings = [liveBinding],
   authentications = [],
+  legacyAccounts = 0,
 }: {
   connections?: SsoConnectionState[];
   identifiers?: IdentifierFact[];
@@ -134,6 +135,8 @@ function scenario({
     userId: string;
     authenticatedAtMs: number;
   }[];
+  /** How many federated accounts the module that owns them still answers for. */
+  legacyAccounts?: number;
 } = {}) {
   const store = MemoryIdentityStore.create();
   for (const connection of connections)
@@ -150,6 +153,7 @@ function scenario({
     evidence: repositories.ssoMigrationEvidence,
     breakGlass: repositories.ssoBreakGlass,
     memberships: { listActiveMembers: async () => members },
+    legacyAccess: { count: async () => legacyAccounts },
     now: () => NOW,
   });
 }

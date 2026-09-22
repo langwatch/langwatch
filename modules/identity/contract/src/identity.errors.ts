@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
+import type { SsoMigrationBlockerView } from "./sso-migration.ts";
+
 /**
  * Every identity refusal in one place (ADR-045: handled since the cause is
  * known and the caller can act). Assert on `code`, never the message.
@@ -132,6 +134,23 @@ export class SsoConnectionInvalidTransitionError extends SsoConnectionCommandRef
       reasons: [new Error(detail)],
     });
     this.name = "SsoConnectionInvalidTransitionError";
+  }
+}
+
+/**
+ * Finalization was asked for while something still says it is premature. The
+ * blocker codes travel in `meta` so the screen can name each one; the
+ * messages are the words a reader acts on.
+ */
+export class SsoMigrationFinalizationBlockedError extends SsoConnectionCommandRefusedError {
+  constructor(blockers: readonly SsoMigrationBlockerView[]) {
+    super("sso_migration_finalization_blocked", "sso_migration_finalization_blocked", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { blockerCodes: blockers.map(({ code }) => code) },
+      reasons: blockers.map(({ message }) => new Error(message)),
+    });
+    this.name = "SsoMigrationFinalizationBlockedError";
   }
 }
 

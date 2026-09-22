@@ -2,6 +2,11 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type {
+  BreakGlassBinding,
+  BreakGlassCandidateView,
+  BreakGlassGrantView,
+} from "./break-glass.ts";
+import type {
   ActivateConnectionCommandData,
   ApproveDomainClaimCommandData,
   AttestDomainCommandData,
@@ -351,6 +356,35 @@ export interface SsoDomainReproofApi {
 }
 
 /**
+ * The way back in (D05, ADR-117 §5): a named person who can still sign in
+ * when the identity provider cannot. Never plan-gated, and never
+ * self-served — the grantor is the actor, never an argument.
+ */
+export interface SsoBreakGlassApi {
+  /** Every grant the organization has held, newest rows included, with who
+   *  holds each one. */
+  findGrants(args: { organizationId: string }): Promise<BreakGlassGrantView[]>;
+  /** Who one can be granted to: the organization's administrators. */
+  findCandidates(args: { organizationId: string }): Promise<BreakGlassCandidateView[]>;
+  grant(args: {
+    organizationId: string;
+    userId: string;
+    actor: SelfServeActor;
+    expiresAtMs: number;
+  }): Promise<BreakGlassBinding>;
+  /** Extends one by writing a new grant that names the old, so the date the
+   *  previous one ended stays readable. */
+  renew(args: {
+    organizationId: string;
+    bindingId: string;
+    actor: SelfServeActor;
+    expiresAtMs: number;
+  }): Promise<{ renewed: BreakGlassBinding; replaced: BreakGlassBinding }>;
+  /** Ends one now. Refused while it is a live connection's only way back in. */
+  revoke(args: { organizationId: string; bindingId: string }): Promise<BreakGlassBinding>;
+}
+
+/**
  * Where one organization's setup journey stands (D05, ADR-123). A read: every
  * verb the journey presses is a command on one of the surfaces above.
  */
@@ -396,6 +430,9 @@ export interface SsoSetupCommandsApi {
   /** Takes the connection live on the strength of the test sign-in it
    *  recorded: the account is resolved here, never supplied by a caller. */
   activate(args: SsoSetupCommand): Promise<void>;
+  /** Finishes the cutover: refused by name while anything still says it is
+   *  premature, and resumable after an interrupted attempt. */
+  finalizeLegacyMigration(args: SsoSetupCommand): Promise<void>;
   discardConnection(args: SsoSetupCommand): Promise<void>;
   /** Which removal this is comes from where the connection stands. */
   removeConnection(
@@ -516,6 +553,7 @@ export interface IdentityApi {
   ssoArrival(): SsoArrivalApi;
   ssoActivity(): SsoAuthenticationActivityApi;
   ssoMigrationCallbacks(): SsoMigrationCallbackApi;
+  ssoBreakGlass(): SsoBreakGlassApi;
   ssoSetup(): SsoSetupApi;
   ssoSetupCommands(): SsoSetupCommandsApi;
   scimSyncGuards(): ScimSyncGuardsApi;

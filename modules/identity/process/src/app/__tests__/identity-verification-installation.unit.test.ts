@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
@@ -19,6 +20,7 @@ describe("identity verification installation", () => {
       .provide({
         organization: createApiFixture<OrganizationApi>(),
         authz: createApiFixture<AuthzApi>(),
+        auth: createApiFixture<AuthApi>(),
       })
       .boot();
 

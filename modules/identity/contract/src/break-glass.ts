@@ -105,3 +105,29 @@ export function breakGlassWarningsDue({
 
   return BREAK_GLASS_WARNING_DAYS.filter((day) => remaining <= day && !sent.has(day));
 }
+
+/**
+ * One grant as a surface reads it: the row, with the two people on it named.
+ * A view rather than the binding, because "who can still get in" answered in
+ * user ids answers it for nobody.
+ */
+export interface BreakGlassGrantView {
+  bindingId: string;
+  userId: string;
+  name: string | null;
+  email: string | null;
+  grantedByUserId: string;
+  grantedByName: string | null;
+  grantedAtMs: number;
+  expiresAtMs: number;
+  supersededAtMs: number | null;
+  live: boolean;
+  daysRemaining: number;
+}
+
+/** Somebody a way back in can be granted to: an administrator, today. */
+export interface BreakGlassCandidateView {
+  userId: string;
+  name: string | null;
+  email: string | null;
+}

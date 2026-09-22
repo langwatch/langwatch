@@ -1,7 +1,11 @@
 import {
   breakGlassIsLive,
+  SsoConnectionInvalidTransitionError,
   ssoMigrationRouteOf,
+  type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  type SsoMigrationBlockerView,
+  type SsoMigrationPhase,
   type SsoMigrationScimStatus,
   type SsoMigrationView,
 } from "@langwatch/identity-contract";
@@ -49,11 +53,32 @@ export interface SsoMigrationDirectoryReads {
   }): Promise<SsoMigrationScimStatus>;
 }
 
+/**
+ * The federated accounts a connection minted, counted by the module that owns
+ * them (ADR-129). Identity reads no `Account` row of its own, so whether
+ * legacy access is gone is somebody else's answer.
+ */
+export interface SsoLegacyAccessReads {
+  count(args: { userIds: string[]; providerId: string }): Promise<number>;
+}
+
+/** The facts finalization must re-read before and after every durable step. */
+export interface SsoMigrationFinalizationEvidence {
+  legacyConnectionId: string;
+  legacyState: SsoConnectionLifecycleState;
+  phase: SsoMigrationPhase;
+  blockers: readonly SsoMigrationBlockerView[];
+  /** No live identifier and no federated account still belongs to the
+   *  connection being retired. */
+  legacyAccessRetired: boolean;
+}
+
 export interface SsoMigrationProgressServiceDeps {
   connections: SsoConnectionReadRepository;
   evidence: SsoMigrationEvidenceRepository;
   breakGlass: SsoBreakGlassRepository;
   memberships: SsoMigrationMemberships;
+  legacyAccess: SsoLegacyAccessReads;
   directory?: SsoMigrationDirectoryReads;
   now?: () => number;
 }
@@ -198,6 +223,63 @@ export class SsoMigrationProgressService {
     };
 
     return { migration };
+  }
+
+  /**
+   * The same reading, as the finalization verb asks for it: no paging, and
+   * the legacy half's own standing beside the blockers. An organization
+   * running no cutover has nothing to finalize, and is refused by name.
+   */
+  async getFinalizationEvidence({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId?: string;
+  }): Promise<SsoMigrationFinalizationEvidence> {
+    const pair = await this.findPair({ organizationId, connectionId });
+    const { migration } = pair
+      ? await this.getProgress({
+          organizationId,
+          connectionId: pair.replacement.connectionId,
+          cursor: null,
+          limit: 0,
+        })
+      : { migration: null };
+    if (!pair || !migration) {
+      throw new SsoConnectionInvalidTransitionError(
+        `organization ${organizationId} is running no legacy migration pair`,
+      );
+    }
+
+    return {
+      legacyConnectionId: pair.legacy.connectionId,
+      legacyState: pair.legacy.state,
+      phase: migration.phase,
+      blockers: migration.blockers,
+      legacyAccessRetired: await this.legacyAccessRetired(pair.legacy),
+    };
+  }
+
+  /** Both halves of "nothing lets anybody in through the old connection any
+   *  more": identity's live identifiers, and auth's account rows. */
+  private async legacyAccessRetired(legacy: SsoConnectionState): Promise<boolean> {
+    const members = await this.deps.memberships.listActiveMembers({
+      organizationId: legacy.organizationId,
+    });
+    const userIds = members.map((member) => member.userId);
+    const holdings = await this.deps.evidence.findLiveIdentifierHoldings({ userIds });
+    const held = holdings.some((holding) =>
+      identifierBelongsToMigrationConnection({ identifier: holding, connection: legacy }),
+    );
+    if (held) return false;
+
+    const accounts = await this.deps.legacyAccess.count({
+      userIds,
+      providerId: legacy.idpMetadata.providerId,
+    });
+
+    return accounts === 0;
   }
 
   private async readScimStatus(pair: MigrationPair): Promise<SsoMigrationScimStatus> {

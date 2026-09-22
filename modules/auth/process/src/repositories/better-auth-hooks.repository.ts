@@ -17,6 +17,14 @@ export type BetterAuthHookOrganization = {
   ssoProvider: string | null;
 };
 
+/** One federated account row, with the id a retirement deletes it by. */
+export type FederatedAccountRow = {
+  rowId: string;
+  userId: string;
+  providerId: string;
+  accountId: string;
+};
+
 /**
  * Private persistence boundary for the Better Auth database hooks — ADR-027
  * SSO gate, ADR-101 identifier reconciliation, ADR-116 SSO auto-join. One
@@ -36,6 +44,15 @@ export abstract class BetterAuthHooksRepository {
   abstract findFederatedAccountsForUser(input: {
     userId: string;
   }): Promise<{ providerId: string; accountId: string }[]>;
+  /**
+   * The federated accounts these people hold, credential rows excluded, each
+   * with the row's own id: what a retiring connection's sweep decides over.
+   */
+  abstract findFederatedAccountsForUsers(input: {
+    userIds: readonly string[];
+  }): Promise<FederatedAccountRow[]>;
+  /** Deletes these account rows, answering how many actually went. */
+  abstract deleteAccounts(input: { accountRowIds: readonly string[] }): Promise<number>;
   abstract flagPendingSsoSetup(input: { userId: string }): Promise<void>;
   /**
    * Creates the default MEMBER membership row. Returns `"already-exists"`

@@ -13,6 +13,7 @@ import { SsoConnectionReadRepository } from "../../repositories/sso-connection.r
 import type { SsoCredentialRepository } from "../../repositories/sso-credential.repository.ts";
 import type { SsoConnectionService } from "../sso-connection.service.ts";
 import type { SsoIdpRegistrationService } from "../sso-idp-registration.service.ts";
+import type { SsoMigrationFinalizationService } from "../sso-migration-finalization.service.ts";
 import { SsoSetupCommandsService } from "../sso-setup-commands.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
@@ -65,6 +66,7 @@ function serviceOver({
     activity: MemoryIdentityRepositories.over(store).ssoMigrationEvidence,
     credentials: createApiFixture<SsoCredentialRepository>({}),
     registrations: createApiFixture<SsoIdpRegistrationService>({}),
+    finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => 1_700_000_000_000,
   });
   return { service, activateConnection };

@@ -70,6 +70,7 @@ import type {
   UpdateOrganizationTeamWithMembersInput,
   CustomRole,
   Organization,
+  OrganizationAdministrator,
   OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
@@ -779,6 +780,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   /** Every member of one organization, for the member pickers. */
   getAllMembers(input: { organizationId: string }): Promise<User[]> {
     return this.#dependencies.membership.getAllMembers(input.organizationId);
+  }
+
+  /** Every administrator who can still sign in, named. */
+  findAdministrators(input: { organizationId: string }): Promise<OrganizationAdministrator[]> {
+    return this.#dependencies.membership.findAdministrators(input);
   }
 
   /** The role a user holds in the organization owning one team — read by the project-protections

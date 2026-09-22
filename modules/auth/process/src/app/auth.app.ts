@@ -15,6 +15,7 @@ import {
   type BrowserSessionInventoryEntry,
   type CliAccessSession,
   type InviteLanding,
+  type LegacySsoAccessQuery,
   type SignUpVerificationResult,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
@@ -34,9 +35,11 @@ import { UserApi } from "@langwatch/user-contract";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
+import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
+import { LegacySsoAccessService } from "../services/legacy-sso-access.service.ts";
 import {
   SignUpVerificationService,
   type SignUpAccountDirectory,
@@ -158,6 +161,9 @@ export class AuthApp implements AuthApiContract {
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
   readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
+  /** The `Account` rows a retiring connection is judged over — auth's own,
+   *  swept for a peer that owns none of them (ADR-129). */
+  readonly #legacySsoAccess: LegacySsoAccessService;
   /**
    * The deployment's ONE Better Auth instance, or nothing where it named no
    * browser-session identity. Assigned once in {@link AuthApp.create}: it must
@@ -180,12 +186,14 @@ export class AuthApp implements AuthApiContract {
     signUp: SignUpVerificationService | null,
     members: AuthInfrastructure,
     dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
+    legacySsoAccess: LegacySsoAccessService,
   ) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
     this.#signUp = signUp;
     this.#members = members;
     this.#dependencies = dependencies;
+    this.#legacySsoAccess = legacySsoAccess;
   }
 
   static create(setup: AuthSetup): Promise<AuthApp> {
@@ -206,6 +214,9 @@ export class AuthApp implements AuthApiContract {
       signUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
       { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
+      LegacySsoAccessService.create({
+        accounts: PrismaBetterAuthHooksRepository.create(members.prisma),
+      }),
     );
 
     app.#offersPasskeys = config.passkeysEnabled;
@@ -247,6 +258,16 @@ export class AuthApp implements AuthApiContract {
 
       return app;
     });
+  }
+
+  retireLegacySsoAccess(
+    input: LegacySsoAccessQuery,
+  ): Promise<{ retired: number; remaining: number }> {
+    return this.#legacySsoAccess.retire(input);
+  }
+
+  countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number> {
+    return this.#legacySsoAccess.count(input);
   }
 
   /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */

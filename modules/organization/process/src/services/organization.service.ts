@@ -65,20 +65,6 @@ import type {
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
-
-const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
-  evaluations: false,
-  datasets: false,
-  annotations: false,
-  automations: false,
-};
-const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
-  evaluations: true,
-  datasets: true,
-  annotations: true,
-  automations: true,
-};
-
 import { OrganizationGroupService } from "./organization-group.service.ts";
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";

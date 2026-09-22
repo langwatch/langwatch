@@ -5,6 +5,7 @@
  * press sends.
  * @see specs/identity/sso-connection-lifecycle.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   emptySsoConnection,
   type SsoConnectionState,
@@ -20,6 +21,7 @@ import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.t
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
+import type { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
 import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
 import {
   InMemoryConnections,
@@ -100,6 +102,7 @@ beforeEach(() => {
     activity: MemoryIdentityRepositories.over(MemoryIdentityStore.create()).ssoMigrationEvidence,
     credentials: vault,
     registrations: SsoIdpRegistrationService.create({ discovery: reachableDiscovery }),
+    finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => T0,
   });
 });

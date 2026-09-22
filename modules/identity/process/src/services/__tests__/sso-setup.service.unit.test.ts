@@ -96,6 +96,7 @@ function scenario(
       evidence: repositories.ssoMigrationEvidence,
       breakGlass: repositories.ssoBreakGlass,
       memberships: { listActiveMembers: async () => [] },
+      legacyAccess: { count: async () => 0 },
       now: () => NOW,
     }),
     now: () => NOW,

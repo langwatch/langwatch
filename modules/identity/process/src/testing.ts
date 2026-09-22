@@ -63,7 +63,7 @@ export function inMemoryIdentityReservations(): IdentityReservationRepository & 
     },
     async release({ userId, holdingIdentifierIds }) {
       let released = 0;
-      for (const [value, claim] of [...held]) {
+      for (const [value, claim] of held) {
         if (claim.userId !== userId) continue;
         if (holdingIdentifierIds.includes(claim.identifierId)) continue;
         held.delete(value);

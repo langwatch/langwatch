@@ -3,6 +3,7 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   IdentityApi,
@@ -22,7 +23,9 @@ import {
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
 import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
+import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -45,6 +48,10 @@ import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.serv
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
 import { SsoAuthenticationActivityService } from "../services/sso-authentication-activity.service.ts";
+import {
+  SsoBreakGlassService,
+  type SsoBreakGlassDirectory,
+} from "../services/sso-break-glass.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
@@ -52,11 +59,14 @@ import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
-import { SsoMigrationCallbackService } from "../services/sso-migration-callback.service.ts";
 import {
-  SsoMigrationProgressService,
-  type SsoMigrationMemberships,
-} from "../services/sso-migration-progress.service.ts";
+  SsoLegacyIdentityRetirementService,
+  type SsoLegacyAccessRetirement,
+  type SsoRetirementMemberships,
+} from "../services/sso-legacy-identity-retirement.service.ts";
+import { SsoMigrationCallbackService } from "../services/sso-migration-callback.service.ts";
+import { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
+import { SsoMigrationProgressService } from "../services/sso-migration-progress.service.ts";
 import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
 import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
 import { SsoSetupService } from "../services/sso-setup.service.ts";
@@ -108,6 +118,7 @@ type IdentityAppParts = {
   ssoArrival: SsoArrivalService;
   ssoActivity: SsoAuthenticationActivityService;
   ssoMigrationCallbacks: SsoMigrationCallbackService;
+  ssoBreakGlass: SsoBreakGlassService;
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
@@ -134,7 +145,7 @@ function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMembershi
 
 /** The organization's own member rows, as the migration read asks for them:
  *  active members only, which is what `getAllMembers` already means. */
-function migrationMemberships(organizations: OrganizationApi): SsoMigrationMemberships {
+function migrationMemberships(organizations: OrganizationApi): SsoRetirementMemberships {
   return {
     listActiveMembers: async ({ organizationId }) => {
       const members = await organizations.getAllMembers({ organizationId });
@@ -144,6 +155,37 @@ function migrationMemberships(organizations: OrganizationApi): SsoMigrationMembe
         email: member.email ?? null,
       }));
     },
+    organizationIdsForMember: (args) => organizations.organizationIdsForMember(args),
+  };
+}
+
+/** Who may hold a way back in, and what they are called: the organization's
+ *  own administrators, asked for rather than queried (ADR-129). */
+function breakGlassDirectory(organizations: OrganizationApi): SsoBreakGlassDirectory {
+  return { findAdministrators: (args) => organizations.findAdministrators(args) };
+}
+
+/** Standing is the organization's answer; whether somebody holds a door that
+ *  is not the identity provider is the module that owns the credential's, and
+ *  is unanswered here — see the handoff. */
+function breakGlassEligibility(
+  organizations: OrganizationApi,
+): (args: { organizationId: string; userId: string }) => Promise<boolean> {
+  return breakGlassHolderEligibility({
+    isAdministrator: async ({ organizationId, userId }) =>
+      (await organizations.findAdministrators({ organizationId })).some(
+        (administrator) => administrator.userId === userId,
+      ),
+    holdsPassword: async () => true,
+  });
+}
+
+/** Auth owns every `Account` row an identity provider minted, so what still
+ *  lets somebody in through a retiring connection is its answer (ADR-129). */
+function legacySsoAccess(auth: AuthApi): SsoLegacyAccessRetirement {
+  return {
+    count: (args) => auth.countLegacySsoAccess(args),
+    retire: (args) => auth.retireLegacySsoAccess(args),
   };
 }
 
@@ -152,7 +194,13 @@ export class IdentityApp implements IdentityApi {
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
    *  membership rows, and the one that owns the pending-admission marker. */
-  static readonly dependencies = { organizations: OrganizationApi, permissions: AuthzApi };
+  static readonly dependencies = {
+    organizations: OrganizationApi,
+    permissions: AuthzApi,
+    /** Who holds the federated account rows a cutover retires: identity
+     *  decides, auth owns and sweeps them. */
+    auth: AuthApi,
+  };
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
   static readonly reads = [
@@ -296,6 +344,18 @@ export class IdentityApp implements IdentityApi {
       users: setup.repositories.users,
       memberships: setup.dependencies.organizations,
     });
+    const memberships = migrationMemberships(setup.dependencies.organizations);
+    const legacyAccess = legacySsoAccess(setup.dependencies.auth);
+    // `directory` is unanswered here: whether provisioning has been repointed
+    // is the directory module's to say, and an installation without one
+    // provisions nobody — which is what `not-applicable` means.
+    const ssoMigrationProgress = SsoMigrationProgressService.create({
+      connections: setup.repositories.ssoConnections,
+      evidence: setup.repositories.ssoMigrationEvidence,
+      breakGlass: setup.repositories.ssoBreakGlass,
+      memberships,
+      legacyAccess,
+    });
     // Q3(c) again: without the connection ledger there is nothing to press
     // against, so the journey's verbs refuse by name rather than half-work.
     const ssoSetupCommands = ssoConnections
@@ -311,16 +371,26 @@ export class IdentityApp implements IdentityApi {
               policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
             }),
           }),
+          finalization: SsoMigrationFinalizationService.create({
+            connections: () => ssoConnections,
+            evidence: ssoMigrationProgress,
+            retirement: SsoLegacyIdentityRetirementService.create({
+              identity,
+              connections: setup.repositories.ssoConnections,
+              evidence: setup.repositories.ssoMigrationEvidence,
+              memberships,
+              legacyAccess,
+            }),
+          }),
         })
       : null;
-    // `directory` is unanswered here: whether provisioning has been repointed
-    // is the directory module's to say, and an installation without one
-    // provisions nobody — which is what `not-applicable` means.
-    const ssoMigrationProgress = SsoMigrationProgressService.create({
-      connections: setup.repositories.ssoConnections,
-      evidence: setup.repositories.ssoMigrationEvidence,
-      breakGlass: setup.repositories.ssoBreakGlass,
-      memberships: migrationMemberships(setup.dependencies.organizations),
+    // `warnings` is unanswered: where an expiry warning reaches somebody is
+    // the composition root's, and the sweep refuses by name until it is.
+    const ssoBreakGlassGrants = SsoBreakGlassService.create({
+      bindings: setup.repositories.ssoBreakGlass,
+      newBindingId: newSsoBreakGlassBindingId,
+      directory: breakGlassDirectory(setup.dependencies.organizations),
+      holderIsEligible: breakGlassEligibility(setup.dependencies.organizations),
     });
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,
@@ -353,6 +423,7 @@ export class IdentityApp implements IdentityApi {
       ssoArrival,
       ssoActivity,
       ssoMigrationCallbacks,
+      ssoBreakGlass: ssoBreakGlassGrants,
       ssoSetup,
       ssoSetupCommands,
       scimSyncGuards,
@@ -501,6 +572,10 @@ export class IdentityApp implements IdentityApi {
 
   ssoSetup(): SsoSetupService {
     return this.#parts.ssoSetup;
+  }
+
+  ssoBreakGlass(): SsoBreakGlassService {
+    return this.#parts.ssoBreakGlass;
   }
 
   ssoSetupCommands(): SsoSetupCommandsService {

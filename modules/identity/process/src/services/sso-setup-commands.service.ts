@@ -17,6 +17,7 @@ import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migrati
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import type { SsoIdpRegistrationService } from "./sso-idp-registration.service.ts";
+import type { SsoMigrationFinalizationService } from "./sso-migration-finalization.service.ts";
 
 /** The states a removal abandons outright — every one before a connection
  *  decides a sign-in. From ACTIVE onwards removal is teardown's. */
@@ -40,6 +41,8 @@ export interface SsoSetupCommandsServiceDeps {
   activity: SsoMigrationEvidenceRepository;
   credentials: SsoCredentialRepository;
   registrations: SsoIdpRegistrationService;
+  /** The cutover's last verb, which is a ceremony of its own. */
+  finalization: SsoMigrationFinalizationService;
   now?: () => number;
 }
 
@@ -202,6 +205,24 @@ export class SsoSetupCommandsService {
       );
     }
     return asserted.providerAccountId;
+  }
+
+  /**
+   * Finishes the cutover: the legacy half stops deciding sign-ins and nothing
+   * it minted still lets anybody in. Refused by name while any blocker
+   * stands, and resumable after an interrupted attempt.
+   */
+  async finalizeLegacyMigration({
+    organizationId,
+    connectionId,
+    actor,
+  }: SsoSetupCommand): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.finalization.finalize({
+      organizationId,
+      replacementConnectionId: connectionId,
+      actorUserId: actor.userId,
+    });
   }
 
   /** Abandons a setup nobody finished. */

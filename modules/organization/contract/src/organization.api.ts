@@ -154,6 +154,13 @@ export type OrganizationInviteValidation = "strict" | "lenient";
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
   Readonly<{ validation: OrganizationInviteValidation }>;
 
+/** One administrator, as a peer that must name them reads them. */
+export interface OrganizationAdministrator {
+  userId: string;
+  name: string | null;
+  email: string | null;
+}
+
 export interface OrganizationApi {
   createAndAssign(
     input: Readonly<{
@@ -271,6 +278,14 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
+  /**
+   * Every administrator who can still sign in, with what to call them. Asked
+   * by a peer choosing somebody for a decision of an administrator's weight —
+   * a way back in, today — which an id on its own cannot be made.
+   */
+  findAdministrators(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationAdministrator[]>;
   findUserOrgRoleByTeamId(
     input: Readonly<{ userId: string; teamId: string }>,
   ): Promise<OrganizationUserRole | null>;

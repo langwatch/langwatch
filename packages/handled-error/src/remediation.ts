@@ -71,6 +71,11 @@ const registry = {
       "Aggregate in the query rather than reading raw rows",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Split the filter into two searches, or drop the clauses that narrow it least; the limit counts every AND, OR and NOT",
+    ],
+  },
   filter_parse_error: {
     tips: [
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",

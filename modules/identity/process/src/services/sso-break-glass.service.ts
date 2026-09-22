@@ -5,9 +5,13 @@ import {
   breakGlassExpiryIsAllowed,
   breakGlassIsLive,
   breakGlassWarningsDue,
+  IdentityCapabilityUnavailableError,
   SsoBreakGlassExpiryOutOfRangeError,
   SsoBreakGlassHolderIneligibleError,
   type BreakGlassBinding,
+  type BreakGlassCandidateView,
+  type BreakGlassGrantView,
+  type SelfServeActor,
 } from "@langwatch/identity-contract";
 
 import type {
@@ -18,15 +22,32 @@ import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connect
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** One person, as the module that owns membership names them (ADR-129). */
+export interface SsoBreakGlassPerson {
+  userId: string;
+  name: string | null;
+  email: string | null;
+}
+
+/**
+ * Who may hold a way back in, and what everybody on a grant is called. Both
+ * are the organization module's rows: identity decides, it names.
+ */
+export interface SsoBreakGlassDirectory {
+  findAdministrators(args: { organizationId: string }): Promise<SsoBreakGlassPerson[]>;
+}
+
 export interface SsoBreakGlassServiceDeps {
   bindings: SsoBreakGlassRepository;
-  warnings: SsoBreakGlassWarningChannel;
+  /** Where an expiry warning goes. Unanswered where the process composed no
+   *  gateway for it, which the sweep refuses by name on. */
+  warnings?: SsoBreakGlassWarningChannel;
   newBindingId: () => string;
-  /**
-   * Whether this person could actually use the way in they are being given.
-   * A binding naming somebody who is not an administrator satisfies
-   * `hasLiveBinding` and satisfies nothing real.
-   */
+  /** Who a grant may name, and what everybody on one is called. */
+  directory: SsoBreakGlassDirectory;
+  /** Whether this person could actually use the way in: an administrator,
+   *  with a door that is not the identity provider. A binding naming anybody
+   *  else satisfies `hasLiveBinding` and satisfies nothing real. */
   holderIsEligible: (args: { organizationId: string; userId: string }) => Promise<boolean>;
   now?: () => number;
 }
@@ -55,12 +76,12 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
   async grant({
     organizationId,
     userId,
-    grantedByUserId,
+    actor,
     expiresAtMs,
   }: {
     organizationId: string;
     userId: string;
-    grantedByUserId: string;
+    actor: SelfServeActor;
     expiresAtMs: number;
   }): Promise<BreakGlassBinding> {
     this.requireExpiryInRange({ expiresAtMs });
@@ -70,7 +91,7 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       bindingId: this.deps.newBindingId(),
       organizationId,
       userId,
-      grantedByUserId,
+      grantedByUserId: actor.userId,
       grantedAtMs: this.now(),
       expiresAtMs,
       supersededAtMs: null,
@@ -90,12 +111,12 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
   async renew({
     bindingId,
     organizationId,
-    grantedByUserId,
+    actor,
     expiresAtMs,
   }: {
     bindingId: string;
     organizationId: string;
-    grantedByUserId: string;
+    actor: SelfServeActor;
     expiresAtMs: number;
   }): Promise<{ renewed: BreakGlassBinding; replaced: BreakGlassBinding }> {
     const replaced = await this.deps.bindings.findById({ bindingId });
@@ -118,7 +139,7 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       bindingId: this.deps.newBindingId(),
       organizationId,
       userId: replaced.userId,
-      grantedByUserId,
+      grantedByUserId: actor.userId,
       grantedAtMs: now,
       expiresAtMs,
       supersededAtMs: null,
@@ -162,6 +183,53 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     return this.deps.bindings.reserveActivationRecovery(args);
   }
 
+  /**
+   * Every grant the organization has held, with who holds each one. A read a
+   * security reviewer acts on, so the people are named rather than listed as
+   * ids.
+   */
+  async findGrants({ organizationId }: { organizationId: string }): Promise<BreakGlassGrantView[]> {
+    const bindings = await this.history({ organizationId });
+    const people = await this.peopleFor({ organizationId });
+    const nowMs = this.now();
+
+    return bindings.map((binding) => ({
+      bindingId: binding.bindingId,
+      userId: binding.userId,
+      name: people.get(binding.userId)?.name ?? null,
+      email: people.get(binding.userId)?.email ?? null,
+      grantedByUserId: binding.grantedByUserId,
+      grantedByName: people.get(binding.grantedByUserId)?.name ?? null,
+      grantedAtMs: binding.grantedAtMs,
+      expiresAtMs: binding.expiresAtMs,
+      supersededAtMs: binding.supersededAtMs,
+      live: breakGlassIsLive({ binding, nowMs }),
+      daysRemaining: breakGlassDaysRemaining({ binding, nowMs }),
+    }));
+  }
+
+  /** Who one can be granted to: the organization's administrators, because
+   *  the grant is a decision of the same weight as being one. */
+  async findCandidates({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<BreakGlassCandidateView[]> {
+    return this.deps.directory.findAdministrators({ organizationId });
+  }
+
+  /** The names a grant is read with. An administrator who has since stopped
+   *  being one reads as an unnamed id rather than disappearing. */
+  private async peopleFor({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Map<string, SsoBreakGlassPerson>> {
+    const people = await this.deps.directory.findAdministrators({ organizationId });
+
+    return new Map(people.map((person) => [person.userId, person]));
+  }
+
   /** Every binding an organization has held, so the history reads whole. */
   async history({ organizationId }: { organizationId: string }): Promise<BreakGlassBinding[]> {
     return this.deps.bindings.findAllForOrganization({ organizationId });
@@ -185,6 +253,9 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
    * one day. Each mark is sent once; a sweep that missed one still sends it.
    */
   async sweepWarnings({ limit = 200 }: { limit?: number } = {}): Promise<{ warned: number }> {
+    const warnings = this.deps.warnings;
+    if (!warnings) throw new IdentityCapabilityUnavailableError("break-glass warning channel");
+
     const nowMs = this.now();
     const horizonMs = nowMs + Math.max(...BREAK_GLASS_WARNING_DAYS) * DAY_MS;
     const expiring = await this.deps.bindings.findLiveExpiringBefore({
@@ -201,7 +272,7 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       // The number the reader is told is the number of days actually left,
       // not the mark that tripped: "seven days" on the day five remain is a
       // warning that lies about a date.
-      await this.deps.warnings.warn({
+      await warnings.warn({
         binding,
         daysRemaining: breakGlassDaysRemaining({ binding, nowMs }),
       });

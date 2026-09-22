@@ -307,6 +307,11 @@ const presentations = {
     title: "That page is too deep to open by number",
     describe: () => "Narrow the time range or filters, or step forward with Next.",
   },
+  filter_too_complex: {
+    title: "That filter is too complex to run",
+    describe: () =>
+      "The filter has more clauses than a single search can evaluate. Split it into two searches, or drop the clauses that narrow it least.",
+  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
@@ -2683,6 +2688,11 @@ const presentations = {
     title: "The signing certificate could not be read",
     describe: () =>
       "The certificate is not a valid X.509 certificate in PEM form. Copy it again from your identity provider, including the BEGIN and END lines.",
+  },
+  sso_migration_finalization_blocked: {
+    title: "Finishing the migration is blocked",
+    describe: () =>
+      "Something still has to happen before the old connection can be retired. The setup page lists what.",
   },
   sso_connection_invalid_transition: {
     title: "This single sign-on connection has moved on",

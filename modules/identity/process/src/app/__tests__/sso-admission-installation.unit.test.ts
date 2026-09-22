@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -19,6 +20,7 @@ const bootIdentity = () =>
     .provide({
       organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
+      auth: createApiFixture<AuthApi>(),
     })
     .boot();
 

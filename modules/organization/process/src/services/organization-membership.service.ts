@@ -5,6 +5,7 @@ import { newAuthzBindingId, type AuthzBindingForSynthesis } from "@langwatch/aut
  */
 import { generate } from "@langwatch/ksuid";
 import {
+  type OrganizationAdministrator,
   type OrganizationIntent,
   type OrganizationUser,
   OrganizationUserRole,
@@ -327,6 +328,26 @@ export class OrganizationMembershipService {
    */
   async getAllMembers(organizationId: string): Promise<User[]> {
     return this.repo.getAllMembers(organizationId);
+  }
+
+  /** Every administrator who can still sign in, named. Both halves are read
+   *  here rather than joined in a query: who is an administrator and who can
+   *  sign in are two different rules, and one is the ledger's. */
+  async findAdministrators({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<OrganizationAdministrator[]> {
+    const administrators = new Set(await this.repo.findActiveAdministratorIds({ organizationId }));
+    const members = await this.repo.getAllMembers(organizationId);
+
+    return members
+      .filter((member) => administrators.has(member.id))
+      .map((member) => ({
+        userId: member.id,
+        name: member.name ?? null,
+        email: member.email ?? null,
+      }));
   }
 
   /**

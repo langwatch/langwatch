@@ -29,11 +29,13 @@ export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenc
     return [...this.store.identifiers.values()]
       .filter((fact) => wanted.has(fact.userId) && isLiveIdentifierState(fact.state))
       .map((fact) => ({
+        identifierId: fact.identifierId,
         userId: fact.userId,
         state: fact.state,
         connectionId: fact.connectionId,
         providerId: fact.providerId,
         providerAccountId: fact.providerAccountId,
+        verifiedAtMs: fact.verifiedAtMs,
       }));
   }
 

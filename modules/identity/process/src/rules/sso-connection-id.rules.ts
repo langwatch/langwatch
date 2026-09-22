@@ -44,6 +44,12 @@ export function grandfatherCommandId({ organizationId }: { organizationId: strin
   return `grandfather:${organizationId}`;
 }
 
+/** One way back in, minted per GRANT: a renewal writes a new row naming the
+ *  one it replaced, so no id is ever reused. */
+export function newSsoBreakGlassBindingId(): string {
+  return generate("ssobg").toString();
+}
+
 /** One recorded sign-in through a connection. */
 export function newSsoAuthenticationActivityId(): string {
   return generate("ssoauth").toString();
