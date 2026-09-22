@@ -17,7 +17,7 @@ A feature file should be a **complete specification** of the work:
 - All user-visible behaviors are described
 - No gaps - if it's not in the feature file, it's not in scope
 
-### Non-Overlapping Test Coverage
+### Test Level Coverage
 Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
 | Tag | Purpose | What It Tests |
@@ -42,6 +42,16 @@ Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
 See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.
 
+## From issue to feature file
+
+Issues are written as Scrum stories: `As a <role>, I want <capability>, so that <benefit>` with Given/When/Then acceptance criteria and a separate Definition of Done.
+
+When an issue is picked up, the story becomes the `Feature:` narrative (the As/I want/So that lines) and each acceptance criterion becomes one `Scenario:` in the feature file.
+
+Tests bind scenarios via `// @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has a test and every tagged test has exactly one scenario.
+
+See `specs/README.md` for feature file binding details.
+
 ## Binding Scenarios to Tests
 
 Scenarios are bound to their executing tests via a `@scenario` JSDoc annotation
@@ -59,13 +69,13 @@ code). The `it()` description stays in whatever form the BDD describe/it tree
 requires — the annotation is what the parity checker reads.
 
 Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test.tsx`).
-One `it` block may carry multiple `@scenario` annotations if it covers several scenarios;
+One `it()` block may carry multiple `@scenario` annotations if it covers several scenarios;
 one scenario may be bound by multiple tests.
 
 The `platform/app/scripts/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
 has no binding. Enforcement is on by default and fails closed — a new feature file
-needs no registration anywhere. The script carries two ratcheted deny-lists instead:
+needs no registration anywhere. The script carries two ratched deny-lists instead:
 `LEGACY_UNBOUND` for files whose enforced scenarios are not yet bound, and
 `LEGACY_INERT` for files that yield no enforced scenario at all (usually because
 nothing in them is tagged). Both only shrink; taking a file off either list is the
