@@ -60,10 +60,9 @@ describe("given a judgement ran on the sentence as typed", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         "The model connected for search did not answer",
       );
-      expect(screen.getByRole("link", { name: "Configure models" })).toHaveAttribute(
-        "href",
-        "/settings/model-providers",
-      );
+      expect(
+        screen.getByRole("link", { name: "Configure models" }),
+      ).toHaveAttribute("href", "/settings/model-providers");
     });
 
     it("says no model is connected when that is the problem", () => {
@@ -83,12 +82,16 @@ describe("given a judgement ran on the sentence as typed", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
       expect(screen.getByRole("status")).toHaveTextContent("Interpreted as:");
-      expect(screen.queryByRole("link", { name: "Configure models" })).toBeNull();
+      expect(
+        screen.queryByRole("link", { name: "Configure models" }),
+      ).toBeNull();
 
       first.unmount();
       noticeFor();
       render(<SearchFallbackNotice />, { wrapper });
-      expect(screen.queryByRole("link", { name: "Configure models" })).toBeNull();
+      expect(
+        screen.queryByRole("link", { name: "Configure models" }),
+      ).toBeNull();
     });
   });
 });
