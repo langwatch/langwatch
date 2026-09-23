@@ -4,11 +4,33 @@
 # carries the whole LangWatchQL access set delivered by the mounted Secret
 # (issue #8258, epic tasks#889 AC3), then scale to a fourth pod.
 #
-# Resources are kept small so three ClickHouse pods plus three Keeper pods fit a
-# single kind node alongside the rest of the stack.
+# Resource sizing target: the GitHub-hosted runner is 4 vCPU / 16 GB. The suite
+# must schedule 3 ClickHouse + 3 Keeper pods alongside the rest of the stack
+# (gateway, postgres, redis) AND leave room for the scale-to-4 step, where a
+# FOURTH ClickHouse pod must also schedule. The subchart couples the ClickHouse
+# container's cpu/memory REQUEST to its LIMIT (single .Values.cpu/.Values.memory
+# knob, see charts/clickhouse-serverless/templates/statefulset.yaml), so cpu is
+# kept small enough that 4 x request fits the node. Keeper exposes a full
+# resources map, so its REQUESTS are lowered while LIMITS stay generous — that
+# shrinks the scheduling footprint without throttling raft.
+#
+# Peak CPU requests at scale-to-4 (see commit body for the node-allocatable sum):
+#   4 ClickHouse x 300m = 1200m
+#   3 Keeper     x 100m =  300m
+#   gateway+postgres+redis ~= 325m
+# well under the ~3920m allocatable on a 4 vCPU runner, with headroom for
+# kube-system daemons.
 clickhouse:
   replicas: 3
   memory: 1Gi
-  cpu: "1"
+  cpu: 300m
   storage:
     size: 1Gi
+  keeper:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
