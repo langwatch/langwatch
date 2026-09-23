@@ -37,14 +37,18 @@ function findBalancedEnd({ text, start }: { text: string; start: number }): numb
       inString = true;
       continue;
     }
-    if (char === "{" || char === "[") depth++;
-    else if (char === "}" || char === "]") {
-      depth--;
-      if (depth === 0) return i;
-      if (depth < 0) return -1;
-    }
+    const change = bracketDepthChange(char);
+    depth += change;
+    if (change < 0 && depth === 0) return i;
+    if (depth < 0) return -1;
   }
   return -1;
+}
+
+function bracketDepthChange(char: string): number {
+  if (char === "{" || char === "[") return 1;
+  if (char === "}" || char === "]") return -1;
+  return 0;
 }
 
 /**
@@ -129,14 +133,17 @@ function numberEnd({ text, at }: { text: string; at: number }): number {
     if (i === fractionFrom) return -1;
   }
 
-  if (text[i] === "e" || text[i] === "E") {
-    i++;
-    if (text[i] === "+" || text[i] === "-") i++;
-    const exponentFrom = i;
-    while (isDigit(text[i])) i++;
-    if (i === exponentFrom) return -1;
-  }
+  return exponentEnd({ text, at: i });
+}
 
+/** Index just past the optional exponent at `at`, or -1 when one opens but has no digits. */
+function exponentEnd({ text, at }: { text: string; at: number }): number {
+  if (text[at] !== "e" && text[at] !== "E") return at;
+  let i = at + 1;
+  if (text[i] === "+" || text[i] === "-") i++;
+  const exponentFrom = i;
+  while (isDigit(text[i])) i++;
+  if (i === exponentFrom) return -1;
   return i;
 }
 
