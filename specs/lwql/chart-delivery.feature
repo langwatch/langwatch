@@ -67,6 +67,9 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
   # against a chart-managed deployment. See ADR-141 and
   # platform/app/src/server/analytics/lwql/provisioning/sqlModeClusterGuard.ts.
 
+  # This asserts permit + DDL-path-ran + config-store yield, not a SQL-store
+  # user: rendered delivery owns langwatch_lwql in users_xml, so sql mode yields
+  # (495). See ADR-141, the AC8 deviation "The AC9 'one node provisions' e2e half".
   @e2e
   Scenario: On a single node, sql mode is permitted and provisions the access model
     Given the single-replica chart-managed release is upgraded to LWQL_ACCESS_MODEL_MODE=sql
