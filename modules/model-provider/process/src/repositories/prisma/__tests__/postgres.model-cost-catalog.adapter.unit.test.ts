@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaModelCostCatalogRepository } from "../prisma.model-cost-catalog.repository.ts";
+import { PrismaModelCostCatalogRepository } from "../../../model-provider.server.ts";
 
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature

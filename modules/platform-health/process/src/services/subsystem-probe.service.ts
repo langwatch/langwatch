@@ -9,6 +9,8 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
+import type { SubsystemProbeChannel } from "../channels/subsystem-probe.channel.ts";
+
 const logger = createLogger("langwatch:platform-health:probes");
 
 /** Canary trace/span ids; never read back, only fed through the real ingestion path. */
@@ -64,7 +66,7 @@ function readbackHeaders(authToken: string, projectId: string | null): Record<st
 /** What the probes reach that they do not own. */
 export interface SubsystemProbeCollaborators {
   /** The deployment's public origin, which every canary is posted back through. */
-  readonly publicBaseUrl: string;
+  readonly canaries: SubsystemProbeChannel;
   /** The automation application the trigger probe reads a recent fire from. */
   automation(): Readonly<{
     findById(input: { triggerId: string; projectId: string }): Promise<unknown>;
@@ -141,17 +143,14 @@ export class SubsystemProbeService {
 
   async runEvaluations({ authToken, projectId }: ProbeCredential): Promise<SubsystemProbeOutcome> {
     const response = await this.#withRetries(() =>
-      fetch(
-        `${this.#collaborators.publicBaseUrl}/api/evaluations/presidio/pii_detection/evaluate`,
-        {
-          method: "POST",
-          headers: canaryHeaders(authToken, projectId),
-          body: JSON.stringify({
-            data: { input: "Hello, my name is John Canary and my email is canary@langwatch.ai." },
-            settings: { entities: { email_address: true, person: true } },
-          }),
-        },
-      ),
+      this.#collaborators.canaries.post({
+        path: "/api/evaluations/presidio/pii_detection/evaluate",
+        headers: canaryHeaders(authToken, projectId),
+        body: JSON.stringify({
+          data: { input: "Hello, my name is John Canary and my email is canary@langwatch.ai." },
+          settings: { entities: { email_address: true, person: true } },
+        }),
+      }),
     );
 
     if (!response.ok) {
@@ -260,8 +259,8 @@ export class SubsystemProbeService {
     }
 
     const response = await this.#withRetries(() =>
-      fetch(`${this.#collaborators.publicBaseUrl}/api/workflows/${workflowId}/run`, {
-        method: "POST",
+      this.#collaborators.canaries.post({
+        path: `/api/workflows/${workflowId}/run`,
         headers: canaryHeaders(authToken, projectId),
         body: JSON.stringify({ input: "\u{1F425}" }),
       }),
@@ -298,8 +297,8 @@ export class SubsystemProbeService {
     input: string;
   }): Promise<Response> {
     const now = nowInstant().epochMilliseconds;
-    return fetch(`${this.#collaborators.publicBaseUrl}/api/collector`, {
-      method: "POST",
+    return this.#collaborators.canaries.post({
+      path: "/api/collector",
       headers: canaryHeaders(authToken, projectId),
       body: JSON.stringify({
         spans: [
@@ -361,8 +360,8 @@ export class SubsystemProbeService {
       ],
     };
 
-    return fetch(`${this.#collaborators.publicBaseUrl}/api/otel/v1/traces`, {
-      method: "POST",
+    return this.#collaborators.canaries.post({
+      path: "/api/otel/v1/traces",
       headers: canaryHeaders(authToken, projectId),
       body: JSON.stringify(payload),
     });
@@ -390,10 +389,10 @@ export class SubsystemProbeService {
       attempt++;
       try {
         const fetchStart = nowInstant().epochMilliseconds;
-        const response = await fetch(
-          `${this.#collaborators.publicBaseUrl}/api/traces/${encodeURIComponent(traceId)}`,
-          { headers: readbackHeaders(authToken, projectId) },
-        );
+        const response = await this.#collaborators.canaries.get({
+          path: `/api/traces/${encodeURIComponent(traceId)}`,
+          headers: readbackHeaders(authToken, projectId),
+        });
         const fetchMs = nowInstant().epochMilliseconds - fetchStart;
         if (response.ok) {
           logger.info({ traceId, attempt, fetchMs }, "Trace found");

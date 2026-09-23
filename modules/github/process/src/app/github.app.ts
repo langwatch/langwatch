@@ -54,15 +54,6 @@ import {
 } from "./github.members.ts";
 import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 
-export const GITHUB_WRITE_PERMISSIONS: Record<string, string> = {
-  contents: "write",
-  pull_requests: "write",
-};
-
-export const GITHUB_READ_PULL_PERMISSIONS: Record<string, string> = {
-  pull_requests: "read",
-};
-
 export type GithubInstallationToken = {
   token: string;
   expiresAt: string;

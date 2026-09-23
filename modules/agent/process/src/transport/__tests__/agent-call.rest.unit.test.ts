@@ -4,6 +4,7 @@ import {
   AgentOwnerOnlyError,
   type AgentApi,
 } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -13,7 +14,6 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -23,7 +23,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { agentRestErrorHandler, createAgentRest } from "../agent.rest.ts";
+import { createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -75,7 +75,7 @@ function buildApi(
     "/",
     runtime.mount(createAgentRest(options.relayMaxPayloadMb).router(), {
       app: () => app,
-      onError: agentRestErrorHandler(renderRefusal),
+      onError: renderRefusal,
       facts: [
         bindRestMiddleware(projectRestFacts, () => ({
           projectSlug: "project-one",

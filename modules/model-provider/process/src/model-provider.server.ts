@@ -1,6 +1,10 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { defineServerModule } from "@langwatch/kernel";
 import { getModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { ModelProviderApp } from "./app/model-provider.app.ts";
 import type {
@@ -8,14 +12,21 @@ import type {
   ModelProviderInfrastructure,
 } from "./app/model-provider.app.ts";
 import type {
+  CodexTokenRefresher,
+  ModelCostProject,
+  ModelProviderCatalog,
+  ModelProviderConnectionRateLimiter,
   ModelProviderCredentialCipher,
   ModelProviderCredentialCodec,
+  ModelProviderIdService,
   ModelProviderManagedGateway,
   ModelProviderRateLimit,
   ModelTranslation,
 } from "./app/model-provider.members.ts";
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
-import { PrismaModelCostCatalogRepository } from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
+import { PrismaModelCostRepository } from "./repositories/prisma/prisma.model-cost.repository.ts";
+import { PrismaModelDefaultRepository } from "./repositories/prisma/prisma.model-default.repository.ts";
+import { PrismaModelProviderRepository } from "./repositories/prisma/prisma.model-provider.repository.ts";
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
@@ -25,13 +36,12 @@ import {
   type CustomKeysRead,
 } from "./services/encrypted.model-provider-api-key-credential.service.ts";
 import { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
-import type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
+import { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 import { ModelProviderExecutionHandleService } from "./services/model-provider-execution-handle.service.ts";
-import {
-  PostgresModelProviderAdapter,
-  type PostgresModelProviderAdapterOptions,
-} from "./services/model-provider-service.composition.ts";
+import { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
+import { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
 import { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
+import { ModelProviderService } from "./services/model-provider.service.ts";
 import { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
 import { RegistryModelProviderCatalogAdapter } from "./services/registry.model-provider-catalog.service.ts";
 import {
@@ -83,6 +93,77 @@ export const modelProviderServer = defineServerModule("model-provider")
 export type ModelProviderTranslationSurface =
   | Readonly<{ executionProxyBaseUrl: string }>
   | ModelTranslation;
+
+export interface PostgresModelProviderAdapterOptions {
+  database: ProcessMembers["prisma"];
+  projects: ProjectApi;
+  organizations: OrganizationApi;
+  catalog: ModelProviderCatalog;
+  translation: ModelTranslation;
+  ids: ModelProviderIdService;
+  authorization: AuthzApi;
+  credentials: ModelProviderCredentialCodec;
+  codexTokenRefresher: CodexTokenRefresher;
+  connectionRateLimiter: ModelProviderConnectionRateLimiter;
+}
+
+/** Composes the public Model Provider service with its private Postgres adapters. */
+export class PostgresModelProviderAdapter {
+  private constructor(private readonly options: PostgresModelProviderAdapterOptions) {}
+
+  static create(options: PostgresModelProviderAdapterOptions): PostgresModelProviderAdapter {
+    return new PostgresModelProviderAdapter(options);
+  }
+
+  build(): ModelProviderService {
+    return ModelProviderService.create({
+      repository: PrismaModelProviderRepository.create(
+        this.options.database,
+        this.options.credentials,
+      ),
+      projects: this.options.projects,
+      organizations: this.options.organizations,
+      credentialPolicy: ModelProviderKeysService.create(),
+      codexTokenRefresher: this.options.codexTokenRefresher,
+      connectionRateLimiter: this.options.connectionRateLimiter,
+      defaults: PrismaModelDefaultRepository.create(this.options.database),
+      costs: PrismaModelCostRepository.create(this.options.database),
+      catalog: this.options.catalog,
+      authorization: this.options.authorization,
+      translation: this.options.translation,
+      ids: this.options.ids,
+    });
+  }
+}
+
+/** The one model the cost listing needs from the client. */
+export type ModelCostCatalogDatabase = Pick<ProcessMembers["prisma"], "customLLMModelCost">;
+
+/**
+ * A project's own model cost rules, composed from one Prisma client and one project read,
+ * instead of `ModelProviderApi`'s nine collaborators a span-pricing read never needs. Satisfies
+ * Trace's `TraceModelCostCatalog`, same as `ModelProviderApi`, which delegates to this service.
+ */
+export class PrismaModelCostCatalogRepository {
+  static create(options: {
+    database: ModelCostCatalogDatabase;
+    projects: ModelCostProject;
+  }): PrismaModelCostCatalogRepository {
+    return new PrismaModelCostCatalogRepository(options.database, options.projects);
+  }
+
+  private constructor(
+    private readonly database: ModelCostCatalogDatabase,
+    private readonly projects: ModelCostProject,
+  ) {}
+
+  build(): ModelCostCatalogService {
+    return ModelCostCatalogService.create({
+      costs: PrismaModelCostRepository.create(this.database),
+      scopes: ModelProviderProjectScopeService.create({ projects: this.projects }),
+    });
+  }
+}
 
 export type ModelProviderRuntimeInput = Readonly<{
   /** The one guarded connection every provider, default and cost row is read on. */

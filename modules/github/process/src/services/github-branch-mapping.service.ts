@@ -7,7 +7,7 @@ import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 import { type GithubAppTokenCache, type GithubPullRequestSummary } from "../app/github.app.ts";
 import type { GithubHost } from "../app/github.members.ts";
-import { GithubRateLimitedError } from "../channels/http/http.github-api.channel.ts";
+import { GithubRateLimitedError } from "../channels/github-api.channel.ts";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,

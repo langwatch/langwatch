@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GithubInstallationNotFoundError } from "../../http/http.github-api.channel.ts";
+import { GithubInstallationNotFoundError } from "../../github-api.channel.ts";
 import { MemoryGithubApiAdapter } from "../memory.github-api.channel.ts";
 
 describe("MemoryGithubApiAdapter", () => {

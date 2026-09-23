@@ -8,13 +8,16 @@ import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GITHUB_READ_PULL_PERMISSIONS, GITHUB_WRITE_PERMISSIONS } from "../../app/github.app.ts";
 import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../../channels/http/http.github-api.channel.ts";
+} from "../../channels/github-api.channel.ts";
 import type { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
+import {
+  GITHUB_READ_PULL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+} from "../../rules/github-app-permissions.rules.ts";
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;

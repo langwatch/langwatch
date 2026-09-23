@@ -1,7 +1,7 @@
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 
 import type { WebhookDestination } from "../app/webhook.app.ts";
-import type { SqsWebhookSender } from "../channels/sqs/sqs.webhook-destination.channel.ts";
+import type { SqsWebhookSender } from "../channels/webhook-destination.channel.ts";
 import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
 import { SqsWebhookDestinationAdapter } from "./sqs.webhook-destination.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";

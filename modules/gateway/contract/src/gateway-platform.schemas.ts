@@ -314,3 +314,15 @@ export const gatewayUpdateCacheRuleSchema = z.object({
 });
 
 export const gatewayIdParamsSchema = z.object({ id: z.string().min(1) });
+
+/** A rotate takes no body: the virtual key travels in the path. */
+export const gatewayRotateVirtualKeyBodySchema = z.object({});
+
+/** An enable takes no body: the virtual key travels in the path. */
+export const gatewayEnableVirtualKeyBodySchema = z.object({});
+
+/** A revoke takes no body: the virtual key travels in the path. */
+export const gatewayRevokeVirtualKeyBodySchema = z.object({});
+
+/** The retired provider-binding writes read no body; they answer 410 whatever was sent. */
+export const gatewayRetiredProviderBindingBodySchema = z.object({});

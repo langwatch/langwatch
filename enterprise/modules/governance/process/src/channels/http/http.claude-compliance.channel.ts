@@ -5,7 +5,7 @@ import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governanc
 import type {
   GovernanceHttpClient,
   IngestionPullDiagnosticsSink,
-} from "../app/governance.members.ts";
+} from "../../app/governance.members.ts";
 /**
  * Anthropic (Claude) Compliance reference puller — built on top of
  * the HttpPollingPullerAdapter with the URL + auth shape locked to
@@ -25,10 +25,7 @@ import type {
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
-import {
-  type HttpPollingConfig,
-  HttpPollingPullerAdapter,
-} from "../channels/http/http.polling.channel.ts";
+import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http.polling.channel.ts";
 
 /**
  * Locked reference config for Anthropic's compliance API. Admins

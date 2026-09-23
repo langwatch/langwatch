@@ -1,5 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
+  AiCallFailedError,
   ModelNotConfiguredError,
   ModelProviderDisabledError,
   type ModelRole,
@@ -7,61 +7,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:modelProviders:aiCall");
-
-/**
- * Legacy wire-format discriminator carried on the tRPC `data.cause` sidecar.
- * @deprecated NOT the error's code — the code is `ai_call_failed`, which is
- */
-export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
-
-/**
- * Thrown when a downstream AI call fails for a reason that is NOT "no model is configured"
- * — the provider returned 401 on a stale key, the registered custom model id no longer
- * exists, the SDK threw parsing a malformed response.
- */
-export class AiCallFailedError extends HandledError {
-  declare readonly code: "ai_call_failed";
-
-  /**
-   * @deprecated The legacy alias of `code` — see {@link AI_CALL_FAILED_CAUSE}.
-   */
-  public readonly cause = AI_CALL_FAILED_CAUSE;
-
-  constructor(
-    public readonly featureKey: string,
-    public readonly role: ModelRole,
-    public readonly featureDisplayName: string,
-    /**
-     * The provider's / SDK's own sentence.
-     */
-    public readonly originalErrorMessage: string,
-  ) {
-    super("ai_call_failed", `AI call failed for "${featureKey}".`, {
-      httpStatus: 400,
-      fault: "provider",
-      // Read by the missing-model/AI-failure toast surface. Carried on the
-      // handled payload (not only on the legacy `data.cause` sidecar) so the
-      // bespoke `aiCallFailedCause` block in `trpc.ts` can be deleted without
-      // the toast losing the feature it is talking about.
-      meta: { featureKey, role, featureDisplayName },
-    });
-    this.name = "AiCallFailedError";
-  }
-
-  toResponseBody(): {
-    cause: typeof AI_CALL_FAILED_CAUSE;
-    featureKey: string;
-    role: ModelRole;
-    featureDisplayName: string;
-  } {
-    return {
-      cause: this.cause,
-      featureKey: this.featureKey,
-      role: this.role,
-      featureDisplayName: this.featureDisplayName,
-    };
-  }
-}
 
 export class AiCallFailureService {
   static create(): AiCallFailureService {
@@ -99,7 +44,12 @@ export class AiCallFailureService {
       // provider error should not be dragged along wholesale.
       const firstLine = message.split("\n")[0]!.slice(0, 200);
 
-      throw new AiCallFailedError(feature.key, feature.role, feature.displayName, firstLine);
+      throw new AiCallFailedError({
+        featureKey: feature.key,
+        role: feature.role,
+        featureDisplayName: feature.displayName,
+        originalErrorMessage: firstLine,
+      });
     }
   }
 }

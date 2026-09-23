@@ -35,7 +35,6 @@ import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
-import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
 
 import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
 
@@ -61,10 +60,10 @@ import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
  * honest advice is that pressing the button again is not worth doing.
  */
 /** The columns this decision actually reads. The status column is not one. */
-export type AgentsListingSummary = Pick<
-  IngestionPullRunProjection,
-  "LastAgentsListingOutcome" | "LastAgentsListingReason"
->;
+export type AgentsListingSummary = Readonly<{
+  LastAgentsListingOutcome: string | null;
+  LastAgentsListingReason: string | null;
+}>;
 
 /**
  * Every refusal reason, and the one thing its reader should do about it.

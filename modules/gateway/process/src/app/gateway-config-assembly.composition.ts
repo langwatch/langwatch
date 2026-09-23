@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import {
   type GatewayModelProviderCredentials,
@@ -56,7 +56,7 @@ export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
   private constructor(private readonly scopeResolution: GatewayScopeResolutionService) {}
 
   static create(input: {
-    prisma: PrismaClient;
+    prisma: ProcessMembers["prisma"];
     platformProviders: GatewayPlatformProviders;
   }): GatewayConfigAssemblyAdapter {
     return new GatewayConfigAssemblyAdapter(

@@ -102,3 +102,6 @@ export const agentTestRunResponseSchema = z.object({
   batchRunId: z.string().describe("The batch the run belongs to."),
   setId: z.string().describe("The internal set that holds agent test runs."),
 });
+
+/** A test run takes no body: the agent travels in the path. */
+export const testAgentBodySchema = z.object({});

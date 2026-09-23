@@ -50,6 +50,7 @@ import type {
   AnomalyAlertHttpClient,
   AnomalySpendReader,
 } from "./app/governance.members.ts";
+import { ClaudeComplianceReferencePullerAdapter } from "./channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
 import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
@@ -77,7 +78,6 @@ import type { AgentsListingSummary } from "./services/agents-listing-outcome.ser
 import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
 import { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
 import { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
-import { ClaudeComplianceReferencePullerAdapter } from "./services/claude-compliance-puller.service.ts";
 import { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "./services/department.service.ts";
 import {

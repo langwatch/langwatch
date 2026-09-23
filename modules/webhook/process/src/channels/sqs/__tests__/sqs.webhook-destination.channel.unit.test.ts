@@ -7,10 +7,10 @@ import {
 } from "@langwatch/aws-client";
 import { describe, expect, it, vi } from "vitest";
 
+import type { SqsDestinationConfig } from "../../webhook-destination.channel.ts";
 import {
   SqsWebhookDestinationChannel,
   type SqsClientFactory,
-  type SqsDestinationConfig,
 } from "../sqs.webhook-destination.channel.ts";
 
 const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/webhooks";

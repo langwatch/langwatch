@@ -5,7 +5,7 @@ import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
 import type {
   SqsDestinationConfig,
   SqsWebhookSender,
-} from "../../channels/sqs/sqs.webhook-destination.channel.ts";
+} from "../../channels/webhook-destination.channel.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,

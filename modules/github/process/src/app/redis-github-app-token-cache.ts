@@ -3,20 +3,22 @@ import { createHash } from "node:crypto";
 import type { GithubRepository } from "@langwatch/github-contract";
 
 import { githubApiChannels } from "../channels/github-api-channels.registry.ts";
-import { GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
+import { GithubInstallationNotFoundError } from "../channels/github-api.channel.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
-  type GithubAppClient,
-  type GithubAppTokenCache,
-  type GithubInstallationDetails,
-  type GithubInstallationToken,
-  type GithubPullRequestSummary,
-  type MintInstallationTokenInput,
+} from "../rules/github-app-permissions.rules.ts";
+import { GithubHostService } from "../services/github-host.service.ts";
+import type {
+  GithubAppClient,
+  GithubAppTokenCache,
+  GithubInstallationDetails,
+  GithubInstallationToken,
+  GithubPullRequestSummary,
+  MintInstallationTokenInput,
 } from "./github.app.ts";
 import type { GithubHost } from "./github.members.ts";
 

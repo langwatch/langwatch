@@ -11,6 +11,7 @@ import {
   agentRestParamsSchema,
   agentRestQuerySchema,
   agentTestRunResponseSchema,
+  testAgentBodySchema,
   archiveResultSchema,
   createAgentRequestSchema,
   relayCallBodySchema,
@@ -18,19 +19,12 @@ import {
   relayPayloadCaps,
   updateAgentRequestSchema,
   type AgentOverview,
-  AgentBusyError,
-  AgentNotFoundError,
-  InvalidAgentConfigError,
 } from "@langwatch/agent-contract";
 import {
-  createFamilyErrorHandler,
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  NotFoundError,
   projectRestFacts,
-  UnprocessableEntityError,
-  type RestErrorHandler,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { z } from "zod";
@@ -208,6 +202,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
 
       .post("/:agentId/test", "testAgent")
       .withParams(agentRestParamsSchema)
+      .withInput(testAgentBodySchema)
       .withPermission("scenarios:create")
       .withOutput(agentTestRunResponseSchema)
       .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
@@ -238,20 +233,3 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .build()
   );
 }
-
-export const agentRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>
-  createFamilyErrorHandler({
-    boundary,
-    loggerName: "langwatch:api:v1:agents:errors",
-    label: "Agent API Error",
-    headers: (error): Record<string, string> =>
-      error instanceof AgentBusyError
-        ? { "Retry-After": String(Math.ceil(z.number().parse(error.meta.retryAfterMs) / 1000)) }
-        : {},
-    mapError: (error) => {
-      if (error instanceof AgentNotFoundError) return new NotFoundError(error.message);
-      if (error instanceof InvalidAgentConfigError)
-        return new UnprocessableEntityError(error.message);
-      return error;
-    },
-  });

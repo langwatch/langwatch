@@ -32,6 +32,10 @@ import {
   gatewayCreateCacheRuleSchema,
   gatewayUpdateCacheRuleSchema,
   gatewayIdParamsSchema,
+  gatewayRotateVirtualKeyBodySchema,
+  gatewayEnableVirtualKeyBodySchema,
+  gatewayRevokeVirtualKeyBodySchema,
+  gatewayRetiredProviderBindingBodySchema,
   GatewayProviderBindingsGoneError,
   type GatewayCaller,
   type GatewayCacheRuleResource,
@@ -377,6 +381,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .post("/virtual-keys/:id/rotate", "postApiGatewayV1VirtualKeysByIdRotate")
   .withParams(gatewayIdParamsSchema)
+  .withInput(gatewayRotateVirtualKeyBodySchema)
   .withPermission("virtualKeys:rotate")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }))
   // Also mints a new secret, so a retried rotate must not mint twice.
@@ -434,6 +439,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .post("/virtual-keys/:id/enable", "postApiGatewayV1VirtualKeysByIdEnable")
   .withParams(gatewayIdParamsSchema)
+  .withInput(gatewayEnableVirtualKeyBodySchema)
   .withPermission("virtualKeys:update")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
@@ -456,6 +462,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .post("/virtual-keys/:id/revoke", "postApiGatewayV1VirtualKeysByIdRevoke")
   .withParams(gatewayIdParamsSchema)
+  .withInput(gatewayRevokeVirtualKeyBodySchema)
   .withPermission("virtualKeys:delete")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
@@ -840,6 +847,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/providers", "postApiGatewayV1Providers")
+  .withInput(gatewayRetiredProviderBindingBodySchema)
   .withPermission("gatewayProviders:manage")
   .withOutput(z.void())
   .withDocs({
@@ -856,6 +864,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .patch("/providers/:id", "patchApiGatewayV1ProvidersById")
   .withParams(gatewayIdParamsSchema)
+  .withInput(gatewayRetiredProviderBindingBodySchema)
   .withPermission("gatewayProviders:update")
   .withOutput(z.void())
   .withDocs({

@@ -20,7 +20,9 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ModelCostProject } from "../app/model-provider.members.ts";
-import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
+import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
+import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
+import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -53,10 +55,10 @@ describe.skipIf(!DB_URL)("given a project's model-provider cascade", () => {
     logger: createLogger("model-provider-evidence-integration"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
-  const evidence = PostgresModelProviderEvidenceAdapter.create({
-    database: prisma,
-    projects: new PrismaProjects(prisma),
-  }).build();
+  const evidence = ModelProviderEvidenceService.create({
+    providers: PrismaModelProviderEvidenceRepository.create(prisma),
+    scopes: ModelProviderProjectScopeService.create({ projects: new PrismaProjects(prisma) }),
+  });
 
   let organizationId: string;
   let teamId: string;

@@ -10,7 +10,7 @@ import { type GithubAppTokenCache } from "../app/github.app.ts";
 import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../channels/http/http.github-api.channel.ts";
+} from "../channels/github-api.channel.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,

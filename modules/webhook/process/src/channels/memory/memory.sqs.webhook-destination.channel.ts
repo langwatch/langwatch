@@ -1,7 +1,7 @@
 import type {
   SqsWebhookDestinationMessage,
   SqsWebhookSender,
-} from "../sqs/sqs.webhook-destination.channel.ts";
+} from "../webhook-destination.channel.ts";
 
 /**
  * The memory SQS sender records queue messages exactly as the destination

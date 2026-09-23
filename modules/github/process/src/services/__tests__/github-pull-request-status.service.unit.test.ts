@@ -13,7 +13,7 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import { GithubRateLimitedError } from "../../channels/http/http.github-api.channel.ts";
+import { GithubRateLimitedError } from "../../channels/github-api.channel.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubPullRequestRow,

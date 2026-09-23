@@ -21,7 +21,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
-import { agentRestErrorHandler } from "../agent.rest.ts";
 
 const outputLog = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock("@langwatch/observability", async (original) => {
@@ -61,7 +60,7 @@ function buildApi({
     "/",
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
-      onError: agentRestErrorHandler(renderRefusal),
+      onError: renderRefusal,
       facts: [
         bindRestMiddleware(agentConnectHeaders, (context) => ({
           authorization: context.req.header("authorization"),

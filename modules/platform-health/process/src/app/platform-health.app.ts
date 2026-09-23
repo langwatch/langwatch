@@ -12,6 +12,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
@@ -60,7 +61,7 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
   static create({ dependencies, members }: PlatformHealthSetup): PlatformHealthApp {
     const probeApiKey = members.secrets.find("PLATFORM_HEALTH_PROBE_API_KEY") ?? "";
     const collaborators: SubsystemProbeCollaborators = {
-      publicBaseUrl: members.publicBaseUrl ?? "",
+      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
       automation: () => ({
         findById: (input) => dependencies.automation.findById(input),
         getRecentFires: async (input) =>

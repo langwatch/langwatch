@@ -2,6 +2,7 @@ import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { OpenAdmission } from "../repositories/gateway-open-admissions.repository.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../rules/gateway-spend-settlement.rules.ts";
 import type { SettleSpendCommandData } from "./gateway-spend-commands.process.ts";
 
 const logger = createLogger("langwatch:gateway-spend:settlement");
@@ -19,13 +20,6 @@ export const SETTLEMENT_GRACE_MS_DEFAULT = 30 * 60 * 1000;
  * retention; seven days is past any grace an operator can configure.
  */
 export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
-
-/**
- * Sanity cap on one sweep: this large a result means something upstream
- * stopped confirming, not steady-state drift. Applied TWICE — per instance,
- * then again after merging — so the sweep settles at most this cap.
- */
-export const MAX_OPEN_ADMISSIONS_PER_SWEEP = 10_000;
 
 /**
  * Operator override, epoch-milliseconds, bounded below so a typo cannot turn

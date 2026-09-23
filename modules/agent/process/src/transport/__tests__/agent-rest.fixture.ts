@@ -1,4 +1,5 @@
 import type { Agent, AgentApi, AgentType } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -8,7 +9,6 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 /**
@@ -22,7 +22,7 @@ import { z } from "zod";
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
-import { agentRestErrorHandler, createAgentRest } from "../agent.rest.ts";
+import { createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -82,7 +82,7 @@ export async function buildAgentApps(
   }
 
   const agents = () => app as AgentApi;
-  const onError = agentRestErrorHandler(renderRefusal);
+  const onError = renderRefusal;
   // Every request authenticates as the same project and person; a route's
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../eventing/gateway-spend-settlement.intent.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../rules/gateway-spend-settlement.rules.ts";
 import {
   GatewayOpenAdmissionsRepository,
   type OpenAdmission,

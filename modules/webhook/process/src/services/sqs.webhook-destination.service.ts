@@ -16,12 +16,12 @@ import {
 import {
   type SqsDestinationConfig,
   type SqsWebhookSender,
-} from "../channels/sqs/sqs.webhook-destination.channel.ts";
+} from "../channels/webhook-destination.channel.ts";
 
 export type {
   AwsClientConfigResolver,
   SqsDestinationConfig,
-} from "../channels/sqs/sqs.webhook-destination.channel.ts";
+} from "../channels/webhook-destination.channel.ts";
 
 /**
  * The Amazon SQS destination: the same batch, the same bytes, the same signature, put on a

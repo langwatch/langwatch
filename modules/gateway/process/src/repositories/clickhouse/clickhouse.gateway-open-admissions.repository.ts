@@ -1,12 +1,10 @@
 import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
-// The cap belongs to the sweep that reports on it, not to the query it
-// bounds. One-way edge: the intent imports nothing from here.
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../eventing/gateway-spend-settlement.intent.ts";
 import {
   GatewayOpenAdmissionsRepository,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../../repositories/gateway-open-admissions.repository.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../rules/gateway-spend-settlement.rules.ts";
 
 const TABLE_NAME = "gateway_spend" as const;
 

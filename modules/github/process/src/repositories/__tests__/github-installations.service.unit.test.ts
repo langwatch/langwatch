@@ -18,7 +18,7 @@ import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache
 import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../../channels/http/http.github-api.channel.ts";
+} from "../../channels/github-api.channel.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
 import { GithubInstallationsService } from "../../services/github-installations.service.ts";

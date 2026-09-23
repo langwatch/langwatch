@@ -9,7 +9,7 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import { GithubInstallationNotFoundError } from "../http/http.github-api.channel.ts";
+import { GithubInstallationNotFoundError } from "../github-api.channel.ts";
 
 export type MemoryGithubInstallation = GithubInstallationDetails;
 export type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo: string };

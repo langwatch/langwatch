@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import type {
   GovernanceActorDirectory,
@@ -7,7 +7,7 @@ import type {
 } from "./governance.app.ts";
 
 export type GovernanceMemberDatabase = Pick<
-  PrismaClient,
+  ProcessMembers["prisma"],
   "organizationUser" | "user" | "virtualKey"
 >;
 
