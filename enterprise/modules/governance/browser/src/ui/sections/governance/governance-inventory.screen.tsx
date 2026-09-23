@@ -3063,9 +3063,8 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
   const cursorPath = (p.cursorJsonPath ?? "").trim();
   const cursorParam = (p.cursorQueryParam ?? "").trim() || "cursor";
   const mappingDsl = (p.eventMappingDsl ?? "").trim();
-  if (!url || !headerValue || !token || !eventsPath || !cursorPath || !mappingDsl) {
-    return null;
-  }
+  if (!url || !headerValue || !token) return null;
+  if (!eventsPath || !cursorPath || !mappingDsl) return null;
   const eventMapping: Record<string, string> = {};
   for (const line of mappingDsl.split("\n")) {
     const trimmed = line.trim();
@@ -3282,9 +3281,10 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 
   const match = STARTING_AT.exec(raw);
   if (!match) return null;
-  if (!isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))) {
-    return null;
-  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!isRealCalendarDate(year, month, day)) return null;
 
   try {
     const instant = Temporal.Instant.from(

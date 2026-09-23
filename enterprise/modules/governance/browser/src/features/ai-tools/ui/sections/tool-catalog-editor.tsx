@@ -441,7 +441,7 @@ function SortableCatalogCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : entry.enabled ? 1 : 0.5,
+    opacity: sortableCardOpacity({ isDragging, enabled: entry.enabled }),
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -620,4 +620,15 @@ function CatalogCard({
       )}
     </VStack>
   );
+}
+
+function sortableCardOpacity({
+  isDragging,
+  enabled,
+}: {
+  isDragging: boolean;
+  enabled: boolean;
+}): number {
+  if (isDragging) return 0.4;
+  return enabled ? 1 : 0.5;
 }

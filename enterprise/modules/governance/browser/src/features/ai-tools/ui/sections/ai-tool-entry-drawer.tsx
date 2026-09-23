@@ -233,6 +233,11 @@ function scopesFromEntry(entry: AiToolEntry, organizationId: string): ScopeChipP
   }));
 }
 
+function saveToolLabel({ isPending, isEdit }: { isPending: boolean; isEdit: boolean }): string {
+  if (isPending) return "Saving…";
+  return isEdit ? "Save changes" : "Save tool";
+}
+
 export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const showErrorToast = useShowErrorToast();
   const toaster = useGovernanceToaster();
@@ -503,7 +508,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             <HStack gap={2} marginTop={4}>
               <Spacer />
               <Button size="sm" onClick={onSave} disabled={!canSave || isPending}>
-                {isPending ? "Saving…" : isEdit ? "Save changes" : "Save tool"}
+                {saveToolLabel({ isPending, isEdit })}
               </Button>
             </HStack>
           </VStack>

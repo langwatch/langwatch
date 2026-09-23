@@ -705,6 +705,9 @@ function RuleComposer({
     [sourcesQuery.data],
   );
   const isEdit = !!composer.id;
+  const showSourcePicker = scopeIdMode === "picker" && composer.scope === "source";
+  const showSourceTypePicker = scopeIdMode === "picker" && composer.scope === "source_type";
+  const showCustomScopeId = !showSourcePicker && !showSourceTypePicker;
   return (
     <Drawer.Root
       open={true}
@@ -831,11 +834,7 @@ function RuleComposer({
                 <VStack align="stretch" gap={1} flex={1}>
                   <HStack gap={2} alignItems="center">
                     <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                      {composer.scope === "source"
-                        ? "Ingestion source"
-                        : composer.scope === "source_type"
-                          ? "Source type"
-                          : "Scope ID"}
+                      {scopeIdLabel(composer.scope)}
                     </Text>
                     <Spacer />
                     <Button
@@ -848,7 +847,7 @@ function RuleComposer({
                       {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
                     </Button>
                   </HStack>
-                  {scopeIdMode === "picker" && composer.scope === "source" ? (
+                  {showSourcePicker && (
                     <DashboardSelect
                       ariaLabel="Ingestion source"
                       // The empty choice is the placeholder rather than an
@@ -862,7 +861,8 @@ function RuleComposer({
                       onChange={(next) => setComposer({ ...composer, scopeId: next })}
                       disabled={sourcesQuery.isLoading}
                     />
-                  ) : scopeIdMode === "picker" && composer.scope === "source_type" ? (
+                  )}
+                  {showSourceTypePicker && (
                     <DashboardSelect
                       ariaLabel="Source type"
                       placeholder="Select a source type"
@@ -870,19 +870,14 @@ function RuleComposer({
                       value={composer.scopeId}
                       onChange={(next) => setComposer({ ...composer, scopeId: next })}
                     />
-                  ) : (
+                  )}
+                  {showCustomScopeId && (
                     <Input
                       size="sm"
                       backgroundColor="white"
                       value={composer.scopeId}
                       onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
-                      placeholder={
-                        composer.scope === "source_type"
-                          ? "otel_generic, workato, ..."
-                          : composer.scope === "source"
-                            ? "ingestion source ID"
-                            : `${composer.scope} ID`
-                      }
+                      placeholder={customScopeIdPlaceholder(composer.scope)}
                     />
                   )}
                 </VStack>
@@ -969,17 +964,7 @@ function RuleComposer({
 
 function ThresholdPreview({ ruleType, raw }: { ruleType: string; raw: string }) {
   const summary = summariseThresholdConfig(ruleType, raw);
-  const palette =
-    summary.kind === "ok"
-      ? { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview" }
-      : summary.kind === "unsupported"
-        ? {
-            bg: "orange.50",
-            border: "orange.300",
-            fg: "orange.900",
-            label: "Won't fire",
-          }
-        : { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid" };
+  const palette = thresholdPreviewPalette(summary.kind);
   return (
     <Box
       borderWidth="1px"
@@ -990,13 +975,7 @@ function ThresholdPreview({ ruleType, raw }: { ruleType: string; raw: string }) 
       marginTop={1}
     >
       <HStack alignItems="start" gap={2}>
-        <Badge
-          colorPalette={
-            palette.label === "Won't fire" ? "orange" : palette.label === "Invalid" ? "red" : "blue"
-          }
-          size="xs"
-          variant="subtle"
-        >
+        <Badge colorPalette={palette.badge} size="xs" variant="subtle">
           {palette.label}
         </Badge>
         <Text fontSize="xs" color={palette.fg} flex={1}>
@@ -1005,4 +984,30 @@ function ThresholdPreview({ ruleType, raw }: { ruleType: string; raw: string }) 
       </HStack>
     </Box>
   );
+}
+
+function scopeIdLabel(scope: Scope): string {
+  if (scope === "source") return "Ingestion source";
+  return scope === "source_type" ? "Source type" : "Scope ID";
+}
+
+function customScopeIdPlaceholder(scope: Scope): string {
+  if (scope === "source_type") return "otel_generic, workato, ...";
+  return scope === "source" ? "ingestion source ID" : `${scope} ID`;
+}
+
+function thresholdPreviewPalette(kind: ReturnType<typeof summariseThresholdConfig>["kind"]) {
+  if (kind === "ok") {
+    return { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview", badge: "blue" };
+  }
+  if (kind === "unsupported") {
+    return {
+      bg: "orange.50",
+      border: "orange.300",
+      fg: "orange.900",
+      label: "Won't fire",
+      badge: "orange",
+    };
+  }
+  return { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid", badge: "red" };
 }

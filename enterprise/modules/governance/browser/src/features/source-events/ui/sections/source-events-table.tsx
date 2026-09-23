@@ -327,6 +327,9 @@ export function SourceEventsTable({
   // "Click a row for the raw and normalised records" describes rows that are
   // not there in the empty state, and the empty pane says its own piece.
   const isEmpty = pager.status === "ready" && pager.loadedCount === 0;
+  const isError = pager.status === "error";
+  const showEmptyState = !isError && isEmpty;
+  const showTable = !isError && !isEmpty;
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="start" gap={1}>
@@ -344,11 +347,9 @@ export function SourceEventsTable({
         )}
       </VStack>
 
-      {pager.status === "error" ? (
-        renderError(pager.error, "Couldn't load this source's events")
-      ) : isEmpty ? (
-        emptyState
-      ) : (
+      {isError && renderError(pager.error, "Couldn't load this source's events")}
+      {showEmptyState && emptyState}
+      {showTable && (
         <Box>
           {/* A failure while pages are already on screen must not hide
               them — it names itself above the table and the next click

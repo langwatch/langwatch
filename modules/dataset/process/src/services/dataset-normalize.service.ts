@@ -53,6 +53,25 @@ export type DatasetNormalizeDeps = {
   getStorage: (projectId: string) => Promise<DatasetStorage>;
 };
 
+async function deleteFlushedChunks({
+  storage,
+  projectId,
+  datasetId,
+}: {
+  storage: DatasetStorage;
+  projectId: string;
+  datasetId: string;
+}): Promise<void> {
+  try {
+    await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
+  } catch (cleanupError) {
+    if (!(cleanupError instanceof Error)) {
+      throw cleanupError;
+    }
+    // non-fatal: a failed reap is preferable to masking the real error.
+  }
+}
+
 /**
  * Thrown when a staged `.json` array is too large to buffer; surfaced to the
  * user as the dataset's `statusError`. Convert to JSONL to stream it instead.
@@ -215,7 +234,9 @@ const parseInto = async (params: {
       // A SUBSET is allowed — headers absent from the confirmed list are the
       // columns the user excluded, and are dropped per-record below.
       const canonicalHeaders = new Set(canonical);
-      if (![...byHeader.keys()].every((h) => canonicalHeaders.has(h))) return;
+      const confirmedHeaders = [...byHeader.keys()];
+      const everyHeaderIsReal = confirmedHeaders.every((h) => canonicalHeaders.has(h));
+      if (!everyHeaderIsReal) return;
       targetByCanonical = byHeader;
       canonicalSet = canonicalHeaders;
       return;
@@ -486,14 +507,7 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
       // chunk-0..k orphaned — and chunk keys, unlike staging keys, carry no lifecycle TTL to
       // reap them, so a permanently-failed dataset would leak them forever. Best-effort delete
       // every flushed chunk.
-      try {
-        await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
-      } catch (cleanupError) {
-        if (!(cleanupError instanceof Error)) {
-          throw cleanupError;
-        }
-        // non-fatal: a failed reap is preferable to masking the real error.
-      }
+      await deleteFlushedChunks({ storage, projectId, datasetId });
       // Mark failed and rethrow so the queue records the failure; the staging
       // object is intentionally NOT deleted so a manual retry can re-run.
       const statusError = error instanceof Error ? error.message : "Normalize failed";

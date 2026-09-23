@@ -301,13 +301,10 @@ export function OttlEditor({
                   // so it needs a `valid` verdict to earn it. A blank line,
                   // a check that hasn't run yet, and a check that couldn't
                   // run all stay neutral.
-                  backgroundColor={
-                    showError
-                      ? "red.500"
-                      : isWritten && status?.validity === "valid"
-                        ? "green.400"
-                        : "border.muted"
-                  }
+                  backgroundColor={statementMarkerColor({
+                    showError,
+                    isValid: isWritten && status?.validity === "valid",
+                  })}
                   flexShrink={0}
                 />
                 <Textarea
@@ -347,4 +344,15 @@ export function OttlEditor({
       </HStack>
     </VStack>
   );
+}
+
+function statementMarkerColor({
+  showError,
+  isValid,
+}: {
+  showError: boolean;
+  isValid: boolean;
+}): string {
+  if (showError) return "red.500";
+  return isValid ? "green.400" : "border.muted";
 }

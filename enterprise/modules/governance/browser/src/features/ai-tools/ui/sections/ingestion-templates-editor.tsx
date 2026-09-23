@@ -298,6 +298,8 @@ function ViewOttlDrawer({
     },
     { enabled: open, refetchOnWindowFocus: false },
   );
+  const isLoadingDetail = detailQuery.isLoading;
+  const detail = detailQuery.data;
 
   return (
     <Drawer.Root
@@ -318,9 +320,8 @@ function ViewOttlDrawer({
               Platform-authored OTTL. Read-only; clone the row from the catalog table to customise
               it for this org.
             </Text>
-            {detailQuery.isLoading ? (
-              <Spinner size="sm" />
-            ) : detailQuery.data ? (
+            {isLoadingDetail && <Spinner size="sm" />}
+            {!isLoadingDetail && detail && (
               <Box
                 as="pre"
                 fontSize="xs"
@@ -334,9 +335,10 @@ function ViewOttlDrawer({
                 maxHeight="400px"
                 overflow="auto"
               >
-                {detailQuery.data.ottlRules || "(no OTTL rules)"}
+                {detail.ottlRules || "(no OTTL rules)"}
               </Box>
-            ) : (
+            )}
+            {!isLoadingDetail && !detail && (
               <Text fontSize="sm" color="fg.muted">
                 Template not found.
               </Text>

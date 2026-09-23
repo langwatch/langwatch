@@ -1169,6 +1169,8 @@ function DepartmentListPanel({
   onRename: (department: DepartmentRecord) => void;
   onArchive: (department: DepartmentRecord) => void;
 }) {
+  const showEmpty = !isLoading && rows.length === 0;
+  const showRows = !isLoading && rows.length > 0;
   return (
     <VStack
       align="stretch"
@@ -1201,17 +1203,19 @@ function DepartmentListPanel({
         </HStack>
         <Text flexShrink={0}>People named by a source</Text>
       </HStack>
-      {isLoading ? (
+      {isLoading && (
         <Box padding={4}>
           <Spinner />
         </Box>
-      ) : rows.length === 0 ? (
+      )}
+      {showEmpty && (
         <Box padding={4} color="fg.muted" fontSize="sm">
           {canManage
             ? "No departments yet. Create one to start attributing spend."
             : "No departments yet."}
         </Box>
-      ) : (
+      )}
+      {showRows &&
         rows.map((row) => (
           <DepartmentRow
             key={row.key}
@@ -1220,8 +1224,7 @@ function DepartmentListPanel({
             onArchive={() => row.record && onArchive(row.record)}
             canManage={canManage}
           />
-        ))
-      )}
+        ))}
     </VStack>
   );
 }
