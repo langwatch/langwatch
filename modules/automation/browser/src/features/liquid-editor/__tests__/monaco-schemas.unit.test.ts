@@ -13,10 +13,16 @@ describe("registerJsonSchema", () => {
       },
     };
 
-    registerJsonSchema(monaco, "file:///automation/conditions.json", {
-      title: "conditions",
+    registerJsonSchema({
+      monaco,
+      modelUri: "file:///automation/conditions.json",
+      schema: { title: "conditions" },
     });
-    registerJsonSchema(monaco, "file:///automation/slack.json", { title: "slack" });
+    registerJsonSchema({
+      monaco,
+      modelUri: "file:///automation/slack.json",
+      schema: { title: "slack" },
+    });
 
     expect(diagnostics).toHaveBeenLastCalledWith({
       validate: true,

@@ -65,32 +65,36 @@ const NO_ORGANIZATIONS: readonly AutomationOrganizationGraph[] = [];
 
 class CapabilityAutomationHost extends AutomationHost {
   constructor(
-    private readonly hostScope: AutomationScope,
-    private readonly currentProject: AutomationProject | undefined,
-    private readonly session: UiSession,
-    private readonly navigation: UiNavigation,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-    private readonly openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"],
-    private readonly goBackDrawer: ReturnType<typeof useDrawer>["goBack"],
-    private readonly organizations: readonly AutomationOrganizationGraph[],
+    private readonly members: {
+      hostScope: AutomationScope;
+      currentProject: AutomationProject | undefined;
+      session: UiSession;
+      navigation: UiNavigation;
+      uiRoute: UiRoute;
+      feedback: UiFeedback;
+      openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+      goBackDrawer: ReturnType<typeof useDrawer>["goBack"];
+      organizations: readonly AutomationOrganizationGraph[];
+    },
   ) {
     super();
   }
 
   scope(): AutomationScope {
-    return this.hostScope;
+    return this.members.hostScope;
   }
 
   organization(): AutomationOrganization | undefined {
-    const found = this.organizations.find((one) => one.id === this.hostScope.organizationId);
+    const found = this.members.organizations.find(
+      (one) => one.id === this.members.hostScope.organizationId,
+    );
     return found === void 0 ? void 0 : { id: found.id, name: found.name, slug: found.slug };
   }
 
   team(): AutomationTeam | undefined {
-    const teamId = this.hostScope.teamId;
+    const teamId = this.members.hostScope.teamId;
     if (teamId === null) return void 0;
-    for (const one of this.organizations) {
+    for (const one of this.members.organizations) {
       const found = one.teams.find((candidate) => candidate.id === teamId);
       if (found) return { id: found.id, name: found.name, slug: found.slug };
     }
@@ -98,23 +102,23 @@ class CapabilityAutomationHost extends AutomationHost {
   }
 
   project(): AutomationProject | undefined {
-    return this.currentProject;
+    return this.members.currentProject;
   }
 
   hasPermission(permission: string): boolean {
-    return this.session.hasPermission(permission);
+    return this.members.session.hasPermission(permission);
   }
 
   isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
+    return this.members.session.isFeatureEnabled(flag);
   }
 
   featureFlag(flag: string): boolean | undefined {
-    return this.session.featureFlag(flag);
+    return this.members.session.featureFlag(flag);
   }
 
   route(): AutomationRouteReading {
-    const { params, query } = this.uiRoute.reading();
+    const { params, query } = this.members.uiRoute.reading();
     return { params, query };
   }
 
@@ -122,18 +126,22 @@ class CapabilityAutomationHost extends AutomationHost {
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
   ): void {
-    this.uiRoute.setQuery(next, options);
+    this.members.uiRoute.setQuery(next, options);
   }
 
   navigate(to: string): void {
-    this.navigation.navigate(to);
+    this.members.navigation.navigate(to);
   }
 
   openDrawer(request: {
     drawer: AutomationDrawer;
     params?: Readonly<Record<string, string | undefined>>;
   }): void {
-    openDrawerAddress({ drawer: request.drawer, params: request.params, route: this.uiRoute });
+    openDrawerAddress({
+      drawer: request.drawer,
+      params: request.params,
+      route: this.members.uiRoute,
+    });
   }
 
   /** The one sub-flow this family runs: the dataset module's own drawer, hands over and returns. */
@@ -141,12 +149,12 @@ class CapabilityAutomationHost extends AutomationHost {
     created: (dataset: AutomationDatasetCreation) => void;
     returned: () => void;
   }): void {
-    this.openRegisteredDrawer("addOrEditDataset", {
+    this.members.openRegisteredDrawer("addOrEditDataset", {
       onSuccess: (saved: { datasetId: string; columnTypes: DatasetColumns }) =>
         handover.created({ datasetId: saved.datasetId, columnTypes: saved.columnTypes }),
       onClose: () => {
         handover.returned();
-        this.goBackDrawer();
+        this.members.goBackDrawer();
       },
     });
   }
@@ -157,11 +165,11 @@ class CapabilityAutomationHost extends AutomationHost {
   }
 
   succeeded(notice: AutomationSuccessNotice): void {
-    this.feedback.succeeded(notice);
+    this.members.feedback.succeeded(notice);
   }
 
   failed(failure: AutomationFailureNotice): void {
-    this.feedback.failed(failure);
+    this.members.feedback.failed(failure);
   }
 
   describeFailure(failure: AutomationFailureNotice): string {
@@ -197,17 +205,17 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityAutomationHost(
+      new CapabilityAutomationHost({
         hostScope,
-        project,
+        currentProject: project,
         session,
         navigation,
-        route,
+        uiRoute: route,
         feedback,
         openRegisteredDrawer,
-        goBack,
+        goBackDrawer: goBack,
         organizations,
-      ),
+      }),
     [
       hostScope,
       project,

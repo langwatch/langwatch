@@ -29,10 +29,7 @@ export type VariableInfo = MonacoVariableInfo;
 // + validation, compact preview pieces, variable surface in hover tooltip.
 
 // Lazy-load Monaco editor locally (not via platform/app) so slow chunk doesn't blank the drawer.
-const LazyMonacoEditor = lazy(async () => {
-  const module = await import("@monaco-editor/react");
-  return { default: module.default };
-});
+const LazyMonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 function MonacoEditor(props: ComponentProps<typeof LazyMonacoEditor>) {
   return (

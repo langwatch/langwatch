@@ -14,7 +14,8 @@ import { triggerSchema } from "./trigger.ts";
  * One automation as the list renders it: the row, the monitors its conditions
  * name, and the custom graph a graph alert points at.
  */
-export const automationListRowSchema = triggerSchema.extend({
+export const automationListRowSchema = z.object({
+  ...triggerSchema.shape,
   checks: z.array(monitorSchema),
   customGraph: customGraphNameRefSchema.nullable(),
 });

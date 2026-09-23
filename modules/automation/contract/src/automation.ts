@@ -46,9 +46,10 @@ export type UnsubscribeView = z.infer<typeof unsubscribeViewSchema>;
  * One suppression row as the operator table renders it: the stored row minus
  * the project id the caller already named, plus its automation's name.
  */
-export const emailSuppressionRowSchema = emailSuppressionSchema
-  .omit({ projectId: true })
-  .extend({ triggerName: z.string().nullable() });
+export const emailSuppressionRowSchema = z.object({
+  ...emailSuppressionSchema.omit({ projectId: true }).shape,
+  triggerName: z.string().nullable(),
+});
 export type EmailSuppressionRow = z.infer<typeof emailSuppressionRowSchema>;
 
 /** What the email-suppression writes answer with: the write landed. */

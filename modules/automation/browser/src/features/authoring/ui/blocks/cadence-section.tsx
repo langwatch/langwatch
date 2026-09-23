@@ -85,14 +85,21 @@ function cadenceSummary(draft: AutomationCadenceDraft): string {
   return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
 }
 
-function cadenceContent(
-  draft: AutomationCadenceDraft,
-  isEdit: boolean,
-  onCadenceChange: (value: NotificationCadence) => void,
-  onTraceDebounceChange: (value: number) => void,
-  onGraphAlertChange: (value: AutomationGraphAlertDraft) => void,
-  onReportChange: (value: AutomationReportDraft) => void,
-) {
+function cadenceContent({
+  draft,
+  isEdit,
+  onCadenceChange,
+  onTraceDebounceChange,
+  onGraphAlertChange,
+  onReportChange,
+}: {
+  draft: AutomationCadenceDraft;
+  isEdit: boolean;
+  onCadenceChange: (value: NotificationCadence) => void;
+  onTraceDebounceChange: (value: number) => void;
+  onGraphAlertChange: (value: AutomationGraphAlertDraft) => void;
+  onReportChange: (value: AutomationReportDraft) => void;
+}) {
   if (draft.source === "customGraph") {
     return <GraphCadence value={draft.graphAlert} onChange={onGraphAlertChange} />;
   }
@@ -140,14 +147,14 @@ export function AutomationCadenceSection({
       complete={cadenceIsSet(draft)}
       summary={cadenceSummary(draft)}
     >
-      {cadenceContent(
+      {cadenceContent({
         draft,
         isEdit,
         onCadenceChange,
         onTraceDebounceChange,
         onGraphAlertChange,
         onReportChange,
-      )}
+      })}
     </FacetSection>
   );
 }

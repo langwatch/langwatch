@@ -164,12 +164,17 @@ interface RegisteredEntry {
 const registered = new Map<string, RegisteredEntry>();
 
 /** Registers one model schema while retaining every previously registered schema. */
-export function registerJsonSchema(
-  monaco: AutomationMonaco,
-  modelUri: string,
-  schema: object,
-  fileMatch: string[] = [modelUri],
-): void {
+export function registerJsonSchema({
+  monaco,
+  modelUri,
+  schema,
+  fileMatch = [modelUri],
+}: {
+  monaco: AutomationMonaco;
+  modelUri: string;
+  schema: object;
+  fileMatch?: string[];
+}): void {
   registered.set(modelUri, { schema, fileMatch });
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
     validate: true,
