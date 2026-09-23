@@ -1397,6 +1397,24 @@ load_images() {
     kind load docker-image "$ch_image" --name "$CLUSTER_NAME"
   fi
 
+  # The values-local.yaml profile (examples/values-local.yaml:16) pins
+  # images.app: { tag: local, pullPolicy: Never }, so test_install_profile_local
+  # needs langwatch/langwatch:local in the cluster. The workflow builds and
+  # kind-loads only $APP_IMAGE (langwatch/langwatch:3.17.0); nothing produces
+  # :local. Under app.replicaCount=0 (values-e2e.yaml) the LWQL render Job is the
+  # first workload to need the app image, and its ClickHouse mount is now
+  # optional: false, so a missing :local blocks the whole install rather than
+  # merely leaving the app scaled to zero. Re-tag the already-loaded app image as
+  # :local and load it too. Fail loudly if it is absent — the Job needs it.
+  local app_image="${APP_IMAGE:-langwatch/langwatch:3.17.0}"
+  if docker image inspect "$app_image" &>/dev/null 2>&1; then
+    info "Tagging $app_image as langwatch/langwatch:local and loading into Kind"
+    docker tag "$app_image" langwatch/langwatch:local
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  else
+    fail "app image $app_image not found — the values-local.yaml profile pins images.app.tag=local (pullPolicy: Never) and the LWQL render Job needs it; build/load it before running the install suites"
+  fi
+
   pass "Images loaded"
 }
 
