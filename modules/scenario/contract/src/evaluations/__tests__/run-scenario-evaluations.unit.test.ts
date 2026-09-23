@@ -12,7 +12,7 @@ import {
   runScenarioEvaluations,
   TraceDataPendingError,
   toScenarioEvaluationResult,
-} from "../runScenarioEvaluations.ts";
+} from "../run-scenario-evaluations.ts";
 import type { ScenarioEvaluationsJobPayload } from "../types.ts";
 
 vi.mock("@langwatch/observability", () => ({

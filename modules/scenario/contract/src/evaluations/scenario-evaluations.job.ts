@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "./constants.ts";
-import { TraceDataPendingError } from "./runScenarioEvaluations.ts";
+import { TraceDataPendingError } from "./run-scenario-evaluations.ts";
 import type { ScenarioEvaluationsJobPayload } from "./types.ts";
 
 const logger = createLogger("langwatch:scenarios:evaluations:job");

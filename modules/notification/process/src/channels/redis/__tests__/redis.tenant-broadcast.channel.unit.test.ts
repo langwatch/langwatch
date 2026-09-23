@@ -35,7 +35,7 @@ function adapterOver(publisher: TenantBroadcastPublisher, logger?: unknown) {
   });
 }
 
-describe("RedisTenantBroadcastAdapter", () => {
+describe("RedisTenantBroadcastChannel", () => {
   describe("given a tenant broadcast publisher", () => {
     /** @scenario "The channel is the event type, prefixed" */
     it("publishes on the channel the application subscribes to", async () => {

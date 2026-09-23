@@ -45,14 +45,31 @@ function openDrawerAddress({
 }
 
 class CapabilityModelProviderHost extends ModelProviderHostApi {
-  constructor(
-    private readonly hostScope: ModelProviderHostScope,
-    private readonly scopeHost: UiScopeHost | undefined,
-    private readonly session: UiSession,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly hostScope: ModelProviderHostScope;
+  private readonly scopeHost: UiScopeHost | undefined;
+  private readonly session: UiSession;
+  private readonly uiRoute: UiRoute;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    hostScope,
+    scopeHost,
+    session,
+    uiRoute,
+    feedback,
+  }: {
+    hostScope: ModelProviderHostScope;
+    scopeHost: UiScopeHost | undefined;
+    session: UiSession;
+    uiRoute: UiRoute;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.hostScope = hostScope;
+    this.scopeHost = scopeHost;
+    this.session = session;
+    this.uiRoute = uiRoute;
+    this.feedback = feedback;
   }
 
   scope(): ModelProviderHostScope {
@@ -129,7 +146,8 @@ export default function ModelProviderHostMount({ children }: { children?: ReactN
   );
 
   const host = useMemo(
-    () => new CapabilityModelProviderHost(hostScope, scopeHost, session, route, feedback),
+    () =>
+      new CapabilityModelProviderHost({ hostScope, scopeHost, session, uiRoute: route, feedback }),
     [hostScope, scopeHost, session, route, feedback],
   );
 

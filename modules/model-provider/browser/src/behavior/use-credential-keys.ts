@@ -68,8 +68,10 @@ export function useCredentialKeys({
   }, [provider.provider, useApiGateway, originalSchemaShape]);
 
   const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
-    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}, undefined, {
-      providerEnabledWithEnvVars: provider.enabled,
+    buildCustomKeyState({
+      displayKeyMap: displayKeys,
+      storedKeys: originalStoredKeysRef.current ?? {},
+      options: { providerEnabledWithEnvVars: provider.enabled },
     }),
   );
 
@@ -88,7 +90,11 @@ export function useCredentialKeys({
           originalSchemaShape,
         );
 
-        return buildCustomKeyState(nextDisplayKeys, originalStoredKeysRef.current, previousKeys);
+        return buildCustomKeyState({
+          displayKeyMap: nextDisplayKeys,
+          storedKeys: originalStoredKeysRef.current,
+          previousKeys,
+        });
       });
 
       onGatewayToggle?.(use);
@@ -123,8 +129,10 @@ export function useCredentialKeys({
       );
 
       setCustomKeys(() =>
-        buildCustomKeyState(nextDisplayKeys, storedKeys, undefined, {
-          providerEnabledWithEnvVars: nextProvider.enabled,
+        buildCustomKeyState({
+          displayKeyMap: nextDisplayKeys,
+          storedKeys,
+          options: { providerEnabledWithEnvVars: nextProvider.enabled },
         }),
       );
 

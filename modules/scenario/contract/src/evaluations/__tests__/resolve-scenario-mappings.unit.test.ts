@@ -13,7 +13,7 @@ import {
   type ScenarioInputs,
   storedInputsOf,
   toolNameOf,
-} from "../resolveScenarioMappings.ts";
+} from "../resolve-scenario-mappings.ts";
 
 const messages: ConversationMessage[] = [
   { role: "user", content: "How many refunds last quarter?" },

@@ -32,13 +32,19 @@ function scopesOrUndefined(
 /**
  * Hook for validating model provider API keys via tRPC, scoped to a project or organization.
  */
-export function useModelProviderApiKeyValidation(
-  provider: string,
-  customKeys: Record<string, string>,
-  projectId: string | undefined,
-  organizationId: string | undefined,
-  scopes?: ProviderScopeSelection,
-) {
+export function useModelProviderApiKeyValidation({
+  provider,
+  customKeys,
+  projectId,
+  organizationId,
+  scopes,
+}: {
+  provider: string;
+  customKeys: Record<string, string>;
+  projectId: string | undefined;
+  organizationId: string | undefined;
+  scopes?: ProviderScopeSelection;
+}) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   // The stable code behind `validationError`, for the analytics that count

@@ -1123,7 +1123,7 @@ const unwrapTypedObject = (v: unknown): unknown => {
 };
 
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
-  value: any,
+  value: unknown,
   type: T,
 ): StringTypeToType[T] | undefined => {
   // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.

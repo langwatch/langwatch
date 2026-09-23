@@ -28,7 +28,7 @@ import {
   resolveAttachmentInputs,
   type ScenarioInputs,
   storedInputsOf,
-} from "./resolveScenarioMappings.ts";
+} from "./resolve-scenario-mappings.ts";
 import type { ScenarioEvaluationsJobPayload } from "./types.ts";
 
 const logger = createLogger("langwatch:scenarios:evaluations");
