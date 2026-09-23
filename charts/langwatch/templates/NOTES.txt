@@ -259,10 +259,14 @@ message.
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
 {{- if .Values.lwql.enabled }}
-    - LWQL_CLICKHOUSE_PASSWORD         (lwql.enabled=true; optional — if
-    - LWQL_POSTGRES_READER_PASSWORD     absent, LangWatchQL simply stays
-                                        unprovisioned instead of failing. See
-                                        Section 8.)
+    - LWQL_CLICKHOUSE_PASSWORD         (lwql.enabled=true; app-Secret keys ONLY
+    - LWQL_POSTGRES_READER_PASSWORD     when you own this Secret — existingSecret
+                                        or autogen off. With autogen the chart
+                                        generates them into its own
+                                        {{ include "langwatch.lwql.passwordSecretName" . }} Secret
+                                        instead. Optional either way — if absent,
+                                        LangWatchQL simply stays unprovisioned
+                                        instead of failing. See Section 8.)
 {{- end }}
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
@@ -307,6 +311,13 @@ message.
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if .Values.lwql.enabled }}
+
+  (The two LWQL_*_PASSWORD lines above apply only to this operator-provided path.
+  With autogen the chart generates them into its own
+  {{ include "langwatch.lwql.passwordSecretName" . }} Secret — do not add them to
+  the app Secret in that case.)
 {{- end }}
 {{- if and $langy.chartManaged $langyOwnSecret }}
 

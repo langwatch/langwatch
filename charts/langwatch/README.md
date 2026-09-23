@@ -259,8 +259,10 @@ full contract. How the model reaches ClickHouse depends on the posture:
   `examples/overlays/clickhouse-external.yaml`.
 
 Either way the chart's only credential job is handing the app and workers the two
-passwords (`LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD`), both from
-the app Secret.
+passwords (`LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD`). With
+autogen (the default) the chart generates them into its own chart-owned
+`<release>-lwql-passwords` Secret; with `secrets.existingSecret` set or `autogen`
+disabled they come from the app Secret you provide.
 
 **`sql`-mode prerequisites (bring-your-own only).** In `sql` mode your ClickHouse
 must satisfy four prerequisites before enabling `lwql.enabled`. Chart-managed
