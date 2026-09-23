@@ -5,12 +5,28 @@ import { describe, expect, it } from "vitest";
 
 import { createSpanEntryAccumulator, emitSystemPrompt } from "../coding-agent-transcript-state.ts";
 
+const span = ({
+  startTimeMs,
+  input,
+}: {
+  startTimeMs: number;
+  input: string | null;
+}): SpanDetail => ({
+  spanId: "span_1",
+  parentSpanId: null,
+  name: "chat",
+  type: "llm",
+  startTimeMs,
+  endTimeMs: startTimeMs,
+  durationMs: 0,
+  status: "ok",
+  input,
+  events: [],
+});
+
 /** A model-call span carrying a chat input with a system message. */
 const spanWithSystem = (text: string, startTimeMs = 1_000): SpanDetail =>
-  ({
-    startTimeMs,
-    input: JSON.stringify([{ role: "system", content: text }]),
-  }) as unknown as SpanDetail;
+  span({ startTimeMs, input: JSON.stringify([{ role: "system", content: text }]) });
 
 const systemEntries = (accumulator: ReturnType<typeof createSpanEntryAccumulator>) =>
   accumulator.entries.filter((entry) => entry.kind === "system_prompt");
@@ -64,7 +80,7 @@ describe("emitSystemPrompt", () => {
     it("records nothing and leaves the flag down, so a later span can still emit", () => {
       const accumulator = createSpanEntryAccumulator();
 
-      emitSystemPrompt({ startTimeMs: 1, input: null } as unknown as SpanDetail, accumulator);
+      emitSystemPrompt(span({ startTimeMs: 1, input: null }), accumulator);
       expect(systemEntries(accumulator)).toHaveLength(0);
 
       emitSystemPrompt(spanWithSystem("arrived late", 5_000), accumulator);

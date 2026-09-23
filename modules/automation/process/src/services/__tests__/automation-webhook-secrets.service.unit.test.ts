@@ -26,10 +26,7 @@ const stored = (over: Record<string, unknown> = {}) =>
 describe("AutomationWebhookSecretsService.redact", () => {
   describe("given stored headers and a signing secret", () => {
     it("returns the marker, never the value", () => {
-      const redacted = adapter.redact(stored()) as unknown as {
-        headers: Record<string, string>;
-        signingSecret: string | null;
-      };
+      const redacted = adapter.redact(stored());
 
       expect(redacted.headers).toEqual({ Authorization: WEBHOOK_HEADER_VALUE_KEPT });
       expect(redacted.signingSecret).toBe(WEBHOOK_HEADER_VALUE_KEPT);
@@ -38,7 +35,7 @@ describe("AutomationWebhookSecretsService.redact", () => {
     it("carries no encrypted field out with it", () => {
       // The ciphertext is not a secret the screen needs either, and shipping
       // it would put every stored value one decrypt away from a reader.
-      const redacted = adapter.redact(stored()) as unknown as Record<string, unknown>;
+      const redacted = adapter.redact(stored());
 
       expect(Object.keys(redacted)).not.toContain("headersEncrypted");
       expect(Object.keys(redacted)).not.toContain("signingSecretEncrypted");
@@ -52,7 +49,7 @@ describe("AutomationWebhookSecretsService.redact", () => {
         stored({
           headersEncrypted: crypto.encrypt(JSON.stringify({ "X-Api-Key": "a", "X-Tenant": "b" })),
         }),
-      ) as unknown as { headers: Record<string, string> };
+      );
 
       expect(Object.keys(redacted.headers).toSorted()).toEqual(["X-Api-Key", "X-Tenant"]);
     });
@@ -60,9 +57,7 @@ describe("AutomationWebhookSecretsService.redact", () => {
 
   describe("given no signing secret is stored", () => {
     it("says so, rather than showing a marker for one that does not exist", () => {
-      const redacted = adapter.redact(stored({ signingSecretEncrypted: undefined })) as unknown as {
-        signingSecret: string | null;
-      };
+      const redacted = adapter.redact(stored({ signingSecretEncrypted: undefined }));
 
       expect(redacted.signingSecret).toBeNull();
     });
@@ -80,7 +75,7 @@ describe("AutomationWebhookSecretsService.persist", () => {
           headers: { Authorization: WEBHOOK_HEADER_VALUE_KEPT },
         } as never,
         existing,
-      }) as unknown as { headersEncrypted?: string };
+      });
 
       expect(crypto.decrypt(saved.headersEncrypted ?? "")).toBe(
         JSON.stringify({ Authorization: "Bearer real-token" }),
@@ -109,7 +104,7 @@ describe("AutomationWebhookSecretsService.persist", () => {
           url: "https://acme.test/hook",
           headers: { Authorization: "Bearer new-token" },
         } as never,
-      }) as unknown as Record<string, unknown>;
+      });
 
       expect(Object.keys(saved)).not.toContain("headers");
       expect(saved.headersEncrypted).toBe(
@@ -121,7 +116,7 @@ describe("AutomationWebhookSecretsService.persist", () => {
       const saved = adapter.persist({
         incoming: { url: "https://acme.test/hook", headers: {} } as never,
         existing: stored(),
-      }) as unknown as { headersEncrypted?: string };
+      });
 
       expect(saved.headersEncrypted).toBeUndefined();
     });

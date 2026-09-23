@@ -41,7 +41,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: SYNC,
     type: "lw.identity.test",
     data,
-  } as unknown as Command<T>;
+  };
 }
 
 const base = {
