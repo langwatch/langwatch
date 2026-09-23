@@ -13,7 +13,7 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
   # call. There is no derivation over the manifest and no skip list — a model not
   # listed is simply not in the catalog (see catalog-inclusion.feature).
   #
-  # Bound by the per-model builder in catalog/derivePostgresCatalog.ts and its tests.
+  # Bound by the per-model builder in catalog/defineCatalogModel.ts and its tests.
 
   Background:
     Given the LangWatchQL Postgres catalog listing every catalogued model
