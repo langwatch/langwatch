@@ -15,7 +15,7 @@ import { useEffect, useRef } from "react";
 import { DEFAULT_MODEL } from "../model/prompt-constants.ts";
 import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
-import { TabDataSchema } from "../model/prompt-tabs-store.ts";
+import { TabDataSchema, type TabData } from "../model/prompt-tabs-store.ts";
 import { promptApi } from "./prompt-api.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
@@ -245,6 +245,85 @@ function mergeTracedVariablesIntoInputs(
   };
 }
 
+/** The explicit action, else one auto-detected from the span's prompt reference. */
+function resolvePlaygroundAction({
+  action,
+  spanData,
+}: {
+  action: PlaygroundAction | null;
+  spanData: PromptStudioSpanResult;
+}): { hasPromptReference: boolean; effectiveAction: PlaygroundAction } {
+  const hasPromptReference = Boolean(
+    spanData.promptHandle && (spanData.promptVersionNumber != null || spanData.promptTag != null),
+  );
+  const effectiveAction: PlaygroundAction =
+    action ?? (hasPromptReference ? "open-existing" : "create-new");
+  return { hasPromptReference, effectiveAction };
+}
+
+/**
+ * When the action is "open-existing" and the span references a managed prompt,
+ * fills the loading tab from that prompt. False sends the caller to the fallback.
+ */
+async function openExistingPromptInTab({
+  spanData,
+  effectiveAction,
+  hasPromptReference,
+  projectId,
+  trpc,
+  notify,
+  tabId,
+  updateTabData,
+  chatMessages,
+  variables,
+}: {
+  spanData: PromptStudioSpanResult;
+  effectiveAction: PlaygroundAction;
+  hasPromptReference: boolean;
+  projectId: string;
+  trpc: ReturnType<typeof promptApi.useUtils>;
+  notify: (notice: { title: string; description?: string }) => void;
+  tabId: string;
+  updateTabData: (params: { tabId: string; updater: (data: TabData) => TabData }) => void;
+  chatMessages: (ChatMessage & { id: string })[];
+  variables: Record<string, string>;
+}): Promise<boolean> {
+  if (effectiveAction !== "open-existing" || !spanData.promptHandle || !hasPromptReference) {
+    return false;
+  }
+  const existingPrompt = await tryOpenExistingPromptTab({
+    promptHandle: spanData.promptHandle,
+    promptVersionNumber: spanData.promptVersionNumber,
+    promptTag: spanData.promptTag,
+    projectId,
+    trpc,
+    notify,
+  });
+  if (!existingPrompt) return false;
+
+  const mergedValues = mergeTracedVariablesIntoInputs(existingPrompt.formValues, variables);
+
+  updateTabData({
+    tabId,
+    updater: () =>
+      TabDataSchema.parse({
+        loading: false,
+        form: {
+          currentValues: mergedValues,
+        },
+        chat: {
+          initialMessagesFromSpanData: chatMessages,
+        },
+        meta: {
+          title: mergedValues.handle ?? null,
+          versionNumber: existingPrompt.versionNumber,
+        },
+        variableValues: variables,
+      }),
+  });
+  return true;
+}
+
 /**
  * Hook to load span data from a trace into the prompt studio: opens the
  * managed prompt at its recorded version (via promptHandle) or creates a new
@@ -295,52 +374,24 @@ export function useLoadSpanIntoPromptPlayground() {
 
         const variables = spanData.promptVariables ?? {};
 
-        const hasPromptReference =
-          spanData.promptHandle &&
-          (spanData.promptVersionNumber != null || spanData.promptTag != null);
+        const { hasPromptReference, effectiveAction } = resolvePlaygroundAction({
+          action,
+          spanData,
+        });
 
-        // Determine effective action: explicit or auto-detected from prompt reference
-        const effectiveAction: PlaygroundAction =
-          action ?? (hasPromptReference ? "open-existing" : "create-new");
-
-        // When action is "open-existing" and span references a managed prompt
-        if (effectiveAction === "open-existing" && spanData.promptHandle && hasPromptReference) {
-          const existingPrompt = await tryOpenExistingPromptTab({
-            promptHandle: spanData.promptHandle,
-            promptVersionNumber: spanData.promptVersionNumber,
-            promptTag: spanData.promptTag,
-            projectId: project.id,
-            trpc,
-            notify: (notice) => host.succeeded(notice),
-          });
-
-          if (existingPrompt) {
-            const mergedValues = mergeTracedVariablesIntoInputs(
-              existingPrompt.formValues,
-              variables,
-            );
-
-            updateTabData({
-              tabId: loadingTabId,
-              updater: () =>
-                TabDataSchema.parse({
-                  loading: false,
-                  form: {
-                    currentValues: mergedValues,
-                  },
-                  chat: {
-                    initialMessagesFromSpanData: chatMessages,
-                  },
-                  meta: {
-                    title: mergedValues.handle ?? null,
-                    versionNumber: existingPrompt.versionNumber,
-                  },
-                  variableValues: variables,
-                }),
-            });
-            return;
-          }
-        }
+        const openedExisting = await openExistingPromptInTab({
+          spanData,
+          effectiveAction,
+          hasPromptReference,
+          projectId: project.id,
+          trpc,
+          notify: (notice) => host.succeeded(notice),
+          tabId: loadingTabId,
+          updateTabData,
+          chatMessages,
+          variables,
+        });
+        if (openedExisting) return;
 
         // Fall back: create new tab from trace data
         const defaultValues = createDefaultPromptFormValues(spanData);

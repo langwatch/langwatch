@@ -58,7 +58,7 @@ export function VersionHistoryListPopover({
         const { versionId } = params;
 
         // Find the version in the already-fetched data
-        const prompt = prompts.find((p: any) => p.versionId === versionId);
+        const prompt = prompts.find((p) => p.versionId === versionId);
         if (!prompt) {
           logger.error("Version not found in loaded data");
           toaster.error({

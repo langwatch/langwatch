@@ -1,12 +1,16 @@
 import type {
   ArrayLiteralExpression,
+  AsExpression,
   Expression,
   Identifier,
   Node,
+  NonNullExpression,
   ObjectLiteralElementLike,
   ObjectLiteralExpression,
+  ParenthesizedExpression,
   PropertyAccessExpression,
   PropertyAssignment,
+  SatisfiesExpression,
   SourceFile,
 } from "typescript/unstable/ast";
 import {
@@ -62,14 +66,20 @@ function collectReassignableNames(source: SourceFile): Set<string> {
   return names;
 }
 
+function isExpressionWrapper(
+  node: Expression,
+): node is NonNullExpression | AsExpression | ParenthesizedExpression | SatisfiesExpression {
+  return (
+    isNonNullExpression(node) ||
+    isAsExpression(node) ||
+    isParenthesizedExpression(node) ||
+    isSatisfiesExpression(node)
+  );
+}
+
 function unwrapExpression(node: Expression): Expression {
   let current = node;
-  while (
-    isNonNullExpression(current) ||
-    isAsExpression(current) ||
-    isParenthesizedExpression(current) ||
-    isSatisfiesExpression(current)
-  ) {
+  while (isExpressionWrapper(current)) {
     current = current.expression;
   }
   return current;

@@ -130,6 +130,30 @@ function isFilled({ element, source }: { element: Node; source: SourceFile }): b
   return values.some((value) => !UNFILLED.has(value));
 }
 
+type TagText = { source: SourceFile; text: string };
+
+function tagOf({ node, source, text }: TagText & { node: { tagName: Node } }): string {
+  return text.slice(node.tagName.getStart(source), node.tagName.getEnd()).trim();
+}
+
+function isTag(node: Node): node is Node & { tagName: Node } {
+  return isJsxOpeningElement(node) || isJsxSelfClosingElement(node);
+}
+
+/**
+ * A `<Drawer.Footer>` opening tag is a SIBLING of the children it wraps, not
+ * their ancestor, so the flag is raised on the ENCLOSING element by checking
+ * its opening tag before its children are walked.
+ */
+function wrapsFooter({ node, source, text }: TagText & { node: Node }): boolean {
+  return (
+    node.forEachChild((child) => {
+      if (!isTag(child)) return undefined;
+      return FOOTER_TAG.test(tagOf({ node: child, source, text })) ? true : undefined;
+    }) ?? false
+  );
+}
+
 /**
  * Filled button spans on lines: skips drawer footer via flag (nodes lack
  * parent links).
@@ -137,22 +161,6 @@ function isFilled({ element, source }: { element: Node; source: SourceFile }): b
 function filledButtonSpans(source: SourceFile): { tag: string; from: number; to: number }[] {
   const spans: { tag: string; from: number; to: number }[] = [];
   const text = source.getText();
-
-  const tagOf = (node: { tagName: Node }): string =>
-    text.slice(node.tagName.getStart(source), node.tagName.getEnd()).trim();
-
-  const isTag = (node: Node): node is Node & { tagName: Node } =>
-    isJsxOpeningElement(node) || isJsxSelfClosingElement(node);
-
-  /**
-   * A `<Drawer.Footer>` opening tag is a SIBLING of the children it wraps, not
-   * their ancestor, so the flag is raised on the ENCLOSING element by checking
-   * its opening tag before its children are walked.
-   */
-  const wrapsFooter = (node: Node): boolean =>
-    node.forEachChild((child) =>
-      isTag(child) && FOOTER_TAG.test(tagOf(child)) ? true : undefined,
-    ) ?? false;
 
   const record = (node: Node & { tagName: Node }, tag: string): void => {
     if (!BUTTON_TAG.test(tag)) return;
@@ -166,11 +174,12 @@ function filledButtonSpans(source: SourceFile): { tag: string; from: number; to:
   };
 
   const visit = (node: Node, inFooter: boolean): void => {
-    const tag = isTag(node) ? tagOf(node) : null;
+    const tag = isTag(node) ? tagOf({ node, source, text }) : null;
 
     if (tag !== null && !inFooter) record(node as Node & { tagName: Node }, tag);
 
-    const footerHere = inFooter || (tag !== null && FOOTER_TAG.test(tag)) || wrapsFooter(node);
+    const footerHere =
+      inFooter || (tag !== null && FOOTER_TAG.test(tag)) || wrapsFooter({ node, source, text });
 
     node.forEachChild((child) => {
       visit(child, footerHere);

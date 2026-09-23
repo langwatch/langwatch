@@ -3,9 +3,13 @@ import { dirname, join, resolve } from "node:path";
 import type {
   CallExpression,
   Expression,
+  Identifier,
   NewExpression,
+  NoSubstitutionTemplateLiteral,
   Node,
   ObjectLiteralElementLike,
+  PropertyName,
+  StringLiteral,
 } from "typescript/unstable/ast";
 import {
   isArrayLiteralExpression,
@@ -145,6 +149,12 @@ function anchoredExactFindOf(node: Expression): string | undefined {
   return literal;
 }
 
+function isTextKey(
+  name: PropertyName,
+): name is StringLiteral | Identifier | NoSubstitutionTemplateLiteral {
+  return isStringLiteral(name) || isIdentifier(name) || isNoSubstitutionTemplateLiteral(name);
+}
+
 /** The key and value of one `"key": value` entry, or undefined for any other shape. */
 function simpleEntryOf({
   property,
@@ -153,9 +163,7 @@ function simpleEntryOf({
 }): { key: string; value: Expression } | undefined {
   if (!isPropertyAssignment(property)) return undefined;
   const name = property.name;
-  if (!isStringLiteral(name) && !isIdentifier(name) && !isNoSubstitutionTemplateLiteral(name)) {
-    return undefined;
-  }
+  if (!isTextKey(name)) return undefined;
   return { key: name.text, value: property.initializer };
 }
 

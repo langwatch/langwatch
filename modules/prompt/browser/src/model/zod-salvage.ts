@@ -10,7 +10,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * (required fields with no top-level default).
  */
 function constructDefaultsFromShape(
-  objectSchema: z.ZodObject<any>,
+  objectSchema: z.ZodObject,
 ): Record<string, unknown> | undefined {
   const constructedDefaults: Record<string, unknown> = {};
   for (const nestedKey of Object.keys(objectSchema.shape)) {
@@ -32,10 +32,7 @@ function constructDefaultsFromShape(
  * own nested defaults if given, else the schema's empty parse, else defaults
  * constructed field-by-field from the schema's shape.
  */
-function resolveNestedDefaultValue(
-  objectSchema: z.ZodObject<any>,
-  nestedDefaults: unknown,
-): unknown {
+function resolveNestedDefaultValue(objectSchema: z.ZodObject, nestedDefaults: unknown): unknown {
   if (nestedDefaults !== undefined) {
     return nestedDefaults;
   }
@@ -52,7 +49,7 @@ function resolveNestedDefaultValue(
  * undefined (so the caller's merge falls back to `schemaDefaults`) when that also fails.
  */
 function salvageNestedField(
-  objectSchema: z.ZodObject<any>,
+  objectSchema: z.ZodObject,
   value: unknown,
   nestedDefaultValue: unknown,
 ): unknown {
@@ -80,7 +77,7 @@ function unwrapObjectSchema(schema: unknown): z.ZodObject | null {
  * validation, keeping any field that parses on its own and falling back to
  * defaults only for the fields that don't.
  */
-export function salvageValidData<T extends z.ZodObject<any>>(
+export function salvageValidData<T extends z.ZodObject>(
   schema: T,
   data: unknown,
   defaults?: z.infer<T>,
@@ -124,7 +121,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
   return merge({}, schemaDefaults, salvaged);
 }
 
-function salvageTopLevelFields<T extends z.ZodObject<any>>({
+function salvageTopLevelFields<T extends z.ZodObject>({
   inputData,
   schema,
   schemaDefaults,
