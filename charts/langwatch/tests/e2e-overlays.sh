@@ -1400,19 +1400,39 @@ load_images() {
   # The values-local.yaml profile (examples/values-local.yaml:16) pins
   # images.app: { tag: local, pullPolicy: Never }, so test_install_profile_local
   # needs langwatch/langwatch:local in the cluster. The workflow builds and
-  # kind-loads only $APP_IMAGE (langwatch/langwatch:3.17.0); nothing produces
-  # :local. Under app.replicaCount=0 (values-e2e.yaml) the LWQL render Job is the
-  # first workload to need the app image, and its ClickHouse mount is now
-  # optional: false, so a missing :local blocks the whole install rather than
-  # merely leaving the app scaled to zero. Re-tag the already-loaded app image as
-  # :local and load it too. Fail loudly if it is absent — the Job needs it.
-  local app_image="${APP_IMAGE:-langwatch/langwatch:3.17.0}"
-  if docker image inspect "$app_image" &>/dev/null 2>&1; then
-    info "Tagging $app_image as langwatch/langwatch:local and loading into Kind"
-    docker tag "$app_image" langwatch/langwatch:local
+  # kind-loads only the real app image (langwatch/langwatch:3.17.0); nothing
+  # produces :local. Under app.replicaCount=0 (values-e2e.yaml) the LWQL render
+  # Job is the first workload to need the app image, and its ClickHouse mount is
+  # now optional: false, so a missing :local blocks the whole install rather than
+  # merely leaving the app scaled to zero.
+  #
+  # $APP_IMAGE is NOT trustworthy as the source: charts/langwatch/Makefile:10 sets
+  # `APP_IMAGE := langwatch/langwatch:local`, and GNU make re-exports any variable
+  # that came from the environment with the makefile's own value. So even though
+  # the workflow exports APP_IMAGE=langwatch/langwatch:3.17.0, invoking this script
+  # via `make` runs it with APP_IMAGE=langwatch/langwatch:local — a tag nobody
+  # built. Resolve the source image without trusting APP_IMAGE alone.
+  if docker image inspect langwatch/langwatch:local &>/dev/null 2>&1; then
+    info "langwatch/langwatch:local already present; loading into Kind"
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  elif [[ -n "${APP_IMAGE:-}" && "$APP_IMAGE" != "langwatch/langwatch:local" ]] \
+    && docker image inspect "$APP_IMAGE" &>/dev/null 2>&1; then
+    info "Tagging $APP_IMAGE as langwatch/langwatch:local and loading into Kind"
+    docker tag "$APP_IMAGE" langwatch/langwatch:local
     kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
   else
-    fail "app image $app_image not found — the values-local.yaml profile pins images.app.tag=local (pullPolicy: Never) and the LWQL render Job needs it; build/load it before running the install suites"
+    # Derive the chart default the same way the workflow's Resolve step does.
+    local repo tag default_image
+    repo=$(helm show values "$CHART_DIR" 2>/dev/null | awk '/^ *repository:/{print $2; exit}')
+    tag=$(helm show values "$CHART_DIR" 2>/dev/null | awk '/^ *tag:/{print $2; exit}')
+    default_image="${repo}:${tag}"
+    if [[ -n "$repo" && -n "$tag" ]] && docker image inspect "$default_image" &>/dev/null 2>&1; then
+      info "Tagging chart default $default_image as langwatch/langwatch:local and loading into Kind"
+      docker tag "$default_image" langwatch/langwatch:local
+      kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+    else
+      fail "cannot produce langwatch/langwatch:local — the values-local.yaml profile pins images.app.tag=local (pullPolicy: Never) and the LWQL render Job needs it; tried: existing :local (absent), \$APP_IMAGE='${APP_IMAGE:-}' (absent or itself :local), chart default '${default_image}' (absent). Build/load the app image before running the install suites"
+    fi
   fi
 
   pass "Images loaded"
