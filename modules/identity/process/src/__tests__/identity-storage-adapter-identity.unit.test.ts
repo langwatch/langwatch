@@ -616,20 +616,30 @@ describe("better-auth over the identity storage adapter", () => {
     });
 
     describe("when the sign-in token refresh restates the account's own provider", () => {
-      /** @scenario "A sign-in that echoes the account's own provider back is served, not refused" */
-      it("writes the tokens instead of refusing the echo", async () => {
+      type AuthContext = Awaited<Stack["auth"]["$context"]>;
+      let userId: string;
+      let context: AuthContext;
+      let google:
+        | Awaited<ReturnType<AuthContext["internalAdapter"]["findAccounts"]>>[number]
+        | undefined;
+
+      beforeEach(async () => {
         await signUp(stack.auth, EMAIL);
-        const userId = userIdOf(stack);
-        const context = await stack.auth.$context;
+        userId = userIdOf(stack);
+        context = await stack.auth.$context;
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
           issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
-        const google = (await context.internalAdapter.findAccounts(userId)).find(
+        google = (await context.internalAdapter.findAccounts(userId)).find(
           (row) => row.providerId === "google",
         );
+      });
+
+      /** @scenario "A sign-in that echoes the account's own provider back is served, not refused" */
+      it("writes the tokens instead of refusing the echo", async () => {
         const statedBefore = stack.commands.length;
 
         // better-auth 1.7's `oauth2/link-account` sends `providerId` in the
@@ -657,19 +667,6 @@ describe("better-auth over the identity storage adapter", () => {
 
       /** @scenario "A sign-in that changes the account's provider is still refused" */
       it("still refuses a provider that differs from the row it names", async () => {
-        await signUp(stack.auth, EMAIL);
-        const userId = userIdOf(stack);
-        const context = await stack.auth.$context;
-        await context.internalAdapter.linkAccount({
-          userId,
-          providerId: "google",
-          issuer: oauthIssuer("google"),
-          accountId: "sub-google-1",
-        });
-        const google = (await context.internalAdapter.findAccounts(userId)).find(
-          (row) => row.providerId === "google",
-        );
-
         // Equality is the whole safety argument: an echo writes nothing, but
         // a DIFFERENT provider is a real linkage rewrite and would repoint
         // the row at another IdP.

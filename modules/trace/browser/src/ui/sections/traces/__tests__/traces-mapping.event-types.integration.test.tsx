@@ -60,14 +60,14 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 }));
 
 /** A trace with no events of the project-wide types above. */
-const traceWithoutEvents = {
+const traceWithoutEvents: Trace = {
   trace_id: "trace-1",
   project_id: "test-project",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
   spans: [],
   events: [],
-} as unknown as Trace;
+};
 
 function renderEventsMapping() {
   const traceMapping: MappingState = {

@@ -57,13 +57,13 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 const { TracesMapping } = await import("../traces-mapping.tsx");
 const { EvaluatorTracesMapping } = await import("../../evaluations/evaluator-traces-mapping.tsx");
 
-const TRACE_IN_A_THREAD = {
+const TRACE_IN_A_THREAD: Trace = {
   trace_id: "trace-1",
   project_id: "project-1",
   metadata: { thread_id: "thread-1" },
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
   spans: [],
-} as unknown as Trace;
+};
 
 /** What the thread read asked for on its first call. */
 function threadReadInput(): { withEditOverlay?: boolean } {

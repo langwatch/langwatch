@@ -47,13 +47,13 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 
 const { TracesMapping } = await import("../traces-mapping.tsx");
 
-const TRACE = {
+const TRACE: Trace = {
   trace_id: "trace-1",
   project_id: "project-1",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
   spans: [],
-} as unknown as Trace;
+};
 
 /** A mapping whose columns make both the span and the annotation expansion available. */
 const BOTH_EXPANDABLE = {

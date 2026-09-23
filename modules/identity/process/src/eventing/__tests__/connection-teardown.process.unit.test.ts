@@ -25,13 +25,13 @@ function context(at: number): ProcessHandlerContext<ConnectionTeardownIntents> {
     key: CONNECTION,
     projectId: ORG,
     intents: {
-      completeTeardown: (key: string, payload: unknown) => ({
+      completeTeardown: (key, payload) => ({
         messageKey: key,
         intentType: "completeTeardown",
         payload,
       }),
     },
-  } as unknown as ProcessHandlerContext<ConnectionTeardownIntents>;
+  };
 }
 
 describe("the connection teardown grace", () => {

@@ -1,9 +1,10 @@
 /** @vitest-environment node */
 
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
+import {
+  createTenantId,
+  type ProjectionStoreContext,
+  type StateProjectionStore,
+  type StoredProjection,
 } from "@langwatch/eventing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
@@ -149,7 +150,10 @@ async function fold(
 ): Promise<StoredProjection<SsoConnectionFoldState>> {
   const store = new InMemoryProjectionStore();
   const projection = new SsoConnectionStateFoldProjection({ store });
-  const context = { aggregateId: CONNECTION, tenantId: ORG };
+  const context: ProjectionStoreContext = {
+    aggregateId: CONNECTION,
+    tenantId: createTenantId(ORG),
+  };
   let state: SsoConnectionFoldState = {
     ...(
       projection as unknown as {
@@ -176,7 +180,7 @@ async function fold(
         updatedAt: applied.occurredAt,
         version: projection.version,
       },
-      context as unknown as ProjectionStoreContext,
+      context,
     );
   }
   return store.stored!;

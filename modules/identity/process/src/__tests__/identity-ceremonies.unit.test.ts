@@ -209,7 +209,7 @@ describe("the identity ceremonies", () => {
       // There is deliberately no user.create ceremony. The mint used to live
       // there ungated, which made a sign-up on an unmigrated organization
       // write `User.userHashKey` it otherwise would not have.
-      expect((ceremonies as unknown as Record<string, unknown>).afterUserCreate).toBeUndefined();
+      expect(ceremonies).not.toHaveProperty("afterUserCreate");
       expect(users.storeUserHashKeyIfMissing).not.toHaveBeenCalled();
     });
   });

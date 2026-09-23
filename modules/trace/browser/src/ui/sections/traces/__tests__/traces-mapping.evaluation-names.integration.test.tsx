@@ -60,14 +60,14 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 }));
 
 /** A trace that was not scored by the project-wide evaluators above. */
-const traceWithoutEvaluations = {
+const traceWithoutEvaluations: Trace = {
   trace_id: "trace-1",
   project_id: "test-project",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
   spans: [],
   evaluations: [],
-} as unknown as Trace;
+};
 
 /** Render with a single column already mapped to the "evaluations" source. */
 function renderEvaluationsMapping() {

@@ -61,7 +61,7 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 }));
 
 /** A trace that contains "step_2a_research_iter1" but NOT "Research.aexecute_stream". */
-const traceWithoutResearchSpan = {
+const traceWithoutResearchSpan: Trace = {
   trace_id: "trace-1",
   project_id: "test-project",
   metadata: {},
@@ -75,7 +75,7 @@ const traceWithoutResearchSpan = {
       timestamps: { started_at: 1, finished_at: 2 },
     },
   ],
-} as unknown as Trace;
+};
 
 function renderSpansMapping() {
   return render(

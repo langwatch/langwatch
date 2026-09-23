@@ -87,7 +87,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: USER,
     type: "lw.identity.test",
     data,
-  } as unknown as Command<T>;
+  };
 }
 
 const base = { tenantId: USER, userId: USER, occurredAtMs: T0, actor: ACTOR };
