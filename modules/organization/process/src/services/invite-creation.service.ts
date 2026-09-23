@@ -34,8 +34,8 @@ import {
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { classifyInvitesByMemberType } from "../rules/invite-memberships.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
-import { InviteService } from "./invite.service.ts";
 
 const logger = createLogger("langwatch:invites");
 
@@ -138,7 +138,7 @@ export class InviteCreationService {
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
-      InviteService.classifyInvitesByMemberType({
+      classifyInvitesByMemberType({
         invites: newInvites,
         customRoleMap,
         isViewOnlyCustomRole: (permissions) => this.deps.seats.isViewOnlyCustomRole(permissions),

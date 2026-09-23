@@ -21,8 +21,8 @@ import {
   type InviteAssignableRoles,
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
+import { resolveInviteTeamMemberships } from "../rules/invite-memberships.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
-import { InviteService } from "./invite.service.ts";
 
 const logger = createLogger("langwatch:invites");
 
@@ -182,8 +182,8 @@ export class InviteAcceptanceService {
    */
   private async assignableTeamMemberships(
     invite: OrganizationInvite,
-  ): Promise<ReturnType<typeof InviteService.resolveInviteTeamMemberships>> {
-    const teamMembershipData = InviteService.resolveInviteTeamMemberships({
+  ): Promise<ReturnType<typeof resolveInviteTeamMemberships>> {
+    const teamMembershipData = resolveInviteTeamMemberships({
       role: invite.role,
       teamIds: invite.teamIds,
       teamAssignments: invite.teamAssignments,

@@ -5,7 +5,7 @@ import type {
   JoinRequestLifecycle,
   JoinRequestNotification,
 } from "../eventing/join-request-lifecycle.process.ts";
-import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
 import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "./join-request.service.ts";
@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:identity:join-request-lifecycle");
  */
 export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecycle {
   static create(
-    reads: Pick<PrismaJoinRequestReadRepository, "tryFindRequest">,
+    reads: Pick<JoinRequestReadRepository, "tryFindRequest">,
     notifier: JoinRequestNotifier,
     joinRequests: () => Pick<JoinRequestService, "expireJoin">,
   ): JoinRequestLifecycleDispatcherAdapter {
@@ -27,7 +27,7 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
   }
 
   private constructor(
-    private readonly reads: Pick<PrismaJoinRequestReadRepository, "tryFindRequest">,
+    private readonly reads: Pick<JoinRequestReadRepository, "tryFindRequest">,
     private readonly notifier: JoinRequestNotifier,
     private readonly joinRequests: () => Pick<JoinRequestService, "expireJoin">,
   ) {}
