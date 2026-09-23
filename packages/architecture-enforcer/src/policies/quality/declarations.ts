@@ -151,7 +151,7 @@ function parseProject(
 function readProject(configPath: string): ts.ParsedCommandLine | undefined {
   if (!existsSync(configPath)) return void 0;
 
-  const read = ts.readConfigFile(configPath, ts.sys.readFile);
+  const read = ts.readConfigFile(configPath, (path) => ts.sys.readFile(path));
   if (read.error) return void 0;
 
   return ts.parseJsonConfigFileContent(

@@ -238,7 +238,7 @@ export const conversationContextSchema = z.object({
 
 export type ConversationContext = z.infer<typeof conversationContextSchema>;
 
-export const instrumentationScopeSchema = z.object({
+const instrumentationScopeSchema = z.object({
   name: z.string(),
   version: z.string().nullable(),
 });

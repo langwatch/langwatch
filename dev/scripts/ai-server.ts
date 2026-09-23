@@ -97,7 +97,7 @@ const server = createServer(async (req, res) => {
   // Log trace context headers when present (for OTEL propagation debugging)
   const traceparent = req.headers.traceparent;
   if (traceparent) {
-    console.log(`[${timestamp}] Trace context: traceparent=${traceparent}`);
+    console.log(`[${timestamp}] Trace context: traceparent=${String(traceparent)}`);
   }
 
   // CORS headers for browser testing
@@ -182,7 +182,7 @@ const server = createServer(async (req, res) => {
       const extractedTraceId = extractedSpan?.spanContext().traceId;
       const extractedSpanId = extractedSpan?.spanContext().spanId;
       console.log(
-        `[${timestamp}] OTEL context extraction: traceparent=${traceparent ?? "none"}, ` +
+        `[${timestamp}] OTEL context extraction: traceparent=${String(traceparent ?? "none")}, ` +
           `extractedTraceId=${extractedTraceId ?? "none"}, extractedSpanId=${extractedSpanId ?? "none"}`,
       );
 

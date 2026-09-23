@@ -212,11 +212,10 @@ describe("explicit Prisma lifecycle", () => {
 
   it("disconnects the client and pool exactly once", async () => {
     const order: string[] = [];
-    const client = fakeClient({
-      $disconnect: vi.fn(async () => {
-        order.push("client");
-      }),
+    const disconnect = vi.fn(async () => {
+      order.push("client");
     });
+    const client = fakeClient({ $disconnect: disconnect });
     const end = vi.fn(async () => {
       order.push("pool");
     });
@@ -225,7 +224,7 @@ describe("explicit Prisma lifecycle", () => {
 
     await Promise.all([shutdown.shutdown(connection), shutdown.shutdown(connection)]);
 
-    expect(client.$disconnect).toHaveBeenCalledOnce();
+    expect(disconnect).toHaveBeenCalledOnce();
     expect(end).toHaveBeenCalledOnce();
     expect(order).toEqual(["client", "pool"]);
   });

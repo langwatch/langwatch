@@ -111,7 +111,7 @@ describe("binding a server to a contract at runtime", () => {
     // guard behind it is reached at all.
     const declaration: {
       router(factory: TrpcProcedureFactory<object>, app: () => ReviewApi): object;
-    } = Reflect.apply(once.build, once, []);
+    } = Reflect.apply(Reflect.get(once, "build"), once, []);
 
     expect(() => declaration.router(inertRuntime, () => ({}) as ReviewApi)).toThrow(
       /no implementation for procedure "archive"/,

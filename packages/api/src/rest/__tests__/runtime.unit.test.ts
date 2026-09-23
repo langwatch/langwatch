@@ -65,7 +65,7 @@ describe("defineRestRouter", () => {
       routes: [{ method: "get" }, { method: "delete" }],
     });
 
-    expect(declaration.routes[1]?.output.safeParse(void 0).success).toBe(true);
+    expect(declaration.routes[1]?.output.validate(void 0)).toBe(true);
   });
 
   it("rejects conflicting request sources and malformed path parameters", () => {
@@ -79,7 +79,7 @@ describe("defineRestRouter", () => {
         .patch("/:id", "updateAnnotation")
         .withParams(z.object({ id: z.string() }));
 
-      Reflect.apply(route.withInput, route, [z.object({ id: z.string() })]);
+      Reflect.apply(Reflect.get(route, "withInput"), route, [z.object({ id: z.string() })]);
     }).toThrow(/declared by multiple sources/);
 
     expect(() => {
@@ -92,13 +92,15 @@ describe("defineRestRouter", () => {
         z.object({ kind: z.literal("reference"), id: z.string() }),
       ]);
 
-      Reflect.apply(route.withInput, route, [body]);
+      Reflect.apply(Reflect.get(route, "withInput"), route, [body]);
     }).toThrow(/declared by multiple sources/);
 
     expect(() => {
       const dynamicPath = "/:id" as string;
       const route = router().get(dynamicPath, "getAnnotation");
-      Reflect.apply(route.withParams, route, [z.object({ annotationId: z.string() })]);
+      Reflect.apply(Reflect.get(route, "withParams"), route, [
+        z.object({ annotationId: z.string() }),
+      ]);
     }).toThrow(/must exactly match/);
 
     expect(() => {
@@ -165,7 +167,7 @@ describe("defineRestRouter", () => {
           .withVersion("2026-08-07")
           .get("/health", "readHealth");
 
-        Reflect.apply(route.handle, route, [() => {}]);
+        Reflect.apply(Reflect.get(route, "handle"), route, [() => {}]);
       }).toThrow(/must declare withPermission\(\) or withAccess\(\)/);
     });
   });

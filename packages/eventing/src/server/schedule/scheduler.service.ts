@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { clearTimeout, setTimeout } from "node:timers";
 
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";

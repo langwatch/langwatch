@@ -270,15 +270,10 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        try {
-          await router.dispatch([event], { tenantId });
-          expect.unreachable("should have thrown");
-        } catch (e) {
-          expect(e).toBeInstanceOf(AggregateError);
-          const aggErr = e as AggregateError;
-          // Should contain errors from both fold and map
-          expect(aggErr.errors.length).toBeGreaterThanOrEqual(2);
-        }
+        // Should contain errors from both fold and map
+        await expect(router.dispatch([event], { tenantId })).rejects.toSatisfy(
+          (error: unknown) => error instanceof AggregateError && error.errors.length >= 2,
+        );
       });
     });
 

@@ -7,9 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkflowStore } from "../../../../behavior/workflow-store.ts";
 
-// Mock toaster
+const { toastCreate } = vi.hoisted(() => ({ toastCreate: vi.fn() }));
+
 vi.mock("@langwatch/browser-host/toaster", () => ({
-  toaster: { create: vi.fn() },
+  toaster: { create: toastCreate },
 }));
 
 // Mock logger
@@ -22,11 +23,7 @@ vi.mock("@langwatch/observability/browser", () => ({
   }),
 }));
 
-import { toaster } from "@langwatch/browser-host/toaster";
-
 import { useHandleServerMessage } from "../use-post-event.tsx";
-
-const toastCreate = vi.mocked(toaster.create);
 
 /** The toast `alertOnError` raised, or undefined if it never fired. */
 function lastToast() {

@@ -67,12 +67,10 @@ export class PrismaSuiteRepository extends SuiteRepository {
     super();
   }
 
-  // Arrow instance properties, not prototype methods: `SuiteRepository`
-  // declares these as property-typed members (a test asserts on
-  // `repo.create` etc without calling it, which is unsafe against a
-  // method-shorthand member), and TypeScript requires a subclass to match
-  // that member kind. No further subclass extends this class and nothing
-  // enumerates its instances, so the conversion is safe.
+  // Arrow instance properties: `SuiteRepository` declares property-typed
+  // members (a test asserts on `repo.create` without calling it) and a
+  // subclass must match that member kind. Nothing extends or enumerates
+  // this class, so the conversion is safe.
   create = async (input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite> => {
     const row = await this.database.simulationSuite.create({
       data: {

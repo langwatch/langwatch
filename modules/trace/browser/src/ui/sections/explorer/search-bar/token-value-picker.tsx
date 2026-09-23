@@ -36,7 +36,7 @@ interface TokenValuePickerProps {
 export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onClose }) => {
   const setFacetValueAt = useFilterStore((s) => s.setFacetValueAt);
   const setSyntaxHelpOpen = useUIStore((s) => s.setSyntaxHelpOpen);
-  const { data: facets = [] } = useTraceFacets();
+  const { data: facets } = useTraceFacets();
   const [filter, setFilter] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);

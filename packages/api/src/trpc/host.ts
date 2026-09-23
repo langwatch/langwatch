@@ -207,7 +207,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       throw new Error("The tRPC root was composed; a namespace can no longer be mounted on it.");
     }
 
-    const mount = this.#runtime.mount as unknown as (
+    const mount = this.#runtime.mount.bind(this.#runtime) as unknown as (
       declaration: MountableTransport,
       app: (ctx: TrpcRequestContext) => unknown,
       options?: TrpcMountOptions<TrpcRequestContext>,
