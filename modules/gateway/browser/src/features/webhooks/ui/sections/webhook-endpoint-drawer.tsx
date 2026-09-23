@@ -78,7 +78,7 @@ function withFamilyToggled(selected: Set<string>, family: string, on: boolean): 
   }
   next.add(wildcard);
   // The wildcard implies every type; drop redundant exact entries.
-  for (const value of [...next]) {
+  for (const value of next) {
     if (value.startsWith(`${family}.`) && value !== wildcard) {
       next.delete(value);
     }
@@ -144,9 +144,10 @@ function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
 
 type DestinationInput = Pick<EndpointInput, "destinationKind" | "url" | "sqs">;
 
-/** The queue fields as the wire takes them: trimmed, and empty ones left
- *  out entirely rather than sent as blanks. An absent secret is what keeps
- *  the stored one rather than clearing it. */
+/**
+ * The queue fields as the wire takes them: trimmed, and empty ones left out entirely rather than
+ * sent as blanks. An absent secret is what keeps the stored one rather than clearing it.
+ */
 function sqsInput({
   queueUrl,
   roleArn,

@@ -52,10 +52,9 @@ export type MarkColourSite =
   | { kind: "unresolved"; role: string; text: string; line: number };
 
 /**
- * Every declaration in the file that binds a name to a string literal, so
- * `stroke={SPARK}` can be answered. Both `const SPARK = "..."` and the string
- * members of `const THEME = { stroke: "..." }` are recorded, the latter under
- * `THEME.stroke`, because that is how a caller writes the reference.
+ * Every declaration in the file that binds a name to a string literal, so `stroke={SPARK}` can be
+ * answered. Both `const SPARK = "..."` and the string members of `const THEME = { stroke: "..." }`
+ * are recorded, the latter under `THEME.stroke`, because that is how a caller writes the reference.
  */
 function isNamedVariableDeclaration(
   node: Node,
@@ -212,10 +211,9 @@ export function markColourSites(source: SourceFile): MarkColourSite[] {
   };
 
   /**
-   * `export const CHART_SPARK_STROKE = "..."` — a mark colour that touches no
-   * attribute in the file declaring it, because its consumers import it. The
-   * role is the declaration's own name. Bypasses `record`, whose role check is
-   * the attribute vocabulary rather than this one.
+   * `export const CHART_SPARK_STROKE = "..."` — a mark colour that touches no attribute in the file
+   * declaring it, because its consumers import it. The role is the declaration's own name. Bypasses
+   * `record`, whose role check is the attribute vocabulary rather than this one.
    */
   const fromDeclaration = (node: Node): void => {
     if (!isMarkNameDeclaration(node)) return;

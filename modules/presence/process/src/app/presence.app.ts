@@ -1,8 +1,8 @@
 import type { EventEmitter } from "node:events";
 
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { PresenceBroadcastFabric } from "@langwatch/presence-contract";
 import {
+  type PresenceBroadcastFabric,
   PresenceApi,
   type PresenceApi as PresenceApiContract,
   type PresenceCursorSubscription,
@@ -44,11 +44,9 @@ export interface PresenceEmitter {
 }
 
 /**
- * The closed members presence derives its own broadcast fabric from: the
- * process's shared Redis connection (or null, degraded), and where a
- * best-effort broadcast warning is reported. `broadcast`/`emitters`/
- * `diagnostics` are a test-only fabric seam; production composition leaves
- * them absent and gets the derived Redis-backed fabric.
+ * The closed members presence derives its broadcast fabric from: shared Redis (or null, degraded)
+ * and a warning sink. `broadcast`/`emitters`/`diagnostics` are a test-only seam, absent in
+ * production.
  */
 type PresenceProcessMembers = Readonly<{
   redis: Redis | Cluster | null;

@@ -1,6 +1,7 @@
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { Context, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
+import type * as apiModule from "@opentelemetry/api";
 
 import type { SpanConfig, TraceConfig } from "../model/foundry-types.ts";
 import { createFoundryProvider } from "./otel-browser.ts";
@@ -33,8 +34,10 @@ interface FoundryExecutor {
 
 const otelDeps = { context, trace, SpanStatusCode } as const;
 
-/** Cache long-lived executors (credential/endpoint/service.name); avoids rebuild per
- * click. Teardown at page-hide. */
+/**
+ * Cache long-lived executors (credential/endpoint/service.name); avoids rebuild per click. Teardown
+ * at page-hide.
+ */
 const executorCache = new Map<string, FoundryExecutor>();
 let pageHideHookInstalled = false;
 
@@ -62,8 +65,10 @@ function ensurePageHideHook(): void {
   });
 }
 
-/** Cached executor (reuses same provider for same options); caller doesn't close
- * (page-hide handler does). */
+/**
+ * Cached executor (reuses same provider for same options); caller doesn't close (page-hide handler
+ * does).
+ */
 export function getFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   ensurePageHideHook();
   const key = executorCacheKey(opts);
@@ -150,9 +155,9 @@ function buildSpan(
   baseTime: number,
   traceConfig: TraceConfig,
   otel: {
-    context: typeof import("@opentelemetry/api").context;
-    trace: typeof import("@opentelemetry/api").trace;
-    SpanStatusCode: typeof import("@opentelemetry/api").SpanStatusCode;
+    context: typeof apiModule.context;
+    trace: typeof apiModule.trace;
+    SpanStatusCode: typeof apiModule.SpanStatusCode;
   },
 ): string {
   const startTimeMs = baseTime + config.offsetMs;
@@ -356,8 +361,10 @@ const GEN_AI_SYSTEMS: { system: string; prefixes?: string[]; fragments?: string[
   { system: "cohere", prefixes: ["command"], fragments: ["cohere"] },
 ];
 
-/** Map model string to OTel gen_ai.system; heuristic infers vendor from
- * prefixes/families. Undefined for unknown (avoids misleading vendor). */
+/**
+ * Map model string to OTel gen_ai.system; heuristic infers vendor from prefixes/families. Undefined
+ * for unknown (avoids misleading vendor).
+ */
 function inferGenAiSystem(model: string | undefined): string | undefined {
   if (!model) return undefined;
   const id = model.toLowerCase();

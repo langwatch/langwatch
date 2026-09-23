@@ -71,13 +71,8 @@ export function scopedProjectId(): string | undefined {
 }
 
 /**
- * Publish the project the command line pointed this request at, BEFORE any
- * credential resolves: the id or slug as the user typed it, not a resolved id.
- *
- * Set from the `preAction` hook rather than passed down through the commands,
- * so a command inherits `--project` without its action having to accept the
- * value and hand it on (cli/utils/projectOption.ts). The resolver reads it
- * with `requestedProject()` and turns it into the project the request names.
+ * Publish the project the command line named (as typed) before any credential resolves. Set from
+ * `preAction` so commands inherit `--project`; the resolver reads it with `requestedProject()`.
  */
 export function setRequestedProject(selector: string | undefined): void {
   currentHolder().requestedProject = selector;
@@ -93,13 +88,9 @@ export function requestedProject(): string | undefined {
 }
 
 /**
- * Take the right to warn that `LANGWATCH_PROJECT_ID` was ignored, once per
- * request. True the first time it is asked in this holder, false afterwards.
- *
- * Request-scoped rather than process-scoped because the daemon serves many
- * requests from one process: a module-level flag would warn the first caller
- * and leave every later one running against the key's own project with
- * nothing on screen saying so, which is the silence the warning exists to end.
+ * Take the once-per-request right to warn that `LANGWATCH_PROJECT_ID` was ignored. Request-scoped
+ * because the daemon serves many requests from one process; a module flag would warn only the
+ * first.
  */
 export function claimProjectEnvIgnoredWarning(): boolean {
   const holder = currentHolder();

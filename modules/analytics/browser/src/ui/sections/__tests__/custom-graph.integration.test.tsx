@@ -37,7 +37,7 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
  * pass vacuously. Giving it a size is the only way to see what it drew.
  */
 vi.mock("recharts", async () => {
-  const actual = await vi.importActual<typeof import("recharts")>("recharts");
+  const actual = await vi.importActual<typeof rechartsModule>("recharts");
   return {
     ...actual,
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -54,6 +54,8 @@ vi.mock("../../../behavior/use-filter-params.ts", () => ({
     queryOpts: { enabled: true },
   }),
 }));
+
+import type * as rechartsModule from "recharts";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { CustomGraph, type CustomGraphInput } from "../custom-graph.tsx";

@@ -111,7 +111,7 @@ describe("jobEnvelope decode failures", () => {
         });
         // Same key, garbage bytes: the body is PRESENT and unreadable — the
         // rolling-deploy codec-skew shape, not an eviction.
-        for (const key of [...redisBlobs.store.keys()]) {
+        for (const key of redisBlobs.store.keys()) {
           redisBlobs.store.set(key, Buffer.from("not a valid compressed body"));
         }
 
@@ -131,7 +131,7 @@ describe("jobEnvelope decode failures", () => {
           tieredBlobs,
           projectId,
         });
-        for (const key of [...redisBlobs.store.keys()]) {
+        for (const key of redisBlobs.store.keys()) {
           redisBlobs.store.set(key, Buffer.from("garbage"));
         }
 
@@ -163,7 +163,7 @@ describe("jobEnvelope decode failures", () => {
         });
         const bomb = Buffer.alloc(MAX_BLOB_BYTES + 1, "a");
         const { gzipSync } = await import("node:zlib");
-        for (const key of [...redisBlobs.store.keys()]) {
+        for (const key of redisBlobs.store.keys()) {
           redisBlobs.store.set(key, gzipSync(bomb));
         }
 
@@ -189,7 +189,7 @@ describe("jobEnvelope decode failures", () => {
         });
         // Valid gzip, so it inflates — then fails to PARSE, echoing its content.
         const { gzipSync } = await import("node:zlib");
-        for (const key of [...redisBlobs.store.keys()]) {
+        for (const key of redisBlobs.store.keys()) {
           redisBlobs.store.set(
             key,
             gzipSync(Buffer.from("patient@hospital.example is HIV positive")),
@@ -222,7 +222,7 @@ describe("jobEnvelope decode failures", () => {
         const corrupt = gzipSync(Buffer.from("hello"));
         corrupt.fill(0xff, 10, corrupt.length - 8); // magic intact, stream broken
 
-        for (const key of [...redisBlobs.store.keys()]) {
+        for (const key of redisBlobs.store.keys()) {
           redisBlobs.store.set(key, corrupt);
         }
 

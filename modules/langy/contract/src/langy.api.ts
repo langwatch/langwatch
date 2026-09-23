@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
+import type * as jsonModule from "./json.ts";
 import type {
   LangyConversationDetail,
   LangyConversationEventPage,
@@ -57,9 +58,9 @@ export interface LangyApi {
     projectId: string;
     conversationId: string;
     userId: string;
-    parts: import("./json.ts").LangyMessagePart[];
+    parts: jsonModule.LangyMessagePart[];
     title?: string | null;
-    role?: import("./json.ts").LangyMessageRole;
+    role?: jsonModule.LangyMessageRole;
     messageId?: string;
   }): Promise<{ messageId: string }>;
   getLocalRecord(input: {

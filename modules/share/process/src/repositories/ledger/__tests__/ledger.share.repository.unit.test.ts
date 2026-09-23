@@ -8,10 +8,8 @@ import type { ShareRepository } from "../../share.repository.ts";
 import { LedgerShareRepository } from "../ledger.share.repository.ts";
 
 /**
- * ADR-092 delivery-plan PR 3 (D-PR3-10). One property carries this file: a
- * share write goes to exactly one of the two writers, decided per organization
- * by the cutover gate. What the database does with a consumed view is pinned on
- * the grant head and, against a real Postgres, in the integration suite here.
+ * ADR-092 delivery-plan PR 3 (D-PR3-10): a share write goes to exactly one of the two writers,
+ * decided per organization by the cutover gate. Consumed views are pinned in the integration suite.
  */
 
 const ORGANIZATION_ID = "organization_share_1";

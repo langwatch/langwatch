@@ -27,7 +27,7 @@ const { fetchMock, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() =
 // The session hook polls a live endpoint on mount; the screen under test is the
 // signed-out one. Everything below it, `signIn` included, stays real.
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return { ...actual, useSession: () => sessionRef.current };
 });
 
@@ -47,6 +47,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import SignIn from "../signin-screen.tsx";
 
 /** What the server puts on the wire for the sign-in call. */

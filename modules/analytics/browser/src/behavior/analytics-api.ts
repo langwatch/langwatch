@@ -23,7 +23,7 @@ import type { FilterParam } from "../model/analytics-filter-params.ts";
 import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
-/** Dashboard owns these wire schemas; WireOf maps persisted values to their transport representation. */
+/** Dashboard owns these wire schemas; WireOf maps persisted values to their wire representation. */
 type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
 type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;

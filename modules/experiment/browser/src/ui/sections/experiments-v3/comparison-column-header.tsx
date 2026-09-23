@@ -94,7 +94,7 @@ export function ComparisonColumnHeader({
       </Button>
       {hasMissingMappings && (
         <Tooltip
-          content="Needs configuration — click to pick variants"
+          content="Needs configuration: click to pick variants"
           positioning={{ placement: "top" }}
           openDelay={0}
           showArrow

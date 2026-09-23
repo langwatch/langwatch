@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Tests the Secrets settings screen. Moved from platform app, adds testing for the four
- * refusal codes this feature raises. Credentials are password fields, never rendered.
- * Spec: specs/secrets/secrets-manager.feature
+ * The Secrets settings screen, including the four refusal codes this feature raises. Credentials
+ * are password fields, never rendered.
+ * @see specs/secrets/secrets-manager.feature
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";

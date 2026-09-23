@@ -1,13 +1,10 @@
 /**
- * `langwatch query "<sql>" -o json` — runs a LangWatchQL statement through the
- * REST door and prints the rows on the CLI output port. Driven through the
- * REAL command tree (`buildProgram`), same shape as `whoami-json.unit.test.ts`,
- * so the port's own resolution and serialization are exercised, not stubbed.
- *
- * Feature: specs/typescript-sdk/cli-cross-project-access.feature
- * Rule: A headless coding agent runs a query from the CLI
+ * `langwatch query "<sql>" -o json` through the REAL command tree (`buildProgram`), like
+ * `whoami-json.unit.test.ts`, so the output port's resolution and serialization are exercised.
+ * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { QueryApiError } from "@/client-sdk/services/query/query-api.service";
 
 const queryMock = vi.fn();

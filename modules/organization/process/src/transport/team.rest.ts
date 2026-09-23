@@ -11,8 +11,8 @@ import { moduleApi } from "@langwatch/kernel/module-api";
  * Routes that address a single team (`:id`) check permissions at team scope;
  * collection routes stay at organization scope as they operate on that whole set.
  */
-import type { organizationTeamRestMemberSchema } from "@langwatch/organization-contract";
 import {
+  type organizationTeamRestMemberSchema,
   organizationTeamRestAddMemberSchema,
   organizationTeamRestArchivedSchema,
   organizationTeamRestCreateSchema,

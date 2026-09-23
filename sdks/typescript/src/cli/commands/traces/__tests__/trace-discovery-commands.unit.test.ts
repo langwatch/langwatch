@@ -1,12 +1,6 @@
 /**
- * `langwatch trace facets` and `langwatch trace fields`, with the API mocked.
- *
- * The pair is the discovery loop: fields says what exists, facets says what is
- * in it. What matters here is that each sends what the flags asked for and
- * renders the shape the endpoint answered with — the facets door answers two
- * different shapes from one path, and telling them apart by the wrong key is
- * how a caller ends up with an empty table over a full payload.
- *
+ * `trace facets` and `trace fields` with the API mocked: each sends what the flags asked and
+ * renders the answered shape. The facets door answers two shapes from one path.
  * @see specs/traces/trace-filter-api.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -17,26 +17,33 @@ const GATED_NOTE = "Needs a Slack app connection";
 
 interface Props {
   cadence: DraftCadence;
-  /** Trace automations and graph alerts render against different variable
-   *  sets, so the picker only offers layouts built for the draft's kind. */
+  /**
+   * Trace automations and graph alerts render against different variable sets, so the picker only
+   * offers layouts built for the draft's kind.
+   */
   kind: SlackBlockKitTemplateKind;
-  /** For a report: what it sends. Only layouts that can render that source's
-   *  data are offered — a chart layout has nothing to plot for a trace-query
-   *  report. A dashboard needs no layout at all, so the form owner does not
-   *  render the picker for it. */
+  /**
+   * For a report: what it sends. Only layouts that can render that source's data are offered — a
+   * chart layout has nothing to plot for a trace-query report. A dashboard needs no layout at all,
+   * so the form owner does not render the picker for it.
+   */
   reportSource?: ReportTemplateSource;
-  /** The chosen delivery method. Templates that lead with a modern block
-   *  (`gatedBlock`) render in full only on a bot connection, so on a webhook
-   *  they show but can't be picked. */
+  /**
+   * The chosen delivery method. Templates that lead with a modern block (`gatedBlock`) render in
+   * full only on a bot connection, so on a webhook they show but can't be picked.
+   */
   deliveryMethod: SlackDeliveryMethod;
   hasEvaluationFilter: boolean;
-  /** The current value of slice.template — used to highlight which preset
-   *  (if any) matches it. Custom edits highlight nothing. */
+  /**
+   * The current value of slice.template — used to highlight which preset (if any) matches it.
+   * Custom edits highlight nothing.
+   */
   currentSource: string;
   onSelect: (option: SlackBlockKitTemplateOption) => void;
-  /** Picking a layout built for the other cadence. The form owner switches
-   *  the cadence alongside the template so the author doesn't have to make
-   *  the round-trip to the cadence stage. */
+  /**
+   * Picking a layout built for the other cadence. The form owner switches the cadence alongside the
+   * template so the author doesn't have to make the round-trip to the cadence stage.
+   */
   onSelectOtherCadence: (option: SlackBlockKitTemplateOption) => void;
 }
 
@@ -58,8 +65,8 @@ function introFor({
     return "Each layout sends one message when the alert fires. The thumbnail shows structure, not the final look.";
   }
   return cadence === "digest"
-    ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
-    : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look.";
+    ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout: the thumbnail shows structure, not the final look."
+    : "Each matching trace sends its own message. Pick a starting layout: the thumbnail shows structure, not the final look.";
 }
 
 export function SlackBlockKitTemplatePicker({
@@ -132,7 +139,7 @@ export function SlackBlockKitTemplatePicker({
             <Stack gap={2} align="stretch" pt={2}>
               <Text textStyle="xs" color="fg.muted">
                 {otherCadence === "digest"
-                  ? "These layouts bundle every match in a window into one message. Picking one switches this automation's cadence to a 5-minute digest — you can adjust the window in the Cadence section."
+                  ? "These layouts bundle every match in a window into one message. Picking one switches this automation's cadence to a 5-minute digest: you can adjust the window in the Cadence section."
                   : "These layouts send one message per matching trace. Picking one switches this automation's cadence to Immediate."}
               </Text>
               <SimpleGrid
@@ -171,9 +178,11 @@ function Card({
   option: SlackBlockKitTemplateOption;
   isSelected: boolean;
   isDefault: boolean;
-  /** Rendered but not selectable — the current connection can't render this
-   *  layout in full. The wireframe still shows so the author can see what it
-   *  would look like once they connect a Slack app. */
+  /**
+   * Rendered but not selectable — the current connection can't render this layout in full. The
+   * wireframe still shows so the author can see what it would look like once they connect a Slack
+   * app.
+   */
   locked?: boolean;
   lockedNote?: string;
   onClick: () => void;

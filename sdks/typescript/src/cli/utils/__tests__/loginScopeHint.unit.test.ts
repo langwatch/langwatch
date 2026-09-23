@@ -1,8 +1,7 @@
 /**
- * `api-keys create` answers 403 to an organization admin, because a CLI login
- * key is minted without `organization:manage` on purpose. Nothing in the
- * refusal said so, so it read as a missing role rather than a login that was
- * never given the permission.
+ * `api-keys create` answers 403 to an organization admin, because a CLI login key is minted without
+ * `organization:manage` on purpose. Nothing in the refusal said so, so it read as a missing role
+ * rather than a login that was never given the permission.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +14,7 @@ import {
   runWithCredentialHolder,
   setResolvedApiKey,
 } from "@/internal/credentialContext";
+
 import { loginPermissionsHint } from "../loginScopeHint";
 
 const LOGIN_KEY = "sk-lw-login_secret";

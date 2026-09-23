@@ -78,7 +78,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: signInMock,
@@ -97,6 +97,7 @@ vi.mock("../../elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import { InviteLanding } from "../invite-landing.tsx";
 
 const INVITE_CODE = "invite-123";

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import type { Evaluator } from "@langwatch/evaluator-contract";

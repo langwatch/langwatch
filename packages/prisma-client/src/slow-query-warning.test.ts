@@ -12,7 +12,7 @@ const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 // in-memory implementation is what `resetSlowQueryThrottle` drives. Only the
 // logger is stubbed, so the throttle assertions exercise the real thing.
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => ({
     info: vi.fn(),
     warn,
@@ -20,6 +20,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
     debug: vi.fn(),
   }),
 }));
+
+import type * as observabilityModule from "@langwatch/observability";
 
 import {
   reportQueryDuration,

@@ -176,7 +176,8 @@ function SimulationsMenuGroup({
       icon={featureIcons.simulations.icon}
       label={projectNavItems.simulations.title}
       showLabel={showExpanded}
-      children={[
+    >
+      {[
         {
           icon: featureIcons.scenarios.icon,
           label: projectNavItems.scenarios.title,
@@ -199,7 +200,7 @@ function SimulationsMenuGroup({
             pathname.includes("/simulations") && !pathname.includes("/simulations/scenarios"),
         },
       ]}
-    />
+    </CollapsibleMenuGroup>
   );
 }
 

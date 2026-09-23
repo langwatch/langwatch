@@ -6,10 +6,12 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
+import type * as reactModule from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
 import type { PendingBinding } from "../group-binding-input-row.tsx";
+import type * as groupBindingInputRowModule from "../group-binding-input-row.tsx";
 
 const {
   mockUpdateMemberRole,
@@ -127,10 +129,10 @@ vi.mock("../../elements/organization-user-role-field.tsx", () => ({
 }));
 
 vi.mock("../group-binding-input-row.tsx", async () => {
-  const actual = await vi.importActual<typeof import("../group-binding-input-row.tsx")>(
+  const actual = await vi.importActual<typeof groupBindingInputRowModule>(
     "../group-binding-input-row",
   );
-  const React = await vi.importActual<typeof import("react")>("react");
+  const React = await vi.importActual<typeof reactModule>("react");
 
   const STUB_BINDING: PendingBinding = {
     roleValue: "MEMBER",

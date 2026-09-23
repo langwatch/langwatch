@@ -9,10 +9,9 @@ import { ModelProviderProjectScopeService } from "./model-provider-project-scope
 export type ModelProviderEvidenceDatabase = Pick<ProcessMembers["prisma"], "modelProvider">;
 
 /**
- * The setup checklist's provider step, composed from one Prisma client and one project read.
- * Replaces a `prisma.modelProvider.findFirst` once written directly in the API's own composition,
- * which bypassed the encryption rules attached to this read
- * (`specs/model-providers/encrypt-custom-keys.feature`).
+ * The setup checklist's provider step, from one Prisma client and one project read; replaces a
+ * direct `prisma.modelProvider.findFirst` that bypassed the encryption rules on this read.
+ * @see specs/model-providers/encrypt-custom-keys.feature
  */
 export class PostgresModelProviderEvidenceAdapter {
   private constructor(

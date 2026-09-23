@@ -5,8 +5,8 @@
  */
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { CreateLogGroupCommand, PutRetentionPolicyCommand } from "@aws-sdk/client-cloudwatch-logs";
-import type { LambdaClient } from "@aws-sdk/client-lambda";
 import {
+  type LambdaClient,
   CreateFunctionCommand,
   GetFunctionCommand,
   UpdateFunctionCodeCommand,

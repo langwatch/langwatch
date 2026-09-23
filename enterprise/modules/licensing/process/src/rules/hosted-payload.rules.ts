@@ -1,8 +1,6 @@
 /**
- * What a hosted-service call may carry (ADR-156). The body is the install's
- * own JSON, relayed by the gateway untouched, so it is parsed here and never
- * trusted for identity — who the caller is arrives outside it.
- *
+ * What a hosted-service call may carry (ADR-156): the install's own JSON, relayed untouched, so it
+ * is parsed here and never trusted for identity.
  * @see specs/self-hosting/connected-services/hosted-services.feature.draft
  */
 
@@ -34,9 +32,7 @@ const categoryQuestionSchema = z.object({
   id: z.string().min(1),
   kind: z.literal("category"),
   instructions: instructionsSchema,
-  options: z
-    .array(z.object({ name: z.string().min(1), description: z.string().min(1) }))
-    .min(2),
+  options: z.array(z.object({ name: z.string().min(1), description: z.string().min(1) })).min(2),
 });
 
 const hostedQuestionSchema = z.discriminatedUnion("kind", [

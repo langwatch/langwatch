@@ -6,8 +6,8 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
 } from "@langwatch/api/rest";
-import type { gatewayBudgetWireSchema } from "@langwatch/gateway-contract";
 import {
+  type gatewayBudgetWireSchema,
   GatewayApi,
   GatewayWindow,
   toStoredEnum,

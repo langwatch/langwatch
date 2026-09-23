@@ -21,11 +21,8 @@ export function policyKey(conversationId: string): string {
 }
 
 /**
- * The connect turn one folder is owed: the terminal connected while the turn
- * before still read as in flight, so the turn that says the folder is
- * connected starts when that turn's end is folded. Cleared by the first call
- * a turn places on the folder, by the start of the owed turn, and with the
- * share that owed it.
+ * The connect turn one folder is owed, started when the in-flight turn's end is folded. Cleared by
+ * the first call a turn places on the folder, by the owed turn's start, and with the share.
  */
 export function owedConnectTurnKey(conversationId: string): string {
   return `${PREFIX}:connect-owed:${conversationId}`;
@@ -45,10 +42,8 @@ export function controlRequestClaimKey(requestId: string): string {
 }
 
 /**
- * ZSET of a user's open request ids across every project, scored by expiry.
- * A request is addressed to a person: the login that answers it may be on
- * another project than the conversation that asked, the personal project of
- * a device login for instance, so the project is never part of the key.
+ * ZSET of a user's open request ids across every project, scored by expiry. The answering login may
+ * be on another project, so the project is never part of the key.
  */
 export function userRequestsKey(userId: string): string {
   return `${PREFIX}:requests:${userId}`;

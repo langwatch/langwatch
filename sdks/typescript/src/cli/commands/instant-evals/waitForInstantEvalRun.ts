@@ -1,20 +1,6 @@
 /**
- * The `--wait` poll for a run, modelled on `utils/waitForBatchRun.ts`.
- *
- * Same three decisions as the batch wait, for the same reasons: the progress
- * prose is for a person and stays on the spinner (stderr), the verdict is
- * RETURNED so the command puts the same numbers into the one document a
- * machine caller reads, and a run that failed or a wait that timed out sets a
- * failing exit code rather than exiting zero on a red run.
- *
- * What differs is what progress means. A batch counts runs; a run counts rows
- * judged and, of those, how many matched, which is the number the caller
- * actually asked a question to learn:
- *
- * ```
- * Judging... 3,200/10,000 (412 matched)
- * ```
- *
+ * The `--wait` poll for a run, modelled on `utils/waitForBatchRun.ts`: progress on the spinner
+ * (stderr), the verdict returned, failure sets the exit code. Progress is rows judged and matched.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -166,11 +152,9 @@ export async function waitForInstantEvalRun({
 }
 
 /**
- * The run, read once more for the document a machine caller reads.
- *
- * Only reached when the wait ended before any poll succeeded, and a failure
- * here is the caller's own: they asked to wait on a run the platform will not
- * answer for.
+ * The run, read once more for the document a machine caller reads. Only reached when the wait ended
+ * before any poll succeeded, and a failure here is the caller's own: they asked to wait on a run
+ * the platform will not answer for.
  */
 async function lastResort(
   service: Pick<InstantEvalsApiService, "get">,

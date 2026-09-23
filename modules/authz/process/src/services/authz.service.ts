@@ -79,8 +79,6 @@ type ScopeIds = {
   organizationId?: string | undefined;
 };
 
-type OrganizationRoleOrNull = CollectedGrants["organizationRole"];
-
 type CheckArgs = {
   principal: AuthzPrincipalRef;
   permission: AuthzPermission;
@@ -93,11 +91,14 @@ export type AuthzServiceOptions = {
   bindings: AuthzBindingRepository;
   /** Omitted = never cache. */
   epoch?: AuthzEpochRepository;
-  /** Internal rollout knob; omitted = cache off. The composition root
-   *  supplies the env read. */
+  /**
+   * Internal rollout knob; omitted = cache off. The composition root supplies the env read.
+   */
   cacheEnabled?: () => boolean;
-  /** Mirrors isDemoProject()'s dynamic env read; omitted = demo off. The
-   *  composition root supplies the env read. */
+  /**
+   * Mirrors isDemoProject()'s dynamic env read; omitted = demo off. The composition root supplies
+   * the env read.
+   */
   demoProjectId?: () => string | undefined;
   /** Absolute cache-entry age bound; defaults to 30s. */
   cacheMaxAgeMs?: number;
@@ -298,8 +299,10 @@ export class AuthzService extends AuthzServiceContract {
     return this.idDecisions.canBatchPermissionsByIds(args);
   }
 
-  /** Most-specific-first, the order every seam resolves in: an explicit
-   *  project or team wins over the organization it sits in. */
+  /**
+   * Most-specific-first, the order every seam resolves in: an explicit project or team wins over
+   * the organization it sits in.
+   */
   async tryResolveScope({
     projectId,
     teamId,

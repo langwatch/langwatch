@@ -1,8 +1,7 @@
 /**
- * The boot cross-check: no route reaches the router unclassified, and the
- * router's own 405 answer for a declared path is not mistaken for one.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * The boot cross-check: no route reaches the router unclassified, and the router's own 405 answer
+ * for a declared path is not mistaken for one. Spec:
+ * packages/api/specs/transport-declaration-split.feature.
  */
 
 import { moduleApi } from "@langwatch/kernel";

@@ -124,8 +124,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
 }));
 
 vi.mock("@langwatch/langy-browser/langy-page-registration", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/langy-browser/langy-page-registration")>();
+  const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
     useRegisterLangyHandlers: () => undefined,
@@ -182,6 +181,8 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
     datasetRecord: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
   },
 }));
+
+import type * as langyPageRegistrationModule from "@langwatch/langy-browser/langy-page-registration";
 
 import ExperimentsWorkbenchPage from "../workbench.screen.tsx";
 

@@ -21,6 +21,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "./agent.queries.ts";
+import type * as agentQueriesModule from "./agent.queries.ts";
 import type { Agent, AgentWithFields } from "./agent.ts";
 import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
 import type {
@@ -89,13 +90,13 @@ export interface AgentApi {
   }): Promise<AgentCopy[]>;
   copyForActor(
     input: CopyAgentCommand & { actorId: string },
-  ): Promise<import("./agent.queries.ts").AgentCopyCreated>;
+  ): Promise<agentQueriesModule.AgentCopyCreated>;
   pushToCopiesForActor(input: {
     agentId: string;
     projectId: string;
     copyIds?: string[];
     actorId: string;
-  }): Promise<import("./agent.queries.ts").AgentPushToCopies>;
+  }): Promise<agentQueriesModule.AgentPushToCopies>;
   syncFromSourceForActor(input: {
     agentId: string;
     projectId: string;

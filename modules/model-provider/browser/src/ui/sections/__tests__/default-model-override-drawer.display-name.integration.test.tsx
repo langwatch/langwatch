@@ -3,6 +3,7 @@
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 
 // Orthogonal to display-name threading and pulls in its own data hooks.
 vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+  const actual = await vi.importActual<typeof authzBrowserKitModule>(
     "@langwatch/authz-browser-kit",
   );
   return {
@@ -119,16 +120,19 @@ function roleRow(role: "default" | "fast" | "embeddings") {
   return screen.getByTestId(`role-row-${role}`);
 }
 
-/** The trigger is never portaled (only Select.Content is), so plain DOM
- *  containment safely scopes it to one role row. */
+/**
+ * The trigger is never portaled (only Select.Content is), so plain DOM containment safely scopes it
+ * to one role row.
+ */
 function triggerFor(role: "default" | "fast" | "embeddings") {
   return within(roleRow(role)).getByRole("combobox");
 }
 
-/** Resolves the role's OWN listbox via its trigger's `aria-controls`,
- *  which @zag-js/select stamps with the same id it gives that trigger's
- *  Content - see the file header for why DOM containment alone can't do
- *  this (Content portals; Default and Fast also share one option pool). */
+/**
+ * Resolves the role's OWN listbox via its trigger's `aria-controls`, which @zag-js/select stamps
+ * with the same id it gives that trigger's Content - see the file header for why DOM containment
+ * alone can't do this (Content portals; Default and Fast also share one option pool).
+ */
 function listboxFor(role: "default" | "fast" | "embeddings") {
   const contentId = triggerFor(role).getAttribute("aria-controls");
   if (!contentId) {

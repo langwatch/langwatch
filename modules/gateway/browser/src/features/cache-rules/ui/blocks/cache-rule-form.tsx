@@ -98,7 +98,7 @@ export function validateForm(state: CacheRuleFormState): CacheRuleFormComplaint 
       // About the matcher block as a whole — no one input is at fault.
       field: null,
       message:
-        "At least one matcher is required (rules matching 'every request' must be explicit — not supported in v1)",
+        "At least one matcher is required (rules matching 'every request' must be explicit, not supported in v1)",
     };
   }
   return null;
@@ -387,16 +387,16 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
                   set("actionMode", e.target.value as "respect" | "force" | "disable")
                 }
               >
-                <option value="respect">respect — passthrough</option>
-                <option value="force">force — cache where supported</option>
-                <option value="disable">disable — strip cache hints</option>
+                <option value="respect">respect: passthrough</option>
+                <option value="force">force: cache where supported</option>
+                <option value="disable">disable: strip cache hints</option>
               </NativeSelect.Field>
             </NativeSelect.Root>
             <Field.HelperText>
               Force injects cache_control: ephemeral on Anthropic (system[-1] +
               messages[-1].content[-1], no-double-inject if already present). OpenAI/Azure caching
-              is automatic — force is a wire no-op but still attributes + bumps the rule-hit
-              counter. Gemini force WARNs + passes through today (v1.1 will wire /cachedContents).
+              is automatic: force is a wire no-op but still attributes + bumps the rule-hit counter.
+              Gemini force WARNs + passes through today (v1.1 will wire /cachedContents).
             </Field.HelperText>
           </Field.Root>
           {state.actionMode === "force" && (
@@ -430,14 +430,14 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             <Field.Label>
               Cache salt (optional)
               <FieldInfoTooltip
-                description="Cache-bust tag — changing it forces regeneration on next hit. Max 64 chars. Useful after a prompt template change: update the salt to invalidate all cached responses tied to the old template."
+                description="Cache-bust tag: changing it forces regeneration on next hit. Max 64 chars. Useful after a prompt template change: update the salt to invalidate all cached responses tied to the old template."
                 docHref="/ai-gateway/cache-control#actions"
               />
             </Field.Label>
             <Input
               value={state.actionSalt}
               onChange={(e) => set("actionSalt", e.target.value)}
-              placeholder="e.g. 2026Q1-rerun — forces cache regeneration when changed"
+              placeholder="e.g. 2026Q1-rerun (forces cache regeneration when changed)"
               maxLength={64}
             />
           </Field.Root>

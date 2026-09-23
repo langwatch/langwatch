@@ -623,7 +623,7 @@ function VirtualKeysPage() {
           if (!open) setRevoking(null);
         }}
         title={`Revoke ${revoking?.name ?? "virtual key"}?`}
-        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
+        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone: revoked keys are never reactivated."
         confirmLabel="Revoke key"
         tone="danger"
         loading={revokeMutation.isPending}

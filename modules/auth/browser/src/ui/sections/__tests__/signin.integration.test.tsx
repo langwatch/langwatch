@@ -17,7 +17,7 @@ const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() 
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: mockSignIn,
@@ -53,6 +53,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import SignIn from "../signin-screen.tsx";
 
 const renderPage = () => {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

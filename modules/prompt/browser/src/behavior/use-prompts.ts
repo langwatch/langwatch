@@ -17,10 +17,7 @@ export const usePrompts = () => {
   const { project } = usePromptProject();
   const projectId = project?.id ?? "";
 
-  const invalidateAll = useCallback(
-    async () => Promise.all([trpc.prompts.invalidate()]),
-    [trpc.prompts],
-  );
+  const invalidateAll = useCallback(async () => trpc.prompts.invalidate(), [trpc.prompts]);
 
   const wrappedCreatePrompt: typeof createPrompt.mutateAsync = useCallback(
     async (params) => {

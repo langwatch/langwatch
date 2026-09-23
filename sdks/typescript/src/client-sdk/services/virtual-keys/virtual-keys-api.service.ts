@@ -1,9 +1,9 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import {
   idempotentCreateInit,
   mutationInit,
@@ -11,8 +11,8 @@ import {
   type MutationOptions,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -117,10 +117,9 @@ export interface CreateVirtualKeyInput {
    */
   metadata?: Record<string, string>;
   /**
-   * Withhold the secret from the response and get a one-time reveal id
-   * instead. The secret is parked for 24 hours and served once, to the
-   * person the key is for, through the LangWatch app; the caller never
-   * holds it.
+   * Withhold the secret from the response and get a one-time reveal id instead. The secret is
+   * parked for 24 hours and served once, to the person the key is for, through the LangWatch app;
+   * the caller never holds it.
    */
   reveal_once?: boolean;
 }
@@ -346,10 +345,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Mint a key. The response carries the secret ONCE; nothing ever serves it
-   * again, so a create that times out is recovered with `idempotencyKey`
-   * rather than by listing. With `reveal_once` the response carries a reveal
-   * id in place of the secret.
+   * Mint a key. The response carries the secret ONCE; nothing ever serves it again, so a create
+   * that times out is recovered with `idempotencyKey` rather than by listing. With `reveal_once`
+   * the response carries a reveal id in place of the secret.
    */
   async create(
     input: CreateVirtualKeyInput & { reveal_once: true },

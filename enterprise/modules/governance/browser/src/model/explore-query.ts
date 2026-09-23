@@ -1,13 +1,7 @@
 /**
- * The explore chart's three controls, and the two strings they drive: the
- * chart title and the query line under it.
- *
- * The query line is a sketch of the language every governance surface is
- * meant to compile through one day. Nothing parses it yet; it is copy, and
- * it is kept here as a pure mapping so the title and the line can never
- * disagree with the controls or with each other.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * The explore chart's three controls and the title and query line they drive, as one pure mapping
+ * so none can disagree. The query line is copy for now: nothing parses it yet.
+ * @see specs/governance/governance-platform-placeholders.feature
  */
 
 export type ExploreMeasure = "cost" | "requests" | "tokens" | "error_rate";

@@ -94,8 +94,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
 // so the two hooks are stood down and everything else (including the store)
 // stays real.
 vi.mock("@langwatch/langy-browser/langy-page-registration", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/langy-browser/langy-page-registration")>();
+  const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
     useRegisterLangyHandlers: () => undefined,
@@ -155,6 +154,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
 }));
 
 import { useLangyStore } from "@langwatch/langy-browser-kit";
+import type * as langyPageRegistrationModule from "@langwatch/langy-browser/langy-page-registration";
 
 import WorkbenchPage from "../workbench.screen.tsx";
 

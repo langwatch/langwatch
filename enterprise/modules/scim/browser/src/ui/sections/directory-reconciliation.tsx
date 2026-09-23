@@ -133,7 +133,7 @@ function RetiredConnections({ connections }: { connections: ConnectionReconcilia
         <VStack gap={2} width="full" align="stretch">
           <Text fontSize="xs" color="fg.muted" maxWidth="72ch">
             These connections have been removed. They provision nobody and their tokens do nothing.
-            Anyone they created is still a member here — taking a connection away never takes people
+            Anyone they created is still a member here: taking a connection away never takes people
             away with it.
           </Text>
           {connections.map((connection) => (

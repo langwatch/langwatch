@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
+
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
@@ -106,7 +108,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
     Links_Attributes: [],
   });
 
-  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository.ts").TraceLegacyReadClickHouseRepository;
+  let TraceLegacyReadClickHouseRepository: typeof traceLegacyReadRepositoryModule.TraceLegacyReadClickHouseRepository;
 
   beforeEach(async () => {
     vi.clearAllMocks();

@@ -10,8 +10,7 @@ import "@testing-library/jest-dom/vitest";
 const mocks = vi.hoisted(() => ({ canManageAnnotations: true }));
 
 vi.mock("../../scenario-roles.tsx", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
+  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -60,6 +59,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 import type { TurnLayout } from "../types.ts";
 

@@ -1,11 +1,13 @@
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   createClaudeCodeAgent,
   installSkillToWorkDir,
@@ -69,7 +71,7 @@ describe("Agent Improvement Skill", () => {
             "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy",
           ),
           scenario.agent(),
-          (state) => {},
+          () => {},
           scenario.judge(),
         ],
       });

@@ -23,6 +23,7 @@ import {
   type UpdateProjectMetadataInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
+import type * as projectContractModule from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TopicApi } from "@langwatch/topic-contract";
@@ -333,7 +334,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return this.#projectService.listByTeam(input);
   }
 
-  listNamesByIds(input: import("@langwatch/project-contract").ProjectNamesByIdsInput) {
+  listNamesByIds(input: projectContractModule.ProjectNamesByIdsInput) {
     return this.#projectService.listNamesByIds(input);
   }
 
@@ -344,9 +345,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return this.#projectService.countUsage(input);
   }
 
-  listIdsByOrganization(
-    input: import("@langwatch/project-contract").ProjectIdsByOrganizationInput,
-  ) {
+  listIdsByOrganization(input: projectContractModule.ProjectIdsByOrganizationInput) {
     return this.#projectService.listIdsByOrganization(input);
   }
 

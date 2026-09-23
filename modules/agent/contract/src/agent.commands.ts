@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type * as connectedModule from "./config/connected.ts";
 import { HTTP_METHODS, httpAuthSchema, httpHeaderSchema } from "./config/http.ts";
 import {
   codeAgentConfigSchema,
@@ -9,6 +10,7 @@ import {
   voiceAgentConfigSchema,
   workflowAgentConfigSchema,
 } from "./config/index.ts";
+import type * as connectedAgentIdentityModule from "./connected-agent.identity.ts";
 
 export const httpAgentTestInputSchema = z.object({
   projectId: z.string(),
@@ -135,6 +137,6 @@ export type RegisterConnectedAgentInput = {
   id: string;
   projectId: string;
   name: string;
-  config: import("./config/connected.ts").ConnectedAgentConfig;
-  identity: import("./connected-agent.identity.ts").ConnectedAgentIdentity;
+  config: connectedModule.ConnectedAgentConfig;
+  identity: connectedAgentIdentityModule.ConnectedAgentIdentity;
 };

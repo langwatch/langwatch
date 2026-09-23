@@ -56,7 +56,7 @@ const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
 
 const CADENCE_HELP: Record<AutomationSource, string> = {
   trace:
-    "How often notifications go out — one per matching trace, or batched into a digest — plus how long to wait for late spans before evaluating.",
+    "How often notifications go out (one per matching trace, or batched into a digest) plus how long to wait for late spans before evaluating.",
   customGraph:
     "What makes the alert fire: the watched metric crosses this threshold over the chosen window.",
   report: "When it's sent, as a recurring schedule in the timezone you pick.",

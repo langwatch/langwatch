@@ -47,8 +47,10 @@ import type { TraceQueryFieldValuesRepository } from "../repositories/read/query
 import type { TraceFullRecordRepository } from "../repositories/read/trace-full-record.repository.ts";
 import type { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
-import type { TraceProjectedReadRepository } from "../repositories/trace-projected-read.repository.ts";
-import { type TraceSpanSummaryRecord } from "../repositories/trace-projected-read.repository.ts";
+import {
+  type TraceProjectedReadRepository,
+  type TraceSpanSummaryRecord,
+} from "../repositories/trace-projected-read.repository.ts";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
 
 type TraceComposition = {

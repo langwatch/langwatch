@@ -1,11 +1,6 @@
 /**
- * The three `langwatch query` discovery subcommands, with the API mocked.
- *
- * `schema`, `reference` and `examples` all read one document and render a slice
- * of it, so what they can get wrong is the slicing: a section flag that filters
- * nothing, a tag that matches an intent and not a tag, a requirement that is
- * printed for one kind of example and dropped for another.
- *
+ * The `langwatch query` discovery subcommands with the API mocked. `schema`, `reference` and
+ * `examples` slice one document, so the tests pin the slicing.
  * @see specs/analytics/lwql-cli-query.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

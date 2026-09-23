@@ -2,8 +2,8 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
-import { encodeJobEnvelope, withJobAttempt } from "../jobEnvelope.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
+import { encodeJobEnvelope, withJobAttempt } from "../jobEnvelope.ts";
 import { gqJobsDroppedTotal } from "../metrics.ts";
 import { JOB_RETRY_CONFIG } from "../retry.ts";
 import { GroupStagingScripts } from "../scripts.ts";
@@ -231,7 +231,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         // codec-skew shape (ADR-030), not an eviction. The key is left
         // present; only its bytes are replaced.
         expect(objectStore.store.size).toBe(1);
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 
@@ -343,7 +343,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
           },
         });
 
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 
@@ -387,7 +387,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         const objectStore = new InMemoryObjectStore();
         await stageOffloaded({ name, groupId, objectStore });
 
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 
@@ -419,7 +419,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         const objectStore = new InMemoryObjectStore();
         await stageOffloaded({ name, groupId, objectStore });
 
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 
@@ -461,7 +461,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         const objectStore = new InMemoryObjectStore();
         await stageOffloaded({ name, groupId, objectStore });
 
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 
@@ -500,7 +500,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         const objectStore = new InMemoryObjectStore();
         await stageOffloaded({ name, groupId, objectStore });
 
-        for (const uri of [...objectStore.store.keys()]) {
+        for (const uri of objectStore.store.keys()) {
           objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
         }
 

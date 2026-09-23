@@ -14,7 +14,7 @@ import { type SaveDialogFormValues, SaveVersionDialog } from "./dialogs/save-ver
  * Single Responsibility: Manages dialog-based prompt operations with closures.
  */
 export function PromptConfigProvider({ children }: { children: React.ReactNode }) {
-  const { projectId = "" } = usePromptProject();
+  const { projectId } = usePromptProject();
 
   // Each state contains all props needed for the respective dialog
   const [saveVersionDialogProps, setSaveVersionDialogProps] = useState<ComponentProps<

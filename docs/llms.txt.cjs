@@ -157,7 +157,7 @@ ${AGENT_REPORT_NOTE}
 }
 
 // Function to process imports in an MDX file
-function processImports(content, filePath) {
+function processImports(content, _filePath) {
   // Find all import statements
   const importRegex = /import\s+(\w+)\s+from\s+["']([^"']+)["'];?/g;
   let modifiedContent = content;

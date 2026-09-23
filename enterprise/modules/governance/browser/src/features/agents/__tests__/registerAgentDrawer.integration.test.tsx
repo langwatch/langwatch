@@ -1,21 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * The register-agent drawer, mounted the way `CurrentDrawer` mounts it: on its
- * own, with the drawer navigation as its only boundary.
- *
- * What it has to prove is that it stayed instructions. `AgentService.create`
- * throws `agent_register_only` (ADR-128), so the drawer shows the snippet that
- * registers an agent and collects nothing — and a test that only checked the
- * snippet was present would pass just as happily on a drawer that had quietly
- * grown a name-and-environment form beside it, so the absence of fields is
- * asserted too.
- *
- * `RenderCode` is mocked to a plain block: the snippet under test is the string
- * the drawer passes it, and highlighting it through Shiki in jsdom buys
- * nothing.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The register-agent drawer as `CurrentDrawer` mounts it. `AgentService.create` throws
+ * `agent_register_only` (ADR-128), so it must show the snippet and assert that no fields exist.
+ * `RenderCode` is mocked.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

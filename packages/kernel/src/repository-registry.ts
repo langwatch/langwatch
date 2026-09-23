@@ -3,16 +3,20 @@
  * Both tiers required for each module to prevent silent empty-list bugs.
  */
 import { snapshotRepositories } from "./repository-ownership.ts";
+import type * as repositoryOwnershipModule from "./repository-ownership.ts";
 import type { Tier } from "./tiers.ts";
 
 type RepositoryProvider = Readonly<{
   readonly requires: readonly string[];
   readonly create: (...arguments_: never[]) => unknown;
-  readonly repositories?: import("./repository-ownership.ts").FeatureRepositories;
+  readonly repositories?: repositoryOwnershipModule.FeatureRepositories;
 }>;
 
 /** The tiers a registry must declare, both of them. */
-export interface RepositoryTiers<Live extends RepositoryProvider, Memory extends RepositoryProvider> {
+export interface RepositoryTiers<
+  Live extends RepositoryProvider,
+  Memory extends RepositoryProvider,
+> {
   readonly live: Live;
   readonly memory: Memory;
 }
@@ -162,6 +166,6 @@ export function validateRepositorySelection(
 export function selectedRepositoryOwnership(
   registry: AnyRepositoryRegistry,
   selection: RepositorySelection,
-): import("./repository-ownership.ts").FeatureRepositories | undefined {
+): repositoryOwnershipModule.FeatureRepositories | undefined {
   return registry.definitions[selection.tier]?.repositories;
 }

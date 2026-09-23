@@ -55,10 +55,9 @@ export function isStampableContext(context: SessionWorkingContext): boolean {
 }
 
 /**
- * The context a stamped contribution carries, or null when it carries none.
- * Stamps are written all-or-nothing, so any missing field means the whole
- * stamp is absent; checking each keeps a partial stamp from ever reading as
- * a context.
+ * The context a stamped contribution carries, or null when it carries none. Stamps are written
+ * all-or-nothing, so any missing field means the whole stamp is absent; checking each keeps a
+ * partial stamp from ever reading as a context.
  */
 export function stampedContextOf(stamp: {
   repositoryHost?: string;

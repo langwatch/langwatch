@@ -1,14 +1,11 @@
-import { generate } from "@langwatch/ksuid";
 import {
   LANGY_CONVERSATION_STATUS,
-  LangyTurnErrors,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { LangyConversationCommands } from "../app/langy.members.ts";
-import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,
@@ -50,8 +47,10 @@ export class LangyConversationLifecycleService {
 
   private constructor(private readonly deps: LangyConversationLifecycleOptions) {}
 
-  /** Resolves conversation id for a chat turn without writing (created by first message_recorded).
-   * adoptUnknownId: an unknown id is ADOPTED rather than minted, for scenario run stability. */
+  /**
+   * Resolves conversation id for a chat turn without writing (created by first message_recorded).
+   * adoptUnknownId: an unknown id is ADOPTED rather than minted, for scenario run stability.
+   */
   async ensureConversation({
     projectId,
     userId,

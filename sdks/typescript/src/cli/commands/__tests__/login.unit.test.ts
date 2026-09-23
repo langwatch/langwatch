@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The two login-flow entry points are the seam: project login goes through
@@ -37,7 +38,7 @@ vi.mock("@/cli/utils/governance/config", () => ({
 // The slug path's server boundary: POST /api/auth/cli/project-key.
 const fetchProjectKeyBySlug = vi.fn();
 vi.mock("@/cli/utils/governance/session-api", async () => {
-  const actual = await vi.importActual<typeof import("@/cli/utils/governance/session-api")>(
+  const actual = await vi.importActual<typeof sessionApiModule>(
     "@/cli/utils/governance/session-api",
   );
   return {
@@ -52,6 +53,8 @@ vi.mock("@/cli/utils/identityNotice", () => ({
   rememberProjectName: vi.fn(),
   maybePrintIdentityNotice: vi.fn(async () => undefined),
 }));
+
+import type * as sessionApiModule from "@/cli/utils/governance/session-api";
 
 import { loginCommand } from "../login";
 

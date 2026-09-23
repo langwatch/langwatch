@@ -4,12 +4,13 @@
  * Builds the router directly: proves what it answers, not whether mounted.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
+import type * as observabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const logCalls: { level: string; fields: unknown; message: string }[] = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof observabilityModule>();
   const record = (level: string) => (fields: unknown, message?: string) => {
     logCalls.push(
       typeof fields === "string"

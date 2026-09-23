@@ -423,7 +423,7 @@ function ParetoNotes({ data, axis }: { data: ParetoPoint[]; axis: AxisConfig }) 
     <VStack align="start" gap={0}>
       {sizeIsMeaningful ? (
         <Text fontSize="xs" color="fg.muted">
-          Point size is {axis.sizeLabel} — bigger is{" "}
+          Point size is {axis.sizeLabel}, bigger is{" "}
           {axis.sizeMetric === "cost" ? "dearer" : "slower"}.
         </Text>
       ) : (
@@ -433,7 +433,7 @@ function ParetoNotes({ data, axis }: { data: ParetoPoint[]; axis: AxisConfig }) 
       )}
       {anyInterval ? (
         <Text fontSize="xs" color="fg.muted">
-          Bars are 95% confidence intervals — vertically for the score,
+          Bars are 95% confidence intervals, vertically for the score,
           {anyXInterval
             ? ` horizontally for the ${axis.xLabel.toLowerCase()}. Both say where the true value lies, not how much individual rows varied.`
             : "."}

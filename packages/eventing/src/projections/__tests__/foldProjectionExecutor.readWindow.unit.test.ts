@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { incrementEsFoldReadWindowFallbackTotal } from "../../metrics.ts";
 
 vi.mock("../../metrics.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics.ts")>();
+  const actual = await importOriginal<typeof metricsModule>();
   return { ...actual, incrementEsFoldReadWindowFallbackTotal: vi.fn() };
 });
 
 import type { Event } from "../../domain/types.ts";
+import type * as metricsModule from "../../metrics.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,

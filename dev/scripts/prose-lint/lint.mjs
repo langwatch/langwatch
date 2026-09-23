@@ -702,7 +702,7 @@ async function lintFile(file, rules, opts, key) {
     );
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
-  const results = new Array(sections.length);
+  const results = Array.from({ length: sections.length });
 
   let next = 0;
   async function worker() {

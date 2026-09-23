@@ -25,9 +25,10 @@ import {
   TemplateDisclosure,
 } from "./template-authoring.tsx";
 
-/** A "field that defaults to the framework template until the user
- *  edits it" — `usingDefault=true` means the editor renders the default
- *  text; `value` only matters once the user has typed. */
+/**
+ * A "field that defaults to the framework template until the user edits it" — `usingDefault=true`
+ * means the editor renders the default text; `value` only matters once the user has typed.
+ */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
@@ -210,7 +211,7 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
                 <Badge
                   size="sm"
                   colorPalette="orange"
-                  title="This address is outside your team. The trigger payload — trace input, output, metadata — will leave your org."
+                  title="This address is outside your team. The trigger payload (trace input, output, metadata) will leave your org."
                 >
                   External
                 </Badge>

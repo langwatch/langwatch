@@ -6,10 +6,8 @@ const buildSharedTraceCacheKey = (...args: Parameters<typeof ShareService.buildP
   ShareService.buildPayloadCacheKey(...args);
 
 /**
- * The cache key is the only thing keeping two viewers of the same link apart.
- * The same trace redacts differently per viewer — an anonymous viewer sees no
- * spend, a signed-in member with `cost:view` does — so a key that ignored
- * protections would serve one viewer's payload to the other. See ADR-057.
+ * The cache key keeps two viewers of one link apart: the same trace redacts differently per viewer
+ * (spend needs `cost:view`), so a key ignoring protections would leak. See ADR-057.
  */
 describe("buildSharedTraceCacheKey", () => {
   const anonymous = {

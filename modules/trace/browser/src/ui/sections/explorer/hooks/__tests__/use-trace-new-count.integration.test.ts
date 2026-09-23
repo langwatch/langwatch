@@ -1,3 +1,4 @@
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,7 +77,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",
   );
   return {

@@ -37,7 +37,7 @@ vi.mock("~/components/governance/GovernanceLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../behavior/governance-api.ts")>()),
+  ...(await importOriginal<typeof governanceApiModule>()),
   api: {
     activityMonitor: {
       spendByUser: {
@@ -56,6 +56,7 @@ vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
   },
 }));
 
+import type * as governanceApiModule from "../../../../behavior/governance-api.ts";
 import UserDetailPage from "../governance-user.screen.tsx";
 
 const renderPage = () =>

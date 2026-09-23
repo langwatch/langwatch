@@ -1,14 +1,7 @@
 /**
- * How a run, an estimate and a judgement read on a terminal.
- *
- * One module because six commands print the same four things, and a run that
- * reads one way under `run` and another under `status` is worse than either.
- *
- * The statement is printed under its own heading on purpose: a caller who
- * asked a question with `--target` gets back the LangWatchQL that answers it,
- * which is what they edit when the shorthand is not enough. In a machine
- * format it is already a field of the run, so it is not printed twice.
- *
+ * How a run, estimate and judgement read on a terminal; one module so six commands print alike. The
+ * statement gets its own heading since `--target` callers edit it; machine formats carry it as a
+ * field.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -32,9 +25,7 @@ export function money(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
-const STATUS_COLOR: Readonly<
-  Record<InstantEvalRun["status"], (text: string) => string>
-> = {
+const STATUS_COLOR: Readonly<Record<InstantEvalRun["status"], (text: string) => string>> = {
   queued: chalk.gray,
   planning: chalk.gray,
   running: chalk.cyan,
@@ -60,9 +51,7 @@ export function printStatement(run: InstantEvalRun): void {
     console.log();
     console.log(chalk.bold("  Parameters:"));
     for (const name of names) {
-      console.log(
-        `    ${chalk.gray(`${name}:`)} ${String(run.parameters[name] ?? "")}`,
-      );
+      console.log(`    ${chalk.gray(`${name}:`)} ${String(run.parameters[name] ?? "")}`);
     }
   }
 }
@@ -97,8 +86,7 @@ export function printRun(run: InstantEvalRun): void {
   console.log();
   console.log(chalk.bold("  Questions:"));
   for (const question of run.questions) {
-    const threshold =
-      question.threshold === null ? "" : ` at ${question.threshold}`;
+    const threshold = question.threshold === null ? "" : ` at ${question.threshold}`;
     console.log(
       `    ${chalk.gray("•")} ${chalk.cyan(question.id)} ${chalk.gray(`${question.kind} via ${question.function}${threshold}`)}`,
     );
@@ -132,9 +120,7 @@ export function printEstimate(estimate: InstantEvalEstimate): void {
   );
   console.log(`    ${chalk.gray("Price:")}    ${chalk.cyan(money(estimate.priceUsd))}`);
   if (estimate.freeBudgetRemainingUsd !== undefined) {
-    console.log(
-      `    ${chalk.gray("Free budget:")} ${money(estimate.freeBudgetRemainingUsd)} left`,
-    );
+    console.log(`    ${chalk.gray("Free budget:")} ${money(estimate.freeBudgetRemainingUsd)} left`);
   }
   console.log();
   console.log(chalk.gray("  Nothing was judged and nothing was charged."));
@@ -181,9 +167,7 @@ function verdictOf(judgment: InstantEvalJudgment): string {
   if (judgment.score !== null) return judgment.score.toFixed(2);
   if (judgment.passed !== null) {
     const probability =
-      judgment.probability === null
-        ? ""
-        : ` (${judgment.probability.toFixed(2)})`;
+      judgment.probability === null ? "" : ` (${judgment.probability.toFixed(2)})`;
     return `${judgment.passed ? "yes" : "no"}${probability}`;
   }
   return judgment.probability === null ? "" : judgment.probability.toFixed(2);
@@ -218,9 +202,7 @@ export function printJudgments({
 
   if (nextCursor) {
     console.log();
-    console.log(
-      chalk.gray(`Next page: ${chalk.cyan(`--cursor ${nextCursor}`)}`),
-    );
+    console.log(chalk.gray(`Next page: ${chalk.cyan(`--cursor ${nextCursor}`)}`));
   }
 }
 
@@ -245,18 +227,12 @@ export function printSample({
     const traceId = typeof row.TraceId === "string" ? row.TraceId : "";
     console.log();
     console.log(`  ${chalk.bold("Trace")} ${chalk.green(traceId)}`);
-    for (const judgment of judgments.filter(
-      (one) => one.traceId === traceId,
-    )) {
-      console.log(
-        `    ${chalk.cyan(judgment.questionId)}: ${verdictOf(judgment)}`,
-      );
+    for (const judgment of judgments.filter((one) => one.traceId === traceId)) {
+      console.log(`    ${chalk.cyan(judgment.questionId)}: ${verdictOf(judgment)}`);
       const text = row[judgment.questionId];
       if (typeof text !== "string" || text === "") continue;
       const shown =
-        text.length > SAMPLE_TEXT_LIMIT
-          ? `${text.slice(0, SAMPLE_TEXT_LIMIT)}\n    […]`
-          : text;
+        text.length > SAMPLE_TEXT_LIMIT ? `${text.slice(0, SAMPLE_TEXT_LIMIT)}\n    […]` : text;
       for (const line of shown.split("\n")) {
         console.log(`      ${chalk.gray(line)}`);
       }

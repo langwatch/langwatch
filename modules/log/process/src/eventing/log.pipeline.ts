@@ -99,10 +99,9 @@ export class LogProcessingAdapter {
 }
 
 /**
- * The registration: the app builds the definition, and the senders are bound
- * back to it once the runtime has built them (ADR-144). Cross-pipeline
- * subscribers (e.g. coding-agent log-facts) are absent until that peer's own
- * `*Api` operation exists; see modules/log/adrs/001-log-processing-boundary.md.
+ * The registration: the app builds the definition and the senders are bound back once built
+ * (ADR-144). Cross-pipeline subscribers wait for the peer's `*Api` operation.
+ * @see modules/log/adrs/001-log-processing-boundary.md
  */
 export const logEventing = defineEventingModule({
   pipeline: LOG_PROCESSING_PIPELINE_NAME,

@@ -12,6 +12,7 @@ import {
   test,
 } from "@playwright/test";
 import { z } from "zod";
+
 import { getProjectSlug } from "../helpers";
 import { findSignUpVerificationToken } from "./db";
 
@@ -29,9 +30,7 @@ export function betterAuthRequestHeaders(): Record<string, string> {
 
 /** A fresh address, so re-runs never collide with a prior run's account. */
 export function generateFrontDoorEmail(prefix: string): string {
-  return `front-door-${prefix}-${Date.now()}-${Math.floor(
-    Math.random() * 10000,
-  )}@langwatch.ai`;
+  return `front-door-${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}@langwatch.ai`;
 }
 
 // =============================================================================
@@ -41,16 +40,11 @@ export function generateFrontDoorEmail(prefix: string): string {
 /** Opens the sign-up screen's address step. */
 export async function givenIAmOnTheSignUpScreen(page: Page): Promise<void> {
   await page.goto("/auth/signup");
-  await expect(
-    page.getByRole("heading", { name: "Create your LangWatch account" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create your LangWatch account" })).toBeVisible();
 }
 
 /** Types the address and reaches the credential step. */
-export async function whenIEnterANewAddressToSignUpWith(
-  page: Page,
-  email: string,
-): Promise<void> {
+export async function whenIEnterANewAddressToSignUpWith(page: Page, email: string): Promise<void> {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByTestId("signup-identifier")).toContainText(email);
@@ -66,13 +60,9 @@ export async function whenIChooseAPasswordToFinishSigningUp(
   password: string = FRONT_DOOR_PASSWORD,
 ): Promise<void> {
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await expect(
-    page.getByLabel("Confirm password", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByLabel("Confirm password", { exact: true })).toBeVisible();
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(page.getByTestId("verification-sent")).toBeVisible({
     timeout: 15000,
   });
@@ -83,9 +73,7 @@ export async function whenIChooseAPasswordToFinishSigningUp(
  * attached to `page` (see `webauthn.ts`) — this is a REAL
  * `navigator.credentials.create()` ceremony, verified server-side.
  */
-export async function whenIChooseAPasskeyToFinishSigningUp(
-  page: Page,
-): Promise<void> {
+export async function whenIChooseAPasskeyToFinishSigningUp(page: Page): Promise<void> {
   await page.getByTestId("passkey-sign-up").click();
 }
 
@@ -100,9 +88,7 @@ export async function findSignUpTokenFor(email: string): Promise<string> {
     const token = await findSignUpVerificationToken(email);
     if (token) return token;
     if (Date.now() > deadline) {
-      throw new Error(
-        `No sign-up verification token appeared in Postgres for ${email} within 10s`,
-      );
+      throw new Error(`No sign-up verification token appeared in Postgres for ${email} within 10s`);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -117,11 +103,10 @@ export async function requestSignUpVerificationToken(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
-  const response = await request.post(
-    "/api/trpc/auth.requestSignUpVerification?batch=1",
-    { data: { "0": { json: { email } } } },
-  );
-  return await signUpVerificationTokenAfterResponse(response, email);
+  const response = await request.post("/api/trpc/auth.requestSignUpVerification?batch=1", {
+    data: { "0": { json: { email } } },
+  });
+  return signUpVerificationTokenAfterResponse(response, email);
 }
 
 const emailDeliveryIsUnconfigured = (): boolean =>
@@ -138,15 +123,14 @@ export async function signUpVerificationTokenAfterResponse(
   email: string,
 ): Promise<string> {
   const responseBody = response.ok() ? "" : await response.text();
-  const expectedDeliveryFailure =
-    response.status() === 500 && emailDeliveryIsUnconfigured();
+  const expectedDeliveryFailure = response.status() === 500 && emailDeliveryIsUnconfigured();
   if (!response.ok() && !expectedDeliveryFailure) {
     throw new Error(
       `requestSignUpVerification failed for ${email}: ${response.status()} ${responseBody.slice(0, 300)}`,
     );
   }
 
-  return await findSignUpTokenFor(email);
+  return findSignUpTokenFor(email);
 }
 
 const confirmedAddressSchema = z.object({
@@ -164,22 +148,13 @@ export async function requestSignUpAddressProof(
   email: string,
 ): Promise<string> {
   const token = await requestSignUpVerificationToken(request, email);
-  const confirmationResponse = await request.post(
-    "/api/auth/sign-up/confirm-address",
-    {
-      data: { token },
-      headers: betterAuthRequestHeaders(),
-    },
-  );
-  const confirmationBody: unknown = await confirmationResponse
-    .json()
-    .catch(() => null);
+  const confirmationResponse = await request.post("/api/auth/sign-up/confirm-address", {
+    data: { token },
+    headers: betterAuthRequestHeaders(),
+  });
+  const confirmationBody: unknown = await confirmationResponse.json().catch(() => null);
   const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
-  if (
-    !confirmationResponse.ok() ||
-    !confirmation.success ||
-    confirmation.data.email !== email
-  ) {
+  if (!confirmationResponse.ok() || !confirmation.success || confirmation.data.email !== email) {
     throw new Error(
       `confirm-address failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
     );
@@ -192,10 +167,7 @@ export async function requestSignUpAddressProof(
  * Opens the confirmation link for `email` — read from Postgres, not from an
  * inbox (see `findSignUpTokenFor`) — the way a person clicking it would.
  */
-export async function whenIOpenTheConfirmationLinkFor(
-  page: Page,
-  email: string,
-): Promise<void> {
+export async function whenIOpenTheConfirmationLinkFor(page: Page, email: string): Promise<void> {
   const token = await findSignUpTokenFor(email);
   await page.goto(`/auth/signup?verify=${encodeURIComponent(token)}`);
 }
@@ -233,9 +205,7 @@ export async function thenTheLinkSignsMeInWithNoSecondPrompt(
   // box, no passkey ceremony, no passkey refusal.
   await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("passkey-ceremony")).toHaveCount(0);
-  await expect(
-    page.getByText("Could not use a passkey", { exact: false }),
-  ).toHaveCount(0);
+  await expect(page.getByText("Could not use a passkey", { exact: false })).toHaveCount(0);
   await expect(page).not.toHaveURL(/\/auth\/sign(in|up)/);
 }
 
@@ -261,31 +231,23 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
     };
   } | null;
   const orgs = data?.["0"]?.result?.data?.json ?? [];
-  const hasProject = orgs.some((o) =>
-    (o.teams ?? []).some((t) => (t.projects ?? []).length > 0),
-  );
+  const hasProject = orgs.some((o) => (o.teams ?? []).some((t) => (t.projects ?? []).length > 0));
   if (hasProject) return;
 
-  const response = await page.request.post(
-    "/api/trpc/onboarding.initializeOrganization?batch=1",
-    {
-      data: {
-        "0": {
-          json: {
-            orgName: "Front Door Test Org",
-            projectName: "Front Door Test Project",
-            language: "other",
-            framework: "other",
-          },
+  const response = await page.request.post("/api/trpc/onboarding.initializeOrganization?batch=1", {
+    data: {
+      "0": {
+        json: {
+          orgName: "Front Door Test Org",
+          projectName: "Front Door Test Project",
+          language: "other",
+          framework: "other",
         },
       },
     },
-  );
+  });
   const result = await response.json().catch(() => null);
-  if (
-    !response.ok() ||
-    (result as { "0"?: { error?: unknown } })?.["0"]?.error
-  ) {
+  if (!response.ok() || (result as { "0"?: { error?: unknown } })?.["0"]?.error) {
     throw new Error(
       `initializeOrganization failed: ${response.status()} ${JSON.stringify(result).slice(0, 300)}`,
     );
@@ -297,10 +259,7 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
  * email, never the literal string "null" (`displayNameFor`,
  * `AppHeaderUserMenu.tsx`).
  */
-export async function thenIAmCalledByMyEmailNeverNull(
-  page: Page,
-  email: string,
-): Promise<void> {
+export async function thenIAmCalledByMyEmailNeverNull(page: Page, email: string): Promise<void> {
   const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/messages`);
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
@@ -312,9 +271,7 @@ export async function thenIAmCalledByMyEmailNeverNull(
   // account — and a modal's backdrop swallows the click on the user menu
   // behind it. Answer them the way a person in a hurry does, then carry on.
   await whenIDeclineWhatTheShellOffersFirst(page);
-  await page
-    .getByRole("button", { name: `Open user menu for ${email}` })
-    .click();
+  await page.getByRole("button", { name: `Open user menu for ${email}` }).click();
   const group = page.getByText(new RegExp(`\\(${escapeRegExp(email)}\\)`));
   await expect(group).toBeVisible({ timeout: 10000 });
   await expect(group).not.toContainText("null");
@@ -328,9 +285,7 @@ export async function thenIAmCalledByMyEmailNeverNull(
  * (confirmed same-domain address) or the passkey nudge (password account).
  * Loops twice — dismissing one is what lets the other's turn come.
  */
-export async function whenIDeclineWhatTheShellOffersFirst(
-  page: Page,
-): Promise<void> {
+export async function whenIDeclineWhatTheShellOffersFirst(page: Page): Promise<void> {
   const takeover = page.getByRole("dialog", {
     name: "Your colleagues are already here",
   });
@@ -345,19 +300,9 @@ export async function whenIDeclineWhatTheShellOffersFirst(
       return;
     }
 
-    // WHICHEVER IS ON TOP, decided fresh every round rather than once. Each
-    // modal waits on its own query, so the nudge can paint first and the
-    // takeover open over it a beat later — and committing to the nudge on
-    // that first look left a click waiting fifteen seconds on a button the
-    // takeover had covered. The takeover goes first whenever it is up,
-    // because it is the one that covers the other.
-    // THE CLICK MAY MISS, AND THAT IS ALLOWED. Between the look above and the
-    // press below the modal can answer itself — its own query resolves to
-    // "nothing to offer", or a dismissal already in flight lands — and a
-    // press aimed at a button that has just gone is not a failure of
-    // anything. What matters is only that the modal ENDS UP gone, which is
-    // what the assertion after each press checks: a genuinely stuck modal
-    // still fails there, loudly, rather than being swallowed here.
+    // Whichever modal is on top, decided every round; the takeover first since it covers the nudge.
+    // A click may miss as a modal closes itself; the assertion after each press catches a stuck
+    // one.
     if (await takeover.isVisible().catch(() => false)) {
       await takeover
         .getByRole("button", { name: /keep working on my own/ })
@@ -384,17 +329,8 @@ export async function whenIDeclineWhatTheShellOffersFirst(
 }
 
 /**
- * Declines ONLY the join-your-team takeover, leaving whatever is underneath it
- * standing.
- *
- * `whenIDeclineWhatTheShellOffersFirst` answers both modals, which is what a
- * step that just wants to reach the shell needs. A test whose SUBJECT is the
- * nudge cannot use it — it would dismiss the thing being asserted. The
- * takeover still has to go first, because it opens over the nudge and takes
- * the rest of the page out of the accessibility tree with it: a
- * `getByRole("button", { name: "Not now" })` matches by substring, so with the
- * takeover up the click lands on its "Not now — keep working on my own" and
- * the nudge is left open behind it.
+ * Declines ONLY the join-your-team takeover, for tests whose subject is the nudge. The takeover
+ * goes first: `getByRole` matches by substring, so its "Not now" would steal the click.
  */
 export async function whenIDeclineTheJoinTakeover(page: Page): Promise<void> {
   const takeover = page.getByRole("dialog", {
@@ -424,10 +360,7 @@ function escapeRegExp(value: string): string {
  */
 export async function givenARegisteredAccount(
   page: Page,
-  {
-    email,
-    password = FRONT_DOOR_PASSWORD,
-  }: { email: string; password?: string },
+  { email, password = FRONT_DOOR_PASSWORD }: { email: string; password?: string },
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(page.request, email);
   const response = await page.request.post("/api/trpc/user.register?batch=1", {
@@ -451,10 +384,7 @@ export async function givenIAmOnTheSignInScreen(page: Page): Promise<void> {
 }
 
 /** Types the address and reaches the password step for a known account. */
-export async function whenIEnterMyAddressToSignIn(
-  page: Page,
-  email: string,
-): Promise<void> {
+export async function whenIEnterMyAddressToSignIn(page: Page, email: string): Promise<void> {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByTestId("routed-identifier")).toContainText(email, {
@@ -475,10 +405,7 @@ export async function whenIEnterMyPasswordToSignIn(
 /** The whole address -> password -> in journey, in one call. */
 export async function whenISignInWithPassword(
   page: Page,
-  {
-    email,
-    password = FRONT_DOOR_PASSWORD,
-  }: { email: string; password?: string },
+  { email, password = FRONT_DOOR_PASSWORD }: { email: string; password?: string },
 ): Promise<void> {
   await givenIAmOnTheSignInScreen(page);
   await whenIEnterMyAddressToSignIn(page, email);
@@ -521,11 +448,7 @@ export async function thenNoErrorFlashAppears(page: Page): Promise<void> {
  */
 export async function whenISignInAndOutSeveralTimes(
   page: Page,
-  {
-    email,
-    password,
-    times,
-  }: { email: string; password: string; times: number },
+  { email, password, times }: { email: string; password: string; times: number },
 ): Promise<void> {
   for (let i = 0; i < times; i++) {
     await whenISignInWithPassword(page, { email, password });

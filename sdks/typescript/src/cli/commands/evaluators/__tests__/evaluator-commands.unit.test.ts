@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import chalk from "chalk";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
-import { EvaluatorsApiError,EvaluatorsApiService } from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiError, EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 
 // Mock dependencies before imports
 vi.mock("@/client-sdk/services/evaluators", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/evaluators")>();
+  const actual = await importOriginal<typeof evaluatorsModule>();
   return {
     ...actual,
     EvaluatorsApiService: vi.fn(),
@@ -28,12 +29,14 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listEvaluatorsCommand } from "../list";
-import { getEvaluatorCommand } from "../get";
+import type * as evaluatorsModule from "@/client-sdk/services/evaluators";
+
+import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 import { createEvaluatorCommand } from "../create";
 import { deleteEvaluatorCommand } from "../delete";
+import { getEvaluatorCommand } from "../get";
+import { listEvaluatorsCommand } from "../list";
 import { updateEvaluatorCommand } from "../update";
-import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

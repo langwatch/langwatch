@@ -3,8 +3,8 @@ import {
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  type PrismaClient,
   type ModelDefaultConfig as PrismaModelDefaultConfig,
   type ModelDefaultConfigScope,
 } from "@langwatch/prisma-client/generated";

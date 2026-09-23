@@ -6,8 +6,7 @@ import {
   type UpdateTriggerCommand,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
-import type { Prisma } from "@langwatch/prisma-client/generated";
-import { type PrismaClient } from "@langwatch/prisma-client/generated";
+import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AutomationClock } from "../../app/automation.members.ts";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";

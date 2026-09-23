@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 
-/**
- * The vendor marks and the wrapper that renders them. Every mark is a plain
- * inline SVG, so what is worth pinning is that each one draws something of its
- * own — a copy-paste slip during a move shows up as two names drawing the same
- * artwork.
- */
+/** The vendor marks and the wrapper that renders them. Every mark is a plain inline SVG, so what is
+ * worth pinning is that each one draws something of its own — a copy-paste slip during a move
+ * shows up as two names drawing the same artwork. */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   AnthropicIcon,
   AWSIcon,

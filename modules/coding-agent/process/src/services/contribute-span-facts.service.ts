@@ -15,10 +15,9 @@ import { MODEL_CALL_SPAN_NAMES } from "../eventing/coding-agent-session-span.pro
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 
 /**
- * Stamps the spans that carry a model call with the session's declared
- * working context, the way the log lane stamps a row-bearing record, so the
- * fold can charge the call's tokens where they were spent. Only reads the
- * memo: the declaration that fills it is a log record.
+ * Stamps the spans that carry a model call with the session's declared working context, the way the
+ * log lane stamps a row-bearing record, so the fold can charge the call's tokens where they were
+ * spent. Only reads the memo: the declaration that fills it is a log record.
  */
 export class EventingContributeSpanFactsAdapter implements CommandHandler<
   Command<ContributeSpanFactsCommandData>,
@@ -62,10 +61,9 @@ export class EventingContributeSpanFactsAdapter implements CommandHandler<
   }
 
   /**
-   * The contribution with the declared context applied when the span carries
-   * a model call; every other span passes through untouched, because nothing
-   * downstream charges it anywhere. A failed memo read degrades to an
-   * unstamped contribution rather than failing it.
+   * The contribution with the declared context applied when the span carries a model call; every
+   * other span passes through untouched, because nothing downstream charges it anywhere. A failed
+   * memo read degrades to an unstamped contribution rather than failing it.
    */
   private async stamped(
     data: ContributeSpanFactsCommandData,

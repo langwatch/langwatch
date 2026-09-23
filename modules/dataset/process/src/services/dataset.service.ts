@@ -34,6 +34,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
 } from "@langwatch/dataset-contract";
+import type * as datasetContractModule from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
@@ -364,7 +365,7 @@ export class DatasetService {
 
   async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
-  ): Promise<import("@langwatch/dataset-contract").CreateDatasetFromUploadResult> {
+  ): Promise<datasetContractModule.CreateDatasetFromUploadResult> {
     if (!this.options.uploads) {
       throw new Error("Dataset upload capability is not configured");
     }

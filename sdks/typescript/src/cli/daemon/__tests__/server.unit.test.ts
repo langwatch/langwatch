@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import type * as NodeFs from "node:fs";
 // The mock factory below needs the module's type. A top-level `import type`
 // gives it that without an inline `import()` annotation: the CLI's exception
 // for inline imports covers load-bearing LAZY RUNTIME imports that keep the
@@ -27,7 +26,7 @@ const { refuseLink } = vi.hoisted(() => ({
 }));
 
 vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof NodeFs>();
+  const actual = await importOriginal<typeof fs>();
   const linkSync: typeof actual.linkSync = (existingPath, newPath) => {
     if (refuseLink.code === null) {
       actual.linkSync(existingPath, newPath);

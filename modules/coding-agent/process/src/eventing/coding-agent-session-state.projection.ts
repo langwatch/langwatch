@@ -92,12 +92,9 @@ export interface CodingAgentSessionData {
   costUsd: number;
   agentReportedCostUsd: number;
   /**
-   * What the session spent under each working context it declared, keyed by
-   * `contextUsageKey`. The counters above stay the amount; this says WHERE it
-   * went, which is what splits one session's cost across the pull requests it
-   * drove (specs/coding-agent/pull-request-linkage.feature). A call with no
-   * stamp charges no context, so the difference between the counters and this
-   * record's sum is what the session spent before it declared anything.
+   * Spend per declared working context, keyed by `contextUsageKey`: where the counters' amount
+   * went, which splits a session's cost across its pull requests. Unstamped calls charge no
+   * context.
    */
   usageByContext: Record<string, CodingAgentSessionContextUsage>;
   modelCallMs: number;
@@ -159,18 +156,15 @@ export interface CodingAgentSessionData {
 const MAX_STEPS = 100;
 export const MAX_SET = 50;
 /**
- * How many working contexts one session's usage record holds. Wider than
- * `MAX_SET` because a long-lived agent declaring a branch per pull request
- * reaches fifty in weeks. Both sides need it: the fold stops opening contexts
- * here, and the read recognises a record of exactly this size as saturated.
+ * How many working contexts one session's usage record holds; wider than `MAX_SET` because a branch
+ * per pull request reaches fifty in weeks. A record of exactly this size reads as saturated.
  */
 export const MAX_USAGE_CONTEXTS = 200;
 
 /**
- * The key one context's usage is kept under. Repository fields are compared
- * case-folded everywhere the usage is read, so they are folded here too and a
- * remote spelled two ways stays one context; a branch name is case sensitive
- * and kept verbatim.
+ * The key one context's usage is kept under. Repository fields are compared case-folded everywhere
+ * the usage is read, so they are folded here too and a remote spelled two ways stays one context; a
+ * branch name is case sensitive and kept verbatim.
  */
 export function contextUsageKey(context: {
   repositoryHost: string;
@@ -321,11 +315,8 @@ export class CodingAgentSessionStateProjection {
   }
 
   /**
-   * Charge what one model call added to the counters to the context it was
-   * stamped with, read as the delta across the fold so the record can never
-   * drift from the totals it partitions. Keyed on the event's own stamp, so a
-   * late event folded in place still commutes. Unstamped charges nothing; a
-   * context past `MAX_USAGE_CONTEXTS` is not opened (ADR-056 bounds).
+   * Charge one model call's counter delta to its stamped context, so the record never drifts from
+   * the totals. Unstamped charges nothing; past `MAX_USAGE_CONTEXTS` nothing opens (ADR-056).
    */
   chargeContextUsage({
     before,

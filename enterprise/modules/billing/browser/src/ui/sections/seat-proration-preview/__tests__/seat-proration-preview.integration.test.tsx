@@ -5,6 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as errorsModule from "@langwatch/browser-host/errors";
 import type { UpgradeModalSeatsVariant } from "@langwatch/browser-host/upgrade-modal-store";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -24,7 +25,7 @@ vi.mock("../../../../behavior/billing-api.ts", () => ({
 }));
 
 vi.mock("@langwatch/browser-host/errors", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/browser-host/errors")>()),
+  ...(await importOriginal<typeof errorsModule>()),
   showErrorToast: showErrorToastMock,
 }));
 
@@ -97,10 +98,11 @@ describe("<SeatProrationPreview/>", () => {
       expect(screen.getAllByText(/\$199\.00/).length).toBeGreaterThan(0);
     });
 
-    /** Confirming charges the proration on the spot, so the dialog has to say
-     *  so — an unlabelled annual total next to a "Confirm" button reads as if
-     *  nothing is taken until the next invoice.
-     *  @scenario "Seats mode modal shows the amount charged immediately" */
+    /**
+     * Confirming charges the proration on the spot, so the dialog has to say so — an unlabelled
+     * annual total next to a "Confirm" button reads as if nothing is taken until the next invoice.
+     * @scenario "Seats mode modal shows the amount charged immediately"
+     */
     it("names what is taken today and the period the recurring total covers", () => {
       previewQuery.mockReturnValue(
         quote({

@@ -1,24 +1,13 @@
 /**
- * `discover_schema`'s renderer, fed the committed reference fixture.
- *
- * The fixture is generated from the platform's own `describeQueryReference` and
- * pinned by a platform-side test, so these assertions are about the RENDERING
- * and never about which fields exist: the filter list used to live in this
- * package, and it drifted precisely because nothing could tell the copy from
- * the original.
- *
- * Passing the reference in rather than fetching it is what keeps this a unit
- * test — the fetch is covered by the integration suite.
- *
+ * `discover_schema`'s renderer, fed the committed reference fixture (generated from
+ * `describeQueryReference` and pinned platform-side), so these assert RENDERING only; the fetch is
+ * integration-tested.
  * @see specs/mcp-server/schema-discovery.feature
  */
 import { describe, it, expect } from "vitest";
 
 import type { QueryReferenceResponse } from "../langwatch-api-query.js";
-import {
-  formatSchema,
-  needsQueryReference,
-} from "../tools/discover-schema.js";
+import { formatSchema, needsQueryReference } from "../tools/discover-schema.js";
 import fixture from "./fixtures/query-reference.json" with { type: "json" };
 
 const reference = fixture as unknown as QueryReferenceResponse;
@@ -70,9 +59,7 @@ describe("formatSchema()", () => {
 
     it("shows worked filters", async () => {
       const result = await formatSchema("filters", reference);
-      const example = reference.examples.find(
-        (candidate) => candidate.language === "trace-filter",
-      );
+      const example = reference.examples.find((candidate) => candidate.language === "trace-filter");
       // Asserted before it is used: `toContain(undefined ?? "")` passes against
       // any string at all, so a fixture that lost its filter examples would
       // read as a rendering that still shows them.
@@ -92,9 +79,7 @@ describe("formatSchema()", () => {
 
     it("shows runnable statements", async () => {
       const result = await formatSchema("lwql", reference);
-      const example = reference.examples.find(
-        (candidate) => candidate.language === "lwql",
-      );
+      const example = reference.examples.find((candidate) => candidate.language === "lwql");
       expect(example).toBeDefined();
       const firstLine = example?.text.split("\n")[0];
       expect(firstLine).toBeTruthy();

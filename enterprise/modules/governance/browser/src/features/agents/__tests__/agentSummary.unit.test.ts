@@ -1,18 +1,8 @@
 /**
- * The four figures the Agents page opens with, asserted without rendering
- * anything.
- *
- * The strip is placement over a pure fold, so this is where its behaviour is
- * pinned: the counts, the shares, the registration line and the words. What
- * the page does with the result — where it sits, and when it is absent — is
- * asserted in `pages/governance/__tests__/agentsSummaryStrip.integration.test.tsx`.
- *
- * Most of these run against `SAMPLE_AGENT_ROWS` rather than a fixture. That is
- * the point: the sample rows are what a reader actually sees, and a test over
- * a private fixture would let those rows drift into an incoherent set while
- * staying green.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The Agents page's four figures, asserted without rendering. Runs against `SAMPLE_AGENT_ROWS` so
+ * the rows a reader sees cannot drift incoherent; placement is in
+ * agentsSummaryStrip.integration.test.tsx.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import { describe, expect, it } from "vitest";
 

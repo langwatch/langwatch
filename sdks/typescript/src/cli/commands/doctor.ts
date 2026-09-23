@@ -1,8 +1,10 @@
+import chalk from "chalk";
+
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
-import chalk from "chalk";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+
 import { resolveCredentials } from "../utils/apiKey";
 import { readFetchFailure } from "../utils/formatFetchError";
 import type { CommandResult } from "../utils/output";
@@ -10,13 +12,9 @@ import { createSpinner } from "../utils/spinner";
 import { failSpinner } from "../utils/spinnerError";
 
 /**
- * `langwatch doctor`: the checkup of a self-hosted install, from a terminal
- * (sdks/typescript/specs/cli/doctor.feature).
- *
- * The checks live on the install, behind `GET /api/checkup` and
- * `POST /api/checkup/run`; this command asks and prints. It never decides a
- * verdict, so what the Settings page shows and what this prints are one
- * answer and cannot disagree.
+ * `langwatch doctor`: a self-hosted install's checkup from a terminal. The install decides the
+ * verdict behind `GET /api/checkup` and `POST /api/checkup/run`; this only asks and prints.
+ * @see sdks/typescript/specs/cli/doctor.feature
  */
 
 export type CheckOutcome = "verified" | "refused" | "unchecked";
@@ -89,9 +87,7 @@ export const doctorCommand = async (options: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(
-          options.scenarioRunPlanId
-            ? { scenarioRunPlanId: options.scenarioRunPlanId }
-            : {},
+          options.scenarioRunPlanId ? { scenarioRunPlanId: options.scenarioRunPlanId } : {},
         ),
       });
       if (!explicit.ok) {
@@ -158,9 +154,7 @@ export function printReport(report: DoctorReport): void {
       console.log(chalk.yellow(`      Fix: ${row.verdict.fix}`));
     }
     if (row.verdict.outcome !== "verified" && row.verdict.docsPath) {
-      console.log(
-        chalk.gray(`      https://docs.langwatch.ai${row.verdict.docsPath}`),
-      );
+      console.log(chalk.gray(`      https://docs.langwatch.ai${row.verdict.docsPath}`));
     }
   }
   console.log();

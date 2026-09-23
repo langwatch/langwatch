@@ -1,16 +1,7 @@
 /**
- * Which project a command runs against, and what happens when the credential
- * in hand cannot be pointed at the one that was named.
- *
- * `LANGWATCH_PROJECT_ID` used to reach `buildAuthHeaders` unresolved, where a
- * user-scoped key put it in the Basic header and a legacy project key dropped
- * it without a word. Setting it to a project id that existed, to one that did
- * not, and leaving it unset all produced the same rows, and nothing on screen
- * said which project had answered.
- *
- * The credential context is the real module here: it is repo-owned, in memory,
- * and what the daemon relies on to keep two requests apart, so the suite drives
- * it the way a request does and reads back what a request would read.
+ * Which project a command runs against, and the refusal when the credential cannot be pointed at
+ * it. Drives the real in-memory credential context the way a request does, as the daemon relies on
+ * it.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +22,7 @@ import {
   scopedProjectId,
   setRequestedProject,
 } from "@/internal/credentialContext";
+
 import { resolveCredentials } from "../apiKey";
 import { ProjectScopeError } from "../projectScope";
 
@@ -42,11 +34,9 @@ const PROJECT_KEY = "sk-lw-onlyonepart";
 class ProcessExitError extends Error {}
 
 /** One request, in its own credential holder, exactly as the daemon runs it. */
-const inOneRequest = <T>(fn: () => Promise<T>): Promise<T> =>
-  runWithCredentialHolder(fn);
+const inOneRequest = <T>(fn: () => Promise<T>): Promise<T> => runWithCredentialHolder(fn);
 
-const whatWasSaid = (): string =>
-  vi.mocked(console.error).mock.calls.flat().join(" ");
+const whatWasSaid = (): string => vi.mocked(console.error).mock.calls.flat().join(" ");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -116,9 +106,7 @@ describe("given a user-scoped key", () => {
       ),
     );
 
-    await expect(
-      inOneRequest(() => resolveCredentials({ project: "nope" })),
-    ).rejects.toThrow();
+    await expect(inOneRequest(() => resolveCredentials({ project: "nope" }))).rejects.toThrow();
 
     expect(whatWasSaid()).toContain("nope");
   });
@@ -188,9 +176,7 @@ describe("given a key that carries its own project", () => {
       .mocked(console.error)
       .mock.calls.flat()
       .filter(
-        (line) =>
-          typeof line === "string" &&
-          line.includes("LANGWATCH_PROJECT_ID was ignored"),
+        (line) => typeof line === "string" && line.includes("LANGWATCH_PROJECT_ID was ignored"),
       );
     expect(warnings).toHaveLength(1);
   });
@@ -200,9 +186,7 @@ describe("given a project key passed with --api-key", () => {
   /** @scenario "a project key given by flag is not blamed on the environment" */
   it("tells the user to drop the flag, not to unset a variable they never set", async () => {
     await expect(
-      inOneRequest(() =>
-        resolveCredentials({ apiKey: PROJECT_KEY, project: "checkout-agent" }),
-      ),
+      inOneRequest(() => resolveCredentials({ apiKey: PROJECT_KEY, project: "checkout-agent" })),
     ).rejects.toThrow(ProcessExitError);
 
     expect(whatWasSaid()).toContain("--api-key");

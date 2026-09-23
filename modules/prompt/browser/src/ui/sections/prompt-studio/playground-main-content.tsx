@@ -16,8 +16,8 @@ export function PromptPlaygroundMainContent() {
    * doesn't mount and it won't load the span.
    */
   useLoadSpanIntoPromptPlayground();
-  const hasNoTabs = useDraggableTabsBrowserStore(
-    ({ windows }) => windows.length === 0 || windows.every((w) => w.tabs.length === 0),
+  const hasNoTabs = useDraggableTabsBrowserStore(({ windows }) =>
+    windows.every((w) => w.tabs.length === 0),
   );
 
   if (hasNoTabs) return <MainContentEmptyState />;

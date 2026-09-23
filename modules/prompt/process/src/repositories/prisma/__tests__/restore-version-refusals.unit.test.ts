@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
+ * Restoring a version has two refusals persistence owns. Both were plain Errors reaching the
+ * boundary as a 500; main answers 404 and 409 (measured 2026-09-21).
  * @see modules/prompt/specs/prompt-version-restore.feature
- *
- * Restoring a version has two refusals persistence owns. Both were plain
- * Errors, so both reached the boundary as an unattributed 500 — measured
- * against main on 2026-09-21, which answers 404 and 409 for the same two.
  */
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { Temporal } from "@langwatch/time";

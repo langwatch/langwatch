@@ -1,18 +1,14 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 /**
- * L2: `moduleApi<Api>(id)` -> `moduleApi<Api>()(id)`.
- *
- * TypeScript will not infer `Id` while `Api` is given explicitly, so the token
- * can only carry its id if the call curries. Without the id in the type a peer
- * cannot be subtracted from what a process still owes (ADR-147).
- *
- * Usage: node dev/scripts/codemods/moduleapi-curry.mjs [--write]
+ * L2: `moduleApi<Api>(id)` to `moduleApi<Api>()(id)`, so the token carries its id in the type and a
+ * peer can be subtracted from what a process owes (ADR-147). Usage: `node <this file> [--write]`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 
 const write = process.argv.includes("--write");
-const CALL = /\bmoduleApi<([^>]+)>\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Z_][A-Z0-9_]*)\s*\)/g;
+const CALL =
+  /\bmoduleApi<([^>]+)>\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Z_][A-Z0-9_]*)\s*\)/g;
 
 const files = execFileSync(
   "grep",

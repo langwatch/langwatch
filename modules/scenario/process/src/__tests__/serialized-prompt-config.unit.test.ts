@@ -14,13 +14,14 @@ vi.mock("ai", () => ({
 }));
 
 vi.mock("@langwatch/scenario-process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/scenario-process")>();
+  const actual = await importOriginal<typeof scenarioProcessModule>();
   return {
     ...actual,
     createModelFromParams: vi.fn(() => ({ modelId: "test-model" })),
   };
 });
 
+import type * as scenarioProcessModule from "@langwatch/scenario-process";
 import { generateText } from "ai";
 
 const mockGenerateText = vi.mocked(generateText);

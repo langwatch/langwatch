@@ -28,11 +28,12 @@ const logged = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => logged,
 }));
 
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
+import type * as observabilityModule from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
 import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.service.ts";

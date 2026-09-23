@@ -29,6 +29,7 @@ import type {
   PersonalWorkspaceIdentity,
   TeamIdentity,
 } from "../../app/organization.members.ts";
+import type * as groupRepositoryModule from "../../repositories/group.repository.ts";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -320,7 +321,7 @@ function createService(
     teams,
     groups: {
       listMembersForGroups: () => Promise.resolve(new Map()),
-    } as unknown as import("../../repositories/group.repository.ts").GroupRepository,
+    } as unknown as groupRepositoryModule.GroupRepository,
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
     groupIdentities: {} as GroupIdentity,

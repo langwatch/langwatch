@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
-/**
- * The shared confirmation modal that stands in for `window.confirm`, which is
- * a11y-hostile and not themable. These are the terms its call sites rely on:
- * what shows while it is open, which callback each button reaches, and what
- * the loading state refuses so a mutation cannot be double-submitted.
- */
+/** The shared confirmation modal that stands in for `window.confirm`, which is a11y-hostile and not
+ * themable. These are the terms its call sites rely on: what shows while it is open, which
+ * callback each button reaches, and what the loading state refuses so a mutation cannot be
+ * double-submitted. */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ConfirmDialog } from "../src/components/confirm-dialog.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

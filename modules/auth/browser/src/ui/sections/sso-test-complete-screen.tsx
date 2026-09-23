@@ -25,7 +25,7 @@ export default function SsoTestComplete() {
         </Text>
         <Text color="fg.muted">
           That address is not a member of {organizationName ?? "your organization"} yet, because the
-          connection is not turned on — so there is nothing here for it to do. Sign back in as
+          connection is not turned on, so there is nothing here for it to do. Sign back in as
           yourself to finish turning the connection on.
         </Text>
         <Button

@@ -13,13 +13,11 @@ import {
   WebhookApi,
   type SqsDestinationInput,
   type WebhookEndpointView,
-  deliveryDtoSchema,
   deliveryListResponseSchema,
   endpointDtoSchema,
   endpointListResponseSchema,
   endpointStatusSchema,
   endpointWithSecretDtoSchema,
-  eventTypeDtoSchema,
   eventTypeListResponseSchema,
   webhookEventEnvelopeSchema,
   webhookEventListResponseSchema,
@@ -100,8 +98,9 @@ function refineDestinationShape(
 
 const createEndpointSchema = z
   .object({
-    /** Absent means http, which is what every endpoint was before there was
-     *  more than one kind. */
+    /**
+     * Absent means http, which is what every endpoint was before there was more than one kind.
+     */
     destination_kind: destinationKindSchema.optional(),
     url: z.string().min(1).max(2000).optional(),
     sqs: sqsDestinationSchema.optional(),
@@ -111,9 +110,10 @@ const createEndpointSchema = z
   .superRefine(refineDestinationShape);
 
 const updateEndpointSchema = z.object({
-  /** Accepted only when it repeats the kind the endpoint already has; the
-   *  service refuses a change, because batches planned against the old
-   *  transport are already in the outbox. */
+  /**
+   * Accepted only when it repeats the kind the endpoint already has; the service refuses a change,
+   * because batches planned against the old transport are already in the outbox.
+   */
   destination_kind: destinationKindSchema.optional(),
   url: z.string().min(1).max(2000).optional(),
   sqs: sqsDestinationSchema.partial().optional(),

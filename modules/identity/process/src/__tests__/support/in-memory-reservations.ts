@@ -37,7 +37,7 @@ export class InMemoryReservations implements IdentityReservationRepository {
     holdingIdentifierIds: readonly string[];
   }): Promise<number> {
     let released = 0;
-    for (const [value, claim] of [...this.held]) {
+    for (const [value, claim] of this.held) {
       if (claim.userId !== userId) continue;
       if (holdingIdentifierIds.includes(claim.identifierId)) continue;
       this.held.delete(value);

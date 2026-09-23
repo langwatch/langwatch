@@ -1,9 +1,10 @@
-import { getLangWatchTracer,LangWatchExporter } from "langwatch";
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
 import * as readline from "readline";
-import cliMarkdown from "cli-markdown";
+
+import { openai } from "@ai-sdk/openai";
 import { registerOTel } from "@vercel/otel";
+import { generateText } from "ai";
+import cliMarkdown from "cli-markdown";
+import { getLangWatchTracer, LangWatchExporter } from "langwatch";
 
 // Use Vercel OTEL with LangWatch exporter
 registerOTel({
@@ -45,7 +46,7 @@ async function main() {
           "langwatch.thread.id": threadId,
         },
       },
-      async (span) => {
+      async (_span) => {
         try {
           // Get user input
           const userInput = await new Promise<string>((resolve) => {

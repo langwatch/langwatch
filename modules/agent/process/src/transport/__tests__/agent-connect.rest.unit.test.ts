@@ -3,6 +3,7 @@ import {
   type AgentApi,
   type AgentConnectRegisterOutput,
 } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -10,7 +11,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type * as observabilityModule from "@langwatch/observability";
 import { Hono } from "hono";
 /**
  * @vitest-environment node
@@ -24,7 +25,7 @@ import { agentRestErrorHandler } from "../agent.rest.ts";
 
 const outputLog = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock("@langwatch/observability", async (original) => {
-  const actual = await original<typeof import("@langwatch/observability")>();
+  const actual = await original<typeof observabilityModule>();
   return {
     ...actual,
     createLogger: (name: string) => {

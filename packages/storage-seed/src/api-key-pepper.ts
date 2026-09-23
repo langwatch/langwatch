@@ -1,12 +1,9 @@
 import { SecretsChain } from "@langwatch/secrets";
 
 /**
- * The pepper seeded API-key hashes and encrypted credentials are keyed
- * under — the same name modules/api-key/contract/src/api-key.config.ts
- * declares (`c.env("API_KEY_PEPPER", ...)`), since a seed hash the running
- * process reads under a different name never verifies. `dev: optional`, so
- * an absent value is a configured state, not broken — never minted here,
- * since a random one would write unverifiable rows.
+ * The pepper seeded API-key hashes are keyed under, the same name api-key.config.ts declares, or
+ * seeds never verify. `dev: optional`: absent is valid, and never minted here (random rows would
+ * not verify).
  */
 export const API_KEY_PEPPER_KEYS = ["API_KEY_PEPPER"] as const;
 

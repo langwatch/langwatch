@@ -1,15 +1,6 @@
 /**
- * The two elapsed-time formatters behind the agents list.
- *
- * Both are exercised incidentally by the list and card integration tests, but
- * only at the values the sample rows happen to hold. `registeredDaysAgo` tops
- * out at 320 across every sample, which never reaches the years branch, and no
- * sample registered today or exactly one day ago. Those are the values where a
- * boundary is either right or off by one, so they are pinned here rather than
- * left to whichever numbers the fixtures carry.
- *
- * The rule these enforce is the page-wide one: a value the platform does not
- * have reads as a dash, and a value it does have never reads as a zero.
+ * The two elapsed-time formatters behind the agents list, pinned at the boundaries the sample rows
+ * never reach (today, one day, years). Unknown reads as a dash; known never reads as zero.
  */
 import { describe, expect, it } from "vitest";
 

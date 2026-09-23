@@ -1,10 +1,8 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 /**
- * What a process builds, what it refuses, and what it closes.
- *
- * Nothing here opens a socket: every test either hands the member in or reads
- * one this process was not configured for, which is the whole of the contract
- * a boot seam depends on.
+ * What a process builds, what it refuses, and what it closes. Nothing here opens a socket: every
+ * test either hands the member in or reads one this process was not configured for, which is the
+ * whole of the contract a boot seam depends on.
  */
 import { describe, expect, it, vi } from "vitest";
 

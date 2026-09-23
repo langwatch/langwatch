@@ -1,12 +1,8 @@
 import type { Hono, MiddlewareHandler } from "hono";
 /**
- * The live twin of the document apps/api/src/features/discovery used to
- * freeze: instead of a byte buffer checked in once, this walks whatever
- * REST families are actually mounted right now and generates the document
- * from their own describeRoute()/validator() metadata (packages/api/src/rest
- * attaches both at declaration time). A route added, renamed or removed
- * changes this document the moment the process restarts — nothing to keep
- * in sync by hand, nothing that can go stale the way the frozen file did.
+ * The live OpenAPI document: generated from the mounted REST families' own
+ * describeRoute()/validator() metadata, so it changes with the routes on restart and cannot go
+ * stale like the frozen file.
  */
 import { generateSpecs } from "hono-openapi";
 
@@ -62,10 +58,9 @@ function documentation() {
 }
 
 /**
- * Mounted at GET /api/openapi.json — restApp is RestHost.app, every family's own router.
- * The generated document is published through the two corrections the schema builders
- * cannot make for themselves: 3.1's numeric exclusive bounds, and the recursive `$defs`
- * blocks whose refs dangle until they are hoisted (specs/api-reference).
+ * GET /api/openapi.json over RestHost.app, with the two corrections schema builders cannot make:
+ * 3.1's numeric exclusive bounds, and hoisting recursive `$defs` whose refs dangle
+ * (specs/api-reference).
  */
 export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
   return async (context) => {

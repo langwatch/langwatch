@@ -1,5 +1,6 @@
-/** Formats NLP engine failures from SerializedCodeAgentAdapter: distinguishes
- * user-code from infra, omits endpoints, strips noise, caps length.
+/**
+ * Formats NLP engine failures from SerializedCodeAgentAdapter: distinguishes user-code from infra,
+ * omits endpoints, strips noise, caps length.
  */
 
 import { goErrorEnvelopeSchema } from "./scenario-generate-nlpgo-error.rules.ts";
@@ -15,13 +16,8 @@ const NOISE_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * ANSI escape sequences from upstream Python loggers.
- *
- * Built from a char code rather than written as `/\x1b\[.../` because
- * `no-control-regex` refuses a control character inside a regex literal. The
- * escape byte is the whole point here: without it the pattern matches any
- * bracketed run of digits and letters, so `[INFO]` and `[0m` are stripped out
- * of ordinary log lines alike.
+ * ANSI escapes from upstream Python loggers, built from a char code because `no-control-regex`
+ * refuses a literal escape. Without the escape byte, `[INFO]` would be stripped too.
  */
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, "g");
 
@@ -50,8 +46,9 @@ export interface NlpEngineResult {
   error?: NlpEngineError;
 }
 
-/** Engine error types that are NOT customer Python: platform errors only,
- * everything else is user code (denylist not allowlist to catch unknowns).
+/**
+ * Engine error types that are NOT customer Python: platform errors only, everything else is user
+ * code (denylist not allowlist to catch unknowns).
  */
 const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
   "engine_error",
@@ -60,8 +57,9 @@ const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
   "context_canceled",
 ]);
 
-/** herr codes engine attributes to customer (not platform errors like
- * bad key/id which adapter supplies, not customer).
+/**
+ * herr codes engine attributes to customer (not platform errors like bad key/id which adapter
+ * supplies, not customer).
  */
 const CUSTOMER_FAULT_HERR_CODES: ReadonlySet<string> = new Set([
   "bad_request",
@@ -127,8 +125,8 @@ export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
   return { isLegacyDetail: false };
 }
 
-/** Classify 200 with failed run: anything not in PLATFORM_ENGINE_ERROR_TYPES
- * is customer code.
+/**
+ * Classify 200 with failed run: anything not in PLATFORM_ENGINE_ERROR_TYPES is customer code.
  */
 export function classifyEngineFailure(args: { errorType?: string }): HttpFailureSource {
   const type = args.errorType;
@@ -136,8 +134,8 @@ export function classifyEngineFailure(args: { errorType?: string }): HttpFailure
   return "user_code";
 }
 
-/** Classify non-2xx response: herr code primary (fallback to legacy FastAPI
- * 500 with detail).
+/**
+ * Classify non-2xx response: herr code primary (fallback to legacy FastAPI 500 with detail).
  */
 export function classifyHttpFailure(args: {
   status: number;
@@ -187,8 +185,9 @@ function renderUserCodeFailure(args: { statusLine: string; detail: string }): st
   ].join("\n");
 }
 
-/** NLP-service failure rendering: redacts detail (infra names host:port),
- * but not user-code detail (customer's traceback).
+/**
+ * NLP-service failure rendering: redacts detail (infra names host:port), but not user-code detail
+ * (customer's traceback).
  */
 function renderServiceFailure(args: { headline: string; detail: string }): string {
   return [
@@ -198,8 +197,9 @@ function renderServiceFailure(args: { headline: string; detail: string }): strin
   ].join("\n");
 }
 
-/** Format 200 with failed run (customer's Python exception): returns message,
- * source, and rawDetail; prefers traceback over one-line message.
+/**
+ * Format 200 with failed run (customer's Python exception): returns message, source, and rawDetail;
+ * prefers traceback over one-line message.
  */
 export function formatEngineError(args: { engineError: NlpEngineError | undefined }): {
   message: string;
@@ -243,8 +243,9 @@ export function formatEngineError(args: { engineError: NlpEngineError | undefine
   };
 }
 
-/** Format non-2xx NLP response: parses raw body, omits internal endpoint from
- * message, returns customer-facing message and classification source.
+/**
+ * Format non-2xx NLP response: parses raw body, omits internal endpoint from message, returns
+ * customer-facing message and classification source.
  */
 export function formatHttpError(args: { status: number; rawBody: string }): {
   message: string;
@@ -278,8 +279,9 @@ export function formatHttpError(args: { status: number; rawBody: string }): {
   };
 }
 
-/** Format 2xx with non-JSON body (proxy/portal): shares renderServiceFailure
- * with non-2xx path to keep wording consistent.
+/**
+ * Format 2xx with non-JSON body (proxy/portal): shares renderServiceFailure with non-2xx path to
+ * keep wording consistent.
  */
 export function formatMalformedBodyError(args: { status: number; rawBody: string }): {
   message: string;
@@ -298,13 +300,15 @@ export function formatMalformedBodyError(args: { status: number; rawBody: string
 
 /** IPv4 (and bracketed IPv6) addresses, with or without a port. */
 const IP_ADDRESS = /\[[0-9a-fA-F:]+\](?::\d{1,5})?|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/g;
-/** `token:port` pair (e.g., `nlp-internal:5561`): deliberate single
- * quantifier to avoid redos on `--` runs; host vs code location decided in code.
+/**
+ * `token:port` pair (e.g., `nlp-internal:5561`): deliberate single quantifier to avoid redos on
+ * `--` runs; host vs code location decided in code.
  */
 const TOKEN_WITH_PORT = /\b[A-Za-z0-9][A-Za-z0-9._-]*:\d{2,5}\b(?![.:\d])/g;
 
-/** Source-file suffixes: distinguish code location from address; don't
- * redact customer's own debugging info like `script.py:42`.
+/**
+ * Source-file suffixes: distinguish code location from address; don't redact customer's own
+ * debugging info like `script.py:42`.
  */
 const SOURCE_FILE_SUFFIX =
   /\.(py|pyc|ts|tsx|js|jsx|mjs|cjs|go|rb|java|kt|c|cc|cpp|h|hpp|rs|sh|sql|json|ya?ml|toml|txt|log)$/i;
@@ -318,8 +322,9 @@ function looksLikeHostPort(match: string): boolean {
 }
 /** Absolute URLs. */
 const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
-/** Engine's execution-harness frames (internal path, pure noise): engine
- * anonymizes customer's frame to `<code-block>`, wrapper frames stay.
+/**
+ * Engine's execution-harness frames (internal path, pure noise): engine anonymizes customer's frame
+ * to `<code-block>`, wrapper frames stay.
  */
 const ENGINE_HARNESS_FRAME =
   /^[ \t]*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^[ \t]{4,}[^ \t\n].*$\n?|^[ \t]*\^+[ \t]*$\n?)*/gm;
@@ -336,8 +341,9 @@ export function redactInternalAddresses(text: string): string {
     .replace(TOKEN_WITH_PORT, (match) => (looksLikeHostPort(match) ? "[redacted]" : match));
 }
 
-/** Replace known secrets literally (not pattern): defence-in-depth for
- * echoed credentials; skip short values to avoid corrupting ordinary text.
+/**
+ * Replace known secrets literally (not pattern): defence-in-depth for echoed credentials; skip
+ * short values to avoid corrupting ordinary text.
  */
 export function scrubKnownSecrets(text: string, secrets: string[]): string {
   let out = text;
@@ -348,8 +354,9 @@ export function scrubKnownSecrets(text: string, secrets: string[]): string {
   return out;
 }
 
-/** Format fetch-time failure (DNS/connect/abort/timeout): omits internal
- * endpoint from message, keeps only actionable code/errno.
+/**
+ * Format fetch-time failure (DNS/connect/abort/timeout): omits internal endpoint from message,
+ * keeps only actionable code/errno.
  */
 export function formatFetchError(args: { cause: unknown; timedOutAfterMs?: number }): string {
   const { cause, timedOutAfterMs } = args;

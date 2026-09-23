@@ -21,15 +21,14 @@ vi.mock("../../hooks/use-trace-header.ts", () => ({
 }));
 
 vi.mock("../../hooks/use-spans-full.ts", async () => {
-  const actual = await vi.importActual<typeof import("../../hooks/use-spans-full.ts")>(
-    "../../hooks/use-spans-full",
-  );
+  const actual = await vi.importActual<typeof useSpansFullModule>("../../hooks/use-spans-full");
   return {
     ...actual,
     useSpansFullCanonical: () => ({ data: spansFull.current }),
   };
 });
 
+import type * as useSpansFullModule from "../../hooks/use-spans-full.ts";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
 
 function renderDialog(patch: TraceEditOverlayPatch) {

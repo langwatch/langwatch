@@ -1,12 +1,6 @@
 /**
- * `langwatch query examples` — the worked queries, in full.
- *
- * Split from `query reference` because the two answer different questions. The
- * reference is "what can I query"; this is "show me one I can copy". Printing
- * every statement inside the reference would bury the field list under a page
- * of SQL, and a caller after one example would read the whole document to find
- * it.
- *
+ * `langwatch query examples`: the worked queries in full. Split from `query reference` because
+ * "what can I query" and "show me one to copy" are different questions.
  * @see specs/analytics/lwql-cli-query.feature
  */
 
@@ -16,11 +10,12 @@ import {
   type QueryReferenceResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { runnableLabel } from "./requirements";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { runnableLabel } from "./requirements";
 
 /** The two languages an example can be written in. */
 export const QUERY_EXAMPLE_LANGUAGES = ["lwql", "trace-filter"] as const;
@@ -37,9 +32,7 @@ function resolveLanguage(language?: string): string | undefined {
   if (language === undefined) return undefined;
   if (!(QUERY_EXAMPLE_LANGUAGES as readonly string[]).includes(language)) {
     console.error(
-      chalk.red(
-        `Error: --language must be one of ${QUERY_EXAMPLE_LANGUAGES.join(", ")}`,
-      ),
+      chalk.red(`Error: --language must be one of ${QUERY_EXAMPLE_LANGUAGES.join(", ")}`),
     );
     process.exit(1);
   }
@@ -47,11 +40,9 @@ function resolveLanguage(language?: string): string | undefined {
 }
 
 /**
- * Matches on tag OR intent.
- *
- * An intent is the one tag every example is guaranteed to carry, so a caller
- * that asks for `--tag cost` and means "the cost questions" gets them rather
- * than an empty list and no hint why.
+ * Matches on tag OR intent. An intent is the one tag every example is guaranteed to carry, so a
+ * caller that asks for `--tag cost` and means "the cost questions" gets them rather than an empty
+ * list and no hint why.
  */
 function matches({
   example,
@@ -73,9 +64,7 @@ function matches({
 
 function printExample(example: Example): void {
   console.log();
-  console.log(
-    `${chalk.cyan.bold(example.id)} ${chalk.gray(`— ${example.title}`)}`,
-  );
+  console.log(`${chalk.cyan.bold(example.id)} ${chalk.gray(`— ${example.title}`)}`);
   console.log(
     chalk.gray(
       `  ${example.language} · ${example.intent} · ${example.tags.join(", ")}${
@@ -91,9 +80,7 @@ function printExample(example: Example): void {
     console.log();
     for (const parameter of example.parameters) {
       console.log(
-        chalk.gray(
-          `    {${parameter.name}:${parameter.type}}  ${parameter.description}`,
-        ),
+        chalk.gray(`    {${parameter.name}:${parameter.type}}  ${parameter.description}`),
       );
     }
   }
@@ -118,9 +105,7 @@ export const queryExamplesCommand = async (
       matches({ example, tag: options.tag, language }),
     );
 
-    spinner.succeed(
-      `${examples.length} example${examples.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`${examples.length} example${examples.length !== 1 ? "s" : ""}`);
 
     return {
       data: { examples },

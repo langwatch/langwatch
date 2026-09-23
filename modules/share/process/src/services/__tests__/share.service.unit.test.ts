@@ -106,10 +106,8 @@ describe("ShareService", () => {
 
   describe("given resolveForViewer's view accounting", () => {
     /**
-     * `maxViews` means distinct viewings, not HTTP requests. Without this a
-     * single-view link dies the moment its recipient presses refresh, which is
-     * not what an operator means by "one view". Authorization still re-runs in
-     * full on every request — only the counting is deduped. See ADR-057.
+     * `maxViews` counts distinct viewings, not requests, so a refresh does not kill a single-view
+     * link. Authorization still re-runs on every request; only counting is deduped (ADR-057).
      */
     describe("given the same viewer re-opens a link inside the window", () => {
       beforeEach(() => {

@@ -121,8 +121,6 @@ describe.each(backends)("given the $name organization repositories", ({ create }
 
   describe("when a team is created", () => {
     it("reads it back and persists all fields", async () => {
-      const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-
       const team = await repositories.team.create({
         teamId: TEAM_ID,
         name: "Default Team",

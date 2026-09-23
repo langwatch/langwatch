@@ -12,8 +12,10 @@ import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
 import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
-import type { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
-import { type ModelParamsResult } from "./scenario-model-parameters.service.ts";
+import {
+  type ScenarioModelParametersService,
+  type ModelParamsResult,
+} from "./scenario-model-parameters.service.ts";
 import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");

@@ -217,7 +217,7 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
       const renderDatasetImage = vi.fn((input: { src: string }) => (
-        <img alt="Resolved dataset image" src={input.src} />
+        <img alt="Resolved dataset" src={input.src} />
       ));
 
       render(
@@ -232,7 +232,7 @@ describe("BatchEvaluationResultsTable", () => {
       expect(renderDatasetImage).toHaveBeenCalledWith({
         src: "https://example.com/output.png",
       });
-      expect(screen.getByAltText("Resolved dataset image")).toHaveAttribute(
+      expect(screen.getByAltText("Resolved dataset")).toHaveAttribute(
         "src",
         "https://example.com/output.png",
       );

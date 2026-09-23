@@ -16,7 +16,7 @@ const departures = vi.hoisted(() => ({ to: [] as string[] }));
 // real — the router hooks moved into this module, and a mock that replaced it
 // wholesale took them out with it.
 vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/browser-host/navigation")>()),
+  ...(await importOriginal<typeof navigationModule>()),
   uiLeaveTo: (url: string) => departures.to.push(url),
   uiOpenExternal: () => {
     throw new Error("The waiting screen opened a tab.");
@@ -34,6 +34,7 @@ import {
   type UiSuccessNotice,
 } from "@langwatch/browser-host/capabilities";
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "@langwatch/browser-host/navigation";
+import type * as navigationModule from "@langwatch/browser-host/navigation";
 import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import { UI_ORGANIZATIONS_PROCEDURE } from "@langwatch/organization-browser/surfaces/organization-facts";
 import {

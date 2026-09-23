@@ -107,7 +107,7 @@ const PROVIDER_MATCHERS: readonly {
 /**
  * Trusts the prefix (`openai/gpt-5`) when it names a known provider, otherwise sniffs the bare
  * model id — the far more common case. Null is a real answer: the caller renders the plain label
- * rather than guessing a vendor. `@langwatch/trace-browser` holds a fourth, unpublished copy of this.
+ * rather than guessing a vendor. `@langwatch/trace-browser` holds a fourth, unpublished copy.
  */
 export function inferProvider(model: string): ProviderKey | null {
   if (!model) return null;

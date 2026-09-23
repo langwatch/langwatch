@@ -1,8 +1,10 @@
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChartsApiError,ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
+import { ChartsApiError, ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 
 vi.mock("@/client-sdk/services/charts/charts-api.service", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -406,10 +408,9 @@ describe("the chart family while the workbench switch is off", () => {
 });
 
 /**
- * `chart schema` read `.views.length` straight off the response, so a payload
- * without `views` crashed with a TypeError that the error reader then filed as
- * `network_error` and told the user to check their connection. The shape is
- * checked before it is read, and the refusal names the fix.
+ * `chart schema` read `.views.length` straight off the response, so a payload without `views`
+ * crashed with a TypeError that the error reader then filed as `network_error` and told the user to
+ * check their connection. The shape is checked before it is read, and the refusal names the fix.
  */
 describe("given the analytics schema comes back in an unexpected shape", () => {
   /** @scenario "chart schema names a payload it does not recognise" */

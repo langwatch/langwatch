@@ -1,15 +1,6 @@
 /**
- * The body a `run` or an `estimate` sends, built from one command line.
- *
- * Two ways in and one body out. A caller who wrote a statement sends it; a
- * caller who has a question sends a target, a window, a filter and the
- * questions, and the platform writes the statement and hands it back. The
- * command refuses a line that says both, because a line that says both has no
- * reading: the statement would win and the target would be ignored, silently.
- *
- * Every refusal happens before anything is sent, so a malformed line never
- * leaves a run half-started.
- *
+ * The body a `run` or `estimate` sends: a statement, or a target, window, filter and questions the
+ * platform turns into one. A line with both is refused, and every refusal happens before sending.
  * @see specs/features/instant-eval-cli.feature
  */
 

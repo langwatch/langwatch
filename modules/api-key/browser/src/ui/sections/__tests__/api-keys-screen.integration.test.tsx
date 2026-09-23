@@ -5,6 +5,7 @@
  * Specs: specs/api-keys/{unified-api-keys,scope-filter,project-key-rotation}.feature
  */
 
+import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -108,7 +109,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // suites; what this file is about is what the SCREEN does with the value they
 // hand back, so the filter is replaced by buttons that call `onChange`.
 vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+  const actual = await vi.importActual<typeof authzBrowserKitModule>(
     "@langwatch/authz-browser-kit",
   );
   return {

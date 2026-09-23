@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../metrics.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics.ts")>();
+  const actual = await importOriginal<typeof metricsModule>();
   return {
     ...actual,
     observeEsFoldBlindReapplyEvents: vi.fn(),
@@ -14,8 +14,9 @@ vi.mock("../../metrics.ts", async (importOriginal) => {
   };
 });
 
-import { observeEsFoldBlindReapplyEvents } from "../../metrics.ts";
 import type { Event } from "../../domain/types.ts";
+import { observeEsFoldBlindReapplyEvents } from "../../metrics.ts";
+import type * as metricsModule from "../../metrics.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,

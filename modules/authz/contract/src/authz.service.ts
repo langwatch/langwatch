@@ -48,6 +48,7 @@ import type {
   PermissionDecision,
 } from "./authz.queries.ts";
 import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz.ts";
+import type * as authzModule from "./authz.ts";
 import type { PermissionScopeArg, TierOfScopeArg } from "./declaration.ts";
 import type { AuthzPermission } from "./registry.ts";
 import type { BindingScopeTier } from "./vocabulary.ts";
@@ -80,7 +81,7 @@ export abstract class AuthzService {
     } as Authorized<Tier, Permission>;
   }
 
-  abstract check(args: AuthzCheckInput): Promise<import("./authz.ts").AuthzDecision>;
+  abstract check(args: AuthzCheckInput): Promise<authzModule.AuthzDecision>;
 
   abstract checkDetailed(args: AuthzCheckInput): Promise<AuthzCheckDetailedOutput>;
 
@@ -193,8 +194,10 @@ export abstract class AuthzService {
 
   abstract getAccessBreakdown(args: AuthzAccessBreakdownInput): Promise<AuthzAccessBreakdownOutput>;
 
-  /** Temporary rollout boundary for legacy callers that still own their
-   * pre-engine fallback. Persistence and migration state remain private. */
+  /**
+   * Temporary rollout boundary for legacy callers that still own their pre-engine fallback.
+   * Persistence and migration state remain private.
+   */
   abstract isOnEngine(args: AuthzListOrganizationBindingsInput): Promise<boolean>;
 
   /** Finalized migration time for compatibility facts, or null before cutover. */

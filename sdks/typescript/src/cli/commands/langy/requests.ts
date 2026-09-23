@@ -115,11 +115,9 @@ function readText(file: string): string {
 }
 
 /**
- * uv owns a Python folder when its lock file is there, when `pyproject.toml`
- * carries a `[tool.uv]` table, or when the virtual environment was made by
- * uv: its `pyvenv.cfg` carries a `uv = <version>` line. The last one matters
- * most, because a venv uv made has no pip in it, so every pip spelling fails
- * there while `uv add` works.
+ * uv owns a Python folder when its lock file is there, `pyproject.toml` has `[tool.uv]`, or
+ * `pyvenv.cfg` has a `uv =` line. The last matters most: a uv venv has no pip, so only `uv add`
+ * works.
  */
 function uvOwns(root: string): boolean {
   if (fs.existsSync(path.join(root, "uv.lock"))) return true;
@@ -320,21 +318,9 @@ export type PersonCredentials = {
 };
 
 /**
- * The credentials the command acts with: the device login on this machine,
- * and only that. A control request is addressed to the person who asked, and
- * a `LANGWATCH_API_KEY`, in the folder's .env or in the shell, names no
- * person the command line can see, so it is never read here and the folder's
- * .env is never written.
- *
- * With no login, or with one that cannot be used (the server refuses it, it
- * holds no login key, or `isAccepted` says the platform turned its key down),
- * the device login runs right away and the login is read again. The login is
- * the standard flow, called rather than repeated. A sign-in that still leaves
- * no usable login ends the command with `SIGN_IN_FAILED_MESSAGE`.
- *
- * A login made against another address than the one the command targets ends
- * the command before any key is read: the key stays with the address that
- * issued it, and replacing the machine's login is the person's call.
+ * The command's credentials: the device login only, never `LANGWATCH_API_KEY`, which names no
+ * person. An unusable login runs the device login once; a login made against another address ends
+ * the command.
  */
 export async function ensureSignedIn({
   login,

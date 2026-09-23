@@ -327,10 +327,9 @@ export interface CodingAgentSessionRow {
   costUsd: number;
   agentReportedCostUsd: number;
   /**
-   * What the session spent under each declared working context (migration
-   * 00099), first seen first. The counters above are the amount; this says
-   * where it went. Empty on a row folded before the column, whose whole usage
-   * then reads as spent before any declaration.
+   * What the session spent under each declared working context (migration 00099), first seen first.
+   * The counters above are the amount; this says where it went. Empty on a row folded before the
+   * column, whose whole usage then reads as spent before any declaration.
    */
   usageByContext: CodingAgentSessionContextUsage[];
 

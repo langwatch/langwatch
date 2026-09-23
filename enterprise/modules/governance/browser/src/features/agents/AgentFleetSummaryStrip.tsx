@@ -10,12 +10,8 @@ import { GovernanceSummarySparkline } from "../../ui/elements/governance-summary
 import type { AgentFleetSummary, AgentStatusLine } from "./agentSummary";
 
 /**
- * A card that is a list of counted states — Health and Ownership both.
- *
- * The two differ in their heading and their test id and in nothing else, and
- * they are meant to: a reader scanning the strip reads the second the way they
- * read the first, so the day one of them grows a divider or a tooltip both
- * should get it. Two copies is how that stops being true.
+ * A card that lists counted states, shared by Health and Ownership: they differ only in heading and
+ * test id, so a change to one reaches both.
  */
 function AgentStatusLaneCard({
   eyebrow,
@@ -43,26 +39,10 @@ function AgentStatusLaneCard({
 }
 
 /**
- * The four cards the Agents page opens with: how many agents there are, how
- * they are doing, who owns them, and where the money goes.
- *
- * PLACEMENT ONLY. Every figure arrives already derived and already worded by
- * `summarizeAgentFleet`, so there is nothing to assert about this file that
- * the unit test next to that function does not already assert without
- * rendering. What is left here is which figure goes in which card.
- *
- * THE SHAPE IS BORROWED, DELIBERATELY. The cards, the eyebrow, the status row
- * and the rank row all come from `~/components/governance/summary`, which was
- * built once for the several governance pages that needed a resume in the same
- * round. This page inventing its own would be the exact mistake that left the
- * section with five separate sample badges.
- *
- * WHEN IT IS NOT RENDERED. The page decides that, not this component — see
- * `AgentsPage`. Briefly: with nothing to summarize it is absent rather than
- * showing four em dashes, because zero agents responding and no agents at all
- * are different facts.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The four cards the Agents page opens with. Placement only: `summarizeAgentFleet` derives and
+ * words every figure, and the page decides when the strip is absent. Built on the shared summary
+ * cards.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 export function AgentFleetSummaryStrip({ summary }: { summary: AgentFleetSummary }) {
   const { fleet, health, ownership, topSpenders } = summary;

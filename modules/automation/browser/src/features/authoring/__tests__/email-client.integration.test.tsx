@@ -17,12 +17,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-/** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
- *  one export as a textarea carrying its `value`, so a test can read back the
- *  template the editor was seeded with — the template an author's first
- *  keystroke would persist. Everything else in the module stays real. */
+/**
+ * The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that one export as a
+ * textarea carrying its `value`, so a test can read back the template the editor was seeded with —
+ * the template an author's first keystroke would persist. Everything else in the module stays real.
+ */
 vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
-  const actual = await original<typeof import("../ui/sections/template-authoring.tsx")>();
+  const actual = await original<typeof templateAuthoringModule>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
@@ -44,6 +45,7 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 import type { EmailPreview } from "@langwatch/automation-contract";
 
 import emailClient, { type EmailSlice } from "../ui/sections/email.client.tsx";
+import type * as templateAuthoringModule from "../ui/sections/template-authoring.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

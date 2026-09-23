@@ -194,7 +194,6 @@ afterEach(() => {
 });
 
 async function runPull({
-  azureSubscriptionId,
   cursor = null,
 }: {
   readSeats?: boolean;

@@ -93,7 +93,7 @@ export function DomainsSection({
 
       {rows.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
-          No domain has been claimed yet. Add the domain your team&apos;s email addresses end in —{" "}
+          No domain has been claimed yet. Add the domain your team&apos;s email addresses end in:{" "}
           <Text as="span" fontFamily="mono">
             acme.com
           </Text>{" "}
@@ -380,14 +380,13 @@ function WhyADomainIsProved({ provesWithLicense }: { provesWithLicense: boolean 
   return (
     <VStack align="stretch" gap={1}>
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        Proving a domain is optional, and you can come back to it at any time — your account manager
+        Proving a domain is optional, and you can come back to it at any time: your account manager
         at LangWatch can also do it for you. You publish a short value we give you in the
         domain&apos;s DNS, or as a file on your website, and we look for it.
       </Text>
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
         Until a domain is proved, people sign in through the link you give them rather than being
-        recognised by their email address — so nobody is sent to your identity provider on their
-        own.
+        recognised by their email address, so nobody is sent to your identity provider on their own.
       </Text>
     </VStack>
   );

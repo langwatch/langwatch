@@ -20,6 +20,7 @@ import {
 
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+import type * as traceLegacyReadRepositoryModule from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
@@ -98,9 +99,7 @@ export type TraceReaderCompositionOptions = {
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
-  filterConditions?:
-    | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
-    | undefined;
+  filterConditions?: traceLegacyReadRepositoryModule.TraceLegacyFilterConditions | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   /** The Instant Eval peer the Explorer's judged searches run through. */
   instantEvals?: TraceAppDependencies["instantEvals"];

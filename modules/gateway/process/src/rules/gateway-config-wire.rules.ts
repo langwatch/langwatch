@@ -1,5 +1,5 @@
-import type { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
 import {
+  type parseVirtualKeyConfig,
   type GatewayBudget,
   type ModelProvider,
   type VirtualKey,

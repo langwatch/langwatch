@@ -39,7 +39,7 @@ vi.mock("langwatch", () => ({
 // the module (createWarnThrottle among them), which modules pulled in
 // transitively call at import time.
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -49,6 +49,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import type { Event } from "@langwatch/eventing";
+import type * as observabilityModule from "@langwatch/observability";
 import {
   EVENTREF_ATTR_PREFIX,
   type NormalizedSpan,
@@ -144,8 +145,10 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
   } as unknown as Event;
 }
 
-/** Extracts span attributes from a lean event into the Record<string, string>
- * format that NormalizedSpan.spanAttributes uses. */
+/**
+ * Extracts span attributes from a lean event into the Record<string, string> format that
+ * NormalizedSpan.spanAttributes uses.
+ */
 function extractSpanAttrs(event: Event): Record<string, string> {
   const data = event.data as {
     span?: { attributes?: { key: string; value: { stringValue?: string } }[] };
@@ -206,8 +209,9 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
   });
 
   describe("when TraceProjectionLeanService.leanForProjection is applied (simulating dispatch interposition)", () => {
-    /** @scenario event_log carries full content; projection queue carries the
-     * lean shape */
+    /**
+     * @scenario event_log carries full content; projection queue carries the lean shape
+     */
     it("the lean event carries a preview within the IO_PREVIEW_BYTES budget for langwatch.output", () => {
       const previewValue = leanAttrs["langwatch.output"] ?? "";
       expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThanOrEqual(

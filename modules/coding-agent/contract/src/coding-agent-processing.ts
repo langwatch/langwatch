@@ -40,10 +40,9 @@ const contributionBaseSchema = z.object({
 });
 
 /**
- * The working context active when a record happened, stamped onto the event
- * from the session's last `session_context` declaration. Absent on pre-stamp
- * events: a log's fact table stores '' and prices under the legacy
- * whole-session rule, and an unstamped model-call span charges no context.
+ * The working context active when a record happened, stamped onto the event from the session's last
+ * `session_context` declaration. Absent on pre-stamp events: a log's fact table stores '' and
+ * prices under the legacy whole-session rule, and an unstamped model-call span charges no context.
  */
 const workingContextStampSchema = {
   repositoryHost: z.string().optional(),

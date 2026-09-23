@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import type * as annotationContractModule from "@langwatch/annotation-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -117,7 +118,7 @@ vi.mock("../../elements/period-picker.tsx", () => ({
 const { AnnotationList } = await import("../annotation-list.tsx");
 const { groupedAnnotationsToRows } = await import("../../../model/annotation-row.ts");
 const { csvFileName } = await import("../../../model/annotation-export.ts");
-type AnnotationWithUser = import("@langwatch/annotation-contract").AnnotationWithUser;
+type AnnotationWithUser = annotationContractModule.AnnotationWithUser;
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
   id: "annotation-1",

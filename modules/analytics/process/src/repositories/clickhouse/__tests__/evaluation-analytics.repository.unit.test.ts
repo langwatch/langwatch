@@ -5,6 +5,7 @@ import {
   type AnalyticsEvaluationRow,
 } from "@langwatch/analytics-contract";
 import { SecurityError } from "@langwatch/eventing";
+import type * as observabilityModule from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
@@ -14,7 +15,7 @@ import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytic
 const loggerSpies = vi.hoisted(() => ({ warn: vi.fn() }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => loggerSpies,
 }));
 

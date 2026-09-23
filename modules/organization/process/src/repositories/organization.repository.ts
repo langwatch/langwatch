@@ -77,10 +77,9 @@ export abstract class OrganizationRepository {
     s3Bucket?: string | null;
   }): Promise<void>;
   /**
-   * The guided-onboarding record out of the organization's `signupData`, and
-   * back into it. The merge is the repository's because the column holds
-   * every other sign-up answer beside this one, and a read-modify-write split
-   * across two calls would drop whichever landed second.
+   * The guided-onboarding record out of the organization's `signupData`, and back into it. The
+   * merge is the repository's because the column holds every other sign-up answer beside this one,
+   * and a read-modify-write split across two calls would drop whichever landed second.
    */
   abstract getGuidedOnboarding(input: { organizationId: string }): Promise<GuidedOnboardingRecord>;
   abstract saveGuidedOnboarding(input: {

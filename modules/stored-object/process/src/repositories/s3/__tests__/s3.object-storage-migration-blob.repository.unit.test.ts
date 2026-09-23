@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { sent } = vi.hoisted(() => ({ sent: { send: vi.fn(), destroy: vi.fn() } }));
 
 vi.mock("@aws-sdk/client-s3", async () => {
-  const actual = await vi.importActual<typeof import("@aws-sdk/client-s3")>("@aws-sdk/client-s3");
+  const actual = await vi.importActual<typeof clientS3Module>("@aws-sdk/client-s3");
   return {
     ...actual,
     S3Client: class {
@@ -17,6 +17,7 @@ vi.mock("@aws-sdk/client-s3", async () => {
   };
 });
 
+import type * as clientS3Module from "@aws-sdk/client-s3";
 import { UnsupportedStorageSchemeError } from "@langwatch/stored-object-contract";
 
 import { MigrationBlobS3Repository } from "#repositories/s3/s3.object-storage-migration-blob.repository";

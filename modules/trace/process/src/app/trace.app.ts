@@ -170,6 +170,7 @@ import { type TraceSpanIngest, type TraceLegacyRead } from "./trace.members.ts";
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type * as traceContractModule from "@langwatch/trace-contract";
 
 import type {
   CollectorEvaluationReport,
@@ -305,8 +306,10 @@ export type TracesSpanReader = Readonly<{
   }): Promise<ModelSpanSampleRow[]>;
 }>;
 
-/** The trace's own summary read: occurredAtMs prunes partitions,
- * visibilityCutoffMs applies the plan's window, full resolves offloaded values. */
+/**
+ * The trace's own summary read: occurredAtMs prunes partitions, visibilityCutoffMs applies the
+ * plan's window, full resolves offloaded values.
+ */
 export type TraceSummaryReader = Readonly<{
   getByTraceId(
     tenantId: string,
@@ -513,9 +516,10 @@ export interface TraceAppDependencies {
   publicBaseUrl?: string;
 }
 
-/** The partition-pruning hint: present or absent, never undefined.
- * Omitting the value scans every weekly partition, turning 100ms reads into
- * multi-second ones. */
+/**
+ * The partition-pruning hint: present or absent, never undefined. Omitting the value scans every
+ * weekly partition, turning 100ms reads into multi-second ones.
+ */
 function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Record<string, never> {
   return occurredAtMs !== undefined ? { occurredAtMs } : {};
 }
@@ -561,11 +565,9 @@ export class TraceApp implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   /**
-   * ClickHouse holds every captured span; `eventing` is the pipeline this
-   * process stages commands on; the logger names the process in a blob
-   * read's refusal. Everything else is a peer Api or its own repository.
+   * Every name is from the process's vocabulary; boot refuses by name. ClickHouse holds every span,
+   * `eventing` stages commands, and the logger names the process in a blob read's refusal.
    */
-  /** Every name is from the process's vocabulary; boot refuses by name. */
   static readonly reads = [
     "clickhouse",
     "eventing",
@@ -794,11 +796,11 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
-  getEvaluationSpans(input: import("@langwatch/trace-contract").EvaluationTraceReadInput) {
+  getEvaluationSpans(input: traceContractModule.EvaluationTraceReadInput) {
     return this.#dependencies.traces.tree.getEvaluationSpans(input);
   }
 
-  getEvaluationEvents(input: import("@langwatch/trace-contract").EvaluationTraceReadInput) {
+  getEvaluationEvents(input: traceContractModule.EvaluationTraceReadInput) {
     return this.#dependencies.traces.tree.getEvaluationEvents(input);
   }
 
@@ -1315,9 +1317,11 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
-  /** Whether the plan's visibility window teases this trace's content. Only
-   * free plans have a window; with one, the trace's own summary decides visibility
-   * (same read the drawer header makes). */
+  /**
+   * Whether the plan's visibility window teases this trace's content. Only free plans have a
+   * window; with one, the trace's own summary decides visibility (same read the drawer header
+   * makes).
+   */
   async isTraceWindowRedacted(input: {
     projectId: string;
     traceId: string;
@@ -1601,8 +1605,10 @@ export class TraceApp implements TraceApi, CollectorApp {
   // The two things a reader may change about a trace
   // -------------------------------------------------------------------------
 
-  /** Renames a trace, attributed to the caller. Attribution is a property of the
-   * act, not the transport. Name is validated by the door. */
+  /**
+   * Renames a trace, attributed to the caller. Attribution is a property of the act, not the
+   * transport. Name is validated by the door.
+   */
   changeTraceName(
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
     by: TraceCaller,

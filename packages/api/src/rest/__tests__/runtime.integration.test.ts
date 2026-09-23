@@ -1,9 +1,7 @@
 /**
- * What the REST runtime publishes and serves for a declared router: the
- * addresses a route answers at, the version headers each one carries, and the
- * operations the document publishes.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * What the REST runtime publishes and serves for a declared router: the addresses a route answers
+ * at, the version headers each one carries, and the operations the document publishes. Spec:
+ * packages/api/specs/transport-declaration-split.feature.
  */
 
 import { moduleApi } from "@langwatch/kernel";

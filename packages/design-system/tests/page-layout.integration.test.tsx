@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 
-/**
- * The page shell every index and detail page is built from. What matters here
- * is the shape it imposes: one h1 per page at the standard size, a header that
- * can drop its rule, and a content card that always wraps its children in a
- * card body.
- */
+/** The page shell every index and detail page is built from. What matters here is the shape it
+ * imposes: one h1 per page at the standard size, a header that can drop its rule, and a content
+ * card that always wraps its children in a card body. */
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { PageLayout } from "../src/components/page-layout.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

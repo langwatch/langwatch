@@ -1,5 +1,5 @@
-import type { AlertType } from "@langwatch/automation-contract";
 import {
+  type AlertType,
   DEFAULT_TRACE_DEBOUNCE_MS,
   findGraphAlertFromTriggerRow as parseGraphAlertRow,
   type AutomationFilterValue,
@@ -28,9 +28,11 @@ export type { AutomationFilterValue, AutomationFilters };
 
 export type ConditionSource = "trace" | "customGraph" | "report";
 
-/** The content + schedule a scheduled REPORT captures (ADR-044). Mirrors the
- *  `reportActionParams` the router persists: a source discriminated by kind
- *  plus a cron+timezone schedule. Flat here for simple form binding. */
+/**
+ * The content + schedule a scheduled REPORT captures (ADR-044). Mirrors the `reportActionParams`
+ * the router persists: a source discriminated by kind plus a cron+timezone schedule. Flat here for
+ * simple form binding.
+ */
 export type ReportSourceKind = "traceQuery" | "customGraph" | "dashboard";
 
 export interface ReportDraft {
@@ -51,11 +53,10 @@ export const INITIAL_REPORT_DRAFT: ReportDraft = {
   timezone: "UTC",
 };
 
-/** The threshold rule a custom-graph alert fires on. Mirrors the fields the
- *  automations drawer's alert form collects and the dispatcher reads off the
- *  Trigger row's `actionParams`. Lives at the draft root (not in a slice)
- *  because both Email and Slack providers reuse the same rule and only
- *  differ in their destination keys. */
+/**
+ * The threshold rule a custom-graph alert fires on, mirroring the drawer's form and the Trigger
+ * row's `actionParams`. At the draft root because Email and Slack share it.
+ */
 export interface GraphAlertDraft {
   seriesName: string;
   operator: GraphAlertOperator;
@@ -79,36 +80,44 @@ export interface AutomationDraft<C extends ProviderClients> {
   /** Where conditions come from — trace filters or a custom graph alert. */
   source: ConditionSource;
   filters: AutomationFilters;
-  /** ADR-043 Subject facet: the Traces-V2 liqe query a trace-subject
-   *  automation is about. When non-empty it supersedes `filters` — the router
-   *  persists `filters` as `{}` and the dispatcher matches this in-memory.
-   *  `null`/empty keeps the legacy structured-`filters` path (edit of an older
-   *  automation). Only meaningful when `source === "trace"`. */
+  /**
+   * ADR-043 Subject facet: the Traces-V2 liqe query of a trace-subject automation. Non-empty
+   * supersedes `filters` (persisted as `{}`); empty keeps the legacy structured path. Only for
+   * `source === "trace"`.
+   */
   filterQuery: string | null;
   customGraphId: string | null;
-  /** Threshold rule for graph alerts. Only meaningful when
-   *  `source === "customGraph"`; carried around the draft so type-switching
-   *  back and forth doesn't wipe the user's threshold while they're
-   *  experimenting. */
+  /**
+   * Threshold rule for graph alerts. Only meaningful when `source === "customGraph"`; carried
+   * around the draft so type-switching back and forth doesn't wipe the user's threshold while
+   * they're experimenting.
+   */
   graphAlert: GraphAlertDraft;
-  /** Report content + schedule. Only meaningful when `source === "report"`;
-   *  carried around so type-switching doesn't wipe it. */
+  /**
+   * Report content + schedule. Only meaningful when `source === "report"`; carried around so
+   * type-switching doesn't wipe it.
+   */
   report: ReportDraft;
-  /** Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch
-   *  time for persist actions, so the draft value can sit dormant while the
-   *  user is type-switching. */
+  /**
+   * Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch time for persist actions,
+   * so the draft value can sit dormant while the user is type-switching.
+   */
   notificationCadence: NotificationCadence;
-  /** Per-trigger trace-readiness debounce in ms (ADR-026). The settle stage
-   *  holds the trace this long before re-evaluating filters; only meaningful
-   *  for notify actions (persist actions ignore it). */
+  /**
+   * Per-trigger trace-readiness debounce in ms (ADR-026). The settle stage holds the trace this
+   * long before re-evaluating filters; only meaningful for notify actions (persist actions ignore
+   * it).
+   */
   traceDebounceMs: number;
-  /** True once the user has looked at the cadence stage (opened it and hit
-   *  Done, or changed either knob). New drafts start unconfirmed so the
-   *  defaults can't silently ship without the author ever seeing them;
-   *  hydrated rows start confirmed because the saved values were chosen. */
+  /**
+   * True once the user has looked at the cadence stage (opened it and hit Done, or changed either
+   * knob). New drafts start unconfirmed so the defaults can't silently ship without the author ever
+   * seeing them; hydrated rows start confirmed because the saved values were chosen.
+   */
   cadenceConfirmed: boolean;
-  /** Per-provider slice — all present, so type-switching never loses the
-   *  slice the user was on. */
+  /**
+   * Per-provider slice — all present, so type-switching never loses the slice the user was on.
+   */
   slices: AllSlices<C>;
 }
 
@@ -524,8 +533,10 @@ function configIsComplete<C extends ProviderClients>(
   }
 }
 
-/** Operator labels matching the dashboard "Configure Alert" copy verbatim
- *  so the experience is identical between the two creation paths. */
+/**
+ * Operator labels matching the dashboard "Configure Alert" copy verbatim so the experience is
+ * identical between the two creation paths.
+ */
 export const OPERATOR_LABELS: Record<GraphAlertOperator, string> = {
   gt: "greater than",
   lt: "less than",
@@ -567,8 +578,10 @@ function configurationSummary<C extends ProviderClients>(
   }
 }
 
-/** True when the active action is a notify provider — used to gate the
- *  preview pane, cadence stage, and test-fire UI. */
+/**
+ * True when the active action is a notify provider — used to gate the preview pane, cadence stage,
+ * and test-fire UI.
+ */
 function isNotifyAction<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
   return (
     draft.action === TriggerAction.SEND_EMAIL ||
@@ -577,11 +590,10 @@ function isNotifyAction<C extends ProviderClients>(draft: AutomationDraft<C>): b
   );
 }
 
-/** Pull the graph-alert threshold rule out of a saved Trigger row's
- *  `actionParams` JSON. Returns the seeded defaults when the row isn't a
- *  graph alert or the JSON shape is unexpected (legacy / hand-edited rows).
- *  The drawer relies on this on edit hydration so the threshold fields
- *  pre-populate. */
+/**
+ * The graph-alert threshold rule from a Trigger row's `actionParams`, or the seeded defaults for
+ * non-alert or unexpected rows; edit hydration relies on it.
+ */
 export function extractGraphAlertFromTriggerRow(actionParams: unknown): GraphAlertDraft {
   // Delegates to the server-side SSOT parser (`parseGraphAlertRow`, same
   // Zod schema as the writer) so edit-hydration can't drift from the row

@@ -3,31 +3,9 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { RefreshCw } from "lucide-react";
 
 /**
- * The control that asks a governance page's providers to say what they have.
- *
- * ONE SHAPE, MANY VOICES, the same split the governance empty state makes: the
- * shape is shared and every word is the caller's. Agents and people are asked
- * of the same providers over the same pipeline, so the states are identical
- * and the sentences are not — "agents" and "people" are not interchangeable in
- * a sentence a reader is meant to act on.
- *
- * WHY IT NEVER REPORTS A RESULT. The request is dispatched and the call
- * returns; a pipeline calls the provider later and the outcome lands in the
- * log after that. There is no completion to await, so this button can only
- * ever say what was STARTED. A spinner that resolved into "found 4 agents"
- * would be inventing the half of the story that has not happened yet.
- *
- * WHY `asked` DISABLES IT UNTIL THE PAGE IS RELOADED. A second request while
- * one is in flight is dropped by the process manager, deliberately, not
- * queued. A button that stays live and silently does nothing is a button that
- * reads as broken, so once a request is recorded this one goes quiet and says
- * why. Reloading is how the reader sees the result, so "reload" is both the
- * honest instruction and the thing that brings the button back.
- *
- * Drawn ghost, so the one outlined control in a page header stays the action
- * that creates something of the organization's own — the arrangement the
- * people page's header already uses for `Run match pass`.
- * Rule: specs/ai-governance/dashboard/governance-ui-controls.feature
+ * The control asking a page's providers what they have; shape shared, words the caller's. It only
+ * says what was STARTED, and `asked` disables it until reload because a second request is dropped.
+ * @see specs/ai-governance/dashboard/governance-ui-controls.feature
  */
 export type GovernanceSyncState =
   /** Pressable. */
@@ -49,10 +27,9 @@ export function GovernanceSyncButton({
   label: string;
   state: GovernanceSyncState;
   /**
-   * Why it cannot be pressed, in the page's own words. Required whenever the
-   * state is not pressable: a disabled control with no reason is the defect
-   * this component exists to avoid, so the two are one decision here rather
-   * than two props a call site can get half right.
+   * Why it cannot be pressed, in the page's own words. Required whenever the state is not
+   * pressable: a disabled control with no reason is the defect this component exists to avoid, so
+   * the two are one decision here rather than two props a call site can get half right.
    */
   reason: string | null;
   onPress: () => void;

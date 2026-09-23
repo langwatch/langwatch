@@ -3,6 +3,7 @@
 import { Table } from "@chakra-ui/react";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { ListTable } from "../src/components/list-table.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

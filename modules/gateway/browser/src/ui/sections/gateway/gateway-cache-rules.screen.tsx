@@ -149,7 +149,7 @@ function CacheRulesPage() {
                 <EmptyState.Title>No cache rules yet</EmptyState.Title>
                 <EmptyState.Description>
                   Cache rules let operators force, disable, or override cache behaviour across
-                  virtual keys, models, principals, or custom request metadata — no client code
+                  virtual keys, models, principals, or custom request metadata: no client code
                   changes required.
                 </EmptyState.Description>
                 {canCreate && (

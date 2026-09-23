@@ -1,8 +1,6 @@
 /**
- * The fields section of the suite editor: one row per field, each an
- * identifier and a type, dragged into order by its handle and removed by its
- * X.
- *
+ * The fields section of the suite editor: one row per field, an identifier and a type, ordered by
+ * drag handle and removed by its X.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 

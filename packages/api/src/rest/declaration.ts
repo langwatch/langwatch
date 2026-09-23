@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { ModuleApiToken } from "@langwatch/kernel";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
 
 import {
@@ -277,7 +278,7 @@ export type RestMethodName = Uppercase<HttpMethod>;
 export type RestRouteAnswers = Readonly<Record<number, OutputSchema>>;
 export type RestDeclaredResult<Answers extends RestRouteAnswers> = {
   [Status in keyof Answers]: Readonly<{
-    status: Status & import("hono/utils/http-status").StatusCode;
+    status: Status & httpStatusModule.StatusCode;
     headers?: Readonly<Record<string, string>>;
     body: z.input<Answers[Status] & OutputSchema>;
   }>;

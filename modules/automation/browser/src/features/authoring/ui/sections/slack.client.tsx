@@ -61,37 +61,40 @@ import {
   TemplateDisclosure,
 } from "./template-authoring.tsx";
 
-/** A template field. `usingDefault` means "the author has not customised this"
- *  — it is what the Reset affordance and the default badge read. `value` is the
- *  template that will actually be sent: empty while the framework default
- *  applies, and pre-filled for a report (whose layout follows its content
- *  source, so the draft carries the matching layout from the start). */
+/**
+ * A template field. `usingDefault` means not customised (Reset and the default badge read it).
+ * `value` is what will be sent: empty under the framework default, pre-filled for a report.
+ */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
 }
 
 export interface SlackSlice {
-  /** How the message reaches Slack: a legacy incoming webhook, or a Slack app
-   *  bot token posting via the Web API. Drives which destination fields and
-   *  which templates are offered. */
+  /**
+   * How the message reaches Slack: a legacy incoming webhook, or a Slack app bot token posting via
+   * the Web API. Drives which destination fields and which templates are offered.
+   */
   deliveryMethod: SlackDeliveryMethod;
   /** Webhook destination (used when `deliveryMethod` is "webhook"). */
   webhook: string;
-  /** A newly typed bot token. Empty means "unchanged": on an edit the server
-   *  keeps the stored token; on a fresh draft an empty token is incomplete.
-   *  The stored token is never read back into the form (see `botTokenAlreadySet`). */
+  /**
+   * A newly typed bot token. Empty means "unchanged": on an edit the server keeps the stored token;
+   * on a fresh draft an empty token is incomplete. The stored token is never read back into the
+   * form (see `botTokenAlreadySet`).
+   */
   botToken: string;
   /** Bot destination channel (id like C0123, or #name). */
   channelId: string;
-  /** True when the row already has a stored bot token (echoed by the server as
-   *  a flag, never the token itself), so the form can show "token set" and let
-   *  the author keep it without retyping. */
+  /**
+   * True when the row already has a stored bot token (echoed by the server as a flag, never the
+   * token itself), so the form can show "token set" and let the author keep it without retyping.
+   */
   botTokenAlreadySet: boolean;
-  /** True only when editing an automation that was saved with a webhook. New
-   *  automations are bot-only (a webhook can't render the modern templates), so
-   *  the webhook option is offered ONLY to keep existing webhook automations
-   *  editable — they can stay on the webhook or upgrade to a Slack app. */
+  /**
+   * True only when editing an automation saved with a webhook. New automations are bot-only; the
+   * webhook option exists only to keep old ones editable.
+   */
   isLegacyWebhook: boolean;
   templateType: SlackTemplateType;
   template: FieldDraft;
@@ -193,7 +196,7 @@ function toActionParams(slice: SlackSlice): SlackActionParams {
 function comboboxEmptyLabel(isPending: boolean, channelCount: number): string {
   if (isPending) return "Loading channels…";
   if (channelCount === 0) return "Type a channel name or ID";
-  return "No match — press Enter to use what you typed";
+  return "No match: press Enter to use what you typed";
 }
 
 function testFireTarget(slice: SlackSlice) {
@@ -232,8 +235,10 @@ oauth_config:
       - channels:read
       - groups:read`;
 
-/** Shown on a legacy webhook automation: nudges the author to move to a Slack
- *  app, which unlocks the richer templates a webhook can't render. */
+/**
+ * Shown on a legacy webhook automation: nudges the author to move to a Slack app, which unlocks the
+ * richer templates a webhook can't render.
+ */
 function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
   return (
     <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" bg="bg.subtle" padding={3}>
@@ -391,7 +396,7 @@ function SlackChannelField({
   const gaps = list.data?.gaps ?? [];
   const gapHints = [
     gaps.includes("private_channels_hidden")
-      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest above."
+      ? "Private channels aren't listed: your Slack app needs the groups:read permission. Reinstall it with the manifest above."
       : null,
     gaps.includes("page_cap")
       ? "This workspace has more channels than we can list here, so some are missing."
@@ -410,7 +415,7 @@ function SlackChannelField({
     )} You can still type the channel above.`;
   } else if (returnedError === "missing_scope") {
     hint =
-      "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above.";
+      "Add the channels:read permission to your Slack app and reinstall it to pick from a list: you can still type the channel above.";
   } else if (returnedError) {
     hint = "Couldn't load channels from Slack. Check the token, or type the channel above.";
   } else {
@@ -876,7 +881,7 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste the copied manifest —
+                  Create the app with &ldquo;From a manifest&rdquo; and paste the copied manifest:
                   it sets the permissions for you.
                 </Text>
               </List.Item>

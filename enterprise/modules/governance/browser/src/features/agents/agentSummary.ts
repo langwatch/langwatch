@@ -1,26 +1,7 @@
 /**
- * The four figures the Agents page opens with, derived from the rows it is
- * about to list.
- *
- * DERIVED, NEVER INVENTED TWICE. The strip could have carried its own set of
- * plausible numbers, and it would have looked identical on the day it shipped
- * and drifted from the cards below it by the second change. Every figure here
- * is a fold over the same `GovernanceAgentRow` values the cards are drawn
- * from, so a reader who adds up the cards gets the strip, and the
- * organization-wide read that one day fills those rows lights the strip up
- * through this same function with nothing to go and change.
- *
- * PURE, AND SEPARATE FROM THE JSX. Everything the strip says — the counts, the
- * shares, the line and the caption — is decided here and asserted in
- * `__tests__/agentSummary.unit.test.ts` without rendering anything. What is
- * left in the page is placement.
- *
- * These are figures over the whole fleet, not over what the filter chips have
- * left on screen. The strip sits above the chips and answers "what is in this
- * organization"; a summary that shrank when the reader narrowed a filter would
- * be answering a different question in the same words.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The Agents page's four figures, folded from the same rows the cards draw, so they cannot drift.
+ * Pure and separate from the JSX; over the whole fleet, not the filtered view.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import type { GovernanceSummaryTone } from "../../ui/elements/governance-summary-cards.tsx";
 import { sourcesPresentIn } from "./agentFilters";
@@ -33,12 +14,8 @@ import {
 } from "./agentRows";
 
 /**
- * How far back the registration line reaches, and how coarsely.
- *
- * Twelve points a month apart. Fewer and the line is a zigzag that implies
- * precision the buckets do not have; more and a card-sized sparkline turns the
- * points into a smear. A month is also the unit the caption speaks in, so the
- * picture and the sentence under it are measured the same way.
+ * The registration line's reach: twelve points a month apart. Fewer implies false precision, more
+ * smears a card-sized sparkline, and a month is the unit the caption speaks in.
  */
 const REGISTRATION_MONTHS = 12;
 const DAYS_PER_MONTH = 30;
@@ -114,14 +91,8 @@ const HEALTH_TONES: Record<AgentHealth, GovernanceSummaryTone> = {
 };
 
 /**
- * A list of things, the way a person says it out loud.
- *
- * "Custom and Databricks", not "Custom, Databricks". The card has room for the
- * word and a reader should not have to parse punctuation to read a sentence.
- *
- * Exported for the page's empty states, which name connected providers in a
- * sentence and would otherwise grow a second copy of this that punctuates two
- * items differently from the summary strip a few pixels above it.
+ * A list the way a person says it: "Custom and Databricks". Exported for the page's empty states so
+ * two items are never punctuated differently a few pixels apart.
  */
 export function spokenList(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? "";
@@ -129,13 +100,9 @@ export function spokenList(items: readonly string[]): string {
 }
 
 /**
- * The cumulative fleet size at each of the last twelve month boundaries.
- *
- * A row whose registration moment was never recorded is left off the line
- * entirely rather than dropped at one end of it: a line that placed unmeasured
- * agents at the oldest point would draw a fleet that has always existed, and
- * one that placed them at the newest would draw a stampede that never
- * happened.
+ * The cumulative fleet size at each of the last twelve month boundaries. Rows with no recorded
+ * registration are left off the line rather than placed at either end, which would draw a false
+ * history.
  */
 function registrationCurve(rows: readonly GovernanceAgentRow[]): number[] {
   const registeredDaysAgo = rows
@@ -149,17 +116,8 @@ function registrationCurve(rows: readonly GovernanceAgentRow[]): number[] {
 }
 
 /**
- * What the line and the caption leave out, said in the caption's own words.
- *
- * The headline counts every agent, and the line beneath it counts only the
- * ones with a registration date, because an agent a provider named has no such
- * date to place — see `buildAgentInventory`. Left unsaid, that is a card
- * contradicting itself: twelve above a line that reaches four, and no way for
- * a reader to tell whether the count is wrong, the line is wrong, or agents
- * went missing. Naming the gap turns it from an apparent error into a fact.
- *
- * The clause covers the arrivals figure as well as the line, which is correct:
- * both are folds over the same dated rows.
+ * What the line and caption leave out, in the caption's words: provider-named agents have no
+ * registration date, so naming the gap stops the headline and line from looking contradictory.
  */
 function trendExclusion(rows: readonly GovernanceAgentRow[]): string {
   const undated = rows.filter((row) => row.registeredDaysAgo === null).length;
@@ -199,17 +157,8 @@ function summarizeFleet(rows: readonly GovernanceAgentRow[]): AgentFleetCount {
 }
 
 /**
- * The health card: one line per state, always all three.
- *
- * A state with nothing in it still gets its line. Dropping it would make the
- * card change shape as the fleet changes, and — worse — would hide the fact
- * that zero agents are erroring, which is the single most reassuring number on
- * the page.
- *
- * The three counts need not add up to the fleet. An agent whose health nothing
- * has measured is counted in none of them, which is the honest arithmetic: it
- * is not idle, and calling it idle to make the column total would be the
- * quietest possible lie.
+ * The health card: always all three states, so the card keeps its shape and zero erroring is shown.
+ * Counts need not sum to the fleet: unmeasured agents are in none, not called idle.
  */
 function summarizeHealth(rows: readonly GovernanceAgentRow[]): AgentStatusLine[] {
   return AGENT_HEALTH_STATES.map((state) => ({
@@ -221,11 +170,8 @@ function summarizeHealth(rows: readonly GovernanceAgentRow[]): AgentStatusLine[]
 }
 
 /**
- * The ownership card: how many have an owner, and where the rest came from.
- *
- * The sources are on the unclaimed line because that is the line a reader acts
- * on. "Three unclaimed" tells an admin they have work; "three unclaimed, from
- * Databricks and Custom" tells them which two consoles to go and look in.
+ * The ownership card: owned count, and the unclaimed line names its sources, because that is the
+ * line a reader acts on.
  */
 function summarizeOwnership(rows: readonly GovernanceAgentRow[]): AgentStatusLine[] {
   const unclaimed = rows.filter((row) => row.owner === null);
@@ -250,13 +196,8 @@ function summarizeOwnership(rows: readonly GovernanceAgentRow[]): AgentStatusLin
 }
 
 /**
- * The spend ranking: the three biggest, as shares of what we measured.
- *
- * The denominator is the measured spend, not the fleet's spend, because those
- * are not the same number and only one of them is knowable. An agent whose
- * cost the platform has not measured is left out of both the ranking and the
- * total — folding it in as zero would silently inflate every other agent's
- * share and present the result as a percentage of everything.
+ * The three biggest spenders as shares of MEASURED spend. Unmeasured agents are left out of the
+ * ranking and the total; folding them in as zero would inflate every other share.
  */
 function summarizeTopSpenders(rows: readonly GovernanceAgentRow[]): AgentSpendLine[] {
   const measured = rows.filter(
@@ -280,13 +221,8 @@ function summarizeTopSpenders(rows: readonly GovernanceAgentRow[]): AgentSpendLi
 }
 
 /**
- * The whole strip, from the rows.
- *
- * There is no "nothing measured" branch here on purpose. With no rows this
- * returns a fleet of zero and three empty health lines, and the page declines
- * to render any of it — the decision about whether an unmeasured organization
- * is worth four boxes belongs to the page, which is the only thing that knows
- * why its rows are empty.
+ * The whole strip, from the rows. No "nothing measured" branch: with no rows it returns zeros, and
+ * the page, which knows why its rows are empty, decides whether to render.
  */
 export function summarizeAgentFleet({
   rows,

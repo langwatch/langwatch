@@ -1,11 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ExperimentRunLoopUnavailableError } from "@langwatch/experiment-contract";
 /**
  * @vitest-environment node
- *
- * Reading a run's progress and starting a run are different capabilities. A
- * process that composes the progress store but no run loop must still answer
- * a poll: gating the read on `ports` made every reader of a run a 503.
+ * Reading a run's progress and starting a run are different capabilities: a process with the
+ * progress store but no run loop must still answer a poll.
  */
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";

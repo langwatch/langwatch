@@ -76,7 +76,7 @@ const buildComparabilityCheck = (
     detail:
       `The run splits into ${groupCount} groups that it never connected by a two-way result. ` +
       "Inside a group the scores compare normally; across groups only the order is meaningful, " +
-      "and the size of the gap is not — it reflects where the solver stopped rather than the evidence.",
+      "and the size of the gap is not: it reflects where the solver stopped rather than the evidence.",
   };
 };
 
@@ -164,7 +164,7 @@ const buildDeclinedRowsCheck = ({
     {
       label: "Rows the judge would not call",
       tone: share >= 0.25 ? "warn" : "note",
-      detail: `${rowsWithoutVerdict} of ${total} rows produced no verdict — the judge picked a different winner when the candidates were shown in the opposite order, so neither answer was recorded. Those rows contribute nothing to the ranking${
+      detail: `${rowsWithoutVerdict} of ${total} rows produced no verdict: the judge picked a different winner when the candidates were shown in the opposite order, so neither answer was recorded. Those rows contribute nothing to the ranking${
         share >= 0.25
           ? ", and at this share they are the likeliest reason it is thin. A judge this order-sensitive will not settle by running more rows; change the judge model or the prompt."
           : "."
@@ -234,7 +234,7 @@ const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
     return {
       label: "How much this run settled",
       tone: "warn",
-      detail: `None of the ${totalPairs} variant pairs were separated — for every pair, the gap between the two scores is smaller than the uncertainty in that gap. ${comparisonCount} comparisons was not enough to order these variants.`,
+      detail: `None of the ${totalPairs} variant pairs were separated: for every pair, the gap between the two scores is smaller than the uncertainty in that gap. ${comparisonCount} comparisons was not enough to order these variants.`,
     };
   }
 
@@ -288,7 +288,7 @@ const buildVerbosityCheck = (verbosity: VerbosityProfile): TrustCheck => {
       tone: "note",
       detail: `The leading variant's answers averaged ${leaderRatio.toFixed(
         1,
-      )}× the length of the rest of the field — it won while writing less, which is the opposite of the usual length bias.`,
+      )}× the length of the rest of the field: it won while writing less, which is the opposite of the usual length bias.`,
     };
   }
 
@@ -348,7 +348,7 @@ const buildJudgeIndependenceCheck = (
       detail: `The judge (${judgeModel}) shares a model family with ${names}. Judges tend to rate their own family's output higher, so ${
         affectsLeader
           ? "discount that variant's lead accordingly."
-          : "that variant's score may be flattered — which matters most if it is close to the one you are about to ship."
+          : "that variant's score may be flattered, which matters most if it is close to the one you are about to ship."
       }`,
     };
   }

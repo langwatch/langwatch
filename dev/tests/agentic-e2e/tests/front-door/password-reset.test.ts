@@ -1,12 +1,13 @@
+import type * as testModule from "@playwright/test";
+
+import { findUserIdByEmail } from "./db";
 /**
  * Feature: Forgot/reset password on credential sign-in
  * (specs/auth/password-reset.feature). Bug-bash #8: a completed reset
  * shows "Continue" (signs in) and an "Add a passkey" action in place.
  */
 import { expect, test } from "./fixtures";
-import { findUserIdByEmail } from "./db";
 import { closeRedis, findPasswordResetToken } from "./redis";
-import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
   betterAuthRequestHeaders,
   FRONT_DOOR_PASSWORD,
@@ -14,6 +15,7 @@ import {
   givenARegisteredAccount,
   whenISignOut,
 } from "./steps";
+import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -21,10 +23,7 @@ test.afterAll(async () => {
   await closeRedis();
 });
 
-async function requestResetToken(
-  page: import("@playwright/test").Page,
-  email: string,
-): Promise<string> {
+async function requestResetToken(page: testModule.Page, email: string): Promise<string> {
   const userId = await findUserIdByEmail(email);
   if (!userId) {
     throw new Error(`No account in Postgres for ${email} to request a reset for`);
@@ -44,9 +43,7 @@ async function requestResetToken(
     const token = await findPasswordResetToken(userId);
     if (token) return token;
     if (Date.now() > deadline) {
-      throw new Error(
-        `No password-reset token appeared in Redis for ${email} within 10s`,
-      );
+      throw new Error(`No password-reset token appeared in Redis for ${email} within 10s`);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -74,9 +71,7 @@ test.describe("Password reset completion", () => {
   // @scenario "A completed reset offers a passkey rather than assuming one"
   // @scenario "Accepting the offer adds the passkey on this screen"
   // @scenario "A user who forgot their password resets it and signs in with the new one"
-  test("a completed reset shows Continue and lets me add a passkey in place", async ({
-    page,
-  }) => {
+  test("a completed reset shows Continue and lets me add a passkey in place", async ({ page }) => {
     const email = generateFrontDoorEmail("reset");
     const oldPassword = FRONT_DOOR_PASSWORD;
     const newPassword = "FrontDoorTestNew456!";
@@ -87,21 +82,15 @@ test.describe("Password reset completion", () => {
     const authenticator = await addVirtualAuthenticator(page);
     try {
       await page.goto(`/auth/reset-password?token=${encodeURIComponent(token)}`);
-      await expect(
-        page.getByRole("heading", { name: "Choose a new password" }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Choose a new password" })).toBeVisible();
 
       await page.getByLabel("New password", { exact: true }).fill(newPassword);
-      await page
-        .getByLabel("Confirm password", { exact: true })
-        .fill(newPassword);
-      await page
-        .getByRole("button", { name: "Reset password", exact: true })
-        .click();
+      await page.getByLabel("Confirm password", { exact: true }).fill(newPassword);
+      await page.getByRole("button", { name: "Reset password", exact: true }).click();
 
-      await expect(
-        page.getByRole("heading", { name: "Password updated" }),
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole("heading", { name: "Password updated" })).toBeVisible({
+        timeout: 10000,
+      });
 
       // "Continue" — signs the device in. The reset endpoint's after-hook
       // already opened the session; this is a plain navigation, not a second
@@ -112,9 +101,7 @@ test.describe("Password reset completion", () => {
       // "Add a passkey" starts the ceremony IN PLACE, on this same card —
       // no navigation to settings first.
       await page.getByTestId("reset-add-passkey").click();
-      await expect(
-        page.getByTestId("reset-passkey-ceremony-title"),
-      ).toBeVisible();
+      await expect(page.getByTestId("reset-passkey-ceremony-title")).toBeVisible();
       await expect(page.getByTestId("reset-passkey-added")).toBeVisible({
         timeout: 15000,
       });

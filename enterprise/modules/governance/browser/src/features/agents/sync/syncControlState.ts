@@ -1,23 +1,14 @@
 /**
- * Which state a governance sync control is in, and — when it cannot be pressed
- * — WHICH unpressable it is.
- *
- * Pure, and deliberately wordless. The reasons a control is unavailable are
- * the same three on every governance page and the sentences that explain them
- * are not: "no connected provider can list agents" and the same claim about
- * people are different sentences, and a shared module holding both would hold
- * a noun parameter and a sentence built by concatenation. So this returns the
- * CAUSE and each page maps it to its own words, which is the split
- * `GovernanceEmptyStateCopy` already makes for empty states.
+ * Which state a governance sync control is in, and which unpressable one. Pure and wordless: it
+ * returns the CAUSE and each page maps it to its own sentence, like `GovernanceEmptyStateCopy`.
  */
 
 import type { GovernanceSyncState } from "./GovernanceSyncButton";
 
 /**
- * Why a control cannot be pressed:
- *   `no_grant`    — the reader lacks the grant that lets them ask.
- *   `checking`    — the read of which providers can be asked is in flight.
- *   `no_provider` — nothing connected can answer this question.
+ * Why a control cannot be pressed: `no_grant` — the reader lacks the grant that lets them ask.
+ * `checking` — the read of which providers can be asked is in flight. `no_provider` — nothing
+ * connected can answer this question.
  */
 export type GovernanceSyncUnavailable = "no_grant" | "checking" | "no_provider";
 
@@ -26,11 +17,8 @@ export type GovernanceSyncStatus =
   | { state: "unavailable"; because: GovernanceSyncUnavailable };
 
 /**
- * The order of the checks is the order of the reader's questions. Whether a
- * request is in flight beats everything, because it is the most recent thing
- * they did, and whether one was already made beats the rest for the same
- * reason. The grant is checked ahead of the sources because a reader who
- * cannot press it does not need to know how many providers they have.
+ * Checks run in the order of the reader's questions: in-flight first, then already-asked, then the
+ * grant, then the sources.
  */
 export function governanceSyncStatus({
   canManage,

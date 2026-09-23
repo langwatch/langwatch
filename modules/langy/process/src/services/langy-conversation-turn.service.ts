@@ -9,12 +9,13 @@ import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract
 import { createLogger } from "@langwatch/observability";
 
 import type { LangyConversationCommands } from "../app/langy.members.ts";
-import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";
 import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
-import type { LangyFinalPartsService } from "./langy-final-parts.service.ts";
-import { type LangyFinalToolCall } from "./langy-final-parts.service.ts";
+import {
+  type LangyFinalPartsService,
+  type LangyFinalToolCall,
+} from "./langy-final-parts.service.ts";
 import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 /**
@@ -282,8 +283,10 @@ export class LangyConversationTurnService {
     });
   }
 
-  /** Ingest turn result via HTTP (independent, at-least-once path when relay's stream dropped).
-   * Idempotent on turnId; verifies turn triple accepted (no HMAC, shared bearer only). */
+  /**
+   * Ingest turn result via HTTP (independent, at-least-once path when relay's stream dropped).
+   * Idempotent on turnId; verifies turn triple accepted (no HMAC, shared bearer only).
+   */
   async turnExists({
     projectId,
     conversationId,
@@ -350,8 +353,10 @@ export class LangyConversationTurnService {
     });
   }
 
-  /** Turn's own account folded off live stream. Read here since both relay and HTTP post paths
-   * finalize (first wins). Best effort: failed read still records what it can. */
+  /**
+   * Turn's own account folded off live stream. Read here since both relay and HTTP post paths
+   * finalize (first wins). Best effort: failed read still records what it can.
+   */
 
   /**
    * The pending shutdown-handoff for a conversation, or null (ADR-048). Read
@@ -414,8 +419,10 @@ export class LangyConversationTurnService {
     });
   }
 
-  /** Finalize agent response (agent_responded carries whole answer). messageId is DERIVED from
-   * turnId, never fresh: finalize has two independent writers (relay + POST). */
+  /**
+   * Finalize agent response (agent_responded carries whole answer). messageId is DERIVED from
+   * turnId, never fresh: finalize has two independent writers (relay + POST).
+   */
   async finalizeTurn({
     projectId,
     conversationId,

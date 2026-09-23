@@ -20,7 +20,9 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { build } from "esbuild";
+
 import { OPTIONAL_EXTERNALS } from "./bundle-optional-externals.mjs";
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -69,14 +71,14 @@ const basePackage = (id) => {
  * thread-stream rethrows on nextTick — uncaught, and the child dies.
  */
 
-/*
- * The rule for adding here: a package that resolves a FILE at runtime relative
- * to its own location cannot be inlined, because inlining moves that location.
+/**
+ * Add here any package that resolves a FILE relative to its own location at runtime: inlining moves
+ * that location.
  */
-/*
- * Lazily import()ed voice adapters. Inlining one costs its whole parse on every
- * spawn for runs that never speak, so it resolves from node_modules instead --
- * which is why @elevenlabs/elevenlabs-js is a declared dependency of this app.
+
+/**
+ * Lazily imported voice adapters stay in node_modules so runs that never speak skip the parse;
+ * hence @elevenlabs/elevenlabs-js is a declared dependency.
  */
 const NEVER_INLINED = [
   /^@elevenlabs\/elevenlabs-js(\/|$)/,
@@ -126,13 +128,13 @@ const banner = {
     'import { createRequire as __lwCreateRequire } from "node:module";',
     'import { dirname as __lwDirname } from "node:path";',
     'import { fileURLToPath as __lwFileURLToPath } from "node:url";',
-    'const require = __lwCreateRequire(import.meta.url);',
-    'const __filename = __lwFileURLToPath(import.meta.url);',
-    'const __dirname = __lwDirname(__filename);',
+    "const require = __lwCreateRequire(import.meta.url);",
+    "const __filename = __lwFileURLToPath(import.meta.url);",
+    "const __dirname = __lwDirname(__filename);",
   ].join("\n"),
 };
 const define = {
-    "import.meta.env.DEV": "false",
+  "import.meta.env.DEV": "false",
   "import.meta.env.PROD": "true",
   "import.meta.env": "{}",
 };

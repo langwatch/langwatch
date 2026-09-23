@@ -1,10 +1,6 @@
 /**
- * The evaluators of a suite draft: the list to pick from, the editor of one
- * attachment, and the writes both of them make into the store.
- *
- * The pick and the edits run while the suite editor drawer is unmounted, so
- * every one of them reads and writes the store rather than a render's draft.
- *
+ * The evaluators of a suite draft: the picker, the attachment editor and their writes. Both run
+ * while the drawer is unmounted, so they read and write the store, not a render's draft.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 

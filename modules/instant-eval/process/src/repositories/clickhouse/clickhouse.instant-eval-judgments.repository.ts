@@ -55,7 +55,7 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
     return new ClickHouseInstantEvalJudgmentsRepository(resolveClient);
   }
 
-  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read it. */
+  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read. */
   async countUsage({
     projectIds,
     since,

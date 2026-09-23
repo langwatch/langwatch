@@ -1,29 +1,8 @@
 /**
- * `--project` on every command that runs inside a project.
- *
- * The flag was added a family at a time, so `instant-eval` shipped without it:
- * a customer holding an organization login could estimate and run nothing
- * against a project other than their personal one, and the refusal named no
- * way out. Adding the option to one more family by hand leaves the next
- * family to make the same mistake, so the option is declared HERE, once, over
- * the finished command tree.
- *
- * Two lists carry everything that is not a plain data-plane command, each
- * entry with the reason it is there. A command absent from both gets the flag,
- * so a new one inherits it and leaving it out is a deliberate edit rather than
- * an oversight. `src/cli/__tests__/project-option.unit.test.ts` walks the tree
- * and fails on any leaf that is neither marked nor listed.
- *
- * The value does not travel through the commands. A command's action would
- * have to accept it, thread it into `resolveCredentials({ project })` and be
- * changed to do so, which is the per-family work this exists to end. Instead
- * `projectSelectorOf` reads it off the command commander is about to run, the
- * `preAction` hook publishes it into the request-scoped credential holder, and
- * `resolveCredentials` picks it up with no argument passed. A command that
- * already threads its own `--project` keeps working: the argument wins, and it
- * is the same value.
- *
- * Spec: specs/typescript-sdk/cli-cross-project-access.feature
+ * `--project`, declared once over the finished command tree so no family can forget it. Exceptions
+ * are listed with reasons; the `preAction` hook publishes the value to the credential holder.
+ * @see src/cli/__tests__/project-option.unit.test.ts
+ * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 
 import type { Command } from "commander";
@@ -37,15 +16,8 @@ export const PROJECT_FLAG_HELP =
   "Project to run against, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
 /**
- * Commands that do not run inside a project, and the reason each one does not.
- *
- * Three kinds, and the reason says which: a command that touches only this
- * machine, one that answers for the ORGANIZATION rather than a project, and
- * one that names projects instead of running inside one. The management plane
- * is the subtle case — those commands do resolve a credential, so they would
- * have taken the flag, but the resource they act on belongs to the
- * organization and pointing the credential at a project changes which role
- * binding the server reads without changing the answer.
+ * Commands that do not run inside a project, each with its reason: machine-local,
+ * organization-scoped (the management plane), or naming projects rather than running in one.
  */
 export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   // This machine only: no request leaves, so there is no project to name.
@@ -92,12 +64,10 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   "governance status": "answers for the organization",
   "governance ingestion-templates admin-list": "answers for the organization",
   "governance ingestion-templates archive": "answers for the organization",
-  "governance ingestion-templates clone-from-platform":
-    "answers for the organization",
+  "governance ingestion-templates clone-from-platform": "answers for the organization",
   "governance ingestion-templates create": "answers for the organization",
   "governance ingestion-templates get": "answers for the organization",
-  "governance ingestion-templates update-ottl-rules":
-    "answers for the organization",
+  "governance ingestion-templates update-ottl-rules": "answers for the organization",
   "organization get": "answers for the organization",
   "organization update": "answers for the organization",
   "organizations create": "answers for the organization",
@@ -183,10 +153,9 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
 };
 
 /**
- * Commands that already declare a `--project` of their own MEANING SOMETHING
- * ELSE. Left exactly as they are: the value is the command's own argument, so
- * reading it as the credential's target would point the command at a project
- * the user did not ask it to run as.
+ * Commands that already declare a `--project` of their own MEANING SOMETHING ELSE. Left exactly as
+ * they are: the value is the command's own argument, so reading it as the credential's target would
+ * point the command at a project the user did not ask it to run as.
  */
 export const COMMANDS_WITH_OWN_PROJECT_FLAG: Record<string, string> = {
   login: "the project whose key is written to .env",
@@ -206,11 +175,7 @@ const PROJECT_SCOPED = Symbol("langwatch.cli.projectScoped");
 /** The command's full path, as a user types it, without the program name. */
 export const commandPath = (cmd: Command): string => {
   const parts: string[] = [];
-  for (
-    let node: Command | null = cmd;
-    node?.parent;
-    node = node.parent as Command | null
-  ) {
+  for (let node: Command | null = cmd; node?.parent; node = node.parent as Command | null) {
     parts.push(node.name());
   }
   return parts.reverse().join(" ");
@@ -224,13 +189,8 @@ export const leafCommands = (root: Command): Command[] => {
 };
 
 /**
- * Declare `--project` on every leaf that runs inside a project, and mark it so
- * the `preAction` hook knows the value is a credential target.
- *
- * Called once, at the end of `buildProgram`, after every command is
- * registered. A leaf that already declares `--project` as its credential
- * target (the trace, chart, query and dashboard-widget families, which adopted
- * the flag first) keeps its own declaration and is only marked.
+ * Declare `--project` on every in-project leaf and mark it as a credential target; called once at
+ * the end of `buildProgram`. Leaves that already declare it keep their own and are only marked.
  */
 export const applyProjectOption = (program: Command): void => {
   for (const leaf of leafCommands(program)) {
@@ -249,10 +209,8 @@ export const isProjectScoped = (cmd: Command): boolean =>
   (cmd as unknown as Record<symbol, boolean>)[PROJECT_SCOPED] === true;
 
 /**
- * The project the command about to run was pointed at, or undefined when it
- * was not pointed anywhere. Reads the command's OWN options rather than the
- * merged globals: a bespoke `--project` on another command in the chain means
- * something else, and merging would let it decide this request's identity.
+ * The project the command about to run was pointed at, from its OWN options: a bespoke `--project`
+ * elsewhere in the chain means something else and must not decide this request's identity.
  */
 export const projectSelectorOf = (cmd: Command): string | undefined => {
   if (!isProjectScoped(cmd)) return undefined;

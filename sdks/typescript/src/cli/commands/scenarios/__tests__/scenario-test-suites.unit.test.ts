@@ -3,13 +3,14 @@
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 
 const mockSuitesList = vi.hoisted(() => vi.fn());
 const mockSuiteGet = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/scenarios")>();
+  const actual = await importOriginal<typeof scenariosModule>();
   return {
     ...actual,
     ScenariosApiService: vi.fn(),
@@ -42,9 +43,11 @@ vi.mock("ora", () => ({
 }));
 
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
+import type * as scenariosModule from "@/client-sdk/services/scenarios";
+
 import { createScenarioCommand } from "../create";
-import { updateScenarioCommand } from "../update";
 import { listScenariosCommand } from "../list";
+import { updateScenarioCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -157,9 +160,7 @@ describe("filing a scenario into a test suite from the command line", () => {
   describe("when updating a scenario with --field", () => {
     /** @scenario "Update the field values of a scenario in place" */
     it("reads the suite the scenario is in for its field types", async () => {
-      const mockScenarioGet = vi
-        .fn()
-        .mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
+      const mockScenarioGet = vi.fn().mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
       vi.mocked(ScenariosApiService).mockImplementation(function () {
         return {
           get: mockScenarioGet,

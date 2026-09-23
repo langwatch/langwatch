@@ -14,6 +14,7 @@ import {
   type LangWatchQLDataset,
   type LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
+import type * as visualizationModule from "@langwatch/analytics-contract/visualization";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,8 +113,7 @@ vi.mock("vega-embed", () => ({ default: vega.embed }));
 const build = vi.hoisted(() => ({ throwWith: null as unknown }));
 
 vi.mock("@langwatch/analytics-contract/visualization", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("@langwatch/analytics-contract/visualization")>();
+  const original = await importOriginal<typeof visualizationModule>();
   return {
     ...original,
     buildLangWatchQLVegaSpec: (input: {

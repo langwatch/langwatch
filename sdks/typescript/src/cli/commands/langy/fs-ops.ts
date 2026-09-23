@@ -5,6 +5,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
 import {
   isAppendEdit,
   type LocalEditParams,
@@ -84,10 +85,9 @@ export function writeFile({ params, root }: { params: LocalWriteParams; root: st
 }
 
 /**
- * Applies the edits in order. Each `oldText` must appear exactly once, so an
- * edit is never applied to the wrong place; anything else is an error the
- * model can act on. An append goes at the end of the file, on its own line,
- * and creates the file when there is none.
+ * Applies the edits in order. Each `oldText` must appear exactly once, so an edit is never applied
+ * to the wrong place; anything else is an error the model can act on. An append goes at the end of
+ * the file, on its own line, and creates the file when there is none.
  */
 export function editFile({ params, root }: { params: LocalEditParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
@@ -127,15 +127,8 @@ export function editFile({ params, root }: { params: LocalEditParams; root: stri
 }
 
 /** The content with `text` added as its last line(s), never mid-line. */
-function appendText({
-  content,
-  text,
-}: {
-  content: string;
-  text: string;
-}): string {
-  const joined =
-    content === "" || content.endsWith("\n") ? content : `${content}\n`;
+function appendText({ content, text }: { content: string; text: string }): string {
+  const joined = content === "" || content.endsWith("\n") ? content : `${content}\n`;
   return text.endsWith("\n") ? `${joined}${text}` : `${joined}${text}\n`;
 }
 
@@ -143,10 +136,9 @@ function appendText({
 const LANGWATCH_ENV_VARIABLES = ["LANGWATCH_API_KEY", "LANGWATCH_ENDPOINT"] as const;
 
 /**
- * Sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in the env file, replacing the
- * lines that already set them and appending the others, so every other line
- * stays as it was. Creates the file when there is none. Answers with the
- * variable names only: the key is written, never reported.
+ * Sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in the env file, replacing the lines that already
+ * set them and appending the others, so every other line stays as it was. Creates the file when
+ * there is none. Answers with the variable names only: the key is written, never reported.
  */
 export function writeLangwatchEnv({
   params,

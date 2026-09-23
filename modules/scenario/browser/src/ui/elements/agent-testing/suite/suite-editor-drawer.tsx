@@ -1,12 +1,6 @@
 /**
- * Edit one test suite, in a right-side drawer: its name on top, the fields
- * and the evaluators it declares, and a "Customize test suite" block pinned
- * to the bottom that offers the two until they are open.
- *
- * The drawer is URL routed. Picking an evaluator and editing one navigate to
- * the evaluator drawers and come back, with the draft held in the suite
- * editor store meanwhile.
- *
+ * Edit one test suite in a URL-routed right-side drawer. Picking or editing an evaluator navigates
+ * to its drawer and back, with the draft held in the suite editor store meanwhile.
  * @see specs/features/agent-testing/suite-editor.feature
  * @see dev/docs/best_practices/drawers.md
  */

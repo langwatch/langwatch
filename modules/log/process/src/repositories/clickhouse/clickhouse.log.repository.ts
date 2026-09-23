@@ -11,10 +11,8 @@ import type { LogClickHouseClientResolver } from "./clickhouse.canonical-log-rec
 import { ClickHouseCanonicalLogRecordRepository } from "./clickhouse.canonical-log-record.repository.ts";
 
 /**
- * Process composition for the log preparation/read service and its durable
- * processing pipeline. `LogService` covers preparation and the trace-scoped
- * read; the pipeline-sender capability lives one level up, on `LogApp`, since
- * only the process knows the senders the runtime hands back at `connect`.
+ * Process composition for the log preparation and trace-scoped read service and its pipeline. The
+ * pipeline senders live on `LogApp`, since only the process knows them at `connect`.
  */
 export class ClickhouseLogRepository {
   private constructor(

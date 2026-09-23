@@ -18,7 +18,7 @@ vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",
   );
   return {
@@ -86,6 +86,8 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
   },
 }));
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { RunHistoryPanel } from "../run-history-panel.tsx";
 

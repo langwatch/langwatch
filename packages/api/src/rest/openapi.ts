@@ -32,18 +32,13 @@ export type RestTransportDocs = Readonly<{
   /** Kept out of the published document: an alias or a compatibility path. */
   readonly hide?: boolean;
   /**
-   * A refusal this operation documents beyond its declared success: a status and a
-   * sentence, never a body — a route that answers an error WITH a schema names it
-   * through `responses`/`documentedResponses()` instead, which resolves a real Zod
-   * type rather than accepting hand-written JSON. This field cannot carry `content`
-   * at all, so there is no way to restate the schema `withOutput` already named.
+   * A refusal documented beyond the declared success: a status and a sentence, never a body. A
+   * route whose error has a schema names it through `responses`/`documentedResponses()` instead.
    */
   readonly errors?: readonly Readonly<{ status: number; description: string }>[];
   /**
-   * The answers the operation documents beyond its declared success and its plain
-   * `errors`, merged over the generated block one status at a time — for the rare
-   * response that needs its OWN schema (`documentedResponses()` builds this from a
-   * real Zod type; nothing here should ever be hand-written JSON).
+   * Answers documented beyond the success and `errors`, merged over the generated block per status:
+   * for the rare response with its OWN schema, built by `documentedResponses()` from real Zod.
    */
   readonly responses?: Readonly<Record<number, DocumentedRouteResponse>>;
   /**
@@ -113,13 +108,9 @@ export function restRouteDocumentation({
   else if (route.access?.kind === "optional" && reaches) {
     options.security = [{}, ...securityRequirement(reaches)];
   }
-  // Every other documented operation states its own scheme. Inheriting the
-  // document default silently advertised `project_api_key` on the whole
-  // surface, so a generated client sent the wrong credential to every
-  // organization, SCIM and instance-admin route (measured 2026-09-21: 626 of
-  // 659 operations). `browser` has no scheme a client can present, and the
-  // family-wide case is already undocumented; a route that raises it inside an
-  // API family keeps the family's own rather than crashing the document.
+  // Every other documented operation states its own scheme: inheriting the default advertised
+  // `project_api_key` on 626 of 659 operations (2026-09-21). `browser` has no presentable scheme,
+  // so it keeps the family's own.
   else if (reaches && reaches !== "browser") options.security = [...securityRequirement(reaches)];
 
   if (deprecated) {
@@ -472,11 +463,8 @@ function normalizeBound({
 // names are not unique across routes, so hoisting renames per occurrence.
 
 /**
- * Moves every schema's local `$defs` block into the document's
- * `components.schemas`, in place, renaming each entry to stay unique across
- * the whole document and rewriting every `$ref` (including a definition's
- * own self-reference) to match. The components section is created when the
- * generated document carries none. A schema with no `$defs` is untouched.
+ * Moves every schema's local `$defs` into `components.schemas` in place, renaming entries to stay
+ * unique and rewriting every `$ref` (self-references included) to match.
  */
 export function hoistStraySchemaDefs(document: unknown): void {
   const schemas = componentSchemasOf(document);

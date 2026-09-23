@@ -1,14 +1,6 @@
 /**
- * The short code a fresh install pastes instead of a license blob (ADR-156,
- * section 5).
- *
- * Pure: no environment, no database. The backoffice mints a code here and the
- * connect host looks one up here, so both sides share one spelling of what a
- * code is and how it is stored.
- *
- * **What is stored is not what is presented.** The registry holds the SHA-256
- * of the normalised code, so read access to the table is not credential access
- * — the same property the license token hash has.
+ * The short code a fresh install pastes instead of a license blob (ADR-156 section 5). Pure, shared
+ * by backoffice and connect host. The registry stores the code's SHA-256, never the code.
  */
 
 import { createHash, randomInt } from "node:crypto";
@@ -38,10 +30,9 @@ const NORMALISED_SHAPE = new RegExp(
 );
 
 /**
- * A fresh code, as it is shown to the operator once and never again. Sixteen
- * characters of a 32 symbol alphabet is eighty bits, far past anything the
- * rate limiter would let a caller work through, and the limiter is what
- * actually bounds guessing.
+ * A fresh code, as it is shown to the operator once and never again. Sixteen characters of a 32
+ * symbol alphabet is eighty bits, far past anything the rate limiter would let a caller work
+ * through, and the limiter is what actually bounds guessing.
  */
 export function mintActivationCode(): string {
   const groups: string[] = [];

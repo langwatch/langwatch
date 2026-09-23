@@ -383,7 +383,7 @@ export function TokenCreatedDialog({
                   tab looking broken next to one that offers a command. */}
               {!assistantCommand && newToken && (
                 <Text fontSize="xs" color="fg.muted">
-                  {activeAssistant.label} has no install command — paste the config below into{" "}
+                  {activeAssistant.label} has no install command: paste the config below into{" "}
                   <Text as="span" fontWeight="semibold" color="fg">
                     {activeAssistant.configPath}
                   </Text>

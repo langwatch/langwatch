@@ -32,7 +32,7 @@ export function PageErrorFallback({
             Something went wrong
           </Heading>
           <Text textStyle="sm" color="fg.muted" textAlign="center" maxWidth="400px">
-            Sorry about that — our team has been notified and is looking into it. You can try again,
+            Sorry about that: our team has been notified and is looking into it. You can try again,
             or head back to the home page.
           </Text>
         </VStack>

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
 import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators.ts";
-import type { JsonValue } from "../../scenario.ts";
 import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {
   checkTypeOf,

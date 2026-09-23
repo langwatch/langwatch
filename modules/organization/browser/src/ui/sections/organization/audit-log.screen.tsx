@@ -130,9 +130,9 @@ export default function AuditLogScreen() {
           <Alert.Content>
             <Alert.Title>Enterprise Feature</Alert.Title>
             <Alert.Description>
-              Organisation-wide audit logs — including AI Gateway events (virtual-key / budget /
-              provider / cache-rule mutations) alongside logins, member changes, settings, RBAC, and
-              billing — are available on Enterprise plans. Contact sales to upgrade.
+              Organisation-wide audit logs (AI Gateway events such as virtual-key, budget, provider
+              and cache-rule changes, alongside logins, member changes, settings, RBAC and billing)
+              are available on Enterprise plans. Contact sales to upgrade.
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>

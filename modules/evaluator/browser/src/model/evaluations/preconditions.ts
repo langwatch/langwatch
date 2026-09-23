@@ -146,16 +146,8 @@ function evaluateNotContainsRule({
 }
 
 /**
- * "matches_regex" rule: regex test against string values.
- *
- * For arrays, tests each element and passes if any one matches, the same
- * any-element semantics `is`, `contains` and `not_contains` already use. The
- * serialized array is still tested as well, so a pattern written against the
- * old JSON-encoded form keeps matching — this rule only ever gains matches,
- * never loses them.
- *
- * Testing only the serialization is why an anchored pattern could not match an
- * array field: `^gpt-4` was tested against `["gpt-4"]`, which starts with `[`.
+ * "matches_regex": arrays pass if any element matches, like `is`/`contains`. The serialized array
+ * is still tested so old JSON-form patterns keep matching; the rule only gains matches.
  */
 function evaluateRegexRule({
   fieldValue,

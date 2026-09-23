@@ -184,13 +184,11 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     };
   }
 
-  // Dialect 4: the NESTED canonical envelope — `{ error: { type, code, message, meta?,
-  // trace_id?, span_id? } }` — which the Go plane still answers with. None of the flat
-  // readings below can see it, so it is read here first.
-  //
-  // The `/api/` REST surface no longer nests: it writes those same fields at the ROOT,
-  // and such a body falls through to the flat reading below, which finds `code` there.
-  // `looksLikeErrorEnvelope` admits it on `message`, which the envelope always carries.
+  // Dialect 4: the NESTED canonical envelope — `{ error: { type, code, message, meta?, trace_id?,
+  // span_id? } }` — which the Go plane still answers with. None of the flat readings below can see
+  // it, so it is read here first. The `/api/` REST surface no longer nests: it writes those same
+  // fields at the ROOT, and such a body falls through to the flat reading below, which finds `code`
+  // there. `looksLikeErrorEnvelope` admits it on `message`, which the envelope always carries.
   const canonical = asRecord(record.error);
   if (canonical && !isSystemError(canonical)) {
     if (typeof canonical.code === "string" || typeof canonical.type === "string") {

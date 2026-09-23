@@ -7,13 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../scenario-roles.tsx", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
+  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
 vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",
   );
   return {
@@ -58,8 +57,11 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+
 import type { TraceListItem } from "../../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;

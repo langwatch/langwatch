@@ -13,6 +13,7 @@ import type { TraceBlobStoreService } from "../../../services/trace-blob-store.s
 import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -178,9 +179,9 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 // ---------------------------------------------------------------------------
 
 describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-022)", () => {
-  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository.ts").TraceLegacyReadClickHouseRepository;
+  let TraceLegacyReadClickHouseRepository: typeof traceLegacyReadRepositoryModule.TraceLegacyReadClickHouseRepository;
   let blobStore: TraceBlobStoreService;
-  let resolveTraceSpansFn: import("../trace-legacy-read.repository.ts").ResolveTraceSpansFn;
+  let resolveTraceSpansFn: traceLegacyReadRepositoryModule.ResolveTraceSpansFn;
   let traceCanonicalisation: TraceCanonicalisationService;
 
   beforeEach(async () => {

@@ -26,8 +26,10 @@ import type {
   WebhookEndpointRuntime,
   WebhookEndpointServiceOptions,
 } from "../webhook-endpoint.repository.ts";
-import type { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
-import { type MemoryWebhookEndpointRow } from "./memory.webhook-database.ts";
+import {
+  type MemoryWebhookDatabase,
+  type MemoryWebhookEndpointRow,
+} from "./memory.webhook-database.ts";
 
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;

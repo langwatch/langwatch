@@ -39,15 +39,9 @@ export interface RealtimeSessionReconciliationRepository {
     projectId: string;
     reason: string;
   }) => Promise<void>;
-  // Left as method shorthand deliberately (unlike its siblings above): the
-  // one implementation (GatewayRealtimeSessionSweep in gateway.server.ts)
-  // declares `session` as the narrower `GatewayRealtimeSession`, not
-  // `GatewayRealtimeSessionRecord`. Bivariant method-parameter checking
-  // accepts that; a property-typed (contravariant) signature does not, and
-  // converting it produced a genuine new typecheck failure (TS2416) rather
-  // than a cosmetic one — reverted to avoid papering over that mismatch with
-  // a cast. The corresponding unbound-method finding in the worker test is
-  // left unfixed; see the lane report.
+  // Method shorthand on purpose: the one implementation narrows `session` to
+  // `GatewayRealtimeSession`, which bivariant method checking accepts and a property signature
+  // rejects (TS2416).
   confirmSession(input: {
     session: GatewayRealtimeSessionRecord;
     audioMs: number;

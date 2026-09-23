@@ -1,3 +1,4 @@
+import type * as observabilityModule from "@langwatch/observability";
 /**
  * A storage refusal is logged before it reaches the customer: better-auth
  * turns an adapter throw into a redirect carrying only the error CODE, which
@@ -13,7 +14,7 @@ const logged = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => logged,
 }));
 

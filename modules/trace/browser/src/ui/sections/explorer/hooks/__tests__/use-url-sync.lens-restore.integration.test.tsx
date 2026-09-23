@@ -26,7 +26,7 @@ let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     useViewStore: (sel: (s: unknown) => unknown) =>
@@ -54,6 +54,8 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
       }),
   };
 });
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { useURLSync } from "../use-url-sync.ts";
 

@@ -43,7 +43,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
 }));
 
 vi.mock("@xyflow/react", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@xyflow/react")>();
+  const original = await importOriginal<typeof reactModule>();
   return {
     ...original,
     useUpdateNodeInternals: () => vi.fn(),
@@ -96,6 +96,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
 }));
 
 import type { Entry } from "@langwatch/workflow-contract";
+import type * as reactModule from "@xyflow/react";
 
 import { _useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { DatasetModal } from "../dataset-modal.tsx";

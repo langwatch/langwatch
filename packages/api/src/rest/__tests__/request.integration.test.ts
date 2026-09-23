@@ -1,18 +1,18 @@
 /**
  * @vitest-environment node
- * Runs the body cap against the exact production wiring over a real
- * socket, since a chunked/no-Content-Length request needs draining and
- * rebuilding, which throws against the platform's own globals — a 500 a
- * store-and-forward assertion would never catch.
+ * The body cap over a real socket with production wiring: a chunked request needs draining and
+ * rebuilding, which throws against the platform's globals, a 500 no store-and-forward test catches.
  * @see ../request.ts
  */
+
+import { createServer, type Server } from "http";
+import type { AddressInfo } from "net";
 
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
 import { bodyLimit as honoBodyLimit } from "hono/body-limit";
-import { createServer, type Server } from "http";
-import type { AddressInfo } from "net";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { bodyLimit } from "../request.ts";
 
 async function listen(server: Server): Promise<number> {

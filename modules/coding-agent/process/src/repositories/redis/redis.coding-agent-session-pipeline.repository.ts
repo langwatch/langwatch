@@ -154,12 +154,11 @@ export class EventingCodingAgentProcessingAdapter {
           traceCanonicalisation: deps.traceCanonicalisation,
         }),
       )
-      // ADR-066 pillar 2: coalesce contributions preserving order; sharding
-      // would break order-dependent model-call derivations.
-      // Instances rather than classes: both contributions carry the
-      // session-context memo. The log lane fills it from a declaration and
-      // stamps row-bearing records; the span lane only reads it, to stamp the
-      // spans that carry a model call.
+      // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
+      // order-dependent model-call derivations. Instances rather than classes: both contributions
+      // carry the session-context memo. The log lane fills it from a declaration and stamps
+      // row-bearing records; the span lane only reads it, to stamp the spans that carry a model
+      // call.
       .withCommandInstance(
         "contributeSpanFacts",
         EventingContributeSpanFactsAdapter,

@@ -33,8 +33,8 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
 import {
+  type GatewayBudgetRepository,
   type ArchiveBudgetInput,
   type BudgetCheckInput,
   type BudgetCheckResult,

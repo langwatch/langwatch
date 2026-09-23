@@ -25,8 +25,10 @@ import { VariableInfoIcon, LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-edito
 import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
 
-/** A template field, mirroring the Slack provider's `FieldDraft`: empty +
- *  `usingDefault` means the framework default envelope applies. */
+/**
+ * A template field, mirroring the Slack provider's `FieldDraft`: empty + `usingDefault` means the
+ * framework default envelope applies.
+ */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
@@ -37,9 +39,11 @@ interface HeaderRow {
   id: string;
   name: string;
   value: string;
-  /** True when the value is a saved secret the server kept back (ADR-040 §3):
-   *  the input shows a masked placeholder, and the save sends the kept
-   *  sentinel so the stored value survives. Typing or renaming clears it. */
+  /**
+   * True when the value is a saved secret the server kept back (ADR-040 §3): the input shows a
+   * masked placeholder, and the save sends the kept sentinel so the stored value survives. Typing
+   * or renaming clears it.
+   */
   kept: boolean;
 }
 
@@ -55,9 +59,11 @@ function newHeaderRow(partial?: { name?: string; value?: string; kept?: boolean 
   };
 }
 
-/** A single stored secret, following the header rows' discipline (ADR-040 §3):
- *  `kept` means the server held the saved value back, so the input stays empty
- *  behind a masked placeholder and the save echoes the kept sentinel. */
+/**
+ * A single stored secret, following the header rows' discipline (ADR-040 §3): `kept` means the
+ * server held the saved value back, so the input stays empty behind a masked placeholder and the
+ * save echoes the kept sentinel.
+ */
 interface SecretDraft {
   value: string;
   kept: boolean;
@@ -142,8 +148,10 @@ function bodyTemplateOf(slice: WebhookSlice): string | null {
   return slice.template.value.trim().length > 0 ? slice.template.value : null;
 }
 
-/** The sentinel for an untouched saved secret, the typed value for a new one,
- *  and null for an empty field, which turns signing off. */
+/**
+ * The sentinel for an untouched saved secret, the typed value for a new one, and null for an empty
+ * field, which turns signing off.
+ */
 function signingSecretOf(slice: WebhookSlice): string | null {
   if (slice.signingSecret.kept) return WEBHOOK_HEADER_VALUE_KEPT;
   const typed = slice.signingSecret.value.trim();
@@ -172,8 +180,10 @@ function testFireTarget(slice: WebhookSlice) {
   };
 }
 
-/** The webhook's body lives inside `actionParams` (ADR-040 §1), not in the
- *  four legacy Trigger template columns — so this contributes nothing. */
+/**
+ * The webhook's body lives inside `actionParams` (ADR-040 §1), not in the four legacy Trigger
+ * template columns — so this contributes nothing.
+ */
 function templatesFromSlice(_slice: WebhookSlice) {
   return {
     emailSubjectTemplate: null,
@@ -195,7 +205,7 @@ function LastTestResult({ attempt }: { attempt: ConfigFormCtx["lastTestAttempt"]
   if (last.status === "success") {
     return (
       <Text textStyle="xs" color="fg.success" data-testid="webhook-test-result">
-        Delivered{last.httpStatus ? ` — HTTP ${last.httpStatus}` : ""}.
+        Delivered{last.httpStatus ? ` (HTTP ${last.httpStatus})` : ""}.
       </Text>
     );
   }
@@ -299,7 +309,7 @@ function HeadersEditor({
         </Button>
       </VStack>
       <Field.HelperText>
-        Sent with every request — for example an Authorization header your endpoint expects. Values
+        Sent with every request, for example an Authorization header your endpoint expects. Values
         are stored encrypted and never shown again.
       </Field.HelperText>
     </Field.Root>
@@ -454,7 +464,7 @@ function WebhookConfigForm({
             </Text>
             {preview.errors.length > 0 ? (
               <Text textStyle="xs" color="fg.error" mt={1}>
-                {preview.errors[0]} — the default body will be sent instead.
+                {preview.errors[0]}: the default body will be sent instead.
               </Text>
             ) : null}
           </Box>

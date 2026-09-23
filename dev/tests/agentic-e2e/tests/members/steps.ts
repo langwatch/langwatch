@@ -16,16 +16,8 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // Members settings is org-scoped at /settings/members (resolved via the
-  // session's active org), not project-prefixed — every app nav link uses this
-  // exact href. The org context comes from the
-  // authenticated session, not the URL.
-  //
-  // The address is kept rather than updated to `/settings/directory` on
-  // purpose: members became the first cut of Directory, and `members.tsx` is
-  // now a `<Navigate>` that forwards the old address on. Arriving the way a
-  // stale link does is what proves that forward still works, so this step
-  // covers the redirect as well as the page it lands on.
+  // Org-scoped at /settings/members, kept rather than `/settings/directory` on purpose:
+  // `members.tsx` now redirects, so arriving by the old address covers the redirect too.
   await page.goto(`/settings/members`);
   await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
     timeout: 15000,
@@ -37,12 +29,8 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Open the invite drawer from People and wait for it to appear.
- *
- * The trigger is called "Invite people" now, beside the inline invite box that
- * launches the same drawer (`PeopleSection` -> `PeopleHeader`). Only the
- * BUTTON was renamed: the drawer it opens still leads with "Add members",
- * which is what the wait below still keys on.
+ * Open the invite drawer from People (the "Invite people" button) and wait for it. Only the button
+ * was renamed; the drawer still leads with "Add members", which the wait keys on.
  */
 export async function whenIClickAddMembers(page: Page) {
   await page.getByRole("button", { name: /Invite people/i }).click();

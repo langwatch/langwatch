@@ -1,15 +1,9 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
- * The governance REST door: who may reach each route, what the wire body looks like, and which
- * application operation each verb dispatches to.
- *
- * The seven ingestion-template operations read `repositories.ingestionTemplates` through
- * `IngestionTemplateService`, not the `governance`/`cli`/`ingest` facade bag — so `buildApi()`
- * below supplies none of the three, and a test that needs a row to exist seeds it for real on the
- * repository rather than overriding a facade method. See
- * `../../app/__tests__/governance.app.unit.test.ts`, which solves the identical problem one file
- * over.
- *
- * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+ * The governance REST door: access, wire body and dispatch per route. Ingestion templates go
+ * through `IngestionTemplateService`, so `buildApi()` supplies no facade and tests seed the
+ * repository.
+ * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
 import {
   bindRestHeader,
@@ -29,7 +23,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -38,10 +31,6 @@ import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
-
-/** A dependency this door never reaches; calling one is the test's own bug. */
-const unreachable = <Method>(): Method =>
-  (() => Promise.reject(new Error("not reachable through the REST door"))) as Method;
 
 const PROJECT: ProjectIdentity = {
   id: "project-1",

@@ -67,6 +67,7 @@ import type {
   UpdateOrganizationSettingsInput,
   UpdateOrganizationSettingsResult,
 } from "./organization.ts";
+import type * as organizationModule from "./organization.ts";
 import type {
   FindPersonalWorkspaceInput,
   EnsuredPersonalWorkspace,
@@ -227,9 +228,7 @@ export interface OrganizationApi {
     record: GuidedOnboardingRecord;
   }): Promise<GuidedOnboardingRecord>;
   updateSettings(input: UpdateOrganizationSettingsInput): Promise<UpdateOrganizationSettingsResult>;
-  getSettings(input: {
-    organizationId: string;
-  }): Promise<import("./organization.ts").OrganizationSettings>;
+  getSettings(input: { organizationId: string }): Promise<organizationModule.OrganizationSettings>;
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage>;
   listMembers(input: {
     organizationId: string;
@@ -299,8 +298,10 @@ export interface OrganizationApi {
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
   ): Promise<string[]>;
-  /** Every organization this person belongs to. Asked by a peer deciding
-   *  something about the person rather than about a listed organization. */
+  /**
+   * Every organization this person belongs to. Asked by a peer deciding something about the person
+   * rather than about a listed organization.
+   */
   organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;

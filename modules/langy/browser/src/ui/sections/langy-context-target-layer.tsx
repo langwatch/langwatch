@@ -9,10 +9,9 @@ import { Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Duplicated from `@langwatch/langy-browser-kit`'s own copy (which serves
- * `useLangyContextTarget`) rather than reached-into: a kit exports one JS
- * entry point, so a raw stylesheet has no subpath to travel through. See
- * the handoff for the packaging question this leaves open.
+ * Duplicated from `@langwatch/langy-browser-kit`'s own copy (which serves `useLangyContextTarget`)
+ * rather than reached-into: a kit exports one JS entry point, so a raw stylesheet has no subpath to
+ * travel through. See the handoff for the packaging question this leaves open.
  */
 import "../../behavior/langy-context-target.css";
 import { createPortal } from "react-dom";

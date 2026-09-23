@@ -30,7 +30,7 @@ function inputPlaceholder(type: string): string | undefined {
 }
 
 export const ExecutionInputPanel = ({
-  fields = [],
+  fields,
   onExecute,
   title = "Inputs",
   buttonText = "Execute",

@@ -280,10 +280,6 @@ const slugToSchemaName = (slug: string): string => {
   return slug.replace(/\//g, "_");
 };
 
-const slugToPathName = (slug: string): string => {
-  return slug.replace(/\//g, "_");
-};
-
 const generateOpenAPISpec = async (): Promise<void> => {
   console.log(`Fetching evaluators from ${EVALUATORS_URL}...`);
 
@@ -360,7 +356,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
   let evaluators: AvailableEvaluators;
   try {
     evaluators = JSON.parse(jsonStr);
-  } catch  {
+  } catch {
     // If direct parsing fails, try a different approach - evaluate as JS
     console.log("Direct JSON parsing failed, trying alternative parsing method...");
 
@@ -417,7 +413,6 @@ const generateOpenAPISpec = async (): Promise<void> => {
 
   for (const [slug, evaluator] of Object.entries(evaluators)) {
     const schemaName = slugToSchemaName(slug);
-    const pathName = slugToPathName(slug);
 
     // Generate request schema
     schemas[`${schemaName}Request`] = generateRequestSchema(

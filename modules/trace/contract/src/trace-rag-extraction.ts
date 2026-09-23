@@ -168,7 +168,7 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
     const parsedString = parseInt(parsed.data, 10);
     unixNano = !isNaN(parsedString) ? parsedString : nowInstant().epochMilliseconds * 1000000;
   } else {
-    const { low = 0, high = 0 } = parsed.data;
+    const { low, high } = parsed.data;
     unixNano = high * 0x100000000 + low;
   }
 

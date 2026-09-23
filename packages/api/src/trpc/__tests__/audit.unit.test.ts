@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * What a finished tRPC call leaves behind: what the audit trail is allowed to
- * keep of the arguments, how loudly the request log records the call, and which
- * trace the span continues.
+ * What a finished tRPC call leaves behind: what the audit trail may keep of the arguments, how
+ * loudly the request log records it, and which trace the span continues.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { context as otelContext, propagation, trace } from "@opentelemetry/api";
@@ -955,14 +953,8 @@ describe("a call that succeeds slowly", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The trace a tRPC span continues, so work the browser starts and the server
-// work it triggers land in one trace instead of two.
-//
-// Binds `A call started in the browser continues on the server` and `Calls over
-// the realtime transports still correlate` in
-// specs/observability/browser-rum-trace-correlation.feature. See ADR-058.
-// ─────────────────────────────────────────────────────────────────────────────
+// The trace a tRPC span continues, so browser work and the server work it triggers land in one
+// trace (ADR-058; specs/observability/browser-rum-trace-correlation.feature).
 
 const REMOTE_TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 const REMOTE_SPAN_ID = "b7ad6b7169203331";
@@ -1058,10 +1050,9 @@ describe("callerTraceContext", () => {
 
   describe("given the HTTP layer has already opened a span for this request", () => {
     /**
-     * The `/api` router extracts the same `traceparent` and opens the server
-     * span that is executing this call. Extracting again would parent the
-     * procedure to the browser instead, leaving the HTTP span a childless
-     * sibling of the work it is actually running.
+     * The `/api` router extracts the same `traceparent` and opens the server span that is executing
+     * this call. Extracting again would parent the procedure to the browser instead, leaving the
+     * HTTP span a childless sibling of the work it is actually running.
      */
     it("keeps the local span as the parent instead of re-extracting", () => {
       otelContext.setGlobalContextManager(new StackContextManager().enable());

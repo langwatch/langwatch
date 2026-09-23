@@ -1,15 +1,6 @@
 /**
- * The guided onboarding in a real browser: a fresh sign-up goes through the
- * organization and tailor steps, Langy takes over the screen (hello, value,
- * provider), the product opens with the panel docked and the tour runs over
- * the real navigation until it hands off to the panel. The skip path lands on
- * the personal home with the offer, and with the flag off the classic wizard
- * is what it always was.
- *
- * Every test signs up its own user, so nothing depends on a stored session.
- * The OpenAI key comes from the environment or the workspace-root .env and never
- * reaches a log or an assertion message.
- *
+ * The guided onboarding in a real browser: sign-up, takeover, docked panel and tour; the skip path;
+ * and the classic wizard with the flag off. Each test signs up its own user.
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  * @see specs/features/onboarding/guided-tour.feature
  */

@@ -1,20 +1,8 @@
 /**
- * The plugin's manifests, read as the two ecosystems read them.
- *
- * These files are hand-authored JSON that nothing validates, and each of the
- * two clients that consumes them fails quietly: an Agent Plugins client
- * REJECTS a plugin whose manifest violates the closed schema, and Claude Code
- * simply loads a plugin whose hooks point at a file that is not there. So the
- * contract is asserted here rather than discovered in somebody's session.
- *
- * The Agent Plugins allowlist below is copied from
- * https://agent-plugins.org/schemas/1.0.0/plugin.schema.json (§5.2 of the
- * specification, "Its schema is closed"). It is transcribed rather than fetched
- * because a unit test must not depend on a network, and because a schema change
- * is a version change: Agent Plugins 1.0.0 is frozen, and moving to a later
- * version is a deliberate edit here.
- *
- * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
+ * The plugin's manifests, read as both ecosystems read them, since both fail quietly. The allowlist
+ * is transcribed from Agent Plugins 1.0.0's closed schema (no network in a unit test).
+ * @see https://agent-plugins.org/schemas/1.0.0/plugin.schema.json
+ * @see specs/ai-governance/agent-plugin/plugin-package.feature
  */
 
 import { existsSync, readFileSync } from "node:fs";

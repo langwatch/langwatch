@@ -1,11 +1,7 @@
 /**
- * `--project` is declared over the finished command tree, so this suite is
- * what makes "a new command cannot forget it" true rather than aspirational.
- *
- * The whole `instant-eval` family shipped with no `--project` because the flag
- * had been added a family at a time and that family was written later. Nothing
- * failed when it was left out. Now a leaf that is neither marked as running
- * inside a project nor listed as one that does not fails here, by name.
+ * `--project` is declared over the finished tree; this suite makes that stick. A leaf neither
+ * marked as in-project nor listed as not fails here by name (`instant-eval` once shipped without
+ * it).
  */
 import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
@@ -27,9 +23,7 @@ import {
 const tree = () => buildProgram({ bin: "langwatch" });
 
 const leafAt = (program: Command, path: string): Command => {
-  const found = leafCommands(program).find(
-    (leaf) => commandPath(leaf) === path,
-  );
+  const found = leafCommands(program).find((leaf) => commandPath(leaf) === path);
   expect(found, `no leaf command "${path}" in the tree`).toBeDefined();
   return found!;
 };
@@ -43,9 +37,7 @@ describe("given the command tree the CLI runs", () => {
     const missing = leafCommands(tree())
       .map(commandPath)
       .filter(
-        (path) =>
-          !(path in COMMANDS_WITHOUT_PROJECT) &&
-          !(path in COMMANDS_WITH_OWN_PROJECT_FLAG),
+        (path) => !(path in COMMANDS_WITHOUT_PROJECT) && !(path in COMMANDS_WITH_OWN_PROJECT_FLAG),
       )
       .filter((path) => !declaresProject(leafAt(tree(), path)));
 

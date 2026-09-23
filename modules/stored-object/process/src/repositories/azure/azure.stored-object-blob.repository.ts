@@ -4,6 +4,7 @@
  */
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
+import type * as webModule from "node:stream/web";
 
 import {
   getStoredObjectStorageScheme,
@@ -249,9 +250,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
         `Azure Blob GET returned empty body for ${redactStoredObjectStorageUri(uri)}`,
       );
     }
-    return Readable.fromWeb(
-      response.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>,
-    );
+    return Readable.fromWeb(response.body as unknown as webModule.ReadableStream<Uint8Array>);
   }
 
   async put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {

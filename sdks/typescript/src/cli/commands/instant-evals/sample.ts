@@ -1,12 +1,6 @@
 /**
- * `langwatch instant-eval sample <id>`: a few rows with the text that was
- * judged beside the verdict it received.
- *
- * The loop this exists for: run a hundred rows, read five of them in full,
- * see what the judge saw, change the words, run again. Sampling judges nothing
- * and costs nothing, because the text is re-read through the statement's own
- * extraction functions.
- *
+ * `langwatch instant-eval sample <id>`: a few rows with the judged text beside the verdict, re-read
+ * through the statement's extraction functions, so it costs nothing.
  * @see specs/features/instant-eval-cli.feature
  */
 

@@ -11,6 +11,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
+import type * as promptTabContextModule from "../../../../../../model/prompt-tab-context.tsx";
 import { FakePromptHost } from "../../../../../../testing.tsx";
 import {
   clearStoreInstances,
@@ -19,6 +20,7 @@ import {
   type PromptTabsCapabilities,
   type TabData,
 } from "../../../studio-internals.ts";
+import type * as studioInternalsModule from "../../../studio-internals.ts";
 import { PromptTabbedSection } from "../prompt-tabbed-section.tsx";
 
 /**
@@ -406,13 +408,13 @@ const { tabIdRef } = vi.hoisted(() => ({
   tabIdRef: { current: "test-tab-id" },
 }));
 vi.mock("../../../studio-internals.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../studio-internals.ts")>()),
+  ...(await importOriginal<typeof studioInternalsModule>()),
   useTabId: () => tabIdRef.current,
 }));
 // The chat input reads the tab id from the context module directly, so the
 // aggregator mock above does not reach it.
 vi.mock("../../../../../../model/prompt-tab-context.tsx", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../../model/prompt-tab-context.tsx")>()),
+  ...(await importOriginal<typeof promptTabContextModule>()),
   useTabId: () => tabIdRef.current,
 }));
 

@@ -13,8 +13,8 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
+  type GatewayApi,
   type GatewayBudgetResource,
   type GatewayBudgetWithSeats,
   type GatewayCacheRuleResource,

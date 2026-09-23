@@ -2,6 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as previewTraceIdModule from "../../../../../model/preview-trace-id.ts";
 import { useTraceSpanTree } from "../use-trace-span-tree.ts";
 
 type SpanTreeInput = {
@@ -47,7 +48,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("../../../../../model/preview-trace-id.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../model/preview-trace-id.ts")>()),
+  ...(await importOriginal<typeof previewTraceIdModule>()),
   isPreviewTraceId: () => previewTraceId,
 }));
 

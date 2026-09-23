@@ -36,6 +36,7 @@ import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
+import type * as zodModule from "zod";
 
 import type { AuthDirectory } from "../app/auth.members.ts";
 import {
@@ -1090,7 +1091,7 @@ async function lookupDeviceFlow({
   request,
 }: {
   app: AuthCliDeviceFlowApi;
-  input: import("zod").infer<typeof lookupQuerySchema>;
+  input: zodModule.infer<typeof lookupQuerySchema>;
   request: Request;
 }): Promise<CliDeviceFlowAnswer> {
   const person = await app.session(request);

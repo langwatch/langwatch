@@ -23,7 +23,7 @@ vi.mock("../../hooks/use-evaluator-options.ts", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     useViewStore: (selector: (s: unknown) => unknown) =>
@@ -40,6 +40,8 @@ vi.mock("../../../../../behavior/time-format.store.ts", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { ColumnPickerContent } from "../column-picker-content.tsx";
 

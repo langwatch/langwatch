@@ -1,13 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
- * Ingestion-template operations: resolve organization and attribute writes.
- * Moved from @audit-uniform integration test (proves the rule once at unit level instead of
- * four times). Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature.
- *
- * These operations read `repositories.ingestionTemplates` through
- * `IngestionTemplateService`, not the `governance` facade — so `buildApp()`
- * below supplies no `governance`/`cli`/`ingest` member at all, proving the
- * REST family needs none of the three. The one test that does need them
- * (the CLI/ingest accessors) builds its own app with the bag present.
+ * Ingestion-template operations resolve the organization and attribute writes through
+ * `IngestionTemplateService`, so `buildApp()` supplies no `governance`/`cli`/`ingest` member.
+ * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -19,7 +14,6 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { governanceServer } from "../../governance.server.ts";

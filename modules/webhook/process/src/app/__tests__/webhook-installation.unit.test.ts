@@ -1,14 +1,12 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
- * The feature installs: a process that chose the memory tier gets a working
- * `WebhookApi` over repositories the installer instantiated. Nothing in this
- * file names a repository class or a tier for the app - the module declared
- * both tiers once, and the process said which one it wanted.
+ * The feature installs: a memory-tier process gets a working `WebhookApi` over installer-built
+ * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 

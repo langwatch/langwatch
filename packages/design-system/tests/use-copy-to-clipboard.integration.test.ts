@@ -1,11 +1,10 @@
-// @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
   COPY_FEEDBACK_MS,
   useCopyToClipboard,
 } from "@langwatch/design-system/use-copy-to-clipboard";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const writeText = vi.fn<(text: string) => Promise<void>>();
 

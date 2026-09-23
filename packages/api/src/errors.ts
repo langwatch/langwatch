@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   HandledError,
   isZodLikeError,
@@ -6,7 +7,6 @@ import {
   ValidationError,
   type ZodLikeError,
 } from "@langwatch/handled-error";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -363,14 +363,12 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
 
 export { formatError, isTrustedHandledError, SchemaFailure, validationErrorFromZod };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// What a surface answers a credential it will not accept. One class per code,
-// because the code is what a caller branches on. The sentences are part of the
-// wire, not decoration: an SDK's own error copy quotes them.
-// ─────────────────────────────────────────────────────────────────────────────
+// What a surface answers a credential it will not accept: one class per code, and the sentences are
+// wire (SDK error copy quotes them).
+
 /**
- * The sentence an unauthenticated caller of a project family receives. It names
- * all three accepted credential shapes because that is what it has always named.
+ * The sentence an unauthenticated caller of a project family receives. It names all three accepted
+ * credential shapes because that is what it has always named.
  */
 export const MISSING_PROJECT_CREDENTIAL_MESSAGE =
   "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";

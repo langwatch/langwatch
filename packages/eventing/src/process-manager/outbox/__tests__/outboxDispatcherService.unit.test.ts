@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type * as metricsModule from "../../../metrics.ts";
 import {
   type PilotState,
   pilotDefinition,
@@ -14,7 +16,7 @@ const { observeDispatchLag } = vi.hoisted(() => ({
   observeDispatchLag: vi.fn(),
 }));
 vi.mock("../../../metrics.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../metrics.ts")>()),
+  ...(await importOriginal<typeof metricsModule>()),
   observeEsProcessOutboxDispatchLag: observeDispatchLag,
 }));
 

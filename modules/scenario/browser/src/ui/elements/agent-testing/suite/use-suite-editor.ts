@@ -1,11 +1,6 @@
 /**
- * The state and the writes of the suite editor.
- *
- * The draft is seeded from the stored suite when the drawer opens on it, and
- * kept in the suite editor store while the person is away in the evaluator
- * list or the evaluator editor. Every pick and every mapping edit writes into
- * that store, so the drawer reads the same draft when it comes back.
- *
+ * The suite editor's state and writes. The draft is seeded from the stored suite and kept in the
+ * store while the person is in the evaluator drawers, so the drawer reads the same draft on return.
  * @see specs/features/agent-testing/suite-editor.feature
  * @see specs/suites/test-suites.feature
  */
@@ -17,7 +12,8 @@ import {
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
   parseEvaluatorAttachments,
-  type ScenarioMappingContext,parseSuiteFieldDefinitions
+  type ScenarioMappingContext,
+  parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
 import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
 import { nanoid } from "nanoid";

@@ -2,17 +2,9 @@ import { Badge, chakra, Separator, Text, VStack } from "@chakra-ui/react";
 import { Archive, Bell, Clock, Inbox, Mail } from "lucide-react";
 
 /**
- * The inbox's folder rail: what Langy filed, what went stale, what was put
- * away, and the two streams that ride on top. Every count is zero until
- * there is a job to fill them, and the rail says zero rather than hiding
- * the numbers: an empty inbox with its folders in place reads as an inbox,
- * not as a page that forgot its navigation.
- *
- * Same grammar as the annotations rail (AnnotationsLayout): 12.5px rows,
- * the selected row on `bg.muted`, the count in the trailing slot. Folders
- * are page state, not routes, because nothing lives behind them yet.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * The inbox's folder rail. Counts show zero until a job fills them, so the inbox keeps its
+ * navigation. Same grammar as AnnotationsLayout; folders are page state, not routes.
+ * @see specs/governance/governance-platform-placeholders.feature
  */
 export type InsightsFolder = "inbox" | "stale" | "archived" | "alerts" | "notifications";
 

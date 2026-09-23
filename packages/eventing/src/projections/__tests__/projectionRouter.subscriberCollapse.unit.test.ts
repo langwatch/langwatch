@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../metrics.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics.ts")>();
+  const actual = await importOriginal<typeof metricsModule>();
   return {
     ...actual,
     incrementEsReactorTotal: vi.fn(),
@@ -13,6 +13,7 @@ vi.mock("../../metrics.ts", async (importOriginal) => {
 });
 
 import type { Event } from "../../domain/types.ts";
+import type * as metricsModule from "../../metrics.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,

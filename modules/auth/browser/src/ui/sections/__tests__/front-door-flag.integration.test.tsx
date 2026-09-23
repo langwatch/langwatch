@@ -87,7 +87,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: signInMock,
@@ -114,6 +114,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import ForgotPassword from "../forgot-password-screen.tsx";
 import SignIn from "../signin-screen.tsx";
 import SignUp from "../signup-screen.tsx";

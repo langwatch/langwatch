@@ -1,12 +1,12 @@
 /**
- * What the compiler refuses in a REST declaration. Each refusal is written
- * WITHOUT a suppression, so the assertion is the diagnostic itself.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * What the compiler refuses in a REST declaration. Each refusal is written WITHOUT a suppression,
+ * so the assertion is the diagnostic itself. Spec:
+ * packages/api/specs/transport-declaration-split.feature.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, it } from "vitest";
 
 /** @scenario "A REST endpoint is one complete declaration in the server" */

@@ -25,29 +25,9 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api } from "../../behavior/governance-api.ts";
 
 /**
- * What the daily Insights job would be told, if there were a job.
- *
- * Nothing behind this drawer stores anything yet. The page owns the values
- * and hands them in; Save hands the edited copy back and closes, Cancel
- * closes and drops the edits. There is no toast and no "saved" wording on
- * purpose: a confirmation here would claim a write that never happened.
- *
- * A drawer, not a modal, on the same shell DepartmentEditDrawer uses: a
- * right-hand sheet the page stays visible behind, so the reader keeps the
- * inbox in view while they tune what fills it. Like that drawer it is
- * page-owned rather than registered in drawerRegistry: the registry can
- * only pass URL params, and this one needs the page's settings and its
- * onSave callback. The known cost is that Langy's drawer dodge keys on the
- * registry, so a floating Langy can sit over this sheet.
- *
- * The Model row is the one control already wired to something real: it
- * reads the model Langy's own routing resolves for this project (the same
- * query the Langy panel seeds its picker from) and lists the same allowed
- * models, through the shared ModelSelector. `model: null` means "whatever
- * Langy is configured with", so a change in Model Providers follows here
- * without anyone re-saving this drawer.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * What the daily Insights job would be told; nothing is stored yet, so Save only hands edits back
+ * (no toast). A page-owned drawer like DepartmentEditDrawer. `model: null` follows Langy's routing.
+ * @see specs/governance/governance-platform-placeholders.feature
  */
 export interface InsightsSettings {
   runs: "daily" | "weekdays" | "weekly";
@@ -206,10 +186,9 @@ export function InsightsSetupDrawer({
 }
 
 /**
- * Same two queries the Langy panel seeds its own picker from: the model
- * Langy's gate resolves for this project, and the models it may use.
- * Governance is org-level and may have no project; like costs.tsx, never
- * let this hook bounce the reader to onboarding on its own.
+ * Same two queries the Langy panel seeds its own picker from: the model Langy's gate resolves for
+ * this project, and the models it may use. Governance is org-level and may have no project; like
+ * costs.tsx, never let this hook bounce the reader to onboarding on its own.
  */
 function useLangyModelChoice({ enabled }: { enabled: boolean }) {
   const { project } = useOrganizationTeamProject({

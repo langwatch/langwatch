@@ -1,7 +1,7 @@
 import { normalizeMetricName } from "@langwatch/coding-agent-contract";
 
-import type { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
 import {
+  type CodingAgentSessionStateProjection,
   type CodingAgentSessionData,
   type MetricSeriesFact,
 } from "./coding-agent-session-state.projection.ts";

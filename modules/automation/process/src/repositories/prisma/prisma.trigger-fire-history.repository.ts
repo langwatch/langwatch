@@ -1,4 +1,5 @@
 import type { TriggerFire, TriggerFireStats } from "@langwatch/automation-contract";
+import type * as automationContractModule from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 
@@ -125,7 +126,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
   findStats(input: {
     projectId: string;
     firesSince: Instant;
-  }): Promise<import("@langwatch/automation-contract").AutomationFireStats[]> {
+  }): Promise<automationContractModule.AutomationFireStats[]> {
     return this.findAllStatsForProject(input).then((rows) =>
       rows.map(({ currentlyFiring: _current, ...row }) => row),
     );

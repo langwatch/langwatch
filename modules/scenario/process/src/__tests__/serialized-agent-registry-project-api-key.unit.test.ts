@@ -10,6 +10,7 @@ import type {
   LiteLLMParams,
   WorkflowAgentData,
 } from "@langwatch/scenario-contract";
+import type * as undiciModule from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SerializedAgentRegistryAdapter } from "../index.ts";
@@ -21,7 +22,7 @@ import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 const mockFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("undici", async () => {
-  const actual = await vi.importActual<typeof import("undici")>("undici");
+  const actual = await vi.importActual<typeof undiciModule>("undici");
   return { ...actual, fetch: mockFetch };
 });
 

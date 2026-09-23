@@ -1,5 +1,4 @@
-import type { ProcessStore, StateProjectionStore } from "@langwatch/eventing";
-import type { EventSourcing } from "@langwatch/eventing";
+import type { ProcessStore, StateProjectionStore, EventSourcing } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import type { TopicApi, TopicClusteringModels } from "@langwatch/topic-contract";
 import { type AssignTopicCommandData, TraceTopicAssignment } from "@langwatch/trace-contract";

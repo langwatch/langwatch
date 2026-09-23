@@ -1,10 +1,6 @@
 /**
- * One markdown table renderer, for results whose columns the caller chose.
- *
- * The two tables that predate this one are hand-rolled and interpolate their
- * cells directly, which is fine for a fixed set of known-safe columns and wrong
- * for a query result: a cell there is captured content, and one pipe in it
- * splits the row for every reader.
+ * One markdown table renderer for caller-chosen columns. Cells are captured content, so they are
+ * escaped: one pipe in a cell would split the row for every reader.
  */
 
 import { escapeMarkdown } from "./escape-markdown.js";
@@ -21,10 +17,8 @@ export function markdownCell(value: unknown): string {
 }
 
 /**
- * A markdown table, or a line saying there is nothing to show.
- *
- * `rows` are read by header, so a row missing a key renders an empty cell
- * rather than shifting every cell after it one column left.
+ * A markdown table, or a line saying there is nothing to show. `rows` are read by header, so a row
+ * missing a key renders an empty cell rather than shifting every cell after it one column left.
  */
 export function markdownTable({
   headers,

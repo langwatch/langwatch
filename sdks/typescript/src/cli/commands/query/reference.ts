@@ -1,15 +1,6 @@
 /**
- * `langwatch query reference` — both query languages, in one read.
- *
- * The first command an agent should run before it filters or aggregates
- * anything: it says which language answers which kind of question, lists every
- * field and column, and carries worked examples the platform validates before
- * publishing them. Each one also says whether THIS key can run it.
- *
- * `--section` exists because the whole document is large and an agent usually
- * knows which half it needs. The default is still the whole thing, so a caller
- * that does not know cannot get half an answer by accident.
- *
+ * `langwatch query reference`: both query languages, every field, and validated examples marked
+ * runnable for THIS key. `--section` narrows it; the default is the whole document.
  * @see specs/analytics/query-reference.feature
  */
 
@@ -19,20 +10,16 @@ import {
   type QueryReferenceResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { runnableLabel } from "./requirements";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { runnableLabel } from "./requirements";
 
 /** The slices a caller can ask for by name. */
-export const QUERY_REFERENCE_SECTIONS = [
-  "lwql",
-  "trace-filter",
-  "examples",
-  "decisions",
-] as const;
+export const QUERY_REFERENCE_SECTIONS = ["lwql", "trace-filter", "examples", "decisions"] as const;
 
 type QueryReferenceSection = (typeof QUERY_REFERENCE_SECTIONS)[number];
 
@@ -45,9 +32,7 @@ function resolveSection(section?: string): QueryReferenceSection | undefined {
   if (section === undefined) return undefined;
   if (!(QUERY_REFERENCE_SECTIONS as readonly string[]).includes(section)) {
     console.error(
-      chalk.red(
-        `Error: --section must be one of ${QUERY_REFERENCE_SECTIONS.join(", ")}`,
-      ),
+      chalk.red(`Error: --section must be one of ${QUERY_REFERENCE_SECTIONS.join(", ")}`),
     );
     process.exit(1);
   }
@@ -104,11 +89,7 @@ function printLwql(reference: QueryReferenceResult): void {
       `Ceilings: ${reference.lwql.limits.maxRowsReturned} rows, ${reference.lwql.limits.maxExecutionTimeSeconds}s. ${reference.lwql.limits.pagination}`,
     ),
   );
-  console.log(
-    chalk.gray(
-      `Columns and types: ${chalk.cyan("langwatch query schema")}`,
-    ),
-  );
+  console.log(chalk.gray(`Columns and types: ${chalk.cyan("langwatch query schema")}`));
 }
 
 function printTraceFilter(reference: QueryReferenceResult): void {

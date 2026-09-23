@@ -3,6 +3,7 @@
  * Spec: specs/model-providers/scope-filter.feature
  */
 
+import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,7 +51,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 // this file is about is what the SCREEN does with the value it hands back, so
 // the menu is replaced by two buttons that call `onChange` directly.
 vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+  const actual = await vi.importActual<typeof authzBrowserKitModule>(
     "@langwatch/authz-browser-kit",
   );
   return {

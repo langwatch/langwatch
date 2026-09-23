@@ -5,37 +5,11 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 /**
- * "Register agent" opens instructions, not a form.
- *
- * An agent registers itself: the customer decorates the function that runs it
- * and the SDK opens the connection (ADR-128). The platform refuses to create a
- * connected agent any other way — `AgentService.create` throws
- * `agent_register_only` — so a name-and-environment form here would collect
- * fields nothing could persist and leave the reader waiting for a row that
- * never arrives. The honest action is to show them the three lines that do
- * work.
- *
- * A DRAWER RATHER THAN A MODAL, which is what changed. It was a Chakra
- * `DialogRoot`, and the product owner asked for the section's ordinary
- * right-side drawer instead. That is not only a shape: a drawer here is
- * URL-routed, so `?drawer.open=addAgent` reopens it from a paste, browser back
- * closes it, and another screen can reach it by address alone
- * (`dev/docs/best_practices/drawers.md`). It is registered in `drawerRegistry`
- * as `addAgent` and mounted by `CurrentDrawer`, never by the page that opens
- * it — the Agents page calls `openDrawer` and holds no open state of its own.
- *
- * NO FOOTER, AND THAT IS THE POINT. The sibling `AddDepartmentDrawer` closes
- * with a solid orange submit, and the section's button rule carves drawer
- * footers out precisely so it can. This drawer has nothing to submit: it
- * collects no fields and persists nothing, so a footer button would either
- * duplicate the close control in the header or, drawn solid, claim an action
- * the flow does not have. The exemption is available and deliberately unused.
- *
- * Both languages, side by side rather than behind a picker: the reader knows
- * which of the two they write, and a picker would hide half the answer behind
- * a click to save six lines of height.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * "Register agent" opens instructions, not a form: agents register themselves through the SDK
+ * (ADR-128). A URL-routed drawer (`addAgent`) with no footer, since it collects and persists
+ * nothing.
+ * @see specs/ai-governance/dashboard/agents-page.feature
+ * @see dev/docs/best_practices/drawers.md
  */
 
 const PYTHON_SNIPPET = `import langwatch

@@ -13,7 +13,7 @@ const stubs = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof observabilityModule>();
   return {
     ...actual,
     createLogger: () => {
@@ -32,6 +32,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
     },
   };
 });
+
+import type * as observabilityModule from "@langwatch/observability";
 
 import { startSystemMigrations as start } from "../convergence.ts";
 

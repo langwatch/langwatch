@@ -9,6 +9,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/langy-contract";
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
+import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -87,7 +88,7 @@ vi.mock("../../../../behavior/use-capability-data.ts", () => ({
 // draws nothing at all — so the chart body would be invisible to the test for
 // a reason that has nothing to do with the card.
 vi.mock("recharts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("recharts")>();
+  const actual = await importOriginal<typeof rechartsModule>();
   return {
     ...actual,
     // Typed with the props being injected: a bare `ReactElement` has unknown

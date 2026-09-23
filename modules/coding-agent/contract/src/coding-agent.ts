@@ -25,10 +25,9 @@ export const codingAgentMetricSeriesRowSchema = z
   .strict();
 
 /**
- * What a session spent under one declared working context: the repository and
- * branch a model call was stamped with, and the tokens and computed cost of
- * every call stamped the same way. Never a share: the amounts are the calls'
- * own, and the pull-request split divides them (migration 00099).
+ * What a session spent under one declared working context: the repository and branch a model call
+ * was stamped with, and the tokens and computed cost of every call stamped the same way. Never a
+ * share: the amounts are the calls' own, and the pull-request split divides them (migration 00099).
  */
 export const codingAgentSessionContextUsageSchema = z
   .object({

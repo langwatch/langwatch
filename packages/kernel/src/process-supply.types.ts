@@ -101,10 +101,7 @@ export type InstalledPeersInAnyBranch<Modules extends readonly SupplyModule[]> =
 type InstalledNames<Modules extends readonly SupplyModule[]> = Modules extends unknown
   ? Modules[number]["name"]
   : never;
-type DefinitelyInstalledInTuple<
-  Modules extends readonly SupplyModule[],
-  Name extends string,
-> = {
+type DefinitelyInstalledInTuple<Modules extends readonly SupplyModule[], Name extends string> = {
   [Index in keyof Modules]: [Modules[Index]] extends [{ readonly name: Name }] ? true : false;
 }[number];
 type AbsentFromBranch<
@@ -140,10 +137,6 @@ type Missing<Required, Supplied> = {
 type Prefix<Fields, Name extends string> = {
   readonly [Key in keyof Fields as `${Name}.${Key & string}`]: Fields[Key];
 };
-type ConflictingPeers<Modules extends readonly SupplyModule[], Peers> = Pick<
-  Peers,
-  Extract<keyof Peers, keyof InstalledPeersInAnyBranch<Modules> & keyof RequiredPeers<Modules>>
->;
 export type MissingSupplyFieldsFrom<
   RequiredMemberSet,
   RequiredConfigSet,
@@ -158,10 +151,7 @@ export type MissingSupplyFieldsFrom<
     Prefix<Missing<RequiredConfigSet, Config>, "config"> &
     Prefix<Missing<RequiredPeerSet, Peers & InstalledPeerSet>, "peer"> &
     Prefix<
-      Pick<
-        Peers,
-        Extract<keyof Peers, keyof InstalledPeerSetInAnyBranch & keyof RequiredPeerSet>
-      >,
+      Pick<Peers, Extract<keyof Peers, keyof InstalledPeerSetInAnyBranch & keyof RequiredPeerSet>>,
       "duplicate-peer"
     >
 >;

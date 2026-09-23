@@ -1,9 +1,7 @@
 /**
- * The explore chart's title and query line are pure functions of the three
- * controls. Pinned here so the sketch never drifts from what the controls
- * say, and so the copy stays in full words.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * The explore chart's title and query line are pure functions of the three controls. Pinned here so
+ * the sketch never drifts from what the controls say, and so the copy stays in full words. Spec:
+ * specs/governance/governance-platform-placeholders.feature
  */
 import { describe, expect, it } from "vitest";
 

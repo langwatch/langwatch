@@ -142,11 +142,11 @@ export function AppHeaderUserMenu() {
                       onValueChange={(e) => accountMenu.graphicsQuality?.set(e.value)}
                     >
                       <Menu.RadioItem value="auto">
-                        Auto — adapts to this device on its own
+                        Auto: adapts to this device on its own
                       </Menu.RadioItem>
-                      <Menu.RadioItem value="on">On — always keep things responsive</Menu.RadioItem>
+                      <Menu.RadioItem value="on">On: always keep things responsive</Menu.RadioItem>
                       <Menu.RadioItem value="off">
-                        Off — always show full decorative effects
+                        Off: always show full decorative effects
                       </Menu.RadioItem>
                     </Menu.RadioItemGroup>
                   </Menu.Content>

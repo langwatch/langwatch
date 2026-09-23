@@ -1,15 +1,6 @@
 /**
- * `langwatch trace fields` — what a trace filter can name.
- *
- * Reads the query reference, so the list is the platform's own rather than a
- * copy of it: the field registry lives in the app, and a second list in the CLI
- * would be a second thing to keep in step. That is the exact drift that left
- * the MCP server naming fields the product had renamed.
- *
- * `--syntax` prints the language's own document and `--examples` the filter
- * examples, because both come down the same call and a caller learning the
- * language wants them next to the field list, not from three commands.
- *
+ * `langwatch trace fields`: what a trace filter can name, read from the platform's query reference
+ * rather than a CLI copy that drifts. `--syntax` and `--examples` come down the same call.
  * @see specs/traces/trace-filter-api.feature
  */
 
@@ -19,12 +10,13 @@ import {
   type QueryReferenceResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { runnableLabel } from "../query/requirements";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { runnableLabel } from "../query/requirements";
 
 export interface TraceFieldsOptions {
   syntax?: boolean;
@@ -63,9 +55,7 @@ function printFields(reference: QueryReferenceResult): void {
 }
 
 function printExamples(reference: QueryReferenceResult): void {
-  const examples = reference.examples.filter(
-    (example) => example.language === "trace-filter",
-  );
+  const examples = reference.examples.filter((example) => example.language === "trace-filter");
   console.log();
   for (const example of examples) {
     console.log(`  ${chalk.cyan(example.text)}`);
@@ -98,9 +88,7 @@ export const traceFieldsCommand = async (
       ? { syntax: traceFilter.syntax }
       : options.examples
         ? {
-            examples: reference.examples.filter(
-              (example) => example.language === "trace-filter",
-            ),
+            examples: reference.examples.filter((example) => example.language === "trace-filter"),
           }
         : {
             fields: traceFilter.fields,

@@ -1,18 +1,8 @@
 /**
- * The Agents page's three choices — source, ownership, sort — and where they
- * live.
- *
- * They live in the address. A filtered agents page is a thing an admin sends
- * to the person who owns the agent ("these six are unclaimed"), and a link that
- * arrives showing everything is a link that lost its point. Every choice is
- * therefore a query parameter, read on load, and the default of each one stays
- * out of the address so a bare page keeps a bare URL.
- *
- * Sorting and filtering are pure functions over rows rather than something the
- * card list does for itself, so the page test can state the expected order
- * without rendering anything.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The Agents page's three choices (source, ownership, sort) live in the address, so a shared link
+ * keeps its filter; defaults stay out of the URL. Sorting and filtering are pure functions over
+ * rows.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
@@ -80,21 +70,18 @@ export function sourceLabel(source: SourceFilter): string {
 }
 
 /**
- * The sources actually present in the rows, in the fixed order the chip lists
- * them. With real rows this is what stops the chip offering a source the
- * organization does not use; with sample rows it is the full list, because the
- * sample set carries one of each.
+ * The sources actually present in the rows, in the fixed order the chip lists them. With real rows
+ * this is what stops the chip offering a source the organization does not use; with sample rows it
+ * is the full list, because the sample set carries one of each.
  */
 export function sourcesPresentIn(rows: readonly GovernanceAgentRow[]): AgentSource[] {
   return AGENT_SOURCES.filter((source) => rows.some((row) => row.source === source));
 }
 
 /**
- * A missing figure sorts last on every ordering, whichever way that ordering
- * runs. An agent that has never run is not the cheapest agent, and putting it
- * at the top of a spend list would read as though it were.
- *
- * `null` here means "both figures are present, so the ordering decides".
+ * A missing figure sorts last on every ordering, whichever way that ordering runs. An agent that
+ * has never run is not the cheapest agent, and putting it at the top of a spend list would read as
+ * though it were. `null` here means "both figures are present, so the ordering decides".
  */
 function nullsLast(a: number | null, b: number | null): number | null {
   if (a === null && b === null) return 0;
@@ -135,11 +122,9 @@ export function applyAgentFilters(
 }
 
 /**
- * The three choices, read from the address and written back to it.
- *
- * `replace` rather than a history entry: changing a filter is refining one
- * view, not navigating, and stacking six entries would make the back button
- * walk the reader back through their own chip clicks.
+ * The three choices, read from the address and written back to it. `replace` rather than a history
+ * entry: changing a filter is refining one view, not navigating, and stacking six entries would
+ * make the back button walk the reader back through their own chip clicks.
  */
 export function useAgentFilters(): {
   filters: AgentFilters;
@@ -169,11 +154,9 @@ export function useAgentFilters(): {
   );
 
   /**
-   * The way back from having filtered everything out of view.
-   *
-   * Source and ownership only. Sort is not a filter — it hides nothing — so
-   * resetting it here would reorder the cards as a side effect of a button
-   * that promised to bring them back.
+   * The way back from having filtered everything out of view. Source and ownership only. Sort is
+   * not a filter — it hides nothing — so resetting it here would reorder the cards as a side effect
+   * of a button that promised to bring them back.
    */
   const clearFilters = useCallback(() => {
     setSearchParams(

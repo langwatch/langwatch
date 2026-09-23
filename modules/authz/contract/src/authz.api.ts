@@ -1,6 +1,8 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
+import type * as authzGrantEventsModule from "./authz-grant.events.ts";
+import type * as authzScopeLineageModule from "./authz-scope-lineage.ts";
 import type {
   AuthzAdmissionScope,
   AuthzPendingAdmissionRead,
@@ -10,7 +12,9 @@ import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
 import type * as Queries from "./authz.queries.ts";
 import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
+import type * as declarationModule from "./declaration.ts";
 import type { AuthzPermission } from "./registry.ts";
+import type * as registryModule from "./registry.ts";
 import type { BindingScopeTier } from "./vocabulary.ts";
 
 export interface AuthzCaller {
@@ -60,8 +64,8 @@ export interface AuthzApi {
   ): Promise<Queries.AuthzCanBatchPermissionsByIdsOutput>;
   tryResolveScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
   checkScopeLineage(
-    args: import("./authz-scope-lineage.ts").AuthzScopeLineageInput,
-  ): Promise<import("./authz-scope-lineage.ts").AuthzScopeLineageResult>;
+    args: authzScopeLineageModule.AuthzScopeLineageInput,
+  ): Promise<authzScopeLineageModule.AuthzScopeLineageResult>;
   explainDecision(
     args: Queries.AuthzExplainDecisionInput,
   ): Promise<Queries.AuthzExplainDecisionOutput>;
@@ -73,14 +77,14 @@ export interface AuthzApi {
     check: {
       userId: string;
       permission: Permission;
-    } & import("./declaration.ts").PermissionScopeArg<Permission>,
+    } & declarationModule.PermissionScopeArg<Permission>,
   ): Promise<boolean>;
   authorizePermission<
     Permission extends AuthzPermission,
-    ScopeArg extends import("./declaration.ts").PermissionScopeArg<Permission>,
+    ScopeArg extends declarationModule.PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
-  ): Promise<Authorized<import("./declaration.ts").TierOfScopeArg<ScopeArg>, Permission>>;
+  ): Promise<Authorized<declarationModule.TierOfScopeArg<ScopeArg>, Permission>>;
   authorizeProjectPermission(args: Queries.AuthzRequireProjectPermissionInput): Promise<void>;
   hasApiKeyPermission(args: Queries.ApiKeyPermissionCheck): Promise<boolean>;
   getApiKeyProjectDecision(
@@ -193,7 +197,7 @@ export interface AuthzApi {
   hasProjectPermission(input: {
     userId: string;
     projectId: string;
-    permission: import("./registry.ts").AuthzPermission;
+    permission: registryModule.AuthzPermission;
   }): Promise<boolean>;
   /**
    * Deterministic grant id to deduplicate replays and prevent drift from
@@ -201,8 +205,8 @@ export interface AuthzApi {
    */
   deriveGrantId(input: {
     organizationId: string;
-    principal: import("./authz-grant.events.ts").LedgerPrincipal;
-    scope: import("./authz-grant.events.ts").LedgerScope;
+    principal: authzGrantEventsModule.LedgerPrincipal;
+    scope: authzGrantEventsModule.LedgerScope;
     resourceToken?: string;
     occurredAtMs: number;
   }): string;

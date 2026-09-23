@@ -134,7 +134,7 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     await this.write({ ...row, status: "FAILED", error: code, updatedAt: at, finishedAt: at });
   }
 
-  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read it. */
+  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read. */
   async countUsage({
     projectIds,
     since,

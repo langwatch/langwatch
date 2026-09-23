@@ -176,10 +176,9 @@ export function parse(line) {
 }
 
 /**
- * Makes a failure record say its error once. Such a record commonly carries the
- * same text three times - as the message, as a serialised error, and as the
- * stack's opening - so each copy is reduced to what it alone adds: the error's
- * type, and the frames.
+ * Makes a failure record say its error once. Such a record commonly carries the same text three
+ * times - as the message, as a serialised error, and as the stack's opening - so each copy is
+ * reduced to what it alone adds: the error's type, and the frames.
  */
 function readErrorOnce(record) {
   record.fields = compactRepeatedError(record.fields, record.message);

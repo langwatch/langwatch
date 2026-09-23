@@ -216,11 +216,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
             env: "bare",
           },
         });
-        expect(matcher(data, "", "env")).toEqual([
-          "canonical",
-          "legacy-rest",
-          "bare",
-        ]);
+        expect(matcher(data, "", "env")).toEqual(["canonical", "legacy-rest", "bare"]);
       });
 
       it("returns null when no form of the key is present", () => {
@@ -232,12 +228,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
       });
     });
 
-    // The return shape is load-bearing, not an implementation detail.
-    // `matches_regex` tests an array's JSON encoding alongside its elements, so
-    // wrapping a lone value in a list widens what an anchored pattern can hit
-    // and drifts from the other three rules, which read the value itself. A
-    // test that only checks whether a filter matched passes either way and
-    // pins nothing, so assert the shape directly.
+    // The return shape is load-bearing, not an implementation detail. `matches_regex` tests an
+    // array's JSON encoding alongside its elements, so wrapping a lone value in a list widens what
+    // an anchored pattern can hit and drifts from the other three rules, which read the value
+    // itself. A test that only checks whether a filter matched passes either way and pins nothing,
+    // so assert the shape directly.
     describe("when every form of the key holds the same value", () => {
       it("collapses them to a plain string rather than a list", () => {
         const data = makeTraceData({

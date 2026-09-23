@@ -6,8 +6,10 @@ import {
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-import type { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
-import { type ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
+import {
+  type ScenarioModelParametersService,
+  type ModelParamsFailureReason,
+} from "./scenario-model-parameters.service.ts";
 
 const logger = createLogger("langwatch:scenarios:workflow-execution");
 

@@ -2,8 +2,12 @@ import { execFile } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+
 import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
+
+import type * as indexModule from "../browser/index.ts";
+import type * as indexModuleTypes from "../index.ts";
 
 const execFileAsync = promisify(execFile);
 const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -31,7 +35,7 @@ describe("runtime safety", () => {
     const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
       "base64",
     )}`;
-    const browserLogger = (await import(moduleUrl)) as typeof import("../browser/index.ts");
+    const browserLogger = (await import(moduleUrl)) as typeof indexModule;
 
     expect(() => {
       const logger = browserLogger.createLogger("browser-entry-smoke");
@@ -65,7 +69,7 @@ describe("runtime safety", () => {
     const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
       "base64",
     )}`;
-    const telemetry = (await import(moduleUrl)) as typeof import("../index.ts");
+    const telemetry = (await import(moduleUrl)) as typeof indexModuleTypes;
 
     expect(() => {
       const logger = telemetry.createLogger("browser-runtime-smoke");

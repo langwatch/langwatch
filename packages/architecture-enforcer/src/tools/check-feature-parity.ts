@@ -1236,12 +1236,11 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
     }
 
     const rest = src.slice(i);
-    // Vitest's typed table form is still a test call: `it.each<T>([...])`.
-    // Keep the type argument narrow and line-local so proximity remains a
-    // lexical check rather than attempting to parse arbitrary TypeScript.
-    // `void it(...)` is the same call, and is how every `node --test` suite
-    // writes it; without the prefix all 34 `.github/scripts` scenarios bound
-    // nothing while reading as bound.
+    // Vitest's typed table form is still a test call: `it.each<T>([...])`. Keep the type argument
+    // narrow and line-local so proximity remains a lexical check rather than attempting to parse
+    // arbitrary TypeScript. `void it(...)` is the same call, and is how every `node --test` suite
+    // writes it; without the prefix all 34 `.github/scripts` scenarios bound nothing while reading
+    // as bound.
 
     const m = rest.match(
       /^(?:(?:void|await)\s+)?(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/,
@@ -1808,8 +1807,10 @@ export function isInert(r: Pick<Report, "scenarios" | "totalScenarios">): boolea
   return r.totalScenarios > 0 && r.scenarios.length === 0;
 }
 
-/** File with some enforced scenarios and untagged ones (reads as N/N bound while untagged
- * invisible); disjoint from `isInert` */
+/**
+ * File with some enforced scenarios and untagged ones (reads as N/N bound while untagged
+ * invisible); disjoint from `isInert`
+ */
 export function isPartiallyTagged(r: Pick<Report, "scenarios" | "untaggedScenarios">): boolean {
   return r.scenarios.length > 0 && r.untaggedScenarios > 0;
 }

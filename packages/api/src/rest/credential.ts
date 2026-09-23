@@ -563,12 +563,8 @@ export type SessionCaller = Readonly<{
 export type SessionVerification = (request: Request) => Promise<SessionCaller | null>;
 
 /**
- * Reads the session a request carries, and nothing else.
- *
- * Its whole contract is the answer: `SessionCaller` or `null`. It refuses
- * nobody, redirects nobody and gates nothing — every enforcement path in this
- * package takes that answer and decides for itself, which is what lets the
- * browser bundle ASK who is asking without becoming a place that says no.
+ * Reads the session a request carries, answering `SessionCaller` or `null`. It refuses, redirects
+ * and gates nobody: every enforcement path decides for itself from that answer.
  */
 export class SessionReader {
   /** A deployment that composed a verifier. */

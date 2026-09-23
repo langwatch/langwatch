@@ -24,8 +24,8 @@ import {
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { SimulationService, type Scenario, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
-import type { SuiteRunCommands } from "@langwatch/suite-process";
 import {
+  type SuiteRunCommands,
   PostgresSuiteRepositories,
   SuiteApp,
   SuiteExecutionService,

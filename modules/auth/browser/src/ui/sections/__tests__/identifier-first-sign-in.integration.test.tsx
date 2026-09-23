@@ -53,7 +53,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: signInMock,
@@ -79,6 +79,7 @@ vi.mock("../../elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import { LAST_USED_METHOD_STORAGE_KEY } from "../../../model/last-used-method.ts";
 import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 

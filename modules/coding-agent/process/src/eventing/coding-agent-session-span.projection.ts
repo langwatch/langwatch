@@ -8,8 +8,10 @@ import {
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
-import type { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
-import { type CodingAgentSessionData } from "./coding-agent-session-state.projection.ts";
+import {
+  type CodingAgentSessionStateProjection,
+  type CodingAgentSessionData,
+} from "./coding-agent-session-state.projection.ts";
 
 const SPAN_STATUS_ERROR = 2;
 const CLAUDE = {
@@ -43,10 +45,9 @@ const DECLARED_SPAN_NAMES: ReadonlySet<string> = new Set(
 );
 
 /**
- * The spans whose tokens the fold counts as a model call, across every
- * span-bearing agent. The contribute service stamps exactly these with the
- * session's declared working context, so the fold can charge their tokens to
- * it; every other span charges nothing anywhere and rides unstamped.
+ * The spans whose tokens the fold counts as a model call, across every span-bearing agent. The
+ * contribute service stamps exactly these with the session's declared working context, so the fold
+ * can charge their tokens to it; every other span charges nothing anywhere and rides unstamped.
  */
 export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
@@ -71,10 +72,9 @@ export interface CodingAgentSessionSpanProjectionInput {
   span: SpanFactsView;
   agent?: string;
   /**
-   * The working context the contribution was stamped with, or null when it
-   * carries none. Only a model call reads it: its tokens and cost are charged
-   * to that context, which is how a span-only agent's session says what it
-   * spent where.
+   * The working context the contribution was stamped with, or null when it carries none. Only a
+   * model call reads it: its tokens and cost are charged to that context, which is how a span-only
+   * agent's session says what it spent where.
    */
   context?: SessionWorkingContext | null;
 }

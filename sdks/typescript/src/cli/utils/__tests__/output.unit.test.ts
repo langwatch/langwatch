@@ -182,12 +182,10 @@ describe("applyJq", () => {
     expect(applyJq(".meta | .name", { meta: { name: "langwatch" } })).toBe("langwatch");
   });
 
-  // The two pipe readings are not the same, and both follow the subset's own
-  // convention that an iteration collects into an array. `| .path` distributes
-  // over that array, because an array has no `.slug` and the result has to
-  // equal the inline `.data[].slug` spelling. `| length` sizes the collected
-  // array itself, which is the reading already pinned above for
-  // `.items[].tags | length`.
+  // The two pipe readings are not the same, and both follow the subset's own convention that an
+  // iteration collects into an array. `| .path` distributes over that array, because an array has
+  // no `.slug` and the result has to equal the inline `.data[].slug` spelling. `| length` sizes the
+  // collected array itself, which is the reading already pinned above for `.items[].tags | length`.
   it("distributes a piped path over an iteration, then sizes each result", () => {
     expect(
       applyJq(".data[] | .slug | length", {

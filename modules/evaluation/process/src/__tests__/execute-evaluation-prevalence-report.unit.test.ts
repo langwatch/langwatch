@@ -18,11 +18,12 @@ const { loggerSpy } = vi.hoisted(() => ({
 // Only createLogger is replaced: the module also carries tracing/context
 // helpers this command's import graph needs for real.
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => loggerSpy,
 }));
 
 import { defaultCodeEvaluatorConfig } from "@langwatch/evaluator-contract";
+import type * as observabilityModule from "@langwatch/observability";
 
 import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "../services/evaluation-execution-intent.service.ts";
 import {

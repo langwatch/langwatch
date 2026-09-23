@@ -1,3 +1,4 @@
+import type * as ioredisModule from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
@@ -18,7 +19,7 @@ function createMockRedis() {
     info: vi.fn().mockResolvedValue(""),
     smembers: vi.fn().mockResolvedValue([]),
     zrange: vi.fn().mockResolvedValue([]),
-  } as unknown as import("ioredis").default;
+  } as unknown as ioredisModule.default;
 }
 
 /**

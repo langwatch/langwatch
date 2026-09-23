@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { searchParamsRef, publicEnvRef } = vi.hoisted(() => ({
+const { searchParamsRef } = vi.hoisted(() => ({
   searchParamsRef: {
     current: new URLSearchParams("") as URLSearchParams | null,
   },

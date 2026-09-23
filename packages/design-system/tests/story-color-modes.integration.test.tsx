@@ -1,12 +1,13 @@
+import { composeStories } from "@storybook/react-vite";
 /**
  * @vitest-environment jsdom
  * Every story, in both colour modes, through the package's own provider.
  */
 /// <reference types="vite/client" />
 import { cleanup, render } from "@testing-library/react";
-import { composeStories } from "@storybook/react-vite";
 import type { ComponentType } from "react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
 import previewAnnotations from "../.storybook/preview.tsx";
 
 const stories = import.meta.glob("../src/**/*.stories.tsx", { eager: true }) as Record<

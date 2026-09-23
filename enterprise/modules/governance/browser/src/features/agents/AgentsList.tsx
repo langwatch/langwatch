@@ -7,26 +7,9 @@ import type { GovernanceAgentRow } from "./agentRows";
 import { AgentsTable } from "./AgentsTable";
 
 /**
- * The two ways the fleet can be drawn, the switch between them, and the branch
- * that picks one.
- *
- * THE DEFAULT IS THE LIST. The page answers "what is running against this
- * organization", which is a comparison across agents; a grid of cards spends a
- * panel on each one and turns ten agents into a scroll. The cards are still
- * here for reading a single agent closely, one press away.
- *
- * The control, its two words and its two glyphs are the inventory catalog's,
- * deliberately (`CatalogLayoutControl` in the inventory page). A reader who
- * learned the switch on one governance screen finds the same switch, saying
- * the same words, on this one. Only the default differs, and it differs
- * because the question each page is opened with does.
- *
- * The branch lives here rather than in the page for the same reason the
- * catalog's does: the page has two places that render agents — the pane and,
- * one day, anything else that lists them — and pushing the branch up would put
- * the same `if` in both.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The fleet's two layouts, the switch and the branch. The list is the default because the page
+ * compares agents; the switch mirrors the inventory catalog's `CatalogLayoutControl`.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 
 export type AgentsLayout = "list" | "grid";

@@ -2,6 +2,7 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { SmallLabel } from "../src/components/small-label.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

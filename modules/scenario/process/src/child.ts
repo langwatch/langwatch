@@ -1,8 +1,6 @@
 /**
- * What the scenario child process needs, and nothing else. The child is a fresh
- * `node` process per simulation, so everything its entry can reach is bundled
- * and parsed on every run -- reaching it through the server barrel pulled the
- * REST transport and the ClickHouse and Redis repositories along with it.
+ * What the scenario child process needs, and nothing else: it is a fresh `node` per simulation, so
+ * everything reachable is parsed each run, and the server barrel dragged in REST and repositories.
  */
 
 export { createChildProcessLogger } from "./services/child-logger.service.ts";

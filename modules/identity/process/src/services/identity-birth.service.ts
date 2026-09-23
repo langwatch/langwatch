@@ -11,8 +11,11 @@ import {
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { IdentityBirth } from "../app/identity.members.ts";
-import { type IdentityNewborn, type IdentityBirthLedger } from "../app/identity.members.ts";
+import {
+  type IdentityBirth,
+  type IdentityNewborn,
+  type IdentityBirthLedger,
+} from "../app/identity.members.ts";
 import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
@@ -26,12 +29,15 @@ export interface IdentityBirthServiceDeps {
   guards: IdentityGuardsApi;
   ledger: IdentityBirthLedger;
   rows: IdentityNewbornRepository;
-  /** The address lock (ADR-116 §6): the entrance and the verification
-   *  ceremony contend on one constraint, not on two reads. */
+  /**
+   * The address lock (ADR-116 §6): the entrance and the verification ceremony contend on one
+   * constraint, not on two reads.
+   */
   reservations: IdentityReservationRepository;
-  /** The write gate's cached answers for this user, dropped once their rows
-   *  commit — injected rather than imported so the sequence stays testable
-   *  without a module-level cache. */
+  /**
+   * The write gate's cached answers for this user, dropped once their rows commit — injected rather
+   * than imported so the sequence stays testable without a module-level cache.
+   */
   forgetGate: (args: { userId: string }) => void;
 }
 

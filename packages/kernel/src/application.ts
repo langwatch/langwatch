@@ -101,14 +101,9 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
   }
 
   /**
-   * The one-shot work this process runs, narrowed by the caller's own guard.
-   *
-   * `contributions` is `unknown[]` because the kernel depends on zod and
-   * nothing else: `Task` is not a name it can hold, so it cannot check the
-   * shape itself. The caller passes the predicate instead, which is what keeps
-   * the narrowing honest at both ends -- no cast here, none at the call site --
-   * and turns a module that declared something other than a task into a boot
-   * failure naming that module, rather than a crash when the thing is run.
+   * The one-shot work this process runs, narrowed by the caller's guard: the kernel cannot name
+   * `Task`, so the predicate keeps the narrowing cast-free and a module that declared a non-task
+   * fails boot by name.
    */
   tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[] {
     if (this.role !== "tasks") {
@@ -661,11 +656,9 @@ function installModuleEventing(
 }
 
 /**
- * What this role starts: declared workers on a worker, declared tasks on tasks.
- *
- * The declaring feature is kept beside each contribution. Flattening loses it
- * otherwise, and a module that declared the wrong thing is then only findable
- * by reading every `withTasks` call in the tree.
+ * What this role starts: declared workers on a worker, declared tasks on tasks. The declaring
+ * feature is kept beside each contribution. Flattening loses it otherwise, and a module that
+ * declared the wrong thing is then only findable by reading every `withTasks` call in the tree.
  */
 function roleContributions(
   declarations: readonly DeclaredFeature[],

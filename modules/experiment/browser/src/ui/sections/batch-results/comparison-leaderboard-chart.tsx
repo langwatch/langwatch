@@ -297,14 +297,14 @@ export function ComparisonLeaderboardChart({
       role="group"
     >
       <LeaderboardCardHeader
-        title={`${column.name} — leaderboard`}
+        title={`${column.name}: leaderboard`}
         headline={headline}
         onExpand={handleExpand}
       />
       <LeaderboardBars bars={bars} chartHeight={chartHeight} />
       {bars.hiddenCount > 0 ? (
         <Text fontSize="2xs" color="fg.muted" textAlign="center" paddingBottom={1}>
-          +{bars.hiddenCount} more — expand for the full leaderboard
+          +{bars.hiddenCount} more, expand for the full leaderboard
         </Text>
       ) : null}
     </Box>

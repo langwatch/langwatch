@@ -1,12 +1,13 @@
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 /**
  * Credential resolution is the first thing every API-calling command does:
  * priority order, session-liveness gate, daemon discipline, both failures.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
-import type * as ProjectScopeNs from "../projectScope";
+
 import type * as SessionApiNs from "../governance/session-api";
+import type * as ProjectScopeNs from "../projectScope";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -47,11 +48,8 @@ vi.mock("../projectScope", async () => {
 });
 
 import { config } from "dotenv";
-import { loadConfig, saveConfig } from "../governance/config";
-import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
+
 import { scopedProjectId } from "../../../internal/credentialContext";
-import { fetchPersonalProject, SessionApiError } from "../governance/session-api";
-import { maybePrintIdentityNotice } from "../identityNotice";
 import {
   loginElsewhereMessage,
   loginMadeElsewhere,
@@ -59,6 +57,10 @@ import {
   SESSION_REVALIDATE_WINDOW_MS,
 } from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
+import { loadConfig, saveConfig } from "../governance/config";
+import { fetchPersonalProject, SessionApiError } from "../governance/session-api";
+import { maybePrintIdentityNotice } from "../identityNotice";
+import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
 
 const mockedDotenvConfig = vi.mocked(config);
 const mockedLoadConfig = vi.mocked(loadConfig);
@@ -506,7 +508,7 @@ describe("resolveCredentials()", () => {
     const LOGIN_ADDRESS = "https://app.langwatch.ai";
     const OTHER = "https://langwatch.other.test";
     const stripAnsi = (text: string): string =>
-      // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+      // eslint-disable-next-line no-control-regex -- strips ANSI escape codes from chalk output
       text.replace(/\u001b\[[0-9;]*m/g, "");
     const loginWithBothKeys = () =>
       loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-login-key" });
@@ -519,9 +521,7 @@ describe("resolveCredentials()", () => {
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-      const stderr = stripAnsi(
-        errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
-      );
+      const stderr = stripAnsi(errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"));
       expect(stderr).toBe(
         `Error: ${loginElsewhereMessage({ loginEndpoint: LOGIN_ADDRESS, endpoint: OTHER })}`,
       );
@@ -558,9 +558,7 @@ describe("resolveCredentials()", () => {
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-      const stdout = logSpy.mock.calls
-        .map((c: unknown[]) => String(c[0]))
-        .join("\n");
+      const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       const domain = readCliErrorDocument(stdout);
       expect(domain?.kind).toBe("login_endpoint_mismatch");
       expect(domain?.isHandled).toBe(true);

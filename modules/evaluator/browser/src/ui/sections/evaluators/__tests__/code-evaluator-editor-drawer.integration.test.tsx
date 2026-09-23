@@ -49,7 +49,7 @@ vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
 vi.mock("@langwatch/prompt-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/prompt-browser-kit")>()),
+  ...(await importOriginal<typeof promptBrowserKitModule>()),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
@@ -73,6 +73,8 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
     },
   },
 }));
+
+import type * as promptBrowserKitModule from "@langwatch/prompt-browser-kit";
 
 import { CodeEvaluatorEditorDrawer } from "../code-evaluator-editor-drawer.tsx";
 

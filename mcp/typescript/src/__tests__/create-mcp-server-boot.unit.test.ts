@@ -5,20 +5,15 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 const SERVER_SRC = resolve(__dirname, "..");
 const ENTRY = resolve(SERVER_SRC, "create-mcp-server.ts");
 
 /**
- * The handlers on the boot path today, out of roughly a hundred the server
- * registers. The first six `create-mcp-server.ts` imports at the top of the
- * file; the last two it never names, and they are here because a handler it
- * does import reaches them. Everything else is reached with `await import(...)`
- * from inside the tool it serves.
- *
- * Adding a name here is a decision to pay for that module at every `npx`
- * start, so make it deliberately rather than to get the test passing again.
+ * The handlers on the boot path today, of about a hundred; the rest load via `await import(...)`.
+ * Adding one here pays for it at every `npx` start, so do it deliberately.
  */
 const EAGER_HANDLERS = new Set([
   "tools/get-experiment-results.ts",

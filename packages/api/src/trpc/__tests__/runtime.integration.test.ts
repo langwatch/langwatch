@@ -1,12 +1,15 @@
 /** @vitest-environment node */
 
-/** tRPC and REST doors align on error handling through the shared error formatter; testing
- * real implementations, not mocks */
+/**
+ * tRPC and REST doors align on error handling through the shared error formatter; testing real
+ * implementations, not mocks
+ */
 
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import { createErrorHandler } from "../../errors.ts";
 import { trpcFailureTraceIds } from "../audit.ts";
 import { createTrpcRuntimePolicy } from "../policy.ts";
@@ -19,10 +22,9 @@ type TestContext = {
 };
 
 /**
- * The failure a service raises when it parses its own data and loses.
- *
- * `.parse`, not `.safeParse`: the whole defect class is the throw, and a
- * hand-built `ZodError` would not carry the `flatten()` the boundary reads.
+ * The failure a service raises when it parses its own data and loses. `.parse`, not `.safeParse`:
+ * the whole defect class is the throw, and a hand-built `ZodError` would not carry the `flatten()`
+ * the boundary reads.
  */
 function zodFailure(parse: () => unknown): unknown {
   try {
@@ -39,10 +41,9 @@ const pathedFailure = () =>
   zodFailure(() => z.object({ name: z.string().min(1) }).parse({ name: "" }));
 
 /**
- * A key the schema does not list: `path` is `[]`, so `flatten()` files it under
- * `formErrors` and `fieldErrors` stays empty. This is the automation-edit
- * failure — a transport spread three command-schema keys the strict schema
- * never listed.
+ * A key the schema does not list: `path` is `[]`, so `flatten()` files it under `formErrors` and
+ * `fieldErrors` stays empty. This is the automation-edit failure — a transport spread three
+ * command-schema keys the strict schema never listed.
  */
 const unrecognizedKeysFailure = () =>
   zodFailure(() =>

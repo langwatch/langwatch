@@ -814,7 +814,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    */
   private async runAuditAll(ops: (() => Promise<unknown> | undefined)[]): Promise<void> {
     if (!this.auditAdapter || ops.length === 0) return;
-    const results = await Promise.allSettled(ops.map((op) => Promise.resolve(op())));
+    const results = await Promise.allSettled(ops.map(async (op) => op()));
     for (const result of results) {
       if (result.status === "rejected") {
         this.logger.warn(

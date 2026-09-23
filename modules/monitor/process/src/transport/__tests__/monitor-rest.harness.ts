@@ -11,8 +11,7 @@ import {
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import { type MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { type MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 
 import {
   createMonitorTestApp,

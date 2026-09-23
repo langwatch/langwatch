@@ -155,7 +155,7 @@ export const datasetEvaluateRequestSchema = z.object({
     .describe("Per-call overrides of the evaluator's settings"),
 });
 
-/** Schema declared here, not imported from @langwatch/evaluator-browser, per value-import boundary. */
+/** Declared here, not imported from @langwatch/evaluator-browser: value-import boundary. */
 export const evaluationInputSchema = z.object({
   trace_id: z.string().optional().nullable(),
   evaluation_id: z.string().optional().nullable(),

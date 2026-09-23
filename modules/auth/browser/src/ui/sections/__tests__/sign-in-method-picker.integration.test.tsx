@@ -14,13 +14,14 @@ const { passkeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     authClient: { signIn: { passkey: passkeyMock } },
   };
 });
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import { AlternativeMethods, SignInMethodPicker } from "../sign-in-method-picker.tsx";
 
 const METHOD_SET: readonly SignInMethod[] = [
@@ -28,8 +29,10 @@ const METHOD_SET: readonly SignInMethod[] = [
   { id: "google", kind: "federated", connectionId: null },
 ];
 
-/** A promise this test resolves on its own schedule, standing in for a
- *  WebAuthn ceremony that has been handed to the browser and is still open. */
+/**
+ * A promise this test resolves on its own schedule, standing in for a WebAuthn ceremony that has
+ * been handed to the browser and is still open.
+ */
 function pendingCeremony(): { promise: Promise<unknown>; resolve: (value: unknown) => void } {
   let resolve!: (value: unknown) => void;
   const promise = new Promise((r) => {

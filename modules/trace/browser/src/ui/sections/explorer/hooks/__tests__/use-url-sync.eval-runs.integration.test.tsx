@@ -33,7 +33,7 @@ const LENSES = [
 let heldRuns: Record<string, string> = {};
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     getPersistedActiveLensId: () => null,
@@ -56,6 +56,8 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
       }),
   };
 });
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { useURLSync } from "../use-url-sync.ts";
 

@@ -220,20 +220,12 @@ export function defaultConfigPath(): string {
 export function displayConfigPath(): string {
   const file = configPath();
   const home = os.homedir();
-  return file.startsWith(`${home}${path.sep}`)
-    ? `~${file.slice(home.length)}`
-    : file;
+  return file.startsWith(`${home}${path.sep}`) ? `~${file.slice(home.length)}` : file;
 }
 
 /**
- * True when this process runs on a config of its own: LANGWATCH_CLI_CONFIG
- * names a file other than the home's default one.
- *
- * The tool wiring under the home (`~/.claude/settings.json`, the `[otel]`
- * block of `~/.codex/config.toml`, the shell rc functions) belongs to the
- * login in the home's default config. A login kept in another file, which is
- * what a test, a dogfood run or a second account does, is not the machine's
- * login, so it never rewrites that wiring.
+ * True when LANGWATCH_CLI_CONFIG names a non-default config. The home's tool wiring belongs to the
+ * default config's login, so an isolated login (test, dogfood, second account) never rewrites it.
  */
 export function isIsolatedConfig(): boolean {
   const env = process.env.LANGWATCH_CLI_CONFIG?.trim();

@@ -23,13 +23,15 @@ vi.mock("../../../use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     useFilterStore: (selector: (s: unknown) => unknown) =>
       selector({ debouncedTimeRange: { from: 1, to: 2, label: undefined } }),
   };
 });
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
 import type { FacetItem, FacetValueState } from "../types.ts";

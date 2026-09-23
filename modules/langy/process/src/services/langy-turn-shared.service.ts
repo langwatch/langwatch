@@ -7,17 +7,17 @@ import {
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
 
-import type {
-  LangyGithubPermit,
-  LangyHarness,
-  LangyModel,
-  LangySessionKey,
-  LangyTurnContextRenderer,
-  LangyTurnMetrics,
-  LangyUiActionSurface,
-  LangyWorker,
+import {
+  type LangyGithubPermit,
+  type LangyHarness,
+  type LangyModel,
+  type LangySessionKey,
+  type LangyTurnContextRenderer,
+  type LangyTurnMetrics,
+  type LangyUiActionSurface,
+  type LangyWorker,
+  type LangyWorkerProbeInput,
 } from "../app/langy.members.ts";
-import { type LangyWorkerProbeInput } from "../app/langy.members.ts";
 import type {
   LangyTurnAccessRepository,
   LangyTurnHandoffRepository,

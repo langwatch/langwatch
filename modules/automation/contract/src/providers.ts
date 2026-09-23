@@ -1,9 +1,11 @@
+import type * as providerTypesModule from "./provider-types.ts";
 /** Shared provider vocabulary used by the automation contract and adapters. */
 import { annotationQueueActionParamsSchema } from "./providers/annotation-queue.ts";
 import { datasetActionParamsSchema } from "./providers/dataset.ts";
 import { emailActionParamsSchema } from "./providers/email.ts";
 import { slackActionParamsSchema } from "./providers/slack.ts";
 import { webhookActionParamsSchema } from "./providers/webhook.ts";
+import type * as triggerModule from "./trigger.ts";
 
 export type {
   Category,
@@ -13,8 +15,8 @@ export type {
   SlackTemplateTypeColumn,
   TemplateDraft,
 } from "./provider-types.ts";
-export type AlertType = import("./trigger.ts").AlertType;
-export type TriggerAction = import("./trigger.ts").TriggerAction;
+export type AlertType = triggerModule.AlertType;
+export type TriggerAction = triggerModule.TriggerAction;
 export {
   annotationQueueActionParamsSchema,
   type AnnotationQueueActionParams,
@@ -70,8 +72,10 @@ export const providerActionValues = [
   "SEND_WEBHOOK",
 ] as const;
 
-/** Runtime enum-shaped values for browser/client callers. The corresponding
- * types are exported by `trigger.ts` and remain string-literal unions. */
+/**
+ * Runtime enum-shaped values for browser/client callers. The corresponding types are exported by
+ * `trigger.ts` and remain string-literal unions.
+ */
 export const TriggerAction = {
   SEND_EMAIL: "SEND_EMAIL",
   ADD_TO_DATASET: "ADD_TO_DATASET",
@@ -86,30 +90,32 @@ export const AlertType = {
   INFO: "INFO",
 } as const;
 
-/** Shared provider registry entries. They remain contract data so web and
- * server adapters pair the same action metadata and Zod validation. */
-export const annotationQueueProvider: import("./provider-types.ts").SharedDef = {
+/**
+ * Shared provider registry entries. They remain contract data so web and server adapters pair the
+ * same action metadata and Zod validation.
+ */
+export const annotationQueueProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
   category: "action",
   label: "Add to annotation queue",
   description: "Queue matched traces for a human to label.",
   actionParamsSchema: annotationQueueActionParamsSchema,
 };
-export const datasetProvider: import("./provider-types.ts").SharedDef = {
+export const datasetProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.ADD_TO_DATASET,
   category: "action",
   label: "Add to dataset",
   description: "Append matched traces to a dataset for later evaluation.",
   actionParamsSchema: datasetActionParamsSchema,
 };
-export const emailProvider: import("./provider-types.ts").SharedDef = {
+export const emailProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.SEND_EMAIL,
   category: "notify",
   label: "Email",
   description: "Send an email to one or more team members or external recipients.",
   actionParamsSchema: emailActionParamsSchema,
 };
-export const slackProvider: import("./provider-types.ts").SharedDef = {
+export const slackProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.SEND_SLACK_MESSAGE,
   category: "notify",
   label: "Slack",
@@ -117,7 +123,7 @@ export const slackProvider: import("./provider-types.ts").SharedDef = {
   alertDescription: "Post a message to a Slack webhook when the alert fires.",
   actionParamsSchema: slackActionParamsSchema,
 };
-export const webhookProvider: import("./provider-types.ts").SharedDef = {
+export const webhookProvider: providerTypesModule.SharedDef = {
   action: TriggerAction.SEND_WEBHOOK,
   category: "notify",
   label: "Webhook",

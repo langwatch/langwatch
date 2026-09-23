@@ -1,23 +1,8 @@
 /**
- * What the Agents page shows for one agent, and the invented set it shows when
- * there is nothing real to show.
- *
- * The row shape is wider than what any one table holds. It is filled from two
- * of them — an agent registered from code (ADR-128) and an agent a provider
- * was asked to list — by `buildAgentInventory` on the server, and the cards do
- * not care which one a row came from.
- *
- * It is still wider than what the platform MEASURES. Spend, request counts and
- * health have no organization-wide read behind them yet, so a real row leaves
- * all three null and the page draws a dash. The sample rows carry figures
- * because they are illustrating what the page will hold.
- *
- * Every figure is nullable on purpose. A connected agent that registered this
- * morning and has never been called has no spend and no request count, and a
- * dash with a reason beside it is the honest rendering; `$0.00` would claim we
- * measured nothing spent.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * One agent as the Agents page shows it, filled by `buildAgentInventory` from code-registered
+ * (ADR-128) and provider-listed agents. Spend, requests and health are nullable: unmeasured reads
+ * as a dash.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 
 /** Where an agent came to us from. The list the source chip offers. */
@@ -32,14 +17,8 @@ export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
 };
 
 /**
- * What an agent is doing right now, as one of three words.
- *
- * Stored rather than derived. "Responding" and "idle" could be read off
- * `lastActiveMinutesAgo`, but "erroring" cannot — an agent that answered a
- * minute ago and failed every one of those answers is recently active and
- * unhealthy at the same time — and a field that is half derived and half
- * stored is a field two readers disagree about. One source, so the three words
- * always agree with each other.
+ * What an agent is doing now, in three words. Stored, not derived: "erroring" cannot be read off
+ * `lastActiveMinutesAgo`, and a half-derived field is one two readers disagree about.
  */
 export const AGENT_HEALTH_STATES = ["responding", "idle", "erroring"] as const;
 export type AgentHealth = (typeof AGENT_HEALTH_STATES)[number];
@@ -55,13 +34,8 @@ export interface GovernanceAgentRow {
   id: string;
   name: string;
   /**
-   * Part of the agent's identity, not a tag: ADR-128 keys a row on it.
-   *
-   * `null` where no stage was declared. A provider-side agent is always null
-   * here: a Dataverse environment address and a Databricks workspace host name
-   * a PLACE, and this column is scanned for a stage, so putting one in the
-   * other's column would make "production" and "acme.crm4.dynamics.com"
-   * answers to the same question.
+   * Part of the agent's identity (ADR-128 keys on it); `null` where no stage was declared. Provider
+   * agents are always null: an environment address names a PLACE, not a stage.
    */
   environment: string | null;
   /** `null` is the unclaimed case, which is the whole point of the filter. */
@@ -84,31 +58,16 @@ export interface GovernanceAgentRow {
    */
   health: AgentHealth | null;
   /**
-   * Days since the agent registered, or `null` if the registration moment was
-   * never recorded. Days rather than a date for the same reason
-   * `lastActiveMinutesAgo` is minutes: a fixed date in invented data goes
-   * stale the week after it is written.
-   *
-   * The fleet card draws its registration line from this, so the read that
-   * one day fills this shape fills the line with it.
+   * Days since registration, or `null` if never recorded. Days rather than a date so invented data
+   * does not go stale; the fleet card draws its registration line from this.
    */
   registeredDaysAgo: number | null;
 }
 
 /**
- * The invented set. Ten agents, three sources, a spread of owned and
- * unclaimed, and one that has registered but never run — the case that proves
- * a missing figure renders as a dash rather than a zero.
- *
- * Names are generic on purpose. Nothing here names a customer, a person or a
- * real deployment.
- *
- * These names are canonical across the governance section: this page is the
- * registry of record, so every agent another page invents spend for has a row
- * here. A reader crossing from Costs must find what they were just billed for.
- * The environment is a column here rather than a suffix on the name, because
- * ADR-128 keys an agent on the pair — an agent is not called "checkout-agent-prod",
- * it is "checkout-agent" running in production.
+ * The invented set: ten generic agents over three sources, including one never run (a missing
+ * figure is a dash). Canonical across governance pages; the environment is a column because ADR-128
+ * keys on the pair.
  */
 export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
   {
@@ -209,13 +168,11 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     id: "sample-it-triage",
     name: "it-service-triage",
     environment: "production",
-    // Owned, and deliberately so. It leaves Copilot Studio as the one source
-    // with nothing unclaimed behind it, which is what makes the "no agent
-    // matches these filters" state reachable at all: every other source has an
-    // unclaimed agent, so before this the empty-filter branch could not be
-    // reached with sample data on, and neither a reviewer nor a test could
-    // ever see it. A bot built inside a service desk having an owner is also
-    // the likelier story.
+    // Owned, and deliberately so. It leaves Copilot Studio as the one source with nothing unclaimed
+    // behind it, which is what makes the "no agent matches these filters" state reachable at all:
+    // every other source has an unclaimed agent, so before this the empty-filter branch could not
+    // be reached with sample data on, and neither a reviewer nor a test could ever see it. A bot
+    // built inside a service desk having an owner is also the likelier story.
     owner: "IT Service Desk",
     models: ["gpt-5-mini"],
     source: "copilot_studio",
@@ -276,22 +233,8 @@ export function formatLastActive(minutesAgo: number | null): string | null {
 }
 
 /**
- * How long the agent has been registered, in the words a reader would use.
- *
- * Coarser than `formatLastActive` on purpose, and it climbs to months and
- * years. "Last active" is how a reader decides whether an agent is alive, so
- * minutes matter there; how long ago it registered is context, and "320 days
- * ago" makes a reader do arithmetic that "10 months ago" does not.
- *
- * The list view draws its Registered column from this. The card has no room
- * for the column and does not show it, which is one of the two facts the list
- * exists to surface.
- *
- * Years are counted in the same thirty-day months this counts months in, not
- * in calendar years. Mixing the two units leaves a gap: a year measured as 365
- * days has not started yet when a twelfth thirty-day month has already ended,
- * so any day in that gap floors to zero and the reader is told "0 years ago".
- * One unit throughout cannot produce a zero.
+ * How long ago the agent registered, coarser than `formatLastActive` and climbing to months and
+ * years. Years count thirty-day months too, so no gap ever floors to "0 years ago".
  */
 export function formatRegistered(daysAgo: number | null): string | null {
   if (daysAgo === null) return null;

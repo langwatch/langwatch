@@ -200,10 +200,8 @@ describe("given the hosted MCP approval step", () => {
 });
 
 /**
- * RFC 6749 §10.6. The authorize step used to accept ANY redirect_uri regardless of what the
- * client registered, so whoever crafted the authorization request — not necessarily the person
- * who clicks Allow — could have the approved code delivered to a domain they control. PKCE
- * does not defend against it: the same attacker authored the challenge.
+ * RFC 6749 §10.6: authorize used to accept any redirect_uri, so whoever crafted the request could
+ * receive the approved code. PKCE does not help: the same attacker authored the challenge.
  */
 describe("given an authorization request naming a client and a redirect URI", () => {
   describe("when the redirect URI is exactly one the client registered", () => {
@@ -294,10 +292,8 @@ describe("given an authorization request naming a client and a redirect URI", ()
 });
 
 /**
- * RFC 6749 §4.1.2.1: once the client is verified and the presented redirect URI is one it
- * registered, a failure belongs back at that URI as an OAuth error. The advertised authorize
- * endpoint is a page in this application, so a failure rendered only here leaves the client's
- * popup waiting forever with nothing to report.
+ * RFC 6749 §4.1.2.1: once the client and redirect URI are verified, a failure goes back to that URI
+ * as an OAuth error, or the client's popup waits forever.
  */
 describe("given a verified client whose approval then fails", () => {
   describe("when the request carries no code challenge", () => {

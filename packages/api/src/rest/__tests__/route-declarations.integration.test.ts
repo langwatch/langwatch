@@ -1,8 +1,6 @@
 /**
- * The two cross-cutting concerns a ROUTE declares for itself: the credential
- * kind it answers behind, and the trail it leaves. Both are fulfilled by the
- * runtime, so the app carries neither.
- *
+ * The two cross-cutting concerns a ROUTE declares for itself: the credential kind it answers
+ * behind, and the trail it leaves. Both are fulfilled by the runtime, so the app carries neither.
  * Spec: specs/server/declarative-process-composition.feature.
  */
 
@@ -141,7 +139,11 @@ describe("given a route that raises a credential kind of its own", () => {
   describe("when a caller reaches a route that raised nothing", () => {
     /** @scenario "A route declares the credential kind it answers behind" */
     it("resolves the family's own door", async () => {
-      const answer = await call(mounted({ audit: recordingSink() }), "GET", "/api/api-keys/key-one");
+      const answer = await call(
+        mounted({ audit: recordingSink() }),
+        "GET",
+        "/api/api-keys/key-one",
+      );
 
       await expect(answer.json()).resolves.toEqual({ id: "key-one", door: "read" });
       expect(readHandlerSawScope).toEqual({ tier: "organization", id: "organization-1" });

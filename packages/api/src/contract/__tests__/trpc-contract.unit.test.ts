@@ -1,8 +1,6 @@
 /**
- * The declaration a contract module makes, and the one thing that keeps it
- * usable from a browser: what it imports.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * The declaration a contract module makes, and the one thing that keeps it usable from a browser:
+ * what it imports. Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
 import { existsSync, readFileSync } from "node:fs";

@@ -24,7 +24,7 @@ const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } = v
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: signInMock,
@@ -52,6 +52,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
   },
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import SignUp from "../signup-screen.tsx";
 
 /**

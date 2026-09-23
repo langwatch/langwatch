@@ -2,7 +2,7 @@
  * The connection write surface the adapter hands back beside the pipeline
  * definition, so the back office can act without rebuilding the guards,
  * break-glass binding and ledger writer as a second composition.
- * @see modules/identity/process/src/repositories/prisma/prisma.sso-connection-pipeline.repository.ts
+ * @see ../prisma.sso-connection-pipeline.repository.ts
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";

@@ -5,6 +5,7 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as errorsModule from "@langwatch/browser-host/errors";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -84,7 +85,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 vi.mock("@langwatch/browser-host/errors", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/browser-host/errors")>()),
+  ...(await importOriginal<typeof errorsModule>()),
   showErrorToast: mockToast,
 }));
 

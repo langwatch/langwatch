@@ -5,6 +5,7 @@
  */
 import { Readable } from "node:stream";
 
+import type * as clientS3Module from "@aws-sdk/client-s3";
 import {
   ObjectNotFoundError,
   UnsupportedStorageSchemeError,
@@ -22,7 +23,7 @@ import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.me
 const { sent } = vi.hoisted(() => ({ sent: { send: vi.fn() } }));
 
 vi.mock("@aws-sdk/client-s3", async () => {
-  const actual = await vi.importActual<typeof import("@aws-sdk/client-s3")>("@aws-sdk/client-s3");
+  const actual = await vi.importActual<typeof clientS3Module>("@aws-sdk/client-s3");
   return {
     ...actual,
     S3Client: class {

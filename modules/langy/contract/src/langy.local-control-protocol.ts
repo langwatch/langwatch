@@ -91,10 +91,9 @@ export const localLsParamsSchema = z.object({
 });
 
 /**
- * The CLI fetches the project's ingest key with the developer's own login and
- * writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the env file the app
- * loads. The key stays on the machine: it never appears in the call, the
- * result or the transcript.
+ * The CLI fetches the project's ingest key with the developer's own login and writes
+ * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the env file the app loads. The key stays on the
+ * machine: it never appears in the call, the result or the transcript.
  */
 export const localLangwatchEnvParamsSchema = z.object({
   /** Relative to the shared folder; the app's `.env` when omitted. */

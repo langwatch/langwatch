@@ -12,6 +12,7 @@ import {
   API_KEY_PREFIX,
   LANGY_SESSION_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
+import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
@@ -71,7 +72,7 @@ export class ApiKeyTokenResolutionService {
     token,
   }: {
     token: string;
-  }): Promise<import("@langwatch/api-key-contract").ApiKeyVerification | null> {
+  }): Promise<apiKeyContractModule.ApiKeyVerification | null> {
     const split = this.findTokenParts(token);
     if (!split) {
       return null;

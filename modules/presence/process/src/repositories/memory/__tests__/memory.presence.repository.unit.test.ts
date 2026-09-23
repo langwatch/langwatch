@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The memory presence repository reads back what it writes, proving the
- * in-memory backend is not a stub. A write followed by a read through the
- * same instances is what proves the memory backend works.
+ * The memory presence repository reads back what it writes through the same instances, proving the
+ * in-memory backend is not a stub.
  */
 import { instantiateRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";

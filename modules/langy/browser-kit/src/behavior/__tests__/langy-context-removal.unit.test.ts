@@ -14,7 +14,7 @@ const chip = traceContextChip(TRACE_ID);
 
 beforeEach(() => {
   useLangyStore.getState().resetChosenChips();
-  for (const attached of [...useLangyStore.getState().attachedContext]) {
+  for (const attached of useLangyStore.getState().attachedContext) {
     useLangyStore.getState().detachContext(attached.id);
   }
   useLangyContextTargetStore.getState().clearPicked();

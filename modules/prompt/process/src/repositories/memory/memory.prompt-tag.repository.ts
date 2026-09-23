@@ -3,8 +3,7 @@ import { toDate, nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 import { PromptTagRepository } from "../prompt-tag.repository.ts";
-import type { MemoryPromptState } from "./memory-prompt.state.ts";
-import { clone, type StoredTag } from "./memory-prompt.state.ts";
+import { type MemoryPromptState, clone, type StoredTag } from "./memory-prompt.state.ts";
 
 export class MemoryPromptTagRepository extends PromptTagRepository {
   readonly #state: MemoryPromptState;

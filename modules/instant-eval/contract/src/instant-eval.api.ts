@@ -73,14 +73,13 @@ export interface InstantEvalRunWindow extends InstantEvalRunReference {
 }
 
 /**
- * The Instant Evals capability: one LangWatchQL statement judged as a job, so
- * every read is a poll of what the pipeline wrote. Creating, estimating,
- * cancelling and sampling arrive with the run service they call.
+ * The Instant Evals capability: one LangWatchQL statement judged as a job; every read polls what
+ * the pipeline wrote.
  */
+
 /**
- * What the install-wide usage report counts here (ADR-156, section 10): the
- * runs and judgements made, since `since` where one is given, and when the
- * first run was. Epoch milliseconds.
+ * What the install-wide usage report counts (ADR-156 section 10): runs and judgements since
+ * `since`, and when the first run was. Epoch milliseconds.
  */
 export interface InstantEvalUsageCount {
   readonly runs: number;

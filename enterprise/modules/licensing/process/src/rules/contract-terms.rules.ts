@@ -1,9 +1,7 @@
 /**
- * What a customer's licenses add up to commercially (ADR-156).
- *
- * The budget spans licenses, so the terms do too: the commit is the sum of the
- * commits, and the most a customer may raise its own cap to is that sum plus
- * every overage maximum that is switched on.
+ * What a customer's licenses add up to commercially (ADR-156). The budget spans licenses, so the
+ * terms do too: the commit is the sum of the commits, and the most a customer may raise its own cap
+ * to is that sum plus every overage maximum that is switched on.
  */
 
 import {
@@ -33,8 +31,7 @@ export function contractTermsOf({
       .map((license) => license.replacesId),
   );
   const counted = licenses.filter(
-    (license) =>
-      statusOfIssuedLicense(license, now) === "active" && !replaced.has(license.id),
+    (license) => statusOfIssuedLicense(license, now) === "active" && !replaced.has(license.id),
   );
 
   const commitUsdCents = sum(counted.map((license) => license.commitUsdCents));
@@ -46,9 +43,7 @@ export function contractTermsOf({
     commitUsdCents,
     maximumUsdCents: commitUsdCents + overageUsdCents,
     overageEnabled: counted.some((license) => license.overageEnabled),
-    services: entitledConnectServices([
-      ...new Set(counted.flatMap((license) => license.services)),
-    ]),
+    services: entitledConnectServices([...new Set(counted.flatMap((license) => license.services))]),
     termEndsAt: latest(counted.map((license) => license.expiresAt)),
     termStartsAt: earliest(counted.map((license) => license.issuedAt)),
   };

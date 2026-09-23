@@ -1,27 +1,17 @@
 /**
- * `langwatch instant-eval results <id>`: one page of a run's judgements.
- *
- * The page is a keyset page, so the cursor a page answers with is the only way
- * to read the one after it: no judgement is ever carried by two pages, and no
- * page is skipped when a run is still writing.
- *
+ * `langwatch instant-eval results <id>`: one keyset page of judgements. The returned cursor is the
+ * only way to the next page, so none repeats or is skipped while a run still writes.
  * @see specs/features/instant-eval-cli.feature
  */
 
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
+import { INSTANT_EVAL_RESULTS_CEILING, readCountFlag } from "./countFlag";
 import { printJudgments } from "./render";
-import {
-  INSTANT_EVAL_RESULTS_CEILING,
-  readCountFlag,
-} from "./countFlag";
 
 /** The states a judgement can be read back in. */
 const JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
@@ -72,9 +62,7 @@ export const resultsInstantEvalCommand = async (
 
   try {
     const page = await service.results(id, {
-      ...(options.question === undefined
-        ? {}
-        : { questionId: options.question }),
+      ...(options.question === undefined ? {} : { questionId: options.question }),
       ...(isMatched === undefined ? {} : { isMatched }),
       ...(options.status === undefined
         ? {}
@@ -92,9 +80,7 @@ export const resultsInstantEvalCommand = async (
       table: () =>
         printJudgments({
           judgments: page.judgments,
-          ...(page.nextCursor === undefined
-            ? {}
-            : { nextCursor: page.nextCursor }),
+          ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
         }),
     };
   } catch (error) {

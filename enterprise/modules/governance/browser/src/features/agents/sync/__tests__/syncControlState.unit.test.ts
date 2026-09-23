@@ -1,14 +1,7 @@
 /**
- * Which state a sync control is in, and which unpressable it is when it is
- * one.
- *
- * The precedence is the point. Each of these inputs can be true at once, and a
- * control that answered the wrong one of the reader's questions would explain
- * itself accurately and unhelpfully — telling an administrator who just pressed
- * it that they have no providers, when what they need to know is that the ask
- * has already gone.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * Which state a sync control is in, and which unpressable one. The precedence is the point: several
+ * inputs can be true at once, and the control must answer the reader's most recent question.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 
 import { describe, expect, it } from "vitest";

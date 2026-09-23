@@ -1,6 +1,6 @@
 /**
  * The PostgreSQL reader role and approved views, as SQL text: `CONNECTION LIMIT -1` provisions
- * cleanly and reads as unlimited, and a malformed tenant path is ambiguous SQL, so both are refused.
+ * cleanly and reads as unlimited; a malformed tenant path is ambiguous SQL. Both are refused.
  * @see ../langwatch-ql-postgres-mapping.service.ts
  * @see specs/lwql/api.feature
  */

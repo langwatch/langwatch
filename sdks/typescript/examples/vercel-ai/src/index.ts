@@ -1,8 +1,9 @@
-import { getLangWatchTracer } from "langwatch";
+import * as readline from "readline";
+
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
+import { getLangWatchTracer } from "langwatch";
 import { setupObservability } from "langwatch/observability/node";
 
 // Use LangWatch observability setup
@@ -42,7 +43,7 @@ async function main() {
           "langwatch.thread.id": threadId,
         },
       },
-      async (span) => {
+      async (_span) => {
         try {
           // Get user input
           const userInput = await new Promise<string>((resolve) => {

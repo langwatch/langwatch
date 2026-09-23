@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 const UNRESOLVABLE_ALIAS = "openai/latest";
 
 vi.mock("@langwatch/model-provider-contract", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/model-provider-contract")>()),
+  ...(await importOriginal<typeof modelProviderContractModule>()),
   isLatestAlias: (model: string) => model === UNRESOLVABLE_ALIAS,
   // Mirrors the real contract: expandLatestAlias returns the input
   // unchanged when there's nothing to resolve it to.
@@ -16,6 +16,7 @@ vi.mock("@langwatch/model-provider-contract", async (importOriginal) => ({
 }));
 
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import type * as modelProviderContractModule from "@langwatch/model-provider-contract";
 
 import { ModelProviderResolutionService } from "../model-provider-resolution.service.ts";
 

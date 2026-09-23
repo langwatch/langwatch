@@ -53,7 +53,7 @@ function expandIpv6Groups(halves: string[]): number[] | null {
   if (tail === null) return null;
   const missing = 8 - head.length - tail.length;
   if (missing < 0) return null;
-  return [...head, ...new Array<number>(missing).fill(0), ...tail];
+  return [...head, ...Array.from({ length: missing }, () => 0), ...tail];
 }
 
 /**

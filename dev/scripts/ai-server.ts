@@ -1,11 +1,14 @@
 import { createServer } from "node:http";
+import type * as nodeHttpModule from "node:http";
+
 import { createOpenAI } from "@ai-sdk/openai";
 import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 import { generateText, stepCountIs, tool } from "ai";
+import type * as langwatchModule from "langwatch";
 import { z } from "zod";
 
 // getLangWatchTracer is loaded lazily after setupObservability initializes
-let tracer: ReturnType<typeof import("langwatch").getLangWatchTracer> | undefined;
+let tracer: ReturnType<typeof langwatchModule.getLangWatchTracer> | undefined;
 
 // Initialize LangWatch observability before the server starts handling requests.
 // This sets up the OTEL NodeSDK with LangWatch exporters so that Vercel AI SDK
@@ -82,7 +85,7 @@ type RequestBody = {
   messages?: { role: string; content: string }[];
 };
 
-function jsonResponse(res: import("node:http").ServerResponse, status: number, data: unknown) {
+function jsonResponse(res: nodeHttpModule.ServerResponse, status: number, data: unknown) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
 }

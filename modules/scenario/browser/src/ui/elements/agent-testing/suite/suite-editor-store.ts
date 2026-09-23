@@ -1,16 +1,11 @@
 /**
- * The draft of the suite editor, kept outside the drawer.
- *
- * Picking an evaluator and editing its mappings both navigate to another
- * drawer, which unmounts the suite editor. The draft lives here so the person
- * comes back to what they typed, and a pick made while the editor is away
- * lands on the same draft.
- *
+ * The suite editor's draft, kept outside the drawer: navigating to an evaluator drawer unmounts the
+ * editor, and the person must come back to what they typed.
  * @see specs/features/agent-testing/suite-editor.feature
  * @see dev/docs/best_practices/drawers.md
  */
 
-import type { EvaluatorAttachment,SuiteFieldType } from "@langwatch/scenario-contract";
+import type { EvaluatorAttachment, SuiteFieldType } from "@langwatch/scenario-contract";
 import { create } from "zustand";
 
 /** One row of the fields section. */

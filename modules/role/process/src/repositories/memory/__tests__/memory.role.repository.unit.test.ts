@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The memory role repository reads back what it writes, proving the
- * in-memory backend is not a stub. A write followed by a read through the
- * same instances is what proves the memory backend works.
+ * The memory role repository reads back what it writes through the same instances, proving the
+ * in-memory backend is not a stub.
  */
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";

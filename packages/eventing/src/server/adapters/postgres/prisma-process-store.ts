@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  type PrismaClient,
   Prisma,
   type ProcessManagerInstance,
   type ProcessManagerOutbox,

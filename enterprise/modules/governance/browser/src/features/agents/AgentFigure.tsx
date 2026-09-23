@@ -5,20 +5,9 @@ import numeral from "numeral";
 import { formatLastActive, type GovernanceAgentRow } from "./agentRows";
 
 /**
- * One figure an agent row carries, and the single way a missing one is drawn.
- *
- * Both layouts render through here. The card stacks a label over the value and
- * the table puts the value in a fixed column, but the formatting and the dash
- * are the same code, so the two cannot disagree about what an agent spent or
- * about the sentence behind an absent figure. This is the arrangement the
- * inventory catalog arrived at for the same reason — see `ToolCardFigure` —
- * where a card and a table also show the same numbers.
- *
- * A figure we do not have is an em dash with a reason on hover, never a zero.
- * `$0.00` is a measurement — it says the agent ran and spent nothing — and an
- * agent that has never been called has not earned that claim.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * One figure of an agent row and the single way a missing one is drawn, shared by card and table
+ * (like the inventory's `ToolCardFigure`). Missing is a dash with a reason, never `$0.00`.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 
 /** What a dash means when nothing more specific is known about the gap. */
@@ -58,10 +47,8 @@ export function formatAgentLastActive(agent: GovernanceAgentRow): string | null 
 }
 
 /**
- * A value, or the dash that stands in for one.
- *
- * The reason is carried on `aria-label` as well as in the tooltip, so a reader
- * who never hovers — and a reader using a screen reader — still gets the
+ * A value, or the dash that stands in for one. The reason is carried on `aria-label` as well as in
+ * the tooltip, so a reader who never hovers — and a reader using a screen reader — still gets the
  * sentence rather than a bare dash.
  */
 export function AgentValue({
@@ -88,13 +75,8 @@ export function AgentValue({
 }
 
 /**
- * Where the agent runs.
- *
- * Here rather than at the two call sites for the reason everything else in
- * this file is here: the card puts it beside the name and the table puts it in
- * a column, and neither gets to decide on its own what an agent that declared
- * no environment looks like. Muted and unweighted, because the environment is
- * context for the name next to it rather than a figure being compared.
+ * Where the agent runs, drawn here so card and table agree on what no declared environment looks
+ * like. Muted: context for the name, not a compared figure.
  */
 export function AgentEnvironment({ environment }: { environment: string | null }) {
   if (environment === null) {

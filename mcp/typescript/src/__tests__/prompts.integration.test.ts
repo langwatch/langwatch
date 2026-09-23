@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleGetPrompt } from "../tools/get-prompt.js";
-import { handleUpdatePrompt } from "../tools/update-prompt.js";
+
 import {
   getPrompt,
   getPromptVersions,
@@ -8,13 +7,16 @@ import {
   type PromptDetailResponse,
   type PromptVersion,
 } from "../langwatch-api.js";
+import type * as langwatchApiModule from "../langwatch-api.js";
+import { handleGetPrompt } from "../tools/get-prompt.js";
+import { handleUpdatePrompt } from "../tools/update-prompt.js";
 
 // Partial mock (spread over the real module) rather than a full replacement:
 // Scenario 11 dynamically imports create-mcp-server.js, which re-exports other
 // langwatch-api.js members (e.g. LangWatchApiError) at tool-registration time.
 // Only the prompt read/write functions need to be fakes for these tests.
 vi.mock("../langwatch-api.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../langwatch-api.js")>();
+  const actual = await importOriginal<typeof langwatchApiModule>();
   return {
     ...actual,
     getPrompt: vi.fn(),

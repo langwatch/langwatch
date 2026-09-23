@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fencedFetch = vi.fn();
 vi.mock("@langwatch/egress", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/egress")>()),
+  ...(await importOriginal<typeof egressModule>()),
   createSsrfUrlValidator: () => async (url: string) => {
     const parsed = new URL(url);
     return {
@@ -21,6 +21,7 @@ vi.mock("@langwatch/egress", async (importOriginal) => ({
 }));
 
 import { RedirectRefusedError } from "@langwatch/egress";
+import type * as egressModule from "@langwatch/egress";
 
 import { SsrfModelProviderEgressAdapter } from "../ssrf.model-provider-egress.service.ts";
 

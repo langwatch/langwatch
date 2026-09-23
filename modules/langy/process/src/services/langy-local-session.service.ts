@@ -342,14 +342,8 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Records the connection and starts the turn that says so.
-   *
-   * A turn already in flight is not a failure: the developer connected while
-   * Langy was working, and the running turn picks the folder up on its next
-   * call. That reading is folded from events, though, so a turn that ended
-   * seconds ago can still read as in flight with no turn left to pick the
-   * folder up. The connect turn is then owed, and the turn's end starts it
-   * unless the turn reached the folder first.
+   * Records the connection and starts the turn that says so. A turn in flight is fine; if it only
+   * reads as in flight (folded events), the connect turn is owed and starts when that turn ends.
    */
   async afterRegister(session: ControlSession): Promise<void> {
     const workspace = await this.presence.read(session.conversationId);

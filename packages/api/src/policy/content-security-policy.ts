@@ -1,9 +1,7 @@
 /**
- * The document policy the browser reads off the page that loads the bundle.
- *
- * `app()` is the baseline this product's single-page application needs; a
- * deployment chains sources onto it rather than assembling one from directives,
- * so a directive nobody thought about is still the baseline's.
+ * The document policy the browser reads off the page that loads the bundle. `app()` is the baseline
+ * this product's single-page application needs; a deployment chains sources onto it rather than
+ * assembling one from directives, so a directive nobody thought about is still the baseline's.
  */
 
 /** The storage endpoints a deployment uploads to directly, as an origin list. */

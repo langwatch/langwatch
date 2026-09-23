@@ -569,10 +569,9 @@ class ComposedScheduledIntents extends AutomationScheduledIntent {
 }
 
 /**
- * The durable automation rows a composing process writes through, each built
- * here rather than by naming the Prisma class: a process holds the client, the
- * module holds the choice of what reads and writes it (private-runtime-export
- * drive, dev/docs/plans/private-runtime-export-drive.md §3d).
+ * The durable automation rows a composing process writes through, each built here rather than by
+ * naming the Prisma class: a process holds the client, the module holds the choice of what reads
+ * and writes it (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
  */
 export function createAutomationTriggers(
   database: TriggerDatabase,

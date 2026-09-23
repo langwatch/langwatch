@@ -3,12 +3,9 @@ import { describe, expect, it } from "vitest";
 import { moduleApi } from "../src/index.ts";
 
 /**
- * The feature-API proxy serves operations only: a plain property read through
- * it throws "exposes operations only" at request time. Four interfaces
- * declared one anyway before the constraint existed (gateway, trace,
- * searchBodySchema, and auth's `baseUrl`, which broke sign-in on
- * 2026-09-14). `moduleApi` now refuses such an interface at compile time, so
- * the mistake fails the build instead of the first caller.
+ * The feature-API proxy serves operations only; a plain property read throws at request time
+ * (auth's `baseUrl` broke sign-in on 2026-09-14). `moduleApi` now refuses such an interface at
+ * compile time.
  */
 describe("given a feature API declared through moduleApi", () => {
   describe("when every member is an operation", () => {

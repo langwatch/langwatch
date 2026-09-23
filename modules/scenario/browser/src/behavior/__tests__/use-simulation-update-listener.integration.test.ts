@@ -10,7 +10,7 @@ let capturedOnData: ((data: { event: string }) => void) | undefined;
 
 let mockIsVisible = true;
 vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",
   );
   return {
@@ -55,6 +55,8 @@ vi.mock("../scenario-api.ts", () => ({
     },
   },
 }));
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 

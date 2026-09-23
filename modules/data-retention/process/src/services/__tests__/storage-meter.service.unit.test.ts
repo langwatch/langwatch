@@ -166,7 +166,7 @@ describe("StorageMeterService memory guard", () => {
 
     describe("when the cached value is stale", () => {
       it("returns the stale value immediately and refreshes in the background", async () => {
-        const { service, query, advance } = makeClockService([42, 99]);
+        const { service, advance } = makeClockService([42, 99]);
 
         expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
         advance(FRESH_MS);

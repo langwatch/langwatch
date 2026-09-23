@@ -99,7 +99,7 @@ function friendlyError(details: string | undefined): {
   if (lower.includes("missing candidate output")) {
     return {
       headline: "One of the candidates is blank",
-      hint: "Its prompt returned an empty string — re-run that prompt or check what it's returning.",
+      hint: "Its prompt returned an empty string: re-run that prompt or check what it's returning.",
       raw,
     };
   }

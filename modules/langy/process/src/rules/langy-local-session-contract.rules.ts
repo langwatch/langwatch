@@ -1,7 +1,7 @@
-/** Vocabulary for one local-control session: credential, session, auth/register outcomes,
- * and collaborator shapes the core receives. Shape only. What a shared folder means to the
- * platform, independent of transport (ADR-129)—WebSocket and long-poll call for auth,
- * presence, subscription, turn start, and frame translation; transports own only clocks. */
+/**
+ * Vocabulary for one local-control session: credential, session, auth/register outcomes and
+ * collaborator shapes, independent of transport (ADR-129). Transports own only clocks.
+ */
 
 import {
   type LangyLocalWorkspaceConnectedEventData,
@@ -12,14 +12,10 @@ import {
   type LocalControlRefusedCode,
   type PlatformFrame,
   type WorkspaceInfo,
-  LangyTurnInProgressError,
-  PRESENCE_HEARTBEAT_MS,
 } from "@langwatch/langy-contract";
-import { nanoid } from "nanoid";
 
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
-import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 
 /** The credential behind one socket, once it resolved to a conversation. */
 export interface ControlCredential {

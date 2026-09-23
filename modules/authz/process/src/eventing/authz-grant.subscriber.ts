@@ -11,8 +11,10 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import type { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
-import { type AuthzAuditRow } from "../repositories/authz-audit-trail.repository.ts";
+import {
+  type AuthzAuditTrailStore,
+  type AuthzAuditRow,
+} from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;

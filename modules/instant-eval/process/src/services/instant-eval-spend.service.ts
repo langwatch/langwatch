@@ -50,10 +50,9 @@ export class InstantEvalSpendService {
   }
 
   /**
-   * The dispatch is awaited and a failure is raised: for a run the caller is
-   * the finish intent, which retries onto the same request id; for a query the
-   * caller logs and moves on, because a lost ledger row is never a reason to
-   * refuse an answer already paid for.
+   * The dispatch is awaited and a failure is raised: for a run the caller is the finish intent,
+   * which retries onto the same request id; for a query the caller logs and moves on, because a
+   * lost ledger row is never a reason to refuse an answer already paid for.
    */
   async recordSpend(record: InstantEvalSpendRecord): Promise<void> {
     const attribution = await this.peers.findSpendAttribution({ projectId: record.projectId });

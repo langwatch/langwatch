@@ -1,9 +1,7 @@
 /**
- * The tRPC transport: the typed root, what a server declaration refuses at
- * runtime, the one execution path a mounted procedure runs, and the wire shape
- * a failed call arrives in.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * The tRPC transport: the typed root, what a server declaration refuses at runtime, the one
+ * execution path a mounted procedure runs, and the wire shape a failed call arrives in. Spec:
+ * packages/api/specs/transport-declaration-split.feature.
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
@@ -440,12 +438,10 @@ describe("the tRPC error formatter", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The four capabilities the declared path grew for the surfaces that could not
-// state themselves honestly: a procedure with no caller, the facts a mount
-// resolves, and an AND-composed permission.
-//
-// Spec: packages/api/specs/trpc-framework.feature.
+// ───────────────────────────────────────────────────────────────────────────── The four
+// capabilities the declared path grew for the surfaces that could not state themselves honestly: a
+// procedure with no caller, the facts a mount resolves, and an AND-composed permission. Spec:
+// packages/api/specs/trpc-framework.feature.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AccountApi {

@@ -105,7 +105,7 @@ describe("the expanded comparison leaderboard, opened straight from a URL", () =
     it("opens it, so the guard above is not simply refusing everything", () => {
       renderDrawer();
 
-      expect(screen.getByText("Comparison — leaderboard")).toBeInTheDocument();
+      expect(screen.getByText("Comparison: leaderboard")).toBeInTheDocument();
     });
   });
 

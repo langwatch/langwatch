@@ -1,5 +1,5 @@
-import type { OutboundProxyResolver } from "./aws-client.ts";
 import {
+  type OutboundProxyResolver,
   AwsClientConfiguration,
   type AwsClientConfig,
   type AwsClientConfigInput,

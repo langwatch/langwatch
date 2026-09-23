@@ -162,7 +162,7 @@ const saveWorkbenchStateBodySchema = z.object({
   commitMessage: z.string().optional(),
 });
 
-/** The run loop, or the refusal a process without one owes the caller. Starting a run needs both halves. */
+/** The run loop, or the refusal a process without one owes. Starting a run needs both halves. */
 export function runLoopOf(run: ExperimentV3RunLoop): {
   ports: ExperimentRunCollaborators;
   progress: ExperimentRunProgressRepository;

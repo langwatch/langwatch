@@ -1,13 +1,15 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   AgentsApiService,
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { type ResolvedCredentials, resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Who a personal or host-scoped agent belongs to, empty for a shared one.
@@ -66,12 +68,9 @@ function identityOf(credentials: ResolvedCredentials): string {
 }
 
 /**
- * What `--wait-online` says when the timeout passes, on stderr in every output
- * format. It names the agent, the wait and the credentials the listing was
- * read with, so the reader is left with the agent process as the thing to
- * look at. It never mentions the login commands: under `--format json` the
- * spinner is silent, and a timeout whose only stderr line is the identity
- * notice with "langwatch login" in it reads as a login failure.
+ * What `--wait-online` says on timeout (stderr, every format): the agent, the wait and the
+ * credentials used. It never mentions login, which would read as a login failure under `--format
+ * json`.
  */
 export function waitOnlineTimeoutLine({
   wanted,
@@ -85,14 +84,12 @@ export function waitOnlineTimeoutLine({
   return `No agent named ${wanted} reported online within ${timeoutSeconds} seconds of --wait-online. The listing was read as ${identityOf(credentials)} at ${credentials.endpoint} and answered; the agent process never reported online.`;
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** True when the list holds the agent, by name or id, and it reports online. */
 const reportsOnline = (agents: AgentResponse[], wanted: string): boolean =>
   agents.some(
-    (agent) =>
-      (agent.name === wanted || agent.id === wanted) && agent.status === "online",
+    (agent) => (agent.name === wanted || agent.id === wanted) && agent.status === "online",
   );
 
 /**
@@ -120,9 +117,7 @@ export const listAgentsCommand = async (
           // Not spinner.fail: the spinner is silent under a machine format,
           // and this line has to reach the caller whatever the format.
           spinner.stop();
-          console.error(
-            waitOnlineTimeoutLine({ wanted, timeoutSeconds, credentials }),
-          );
+          console.error(waitOnlineTimeoutLine({ wanted, timeoutSeconds, credentials }));
           console.error(
             chalk.gray(
               "Read the process's own output for the reason: an exception at startup, or the SDK's connect line.",

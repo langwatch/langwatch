@@ -8,12 +8,13 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type * as reportScheduleModule from "../model/report-schedule.ts";
 import { ReportScheduleField } from "../ui/elements/report-schedule-field.tsx";
 
 // The viewer's locale is non-deterministic across machines/CI, so pin the
 // browser timezone the "default to locale" behaviour reads.
 vi.mock("../model/report-schedule.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../model/report-schedule.ts")>();
+  const actual = await importOriginal<typeof reportScheduleModule>();
   return { ...actual, defaultTimezone: () => "Europe/Amsterdam" };
 });
 
@@ -27,8 +28,10 @@ globalThis.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
-/** Controlled host so the field behaves as it does in the drawer: props in,
- *  edits back out through `onChange`, which the spy observes. */
+/**
+ * Controlled host so the field behaves as it does in the drawer: props in, edits back out through
+ * `onChange`, which the spy observes.
+ */
 function Harness({
   initialCron,
   initialTimezone,

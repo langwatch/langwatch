@@ -82,10 +82,7 @@ export class ClientAddress {
    * request for everything behind it. The answer's headers are untouched — this
    * decides who called, never what they are told.
    */
-  handle(exchange: {
-    request: Request;
-    socketAddress: string | undefined;
-  }): void {
+  handle(exchange: { request: Request; socketAddress: string | undefined }): void {
     const address = this.of({
       header: (name) => exchange.request.headers.get(name) ?? void 0,
       ...(exchange.socketAddress ? { socketAddress: exchange.socketAddress } : {}),
@@ -111,10 +108,9 @@ export class ClientAddress {
   }
 
   /**
-   * Whether an address is this deployment's own hop rather than a caller. With
-   * a list present the operator has answered exactly; absent, a private peer
-   * counts as infrastructure, which is what keeps visitors behind one office
-   * router from sharing a single signed-out budget.
+   * Whether an address is this deployment's own hop rather than a caller. With a list present the
+   * operator has answered exactly; absent, a private peer counts as infrastructure, which is what
+   * keeps visitors behind one office router from sharing a single signed-out budget.
    */
   private isInfrastructureHop(address: string): boolean {
     if (this.trusted === void 0) return isPrivateAddress(address);

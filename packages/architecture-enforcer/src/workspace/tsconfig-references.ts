@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+
 import ts from "typescript";
 
 /**
@@ -211,14 +212,8 @@ function producerFile(directory: string): string | undefined {
 }
 
 /**
- * The projects a member's own `typecheck` builds. A member that declares no
- * `typecheck` script has opted out and the solution leaves it alone, which is
- * what the recursive form it replaced did: `@langwatch/mcp-server` and
- * `@langwatch/skills` are checked by nothing today. A `tsconfig.test.json` is
- * that package's `tsconfig.json` widened -- the same sources with `exclude: []`
- * and the test types added -- so it stands in for it rather than joining it,
- * and the two type-test spellings are separate projects over their own
- * directory.
+ * The projects a member's `typecheck` builds; no script means opted out. A `tsconfig.test.json` is
+ * the package's config widened, so it stands in for it; type-test spellings are separate projects.
  */
 function checkRootsOf(directory: string): string[] {
   const widened = join(directory, "tsconfig.test.json");
@@ -355,9 +350,7 @@ export function deriveProjects(
     const ownProducer = isGroupMember ? groupSolution : producerFile(member.directory);
 
     // The group compiles its members together, so a member's producer is the group alone.
-    const buildTargets = (
-      isGroupMember ? [groupSolution] : targetsFor(member.dependencies)
-    ).filter(
+    const buildTargets = (isGroupMember ? [groupSolution] : targetsFor(member.dependencies)).filter(
       (target) => !dropped.has(`${producerFile(member.directory) ?? ""}\n${target}`),
     );
 
@@ -368,12 +361,11 @@ export function deriveProjects(
 
     const consumerTargets = unique([...(ownProducer ? [ownProducer] : []), ...dependencyTargets]);
 
-    // Every config a check runs against carries the graph itself: `extends`
-    // does not inherit `references`, so a test config restates what its
-    // package's tsconfig.json says, and an application owning no build config
-    // still carries them — they are what `tsc -b` walks to reach its
-    // dependencies. A build config that emits JavaScript is not in the
-    // declaration graph at all, so its references stay as its owner wrote them.
+    // Every config a check runs against carries the graph itself: `extends` does not inherit
+    // `references`, so a test config restates what its package's tsconfig.json says, and an
+    // application owning no build config still carries them — they are what `tsc -b` walks to reach
+    // its dependencies. A build config that emits JavaScript is not in the declaration graph at
+    // all, so its references stay as its owner wrote them.
     const build = join(member.directory, "tsconfig.build.json");
 
     const kinds: readonly { file: string; targets: string[] }[] = [
@@ -423,9 +415,7 @@ export function deriveProjects(
     const config = readJsonc(solution);
 
     const derived = unique(
-      members
-        .filter((member) => member.checks)
-        .flatMap((member) => checkRootsOf(member.directory)),
+      members.filter((member) => member.checks).flatMap((member) => checkRootsOf(member.directory)),
     ).map((file) => relativeReference(root, file));
 
     // A check root that is not a workspace member of its own -- the mail

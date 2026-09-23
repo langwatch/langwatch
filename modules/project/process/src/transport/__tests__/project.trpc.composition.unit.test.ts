@@ -12,8 +12,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type Project, type ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
-import { type TopicClusteringStatus } from "@langwatch/topic-contract";
+import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

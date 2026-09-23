@@ -990,7 +990,7 @@ export class GatewayApp implements GatewayApi {
     return this.#coreDependencies?.spendEvents;
   }
 
-  /** The usage report's figures (ADR-156, section 10); refused where no spend ledger is composed. */
+  /** The usage report's figures (ADR-156 section 10); refused where no spend ledger is composed. */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
     const spendEvents = this.spendEvents();
     if (!spendEvents) return Promise.reject(this.spendStoreUnavailable());

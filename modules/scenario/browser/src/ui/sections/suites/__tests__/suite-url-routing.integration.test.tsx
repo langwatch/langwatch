@@ -4,6 +4,7 @@
  * @see specs/suites/simulation-runs-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +20,7 @@ vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     useSSESubscription: () => ({

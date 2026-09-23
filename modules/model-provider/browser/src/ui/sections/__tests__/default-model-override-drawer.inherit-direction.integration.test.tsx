@@ -5,6 +5,7 @@
  * Binds specs/model-providers/role-based-default-models.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { featuresByRole } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,7 +37,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 // so create-mode tests can drive the scope selection without the real
 // multi-select dropdown.
 vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+  const actual = await vi.importActual<typeof authzBrowserKitModule>(
     "@langwatch/authz-browser-kit",
   );
   return {

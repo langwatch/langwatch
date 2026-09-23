@@ -26,10 +26,8 @@ export function LogoIcon({ width, height }: { width: number; height: number }) {
 }
 
 /**
- * The logo for a surface that follows the colour mode. On light it is the
- * chrome's mark, white faces and navy lines. On dark the white faces would
- * read as a lit slab on the card, so it drops them and draws the lines in the
- * off-white of the dark theme wordmark (`/images/logo-full-darktheme.svg`).
+ * The logo for a surface that follows the colour mode. On dark it drops the white faces and draws
+ * the lines in the dark wordmark's off-white (`/images/logo-full-darktheme.svg`).
  */
 export function ThemedLogoIcon({ height }: { height: number }) {
   return (
@@ -42,14 +40,8 @@ export function ThemedLogoIcon({ height }: { height: number }) {
       flexShrink={0}
       aria-hidden="true"
     >
-      <chakra.path
-        d={LOGO_PLATE_PATH}
-        fill={{ base: "#fff", _dark: "transparent" }}
-      />
-      <chakra.path
-        d={LOGO_LINES_PATH}
-        fill={{ base: "#213B41", _dark: "#F1F5F9" }}
-      />
+      <chakra.path d={LOGO_PLATE_PATH} fill={{ base: "#fff", _dark: "transparent" }} />
+      <chakra.path d={LOGO_LINES_PATH} fill={{ base: "#213B41", _dark: "#F1F5F9" }} />
     </chakra.svg>
   );
 }

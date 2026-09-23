@@ -24,7 +24,7 @@ const mockLogger = vi.hoisted(() => ({
 
 // Mock fs.existsSync to control bundle presence
 vi.mock("fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("fs")>();
+  const actual = await importOriginal<typeof fsModule>();
   return {
     default: {
       ...actual,
@@ -48,6 +48,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import fs from "fs";
+import type * as fsModule from "fs";
 
 const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
 const SOURCE_PATH = path.join(

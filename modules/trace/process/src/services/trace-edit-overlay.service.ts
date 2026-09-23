@@ -10,12 +10,15 @@ import {
   traceEditOverlayPatchSchema,
 } from "@langwatch/trace-contract";
 
-import type { TraceEditOverlayRepository } from "../repositories/trace-edit-overlay.repository.ts";
-import { type TraceEditOverlayRow } from "../repositories/trace-edit-overlay.repository.ts";
+import {
+  type TraceEditOverlayRepository,
+  type TraceEditOverlayRow,
+} from "../repositories/trace-edit-overlay.repository.ts";
 
-/** The fields a suggestion can correct, on the trace itself or on one of its
- *  spans: the two that hold a captured value a reviewer reads and can rewrite
- *  as text. */
+/**
+ * The fields a suggestion can correct, on the trace itself or on one of its spans: the two that
+ * hold a captured value a reviewer reads and can rewrite as text.
+ */
 export type TraceEditIOField = "input" | "output";
 
 /**

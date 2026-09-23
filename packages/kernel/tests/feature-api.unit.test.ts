@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
-import { LocalFeatureApis } from "../src/local-feature-api.ts";
 import {
   DuplicateProviderError,
   FeatureApiUnavailableError,
   MissingProviderError,
 } from "../src/boot-errors.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import {
   defineServerModule,
   serverFeature,
   type FeatureSetup,
   type ServerRole,
 } from "../src/feature-installer.ts";
+import { LocalFeatureApis } from "../src/local-feature-api.ts";
+import { moduleApi } from "../src/module-api-token.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 interface ProjectApi {
   // Property-typed, not method shorthand: several tests below deliberately
@@ -345,9 +346,9 @@ describe("feature APIs", () => {
   it("preserves factory failures and unwinds partial construction", async () => {
     const events: string[] = [];
     const cause = new Error("organization failed");
-    await expect(
-      graph({ events, failOrganization: cause }, false, "worker").boot(),
-    ).rejects.toBe(cause);
+    await expect(graph({ events, failOrganization: cause }, false, "worker").boot()).rejects.toBe(
+      cause,
+    );
     expect(events).toEqual([
       "create:project",
       "create:organization",
@@ -415,15 +416,6 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const duplicate = moduleApi<ProjectApi>()("project");
-    const existing: ProjectApi = {
-      name: async () => "provided",
-      organizationName: async () => "provided",
-      echo: (value) => value,
-      fail: (error) => {
-        throw error;
-      },
-    };
     const builder = createApp({ role: "api", members: processMembers() }).withModules([
       project,
       defineServerModule("project").withApp(ProjectApp).build(),
@@ -435,8 +427,10 @@ describe("feature APIs", () => {
     interface ProjectGrant {
       grant(): string;
     }
-    /** A second token carrying an installed module's name, the way the core
-     * license source carries the licensing module's. */
+    /**
+     * A second token carrying an installed module's name, the way the core license source carries
+     * the licensing module's.
+     */
     const ProjectGrant = moduleApi<ProjectGrant>()("project");
 
     class GrantedOrganizationApp implements OrganizationApi {

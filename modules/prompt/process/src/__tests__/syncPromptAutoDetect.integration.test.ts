@@ -6,8 +6,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
-import type { PromptService } from "../services/prompt.service.ts";
-import { type VersionedPrompt } from "../services/prompt.service.ts";
+import { type PromptService, type VersionedPrompt } from "../services/prompt.service.ts";
 
 describe("PromptService", () => {
   describe("syncPrompt()", () => {

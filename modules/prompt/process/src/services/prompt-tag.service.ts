@@ -6,8 +6,11 @@ import {
   type PromptTag,
 } from "@langwatch/prompt-contract";
 
-import type { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
-import { PROTECTED_TAGS, type ProtectedTag } from "../repositories/prompt-tag.repository.ts";
+import {
+  type PromptTagRepository,
+  PROTECTED_TAGS,
+  type ProtectedTag,
+} from "../repositories/prompt-tag.repository.ts";
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (

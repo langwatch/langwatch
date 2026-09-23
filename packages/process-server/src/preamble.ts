@@ -1,8 +1,7 @@
 /**
- * §4's opening words. `Server.create("name")` starts this builder; `start()`
- * runs fatal handlers → config parse → secrets chain + preflight → telemetry
- * → metrics, and answers with the ProcessServer the main composes on. Order
- * is load-bearing: config feeds secrets; both exist before telemetry.
+ * `Server.create("name")` starts this builder; `start()` runs fatal handlers, config parse, secrets
+ * chain and preflight, telemetry, metrics. Order is load-bearing: config feeds secrets, both
+ * precede telemetry.
  */
 import process from "node:process";
 

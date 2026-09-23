@@ -8,6 +8,7 @@ import {
   spanTreePageSchema,
   spanTreeTransportInputSchema,
 } from "../index.ts";
+import type * as indexModule from "../index.ts";
 
 type LiveSpanTreeNodeShape = {
   spanId: string;
@@ -29,7 +30,7 @@ type LiveSpanTreeNodeShape = {
 };
 
 // `".."`, not `"../src"`: from `src/__tests__/` that resolved to `src/src`.
-type ContractNode = import("../index.ts").SpanTreeNode;
+type ContractNode = indexModule.SpanTreeNode;
 type NodeParity = [ContractNode] extends [LiveSpanTreeNodeShape]
   ? [LiveSpanTreeNodeShape] extends [ContractNode]
     ? true

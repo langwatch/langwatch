@@ -28,8 +28,9 @@ function graphAlertFireDigest(input: {
     .slice(0, 16);
 }
 
-/** Why an evaluation was skipped, when the predicate is one that cannot fire
- *  on an empty result. */
+/**
+ * Why an evaluation was skipped, when the predicate is one that cannot fire on an empty result.
+ */
 function findNoDataDetail(operator: string, threshold: number): string | undefined {
   return isNoDataPredicate({ operator, threshold }) ? "no-data predicate" : undefined;
 }
@@ -115,7 +116,7 @@ export class GraphTriggerAlertDeliveryService {
         }),
       });
 
-      return this.finish(plan, values.currentValue, result, claimId);
+      return await this.finish(plan, values.currentValue, result, claimId);
     } catch (error) {
       await this.rollbackRetryableClaim(plan, claimId, error);
 

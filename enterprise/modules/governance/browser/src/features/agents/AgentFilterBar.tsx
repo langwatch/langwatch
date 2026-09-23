@@ -14,15 +14,9 @@ import {
 import { AGENT_SOURCE_LABELS, type AgentSource } from "./agentRows";
 
 /**
- * The Agents page's filter row: source, ownership, sort, in that order, in one
- * row under the header. Every chip is the section's `FilterChip`, so the page
- * reads as the same screen as Costs rather than a cousin of it.
- *
- * `sources` is the list actually present in the rows on screen, not the full
- * enumeration — a chip that offers a source the organization does not use
- * takes the reader to an empty page and tells them nothing.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The Agents filter row: source, ownership, sort, on the section's `FilterChip`. `sources` lists
+ * only sources present in the rows, so no chip leads to an empty page.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 export function AgentFilterBar({
   filters,

@@ -80,10 +80,9 @@ export class PromptHandleTakenError extends HandledError {
   }
 }
 /**
- * A version number this prompt already has. Raised by persistence, where the
- * uniqueness on (configId, version) actually lives — a raw constraint error
- * reached the boundary as an unattributed 500, where a restore owes the
- * caller a conflict it can act on.
+ * A version number this prompt already has. Raised by persistence, where the uniqueness on
+ * (configId, version) actually lives — a raw constraint error reached the boundary as an
+ * unattributed 500, where a restore owes the caller a conflict it can act on.
  */
 export class PromptVersionConflictError extends HandledError {
   declare readonly code: "prompt_version_conflict";

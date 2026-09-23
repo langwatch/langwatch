@@ -182,7 +182,7 @@ function MatchupReasoning({
 const SHIP_HELP = (
   <>
     Each verdict the judge gave is read as one matchup per pair of variants in it. Each variant gets
-    a score from those, weighted by how strong its opponents were — so beating a good variant counts
+    a score from those, weighted by how strong its opponents were, so beating a good variant counts
     for more than beating a weak one. The score is chess-rating style: 0 is average for this group,
     and it is the GAP that means something, not the number. A 400-point gap is roughly 10:1 odds; 0
     is a coin flip. The shaded band behind each bar is where that score could plausibly sit. Whether
@@ -197,14 +197,14 @@ const TRUST_HELP = (
   <>
     Every check is reported either way, so a silent panel means the check passed rather than that it
     was never run. Ticks are fine, amber is a real problem worth acting on, and grey is a
-    measurement for you to judge — like how much longer the leading variant&apos;s answers were,
+    measurement for you to judge, like how much longer the leading variant&apos;s answers were,
     which matters because judges tend to favour longer answers whether or not they are better.
   </>
 );
 
 const TRADEOFF_HELP = (
   <>
-    Cost and latency are shown next to quality, never blended into it — a single &quot;best
+    Cost and latency are shown next to quality, never blended into it: a single &quot;best
     overall&quot; number would hide the trade-off you are actually making. All three are on one
     chart: two as position, the third as point size. A variant that is no better on any of them is
     called out above, so you do not have to find it yourself. The grid below counts how often each
@@ -354,7 +354,7 @@ function LoadedComparisonLeaderboardDrawer({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {column.name} — leaderboard
+            {column.name}: leaderboard
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>

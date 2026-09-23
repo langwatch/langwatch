@@ -13,8 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../scenario-roles.tsx", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
+  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -55,6 +54,7 @@ import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
+import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";

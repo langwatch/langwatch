@@ -98,14 +98,8 @@ describe("resolveAzureCredentials", () => {
 
     /** @scenario "Adding an auth mode forces every Azure credential construction site to be revisited" */
     it("exhaustively handles every AZURE_BLOB_AUTH_MODE value — a switch, not a default fallthrough", () => {
-      // The implementation's mode switch ends every non-sharedKey arm with a
-      // `const unreachable: never = mode` exhaustiveness check — a fifth
-      // auth-mode value added to azureBlobAuthModeSchema without a matching
-      // arm here fails to COMPILE, not just fails a runtime assertion. This
-      // test pins the runtime half of that contract: every currently
-      // supported mode is actually reachable and returns its own
-      // discriminated credential shape, proving there is no silent
-      // default-case swallow.
+      // The mode switch's `never` check makes a new auth mode fail to COMPILE; this pins the
+      // runtime half: every supported mode is reachable and returns its own credential shape.
       const modes = ["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"] as const;
 
       for (const mode of modes) {

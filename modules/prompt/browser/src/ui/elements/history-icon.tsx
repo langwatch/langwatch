@@ -4,7 +4,7 @@
  * The Design System publishes no equivalent.
  */
 
-export function HistoryIcon({ size = 24 }: { size: number }) {
+export function HistoryIcon({ size }: { size: number }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

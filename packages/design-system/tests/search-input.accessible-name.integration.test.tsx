@@ -2,6 +2,7 @@
 
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
 import { SearchInput } from "../src/components/search-input.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

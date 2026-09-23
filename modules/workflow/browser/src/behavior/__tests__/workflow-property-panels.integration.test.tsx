@@ -3,6 +3,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { Component, End, Entry } from "@langwatch/workflow-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
+import type * as reactModule from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CodePropertiesPanel } from "../../ui/sections/properties/workflow-code-properties-panel.tsx";
@@ -20,7 +21,7 @@ import { RetrievePropertiesPanel } from "../../ui/sections/properties/workflow-r
 import { _useWorkflowStore } from "../use-workflow-store.ts";
 
 vi.mock("@xyflow/react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@xyflow/react")>()),
+  ...(await importOriginal<typeof reactModule>()),
   useUpdateNodeInternals: () => vi.fn(),
 }));
 

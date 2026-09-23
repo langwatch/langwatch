@@ -869,10 +869,10 @@ export type TraceMapping = Record<
   }
 >;
 
-/** Additional mapping source keys executed server-side (e.g. in the
- * evaluations worker). They appear in the UI and schema but their
- * implementations live outside this module to avoid pulling Node.js-only
- * dependencies into the frontend bundle.
+/**
+ * Additional mapping source keys executed server-side (e.g. in the evaluations worker). They appear
+ * in the UI and schema but their implementations live outside this module to avoid pulling
+ * Node.js-only dependencies into the frontend bundle.
  */
 export const SERVER_ONLY_TRACE_SOURCES = ["formatted_trace"] as const;
 export const SERVER_ONLY_THREAD_SOURCES = ["formatted_traces"] as const;

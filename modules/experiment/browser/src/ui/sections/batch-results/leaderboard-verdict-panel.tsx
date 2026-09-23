@@ -289,7 +289,7 @@ function ScoreBars({
         which is what they're for, not the test. */}
       <Text fontSize="2xs" color="fg.muted">
         Bar marks the score, the shaded band the range it could plausibly be. Two bands overlapping
-        does not by itself mean the run failed to separate them — that is judged on the gap between
+        does not by itself mean the run failed to separate them: that is judged on the gap between
         the two scores, which is pinned down better than either score alone
         {showTieShading
           ? ", and “tied for first” marks the variants it could not separate from the top scorer"

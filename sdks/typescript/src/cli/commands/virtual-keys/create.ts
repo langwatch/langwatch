@@ -31,10 +31,9 @@ export interface CreateVirtualKeyOptions {
   budgetBreach?: "block" | "warn";
   providersAllowed?: string;
   /**
-   * Withhold the secret and print a one-time reveal id instead. For a caller
-   * that relays the key to someone else, an agent printing a snippet for
-   * instance: the person reads the secret once through the app, and the
-   * caller never holds it.
+   * Withhold the secret and print a one-time reveal id instead. For a caller that relays the key to
+   * someone else, an agent printing a snippet for instance: the person reads the secret once
+   * through the app, and the caller never holds it.
    */
   revealOnce?: boolean;
 }

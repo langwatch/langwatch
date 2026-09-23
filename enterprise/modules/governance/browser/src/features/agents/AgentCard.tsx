@@ -12,25 +12,9 @@ import {
 import { AGENT_SOURCE_LABELS, type GovernanceAgentRow } from "./agentRows";
 
 /**
- * One agent, as a card: what it is called, where it runs, who owns it, what it
- * runs on, where we found it, and the three figures an admin came to the page
- * for.
- *
- * This is the page's optional layout; the list is the default. A card spends a
- * lot of width on one agent, which is the right trade when the reader is
- * looking at one and the wrong one when they are comparing ten. Both layouts
- * draw their figures through `AgentFigure`, so neither can format a number or
- * word a dash differently from the other.
- *
- * A figure we do not have renders as a dash with a reason on hover, never as
- * zero. `$0.00` is a measurement — it says the agent ran and spent nothing —
- * and an agent that has never been called has not earned that claim.
- *
- * `sample` is not optional on an invented card. A badge on the panel would be
- * a claim about the screen; this is a claim about the row, and the rows are
- * what a reader quotes.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * One agent as a card, the page's optional layout. Figures go through `AgentFigure` like the list;
+ * unknown is a dash with a reason, never zero. `sample` is required on invented cards.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
 export function AgentCard({
   agent,

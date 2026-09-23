@@ -1,7 +1,7 @@
 import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
 
-import type { IdentityLookupRepository } from "../identity-lookup.repository.ts";
 import {
+  type IdentityLookupRepository,
   type LookupConnectionRow,
   type LookupIdentifierRow,
   type LookupInvitationRow,

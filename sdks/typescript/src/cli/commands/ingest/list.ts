@@ -1,8 +1,10 @@
 import { setTimeout as wait } from "node:timers/promises";
+
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
@@ -42,12 +44,7 @@ export async function ingestListCommand(options: { all?: boolean; json?: boolean
   }
 
   // Stable formatted table. No external table dep — keep deps tight.
-  const cols: (keyof (typeof sources)[number])[] = [
-    "name",
-    "sourceType",
-    "status",
-    "lastEventAt",
-  ];
+
   const headerRow = ["NAME", "TYPE", "STATUS", "LAST EVENT"];
   const rows: string[][] = [headerRow];
   for (const s of sources) {

@@ -161,7 +161,6 @@ function SectionLabel({ children }: { children: string }) {
 function CommentField({
   value,
   onChange,
-  autoFocus,
 }: {
   value: string;
   onChange: (v: string) => void;

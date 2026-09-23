@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
-import { ScenariosApiError,ScenariosApiService } from "@/client-sdk/services/scenarios";
+import { ScenariosApiError, ScenariosApiService } from "@/client-sdk/services/scenarios";
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/scenarios")>();
+  const actual = await importOriginal<typeof scenariosModule>();
   return {
     ...actual,
     ScenariosApiService: vi.fn(),
@@ -26,11 +27,13 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listScenariosCommand } from "../list";
-import { getScenarioCommand } from "../get";
+import type * as scenariosModule from "@/client-sdk/services/scenarios";
+
 import { createScenarioCommand } from "../create";
-import { updateScenarioCommand } from "../update";
 import { deleteScenarioCommand } from "../delete";
+import { getScenarioCommand } from "../get";
+import { listScenariosCommand } from "../list";
+import { updateScenarioCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

@@ -74,7 +74,7 @@ vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
     useFilterStore: (selector: (s: unknown) => unknown) =>
@@ -105,7 +105,7 @@ vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
 }));
 
 vi.mock("@langwatch/trace-contract", async (importOriginal) => {
-  const contract = await importOriginal<typeof import("@langwatch/trace-contract")>();
+  const contract = await importOriginal<typeof traceContractModule>();
 
   return {
     ...contract,
@@ -165,6 +165,8 @@ vi.mock("@dnd-kit/sortable", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as traceContractModule from "@langwatch/trace-contract";
 import type React from "react";
 
 import { FilterSidebar } from "../filter-sidebar.tsx";

@@ -71,10 +71,9 @@ function workspaceMembers(): Member[] {
 }
 
 /**
- * The packages that render React: a module's browser package — `browser`, or
- * a `browser-` prefixed sibling like `browser-kit` — the browser application,
- * and the shared UI packages. Everything else is a contract, a process
- * package or a tool.
+ * The packages that render React: a module's browser package — `browser`, or a `browser-` prefixed
+ * sibling like `browser-kit` — the browser application, and the shared UI packages. Everything else
+ * is a contract, a process package or a tool.
  */
 function isWebPackage(dir: string): boolean {
   const leaf = dir.slice(dir.lastIndexOf("/") + 1);

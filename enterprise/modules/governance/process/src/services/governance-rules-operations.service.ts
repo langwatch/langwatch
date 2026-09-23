@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  GovernanceApi,
   GovernanceOtlpPolicyInput,
   GovernanceOtlpReceiverPolicies,
 } from "@langwatch/enterprise-governance-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 
 import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service.ts";
 import type { AnomalyRuleService } from "./anomaly-rule.service.ts";

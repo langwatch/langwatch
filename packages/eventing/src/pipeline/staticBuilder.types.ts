@@ -1,6 +1,8 @@
+import type * as commandModule from "../commands/command.ts";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
@@ -15,7 +17,6 @@ import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.t
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
 import type { PipelineMetadata } from "./types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * Queue serialization and append-coalescing options (ADR-066 pillar 2), shared
@@ -116,7 +117,7 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed handler instance for DI; used instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command.ts").CommandHandler<any, EventType>;
+    handlerInstance?: commandModule.CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }[];
 

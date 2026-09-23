@@ -20,18 +20,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-/** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
- *  one export as a textarea carrying its `value`, so a test can read back the
- *  template the editor was seeded with. Everything else in the module stays
- *  real (FieldHeader is exercised as-is). */
+/**
+ * The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that one export as a
+ * textarea carrying its `value`, so a test can read back the template the editor was seeded with.
+ * Everything else in the module stays real (FieldHeader is exercised as-is).
+ */
 vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
-  const actual = await original<typeof import("../ui/sections/template-authoring.tsx")>();
+  const actual = await original<typeof templateAuthoringModule>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
   };
 });
 
+import type * as templateAuthoringModule from "../ui/sections/template-authoring.tsx";
 import webhookClient, { type WebhookSlice } from "../ui/sections/webhook.client.tsx";
 
 afterEach(() => cleanup());
@@ -60,8 +62,10 @@ function makeCtx(
   };
 }
 
-/** `onChangeSpy` mirrors the Slack suite's harness: it sees every slice the
- *  form emits, so a test can assert on what a save would serialise. */
+/**
+ * `onChangeSpy` mirrors the Slack suite's harness: it sees every slice the form emits, so a test
+ * can assert on what a save would serialise.
+ */
 function Harness({
   ctx,
   initial,
@@ -233,8 +237,10 @@ function signingSecretInput() {
   return screen.getByTestId("webhook-signing-secret");
 }
 
-/** A saved row whose only secret is the signing one, so the masked placeholder
- *  it renders cannot be confused with a kept header row's. */
+/**
+ * A saved row whose only secret is the signing one, so the masked placeholder it renders cannot be
+ * confused with a kept header row's.
+ */
 const savedSignedRow = savedRowWith({
   url: "https://example.com/hooks",
   method: "POST",

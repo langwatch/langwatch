@@ -1,6 +1,9 @@
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import type { Prisma } from "@langwatch/prisma-client/generated";
-import { type IngestionSource, type PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  type Prisma,
+  type IngestionSource,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
 import {

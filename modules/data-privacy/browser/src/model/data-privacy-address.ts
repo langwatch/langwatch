@@ -1,8 +1,7 @@
 /**
- * How a privacy rule is named in a URL: the two query parameters and the
- * address they carry. Kept out of the screen so `data-privacy.ts` can publish
- * this vocabulary without statically importing a screen it also loads lazily —
- * that pair is what kept every screen in the browser's main chunk.
+ * How a privacy rule is named in a URL: the two query parameters and the address they carry. Kept
+ * out of the screen so `data-privacy.ts` can publish this vocabulary without statically importing a
+ * screen it also loads lazily — that pair is what kept every screen in the browser's main chunk.
  */
 
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";

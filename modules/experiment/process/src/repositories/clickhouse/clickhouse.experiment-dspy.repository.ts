@@ -238,7 +238,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;
-      return this.findWithClient(client, input);
+      return await this.findWithClient(client, input);
     } catch (error) {
       this.options.telemetry.warn(
         { projectId: input.tenantId, error },

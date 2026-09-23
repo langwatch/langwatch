@@ -1,17 +1,11 @@
 /**
- * The Agents page's own parts: the list and the card the fleet is drawn as,
- * the switch between them, the filter row, the register dialog, and the
- * invented rows that fill an empty page.
- *
- * This is a barrel over a directory, not a re-export of code that lives
- * elsewhere: nothing behind it has another home.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * The Agents page's own parts: list, card, layout switch, filter row, register drawer and sample
+ * rows. A barrel over this directory only.
+ * @see specs/ai-governance/dashboard/agents-page.feature
  */
-// `AgentFigure` is deliberately absent. It is the plumbing the card and the
-// table share so the two cannot format a number or word a dash differently,
-// and it is theirs: both import it directly, and nothing outside this
-// directory has any business rendering one figure of an agent.
+
+// `AgentFigure` is deliberately absent: it is the card's and table's shared plumbing, imported
+// directly.
 export { AgentCard } from "./AgentCard";
 export { AgentFilterBar } from "./AgentFilterBar";
 export { AgentFleetSummaryStrip } from "./AgentFleetSummaryStrip";

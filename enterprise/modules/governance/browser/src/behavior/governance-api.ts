@@ -31,6 +31,7 @@ import type {
   SpendOverTimeResult,
   SpendSortField,
 } from "@langwatch/enterprise-governance-contract";
+import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
 // Acknowledgement for writes that return void; `.ok` is the only field read.
 export type GovernanceAcknowledgement = { ok: boolean };
@@ -518,7 +519,7 @@ export type GovernanceApiMap = {
     assignments: {
       query: {
         input: { organizationId: string };
-        output: import("@langwatch/enterprise-governance-contract").DepartmentAssignments;
+        output: enterpriseGovernanceContractModule.DepartmentAssignments;
       };
     };
     create: {

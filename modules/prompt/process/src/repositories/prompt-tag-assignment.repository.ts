@@ -7,10 +7,9 @@ import type { PromptTag } from "@langwatch/prompt-contract";
 import type { TimeInput } from "@langwatch/time";
 
 /**
- * An invalid tag or tag/version pairing. The contract's own refusal, re-exported
- * under the name this repository's callers already use: a plain Error here
- * reached the boundary unattributed, so `PUT /api/prompts/{id}/tags/{tag}`
- * answered 500 where it owed the caller a named 4xx.
+ * An invalid tag or tag/version pairing. The contract's own refusal, re-exported under the name
+ * this repository's callers already use: a plain Error here reached the boundary unattributed, so
+ * `PUT /api/prompts/{id}/tags/{tag}` answered 500 where it owed the caller a named 4xx.
  */
 export { PromptTagInvalidError as TagValidationError } from "@langwatch/prompt-contract";
 

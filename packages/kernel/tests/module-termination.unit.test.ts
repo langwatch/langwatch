@@ -11,13 +11,9 @@ import {
 import { defineRepositories } from "../src/repository-registry.ts";
 
 /**
- * The one termination rule, pinned in types.
- *
- * `withTransports`, `withWorkers`, `withTasks`, `withEventing` and
- * `withTransportFacts` all answer something a process can install as it
- * stands. There is nothing left to build past that point, so the value
- * carries no `.build()` at all - the deprecated identity that once stood in
- * for it is gone now that every installer states its own terminator.
+ * The one termination rule, pinned in types: `withTransports`, `withWorkers`, `withTasks`,
+ * `withEventing` and `withTransportFacts` each answer something installable, so the value carries
+ * no `.build()`.
  */
 
 type Equal<Left, Right> =

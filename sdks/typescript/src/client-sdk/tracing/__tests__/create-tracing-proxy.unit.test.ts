@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createTracingProxy } from "../create-tracing-proxy";
+
 import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
   type MockTracer,
@@ -7,6 +7,7 @@ import {
   setupTestEnvironment,
   createDelayedPromise,
 } from "../../../observability-sdk/__tests__/test-utils";
+import { createTracingProxy } from "../create-tracing-proxy";
 
 describe("createTracingProxy", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -362,8 +363,8 @@ describe("createTracingProxy", () => {
       class PromiseChainClass {
         public async promiseChain() {
           return Promise.resolve("step1")
-            .then((_result) => Promise.resolve(_result + " -> step2"))
-            .then((_result) => Promise.resolve(_result + " -> step3"))
+            .then((_result) => _result + " -> step2")
+            .then((_result) => _result + " -> step3")
             .then(() => {
               throw new Error("Error in promise chain");
             });

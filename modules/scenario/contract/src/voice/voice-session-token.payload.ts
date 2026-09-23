@@ -1,5 +1,5 @@
 // Claims a signed voice session token carries between mint and finish: only ids and project scope.
-// Signing/verification server-side (@langwatch/scenario-process). Short-lived (call budget + grace).
+// Signed and verified server-side (@langwatch/scenario-process). Short-lived: call budget + grace.
 
 import { z } from "zod";
 

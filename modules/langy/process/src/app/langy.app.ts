@@ -29,6 +29,7 @@ import {
   type LangyServerConfig,
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
+import type * as langyContractModule from "@langwatch/langy-contract";
 import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -224,7 +225,7 @@ export class LangyApp implements LangyApiContract {
     );
   }
 
-  ingestInternalTurnResult(input: import("@langwatch/langy-contract").LangyTurnResultInput) {
+  ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput) {
     return this.#internal.ingestTurnResult(input);
   }
 

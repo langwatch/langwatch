@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 
 /**
- * The base Toaster contract: every toast carries a close button (call sites
- * cannot opt out), and the toast region sits at the bottom center of the
- * screen so it never covers a drawer's close button.
- *
- * UX contract: specs/components/toasts.feature.
+ * The base Toaster contract: every toast carries a close button (call sites cannot opt out), and
+ * the toast region sits at the bottom center of the screen so it never covers a drawer's close
+ * button. UX contract: specs/components/toasts.feature.
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { Toaster, toaster } from "../src/components/toaster.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 

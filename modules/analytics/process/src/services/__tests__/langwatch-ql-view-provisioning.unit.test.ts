@@ -1,7 +1,7 @@
 /**
  * The provisioning SQL for a view's tenant column and for a two-table view, pinned as text: a
  * policy on the wrong column or an ungranted predicate column is not a syntax error.
- * @see ../../langwatch-ql/__tests__/catalog-view-join.integration.test.ts — the same over ClickHouse
+ * @see ../../langwatch-ql/__tests__/catalog-view-join.integration.test.ts (over ClickHouse)
  * @see specs/lwql/api.feature
  */
 import { readFileSync } from "node:fs";

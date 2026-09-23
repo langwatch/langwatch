@@ -40,10 +40,8 @@ export interface RunUnifiedLoginOptions {
   /** Pre-loaded config to mutate; defaults to `loadConfig()`. */
   cfg?: GovernanceConfig;
   /**
-   * The login runs as a step of another command, which words the sign-in
-   * itself. Prints the address to open, the code and who signed in, plus any
-   * change to the machine's tool wiring; the header, the AI tools, the model
-   * providers, the budgets and the dashboard line are left to `langwatch login`.
+   * The login runs as a step of another command: only the address, code, signed-in identity and
+   * wiring changes are printed; the rest is left to `langwatch login`.
    */
   isQuiet?: boolean;
 }
@@ -306,10 +304,8 @@ export async function runDeviceFlowLogin(
 }
 
 /**
- * Whose login is being replaced, when it is not the same one. Undefined when
- * there is nothing to say: no login here yet, or the same organization again.
- * Told rather than refused — the new identity is only known AFTER the browser
- * approval, and the point is that the person can see what happened.
+ * Whose login is being replaced, when it is a different one; undefined otherwise. Told, not
+ * refused: the new identity is only known after browser approval.
  */
 export function replacedSessionNotice({
   previous,

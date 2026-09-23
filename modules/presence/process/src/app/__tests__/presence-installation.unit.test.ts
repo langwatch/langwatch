@@ -5,8 +5,6 @@ import { createApp, withMemoryRepositories } from "@langwatch/kernel";
  * @see modules/presence/specs/presence.feature
  */
 import { PresenceApi } from "@langwatch/presence-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { presenceServer } from "../../presence.server.ts";

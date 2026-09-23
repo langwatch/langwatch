@@ -21,70 +21,69 @@ import {
   OrganizationCapabilityUnavailableError,
   OrganizationNotFoundForTeamError,
   type OrganizationUsageCount,
+  type AddOrganizationGroupBindingInput,
+  type AddOrganizationTeamMemberInput,
+  type ApplyOrganizationGroupEditsInput,
+  type ChangeOrganizationGroupMemberInput,
+  type CreateOrganizationGroupInput,
+  type CreateOrganizationTeamWithMembersInput,
+  type CreateOrganizationTeamInput,
+  type DeleteOrganizationGroupInput,
+  type GetOrganizationBillingProfileInput,
+  type GetOrganizationIdByTeamIdInput,
+  type GetOrganizationMembersInput,
+  type GetOrganizationGroupInput,
+  type GetOrganizationTeamByIdInput,
+  type GetOrganizationTeamBySlugForMemberInput,
+  type GetOrganizationTeamInput,
+  type GetOrganizationTeamWithMembersInput,
+  type GetOldestTeamInput,
+  type ListMemberOrganizationGroupsInput,
+  type ListOrganizationGroupsInput,
+  type ListOrganizationTeamAccessInput,
+  type ListOrganizationTeamsWithMembersInput,
+  type OrganizationBillingProfile,
+  type OrganizationGroup,
+  type OrganizationGroupBinding,
+  type JoinRequestJoining,
+  type OrganizationGroupDetails,
+  type OrganizationGroupPage,
+  type OrganizationGroupSummary,
+  type OrganizationTeam,
+  type OrganizationTeamAccess,
+  type OrganizationTeamWithMembers,
+  type EnrichedAuditLog,
+  type EnsuredPersonalWorkspace,
+  type FindPersonalWorkspaceInput,
+  type PersonalFeatures,
+  type PersonalWorkspace,
+  type PersonalWorkspaceInput,
+  type PersonalWorkspaceFeaturesInput,
+  type RemoveOrganizationGroupBindingInput,
+  type RemoveOrganizationTeamMemberInput,
+  type RenameOrganizationGroupInput,
+  type UpdateOrganizationSettingsInput,
+  type UpdateOrganizationSettingsResult,
+  type UpdateOrganizationTeamInput,
+  type UpdateOrganizationTeamWithMembersInput,
+  type CustomRole,
+  type Organization,
+  type OrganizationAdministrator,
+  type OrganizationIntent,
+  type OrganizationUser,
+  type OrganizationUserRole,
+  type ProjectRow,
+  type Team,
+  type TeamUser,
+  type User,
+  type GroupDetail,
+  type GroupListItem,
+  type GroupMembershipView,
+  type TeamWithProjects,
+  type OrganizationMemberProvenance,
+  type OrganizationGroupService,
 } from "@langwatch/organization-contract";
-import type {
-  AddOrganizationGroupBindingInput,
-  AddOrganizationTeamMemberInput,
-  ApplyOrganizationGroupEditsInput,
-  ChangeOrganizationGroupMemberInput,
-  CreateOrganizationGroupInput,
-  CreateOrganizationTeamWithMembersInput,
-  CreateOrganizationTeamInput,
-  DeleteOrganizationGroupInput,
-  GetOrganizationBillingProfileInput,
-  GetOrganizationIdByTeamIdInput,
-  GetOrganizationMembersInput,
-  GetOrganizationGroupInput,
-  GetOrganizationTeamByIdInput,
-  GetOrganizationTeamBySlugForMemberInput,
-  GetOrganizationTeamInput,
-  GetOrganizationTeamWithMembersInput,
-  GetOldestTeamInput,
-  ListMemberOrganizationGroupsInput,
-  ListOrganizationGroupsInput,
-  ListOrganizationTeamAccessInput,
-  ListOrganizationTeamsWithMembersInput,
-  OrganizationBillingProfile,
-  OrganizationGroup,
-  OrganizationGroupBinding,
-  JoinRequestJoining,
-  OrganizationGroupDetails,
-  OrganizationGroupPage,
-  OrganizationGroupSummary,
-  OrganizationTeam,
-  OrganizationTeamAccess,
-  OrganizationTeamWithMembers,
-  EnrichedAuditLog,
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  PersonalFeatures,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
-  PersonalWorkspaceFeaturesInput,
-  RemoveOrganizationGroupBindingInput,
-  RemoveOrganizationTeamMemberInput,
-  RenameOrganizationGroupInput,
-  UpdateOrganizationSettingsInput,
-  UpdateOrganizationSettingsResult,
-  UpdateOrganizationTeamInput,
-  UpdateOrganizationTeamWithMembersInput,
-  CustomRole,
-  Organization,
-  OrganizationAdministrator,
-  OrganizationIntent,
-  OrganizationUser,
-  OrganizationUserRole,
-  ProjectRow,
-  Team,
-  TeamUser,
-  User,
-  GroupDetail,
-  GroupListItem,
-  GroupMembershipView,
-  TeamWithProjects,
-  OrganizationMemberProvenance,
-  OrganizationGroupService,
-} from "@langwatch/organization-contract";
+import type * as organizationContractModule from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
@@ -188,8 +187,10 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
-/** `publicBaseUrl`/`processName` are the process's own facts. The demo project
- * is `authz`'s: its env leaves have one owner, so this module asks that peer. */
+/**
+ * `publicBaseUrl`/`processName` are the process's own facts. The demo project is `authz`'s: its env
+ * leaves have one owner, so this module asks that peer.
+ */
 type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger", "redis"]> &
   Readonly<{
     publicBaseUrl: string | undefined;
@@ -546,8 +547,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
   }
 
-  /** Frees a seat reversibly. The acting user travels whole, since the disable
-   * guard identifies the operator by more than their id. */
+  /**
+   * Frees a seat reversibly. The acting user travels whole, since the disable guard identifies the
+   * operator by more than their id.
+   */
   setMemberDisabled(
     input: Omit<Parameters<OrganizationMembershipService["setMemberDisabled"]>[0], "actingUser">,
     by: (OrganizationCaller & { name?: string | null; email?: string | null }) | null,
@@ -558,8 +561,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
   }
 
-  /** Refuses when this removal would leave the organization without an
-   *  administrator who can sign in. */
+  /**
+   * Refuses when this removal would leave the organization without an administrator who can sign
+   * in.
+   */
   assertRemovalKeepsAnAdministrator(input: {
     organizationId: string;
     userId: string;
@@ -772,14 +777,18 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.createMembership(input);
   }
 
-  /** Whether a user is a member of an organization — a door the feature-flag resolver asks
-   * on every organization-targeted read, to gate whether the caller may see a flag's answer. */
+  /**
+   * Whether a user is a member of an organization — a door the feature-flag resolver asks on every
+   * organization-targeted read, to gate whether the caller may see a flag's answer.
+   */
   isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
     return this.#dependencies.organizations.isMember(input);
   }
 
-  /** The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
-   * asks a flag per listed organization, and this avoids a membership query per row. */
+  /**
+   * The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
+   * asks a flag per listed organization, and this avoids a membership query per row.
+   */
   findAllIds(): Promise<string[]> {
     return this.#dependencies.organizations.findAllIds();
   }
@@ -847,8 +856,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.findAdministrators(input);
   }
 
-  /** The role a user holds in the organization owning one team — read by the project-protections
-   * resolver, since a user with no team binding may still reach a project via an org-wide role. */
+  /**
+   * The role a user holds in the organization owning one team — read by the project-protections
+   * resolver, since a user with no team binding may still reach a project via an org-wide role.
+   */
   findUserOrgRoleByTeamId(input: {
     userId: string;
     teamId: string;
@@ -979,8 +990,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   listTeams(
-    input: import("@langwatch/organization-contract").ListOrganizationTeamsInput,
-  ): Promise<import("@langwatch/organization-contract").OrganizationTeamPage> {
+    input: organizationContractModule.ListOrganizationTeamsInput,
+  ): Promise<organizationContractModule.OrganizationTeamPage> {
     return this.#dependencies.organizations.listTeams(input);
   }
 
@@ -1090,7 +1101,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   resolveBindingScopeNames(input: {
     organizationId: string;
-    bindings: readonly import("@langwatch/organization-contract").OrganizationGroupBinding[];
+    bindings: readonly organizationContractModule.OrganizationGroupBinding[];
   }): Promise<ReadonlyMap<string, string>> {
     return this.#dependencies.groups.resolveBindingScopeNames(input);
   }

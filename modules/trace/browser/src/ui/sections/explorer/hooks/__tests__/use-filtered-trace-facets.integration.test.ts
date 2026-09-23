@@ -33,7 +33,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",
   );
   return {
@@ -49,6 +49,8 @@ vi.mock("../../../../../behavior/explorer/onboarding/use-preview-traces-active.t
 vi.mock("../use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [], evalRuns: undefined }),
 }));
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
 
 import { useFilteredTraceFacets } from "../use-filtered-trace-facets.ts";
 

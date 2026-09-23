@@ -3,8 +3,10 @@ import { timingSafeEqual } from "node:crypto";
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
-/** Operator back office application: holds every capability the feature api
- * reaches, and centralizes rules the transport was deciding separately. */
+/**
+ * Operator back office application: holds every capability the feature api reaches, and centralizes
+ * rules the transport was deciding separately.
+ */
 import {
   AuditLogApi,
   type AuditLogApi as AuditLogApiContract,
@@ -119,7 +121,7 @@ import {
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { type Instant, nowInstant } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -182,8 +184,10 @@ export type OpsProcessRef = {
   processKey: string;
 };
 
-/** Event-sourcing explorers typed with contract vocabulary, not Promise<unknown>;
- * the concrete types reach the client through the return type. */
+/**
+ * Event-sourcing explorers typed with contract vocabulary, not Promise<unknown>; the concrete types
+ * reach the client through the return type.
+ */
 export type OpsEventExplorer = {
   discoverAggregates(input: {
     projectionNames: string[];
@@ -309,8 +313,10 @@ export type OpsCapability = OpsService & {
 export interface OpsAppDependencies {
   users: UserApiContract;
   auth: AuthApiContract;
-  /** Which of an organization's two routes decides its sign-in — the module
-   *  that owns connections answers, per organization. */
+  /**
+   * Which of an organization's two routes decides its sign-in — the module that owns connections
+   * answers, per organization.
+   */
   identity: IdentityApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApiContract;
@@ -363,8 +369,10 @@ export interface OpsSystemMigrationRunner {
   rollBack(input: { migrationName: string; tenantId: string; actorUserId: string }): Promise<void>;
 }
 
-/** The license registry (ADR-156), an availability decision: `licensing` is
- * enterprise-only, so the real one is supplied by composition when installed. */
+/**
+ * The license registry (ADR-156), an availability decision: `licensing` is enterprise-only, so the
+ * real one is supplied by composition when installed.
+ */
 export interface OpsLicenseRegistry {
   list(input: { page: number; pageSize: number; search?: string }): Promise<IssuedLicensePage>;
   getById(input: { id: string }): Promise<IssuedLicenseView>;
@@ -790,16 +798,19 @@ export class OpsApp implements OpsApi {
     this.#dependencies = dependencies;
   }
 
-  /** Whether this identity is on the deployment's operator allow-list,
-   * keyed on email address. */
+  /**
+   * Whether this identity is on the deployment's operator allow-list, keyed on email address.
+   */
   isAdmin(identity: AdminIdentity): boolean {
     return this.#dependencies.ops.isAdmin(identity);
   }
 
   // -- the rules the transport used to hold ----------------------------------
 
-  /** Extra gate on destructive operator writes: signed-in (not impersonated),
-   * typed confirmation, because damage is silent. */
+  /**
+   * Extra gate on destructive operator writes: signed-in (not impersonated), typed confirmation,
+   * because damage is silent.
+   */
   requireDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void {
     if (!operator) throw new OpsOperatorSessionRequiredError();
     if (operator.impersonator) throw new OpsImpersonatedOperatorRefusedError();
@@ -811,8 +822,10 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.ops.snapshots?.findDashboardData() ?? null;
   }
 
-  /** The two integers the global ops badge renders. Without a snapshot
-   * collector, null means "we cannot say", not "all clear". */
+  /**
+   * The two integers the global ops badge renders. Without a snapshot collector, null means "we
+   * cannot say", not "all clear".
+   */
   badgeCounts(): OpsBadgeReading {
     const snapshots = this.#dependencies.ops.snapshots;
     if (!snapshots) return { blockedCount: 0, dlqCount: 0, computedAt: null };
@@ -1931,8 +1944,10 @@ export interface OpsWorker {
   tryStartQueueMetricsWriter(): OpsWorkerHandle | undefined;
 }
 
-/** Where one organization's data lives. The routing places an
- * organization-rooted append on its own instance. */
+/**
+ * Where one organization's data lives. The routing places an organization-rooted append on its own
+ * instance.
+ */
 export type OrganizationDataplane =
   | Readonly<{ kind: "shared" }>
   | Readonly<{ kind: "private"; endpoint: string }>;
@@ -1965,8 +1980,10 @@ export interface OpsReplayRuntime {
   close: () => Promise<void>;
 }
 
-/** Builds the runtime a replay run drives. `create` throws when the
- * deployment cannot serve a replay (no Redis, no ClickHouse route). */
+/**
+ * Builds the runtime a replay run drives. `create` throws when the deployment cannot serve a replay
+ * (no Redis, no ClickHouse route).
+ */
 export interface OpsReplayRuntimeFactory {
   create(): OpsReplayRuntime;
 }

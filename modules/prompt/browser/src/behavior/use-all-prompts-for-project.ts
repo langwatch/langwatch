@@ -7,7 +7,7 @@ import { usePromptProject } from "./use-prompt-project.ts";
  * @returns Query result containing prompts for the project
  */
 export function useAllPromptsForProject() {
-  const { projectId = "" } = usePromptProject();
+  const { projectId } = usePromptProject();
   return promptApi.prompts.getAllPromptsForProject.useQuery(
     {
       projectId: projectId,

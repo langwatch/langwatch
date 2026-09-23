@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * What happens to a REST request before its handler answers: the validator's
- * refusal reaching the boundary, the size the body cap is willing to trust, and
- * the receipt ledger behind `Idempotency-Key`.
+ * What happens to a REST request before its handler answers: the validator's refusal reaching the
+ * boundary, the body size cap, and the receipt ledger behind `Idempotency-Key`.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -33,11 +31,9 @@ import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The boundary the validator's refusal has to reach, flattened the way
- * applications render it: `code` as `error`, `meta` flattened, `reasons`
- * only when non-empty. A failure that is not handled keeps its declared
- * status — the malformed-body catch must leave a route's own 400 alone
- * rather than reporting it as a parse failure.
+ * The boundary the validator's refusal must reach, flattened as applications render it. An
+ * unhandled failure keeps its declared status: the malformed-body catch leaves a route's own 400
+ * alone.
  */
 const handleError: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
@@ -61,11 +57,8 @@ const handleError: ErrorHandler = (error, c) => {
 };
 
 /**
- * These run against a REAL Hono app with the REAL error handler mounted, because
- * the whole point of the wrapper is what happens BETWEEN those two: the stock
- * validator answers a schema failure itself and `onError` never runs, so a test
- * that called the middleware in isolation would pass while the boundary stayed
- * broken.
+ * Against a REAL Hono app with the REAL error handler: the stock validator answers schema failures
+ * itself so `onError` never runs, which an isolated middleware test would miss.
  */
 const schema = z.object({
   name: z.string().min(1),
@@ -529,11 +522,9 @@ const SCOPE = "project_acme";
 const KEY = "order-4711";
 
 /**
- * A receipt store with a unique index, and nothing else.
- *
- * The rows are held by `${scopeId}:${key}` rather than by id precisely so a
- * duplicate insert throws the way Postgres does — `code: "P2002"`, which is
- * what the ledger duck-types the loss on.
+ * A receipt store with a unique index, and nothing else. The rows are held by `${scopeId}:${key}`
+ * rather than by id precisely so a duplicate insert throws the way Postgres does — `code: "P2002"`,
+ * which is what the ledger duck-types the loss on.
  */
 class FakeReceiptStore implements IdempotencyReceiptPersistence {
   private readonly rows = new Map<
@@ -607,11 +598,9 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
 }
 
 /**
- * A cipher that is a round trip and says so.
- *
- * The prefix is what makes a stored body visibly ciphertext in an assertion:
- * a ledger that forgot to encrypt would store the JSON and this test would
- * still pass on a bare identity function.
+ * A cipher that is a round trip and says so. The prefix is what makes a stored body visibly
+ * ciphertext in an assertion: a ledger that forgot to encrypt would store the JSON and this test
+ * would still pass on a bare identity function.
  */
 const cipher: IdempotencyResponseCipher = {
   encrypt: (value) => `enc:${value}`,
@@ -627,11 +616,9 @@ function ledgerOver(receipts: IdempotencyReceiptPersistence) {
 }
 
 /**
- * The handled error one run rejected with, and proof that it rejected at all.
- *
- * A helper rather than `.catch()` at each site: catching widens the awaited
- * value to "the outcome OR the error", so every assertion below has to argue
- * with a branch these scenarios exist to rule out.
+ * The handled error one run rejected with, and proof that it rejected at all. A helper rather than
+ * `.catch()` at each site: catching widens the awaited value to "the outcome OR the error", so
+ * every assertion below has to argue with a branch these scenarios exist to rule out.
  */
 async function refusalFrom(
   run: Promise<unknown>,

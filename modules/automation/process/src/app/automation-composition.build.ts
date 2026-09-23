@@ -31,7 +31,6 @@ import type {
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
-import { HmacUnsubscribeTokenAdapter } from "../services/unsubscribe-token.service.ts";
 import type {
   AutomationAuditSink,
   AutomationCallCounter,

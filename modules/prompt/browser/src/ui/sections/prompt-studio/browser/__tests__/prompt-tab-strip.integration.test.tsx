@@ -6,13 +6,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals.ts";
+import type * as studioInternalsModule from "../../studio-internals.ts";
 import { DraggableTabsBrowser } from "../draggable-tabs-browser.tsx";
 import { PromptTabStrip } from "../prompt-tab-strip.tsx";
 import { usePromptBrowserTabController } from "../tab/use-prompt-browser-tab-controller.ts";
 
 vi.mock("../../studio-internals.ts", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../studio-internals.ts")>("../../studio-internals");
+  const actual = await vi.importActual<typeof studioInternalsModule>("../../studio-internals");
   return { ...actual, useIsOverflowing: vi.fn() };
 });
 

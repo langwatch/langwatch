@@ -121,7 +121,7 @@ function LeaderboardWarnings({
         <WarnBanner
           tone="warning"
           icon={LuTriangleAlert}
-          text={`Sample size low — at least one variant has fewer than ${warnThreshold} matchups. Scores may be unstable.`}
+          text={`Sample size low: at least one variant has fewer than ${warnThreshold} matchups. Scores may be unstable.`}
         />
       ) : null}
 
@@ -129,7 +129,7 @@ function LeaderboardWarnings({
         <WarnBanner
           tone="info"
           icon={LuTriangleAlert}
-          text="One or more variants have no wins or no losses — MLE is undefined for those and shown smoothed at the bottom of the table."
+          text="One or more variants have no wins or no losses: MLE is undefined for those and shown smoothed at the bottom of the table."
         />
       ) : null}
 
@@ -430,7 +430,7 @@ function WinMatrixHeatmap({
   return (
     <VStack align="stretch" gap={2}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Win matrix (row = winner, column = opponent) — click a cell for why
+        Win matrix (row = winner, column = opponent), click a cell for why
       </Text>
       {/* The note states only what the detector actually establishes.
         `winMatrixHasPairwiseDetail` tests whether any row VARIES across
@@ -438,7 +438,7 @@ function WinMatrixHeatmap({
         variants together, which strictly two-way rows can also satisfy. */}
       {!hasPairwiseDetail ? (
         <Text fontSize="2xs" color="fg.muted">
-          Each row here is the same number repeated — that variant&apos;s total wins, not a
+          Each row here is the same number repeated: that variant&apos;s total wins, not a
           per-opponent tally, so the counts cannot tell you who it beat. The shading still can: it
           is how often the row variant won when those two met.
         </Text>

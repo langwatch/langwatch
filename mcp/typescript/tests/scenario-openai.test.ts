@@ -4,8 +4,11 @@ import os from "os";
 import path from "path";
 
 import { anthropic } from "@ai-sdk/anthropic";
-import type { ScenarioExecutionStateLike } from "@langwatch/scenario";
-import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
+import scenario, {
+  type ScenarioExecutionStateLike,
+  type AgentAdapter,
+  AgentRole,
+} from "@langwatch/scenario";
 import chalk from "chalk";
 import dotenv from "dotenv";
 import * as pty from "node-pty";

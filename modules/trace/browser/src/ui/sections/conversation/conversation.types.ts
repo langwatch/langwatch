@@ -73,10 +73,9 @@ export interface ConversationTurn {
 }
 
 /**
- * How the two sides of the thread are drawn. `scenario` swaps them, because a
- * scenario run's `user` messages come from a simulated user and its
- * `assistant` messages from the agent under test. On a voice run the caller
- * was a person rather than a simulator, which reads as "You" (#8020).
+ * How the two sides of the thread are drawn. `scenario` swaps them, because a scenario run's `user`
+ * messages come from a simulated user and its `assistant` messages from the agent under test. On a
+ * voice run the caller was a person rather than a simulator, which reads as "You" (#8020).
  */
 export type ConversationRoleMode = "chat" | "scenario" | "scenario-human-caller";
 

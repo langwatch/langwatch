@@ -36,7 +36,7 @@ async function lwFetch({ path, init }: { path: string; init: RequestInit }): Pro
           `${init.method ?? "GET"} ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
         );
       }
-      return res.json();
+      return await res.json();
     } catch (error) {
       if (error instanceof LwHttpError) throw error;
       lastError = error;

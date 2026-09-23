@@ -87,13 +87,16 @@ export async function renderTriggerSlack({
   templateType: SlackTemplateType | null;
   template: string | null;
   context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
-  /** Per-context default overrides (ADR-034 Phase 8.1). When omitted,
-   *  the trace defaults apply — same behaviour as before. */
+  /**
+   * Per-context default overrides (ADR-034 Phase 8.1). When omitted, the trace defaults apply —
+   * same behaviour as before.
+   */
   defaults?: SlackRenderDefaults;
   testFire?: boolean;
-  /** Keep the gated Block Kit blocks (chart/table/alert) that only render on
-   *  the Web API surface. Set only for bot-token delivery; a webhook drops
-   *  them (they'd be rejected as `invalid_blocks`). */
+  /**
+   * Keep the gated Block Kit blocks (chart/table/alert) that only render on the Web API surface.
+   * Set only for bot-token delivery; a webhook drops them (they'd be rejected as `invalid_blocks`).
+   */
   allowGatedBlocks?: boolean;
 }): Promise<RenderedSlack> {
   const slackString = defaults?.slackString ?? DEFAULT_SLACK_TEMPLATE;
@@ -133,7 +136,7 @@ export async function renderTriggerSlack({
     if (blocks.length === 0) {
       // Expected outcome (e.g. every block was filtered by the allowlist),
       // not a render failure — fall back to the plain-text default directly.
-      return fallbackToDefaultText({
+      return await fallbackToDefaultText({
         context,
         testFire,
         error: "Block Kit template produced no allowed blocks",

@@ -5,6 +5,7 @@
  * Spec: specs/model-providers/providers-without-a-project.feature
  */
 
+import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,7 +66,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 }));
 
 vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+  const actual = await vi.importActual<typeof authzBrowserKitModule>(
     "@langwatch/authz-browser-kit",
   );
   return {

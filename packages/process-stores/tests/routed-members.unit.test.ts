@@ -1,14 +1,14 @@
 /**
- * The two members that route themselves, and the gateway the process names.
- *
- * Every test here stops before a socket: routing and refusal are decided from
- * the directory read and the config alone, which is the point of both.
+ * The two members that route themselves, and the gateway the process names. Every test here stops
+ * before a socket: routing and refusal are decided from the directory read and the config alone,
+ * which is the point of both.
  */
 import { describe, expect, it, vi } from "vitest";
-import { cachedTenantDirectory } from "../src/tenant-directory.ts";
-import { buildObjectStorage, UnknownStorageProjectError } from "../src/object-storage-member.ts";
-import { buildMail } from "../src/mail-member.ts";
+
 import type { MailConfig } from "../src/config.ts";
+import { buildMail } from "../src/mail-member.ts";
+import { buildObjectStorage, UnknownStorageProjectError } from "../src/object-storage-member.ts";
+import { cachedTenantDirectory } from "../src/tenant-directory.ts";
 
 describe("given the directory both routed members place a tenant with", () => {
   describe("when the same tenant is placed twice", () => {
@@ -69,9 +69,9 @@ describe("given object storage with an organization on its own account", () => {
         directory: { organizationForTenant: () => Promise.resolve(null) },
       });
 
-      await expect(storage.value.put({ projectId: "unknown", key: "k" }, new Uint8Array())).rejects.toBeInstanceOf(
-        UnknownStorageProjectError,
-      );
+      await expect(
+        storage.value.put({ projectId: "unknown", key: "k" }, new Uint8Array()),
+      ).rejects.toBeInstanceOf(UnknownStorageProjectError);
     });
 
     it("refuses a call that names no project at all", async () => {
@@ -139,9 +139,9 @@ describe("given the mail gateway this deployment named", () => {
     });
 
     it("refuses a gateway with no sending address", () => {
-      expect(() =>
-        buildMail({ provider: "resend", defaultFrom: "   ", apiKey: "key" }),
-      ).toThrow("without a sending address");
+      expect(() => buildMail({ provider: "resend", defaultFrom: "   ", apiKey: "key" })).toThrow(
+        "without a sending address",
+      );
     });
   });
 

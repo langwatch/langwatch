@@ -1,19 +1,12 @@
 /**
- * The global anchor rule has to stay inside a cascade layer.
- *
- * Chakra emits every component style into `@layer recipes`, and an unlayered
- * author rule beats all layers. While `a { color: inherit }` sat unlayered in
- * `globals.scss`, any component rendered `asChild` over an `<a>` lost the
- * colour its own recipe set: a solid Button used as a link dropped
- * `colorPalette.contrast` and took the surrounding text colour, which is how
- * the guided onboarding pull request card ended up with black text on the
- * brand orange.
- *
- * jsdom implements no cascade layers, so the rule is checked where it lives.
+ * The global anchor rule must stay in a cascade layer: unlayered, it beats Chakra's `@layer
+ * recipes` and `asChild` links lose their colour. jsdom has no layers, so the file is checked
+ * directly.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const globals = readFileSync(
@@ -58,9 +51,7 @@ describe("globals.scss", () => {
 
     it("declares no unlayered rule for bare anchors", () => {
       expect(
-        unlayeredSelectors(globals).filter((selector) =>
-          /(^|,)\s*a\s*(,|$)/.test(selector),
-        ),
+        unlayeredSelectors(globals).filter((selector) => /(^|,)\s*a\s*(,|$)/.test(selector)),
       ).toEqual([]);
     });
   });

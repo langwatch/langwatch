@@ -1,10 +1,12 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
-import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
 import { describe, expect, it } from "vitest";
+
 import {
   createClaudeCodeAgent,
   createSkillTestWorkDir,
@@ -63,7 +65,7 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
         script: [
           scenario.user("use langwatch to list my prompts"),
           scenario.agent(),
-          (state) => {},
+          () => {},
           scenario.judge(),
         ],
       });

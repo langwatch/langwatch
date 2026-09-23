@@ -1,7 +1,7 @@
 /**
  * `@langwatch/charts`, bundled into the sandboxed frame as `window.LWCharts` (see
- * `chart-frame-document.ts` in the contract). Reads `window.React`/`window.Recharts` directly rather than importing
- * them, so hooks share the author's own instance -- a bundled copy would break the rules of hooks.
+ * `chart-frame-document.ts`). Reads `window.React`/`window.Recharts` so hooks share the author's
+ * instance.
  */
 
 import { Temporal } from "@langwatch/time";

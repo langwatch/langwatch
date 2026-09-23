@@ -1,3 +1,4 @@
+import type * as groupQueueModule from "@langwatch/group-queue";
 import { describe, expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({
@@ -6,7 +7,7 @@ const captured = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/group-queue", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/group-queue")>();
+  const actual = await importOriginal<typeof groupQueueModule>();
 
   class CapturingProducer {
     constructor(definition: { name: string }) {

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ExperimentsApiServiceError,ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
+import {
+  ExperimentsApiServiceError,
+  ExperimentsApiService,
+} from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("@/client-sdk/services/experiments/experiments-api.service")
-    >();
+  const actual = await importOriginal<typeof experimentsApiServiceModule>();
   return {
     ...actual,
     ExperimentsApiService: vi.fn(),
@@ -29,6 +30,8 @@ vi.mock("ora", () => ({
     text: "",
   }),
 }));
+
+import type * as experimentsApiServiceModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";

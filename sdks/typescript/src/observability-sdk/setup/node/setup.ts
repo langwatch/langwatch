@@ -1,4 +1,5 @@
 import { trace } from "@opentelemetry/api";
+import type * as apiModule from "@opentelemetry/api";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { type Resource } from "@opentelemetry/resources";
 import {
@@ -306,7 +307,7 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
 }
 
 function setupDedicatedProvider(
-  provider: import("@opentelemetry/api").TracerProvider,
+  provider: apiModule.TracerProvider,
   options: SetupObservabilityOptions,
   logger: Logger,
 ): ObservabilityHandle {

@@ -91,7 +91,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
+  const actual = await importOriginal<typeof authClientModule>();
   return {
     ...actual,
     signIn: signInMock,
@@ -116,6 +116,7 @@ vi.mock("../../elements/router-link.tsx", () => ({
   ),
 }));
 
+import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
 
 const localPicker: RoutingDecision = {

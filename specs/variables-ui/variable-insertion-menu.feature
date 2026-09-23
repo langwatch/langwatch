@@ -8,9 +8,9 @@ Feature: Variable insertion menu
   # via {{ trigger, source-grouped fields, type icons, search, key
   # navigation, insertion). Tests exist at
   # `modules/prompt/browser/tests/surfaces/variables/
-  # variable-insert-menu.test.tsx` and the trigger logic in
+  # variable-insert-menu.integration.test.tsx` and the trigger logic in
   # `modules/prompt/browser/tests/surfaces/prompt-textarea/
-  # prompt-textarea-with-variables.test.tsx`.
+  # prompt-textarea-with-variables.integration.test.tsx`.
   #
   # All scenarios are pre-classified KEEP/UPDATE in
   # `specs/variables-ui/AUDIT_MANIFEST.md`. The 5 UPDATE rows

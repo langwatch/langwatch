@@ -32,7 +32,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
 }));
 
 vi.mock("recharts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("recharts")>();
+  const actual = await importOriginal<typeof rechartsModule>();
   return {
     ...actual,
     ResponsiveContainer: ({
@@ -42,6 +42,8 @@ vi.mock("recharts", async (importOriginal) => {
     }) => cloneElement(children, { width: 640, height: 200 }),
   };
 });
+
+import type * as rechartsModule from "recharts";
 
 import { isLangyTranscriptMessage } from "../../../../../model/langy-transcript.ts";
 import { MessageContent } from "../message-content.tsx";

@@ -62,8 +62,10 @@ export function FieldHeader({
   label: string;
   usingDefault: boolean;
   onReset: () => void;
-  /** Optional element rendered next to the label — used by template fields
-   *  to slot a `VariableInfoIcon`. Keeps the row chrome out of this primitive. */
+  /**
+   * Optional element rendered next to the label — used by template fields to slot a
+   * `VariableInfoIcon`. Keeps the row chrome out of this primitive.
+   */
   trailing?: React.ReactNode;
 }) {
   return (
@@ -162,14 +164,17 @@ export function LiquidEditor({
   value: string;
   onChange: (value: string) => void;
   variables: VariableInfo[];
-  /** "liquid" (default) for regular templates, "liquid-json" for slack
-   *  block_kit (JSON whose string values carry Liquid). */
+  /**
+   * "liquid" (default) for regular templates, "liquid-json" for slack block_kit (JSON whose string
+   * values carry Liquid).
+   */
   language?: string;
   height?: string;
-  /** Optional JSON Schema to validate the source against. Liquid spans are
-   *  stripped to same-length placeholders before validation, so any markers
-   *  Monaco's JSON service produces map back 1:1 onto the editor. Pass with
-   *  `jsonSchemaShadowUri` — a stable per-editor URI. */
+  /**
+   * Optional JSON Schema to validate the source against. Liquid spans are stripped to same-length
+   * placeholders before validation, so any markers Monaco's JSON service produces map back 1:1 onto
+   * the editor. Pass with `jsonSchemaShadowUri` — a stable per-editor URI.
+   */
   jsonSchema?: object;
   jsonSchemaShadowUri?: string;
 }) {
@@ -271,8 +276,10 @@ export function CompactEmailPreview({
 }: {
   subject: string;
   html: string;
-  /** Default iframe height. Callers in drawers with lots of vertical room
-   *  pass a larger value; the user-resize handle still works. */
+  /**
+   * Default iframe height. Callers in drawers with lots of vertical room pass a larger value; the
+   * user-resize handle still works.
+   */
   previewHeight?: string;
 }) {
   return (
@@ -310,8 +317,10 @@ export function CompactEmailPreview({
 
 type SlackBlock = Record<string, unknown>;
 
-/** Name of the synced popup window. Reused across calls so a second click
- *  re-points the existing popup instead of opening a new one. */
+/**
+ * Name of the synced popup window. Reused across calls so a second click re-points the existing
+ * popup instead of opening a new one.
+ */
 const SYNCED_BUILDER_WINDOW_NAME = "lwBlockKitBuilder";
 
 // Compact Slack preview: plain-text renders mrkdwn inline; Block Kit shows block count + links to
@@ -455,7 +464,7 @@ function SlackTextPreviewCard({ text }: { text: string }) {
           Preview
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          — how this message will appear in Slack
+          How this message will appear in Slack
         </Text>
       </HStack>
       <Box padding={4}>

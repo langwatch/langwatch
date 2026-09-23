@@ -62,7 +62,7 @@ function subjectSummary(draft: AutomationDraft): string {
 const SUBJECT_HELP = {
   trace:
     "Which incoming traces this automation acts on. It fires when a trace matches every condition you set.",
-  customGraph: "The metric this alert watches — one series on one of your analytics graphs.",
+  customGraph: "The metric this alert watches: one series on one of your analytics graphs.",
   report:
     "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
@@ -87,8 +87,10 @@ export function SubjectSection({
   prefilledGraphId,
   accordion,
 }: {
-  /** The graph select is locked to this value when the drawer was opened
-   *  from a specific chart card (Phase 5.2). */
+  /**
+   * The graph select is locked to this value when the drawer was opened from a specific chart card
+   * (Phase 5.2).
+   */
   prefilledGraphId?: string;
   accordion?: FacetAccordionProps;
 }) {
@@ -151,7 +153,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
             {(graphs.data ?? []).map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name ?? g.id}
-                {g.trigger && g.id !== draft.customGraphId ? " — already automated" : ""}
+                {g.trigger && g.id !== draft.customGraphId ? " (already automated)" : ""}
               </option>
             ))}
           </NativeSelect.Field>
@@ -337,7 +339,7 @@ function TraceSubject() {
     return (
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
-          This automation uses the older structured filters. It keeps working as is — clear these
+          This automation uses the older structured filters. It keeps working as is: clear these
           conditions to switch it to a search query.
         </Text>
         <FilterDisplay filters={draft.filters} hasBorder />
@@ -393,9 +395,11 @@ function TraceQuerySubject({
   onChange,
   cadence,
   canBatch,
-  /** A report runs on a schedule and sends the traces that matched in the
-   *  window, so it reads as "which traces go in the report", and the per-trace
-   *  firing-rate estimate ("about 6 times a day") does not apply to it. */
+  /**
+   * A report runs on a schedule and sends the traces that matched in the window, so it reads as
+   * "which traces go in the report", and the per-trace firing-rate estimate ("about 6 times a day")
+   * does not apply to it.
+   */
   purpose = "automation",
 }: {
   query: string;
@@ -541,9 +545,11 @@ function TraceQuerySubject({
   );
 }
 
-/** Builder ⇄ Code switch. Code carries a Beta badge — the raw-query editor is
- *  the power-user path we haven't fully polished yet. Builder is disabled (with
- *  a why) when the current query is too rich to represent structurally. */
+/**
+ * Builder ⇄ Code switch. Code carries a Beta badge — the raw-query editor is the power-user path we
+ * haven't fully polished yet. Builder is disabled (with a why) when the current query is too rich
+ * to represent structurally.
+ */
 function SubjectModeToggle({
   mode,
   onMode,
@@ -571,7 +577,7 @@ function SubjectModeToggle({
         {builderEnabled ? (
           builderButton
         ) : (
-          <Tooltip content="This query is too advanced for the builder — simplify it, or keep editing as code.">
+          <Tooltip content="This query is too advanced for the builder: simplify it, or keep editing as code.">
             <Box>{builderButton}</Box>
           </Tooltip>
         )}
@@ -618,8 +624,10 @@ function TracePreview({
   cadence: NotificationCadence;
   canBatch: boolean;
   showFiringRate: boolean;
-  /** An automation must be scoped — an empty query would act on every trace,
-   *  so we say so rather than silently leaving Save disabled. */
+  /**
+   * An automation must be scoped — an empty query would act on every trace, so we say so rather
+   * than silently leaving Save disabled.
+   */
   requireQuery: boolean;
   /** Set when the estimate outruns the plan's daily ceiling, null otherwise. */
   capAdvice: DailyCapAdvice | null;

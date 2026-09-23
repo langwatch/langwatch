@@ -1,12 +1,12 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
-import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** The typed columns/rows/statistics payload `POST /api/v1/query` answers with. */
 export type QueryRunResult =
@@ -17,12 +17,8 @@ export type QuerySchemaResult =
   paths["/api/v1/query/schema"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * Both query languages, as `GET /api/v1/query/reference` describes them.
- *
- * A superset of {@link QuerySchemaResult} in one direction only: it embeds the
- * schema and adds the trace filter language, worked examples and the decision
- * table. Nothing here is tenant data — the values a field holds come from
- * `GET /api/traces/facets`.
+ * Both query languages as `GET /api/v1/query/reference` describes them: {@link QuerySchemaResult}
+ * plus the filter language, examples and decision table. No tenant data; values come from facets.
  */
 export type QueryReferenceResult =
   paths["/api/v1/query/reference"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -112,16 +108,12 @@ export class QueryApiService {
   }
 
   /**
-   * Describes both query languages in one payload: the LangWatchQL schema,
-   * limits and endpoints, the trace filter's syntax and fields, worked examples
-   * validated in both, and which language answers which kind of
-   * question.
+   * Describes both query languages in one payload: the LangWatchQL schema, limits and endpoints,
+   * the trace filter's syntax and fields, worked examples validated in both, and which language
+   * answers which kind of question.
    */
   async reference(): Promise<QueryReferenceResult> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/query/reference",
-      {},
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/query/reference", {});
     if (error) this.handleApiError("read query reference", error, response);
     return data;
   }

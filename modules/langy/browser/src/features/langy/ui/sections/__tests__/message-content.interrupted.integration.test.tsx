@@ -36,7 +36,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
 }));
 
 vi.mock("recharts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("recharts")>();
+  const actual = await importOriginal<typeof rechartsModule>();
   return {
     ...actual,
     ResponsiveContainer: ({
@@ -48,6 +48,7 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 import { useLangyStore } from "@langwatch/langy-browser-kit";
+import type * as rechartsModule from "recharts";
 
 import { MessageContent } from "../message-content.tsx";
 

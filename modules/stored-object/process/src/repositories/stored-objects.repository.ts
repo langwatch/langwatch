@@ -6,13 +6,8 @@ import type { StoredObject } from "../rules/stored-object-row.rules.ts";
 
 export abstract class StoredObjectsRepository {
   /**
-   * Inserts a single stored_objects row.
-   *
-   * Declared as a property of function type, not method shorthand: tests hold
-   * a mock repository and reference these members unbound (e.g.
-   * `vi.mocked(repo.insert)`), which `typescript/unbound-method` flags against
-   * method shorthand. The methods below carry no `this` state, so the
-   * property form changes nothing at runtime.
+   * Inserts one stored_objects row. A function-typed property rather than method shorthand, so
+   * tests can reference members unbound without `typescript/unbound-method`; no runtime difference.
    */
   abstract insert: (params: { projectId: string; row: StoredObject }) => Promise<void>;
 

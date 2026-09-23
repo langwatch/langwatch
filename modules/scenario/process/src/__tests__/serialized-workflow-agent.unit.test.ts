@@ -18,6 +18,7 @@ vi.mock("@langwatch/observability/tracing", () => ({
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { SerializedWorkflowAgentAdapter } from "@langwatch/scenario-process";
+import type * as undiciModule from "undici";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
@@ -31,7 +32,7 @@ const mockFetch = vi.hoisted(() => vi.fn());
 const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
 
 vi.mock("undici", async () => {
-  const actual = await vi.importActual<typeof import("undici")>("undici");
+  const actual = await vi.importActual<typeof undiciModule>("undici");
   return {
     ...actual,
     fetch: mockFetch,

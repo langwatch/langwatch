@@ -1,5 +1,7 @@
+import type * as observabilityModule from "@langwatch/observability";
 import { register } from "prom-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { FoldProjectionStore } from "../foldProjection.types.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
@@ -9,7 +11,7 @@ import { RedisCachedFoldStore } from "../redisCachedFoldStore.ts";
 // warn (once), while leaving every other observability export intact.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof observabilityModule>();
   return {
     ...actual,
     createLogger: () => ({

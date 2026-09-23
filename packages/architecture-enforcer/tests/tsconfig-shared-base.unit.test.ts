@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -71,32 +72,26 @@ function resolveTsconfig(file: string): Resolved {
     chain: [...(parent ? [parent] : []), ...inherited.chain],
     options: {
       ...inherited.options,
-      ...((own.compilerOptions as Record<string, unknown> | undefined) ?? {}),
+      ...(own.compilerOptions as Record<string, unknown> | undefined),
     },
   };
 }
 
 /**
- * A solution names other projects and compiles nothing of its own: no sources,
- * so no options to inherit from the base and no build info to cache. The root
- * `tsconfig.json` the workspace typecheck builds is one, as are the two
- * declaration groups under `dev/`. Every rule below is about a package's own
- * project, so a solution is not a subject of any of them.
+ * A solution names other projects and compiles nothing itself (the root `tsconfig.json`, the two
+ * declaration groups under `dev/`), so none of the package rules below apply to it.
  */
 function isSolution(file: string): boolean {
   const config = readTsconfig(join(REPO_ROOT, file));
   const files = config.files;
 
-  return (
-    Array.isArray(files) && files.length === 0 && config.compilerOptions === void 0
-  );
+  return Array.isArray(files) && files.length === 0 && config.compilerOptions === void 0;
 }
 
 /**
- * The directory of the package a project belongs to: the nearest ancestor with
- * a manifest. A project may keep its build info anywhere inside that package --
- * the mail preview studio emits into `packages/mail/dist`, so its build info
- * belongs there too -- and nowhere outside it.
+ * The directory of the package a project belongs to: the nearest ancestor with a manifest. A
+ * project may keep its build info anywhere inside that package -- the mail preview studio emits
+ * into `packages/mail/dist`, so its build info belongs there too -- and nowhere outside it.
  */
 function owns(project: string, buildInfo: string): boolean {
   let directory = dirname(project);

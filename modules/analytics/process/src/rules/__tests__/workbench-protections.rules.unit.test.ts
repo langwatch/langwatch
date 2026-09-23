@@ -7,6 +7,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
+import type * as dataPrivacyContractModule from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -50,7 +51,7 @@ const API_KEY_CREDENTIAL: RestCredentialPrincipal = {
 const LEGACY_PROJECT_KEY_CREDENTIAL: RestCredentialPrincipal = { kind: "legacyProjectKey" };
 
 function dataPrivacyResolving(
-  resolve: () => Promise<import("@langwatch/data-privacy-contract").ResolvedDataPrivacy>,
+  resolve: () => Promise<dataPrivacyContractModule.ResolvedDataPrivacy>,
 ): { dataPrivacy: DataPrivacyApi; getResolvedForProject: ReturnType<typeof vi.fn> } {
   const getResolvedForProject = vi.fn(resolve);
   return {

@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
+
 import ts from "typescript";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+
 import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const FORBIDDEN_DECLARATION = [
   { pattern: /@prisma\/client/, name: "Prisma" },
@@ -19,16 +21,9 @@ const FORBIDDEN_DECLARATION = [
 ] as const;
 
 /**
- * The declaration text with every comment blanked out, offsets preserved.
- *
- * The patterns above are matched against declaration TEXT, and the compiler
- * copies JSDoc through to the `.d.ts` verbatim. Prose that merely mentions a
- * forbidden path -- "frozen twin of `platform/app/src/...`", "moved from
- * platform/app" -- then reads as a leak: 40 of the first run's 310 findings
- * were comments, not one of them an import. A leak is a thing the type
- * mentions, so comments cannot carry one and string literals always can (an
- * import specifier is a string). Comment bodies become spaces rather than
- * being removed, so a match index still points at the right line.
+ * The declaration text with comments blanked to spaces (offsets kept): JSDoc copied into `.d.ts`
+ * mentioning a forbidden path was 40 of 310 false findings. Strings are kept; import specifiers are
+ * strings.
  */
 function withoutComments(source: string): string {
   const out = source.split("");

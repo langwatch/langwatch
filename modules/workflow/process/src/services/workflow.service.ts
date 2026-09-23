@@ -25,6 +25,7 @@ import {
   type WorkflowMappingFields,
   type WorkflowReference,
 } from "@langwatch/workflow-contract";
+import type * as workflowContractModule from "@langwatch/workflow-contract";
 
 import type { WorkflowDslMigration, WorkflowExecution, WorkflowId } from "../app/workflow.app.ts";
 import type {
@@ -254,7 +255,7 @@ export class WorkflowService {
   }
 
   async create(
-    input: import("@langwatch/workflow-contract").CreateWorkflowCommand,
+    input: workflowContractModule.CreateWorkflowCommand,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     const command = this.parse(createWorkflowCommandSchema, input);
     const id = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
@@ -285,9 +286,7 @@ export class WorkflowService {
     return { workflow: published, version };
   }
 
-  async update(
-    input: import("@langwatch/workflow-contract").UpdateWorkflowCommand,
-  ): Promise<Workflow> {
+  async update(input: workflowContractModule.UpdateWorkflowCommand): Promise<Workflow> {
     const command = this.parse(updateWorkflowCommandSchema, input);
     const existing = await this.getById(command);
     const data = this.dsl.metadata({
@@ -304,7 +303,7 @@ export class WorkflowService {
   }
 
   async saveVersion(
-    input: import("@langwatch/workflow-contract").SaveWorkflowVersionCommand,
+    input: workflowContractModule.SaveWorkflowVersionCommand,
   ): Promise<WorkflowVersion> {
     const command = this.parse(saveWorkflowVersionCommandSchema, input);
     const workflow = await this.getById({
@@ -350,9 +349,7 @@ export class WorkflowService {
     return version;
   }
 
-  async publish(
-    input: import("@langwatch/workflow-contract").PublishWorkflowCommand,
-  ): Promise<Workflow> {
+  async publish(input: workflowContractModule.PublishWorkflowCommand): Promise<Workflow> {
     const command = this.parse(publishWorkflowCommandSchema, input);
     const version = await this.options.repository.findVersion({
       id: command.versionId,
@@ -376,9 +373,7 @@ export class WorkflowService {
     });
   }
 
-  async archive(
-    input: import("@langwatch/workflow-contract").ArchiveWorkflowCommand,
-  ): Promise<Workflow> {
+  async archive(input: workflowContractModule.ArchiveWorkflowCommand): Promise<Workflow> {
     const command = this.parse(archiveWorkflowCommandSchema, input);
     await this.getById(command);
 
@@ -390,7 +385,7 @@ export class WorkflowService {
   }
 
   async copy(
-    input: import("@langwatch/workflow-contract").CopyWorkflowCommand,
+    input: workflowContractModule.CopyWorkflowCommand,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     const command = this.parse(copyWorkflowCommandSchema, input);
     const source = await this.getById({

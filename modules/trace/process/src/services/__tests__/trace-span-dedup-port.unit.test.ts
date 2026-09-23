@@ -1,10 +1,10 @@
-/** Dedup port is structural only: assignable by shape, not by class
- * inheritance. */
+/**
+ * Dedup port is structural only: assignable by shape, not by class inheritance.
+ */
 
 import { describe, expect, it } from "vitest";
 
-import type { TraceSpanDedup } from "../trace-ingestion.service.ts";
-import { type SpanDedupRef } from "../trace-ingestion.service.ts";
+import { type TraceSpanDedup, type SpanDedupRef } from "../trace-ingestion.service.ts";
 
 describe("TraceSpanDedup", () => {
   describe("given a plain object with the port's three methods", () => {

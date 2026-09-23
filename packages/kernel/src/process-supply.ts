@@ -45,10 +45,9 @@ type MissingFrom<
 > &
   string;
 /**
- * What a process exposes: the hosts every declared transport mounts on, and the
- * one handler it serves once they have. Both come from ONE call, at the one
- * moment either can be built — every module's application exists and nothing is
- * listening yet.
+ * What a process exposes: the hosts every declared transport mounts on, and the one handler it
+ * serves once they have. Both come from ONE call, at the one moment either can be built — every
+ * module's application exists and nothing is listening yet.
  */
 export interface ExposedSurface<Rest, Trpc> {
   readonly hosts: FeatureTransportHosts<Rest, Trpc>;
@@ -418,12 +417,8 @@ export class ProcessSupply<
   }
 
   /**
-   * What this process serves. `expose` exists for the roles that answer
-   * requests; a worker has nothing to expose and says so by never calling it.
-   *
-   * The whole composition — which surfaces, on which prefixes, behind which
-   * middleware — is written INSIDE this call, once, by whoever implements it.
-   * A main never sees a namespace, a mount, or any transport internals.
+   * What this process serves; a worker never calls it. The whole composition (surfaces, prefixes,
+   * middleware) is written inside this call, so a main never sees a mount or transport internals.
    */
   expose<NextRest, NextTrpc>(
     surface: (peers: TransportPeers) => ExposedSurface<NextRest, NextTrpc>,

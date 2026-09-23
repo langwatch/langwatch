@@ -1,9 +1,6 @@
 /**
- * The evaluator picker and its navigation flow: picking from the list or
- * creating one, opening the right editor for a new or an already attached
- * evaluator, and wiring the mapping, gate and removal writes back into the
- * suite draft store.
- *
+ * The evaluator picker and its navigation flow: pick or create, open the right editor for a new or
+ * attached evaluator, and write mapping, gate and removal back into the draft store.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
@@ -110,14 +107,9 @@ function editAttachment({
 }
 
 /**
- * What a pick does: an evaluator already attached opens its editor, a new
- * one is attached with inferred mappings and opens its editor when an input
- * still needs a person.
- *
- * A pick from the list replaces the list in the stack, so back from the
- * editor lands on the suite editor. An evaluator created from the list
- * arrives once the stack is already back on the suite editor, so its editor
- * is pushed on top and nothing goes back.
+ * A pick opens an attached evaluator's editor, or attaches a new one with inferred mappings and
+ * opens it if an input needs a person. A created evaluator arrives after the stack is back, so it
+ * is pushed.
  */
 function attachEvaluator({
   evaluator,
@@ -160,10 +152,9 @@ function attachEvaluator({
 }
 
 /**
- * Opens the evaluator list for a pick, and wires the flow that lets a person
- * create an evaluator from it instead: once it is saved, the stack resets to
- * this drawer and the evaluator is attached like a picked one, so its editor
- * sits on top of the suite editor.
+ * Opens the evaluator list for a pick, and wires the flow that lets a person create an evaluator
+ * from it instead: once it is saved, the stack resets to this drawer and the evaluator is attached
+ * like a picked one, so its editor sits on top of the suite editor.
  */
 export function openEvaluatorPicker({
   attach,

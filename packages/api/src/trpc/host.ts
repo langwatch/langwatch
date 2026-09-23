@@ -1,11 +1,6 @@
 /**
- * Where every declared tRPC namespace mounts: one root at `/api/trpc`, plus the
- * subscription lane at `/api/sse` over the SAME router, so a procedure is
- * reachable live exactly when it is reachable at all.
- *
- * tRPC IS session-authenticated. That is not settable by a deployment — it is
- * what this transport means — so the session reader is a required collaborator
- * and nothing upstream can omit or replace it.
+ * Where every tRPC namespace mounts: `/api/trpc`, plus the subscription lane at `/api/sse` over the
+ * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
  */
 import { LiteMemberRestrictedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -428,4 +423,3 @@ function namespaceOf(declaration: MountableTransport): string {
 
   throw new Error("A tRPC declaration reached the tRPC surface with no namespace.");
 }
-

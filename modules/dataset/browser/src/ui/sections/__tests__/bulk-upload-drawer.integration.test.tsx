@@ -16,7 +16,7 @@ const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 const retryDatasetNormalize = vi.fn();
 vi.mock("../../../behavior/direct-upload.ts", async (orig) => {
-  const actual = await orig<typeof import("../../../behavior/direct-upload.ts")>();
+  const actual = await orig<typeof directUploadModule>();
   return {
     ...actual,
     requestDirectUpload: (...a: unknown[]) => requestDirectUpload(...a),
@@ -29,7 +29,7 @@ vi.mock("../../../behavior/direct-upload.ts", async (orig) => {
 
 const parseHeaderColumns = vi.fn();
 vi.mock("../../../model/parse-header-columns.ts", async (orig) => {
-  const actual = await orig<typeof import("../../../model/parse-header-columns.ts")>();
+  const actual = await orig<typeof parseHeaderColumnsModule>();
   return {
     ...actual,
     parseHeaderColumns: (...a: unknown[]) => parseHeaderColumns(...a),
@@ -49,6 +49,8 @@ vi.mock("../../../behavior/dataset-api.ts", () => ({
   },
 }));
 
+import type * as directUploadModule from "../../../behavior/direct-upload.ts";
+import type * as parseHeaderColumnsModule from "../../../model/parse-header-columns.ts";
 import { BulkUploadDrawer } from "../bulk-upload-drawer.tsx";
 
 // Faithful to what `parseHeaderColumns` actually returns: each column carries

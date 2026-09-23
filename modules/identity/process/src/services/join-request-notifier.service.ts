@@ -278,10 +278,8 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   /**
-   * A personal project of the requester's own, in any organization they already hold one
-   * in — not necessarily the one whose request just lapsed, since a request that never
-   * resolved never gave them a personal workspace THERE. `undefined` when they have none
-   * yet, which is the ordinary case for somebody who has never signed in before.
+   * A personal project of the requester's own in any organization they hold one in, not necessarily
+   * this one. `undefined` when they have none yet, the ordinary case for a first sign-in.
    */
   private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
     const slug = await this.context.tryFindPersonalTeamSlug(userId);
@@ -289,10 +287,9 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   /**
-   * Seats held against what the plan covers, or nothing for an organization on
-   * enterprise or negotiated terms — the same gate the invitation re-request
-   * mail's seat census uses, since a public seat ceiling is not that
-   * organization's number either.
+   * Seats held against what the plan covers, or nothing for an organization on enterprise or
+   * negotiated terms — the same gate the invitation re-request mail's seat census uses, since a
+   * public seat ceiling is not that organization's number either.
    */
   private async trySeats({
     organizationId,

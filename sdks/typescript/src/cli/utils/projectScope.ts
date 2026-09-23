@@ -4,6 +4,7 @@ import {
   ProjectsApiService,
   type Project,
 } from "@/client-sdk/services/projects/projects-api.service";
+
 import type { GovernanceConfig } from "./governance/config";
 
 /** Error on --project resolution: code is not_accessible or lookup_failed. */
@@ -125,11 +126,8 @@ export const resolveProjectSelector = async ({
 };
 
 /**
- * Where the key in hand came from, which decides what to tell someone whose
- * key cannot be pointed at the project they named. `--api-key` and
- * `LANGWATCH_API_KEY` are two sources, not one: the way out of the first is to
- * drop the flag, and telling that user to unset a variable they never set
- * points them at a key that is not the one answering.
+ * Where the key in hand came from, which decides the advice when it cannot be pointed at the named
+ * project: drop `--api-key`, or unset `LANGWATCH_API_KEY`.
  */
 export type BoundKeySource = "flag-key" | "env-key" | "personal-project-login";
 
@@ -167,13 +165,8 @@ const BOUND_KEY_COPY: Record<
 };
 
 /**
- * The refusal for a project named against a key that carries its own project.
- *
- * A legacy project key (`sk-lw-` with no lookup id) encodes its project in the
- * token, so the server reads the project off the key and ignores any the
- * request names. Running anyway answers from the key's own project, which is
- * the silence this replaces: the rows come back, they are from somewhere else,
- * and nothing on screen says so.
+ * The refusal for a project named against a legacy project key (`sk-lw-`, no lookup id), whose
+ * project the server reads off the token; running anyway would silently answer from elsewhere.
  */
 export const projectScopeNotSupported = ({
   selector,

@@ -1,10 +1,6 @@
 /**
- * Which workflow an agent is linked to, when the row and the config disagree.
- *
- * The column was added after the config field, so both carry an answer on the
- * rows written before the migration and only one carries it after. Every read
- * that resolves an agent's fields goes through this, which is why the
- * precedence is pinned here rather than inside one caller's suite.
+ * Which workflow an agent is linked to when the column and the config disagree (pre-migration rows
+ * carry both). Every field-resolving read goes through this, so the precedence is pinned here.
  */
 import { describe, expect, it } from "vitest";
 

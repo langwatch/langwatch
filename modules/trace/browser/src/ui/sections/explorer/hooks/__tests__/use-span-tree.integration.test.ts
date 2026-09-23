@@ -4,6 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness.ts";
+import type * as spanTreePagedQueryModule from "../span-tree-paged-query.ts";
 import { useSpanTree } from "../use-span-tree.ts";
 
 type TreeQueryOptions = {
@@ -91,9 +92,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 const QUERY_FN_MARKER = () => Promise.resolve([]);
 
 vi.mock("../span-tree-paged-query.ts", async () => {
-  const actual = await vi.importActual<typeof import("../span-tree-paged-query.ts")>(
-    "../span-tree-paged-query",
-  );
+  const actual = await vi.importActual<typeof spanTreePagedQueryModule>("../span-tree-paged-query");
   return {
     spanTreeQueryKey: (input: unknown) => ["spanTree", input],
     spanTreeQueryFn: () => QUERY_FN_MARKER,

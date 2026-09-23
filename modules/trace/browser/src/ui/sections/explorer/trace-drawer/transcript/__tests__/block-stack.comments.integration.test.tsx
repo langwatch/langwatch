@@ -25,7 +25,7 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("../../../hooks/use-anchored-annotations.ts", async () => {
-  const actual = await vi.importActual<typeof import("../../../hooks/use-anchored-annotations.ts")>(
+  const actual = await vi.importActual<typeof useAnchoredAnnotationsModule>(
     "../../../hooks/use-anchored-annotations",
   );
   return {
@@ -91,6 +91,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 import { withBlockKeys } from "@langwatch/trace-contract/transcript";
 import type { ContentBlock } from "@langwatch/trace-contract/transcript";
 
+import type * as useAnchoredAnnotationsModule from "../../../hooks/use-anchored-annotations.ts";
 import { BlockStack } from "../block-stack.tsx";
 import { MessageCommentScope } from "../message-comments.tsx";
 
