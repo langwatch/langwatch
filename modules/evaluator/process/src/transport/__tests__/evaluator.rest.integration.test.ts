@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `/api/evaluators` family over the runtime a process mounts it on:
@@ -22,7 +23,7 @@ import { createEvaluatorRest } from "../evaluator.rest.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
-const evaluator = {
+const evaluator: Evaluator = {
   id: "evaluator_1",
   projectId: "project-1",
   name: "Original Name",
@@ -31,9 +32,10 @@ const evaluator = {
   config: { evaluatorType: "langevals/exact_match", settings: {} },
   workflowId: null,
   copiedFromEvaluatorId: null,
+  archivedAt: null,
   createdAt: NOW,
   updatedAt: NOW,
-} as unknown as Evaluator;
+};
 
 /** What the read routes answer with: the row plus its computed fields. */
 const enriched = { ...evaluator, fields: [], outputFields: [] };
@@ -61,7 +63,7 @@ const renderHandled: RestErrorHandler = (error, c) => {
   return c.json({ error: "internal_server_error" }, 500);
 };
 
-function buildApi(overrides: Record<string, unknown> = {}) {
+function buildApi(overrides: Partial<EvaluatorApi> = {}) {
   const mocks = {
     getAllWithFields: vi.fn(async () => [enriched]),
     findByIdOrSlugWithFields: vi.fn(async () => enriched),
@@ -72,11 +74,11 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     archive: vi.fn(async () => evaluator),
     ...overrides,
   };
-  const stub = {
+  const stub = createApiFixture<EvaluatorApi>({
     platformUrl: ({ projectSlug, path }: { projectSlug: string; path: string }) =>
       `https://app.langwatch.test/${projectSlug}${path}`,
     ...mocks,
-  } as unknown as EvaluatorApi;
+  });
 
   const runtime = createRestRuntime({
     identity: {

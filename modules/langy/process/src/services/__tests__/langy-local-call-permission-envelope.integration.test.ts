@@ -6,7 +6,7 @@
 
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
@@ -61,15 +61,22 @@ async function callWaitingOnACard(clock: { now: number }) {
   return { dispatcher, store, callId: call.callId };
 }
 
+type WaitingCall = Awaited<ReturnType<typeof callWaitingOnACard>>;
+
 describe("given a call waiting on a permission card", () => {
   describe("when the developer answers long after the command's own limit", () => {
+    let clock: { now: number };
+    let dispatcher: WaitingCall["dispatcher"];
+    let callId: WaitingCall["callId"];
+
+    beforeEach(async () => {
+      clock = { now: 1_752_600_100_000 };
+      ({ dispatcher, callId } = await callWaitingOnACard(clock));
+      clock.now += ANSWER_DELAY_MS;
+    });
+
     /** @scenario "A call waiting on a permission card keeps its envelope" */
     it("still holds the call, and gives the command its whole limit again", async () => {
-      const clock = { now: 1_752_600_100_000 };
-      const { dispatcher, callId } = await callWaitingOnACard(clock);
-
-      clock.now += ANSWER_DELAY_MS;
-
       const waiting = await dispatcher.read(callId);
       expect(waiting?.state).toBe("awaiting_permission");
       const polled = await dispatcher.tryPoll({ callId, holdMs: 0 });
@@ -89,11 +96,6 @@ describe("given a call waiting on a permission card", () => {
 
     /** @scenario "A call waiting on a permission card keeps its envelope" */
     it("keeps the call in the conversation's pending set", async () => {
-      const clock = { now: 1_752_600_100_000 };
-      const { dispatcher, callId } = await callWaitingOnACard(clock);
-
-      clock.now += ANSWER_DELAY_MS;
-
       const pending = await dispatcher.pendingEnvelopes(conversationId);
       expect(pending.map((envelope) => envelope.callId)).toEqual([callId]);
     });

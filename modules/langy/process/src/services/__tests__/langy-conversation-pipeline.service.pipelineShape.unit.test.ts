@@ -1,8 +1,9 @@
-import type {
-  AppendStore,
-  EventSubscriberDefinition,
-  ProjectionStoreContext,
-  StateProjectionStore,
+import {
+  type AppendStore,
+  createTenantId,
+  type EventSubscriberDefinition,
+  type ProjectionStoreContext,
+  type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
@@ -32,9 +33,9 @@ import {
 
 /** Append-only store — deliberately no load/read/get, matching the map contract. */
 function appendStore<T>(
-  append: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined),
+  append: AppendStore<T>["append"] = vi.fn().mockResolvedValue(undefined),
 ): AppendStore<T> {
-  return { append: append as unknown as AppendStore<T>["append"] };
+  return { append };
 }
 
 function stateStore<T>(): StateProjectionStore<T> {
@@ -218,7 +219,7 @@ describe("langy-conversation-processing pipeline shape", () => {
         });
         const context: ProjectionStoreContext = {
           aggregateId: CONVERSATION_ID,
-          tenantId: PROJECT_ID as unknown as ProjectionStoreContext["tenantId"],
+          tenantId: createTenantId(PROJECT_ID),
         };
 
         // The framework's per-event step: pure map -> append. No prior read.

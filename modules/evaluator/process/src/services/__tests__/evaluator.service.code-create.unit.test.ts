@@ -17,9 +17,30 @@ function persistedConfig(config: PersistEvaluatorInput["config"]): Evaluator["co
   return JSON.parse(JSON.stringify(config ?? null));
 }
 
+function notUsedHere(): Promise<never> {
+  return Promise.reject(new Error("this repository member is not used in this case"));
+}
+
+function unusedRepository(): EvaluatorRepository {
+  return {
+    findById: notUsedHere,
+    findByIdAcrossProjects: notUsedHere,
+    findBySlug: notUsedHere,
+    findByWorkflow: notUsedHere,
+    findByIdOrSlug: notUsedHere,
+    findAll: notUsedHere,
+    findCopies: notUsedHere,
+    create: notUsedHere,
+    update: notUsedHere,
+    archive: notUsedHere,
+    updateNameAndConfig: notUsedHere,
+  };
+}
+
 function buildService() {
   const created: PersistEvaluatorInput[] = [];
-  const repository = {
+  const repository: EvaluatorRepository = {
+    ...unusedRepository(),
     create: async (input: PersistEvaluatorInput) => {
       created.push(input);
       return {
@@ -63,7 +84,7 @@ function buildService() {
               updatedAt: new Date(),
             }) satisfies Evaluator,
         ),
-  } as unknown as EvaluatorRepository;
+  };
 
   const workflows = {} as never;
   const codeExecution: EvaluatorCodeExecution = {

@@ -16,7 +16,9 @@ import {
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);
-  const stash = vi.fn(async () => undefined);
+  const stash = vi.fn<(input: { system: string; historySeed?: string }) => Promise<undefined>>(
+    async () => undefined,
+  );
   const findAllByConversation = vi.fn(async (): Promise<LangyMessageRow[]> => []);
   const probe = vi.fn(async () => false);
 
@@ -206,11 +208,9 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
     expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
-    const stashed = (
-      mocks.stash.mock.calls[0] as unknown as [{ system: string; historySeed?: string }]
-    )[0];
-    expect(stashed.historySeed).toBe(historySeed);
-    expect(stashed.system).toBe(system);
+    const stashed = mocks.stash.mock.calls[0]?.[0];
+    expect(stashed?.historySeed).toBe(historySeed);
+    expect(stashed?.system).toBe(system);
   });
 
   /** @scenario Carrying the conversation does not defeat prompt caching */

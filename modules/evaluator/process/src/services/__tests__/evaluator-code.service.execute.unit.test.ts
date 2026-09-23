@@ -27,10 +27,31 @@ const savedEvaluator: Evaluator = {
   updatedAt: new Date(),
 };
 
+function notUsedHere(): Promise<never> {
+  return Promise.reject(new Error("this repository member is not used in this case"));
+}
+
+function unusedRepository(): EvaluatorRepository {
+  return {
+    findById: notUsedHere,
+    findByIdAcrossProjects: notUsedHere,
+    findBySlug: notUsedHere,
+    findByWorkflow: notUsedHere,
+    findByIdOrSlug: notUsedHere,
+    findAll: notUsedHere,
+    findCopies: notUsedHere,
+    create: notUsedHere,
+    update: notUsedHere,
+    archive: notUsedHere,
+    updateNameAndConfig: notUsedHere,
+  };
+}
+
 function buildService(codeExecution: EvaluatorCodeExecution) {
-  const repository = {
+  const repository: EvaluatorRepository = {
+    ...unusedRepository(),
     findById: async () => savedEvaluator,
-  } as unknown as EvaluatorRepository;
+  };
   const workflows = {
     enrichStudioEvent: async ({ event }: { event: StudioClientEvent }) => event,
   } as never;

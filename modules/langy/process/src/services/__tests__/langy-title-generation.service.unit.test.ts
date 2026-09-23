@@ -17,7 +17,7 @@ const records = [{ id: "msg_1", role: "user", content: "instrument my traces wit
 function messages(rows = records): LangyTrustedMessageReader {
   return {
     getRecordsByConversation: vi.fn().mockResolvedValue(rows),
-  } as unknown as LangyTrustedMessageReader;
+  };
 }
 
 /** A model resolver standing in for the project's own model configuration. */

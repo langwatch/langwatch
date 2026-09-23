@@ -91,7 +91,7 @@ describe("LangyTurnBaseDependenciesService harness resolution", () => {
     it("rides the harness on the probe, the handoff stash and the dispatch", async () => {
       const fixture = makeFixture({
         harness: { resolve: vi.fn(async () => "pi" as const) },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
 
       await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 

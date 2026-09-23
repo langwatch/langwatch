@@ -98,11 +98,10 @@ function renderSidebar({
  */
 function recordScrollIntoView(): { element: HTMLElement; options?: ScrollIntoViewOptions }[] {
   const scrolls: { element: HTMLElement; options?: ScrollIntoViewOptions }[] = [];
-  (
-    window.HTMLElement.prototype as unknown as {
-      scrollIntoView: (options?: ScrollIntoViewOptions) => void;
-    }
-  ).scrollIntoView = function (this: HTMLElement, options?: ScrollIntoViewOptions) {
+  window.HTMLElement.prototype.scrollIntoView = function (
+    this: HTMLElement,
+    options?: ScrollIntoViewOptions,
+  ) {
     scrolls.push({ element: this, options });
   };
   return scrolls;
