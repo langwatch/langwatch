@@ -95,7 +95,7 @@ function spanWith(attributes: { key: string; value: { stringValue: string } }[])
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 function serviceWith(options: {
@@ -152,7 +152,7 @@ describe("given a tenant whose policy resolves to the essential level", () => {
         attributes: [{ key: "note", value: { stringValue: "ana@example.com" } }],
         droppedAttributesCount: 0,
       },
-    ] as unknown as OtlpSpan["events"];
+    ];
     span.links = [
       {
         traceId: "t",
@@ -160,12 +160,12 @@ describe("given a tenant whose policy resolves to the essential level", () => {
         attributes: [{ key: "note", value: { stringValue: "bob@example.com" } }],
         droppedAttributesCount: 0,
       },
-    ] as unknown as OtlpSpan["links"];
+    ];
     span.status = { message: "failed for cara@example.com", code: 2 } as OtlpSpan["status"];
-    const resource = {
+    const resource: OtlpResource = {
       attributes: [{ key: "host.user", value: { stringValue: "dan@example.com" } }],
       droppedAttributesCount: 0,
-    } as unknown as OtlpResource;
+    };
 
     await serviceWith({ transport }).redactSpan({
       span,

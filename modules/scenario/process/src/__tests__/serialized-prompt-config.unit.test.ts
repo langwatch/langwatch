@@ -2,10 +2,10 @@
  * @vitest-environment node
  */
 
-import { createLogger } from "@langwatch/observability";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
 import { SerializedPromptConfigAdapter } from "@langwatch/scenario-process";
+import { createTestLogger } from "@langwatch/test-harness";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -298,8 +298,7 @@ describe("SerializedPromptConfigAdapter", () => {
             { identifier: "customer_tier", type: "str" },
           ],
         };
-        const logger = createLogger("scenario-prompt-adapter-test");
-        vi.spyOn(logger, "warn").mockImplementation(() => void 0);
+        const { logger } = createTestLogger();
         const adapter = new SerializedPromptConfigAdapter({
           config: config,
           litellmParams: defaultLitellmParams,

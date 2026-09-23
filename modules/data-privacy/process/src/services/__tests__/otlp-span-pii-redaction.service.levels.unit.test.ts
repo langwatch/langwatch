@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type {
@@ -17,17 +18,15 @@ import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-pol
  * The rollout switches this suite reads, held in memory. The packaged flag
  * service is another feature's server package, which this one may not reach.
  */
-class FlagSwitches {
-  private readonly on = new Set<string>();
-
-  setFlag(key: string, value: boolean): void {
-    if (value) this.on.add(key);
-    else this.on.delete(key);
-  }
-
-  isEnabled = async (key: string): Promise<boolean> => this.on.has(key);
-  getVariant = async (): Promise<null> => null;
-  getPayload = async (): Promise<null> => null;
+function flagSwitches(): { api: FeatureFlagApi; setFlag(key: string, value: boolean): void } {
+  const on = new Set<string>();
+  return {
+    api: createApiFixture<FeatureFlagApi>({ isEnabled: async (key: string) => on.has(key) }),
+    setFlag: (key, value) => {
+      if (value) on.add(key);
+      else on.delete(key);
+    },
+  };
 }
 
 /** The analysis-service batch call the strict level escalates to. */
@@ -82,11 +81,11 @@ function transportFor(batch: BatchClearPIIFunction) {
 describe("OtlpSpanPiiRedactionService", () => {
   let service: OtlpSpanPiiRedactionService;
   let batchSpy: ReturnType<typeof vi.fn>;
-  let featureFlags: FlagSwitches;
+  let featureFlags: ReturnType<typeof flagSwitches>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    featureFlags = new FlagSwitches();
+    featureFlags = flagSwitches();
     const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
     batchSpy = spy;
     service = OtlpSpanPiiRedactionService.create({
@@ -95,7 +94,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       isProduction: false,
       nativePolicyEnforced: false,
       dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
-      featureFlags: featureFlags as unknown as FeatureFlagApi,
+      featureFlags: featureFlags.api,
       piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
     });
   });

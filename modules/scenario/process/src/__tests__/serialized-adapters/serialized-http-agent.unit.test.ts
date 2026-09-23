@@ -747,14 +747,14 @@ describe("SerializedHttpAgentAdapter", () => {
       sessionPath: "$.conversation_id",
     };
 
-    const reply = (body: Record<string, unknown>) =>
-      ({
-        ok: true,
-        status: 200,
-        headers: new Headers({ "content-type": "application/json" }),
-        json: vi.fn().mockResolvedValue(body),
-        text: vi.fn().mockResolvedValue(JSON.stringify(body)),
-      }) as unknown as Awaited<ReturnType<typeof mockScenarioHttpFetch>>;
+    const reply = (body: Record<string, unknown>) => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({ "content-type": "application/json" }),
+      json: vi.fn().mockResolvedValue(body),
+      text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+    });
 
     const turn = (threadId: string, text: string): AgentInput => ({
       ...defaultInput,

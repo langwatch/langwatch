@@ -52,7 +52,7 @@ function job(): ExecutionJobData {
   };
 }
 
-const jobData = {
+const jobData: ChildProcessJobData = {
   context: { projectId: "proj-1", scenarioId: "scen-1", setId: "set-1", batchRunId: "batch-1" },
   scenario: { id: "scen-1", name: "Test", situation: "Ask", criteria: [], labels: [] },
   adapterData: {
@@ -66,7 +66,7 @@ const jobData = {
   nlpServiceUrl: "http://langwatch_nlp:5561",
   target: { type: "http", referenceId: "agent-1" },
   parameters: {},
-} as unknown as ChildProcessJobData;
+};
 
 describe("NodeScenarioChildProcessAdapter", () => {
   beforeEach(() => {

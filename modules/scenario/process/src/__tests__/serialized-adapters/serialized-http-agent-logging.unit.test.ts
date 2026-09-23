@@ -3,9 +3,10 @@
  * at appropriate level with CloudWatch-friendly fields (lw#3593).
  */
 
-import { createLogger, type Logger } from "@langwatch/observability";
+import type { Logger } from "@langwatch/observability";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -21,15 +22,6 @@ vi.mock("@langwatch/observability/tracing", () => ({
 }));
 
 const mockSsrfSafeFetch = mockScenarioHttpFetch;
-
-function makeFakeLogger(): Logger {
-  const logger = createLogger("scenario-http-adapter-test");
-  vi.spyOn(logger, "info").mockImplementation(() => void 0);
-  vi.spyOn(logger, "warn").mockImplementation(() => void 0);
-  vi.spyOn(logger, "error").mockImplementation(() => void 0);
-  vi.spyOn(logger, "debug").mockImplementation(() => void 0);
-  return logger;
-}
 
 const defaultConfig: HttpAgentData = {
   type: "http",
@@ -52,10 +44,11 @@ const defaultInput: AgentInput = {
 
 describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
   let logger: Logger;
+  let lines: TestLogLines;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    logger = makeFakeLogger();
+    ({ logger, lines } = createTestLogger());
   });
 
   describe("given the upstream returns 200", () => {
@@ -78,14 +71,13 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
 
         await adapter.call(defaultInput);
 
-        expect(logger.info).toHaveBeenCalledWith(
+        expect(lines.findLine("info", "http call ok")).toEqual(
           expect.objectContaining({
             url: "https://api.example.com/chat",
             method: "POST",
             statusCode: 200,
             durationMs: expect.any(Number),
           }),
-          "http call ok",
         );
       });
     });
@@ -117,10 +109,8 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
 
         // X-Custom-Token is not a name any list can know about. The value
         // scrub is what keeps the credential out of the log line.
-        const [entry] = vi.mocked(logger.info).mock.calls[0] as [
-          { headers: Record<string, string> },
-        ];
-        expect(entry.headers["X-Custom-Token"]).toBe("[redacted]");
+        const entry = lines.findLine("info", "http call ok");
+        expect(entry?.headers).toMatchObject({ "X-Custom-Token": "[redacted]" });
         expect(JSON.stringify(entry)).not.toContain("tok-live-abc123");
       });
     });
@@ -146,7 +136,7 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
 
         await expect(adapter.call(defaultInput)).rejects.toThrow(/HTTP 503/);
 
-        expect(logger.warn).toHaveBeenCalledWith(
+        expect(lines.findLine("warn", "http call failed")).toEqual(
           expect.objectContaining({
             url: "https://api.example.com/chat",
             method: "POST",
@@ -154,7 +144,6 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
             durationMs: expect.any(Number),
             responseBodyPreview: expect.stringContaining("upstream busy"),
           }),
-          "http call failed",
         );
       });
     });
@@ -173,14 +162,13 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
 
         await expect(adapter.call(defaultInput)).rejects.toThrow("ECONNREFUSED");
 
-        expect(logger.error).toHaveBeenCalledWith(
+        expect(lines.findLine("error", "http call failed")).toEqual(
           expect.objectContaining({
             url: "https://api.example.com/chat",
             method: "POST",
             errorClass: "Error",
             message: "ECONNREFUSED",
           }),
-          "http call failed",
         );
       });
     });

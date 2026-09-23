@@ -155,7 +155,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
       isSaas: false,
     }),
     translation: VercelAiModelTranslationAdapter.create({
-      projects: {} as unknown as ProjectApi,
+      projects: createApiFixture<ProjectApi>({}),
       executionProxyBaseUrl: "http://langwatch_nlp:5561/go/proxy/v1",
     }),
     ids: PrefixedModelProviderIdAdapter.create({

@@ -311,7 +311,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
     );
   });
 
-  describe("parked handoffs", () => {
+  describe("given parked handoffs", () => {
     /**
      * Broadcasts are fire-and-forget: a tab that is mid-reload when one goes
      * out would miss a run the SDK was already told had been delivered.

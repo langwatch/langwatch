@@ -15,6 +15,7 @@ type BatchClearPIIFunction = (
   options: Record<string, unknown>,
 ) => Promise<(string | null)[]>;
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 
@@ -26,21 +27,19 @@ const TENANT = createTenantId("project-web-app");
  * The rollout switches this suite reads, held in memory. The packaged flag
  * service is another feature's server package, which this one may not reach.
  */
-class FlagSwitches {
-  private readonly on = new Set<string>();
-
-  setFlag(key: string, value: boolean): void {
-    if (value) this.on.add(key);
-    else this.on.delete(key);
-  }
-
-  isEnabled = async (key: string): Promise<boolean> => this.on.has(key);
-  getVariant = async (): Promise<null> => null;
-  getPayload = async (): Promise<null> => null;
+function flagSwitches(): { api: FeatureFlagApi; setFlag(key: string, value: boolean): void } {
+  const on = new Set<string>();
+  return {
+    api: createApiFixture<FeatureFlagApi>({ isEnabled: async (key: string) => on.has(key) }),
+    setFlag: (key, value) => {
+      if (value) on.add(key);
+      else on.delete(key);
+    },
+  };
 }
 
 /** No rollout is on unless a case turns one on. */
-const allFlagsOff = new FlagSwitches() as never;
+const allFlagsOff = flagSwitches().api;
 
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,
@@ -105,7 +104,7 @@ function spanWith(attributes: Record<string, string>): OtlpSpan {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 function attr(span: OtlpSpan, key: string): string | undefined {
@@ -550,11 +549,8 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // The strict-PII analysis kill switch is on, so buildOptions returns null
       // even though langevals is configured. That is a deliberate opt-out, not an
       // outage, so the incomplete marker must NOT show.
-      const featureFlags = new FlagSwitches() as unknown as FeatureFlagApi;
-      (featureFlags as unknown as FlagSwitches).setFlag(
-        "ops_pii_strict_presidio_redaction_disabled",
-        true,
-      );
+      const switches = flagSwitches();
+      switches.setFlag("ops_pii_strict_presidio_redaction_disabled", true);
       const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
       const service = OtlpSpanPiiRedactionService.create({
         isLangevalsConfigured: true,
@@ -563,7 +559,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         nativePolicyEnforced: true,
         piiRedactionMaxAttributeLength: 250_000,
         dataPrivacy: resolverFor(mkPolicy({ piiLevel: "strict" })),
-        featureFlags,
+        featureFlags: switches.api,
       });
       const span = spanWith({ input: "mail a@b.com, I am John from New York" });
 

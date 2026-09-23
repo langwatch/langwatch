@@ -73,7 +73,7 @@ function span(
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 const keys = (target: OtlpSpan): string[] => target.attributes.map((attr) => attr.key);

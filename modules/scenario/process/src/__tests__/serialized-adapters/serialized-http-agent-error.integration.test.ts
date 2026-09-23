@@ -5,9 +5,10 @@
 
 import http from "node:http";
 
-import { createLogger, type Logger } from "@langwatch/observability";
+import type { Logger } from "@langwatch/observability";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { createTestLogger, type TestLogLine } from "@langwatch/test-harness";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.fixture.ts";
@@ -72,39 +73,21 @@ async function createStubServer(): Promise<StubServer> {
 }
 
 // ---------------------------------------------------------------------------
-// Fake logger — captures every call to info/warn/error for assertion.
-// Mirrors the makeFakeLogger pattern from
-// http-agent.adapter.logging.unit.test.ts.
+// Test logger — a real pino logger writing into memory for assertion.
 // ---------------------------------------------------------------------------
 
-type FakeLogger = Logger;
+type FakeLogger = ReturnType<typeof createTestLogger>;
 
 function makeFakeLogger(): FakeLogger {
-  const logger = createLogger("scenario-http-error-test");
-  vi.spyOn(logger, "info").mockImplementation(() => void 0);
-  vi.spyOn(logger, "warn").mockImplementation(() => void 0);
-  vi.spyOn(logger, "error").mockImplementation(() => void 0);
-  vi.spyOn(logger, "debug").mockImplementation(() => void 0);
-  return logger;
+  return createTestLogger();
 }
 
-function loggerArg(logger: FakeLogger): Logger {
-  return logger;
+function loggerArg(fake: FakeLogger): Logger {
+  return fake.logger;
 }
 
-function collectEntries(logger: FakeLogger): Record<string, unknown>[] {
-  const entries: Record<string, unknown>[] = [];
-  for (const level of ["info", "warn", "error", "debug"] as const) {
-    for (const call of vi.mocked(logger[level]).mock.calls) {
-      const [obj, msg] = call;
-      entries.push({
-        level,
-        msg,
-        ...(typeof obj === "object" && obj !== null ? (obj as Record<string, unknown>) : {}),
-      });
-    }
-  }
-  return entries;
+function collectEntries(fake: FakeLogger): TestLogLine[] {
+  return [...fake.lines];
 }
 
 // ---------------------------------------------------------------------------
