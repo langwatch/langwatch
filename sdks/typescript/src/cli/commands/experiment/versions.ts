@@ -35,25 +35,25 @@ const authorOf = (version: ExperimentVersionSummary): string => {
 const versionOf = (version: ExperimentVersionSummary): string =>
   version.autoSaved ? "autosave" : `v${version.version}`;
 
+const readLimit = (raw: string | undefined): number => {
+  if (raw === undefined) return DEFAULT_LIMIT;
+  const parsed = parsePositiveIntOrNull(raw);
+  if (parsed === null) {
+    // Falling back to the default would serve a page size nobody asked for,
+    // and the caller would read the short page as the whole history.
+    console.error(`--limit takes a whole number of versions, 1 to ${MAX_PAGE_SIZE}. Got "${raw}".`);
+    process.exit(1);
+  }
+  return Math.min(parsed, MAX_PAGE_SIZE);
+};
+
 export const experimentVersionsCommand = async (
   slug: string,
   options: ExperimentVersionsOptions = {},
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const limit = (() => {
-    if (options.limit === undefined) return DEFAULT_LIMIT;
-    const parsed = parsePositiveIntOrNull(options.limit);
-    if (parsed === null) {
-      // Falling back to the default would serve a page size nobody asked for,
-      // and the caller would read the short page as the whole history.
-      console.error(
-        `--limit takes a whole number of versions, 1 to ${MAX_PAGE_SIZE}. Got "${options.limit}".`,
-      );
-      process.exit(1);
-    }
-    return Math.min(parsed, MAX_PAGE_SIZE);
-  })();
+  const limit = readLimit(options.limit);
 
   const cursor = (() => {
     if (options.cursor === undefined) return undefined;

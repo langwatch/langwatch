@@ -51,7 +51,7 @@ export const resultsInstantEvalCommand = async (
     process.exit(1);
   }
 
-  const isMatched = options.matched ? true : options.unmatched ? false : undefined;
+  const isMatched = options.matched || (options.unmatched ? false : undefined);
   const limit = readCountFlag({
     raw: options.limit,
     flag: "--limit",
