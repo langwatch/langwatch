@@ -211,7 +211,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
         llm.invoke([{ role: "user", content: "This should fail" }], {
           callbacks: [tracingCallback],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     await spanProcessor.forceFlush();

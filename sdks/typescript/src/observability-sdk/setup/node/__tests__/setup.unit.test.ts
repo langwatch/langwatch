@@ -219,7 +219,7 @@ describe("langwatch configuration", () => {
         logger,
         resourceFromAttributes({}),
       ),
-    ).toThrow();
+    ).toThrow(Error);
   });
 
   it("does not warn when langwatch disabled but alternatives provided", () => {
