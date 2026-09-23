@@ -422,6 +422,22 @@ Three things to know before flipping it on:
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
+### Voice worker (phone targets)
+
+Off by default. Set `voice.enabled: true` to deploy a single-replica worker that lets scenario/agent runs place and receive phone calls.
+
+**Media Streams connects inbound to you.** Without a publicly-reachable `voice.publicBaseUrl`, there are no phone targets, no matter what else is configured: the call provider dials that URL back to reach the worker's WebSocket listener.
+
+Minimum viable opt-in:
+
+```yaml
+voice:
+  enabled: true
+  publicBaseUrl: "https://voice.your-corp.com" # must be inbound-reachable from the call provider
+```
+
+Terminate TLS at your own edge, either `voice.ingress.enabled: true` with your own hostname/annotations, or an external load balancer pointed at the `voice.service`. Call-provider credentials (account SID, auth token, from-number) are configured per project inside LangWatch, not chart values.
+
 ## Upgrade
 
 ```bash

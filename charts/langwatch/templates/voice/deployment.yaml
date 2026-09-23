@@ -1,0 +1,131 @@
+{{- if .Values.voice.enabled }}
+{{- $voicePublicBaseUrl := include "langwatch.voice.publicBaseUrl" . }}
+{{/* Empty means unresolved: no explicit voice.publicBaseUrl and
+     app.http.publicUrl is not an https:// origin (e.g. the chart default,
+     http://localhost:5560). That is a quiet "render nothing", not a failure
+     — see the helper doc comment. An explicit bad value never resolves to
+     empty, so it always reaches the regex check below and fails loudly. */}}
+{{- if $voicePublicBaseUrl }}
+{{- if not (regexMatch "^https://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$" $voicePublicBaseUrl) }}
+{{- fail (printf "voice.publicBaseUrl (%q) must be an https origin only: scheme, hostname, optional port 1-65535, no path or query, for example https://voice.example.com." $voicePublicBaseUrl) }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-voice
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-voice
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: voice
+    {{- include "langwatch.labels" . | nindent 4 }}
+  {{- with .Values.voice.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Fixed at 1, not a value: the Media Streams WebSocket routes an
+  # in-flight call by nonce inside one process, so a second replica would
+  # split a call's frames across two processes with no shared state.
+  replicas: 1
+  # Recreate, not RollingUpdate: two replicas would each answer half a call's
+  # frames, so the old pod must fully terminate before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-voice
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-voice
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: voice
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.voice.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.voice "name" "voice") }}
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.voice) | nindent 8 }}
+
+      {{- with (coalesce .Values.voice.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.voice.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Release.Name }}-voice
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.voice) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/platform/app
+          command: ['pnpm']
+          args: ['run', 'start:workers']
+          ports:
+            - name: voice-ws
+              containerPort: {{ .Values.voice.wsPort }}
+              protocol: TCP
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.voice "name" "voice") | nindent 12 }}
+
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.voice.otel.serviceName | default "langwatch-voice" | quote }}
+
+            # Same value as the workers Deployment: the process needs the app's
+            # callback base URL for the rest of the worker runtime it shares with
+            # the workers Deployment.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
+            # Env contract: langwatch/langwatch#8014 (voice-env-contract comment).
+            - name: VOICE_WS_PORT
+              value: {{ .Values.voice.wsPort | quote }}
+            - name: VOICE_PUBLIC_BASE_URL
+              value: {{ $voicePublicBaseUrl | quote }}
+
+            {{- with .Values.voice.extraEnvs }}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "voice.extraEnvs") }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          resources:
+            {{- toYaml .Values.voice.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}
+{{- end }}
