@@ -10,7 +10,7 @@ import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./
 import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
-import { buildMail } from "./mail-member.ts";
+import { buildMail, skippedMail } from "./mail-member.ts";
 import { MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
 import { buildObjectStorage } from "./object-storage-member.ts";
 import { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
@@ -170,18 +170,10 @@ export function createProcessMembers(options: {
           : { eventLog: { prisma: read("prisma"), clickhouse: read("clickhouse") } }),
       });
     },
-    mail: () => {
-      // `off` is a statement rather than an absence, so it refuses here for a
-      // reason of its own: a module that sends mail on a process started with
-      // no gateway is a boot refusal naming both, never a message dropped.
-      if (config.mail.provider === "off") {
-        throw new MemberNotConfiguredError(
-          "mail",
-          "this process was started with MAIL_PROVIDER=off",
-        );
-      }
-      return buildMail(config.mail);
-    },
+    // `off` is a state, not a refusal: the process boots and every send is
+    // skipped with a log line naming it (ARCHITECTURE.md §6).
+    mail: () =>
+      config.mail.provider === "off" ? skippedMail(read("logger")) : buildMail(config.mail),
 
     // Redis-backed, so each inherits Redis's own refusal rather than repeating
     // it, and each is built over the ONE connection this process opened.

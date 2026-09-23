@@ -4,6 +4,7 @@
  * discriminant (ADR-144 §13a) — no inference from a leftover credential.
  */
 import { directSesClientConfiguration, MailerAdapter } from "@langwatch/mail/gateway";
+import type { Logger } from "@langwatch/observability";
 
 import type { MailConfig, OutboundProxyConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
@@ -66,4 +67,18 @@ export function buildMail(config: Exclude<MailConfig, { provider: "off" }>): Bui
   };
 
   return { value: mail, close: () => adapter.close() };
+}
+
+/** Mail off is a state (ARCHITECTURE.md §6): each send is skipped with one line naming it. */
+export function skippedMail(logger: Logger): BuiltMember<Mail> {
+  const mail: Mail = {
+    async send(message) {
+      logger.warn(
+        { subject: message.subject },
+        `Email is not configured on this process (MAIL_PROVIDER=off), so "${message.subject}" was not sent`,
+      );
+    },
+  };
+
+  return { value: mail };
 }

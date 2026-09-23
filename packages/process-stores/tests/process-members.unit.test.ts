@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 /**
  * What a process builds, what it refuses, and what it closes. Nothing here opens a socket: every
@@ -87,16 +88,33 @@ describe("given a process that named no store", () => {
       }
     });
 
-    it("refuses mail on a process started with the gateway off", () => {
-      const members = createProcessMembers({ config: config() });
-
-      expect(() => members.read("mail")).toThrow("MAIL_PROVIDER=off");
-    });
-
     it("refuses object storage that names no bucket", () => {
       const members = createProcessMembers({ config: config() });
 
       expect(() => members.read("objectStorage")).toThrow(MemberNotConfiguredError);
+    });
+  });
+});
+
+describe("given a process started with mail off", () => {
+  describe("when a module reads mail and sends", () => {
+    /** @scenario "Mail off boots and skips each send with one log line" */
+    it("builds the member and skips the send with one line naming it", async () => {
+      const logger = createLogger("process-members-test");
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+      const members = createProcessMembers({ config: config(), members: { logger } });
+
+      await members.read("mail").send({
+        to: "ada@example.com",
+        subject: "Trigger - Errors above threshold",
+        html: "<p>hi</p>",
+      });
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        { subject: "Trigger - Errors above threshold" },
+        expect.stringContaining('"Trigger - Errors above threshold" was not sent'),
+      );
     });
   });
 });

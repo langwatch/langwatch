@@ -140,7 +140,7 @@ export type MailProvider = "smtp" | "ses" | "resend" | "off";
 /**
  * Which gateway this process sends through, with only that gateway's own
  * fields present. A bad shape is refused at parse by the boot seam, not at
- * the first send weeks later, and `off` refuses reading `mail` by name at boot.
+ * the first send weeks later, and `off` builds a member that skips every send.
  */
 export type MailConfig =
   | Readonly<{ readonly provider: "off" }>
