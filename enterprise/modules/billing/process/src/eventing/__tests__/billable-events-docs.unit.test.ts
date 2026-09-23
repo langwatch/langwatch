@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeter } from "../../repositories/billable-events-meter.repository.ts";
 import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
@@ -79,7 +79,7 @@ function pricingFaqAnswer(): string {
 }
 
 const meteredEventTypes = BillableEventsMeterProjection.create({
-  meter: {} as unknown as BillableEventsMeter,
+  meter: { insert: vi.fn<BillableEventsMeter["insert"]>() },
   organizations: {} as unknown as BillingTenantOrganizationService,
 }).build().eventTypes;
 

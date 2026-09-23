@@ -38,7 +38,7 @@ function recordNotFound(): Error & { code: string } {
   return Object.assign(new Error("No Subscription found"), { code: "P2025" });
 }
 
-function repositoryDouble(overrides: Partial<BillingSubscription> = {}) {
+function repositoryDouble(overrides: Partial<BillingSubscription> = {}): BillingSubscription {
   return {
     findActive: vi.fn(),
     findLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
@@ -54,7 +54,7 @@ function repositoryDouble(overrides: Partial<BillingSubscription> = {}) {
     migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     ...overrides,
-  } as unknown as BillingSubscription;
+  };
 }
 
 function compose(

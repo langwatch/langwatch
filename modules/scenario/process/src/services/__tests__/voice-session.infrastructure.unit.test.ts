@@ -118,7 +118,7 @@ function voiceAgentRow(over: Partial<AgentRow> = {}): AgentRow {
     outputFields: [],
     fieldsResolved: true,
     ...over,
-  } as unknown as AgentRow;
+  };
 }
 
 describe("Feature: voice-session infrastructure composition", () => {

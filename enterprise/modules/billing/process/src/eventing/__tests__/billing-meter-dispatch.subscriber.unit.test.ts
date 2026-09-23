@@ -1,5 +1,5 @@
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
-import type { Event } from "@langwatch/eventing";
+import { createTenantId, type Event } from "@langwatch/eventing";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -38,7 +38,17 @@ function compose(
   return { subscriber, dispatched };
 }
 
-const EVENT = { id: "evt_1", tenantId: "project_alpha" } as unknown as Event;
+const EVENT: Event = {
+  id: "evt_1",
+  aggregateId: "org_1",
+  aggregateType: "billable_events",
+  tenantId: createTenantId("project_alpha"),
+  createdAt: 0,
+  occurredAt: 0,
+  type: "lw.billing.billable_event.recorded",
+  version: "2026-01-01",
+  data: {},
+};
 const CONTEXT = { tenantId: "project_alpha" } as never;
 
 describe("BillingMeterDispatchSubscriber", () => {

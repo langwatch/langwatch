@@ -8,9 +8,8 @@ const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),
 }));
 
-let billableEvents: { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq } | undefined;
-const service = () =>
-  BillableEventsQueryService.create(billableEvents as unknown as BillableEvents);
+let billableEvents: BillableEvents | undefined;
+const service = () => BillableEventsQueryService.create(billableEvents ?? null);
 
 describe("billingMonthDateRange", () => {
   describe("when given a mid-year billing month", () => {
@@ -143,7 +142,13 @@ describe("getPreviousBillingMonth", () => {
 describe("queryTraceSummariesTotalUniq", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    billableEvents = { findTraceSummariesTotalUniq };
+    billableEvents = {
+      findTotal: vi.fn<BillableEvents["findTotal"]>(),
+      findTotalUniq: vi.fn<BillableEvents["findTotalUniq"]>(),
+      findTraceSummariesTotalUniq,
+      findByProjectApprox: vi.fn<BillableEvents["findByProjectApprox"]>(),
+      findByProject: vi.fn<BillableEvents["findByProject"]>(),
+    };
   });
 
   describe("when a ClickHouse repository is available", () => {

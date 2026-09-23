@@ -228,8 +228,8 @@ describe("NurturingService", () => {
     /** @scenario 'NurturingService enforces a 10-second request timeout' */
     it("aborts the request", async () => {
       const errorReporter = FakeErrorReporter.create();
-      const slowFetch = vi.fn().mockImplementation((_url, options) => {
-        return new Promise((_resolve, reject) => {
+      const slowFetch = vi.fn<typeof fetch>().mockImplementation((_url, options) => {
+        return new Promise<Response>((_resolve, reject) => {
           // Simulate the abort signal triggering
           if (options?.signal) {
             options.signal.addEventListener("abort", () => {
@@ -241,7 +241,7 @@ describe("NurturingService", () => {
 
       const service = NurturingService.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
-        fetchFn: slowFetch as unknown as typeof fetch,
+        fetchFn: slowFetch,
         errorReporter,
       });
 

@@ -99,7 +99,7 @@ function serviceAnswering(answers: Answers = {}) {
     // Never reached: every workflow lookup below answers not-found, so the
     // target is refused before anything is hydrated.
     workflowHydrator: ScenarioWorkflowHydratorService.create(
-      ScenarioModelParametersService.create({} as unknown as ModelProviderApi),
+      ScenarioModelParametersService.create(createApiFixture<ModelProviderApi>({})),
     ),
     legacyDefaultModel: "openai/gpt-5-mini",
     langwatchEndpoint: "https://app.langwatch.test",

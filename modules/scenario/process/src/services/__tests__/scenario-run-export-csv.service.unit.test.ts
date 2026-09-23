@@ -318,7 +318,7 @@ describe("scenario run CSV serializers", () => {
             messages: [
               { role: "user", content: "hi", trace_id: "trace_b" },
               { role: "assistant", content: "yo", trace_id: "trace_c" },
-            ] as unknown as SimulationExportRun["messages"],
+            ],
           }),
         ],
         includeHeader: true,
@@ -509,9 +509,7 @@ describe("scenario run CSV serializers", () => {
         serializeRunsToFullCsv({
           runs: [
             buildRun({
-              messages: [
-                { role: "user", content: "hi", id: "=1+1", trace_id: "@evil" },
-              ] as unknown as SimulationExportRun["messages"],
+              messages: [{ role: "user", content: "hi", id: "=1+1", trace_id: "@evil" }],
             }),
           ],
           includeHeader: true,
@@ -725,9 +723,7 @@ describe("scenario run CSV serializers", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
-            messages: [
-              { role: "user", content: parts },
-            ] as unknown as SimulationExportRun["messages"],
+            messages: [{ role: "user", content: parts }],
           }),
         ],
         includeHeader: true,

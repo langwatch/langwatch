@@ -162,7 +162,7 @@ describe("the scenarios tRPC transport", () => {
           error: "No default model is configured for this project",
         }),
         queueSimulationRun,
-      } as unknown as Partial<ScenarioApi>);
+      });
 
       await expect(caller.run(runInput)).rejects.toMatchObject({
         cause: { code: "scenario_run_rejected" },
