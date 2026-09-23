@@ -554,8 +554,16 @@ function matchEvaluationValues(
       // never fires the trigger (#8170). Reject a short, non-finite or
       // inverted range as ClickHouse does (1=0), so it matches nothing.
       if (values.length < 2) return false;
-      const min = parseFloat(values[0] ?? "");
-      const max = parseFloat(values[1] ?? "");
+      // `Number`, not `parseFloat`: parseFloat stops at the first non-numeric
+      // character, so "0.6x" would parse to 0.6 and let a non-numeric range
+      // fire the trigger. `Number` yields NaN for any trailing text, failing
+      // closed as the acceptance criteria require. `Number("")` is 0, so a
+      // blank / whitespace-only bound is rejected explicitly first.
+      const minRaw = values[0] ?? "";
+      const maxRaw = values[1] ?? "";
+      if (minRaw.trim() === "" || maxRaw.trim() === "") return false;
+      const min = Number(minRaw);
+      const max = Number(maxRaw);
       if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
         return false;
       }

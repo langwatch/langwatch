@@ -788,6 +788,26 @@ describe("matchesEvaluationFilters", () => {
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
 
+    it("matches nothing for a bound with trailing non-numeric text", () => {
+      // `parseFloat("0.6x")` is 0.6; `Number("0.6x")` is NaN. The matcher must
+      // fail closed on a trailing-text bound, not silently parse it and fire.
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.7 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["0.6x", "0.9"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches nothing for a blank bound", () => {
+      // `Number("")` is 0 — a blank bound must be rejected explicitly, not
+      // treated as a 0 boundary.
+      const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.7 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["", "0.9"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
     it("matches nothing when the range has fewer than two bounds", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
       const filters: TriggerFilters = {
