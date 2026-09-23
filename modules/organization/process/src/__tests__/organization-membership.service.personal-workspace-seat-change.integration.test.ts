@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * The one write in the personal-workspace suite that has to succeed.
@@ -35,29 +36,29 @@ interface RecordedRoleChange {
 /** The corrections the seat change asked the ledger for, in order. */
 const roleChanges: RecordedRoleChange[] = [];
 
-const recordingGrantsWriter = {
+const recordingGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindings: async () => {},
   revokeBindingsWhere: async () => 0,
   changeBindingRole: async ({ bindingId, role }: { bindingId: string; role: string }) => {
     roleChanges.push({ bindingId, role });
   },
-} as unknown as AuthzGrantsService;
+});
 
-const seats = {
+const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
-} as unknown as OrganizationSeatLicense;
-const sessions = {
+};
+const sessions: OrganizationSessionRevocation = {
   revokeAllBrowserSessions: vi.fn(),
-} as unknown as OrganizationSessionRevocation;
-const grantCache = {
+};
+const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
-} as unknown as OrganizationGrantCache;
-const prompts = {
+};
+const prompts: OrganizationPromptSeed = {
   seedTagsForOrganization: vi.fn(),
   reportCompensationFailure: vi.fn(),
-} as unknown as OrganizationPromptSeed;
+};
 
 describe.skipIf(!DB_URL)(
   "given a member with a personal workspace who also administers a shared team",

@@ -2,6 +2,7 @@
  * The organization fence on the audit trail.
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +22,7 @@ const prisma = {
   user: { findMany: userFindMany },
 } as unknown as PrismaClient;
 
-const writer = {} as unknown as AuthzGrantsService;
+const writer = createApiFixture<AuthzGrantsService>();
 
 let repository: PrismaOrganizationMembershipRepository;
 

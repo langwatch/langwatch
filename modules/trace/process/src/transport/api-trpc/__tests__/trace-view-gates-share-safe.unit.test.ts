@@ -188,7 +188,7 @@ describe("sharedTrace share-safe gates", () => {
 
   describe("given a restricted-attribute rule", () => {
     it("redacts matching resource attributes for the viewer", () => {
-      const resources = {
+      const resources: TraceResourceInfoDto = {
         rootSpanId: "root",
         resourceAttributes: { "service.name": "api", "customer.id": "acme" },
         scope: null,
@@ -200,7 +200,7 @@ describe("sharedTrace share-safe gates", () => {
             scope: { name: "", version: null },
           },
         ],
-      } as unknown as TraceResourceInfoDto;
+      };
       const out = gateResources({
         resources,
         protections: {
@@ -219,7 +219,7 @@ describe("sharedTrace share-safe gates", () => {
      * pins the "catch-all means hide all" invariant.
      */
     it("redacts every resource attribute under the fail-closed catch-all rule", () => {
-      const resources = {
+      const resources: TraceResourceInfoDto = {
         rootSpanId: "root",
         resourceAttributes: { "service.name": "api", "customer.id": "acme" },
         scope: null,
@@ -231,7 +231,7 @@ describe("sharedTrace share-safe gates", () => {
             scope: { name: "", version: null },
           },
         ],
-      } as unknown as TraceResourceInfoDto;
+      };
       const out = gateResources({
         resources,
         protections: {
@@ -245,12 +245,12 @@ describe("sharedTrace share-safe gates", () => {
     });
 
     it("leaves attributes untouched when no hidden rules apply", () => {
-      const resources = {
+      const resources: TraceResourceInfoDto = {
         rootSpanId: "root",
         resourceAttributes: { "service.name": "api" },
         scope: null,
         spans: [],
-      } as unknown as TraceResourceInfoDto;
+      };
       const out = gateResources({ resources, protections: anonProtections });
       expect(out.resourceAttributes["service.name"]).toBe("api");
     });
@@ -301,7 +301,7 @@ describe("sharedTrace share-safe gates", () => {
   });
 
   describe("given evaluator verdicts", () => {
-    const evaluations = [
+    const evaluations: Evaluation[] = [
       {
         evaluation_id: "eval_1",
         evaluator_id: "ev_check",
@@ -318,7 +318,7 @@ describe("sharedTrace share-safe gates", () => {
         },
         timestamps: {},
       },
-    ] as unknown as Evaluation[];
+    ];
 
     describe("when the viewer cannot read captured content", () => {
       /** @scenario Evaluator output never reveals content the viewer may not see */

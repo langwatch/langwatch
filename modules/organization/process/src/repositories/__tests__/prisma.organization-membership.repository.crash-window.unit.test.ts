@@ -1,5 +1,6 @@
 /** Crash window between Prisma write and ledger append: member keeps old access on failure. */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   OrganizationUserRole,
@@ -46,12 +47,12 @@ const changeBindingRole = vi.fn();
 const revokeBindings = vi.fn();
 const revokeBindingsWhere = vi.fn();
 
-const writer = {
+const writer = createApiFixture<AuthzGrantsService>({
   attachBindings,
   changeBindingRole,
   revokeBindings,
   revokeBindingsWhere,
-} as unknown as AuthzGrantsService;
+});
 
 let repository: PrismaOrganizationMembershipRepository;
 

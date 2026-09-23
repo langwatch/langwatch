@@ -35,7 +35,6 @@ import {
   transcriptRestResponseSchema,
   type CompiledProjection,
   type Protections,
-  type ProjectableTrace,
   type Trace,
   type TraceFacetsQuery,
   type TraceSearchBody,
@@ -385,7 +384,7 @@ async function searchTraces({
   });
 
   const serializeTrace = projection
-    ? (trace: Trace) => projection!.project(trace as unknown as ProjectableTrace)
+    ? (trace: Trace) => projection!.project(trace)
     : (trace: Trace) => formatTraceRow(trace, { app, format, projectSlug: project.projectSlug });
 
   const { serializedTraces, skippedCount } = serializeTraceRows(enrichedTraces, serializeTrace);

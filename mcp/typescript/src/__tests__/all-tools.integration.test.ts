@@ -1094,7 +1094,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("run_query", () => {
+  describe("run_query()", () => {
     describe("when the statement returns rows", () => {
       /** @scenario Agent runs an analytics SQL statement and reads a table */
       it("sends the statement unchanged and renders a markdown table", async () => {

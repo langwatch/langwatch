@@ -162,11 +162,7 @@ describe("redactV2Content", () => {
         (out.params as { app: { billing: { card_token: string } } }).app.billing.card_token,
       ).toBe("[REDACTED] (visible to Admins)");
       expect((out.params as { model: string }).model).toBe("gpt-5-mini");
-      const event = (
-        out as unknown as {
-          events: { attributes: Record<string, unknown> }[];
-        }
-      ).events[0]!;
+      const event = out.events[0]!;
       expect(event.attributes["app.billing.plan"]).toBe("[REDACTED] (visible to Admins)");
       expect(event.attributes.keep).toBe("yes");
     });

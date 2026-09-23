@@ -38,7 +38,7 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
   let nextId = 1;
   const teamsInOrganization = options.teamsInOrganization;
 
-  const repository: OrganizationInviteRepository = {
+  const repository: OrganizationInviteRepository = createApiFixture<OrganizationInviteRepository>({
     tryFindOrganizationWithMembers: async () => ({
       ...makeOrganization({ id: ORGANIZATION_ID }),
       members: [],
@@ -104,10 +104,9 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 
       return { ...invite, organization: makeOrganization({ id: invite.organizationId }) };
     },
-    withTransaction: async (
-      write: (transaction: OrganizationInviteRepository) => Promise<unknown>,
-    ) => write(repository),
-  } as unknown as OrganizationInviteRepository;
+    withTransaction: async <T>(write: (transaction: OrganizationInviteRepository) => Promise<T>) =>
+      write(repository),
+  });
 
   return repository;
 }
@@ -264,7 +263,7 @@ describe("given a deployment that composed no invitation service", () => {
         dependencies: {
           organizations: {} as unknown as ServerOrganizationAppDependencies["organizations"],
           membership: {} as unknown as ServerOrganizationAppDependencies["membership"],
-          projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
+          projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
           permissions: createApiFixture<AuthzApi>({}),
         },
       });

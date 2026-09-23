@@ -990,7 +990,7 @@ function lengthPrecedingMatch({
 
 /** Whether a rule's second-stage test rejects this candidate. */
 function ruleDeclines(rule: ValueRule, match: RegExpMatchArray): boolean {
-  return rule.accept !== undefined && !rule.accept(match as unknown as string[]);
+  return rule.accept !== undefined && !rule.accept(match);
 }
 
 /** How much of a match the rule claims: all of it, or up to the value boundary. */

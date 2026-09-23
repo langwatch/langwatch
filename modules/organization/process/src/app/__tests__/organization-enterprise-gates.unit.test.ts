@@ -50,7 +50,7 @@ function application(options: { enterprise: boolean }) {
     assertAuditLogsAllowed: vi.fn(refuse("Audit logs require an Enterprise plan")),
     assertScimAllowed: vi.fn(async () => undefined),
     assertTeamRoleChangeWithinSeatLimits: vi.fn(async () => undefined),
-  } as unknown as OrganizationPlanGate;
+  } satisfies OrganizationPlanGate;
 
   const organizations = {
     getTeamById: vi.fn(async () => TEAM),
@@ -69,7 +69,7 @@ function application(options: { enterprise: boolean }) {
     dependencies: {
       organizations: organizations as unknown as ServerOrganizationAppDependencies["organizations"],
       membership: membership as unknown as ServerOrganizationAppDependencies["membership"],
-      projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
+      projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
       permissions: createApiFixture<AuthzApi>({ hasPermission: vi.fn(async () => true) }),
     },
     members: { plans },

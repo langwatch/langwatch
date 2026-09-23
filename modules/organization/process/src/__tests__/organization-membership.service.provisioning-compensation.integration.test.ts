@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Provisioning failures after org commit need rollback: without it, the slug
@@ -29,21 +30,21 @@ const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 const SEEDING_FAILURE = "prompt tag seeding is unavailable";
 
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
-const seats = {
+const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
-} as unknown as OrganizationSeatLicense;
-const sessions = {
+};
+const sessions: OrganizationSessionRevocation = {
   revokeAllBrowserSessions: vi.fn(),
-} as unknown as OrganizationSessionRevocation;
-const grantCache = {
+};
+const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
-} as unknown as OrganizationGrantCache;
+};
 
 /** A prompt-seed port whose seeding is down, recording who it was asked about. */
 function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationPromptSeed {
@@ -53,7 +54,7 @@ function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationPromptS
       throw new Error(SEEDING_FAILURE);
     }),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeed;
+  };
 }
 
 /** A prompt-seed port that works, for the retry half of the scenario. */
@@ -61,7 +62,7 @@ function buildWorkingPrompts(): OrganizationPromptSeed {
   return {
     seedTagsForOrganization: vi.fn(async () => {}),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeed;
+  };
 }
 
 describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", () => {

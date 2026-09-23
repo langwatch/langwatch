@@ -68,12 +68,12 @@ function buildService(options?: {
     applyEdits: vi.fn().mockResolvedValue(undefined),
   } satisfies Record<keyof GroupRepository, unknown>;
 
-  const teamRepository = {
+  const teamRepository = createApiFixture<TeamRepository>({
     get: vi.fn().mockResolvedValue(team),
     getOrganizationMembers: options?.organizationMembersFailure
       ? vi.fn().mockRejectedValue(options.organizationMembersFailure)
       : vi.fn().mockImplementation(({ userIds }) => Promise.resolve(userIds)),
-  } as unknown as TeamRepository;
+  });
 
   const authz = {
     tryResolveScope: vi.fn().mockImplementation((input) => {
@@ -121,7 +121,7 @@ function buildService(options?: {
   const service = OrganizationService.create({
     repository: {} as OrganizationRepository,
     teams: teamRepository,
-    groups: groupRepository as unknown as GroupRepository,
+    groups: groupRepository,
     identities: {} as PersonalWorkspaceIdentity,
     teamIdentities: {} as TeamIdentity,
     groupIdentities: {
