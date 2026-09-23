@@ -76,18 +76,47 @@ function projectOf(
 }
 
 class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
-  constructor(
-    private readonly session: UiSession,
-    private readonly navigationCapability: UiNavigation,
-    private readonly routeCapability: UiRoute,
-    private readonly feedback: UiFeedback,
-    private readonly scope_: PersonalScope,
-    private readonly organizationRole_: PersonalOrganizationRole,
-    private readonly deployment_: PersonalDeployment,
-    private readonly organization_: PersonalOrganization | undefined,
-    private readonly project_: PersonalProject | undefined,
-  ) {
+  private readonly session: UiSession;
+  private readonly navigationCapability: UiNavigation;
+  private readonly routeCapability: UiRoute;
+  private readonly feedback: UiFeedback;
+  private readonly scope_: PersonalScope;
+  private readonly organizationRole_: PersonalOrganizationRole;
+  private readonly deployment_: PersonalDeployment;
+  private readonly organization_: PersonalOrganization | undefined;
+  private readonly project_: PersonalProject | undefined;
+
+  constructor({
+    session,
+    navigationCapability,
+    routeCapability,
+    feedback,
+    scope,
+    organizationRole,
+    deployment,
+    organization,
+    project,
+  }: {
+    session: UiSession;
+    navigationCapability: UiNavigation;
+    routeCapability: UiRoute;
+    feedback: UiFeedback;
+    scope: PersonalScope;
+    organizationRole: PersonalOrganizationRole;
+    deployment: PersonalDeployment;
+    organization: PersonalOrganization | undefined;
+    project: PersonalProject | undefined;
+  }) {
     super();
+    this.session = session;
+    this.navigationCapability = navigationCapability;
+    this.routeCapability = routeCapability;
+    this.feedback = feedback;
+    this.scope_ = scope;
+    this.organizationRole_ = organizationRole;
+    this.deployment_ = deployment;
+    this.organization_ = organization;
+    this.project_ = project;
   }
 
   scope(): PersonalScope {
@@ -216,14 +245,14 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   // renders that carry the same reading.
   const host = useMemo(
     () =>
-      new CapabilityPersonalWorkspaceHost(
+      new CapabilityPersonalWorkspaceHost({
         session,
-        navigation,
-        route,
+        navigationCapability: navigation,
+        routeCapability: route,
         feedback,
-        { organizationId: activeScope.organizationId, projectId: activeScope.projectId },
+        scope: { organizationId: activeScope.organizationId, projectId: activeScope.projectId },
         organizationRole,
-        {
+        deployment: {
           isSaas: deployment.isSaaS,
           appBaseUrl: deployment.appBaseUrl,
           // No capability carries these three yet — see the handoff for the
@@ -234,7 +263,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         },
         organization,
         project,
-      ),
+      }),
     [
       session,
       navigation,

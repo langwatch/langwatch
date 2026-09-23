@@ -16,33 +16,48 @@ export function transcriptNoteEntry({
     case "compaction":
       return compactionEntry(attrs, atMs);
     case "permission_mode_changed":
-      return note(atMs, "warning", event, approvalModeText(attrs));
+      return note({ atMs, level: "warning", event, text: approvalModeText(attrs) });
     case "api_error":
-      return note(atMs, "error", event, apiErrorText(attrs));
+      return note({ atMs, level: "error", event, text: apiErrorText(attrs) });
     case "retries_exhausted":
-      return note(
+      return note({
         atMs,
-        "error",
+        level: "error",
         event,
-        "Gave up after retrying — whatever this was doing did not happen.",
-      );
+        text: "Gave up after retrying — whatever this was doing did not happen.",
+      });
     case "session_error":
     case "internal_error":
-      return note(atMs, "error", event, readString(attrs, "error") ?? "The session hit an error.");
+      return note({
+        atMs,
+        level: "error",
+        event,
+        text: readString(attrs, "error") ?? "The session hit an error.",
+      });
     case "api_refusal":
-      return note(atMs, "error", event, "The model refused to answer.");
+      return note({ atMs, level: "error", event, text: "The model refused to answer." });
     case "subtask_invoked":
-      return note(atMs, "info", event, subtaskText(attrs));
+      return note({ atMs, level: "info", event, text: subtaskText(attrs) });
     case "commit":
-      return note(atMs, "info", event, commitText(attrs));
+      return note({ atMs, level: "info", event, text: commitText(attrs) });
     case "skill_activated":
-      return note(atMs, "info", event, skillText(attrs));
+      return note({ atMs, level: "info", event, text: skillText(attrs) });
     default:
       return null;
   }
 }
 
-function note(atMs: number, level: NoteEntry["level"], event: string, text: string): NoteEntry {
+function note({
+  atMs,
+  level,
+  event,
+  text,
+}: {
+  atMs: number;
+  level: NoteEntry["level"];
+  event: string;
+  text: string;
+}): NoteEntry {
   return { kind: "note", atMs, level, event, text };
 }
 
@@ -55,7 +70,7 @@ function compactionEntry(attrs: Record<string, unknown>, atMs: number): NoteEntr
       ? `Context compacted (${trigger}): ${formatTokenCount(pre)} → ${formatTokenCount(post)} tokens`
       : `Context compacted (${trigger})`;
 
-  return note(atMs, "info", "compaction", text);
+  return note({ atMs, level: "info", event: "compaction", text });
 }
 
 function approvalModeText(attrs: Record<string, unknown>): string {

@@ -192,21 +192,21 @@ export class ModelProviderDefaultsService {
     const effective: Record<string, ModelDefaultEffective | null> = {};
     for (const role of roles) {
       const feature = features.find((candidate) => candidate.role === role);
-      effective[role] = this.resolveConfigured(
-        input.configs,
-        input.chain,
-        feature?.key ?? role,
+      effective[role] = this.resolveConfigured({
+        configs: input.configs,
+        chain: input.chain,
+        key: feature?.key ?? role,
         role,
-      );
+      });
     }
 
     for (const feature of features) {
-      effective[feature.key] = this.resolveConfigured(
-        input.configs,
-        input.chain,
-        feature.key,
-        feature.role,
-      );
+      effective[feature.key] = this.resolveConfigured({
+        configs: input.configs,
+        chain: input.chain,
+        key: feature.key,
+        role: feature.role,
+      });
     }
 
     return effective;
@@ -228,7 +228,13 @@ export class ModelProviderDefaultsService {
     const inherited: ModelDefaultInheritedValues["inherited"] = {};
     for (const key of keys) {
       const role = features.find((feature) => feature.key === key)?.role ?? key;
-      const configured = this.resolveConfigured(input.configs, input.tiers, key, role, false);
+      const configured = this.resolveConfigured({
+        configs: input.configs,
+        chain: input.tiers,
+        key,
+        role,
+        expandModel: false,
+      });
       inherited[key] = configured ?? (await this.inferDefault(input.projectId, key));
     }
 
@@ -267,13 +273,19 @@ export class ModelProviderDefaultsService {
     };
   }
 
-  private resolveConfigured(
-    configs: ModelDefaultConfig[],
-    chain: ModelDefaultScope[],
-    key: string,
-    role: string,
+  private resolveConfigured({
+    configs,
+    chain,
+    key,
+    role,
     expandModel = true,
-  ): ModelDefaultEffective | null {
+  }: {
+    configs: ModelDefaultConfig[];
+    chain: ModelDefaultScope[];
+    key: string;
+    role: string;
+    expandModel?: boolean;
+  }): ModelDefaultEffective | null {
     for (const tier of DEFAULT_TIERS) {
       const configured = this.findConfigured({ configs, chain, key, tier, expandModel });
       if (configured) {

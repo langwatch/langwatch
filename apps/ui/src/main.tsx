@@ -119,16 +119,25 @@ function useBrowserUiCapabilities({
 }
 
 class BrowserUiShell extends UiShell {
-  static create(
-    config: PublicAppConfig,
-    isDevelopment: boolean,
-    deployment: UiDeployment,
-    screens: UiModuleScreens,
-    apis: readonly UiFeatureApiBinding[],
-    drawers: UiDrawerRegistry,
-    transport: UiFeatureApiTransport,
-    hosts: readonly UiModuleHostMount[],
-  ): BrowserUiShell {
+  static create({
+    config,
+    isDevelopment,
+    deployment,
+    screens,
+    apis,
+    drawers,
+    transport,
+    hosts,
+  }: {
+    config: PublicAppConfig;
+    isDevelopment: boolean;
+    deployment: UiDeployment;
+    screens: UiModuleScreens;
+    apis: readonly UiFeatureApiBinding[];
+    drawers: UiDrawerRegistry;
+    transport: UiFeatureApiTransport;
+    hosts: readonly UiModuleHostMount[];
+  }): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({
         sessionQueryKey: UI_SESSION_QUERY_KEY,
@@ -221,16 +230,16 @@ export async function startUi(): Promise<void> {
   configureDocsRuntime({ mode: config.mode, hostname: window.location.hostname });
   UiRuntime.create({
     document,
-    shell: BrowserUiShell.create(
+    shell: BrowserUiShell.create({
       config,
-      config.mode === "development",
-      deriveUiDeployment(config),
-      installedModuleScreens(installed.modules),
-      installedModuleApis(installed.modules),
-      installedModuleDrawers(installed.modules),
+      isDevelopment: config.mode === "development",
+      deployment: deriveUiDeployment(config),
+      screens: installedModuleScreens(installed.modules),
+      apis: installedModuleApis(installed.modules),
+      drawers: installedModuleDrawers(installed.modules),
       transport,
-      installedModuleHostMounts(installed.modules),
-    ),
+      hosts: installedModuleHostMounts(installed.modules),
+    }),
   }).start();
 }
 

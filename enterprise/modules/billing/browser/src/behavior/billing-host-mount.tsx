@@ -24,15 +24,35 @@ import {
 import { billingApi } from "./billing-api.ts";
 
 class CapabilityBillingHost extends BillingHostApi {
-  constructor(
-    private readonly org: BillingHostOrganization | undefined,
-    private readonly teamId: string | undefined,
-    private readonly query: Readonly<Record<string, string | undefined>>,
-    private readonly deploymentIsSaaS: boolean,
-    private readonly navigation: UiNavigation,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly org: BillingHostOrganization | undefined;
+  private readonly teamId: string | undefined;
+  private readonly query: Readonly<Record<string, string | undefined>>;
+  private readonly deploymentIsSaaS: boolean;
+  private readonly navigation: UiNavigation;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    org,
+    teamId,
+    query,
+    deploymentIsSaaS,
+    navigation,
+    feedback,
+  }: {
+    org: BillingHostOrganization | undefined;
+    teamId: string | undefined;
+    query: Readonly<Record<string, string | undefined>>;
+    deploymentIsSaaS: boolean;
+    navigation: UiNavigation;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.org = org;
+    this.teamId = teamId;
+    this.query = query;
+    this.deploymentIsSaaS = deploymentIsSaaS;
+    this.navigation = navigation;
+    this.feedback = feedback;
   }
 
   organization(): BillingHostOrganization | undefined {
@@ -106,7 +126,15 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
   const query = route.reading().query;
 
   const host = useMemo(
-    () => new CapabilityBillingHost(org, teamId, query, deployment.isSaaS, navigation, feedback),
+    () =>
+      new CapabilityBillingHost({
+        org,
+        teamId,
+        query,
+        deploymentIsSaaS: deployment.isSaaS,
+        navigation,
+        feedback,
+      }),
     [org, teamId, query, deployment.isSaaS, navigation, feedback],
   );
 

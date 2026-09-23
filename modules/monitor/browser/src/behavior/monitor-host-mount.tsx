@@ -26,14 +26,31 @@ import {
 } from "../model/monitor-host.ts";
 
 class CapabilityMonitorHost extends MonitorHostApi {
-  constructor(
-    private readonly hostScope: MonitorScope,
-    private readonly session: UiSession,
-    private readonly navigation: UiNavigation,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly hostScope: MonitorScope;
+  private readonly session: UiSession;
+  private readonly navigation: UiNavigation;
+  private readonly uiRoute: UiRoute;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    hostScope,
+    session,
+    navigation,
+    uiRoute,
+    feedback,
+  }: {
+    hostScope: MonitorScope;
+    session: UiSession;
+    navigation: UiNavigation;
+    uiRoute: UiRoute;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.hostScope = hostScope;
+    this.session = session;
+    this.navigation = navigation;
+    this.uiRoute = uiRoute;
+    this.feedback = feedback;
   }
 
   scope(): MonitorScope {
@@ -96,7 +113,7 @@ export default function MonitorHostMount({ children }: { children?: ReactNode })
   );
 
   const host = useMemo(
-    () => new CapabilityMonitorHost(hostScope, session, navigation, route, feedback),
+    () => new CapabilityMonitorHost({ hostScope, session, navigation, uiRoute: route, feedback }),
     [hostScope, session, navigation, route, feedback],
   );
 

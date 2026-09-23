@@ -13,12 +13,27 @@ import type { SchedulerWake } from "../channels/automation-scheduler-wake.channe
 import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 export class ReportScheduleService {
-  private constructor(
-    private readonly jobs: AutomationScheduledJobRepository,
-    private readonly clock: AutomationClock,
-    private readonly wake: SchedulerWake,
-    private readonly triggers: TriggerRepository,
-  ) {}
+  private readonly jobs: AutomationScheduledJobRepository;
+  private readonly clock: AutomationClock;
+  private readonly wake: SchedulerWake;
+  private readonly triggers: TriggerRepository;
+
+  private constructor({
+    jobs,
+    clock,
+    wake,
+    triggers,
+  }: {
+    jobs: AutomationScheduledJobRepository;
+    clock: AutomationClock;
+    wake: SchedulerWake;
+    triggers: TriggerRepository;
+  }) {
+    this.jobs = jobs;
+    this.clock = clock;
+    this.wake = wake;
+    this.triggers = triggers;
+  }
 
   static create(deps: {
     jobs: AutomationScheduledJobRepository;
@@ -26,7 +41,7 @@ export class ReportScheduleService {
     wake: SchedulerWake;
     triggers: TriggerRepository;
   }): ReportScheduleService {
-    return new ReportScheduleService(deps.jobs, deps.clock, deps.wake, deps.triggers);
+    return new ReportScheduleService(deps);
   }
 
   static computeNextRunAt(input: { cron: string; timezone: string; after: Instant }): Instant {

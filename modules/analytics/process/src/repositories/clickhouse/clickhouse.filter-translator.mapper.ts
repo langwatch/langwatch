@@ -131,13 +131,19 @@ const noOpFilter: FilterTranslation = {
  *
  * Uses registry lookup instead of switch statement for better extensibility.
  */
-export function translateFilter(
-  field: FilterField,
-  values: string[],
-  key?: string,
-  subkey?: string,
-  spanTimePredicate?: string,
-): FilterTranslation {
+export function translateFilter({
+  field,
+  values,
+  key,
+  subkey,
+  spanTimePredicate,
+}: {
+  field: FilterField;
+  values: string[];
+  key?: string;
+  subkey?: string;
+  spanTimePredicate?: string;
+}): FilterTranslation {
   if (values.length === 0) {
     return noOpFilter;
   }
@@ -737,14 +743,16 @@ function translateNestedFilter({
 
   for (const [key, subValue] of Object.entries(value)) {
     if (Array.isArray(subValue)) {
-      translations.push(translateFilter(field, subValue, key, undefined, spanTimePredicate));
+      translations.push(translateFilter({ field, values: subValue, key, spanTimePredicate }));
       continue;
     }
     if (typeof subValue !== "object") continue;
 
     for (const [subkey, subSubValue] of Object.entries(subValue)) {
       if (Array.isArray(subSubValue)) {
-        translations.push(translateFilter(field, subSubValue, key, subkey, spanTimePredicate));
+        translations.push(
+          translateFilter({ field, values: subSubValue, key, subkey, spanTimePredicate }),
+        );
       }
     }
   }
@@ -771,7 +779,7 @@ export function translateAllFilters(
     if (Array.isArray(value)) {
       // Simple array filter
       translations.push(
-        translateFilter(field as FilterField, value, undefined, undefined, spanTimePredicate),
+        translateFilter({ field: field as FilterField, values: value, spanTimePredicate }),
       );
     } else if (typeof value === "object") {
       translations.push(
