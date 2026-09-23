@@ -126,33 +126,23 @@ function buildQuery(series: AnalyticsSeries[], projectId = TENANT_ID) {
   return buildTimeseriesQuery({ ...baseInput, projectId, series });
 }
 
-/** Runs the query and drains it, failing the case only on a memory refusal. */
+/** Runs the query under the memory budget and drains it; a refusal rejects. */
 async function runWithinBudget({
   client,
-  label,
   sql,
   params,
 }: {
   client: ClickHouseClient;
-  label: string;
   sql: string;
   params: Record<string, unknown>;
-}): Promise<void> {
-  try {
-    const result = await client.query({
-      query: sql,
-      query_params: params,
-      format: "JSONEachRow",
-      clickhouse_settings: { max_memory_usage: MEMORY_BUDGET },
-    });
-    await result.json();
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
-      expect.fail(`Query "${label}" exceeded the 50MB memory budget: ${message}`);
-    }
-    throw error;
-  }
+}): Promise<unknown[]> {
+  const result = await client.query({
+    query: sql,
+    query_params: params,
+    format: "JSONEachRow",
+    clickhouse_settings: { max_memory_usage: MEMORY_BUDGET },
+  });
+  return result.json();
 }
 
 function currentPeriodValue(rows: Record<string, unknown>[]): number {
@@ -192,7 +182,7 @@ describe("memory safety of the generated analytics queries", () => {
           query_params: params,
           format: "JSONEachRow",
         });
-        await result.json();
+        expect(await result.json()).toEqual(expect.any(Array));
       });
     }
   });
@@ -221,7 +211,9 @@ describe("memory safety of the generated analytics queries", () => {
       /** @scenario Analytics queries complete within a tight memory budget */
       it(`completes ${label} within the 50MB memory budget`, async () => {
         const { sql, params } = buildQuery(series, WIDE_TENANT_ID);
-        await runWithinBudget({ client, label, sql, params });
+        await expect(runWithinBudget({ client, sql, params }), label).resolves.toEqual(
+          expect.any(Array),
+        );
       });
     }
   });
@@ -277,7 +269,7 @@ describe("memory safety of the generated analytics queries", () => {
         [{ metric: "performance.total_cost", aggregation: "sum" }],
         WIDE_COLUMN_TENANT_ID,
       );
-      await runWithinBudget({ client, label: "performance.total_cost", sql, params });
+      await expect(runWithinBudget({ client, sql, params })).resolves.toEqual(expect.any(Array));
     });
 
     it("completes the tokens_per_second query within 50MB on wide-attribute data", async () => {
@@ -285,7 +277,7 @@ describe("memory safety of the generated analytics queries", () => {
         [{ metric: "performance.tokens_per_second", aggregation: "avg" }],
         WIDE_COLUMN_TENANT_ID,
       );
-      await runWithinBudget({ client, label: "performance.tokens_per_second", sql, params });
+      await expect(runWithinBudget({ client, sql, params })).resolves.toEqual(expect.any(Array));
     });
   });
 

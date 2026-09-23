@@ -29,7 +29,8 @@ describe.each(backends)("given the $name installation nonces", (backend) => {
 
   describe("when a nonce has been registered", () => {
     beforeEach(async () => {
-      await expect(nonces.registerNonce({ nonce: NONCE, ttlSec: 600 })).resolves.toBe(true);
+      const registered = await nonces.registerNonce({ nonce: NONCE, ttlSec: 600 });
+      if (!registered) throw new Error("setup: the nonce was not registered");
     });
 
     it("consumes it once", async () => {

@@ -1,7 +1,9 @@
 /** E2E tests validating spans are correctly created, configured and sent to LangWatch. */
 
-import { describe, it, expect } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { describe, it, expect } from "vitest";
+
+import * as semconv from "../../semconv";
 import {
   setupE2ETest,
   createTestTracer,
@@ -13,7 +15,6 @@ import {
   expectSpanAttribute,
   expectSpanAttributeWithTrace,
 } from "./e2e-utils";
-import * as semconv from "../../semconv";
 
 describe("Basic Span Ingestion E2E", () => {
   const setup = setupE2ETest();
@@ -117,8 +118,8 @@ describe("Basic Span Ingestion E2E", () => {
       const testIds = generateTestIds();
       let traceId: string;
 
-      try {
-        await tracer.withActiveSpan("failing-operation", async (span) => {
+      await expect(
+        tracer.withActiveSpan("failing-operation", async (span) => {
           traceId = getTraceIdFromSpan(span);
           createSpanWithCommonAttributes(span, testIds, "error-handling");
 
@@ -131,10 +132,8 @@ describe("Basic Span Ingestion E2E", () => {
           });
 
           throw error;
-        });
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
+        }),
+      ).rejects.toThrow("Test error");
 
       // Verify error span ingestion
       const trace = await expectTraceToBeIngested(setup.client, traceId!, 1);

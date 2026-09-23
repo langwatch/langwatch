@@ -109,12 +109,10 @@ describe("memory-safety", () => {
       let limitMatches: RegExpMatchArray;
 
       beforeEach(() => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
         if (!getDistinctFieldNamesBody) {
           throw new Error("findDistinctFieldNames source was not found");
         }
         const matches = getDistinctFieldNamesBody[0].match(BOUNDED_LIMIT);
-        expect(matches).not.toBeNull();
         if (!matches) {
           throw new Error("findDistinctFieldNames has no bounded LIMIT");
         }

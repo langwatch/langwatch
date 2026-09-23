@@ -60,11 +60,11 @@ function renderScreen() {
 }
 
 /** An element on each tab, used to wait out the AnimatePresence swap. */
-const TAB_MARKER: Record<string, RegExp> = {
+const TAB_MARKER = {
   Prompt: /^Copy prompt$/,
   Skill: /^Copy install command:/,
   MCP: /^Copy config$/,
-};
+} satisfies Record<string, RegExp>;
 
 function copyButtons(): HTMLElement[] {
   return screen
@@ -84,13 +84,11 @@ function findCopyButton(pattern: RegExp): HTMLElement | undefined {
 async function goToTab(name: keyof typeof TAB_MARKER): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name }));
   const marker = TAB_MARKER[name];
-  if (marker) {
-    // Generous timeout: the swap is a real animation frame chain, and it
-    // runs well past the 1s default when the whole file executes together.
-    await waitFor(() => expect(findCopyButton(marker)).toBeDefined(), {
-      timeout: 10_000,
-    });
-  }
+  // Generous timeout: the swap is a real animation frame chain, and it
+  // runs well past the 1s default when the whole file executes together.
+  await waitFor(() => expect(findCopyButton(marker)).toBeDefined(), {
+    timeout: 10_000,
+  });
   emitMock.mockClear();
 }
 
@@ -101,7 +99,7 @@ async function goToTab(name: keyof typeof TAB_MARKER): Promise<void> {
  */
 async function copyEverythingOnEveryTab(): Promise<EmitCall[]> {
   const collected: EmitCall[] = [];
-  for (const tab of ["Prompt", "Skill", "MCP"]) {
+  for (const tab of ["Prompt", "Skill", "MCP"] as const) {
     await goToTab(tab);
     for (const button of copyButtons()) fireEvent.click(button);
     await waitFor(() => expect(emitMock).toHaveBeenCalled());

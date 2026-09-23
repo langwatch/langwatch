@@ -67,7 +67,7 @@ describe("given a count on a catalog card", () => {
       for (const card of SAMPLE_TOOL_CARDS) {
         for (const row of counted) {
           const value = card.values[row];
-          if (value !== undefined) expect(typeof value).toBe("number");
+          expect(["number", "undefined"]).toContain(typeof value);
         }
       }
     });

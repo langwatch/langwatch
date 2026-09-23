@@ -56,7 +56,7 @@ describe("scenario update, given both test suite flags on one line", () => {
         "suite_abc",
         "--no-test-suite",
       ]),
-    ).rejects.toThrow();
+    ).rejects.toThrow("process.exit(1)");
 
     expect(exit).toHaveBeenCalledWith(1);
     expect(reported.join("\n")).toContain("cannot be used together");

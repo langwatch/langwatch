@@ -71,8 +71,6 @@ async function insertRows(rows: ReturnType<typeof makeRow>[]) {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -94,111 +92,114 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("ClickHouseStalledSimulationRunRepository.findStalledRuns (integration)", () => {
-  describe("given a mix of abandoned, active, terminal and archived runs", () => {
-    /** @scenario "The backfill only selects abandoned non-terminal runs" */
-    it("surfaces only the abandoned non-terminal runs, with the ids needed to finish them", async () => {
-      const abandonedStarted = makeRow({
-        ScenarioRunId: "abandoned-started",
-        ScenarioId: "scenario-abandoned",
-        BatchRunId: "batch-abandoned",
-        ScenarioSetId: "set-abandoned",
-        Status: "IN_PROGRESS",
-      });
-      const abandonedQueued = makeRow({
-        ScenarioRunId: "abandoned-queued",
-        Status: "QUEUED",
-      });
-      const recentlyActive = makeRow({
-        ScenarioRunId: "recently-active",
-        Status: "IN_PROGRESS",
-        StartedAt: hoursAgo(1),
-        CreatedAt: hoursAgo(1),
-        UpdatedAt: hoursAgo(1),
-      });
-      const finished = makeRow({
-        ScenarioRunId: "already-finished",
-        Status: "SUCCESS",
-        Verdict: "success",
-        FinishedAt: hoursAgo(48),
-      });
-      const archived = makeRow({
-        ScenarioRunId: "archived-run",
-        Status: "IN_PROGRESS",
-        ArchivedAt: hoursAgo(48),
-      });
+describe.skipIf(databaseUrl === null)(
+  "ClickHouseStalledSimulationRunRepository.findStalledRuns (integration)",
+  () => {
+    describe("given a mix of abandoned, active, terminal and archived runs", () => {
+      /** @scenario "The backfill only selects abandoned non-terminal runs" */
+      it("surfaces only the abandoned non-terminal runs, with the ids needed to finish them", async () => {
+        const abandonedStarted = makeRow({
+          ScenarioRunId: "abandoned-started",
+          ScenarioId: "scenario-abandoned",
+          BatchRunId: "batch-abandoned",
+          ScenarioSetId: "set-abandoned",
+          Status: "IN_PROGRESS",
+        });
+        const abandonedQueued = makeRow({
+          ScenarioRunId: "abandoned-queued",
+          Status: "QUEUED",
+        });
+        const recentlyActive = makeRow({
+          ScenarioRunId: "recently-active",
+          Status: "IN_PROGRESS",
+          StartedAt: hoursAgo(1),
+          CreatedAt: hoursAgo(1),
+          UpdatedAt: hoursAgo(1),
+        });
+        const finished = makeRow({
+          ScenarioRunId: "already-finished",
+          Status: "SUCCESS",
+          Verdict: "success",
+          FinishedAt: hoursAgo(48),
+        });
+        const archived = makeRow({
+          ScenarioRunId: "archived-run",
+          Status: "IN_PROGRESS",
+          ArchivedAt: hoursAgo(48),
+        });
 
-      await insertRows([abandonedStarted, abandonedQueued, recentlyActive, finished, archived]);
+        await insertRows([abandonedStarted, abandonedQueued, recentlyActive, finished, archived]);
 
-      const result = await finder.findStalledRuns({
-        now: NOW,
-        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
-      });
-      const mine = result.filter((r) => r.tenantId === tenantId);
-      const ids = mine.map((r) => r.scenarioRunId);
+        const result = await finder.findStalledRuns({
+          now: NOW,
+          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+        });
+        const mine = result.filter((r) => r.tenantId === tenantId);
+        const ids = mine.map((r) => r.scenarioRunId);
 
-      expect(ids).toContain("abandoned-started");
-      expect(ids).toContain("abandoned-queued");
-      expect(ids).not.toContain("recently-active");
-      expect(ids).not.toContain("already-finished");
-      expect(ids).not.toContain("archived-run");
+        expect(ids).toContain("abandoned-started");
+        expect(ids).toContain("abandoned-queued");
+        expect(ids).not.toContain("recently-active");
+        expect(ids).not.toContain("already-finished");
+        expect(ids).not.toContain("archived-run");
 
-      const abandonedRow = mine.find((r) => r.scenarioRunId === "abandoned-started");
-      expect(abandonedRow).toEqual({
-        tenantId,
-        scenarioRunId: "abandoned-started",
-        scenarioId: "scenario-abandoned",
-        batchRunId: "batch-abandoned",
-        scenarioSetId: "set-abandoned",
-        status: "IN_PROGRESS",
+        const abandonedRow = mine.find((r) => r.scenarioRunId === "abandoned-started");
+        expect(abandonedRow).toEqual({
+          tenantId,
+          scenarioRunId: "abandoned-started",
+          scenarioId: "scenario-abandoned",
+          batchRunId: "batch-abandoned",
+          scenarioSetId: "set-abandoned",
+          status: "IN_PROGRESS",
+        });
       });
     });
-  });
 
-  describe("given a run whose latest version is terminal", () => {
-    it("does not surface it even though a stale non-terminal version exists", async () => {
-      const runId = "superseded-by-terminal";
-      const staleVersion = makeRow({
-        ScenarioRunId: runId,
-        Status: "IN_PROGRESS",
-        UpdatedAt: hoursAgo(72),
+    describe("given a run whose latest version is terminal", () => {
+      it("does not surface it even though a stale non-terminal version exists", async () => {
+        const runId = "superseded-by-terminal";
+        const staleVersion = makeRow({
+          ScenarioRunId: runId,
+          Status: "IN_PROGRESS",
+          UpdatedAt: hoursAgo(72),
+        });
+        const terminalVersion = makeRow({
+          ScenarioRunId: runId,
+          BatchRunId: staleVersion.BatchRunId,
+          ScenarioSetId: staleVersion.ScenarioSetId,
+          Status: "ERROR",
+          FinishedAt: hoursAgo(70),
+          UpdatedAt: hoursAgo(70),
+        });
+
+        await insertRows([staleVersion, terminalVersion]);
+
+        const result = await finder.findStalledRuns({
+          now: NOW,
+          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+        });
+
+        expect(result.map((r) => r.scenarioRunId)).not.toContain(runId);
       });
-      const terminalVersion = makeRow({
-        ScenarioRunId: runId,
-        BatchRunId: staleVersion.BatchRunId,
-        ScenarioSetId: staleVersion.ScenarioSetId,
-        Status: "ERROR",
-        FinishedAt: hoursAgo(70),
-        UpdatedAt: hoursAgo(70),
-      });
-
-      await insertRows([staleVersion, terminalVersion]);
-
-      const result = await finder.findStalledRuns({
-        now: NOW,
-        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
-      });
-
-      expect(result.map((r) => r.scenarioRunId)).not.toContain(runId);
     });
-  });
 
-  describe("given abandoned runs belonging to different tenants", () => {
-    it("surfaces every tenant's runs, each attributed to its own tenant", async () => {
-      await insertRows([
-        makeRow({ ScenarioRunId: "abandoned-tenant-a" }),
-        makeRow({ ScenarioRunId: "abandoned-tenant-b", TenantId: otherTenantId }),
-      ]);
+    describe("given abandoned runs belonging to different tenants", () => {
+      it("surfaces every tenant's runs, each attributed to its own tenant", async () => {
+        await insertRows([
+          makeRow({ ScenarioRunId: "abandoned-tenant-a" }),
+          makeRow({ ScenarioRunId: "abandoned-tenant-b", TenantId: otherTenantId }),
+        ]);
 
-      const result = await finder.findStalledRuns({
-        now: NOW,
-        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+        const result = await finder.findStalledRuns({
+          now: NOW,
+          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+        });
+
+        const a = result.find((r) => r.scenarioRunId === "abandoned-tenant-a");
+        const b = result.find((r) => r.scenarioRunId === "abandoned-tenant-b");
+        expect(a?.tenantId).toBe(tenantId);
+        expect(b?.tenantId).toBe(otherTenantId);
       });
-
-      const a = result.find((r) => r.scenarioRunId === "abandoned-tenant-a");
-      const b = result.find((r) => r.scenarioRunId === "abandoned-tenant-b");
-      expect(a?.tenantId).toBe(tenantId);
-      expect(b?.tenantId).toBe(otherTenantId);
     });
-  });
-});
+  },
+);

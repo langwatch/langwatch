@@ -85,12 +85,14 @@ describe("usePromptConfigForm — dirty baseline after loading a seeded prompt",
       isDirtyCalls = [];
       render(<DirtyBaselineHarness onIsDirty={(value) => isDirtyCalls.push(value)} />);
       await waitFor(() => {
-        expect(isDirtyCalls[isDirtyCalls.length - 1]).toBe(false);
+        if (isDirtyCalls.at(-1) !== false) throw new Error("isDirty has not settled to false");
       });
     });
 
     /** @scenario "An untouched prompt is not reported as modified" */
-    it("settles isDirty to false, not true", async () => {});
+    it("settles isDirty to false, not true", () => {
+      expect(isDirtyCalls.at(-1)).toBe(false);
+    });
 
     /** @scenario "Closing an untouched prompt warns about nothing" */
     it("never reports dirty at any point during settling", async () => {

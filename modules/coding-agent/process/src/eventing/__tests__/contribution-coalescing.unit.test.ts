@@ -78,7 +78,9 @@ function batchParamsFor({
     handler: EventingContributeLogFactsAdapter.create({
       contextMemo: new MemorySessionContextMemoRepository(),
     }),
-    getAggregateId: EventingContributeLogFactsAdapter.getAggregateId,
+    getAggregateId: (
+      command: Parameters<typeof EventingContributeLogFactsAdapter.getAggregateId>[0],
+    ) => EventingContributeLogFactsAdapter.getAggregateId(command),
     storeEventsFn: storeEventsFn as never,
     aggregateType: "coding_agent_session" as const,
     commandName: "contributeLogFacts",

@@ -62,11 +62,12 @@ class RecordingAnnouncements implements BetterAuthAnnouncements {
 
 const ACME = { id: "org_acme", name: "Acme", ssoDomain: "acme.com", ssoProvider: "google" };
 
-function signupRepo(organization: typeof ACME | null): BetterAuthHooksRepository {
-  return {
+function signupRepo(organization: typeof ACME | null) {
+  const mocks = {
     tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
     createOrganizationMembership: vi.fn().mockResolvedValue("created"),
-  } as unknown as BetterAuthHooksRepository;
+  };
+  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
 }
 
 function accountRepo({
@@ -77,22 +78,23 @@ function accountRepo({
   organization: typeof ACME | null;
   accountCount: number;
   user?: { id: string; email: string; deactivatedAt: Date | null };
-}): BetterAuthHooksRepository {
-  return {
+}) {
+  const mocks = {
     tryFindUserForHooks: vi
       .fn()
       .mockResolvedValue({ ...user, pendingSsoSetup: false, signupConfirmationPending: false }),
     tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
     countAccountsForUser: vi.fn().mockResolvedValue(accountCount),
     flagPendingSsoSetup: vi.fn().mockResolvedValue(undefined),
-  } as unknown as BetterAuthHooksRepository;
+  };
+  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
 }
 
 describe("signing in through a domain-matched organization's identity provider", () => {
   describe("given nobody with that email has an account yet", () => {
     /** @scenario New user with matching SSO domain joins the SSO org */
     it("joins the new user to the organization as a member", async () => {
-      const repo = signupRepo(ACME);
+      const { double: repo, mocks } = signupRepo(ACME);
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
@@ -113,7 +115,7 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(repo.createOrganizationMembership).toHaveBeenCalledWith({
+      expect(mocks.createOrganizationMembership).toHaveBeenCalledWith({
         userId: "user_new",
         organizationId: "org_acme",
       });
@@ -126,7 +128,7 @@ describe("signing in through a domain-matched organization's identity provider",
   describe("given a credential signup whose email nobody has verified", () => {
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {
-      const repo = signupRepo(ACME);
+      const { double: repo, mocks } = signupRepo(ACME);
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
@@ -152,14 +154,14 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(repo.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
-      expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
 
     /** @scenario Unverified signup does not claim a pending invite addressed to its email */
     it("leaves the pending invite unapplied and grants nothing", async () => {
-      const repo = signupRepo(ACME);
+      const { double: repo, mocks } = signupRepo(ACME);
       const invites = new StubPendingInvites({ id: "invite_1" });
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
@@ -187,7 +189,7 @@ describe("signing in through a domain-matched organization's identity provider",
       });
 
       expect(invites.applyInvite).not.toHaveBeenCalled();
-      expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
   });
@@ -195,7 +197,7 @@ describe("signing in through a domain-matched organization's identity provider",
   describe("given an existing user signs in through the organization's own provider", () => {
     /** @scenario Existing user with correct SSO provider auto-links */
     it("lets the account row be created and leaves the pending flag alone", async () => {
-      const repo = accountRepo({ organization: ACME, accountCount: 1 });
+      const { double: repo, mocks } = accountRepo({ organization: ACME, accountCount: 1 });
 
       await tryBeforeAccountCreate({
         repo,
@@ -203,14 +205,14 @@ describe("signing in through a domain-matched organization's identity provider",
         federation: new LicensedFederation(),
       });
 
-      expect(repo.flagPendingSsoSetup).not.toHaveBeenCalled();
+      expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
   describe("given an existing user signs in through a provider the organization does not use", () => {
     /** @scenario Existing user with wrong SSO provider gets pending flag */
     it("lets them in, and flags the account for setup", async () => {
-      const repo = accountRepo({
+      const { double: repo, mocks } = accountRepo({
         organization: { ...ACME, ssoProvider: "okta" },
         accountCount: 1,
       });
@@ -221,7 +223,7 @@ describe("signing in through a domain-matched organization's identity provider",
         federation: new LicensedFederation(),
       });
 
-      expect(repo.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
+      expect(mocks.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
     });
   });
 });

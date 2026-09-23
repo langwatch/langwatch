@@ -371,7 +371,6 @@ describe("Parameter Config", () => {
 
     beforeEach(() => {
       const reasoning = PARAMETER_CONFIG.reasoning;
-      expect(reasoning?.type).toBe("select");
       if (reasoning?.type !== "select") {
         throw new Error("expected a select parameter config");
       }

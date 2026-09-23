@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+
 import type { BashOutput, LocalCall } from "../../../../agent/local-control-protocol";
 import {
   callHeadline,
@@ -759,12 +760,11 @@ describe("when the conversation title is wider than the terminal", () => {
 
     const words = "Instrument traces with LangWatch";
     expect(writer.lines.join(" ").replace(/\s+/g, " ")).toContain(words);
-    for (const line of writer.lines) {
-      // A single word wider than the terminal keeps its own line, and only
-      // such a line may be longer than the terminal.
-      if (line.trim().split(" ").length > 1) {
-        expect(line.length).toBeLessThanOrEqual(40);
-      }
+    // A single word wider than the terminal keeps its own line, and only
+    // such a line may be longer than the terminal.
+    const wrappedLines = writer.lines.filter((line) => line.trim().split(" ").length > 1);
+    for (const line of wrappedLines) {
+      expect(line.length).toBeLessThanOrEqual(40);
     }
     // The link is one word, so it keeps its own line rather than being cut.
     expect(writer.lines).toContainEqual("     http://localhost:5570/acme?langyConversation=conv_1");

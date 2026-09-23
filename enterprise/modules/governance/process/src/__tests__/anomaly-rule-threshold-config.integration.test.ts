@@ -172,7 +172,8 @@ describe.skipIf(!databaseUrl)("AnomalyRule.thresholdConfig — structured schema
     it("returns ok=true for a valid config", () => {
       const result = safeParseSpendSpikeThresholdConfig(validSpendSpikeConfig);
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.data).toEqual(validSpendSpikeConfig);
+      if (!result.ok) throw new Error("unreachable: asserted above");
+      expect(result.data).toEqual(validSpendSpikeConfig);
     });
 
     /** @scenario "Stale row that fails strict validation logs a warning and skips" */
@@ -183,9 +184,8 @@ describe.skipIf(!databaseUrl)("AnomalyRule.thresholdConfig — structured schema
       const stale = { window_sec: 3600, ratio_vs_baseline: 2.5 };
       const result = safeParseSpendSpikeThresholdConfig(stale);
       expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
+      if (result.ok) throw new Error("unreachable: asserted above");
+      expect(result.error.issues.length).toBeGreaterThan(0);
     });
   });
 });

@@ -55,7 +55,9 @@ describe("the sign-in security door", () => {
     const getSignInSecuritySettings = vi.fn(async () => SETTINGS);
     const caller = mounted(createApiFixture<AuthApi>({ getSignInSecuritySettings }), false);
 
-    await expect(caller.get({ organizationId: "acme" })).rejects.toThrow();
+    await expect(caller.get({ organizationId: "acme" })).rejects.toMatchObject({
+      cause: { code: "permission_denied" },
+    });
     expect(getSignInSecuritySettings).not.toHaveBeenCalled();
   });
 

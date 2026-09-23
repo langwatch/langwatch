@@ -81,9 +81,8 @@ describe("executionRequestSchema", () => {
 
     const result = executionRequestSchema.safeParse(validRequest);
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.evaluators[0]?.dbEvaluatorId).toBe("evaluator_abc123");
-    }
+    if (!result.success) throw new Error("unreachable: asserted above");
+    expect(result.data.evaluators[0]?.dbEvaluatorId).toBe("evaluator_abc123");
   });
 
   it("still accepts deprecated settings field for backward compatibility", () => {

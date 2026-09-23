@@ -148,8 +148,8 @@ describe("WAVE_MOTION_TARGETS", () => {
 
   it("gives ONLY the tool state a pulse", () => {
     for (const [state, target] of Object.entries(WAVE_MOTION_TARGETS)) {
-      if (state === "tool") expect(target.pulse).toBeGreaterThan(0);
-      else expect(target.pulse).toBe(0);
+      expect(target.pulse > 0, state).toBe(state === "tool");
+      expect(target.pulse).toBeGreaterThanOrEqual(0);
     }
   });
 

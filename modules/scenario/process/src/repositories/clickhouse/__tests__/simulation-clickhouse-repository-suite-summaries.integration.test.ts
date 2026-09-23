@@ -77,8 +77,6 @@ async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -98,7 +96,7 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("a test suite's runs in the results view", () => {
+describe.skipIf(databaseUrl === null)("a test suite's runs in the results view", () => {
   describe("when a test suite's internal run set holds a finished batch", () => {
     /** @scenario "A test suite run appears in the results view under the test suite's name" */
     it("lists the run plan that run resolved among the internal suite sets", async () => {

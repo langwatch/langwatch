@@ -110,9 +110,8 @@ describe("provider actionParams schemas", () => {
           datasetMapping: { mapping: validMapping.mapping },
         });
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.datasetMapping.expansions).toEqual([]);
-        }
+        if (!result.success) throw new Error("unreachable: asserted above");
+        expect(result.data.datasetMapping.expansions).toEqual([]);
       });
 
       it("rejects an empty datasetId", () => {

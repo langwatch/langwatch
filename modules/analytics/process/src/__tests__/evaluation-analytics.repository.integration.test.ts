@@ -53,8 +53,6 @@ function evaluationRow(overrides: Partial<AnalyticsEvaluationRow> = {}): Analyti
   };
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 afterAll(async () => {
   if (!client) return;
   await client.command({
@@ -77,7 +75,7 @@ function repository(): ClickHouseAnalyticsEvaluationRepository {
   });
 }
 
-integration("evaluation_analytics ClickHouse contract", () => {
+describe.skipIf(databaseUrl === null)("evaluation_analytics ClickHouse contract", () => {
   it("round-trips lifecycle operands and the applied-event watermark", async () => {
     const repo = repository();
     const row = evaluationRow({ evaluationId: `${tag}-round-trip` });

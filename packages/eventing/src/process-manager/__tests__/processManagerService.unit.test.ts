@@ -322,9 +322,8 @@ describe("ProcessManagerService", () => {
 
       expect(first.outcome).toBe("committed");
       expect(second.outcome).toBe("committed");
-      if (second.outcome === "committed") {
-        expect(second.duplicateMessageKeys).toEqual(["only-once"]);
-      }
+      if (second.outcome !== "committed") throw new Error("unreachable: asserted above");
+      expect(second.duplicateMessageKeys).toEqual(["only-once"]);
       const messages = await store.findMessagesByRef({ ref });
       expect(messages).toHaveLength(1);
       const instance = await store.findByRef({ ref });

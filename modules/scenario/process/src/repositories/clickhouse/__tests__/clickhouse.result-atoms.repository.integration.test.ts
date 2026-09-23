@@ -140,8 +140,6 @@ const baseFilter = (over: Partial<ResultsFilter> = {}): ResultsFilter => ({
   ...over,
 });
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   ch = createClient({
@@ -163,7 +161,7 @@ afterAll(async () => {
   ch = undefined;
 });
 
-integration("findAtoms", () => {
+describe.skipIf(databaseUrl === null)("findAtoms", () => {
   describe("given one run of one scenario against one target", () => {
     /** @scenario "An atom names its plan, its run and its scenario" */
     /** @scenario "An atom carries the target the run was pointed at" */
@@ -438,7 +436,7 @@ integration("findAtoms", () => {
   });
 });
 
-integration("the evaluator results of an atom", () => {
+describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => {
   const sqlCheck = (over: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult => ({
     evaluatorId: "ragas/sql_query_equivalence",
     name: "SQL Query Equivalence",
@@ -546,7 +544,7 @@ integration("the evaluator results of an atom", () => {
   });
 });
 
-integration("the cost of an atom", () => {
+describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
   describe("given a run with a stored total", () => {
     /** @scenario "An atom takes its cost from the stored total of its run" */
     it("takes the stored total and names the run as its source", async () => {
@@ -733,7 +731,7 @@ integration("the cost of an atom", () => {
   });
 });
 
-integration("filters", () => {
+describe.skipIf(databaseUrl === null)("filters", () => {
   describe("when a run started before the period", () => {
     /** @scenario "The period keeps out runs outside it" */
     it("is left out", async () => {
@@ -905,7 +903,7 @@ integration("filters", () => {
   });
 });
 
-integration("the target of a run that reports its agents", () => {
+describe.skipIf(databaseUrl === null)("the target of a run that reports its agents", () => {
   const reported = [
     { name: "AcmeSupportAgent", role: "agent" as const },
     { name: "UserSimulatorAgent", role: "user" as const },
@@ -1011,7 +1009,7 @@ integration("the target of a run that reports its agents", () => {
   });
 });
 
-integration("the target of a run whose target carries parameters", () => {
+describe.skipIf(databaseUrl === null)("the target of a run whose target carries parameters", () => {
   const overrides = { model: "gpt-5-mini" };
   const variantKey = targetKeyOf({
     referenceId: "prod-agent",
@@ -1140,7 +1138,7 @@ integration("the target of a run whose target carries parameters", () => {
   });
 });
 
-integration("findRunTargets", () => {
+describe.skipIf(databaseUrl === null)("findRunTargets", () => {
   describe("given a variant of a stored target, a plain run of it, and a run from code", () => {
     /** @scenario "The run targets list carries parameter variants" */
     it("lists the variant with its reference id and overrides, the code target, and not the plain run", async () => {
@@ -1235,7 +1233,7 @@ integration("findRunTargets", () => {
   });
 });
 
-integration("findCodeScenarios", () => {
+describe.skipIf(databaseUrl === null)("findCodeScenarios", () => {
   describe("given runs from code and a run started on the platform", () => {
     /** @scenario "The scenarios that ran from code are listed for the filter" */
     it("lists the code scenarios under their keys and leaves the platform run out", async () => {
@@ -1274,7 +1272,7 @@ integration("findCodeScenarios", () => {
   });
 });
 
-integration("findRunOrdinals", () => {
+describe.skipIf(databaseUrl === null)("findRunOrdinals", () => {
   describe("given a plan with three runs inside the period", () => {
     /** @scenario "The number of a run counts the runs of its plan, oldest first" */
     it("numbers them from one, oldest first", async () => {
@@ -1302,7 +1300,7 @@ integration("findRunOrdinals", () => {
   });
 });
 
-integration("aggregateGroups", () => {
+describe.skipIf(databaseUrl === null)("aggregateGroups", () => {
   describe("when grouped by scenario over runs pushed from code", () => {
     /** @scenario "A run pushed from code folds under its set and its name" */
     it("folds runs of one name in one set together, and keeps sets apart", async () => {
@@ -1445,7 +1443,7 @@ integration("aggregateGroups", () => {
   });
 });
 
-integration("aggregateTrend", () => {
+describe.skipIf(databaseUrl === null)("aggregateTrend", () => {
   describe("given a plan with more runs in the period than a sparkline draws", () => {
     /** @scenario "A sparkline asks the database only for the points it draws" */
     it("returns only the points drawn, and the most recent of them", async () => {

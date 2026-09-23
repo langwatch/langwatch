@@ -39,14 +39,11 @@ describe("the analytics filter catalogue", () => {
 
       /** A field that requires another must require one the catalogue knows. */
       it("only requires fields the catalogue itself offers", () => {
-        for (const definition of Object.values(availableFilters)) {
-          if (definition.requiresKey) {
-            expect(availableFilters[definition.requiresKey.filter]).toBeDefined();
-          }
-          if (definition.requiresSubkey) {
-            expect(availableFilters[definition.requiresSubkey.filter]).toBeDefined();
-          }
-        }
+        const required = Object.values(availableFilters).flatMap((definition) => [
+          ...(definition.requiresKey ? [definition.requiresKey.filter] : []),
+          ...(definition.requiresSubkey ? [definition.requiresSubkey.filter] : []),
+        ]);
+        expect(Object.keys(availableFilters)).toEqual(expect.arrayContaining(required));
       });
     });
   });

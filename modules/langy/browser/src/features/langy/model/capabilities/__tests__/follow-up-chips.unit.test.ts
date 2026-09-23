@@ -62,10 +62,8 @@ describe("deriveFollowUpChips", () => {
           projectSlug: "demo",
         });
 
-        const firstPlain = chips.findIndex((chip) => !chip.carried);
         const lastCarried = chips.map((c) => c.carried).lastIndexOf(true);
         expect(lastCarried).toBe(0);
-        if (firstPlain !== -1) expect(lastCarried).toBeLessThan(firstPlain);
       });
 
       it("keeps the row a next step, not a menu", () => {

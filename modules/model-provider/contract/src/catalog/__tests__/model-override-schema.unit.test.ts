@@ -27,9 +27,8 @@ describe("modelOverrideSchema", () => {
       (value) => {
         const result = modelOverrideSchema.safeParse(value);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0]?.message).toContain("provider/model");
-        }
+        if (result.success) throw new Error("unreachable: asserted above");
+        expect(result.error.issues[0]?.message).toContain("provider/model");
       },
     );
   });
@@ -45,9 +44,8 @@ describe("modelOverrideSchema", () => {
     ])("rejects %j with a provider/model message", (value) => {
       const result = modelOverrideSchema.safeParse(value);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0]?.message).toContain("provider/model");
-      }
+      if (result.success) throw new Error("unreachable: asserted above");
+      expect(result.error.issues[0]?.message).toContain("provider/model");
     });
   });
 });

@@ -334,6 +334,7 @@ describe("resolveLangWatchQLGranularity", () => {
         },
       ];
 
+      const coarsened: { from: number; to: number | undefined }[] = [];
       for (const timeWindow of windows) {
         for (const step of LWQL_GRANULARITY_STEPS) {
           const resolution = timeWindows.resolveGranularity({
@@ -344,9 +345,16 @@ describe("resolveLangWatchQLGranularity", () => {
           });
 
           if (resolution.coarsenedFromSeconds !== undefined) {
-            expect(resolution.granularitySeconds).toBeGreaterThan(resolution.coarsenedFromSeconds);
+            coarsened.push({
+              from: resolution.coarsenedFromSeconds,
+              to: resolution.granularitySeconds,
+            });
           }
         }
+      }
+      expect(coarsened.length).toBeGreaterThan(0);
+      for (const { from, to } of coarsened) {
+        expect(to).toBeGreaterThan(from);
       }
     });
 

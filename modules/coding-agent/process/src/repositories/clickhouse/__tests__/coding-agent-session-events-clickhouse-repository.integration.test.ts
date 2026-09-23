@@ -17,7 +17,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
 
 let ch: ClickHouseClient;
 let repository: CodingAgentSessionEventsClickHouseRepository;
@@ -129,7 +128,7 @@ afterAll(async () => {
   }
 });
 
-integration("CodingAgentSessionEventsClickHouseRepository", () => {
+describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepository", () => {
   describe("given the same event written twice", () => {
     /** @scenario "re-delivery does not duplicate a row" */
     it("lists the event exactly once", async () => {

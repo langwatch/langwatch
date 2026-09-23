@@ -28,13 +28,10 @@ describe("partitionStreamingText", () => {
 
     const result = partitionStreamingText(text);
 
-    for (const word of result.animatedWords) {
-      if (word.includes("\n")) {
-        // A token carrying a newline is pure whitespace — it renders as plain
-        // flow text, never inside an animated inline-block span.
-        expect(word.trim()).toBe("");
-      }
-    }
+    // A token carrying a newline is pure whitespace — it renders as plain
+    // flow text, never inside an animated inline-block span.
+    const newlineWords = result.animatedWords.filter((word) => word.includes("\n"));
+    expect(newlineWords.map((word) => word.trim())).toEqual(newlineWords.map(() => ""));
     // Nothing lost in the re-tokenisation.
     expect(result.settledText + result.animatedWords.join("")).toBe(text);
   });

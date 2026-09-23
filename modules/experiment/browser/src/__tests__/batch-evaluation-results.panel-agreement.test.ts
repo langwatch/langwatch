@@ -155,9 +155,10 @@ describe("the panels agree on which pairs were separated", () => {
       const verdict = computeLeaderboardVerdict(leaderboard);
       const adequacy = computeSampleAdequacy(leaderboard);
 
-      if (verdict.kind === "clear-winner") {
-        expect(adequacy.separatedPairs).toBe(adequacy.totalPairs);
-      }
+      expect({
+        crowned: verdict.kind === "clear-winner",
+        settled: adequacy.separatedPairs === adequacy.totalPairs,
+      }).not.toEqual({ crowned: true, settled: false });
       expect(verdict.tiedIds.length + adequacy.separatedPairs).toBeGreaterThan(0);
     });
   });

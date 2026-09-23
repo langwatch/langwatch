@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { LocalCall } from "../../../../agent/local-control-protocol";
 import {
   approvalCardFor,
@@ -142,9 +143,7 @@ describe("the box the selector draws", () => {
     expect(drawn).toContainEqual(
       expect.stringContaining('❯ 1. Yes, allow "uv run" for this session'),
     );
-    expect(drawn).toContainEqual(
-      expect.stringContaining("2. Yes, this time only"),
-    );
+    expect(drawn).toContainEqual(expect.stringContaining("2. Yes, this time only"));
     expect(drawn).toContainEqual(
       expect.stringContaining("3. No, and tell Langy what to do instead"),
     );
@@ -218,7 +217,7 @@ describe("the box the selector draws", () => {
     ];
     for (const [what, patterns, sentence] of sentences) {
       describe(`when the grant is ${what}`, () => {
-        it(sentence === null ? "says nothing" : "reads what it covers", () => {
+        it("reads what it covers, or says nothing when it covers nothing", () => {
           expect(grantCoverageSentence(patterns)).toBe(sentence);
         });
       });
@@ -253,9 +252,7 @@ describe("the box the selector draws", () => {
 
       expect(first).toHaveLength(second.length);
       expect(second.filter((line) => line.includes("❯"))).toHaveLength(1);
-      expect(
-        second.find((line) => line.includes("❯")),
-      ).toContain("2. Yes, this time only");
+      expect(second.find((line) => line.includes("❯"))).toContain("2. Yes, this time only");
     });
   });
 
@@ -273,9 +270,7 @@ describe("the box the selector draws", () => {
 });
 
 describe("given a permission selector open in the terminal", () => {
-  const open = (
-    over: { card?: ApprovalCard; reason?: string } = {},
-  ) => {
+  const open = (over: { card?: ApprovalCard; reason?: string } = {}) => {
     const screen = fakeScreen();
     const keys = fakeKeys();
     const asked: string[] = [];

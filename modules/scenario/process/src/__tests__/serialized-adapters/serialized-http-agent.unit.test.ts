@@ -11,6 +11,7 @@ import {
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { HttpAgentTransportError } from "../../services/serialized-http-agent.service.ts";
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,
@@ -709,7 +710,7 @@ describe("SerializedHttpAgentAdapter", () => {
           };
           const adapter = createMockHttpAgentAdapter({ config });
 
-          await expect(adapter.call(input)).rejects.toThrow();
+          await expect(adapter.call(input)).rejects.toThrow(HttpAgentTransportError);
 
           expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
             `https://${host}/path`,

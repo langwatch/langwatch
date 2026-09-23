@@ -15,11 +15,11 @@ class ReversingCipher extends ModelProviderCredentialCipher {
   }
 }
 
-function emptyDatabase(): ModelProviderMigrationDatabase {
+function emptyDatabase() {
   return {
     project: { findMany: vi.fn(async () => []) },
     modelProvider: { findMany: vi.fn(async () => []), update: vi.fn(async () => undefined) },
-  };
+  } satisfies ModelProviderMigrationDatabase;
 }
 
 describe("ModelProviderCredentialsMigrateTask", () => {

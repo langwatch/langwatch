@@ -199,6 +199,8 @@ describe("given a deployment that offers passkeys", () => {
         fireEvent.pointerDown(getByLabelText("Email"));
 
         await flush();
+        expect(passkeyMock).toHaveBeenCalled();
+        expect(getByLabelText("Email")).toBeDefined();
       });
     });
   });

@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 import { ModelProviderCustomModelsMigrateTask } from "../model-provider-custom-models-migrate.task.ts";
 
-function emptyDatabase(): ModelProviderMigrationDatabase {
+function emptyDatabase() {
   return {
     project: { findMany: vi.fn(async () => []) },
     modelProvider: { findMany: vi.fn(async () => []), update: vi.fn(async () => undefined) },
-  };
+  } satisfies ModelProviderMigrationDatabase;
 }
 
 describe("ModelProviderCustomModelsMigrateTask", () => {

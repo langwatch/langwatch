@@ -29,11 +29,13 @@ describe("share expiry options", () => {
     });
 
     it("never returns a moment already in the past", () => {
-      for (const option of SHARE_EXPIRY_OPTIONS) {
+      const expiries = SHARE_EXPIRY_OPTIONS.flatMap((option) => {
         const expiry = expiryToInstant({ option, now: NOW });
-        if (expiry) {
-          expect(expiry.epochMilliseconds).toBeGreaterThan(NOW.epochMilliseconds);
-        }
+        return expiry ? [expiry.epochMilliseconds] : [];
+      });
+      expect(expiries.length).toBeGreaterThan(0);
+      for (const expiry of expiries) {
+        expect(expiry).toBeGreaterThan(NOW.epochMilliseconds);
       }
     });
   });

@@ -85,10 +85,7 @@ describe("memory-safety", () => {
           });
 
           const outerSelect = getOutermostSelect(result.sql);
-          // If SpanAttributes appears in outermost SELECT, it must be with ['key'] access
-          if (outerSelect.includes("SpanAttributes")) {
-            expect(outerSelect).not.toMatch(bareSpanAttributesPattern);
-          }
+          expect(outerSelect).not.toMatch(bareSpanAttributesPattern);
         });
       });
     }
@@ -108,9 +105,7 @@ describe("memory-safety", () => {
         });
 
         const outerSelect = getOutermostSelect(result.sql);
-        if (outerSelect.includes("SpanAttributes")) {
-          expect(outerSelect).not.toMatch(bareSpanAttributesPattern);
-        }
+        expect(outerSelect).not.toMatch(bareSpanAttributesPattern);
       });
     });
   });

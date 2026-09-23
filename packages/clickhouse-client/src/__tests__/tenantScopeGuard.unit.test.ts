@@ -71,10 +71,7 @@ describe("the ClickHouse tenant-scope guard", () => {
         "the stored-object column name",
         "SELECT project_id FROM stored_objects WHERE project_id = {projectId:String}",
       ],
-      [
-        "a table alias",
-        "SELECT 1 FROM simulation_runs AS t WHERE t.TenantId = {tenantId:String}",
-      ],
+      ["a table alias", "SELECT 1 FROM simulation_runs AS t WHERE t.TenantId = {tenantId:String}"],
     ])("accepts %s", async (_name, query) => {
       const driver = recordingClient();
       const guarded = withClickHouseTenantScope({ client: driver, instance: "shared" });
@@ -119,6 +116,13 @@ describe("the ClickHouse tenant-scope guard", () => {
           query: "SELECT 1 FROM trace_summaries -- WHERE TenantId = {tenantId:String}",
         }),
       ).rejects.toThrow(/not tenant-scoped/);
+    });
+
+    it("accepts a scoped statement whose string literal holds astral characters", async () => {
+      const guarded = withClickHouseTenantScope({ client: recordingClient(), instance: "shared" });
+      const query = `SELECT '${"😀".repeat(60)}' AS pad FROM trace_summaries WHERE TenantId = {tenantId:String}`;
+
+      await expect(guarded.query({ query })).resolves.toEqual({ ok: true });
     });
 
     it("throws a plain Error, so it degrades to unknown rather than posing as a customer fault", async () => {
@@ -196,7 +200,12 @@ describe("the ClickHouse tenant-scope guard", () => {
       });
 
       const instances = ["shared", "private-acme"].map((instance) =>
-        factory.create({ url: "http://localhost:8123", instance, cluster: "", maxOpenConnections: 4 }),
+        factory.create({
+          url: "http://localhost:8123",
+          instance,
+          cluster: "",
+          maxOpenConnections: 4,
+        }),
       );
 
       for (const client of instances) {

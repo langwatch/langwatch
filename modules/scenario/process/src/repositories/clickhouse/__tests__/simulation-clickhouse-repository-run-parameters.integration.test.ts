@@ -6,13 +6,13 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 import {
   SuiteExecutionService,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-process";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -129,8 +129,6 @@ async function storeRun(command: QueueSimulationRunCommandData): Promise<void> {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -150,28 +148,31 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("given a run queued against a target carrying an override", () => {
-  describe("when the run is stored and read back", () => {
-    /** @scenario The target key and its parameters read back off the stored run */
-    it("reads the target key and the override back under the reserved langwatch namespace", async () => {
-      const command = await queueRunAgainstTarget();
-      await storeRun(command);
+describe.skipIf(databaseUrl === null)(
+  "given a run queued against a target carrying an override",
+  () => {
+    describe("when the run is stored and read back", () => {
+      /** @scenario The target key and its parameters read back off the stored run */
+      it("reads the target key and the override back under the reserved langwatch namespace", async () => {
+        const command = await queueRunAgainstTarget();
+        await storeRun(command);
 
-      const run = await repository.findScenarioRunData({
-        projectId: tenantId,
-        scenarioRunId: command.scenarioRunId,
-      });
+        const run = await repository.findScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId: command.scenarioRunId,
+        });
 
-      const targetKey = targetKeyOf(target);
-      expect(targetKey).not.toBe("prod-agent");
-      expect(run?.metadata).toMatchObject({
-        langwatch: {
-          targetReferenceId: "prod-agent",
-          targetKey,
-          targetParameters: { model: "gpt-5-mini" },
-        },
-        parameters: { model: "gpt-5-mini", region: "eu-central" },
+        const targetKey = targetKeyOf(target);
+        expect(targetKey).not.toBe("prod-agent");
+        expect(run?.metadata).toMatchObject({
+          langwatch: {
+            targetReferenceId: "prod-agent",
+            targetKey,
+            targetParameters: { model: "gpt-5-mini" },
+          },
+          parameters: { model: "gpt-5-mini", region: "eu-central" },
+        });
       });
     });
-  });
-});
+  },
+);

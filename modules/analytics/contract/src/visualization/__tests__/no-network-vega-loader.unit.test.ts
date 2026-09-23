@@ -45,9 +45,9 @@ describe("the no-network Vega loader", () => {
   // here, including the two below that never otherwise touch `reachedTheNetwork` —
   // which is the point of guarding it here instead of per-test.
   afterEach(() => {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: suite-wide guard
-    expect(reachedTheNetwork).not.toHaveBeenCalled();
+    const requests = reachedTheNetwork.mock.calls.length;
     vi.unstubAllGlobals();
+    if (requests > 0) throw new Error(`the loader reached the network ${requests} time(s)`);
   });
 
   describe("given a spec that slipped past static validation with a loadable resource", () => {

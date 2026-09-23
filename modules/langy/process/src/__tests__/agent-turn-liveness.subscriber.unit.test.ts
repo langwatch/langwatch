@@ -112,10 +112,9 @@ describe("agent turn liveness subscriber", () => {
     expect(subscriber.options?.delay).toBe(LANGY_HEARTBEAT_GRACE_MS);
     const deduplication = subscriber.options?.deduplication;
     expect(typeof deduplication).toBe("object");
-    if (typeof deduplication === "object") {
-      expect(deduplication.makeId(event)).toBe("langy-liveness:project_2:conv_2:turn_1");
-      expect(deduplication.ttlMs).toBe(LANGY_HEARTBEAT_GRACE_MS * 2);
-    }
+    if (typeof deduplication !== "object") throw new Error("unreachable: asserted above");
+    expect(deduplication.makeId(event)).toBe("langy-liveness:project_2:conv_2:turn_1");
+    expect(deduplication.ttlMs).toBe(LANGY_HEARTBEAT_GRACE_MS * 2);
   });
 
   it("uses a fresh Postgres read scoped by the committed tenant and aggregate", async () => {

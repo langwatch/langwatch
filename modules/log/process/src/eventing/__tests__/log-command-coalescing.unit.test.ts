@@ -79,7 +79,7 @@ function batchParamsFor({
     commandType: RECORD_CANONICAL_LOG_COMMAND_TYPE,
     commandSchema: RecordCanonicalLogCommand.schema,
     handler: new RecordCanonicalLogCommand(),
-    getAggregateId: RecordCanonicalLogCommand.getAggregateId,
+    getAggregateId: (command) => RecordCanonicalLogCommand.getAggregateId(command),
     storeEventsFn,
     aggregateType: "log" as const,
     commandName: "recordLogRecord",

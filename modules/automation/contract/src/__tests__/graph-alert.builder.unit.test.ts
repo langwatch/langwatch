@@ -195,9 +195,8 @@ describe("graphAlertActionParamsSchema", () => {
         });
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0]?.message).toMatch(/series/i);
-        }
+        if (result.success) throw new Error("unreachable: asserted above");
+        expect(result.error.issues[0]?.message).toMatch(/series/i);
       });
     });
   });

@@ -61,16 +61,17 @@ function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
 function buildAgentApi({ agents }: { agents: { id: string; config: Record<string, unknown> }[] }) {
   const updatedConfigs: Record<string, Record<string, unknown>> = {};
 
-  const agentsApi = createApiFixture<AgentApi>({
+  const mocks = {
     listWorkflowConfigs: vi.fn<AgentApi["listWorkflowConfigs"]>().mockResolvedValue(agents),
     updateWorkflowConfig: vi.fn<AgentApi["updateWorkflowConfig"]>(async (input) => {
       expect(input.projectId).toBe("proj-1");
       expect(input.workflowId).toBe("wf-1");
       updatedConfigs[input.id] = input.config;
     }),
-  });
+  };
+  const agentsApi = createApiFixture<AgentApi>(mocks);
 
-  return { agentsApi, updatedConfigs };
+  return { agentsApi, mocks, updatedConfigs };
 }
 
 // Declared, unwired entry outputs must still become scenario inputs.
@@ -214,7 +215,7 @@ describe("WorkflowAgentMappingService", () => {
 
     it("queries agents by workflowId and projectId excluding archived", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
-      const { agentsApi } = buildAgentApi({
+      const { agentsApi, mocks } = buildAgentApi({
         agents: [{ id: "agent-1", config: {} }],
       });
 
@@ -225,7 +226,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.listWorkflowConfigs).toHaveBeenCalledWith(
+      expect(mocks.listWorkflowConfigs).toHaveBeenCalledWith(
         expect.objectContaining({
           workflowId: "wf-1",
           projectId: "proj-1",
@@ -240,7 +241,7 @@ describe("WorkflowAgentMappingService", () => {
       const existingMappings = {
         query: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { agentsApi } = buildAgentApi({
+      const { agentsApi, mocks } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -256,7 +257,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -265,7 +266,7 @@ describe("WorkflowAgentMappingService", () => {
     it("skips auto-compute and leaves scenarioMappings empty", async () => {
       // Blank template: entry outputs "question", end inputs "output"
       const dsl = buildDSL({ inputs: ["question"], output: "output" });
-      const { agentsApi } = buildAgentApi({
+      const { agentsApi, mocks } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
@@ -276,7 +277,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -288,7 +289,7 @@ describe("WorkflowAgentMappingService", () => {
       const staleExistingMappings = {
         old_query: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { agentsApi, updatedConfigs } = buildAgentApi({
+      const { agentsApi, mocks, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -307,7 +308,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       const mappings = config!.scenarioMappings as Record<string, unknown>;
@@ -322,7 +323,7 @@ describe("WorkflowAgentMappingService", () => {
       const currentMappings = {
         prompt: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { agentsApi } = buildAgentApi({
+      const { agentsApi, mocks } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -341,7 +342,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).not.toHaveBeenCalled();
     });
 
     it("preserves user-set mappings for non-stale keys when another key is stale", async () => {
@@ -358,7 +359,7 @@ describe("WorkflowAgentMappingService", () => {
           path: ["custom", "user_picked"],
         },
       };
-      const { agentsApi, updatedConfigs } = buildAgentApi({
+      const { agentsApi, mocks, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -377,7 +378,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       const mappings = config!.scenarioMappings as Record<
@@ -417,7 +418,7 @@ describe("WorkflowAgentMappingService", () => {
           },
         ],
       };
-      const { agentsApi, updatedConfigs } = buildAgentApi({
+      const { agentsApi, mocks, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -443,7 +444,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       // Stale scenarioOutputField must be removed, not left pointing at
@@ -459,7 +460,7 @@ describe("WorkflowAgentMappingService", () => {
       const currentMappings = {
         prompt: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { agentsApi, updatedConfigs } = buildAgentApi({
+      const { agentsApi, mocks, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -479,7 +480,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config!.scenarioOutputField).toBe("new_out");
       // Input mappings are preserved verbatim.
@@ -495,7 +496,7 @@ describe("WorkflowAgentMappingService", () => {
   describe("when no agents are linked to the workflow", () => {
     it("does not attempt any updates", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
-      const { agentsApi } = buildAgentApi({ agents: [] });
+      const { agentsApi, mocks } = buildAgentApi({ agents: [] });
 
       await recompute({
         agents: agentsApi,
@@ -504,7 +505,7 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 

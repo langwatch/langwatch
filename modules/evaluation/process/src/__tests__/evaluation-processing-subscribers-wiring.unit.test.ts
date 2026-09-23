@@ -101,15 +101,15 @@ describe("evaluation processing pipeline subscriber wiring", () => {
     it("reacts only to evaluation completed/reported events", () => {
       const { pipeline } = buildPipeline();
       const entry = pipeline.foldSubscribers.get("triggerMatch");
-      const shouldDispatch = entry?.definition.shouldDispatch;
+      const definition = entry?.definition;
 
       const context = {
         tenantId,
         aggregateId: "eval-1",
         foldState: createRunState(),
       };
-      expect(shouldDispatch?.(completedEvent(), context)).toBe(true);
-      expect(shouldDispatch?.(createEvaluationStartedEvent(), context)).toBe(false);
+      expect(definition?.shouldDispatch?.(completedEvent(), context)).toBe(true);
+      expect(definition?.shouldDispatch?.(createEvaluationStartedEvent(), context)).toBe(false);
     });
 
     it("delegates to Automation's complete subscriber service with committed fold state", async () => {

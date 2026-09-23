@@ -72,8 +72,6 @@ function finishedRunWithInstance(scenarioRunId: string): SimulationRunState["dat
   } as SimulationRunState["data"];
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   ch = createClient({
@@ -97,35 +95,38 @@ afterAll(async () => {
   ch = undefined;
 });
 
-integration("given a run that was queued, finished and had its instance recorded", () => {
-  describe("when the run is stored and read back", () => {
-    /** @scenario A finished run stores the instance that served it */
-    it("carries the instance under the reserved langwatch namespace, beside what was already there", async () => {
-      const scenarioRunId = `run-served-${nanoid()}`;
-      await stateRepository.storeProjection(
-        {
-          id: `proj-${nanoid()}`,
-          aggregateId: scenarioRunId,
-          tenantId: createTenantId(tenantId),
-          version: new Date(now).toISOString().slice(0, 10),
-          data: finishedRunWithInstance(scenarioRunId),
-        } as unknown as SimulationRunState,
-        { tenantId: createTenantId(tenantId) },
-      );
+describe.skipIf(databaseUrl === null)(
+  "given a run that was queued, finished and had its instance recorded",
+  () => {
+    describe("when the run is stored and read back", () => {
+      /** @scenario A finished run stores the instance that served it */
+      it("carries the instance under the reserved langwatch namespace, beside what was already there", async () => {
+        const scenarioRunId = `run-served-${nanoid()}`;
+        await stateRepository.storeProjection(
+          {
+            id: `proj-${nanoid()}`,
+            aggregateId: scenarioRunId,
+            tenantId: createTenantId(tenantId),
+            version: new Date(now).toISOString().slice(0, 10),
+            data: finishedRunWithInstance(scenarioRunId),
+          } as unknown as SimulationRunState,
+          { tenantId: createTenantId(tenantId) },
+        );
 
-      const run = await runs.findScenarioRunData({
-        projectId: tenantId,
-        scenarioRunId,
-      });
+        const run = await runs.findScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId,
+        });
 
-      expect(run?.status).toBe("SUCCESS");
-      expect(run?.metadata).toMatchObject({
-        langwatch: {
-          targetReferenceId: "prod-agent",
-          targetType: "connected",
-          agentInstance: AGENT_INSTANCE,
-        },
+        expect(run?.status).toBe("SUCCESS");
+        expect(run?.metadata).toMatchObject({
+          langwatch: {
+            targetReferenceId: "prod-agent",
+            targetType: "connected",
+            agentInstance: AGENT_INSTANCE,
+          },
+        });
       });
     });
-  });
-});
+  },
+);

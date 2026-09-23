@@ -12,7 +12,7 @@ import {
 
 const USER = "user_sam";
 
-function stateWithStatus(status: TenantMigrationStatus | null): SystemMigrationStateRepository {
+function stateWithStatus(status: TenantMigrationStatus | null) {
   return {
     tryFindRecord: vi.fn(
       async ({ migrationName, tenantId }: { migrationName: string; tenantId: string }) =>
@@ -24,7 +24,7 @@ function stateWithStatus(status: TenantMigrationStatus | null): SystemMigrationS
     // is by definition past the "has anyone finalized" question, so the
     // default answers yes and each test still proves its own fork.
     hasFinalizedTenant: vi.fn(async () => true),
-  };
+  } satisfies SystemMigrationStateRepository;
 }
 
 afterEach(() => {

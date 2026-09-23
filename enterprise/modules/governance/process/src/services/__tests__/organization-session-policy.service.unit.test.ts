@@ -82,15 +82,12 @@ describe("OrganizationSessionPolicyService", () => {
 
     it("names the value and the cap on the refusal so the caller can render it", async () => {
       const service = OrganizationSessionPolicyService.create(new MemoryRepository());
-      try {
-        await service.setMaxDurationDays("org-1", 9999);
-        throw new Error("expected refusal");
-      } catch (error) {
-        expect(error).toBeInstanceOf(SessionPolicyOutOfRangeError);
-        const refusal = error as SessionPolicyOutOfRangeError;
-        expect(refusal.value).toBe(9999);
-        expect(refusal.maxDays).toBe(SESSION_POLICY_MAX_DAYS);
-      }
+      const refusal = await service
+        .setMaxDurationDays("org-1", 9999)
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(SessionPolicyOutOfRangeError);
+      expect(refusal).toMatchObject({ value: 9999, maxDays: SESSION_POLICY_MAX_DAYS });
     });
   });
 });

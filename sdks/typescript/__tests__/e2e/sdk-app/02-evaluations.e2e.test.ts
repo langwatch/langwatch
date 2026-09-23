@@ -13,46 +13,50 @@ import { READ_BUDGET_MS, apiKey, client, endpoint, pollUntil, unique } from "./s
 describe("given an application that evaluates what its model said", () => {
   describe("when it records an evaluation on the span it just wrote", () => {
     // @scenario "An evaluation recorded on a span is readable on the trace"
-    it("reads that evaluation back on the trace, under the name it gave", async () => {
-      const langwatch: LangWatch = client();
-      const evaluationName = unique("sdk-app-span-evaluation");
-      const observability = setupObservability({
-        langwatch: { apiKey: apiKey(), endpoint: endpoint(), processorType: "simple" },
-        serviceName: "sdk-app-journey",
-        advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
-      });
-
-      const tracer = getLangWatchTracer("sdk-app-journey");
-      let traceId = "";
-      await tracer.withActiveSpan("judged-answer", async (span) => {
-        traceId = span.spanContext().traceId;
-        span.setType("llm");
-        span.setInput({ message: "Is a span part of a trace?" });
-        span.setOutput({ response: "Yes." });
-        span.addEvaluation({
-          name: evaluationName,
-          type: "custom",
-          status: "processed",
-          passed: true,
-          score: 1,
-          label: "correct",
-          details: "The answer names the relationship.",
+    it(
+      "reads that evaluation back on the trace, under the name it gave",
+      async () => {
+        const langwatch: LangWatch = client();
+        const evaluationName = unique("sdk-app-span-evaluation");
+        const observability = setupObservability({
+          langwatch: { apiKey: apiKey(), endpoint: endpoint(), processorType: "simple" },
+          serviceName: "sdk-app-journey",
+          advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
         });
-      });
-      await observability.shutdown();
 
-      const evaluation = await pollUntil({
-        what: `the evaluation ${evaluationName} on trace ${traceId}`,
-        read: async () => {
-          const trace = await langwatch.traces.get(traceId, { includeSpans: true });
-          return trace?.evaluations?.find((each) => each.name === evaluationName) ?? null;
-        },
-      });
+        const tracer = getLangWatchTracer("sdk-app-journey");
+        let traceId = "";
+        await tracer.withActiveSpan("judged-answer", async (span) => {
+          traceId = span.spanContext().traceId;
+          span.setType("llm");
+          span.setInput({ message: "Is a span part of a trace?" });
+          span.setOutput({ response: "Yes." });
+          span.addEvaluation({
+            name: evaluationName,
+            type: "custom",
+            status: "processed",
+            passed: true,
+            score: 1,
+            label: "correct",
+            details: "The answer names the relationship.",
+          });
+        });
+        await observability.shutdown();
 
-      expect(evaluation.passed).toBe(true);
-      expect(evaluation.score).toBe(1);
-      expect(evaluation.label).toBe("correct");
-    }, READ_BUDGET_MS + 60_000);
+        const evaluation = await pollUntil({
+          what: `the evaluation ${evaluationName} on trace ${traceId}`,
+          read: async () => {
+            const trace = await langwatch.traces.get(traceId, { includeSpans: true });
+            return trace?.evaluations?.find((each) => each.name === evaluationName) ?? null;
+          },
+        });
+
+        expect(evaluation.passed).toBe(true);
+        expect(evaluation.score).toBe(1);
+        expect(evaluation.label).toBe("correct");
+      },
+      READ_BUDGET_MS + 60_000,
+    );
   });
 
   describe("when it creates an evaluator and calls it by slug", () => {
@@ -78,7 +82,7 @@ describe("given an application that evaluates what its model said", () => {
 
         expect(result.status).toBeTruthy();
         expect(["processed", "skipped", "error"]).toContain(result.status);
-        if (result.status === "processed") expect(result.passed).toBe(true);
+        expect(result.status === "processed" ? result.passed : true).toBe(true);
       } finally {
         await langwatch.evaluators.delete(evaluator.id).catch(() => undefined);
       }

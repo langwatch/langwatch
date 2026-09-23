@@ -55,20 +55,19 @@ class StubAnnouncements implements BetterAuthAnnouncements {
   }
 }
 
-function organizationRepo(
-  organization: { id: string; ssoDomain: string } | null,
-): BetterAuthHooksRepository {
-  return {
+function organizationRepo(organization: { id: string; ssoDomain: string } | null) {
+  const mocks = {
     tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
     createOrganizationMembership: vi.fn(),
-  } as unknown as BetterAuthHooksRepository;
+  };
+  return { double: mocks as unknown as BetterAuthHooksRepository, mocks };
 }
 
 describe("the ssoDomain auto-join on an unlicensed deployment", () => {
   /** @scenario "Unlicensed-mode signup does not auto-join a domain-matched organization" */
   it("creates the account and skips the domain-matched organization entirely", async () => {
     const federation = new StubFederation(false);
-    const repo = organizationRepo({ id: "org_1", ssoDomain: "acme.com" });
+    const { double: repo, mocks } = organizationRepo({ id: "org_1", ssoDomain: "acme.com" });
 
     await afterUserCreate({
       repo,
@@ -93,7 +92,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
       },
     });
 
-    expect(repo.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
-    expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
+    expect(mocks.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+    expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
   });
 });

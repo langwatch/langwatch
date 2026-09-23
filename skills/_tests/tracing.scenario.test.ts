@@ -1,11 +1,13 @@
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
@@ -402,10 +404,8 @@ describe("Tracing Skill", () => {
 
             // Verify .env was created with the key
             const envFile = path.join(tempFolder, ".env");
-            if (fs.existsSync(envFile)) {
-              const envContent = fs.readFileSync(envFile, "utf8");
-              expect(envContent).toContain("LANGWATCH_API_KEY");
-            }
+            expect(fs.existsSync(envFile)).toBe(true);
+            expect(fs.readFileSync(envFile, "utf8")).toContain("LANGWATCH_API_KEY");
           },
           scenario.judge(),
         ],

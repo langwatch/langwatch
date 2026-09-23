@@ -31,9 +31,8 @@ describe("validateNodeName", () => {
         name: "fetch_data",
       });
       expect(result.valid).toBe(false);
-      if (!result.valid) {
-        expect(result.error).toContain("already exists");
-      }
+      if (result.valid) throw new Error("unreachable: asserted above");
+      expect(result.error).toContain("already exists");
     });
   });
 

@@ -79,13 +79,10 @@ describe("ensureJsonSafe", () => {
 
   describe("when rejecting a value", () => {
     it("reports the path to the offending value", () => {
-      try {
-        ensureJsonSafe({ a: [1, { b: undefined }] });
-        expect.unreachable("expected ensureJsonSafe to throw");
-      } catch (error) {
-        expect(error).toBeInstanceOf(JsonSafetyError);
-        expect((error as JsonSafetyError).path).toBe("$.a[1].b");
-      }
+      const ensure = () => ensureJsonSafe({ a: [1, { b: undefined }] });
+
+      expect(ensure).toThrow(JsonSafetyError);
+      expect(ensure).toThrow(expect.objectContaining({ path: "$.a[1].b" }));
     });
   });
 });

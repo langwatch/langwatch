@@ -49,8 +49,7 @@ describe("parseWorkflowImport", () => {
       error: { title: "Invalid workflow file" },
     });
 
-    if (!result.success) {
-      expect(result.error.description).toContain("nodes");
-    }
+    if (result.success) throw new Error("unreachable: asserted above");
+    expect(result.error.description).toContain("nodes");
   });
 });

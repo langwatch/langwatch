@@ -5,12 +5,12 @@ import {
   type StorageMeterRedis,
 } from "../storage-meter-cache.store.ts";
 
-function createRedis(): StorageMeterRedis {
+function createRedis() {
   return {
     get: vi.fn().mockRejectedValue(new Error("Redis unavailable")),
     setex: vi.fn().mockResolvedValue("OK"),
     set: vi.fn().mockResolvedValue("OK"),
-  };
+  } satisfies StorageMeterRedis;
 }
 
 describe("RedisStorageMeterCacheStore", () => {

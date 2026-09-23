@@ -51,7 +51,8 @@ describe("callerVoiceConfigSchema voiceModel shape", () => {
         voiceModel: "openai/nova",
       });
       expect(result.success).toBe(true);
-      if (result.success) expect(result.data.voiceModel).toBe("openai/nova");
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.voiceModel).toBe("openai/nova");
     });
   });
 
@@ -67,7 +68,8 @@ describe("callerVoiceConfigSchema voiceModel shape", () => {
     it("accepts it as the project default", () => {
       const result = callerVoiceConfigSchema.safeParse({ voiceModel: null });
       expect(result.success).toBe(true);
-      if (result.success) expect(result.data.voiceModel).toBeNull();
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.voiceModel).toBeNull();
     });
   });
 });

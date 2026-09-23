@@ -62,7 +62,7 @@ const renderHandled: RestErrorHandler = (error, c) => {
 };
 
 function buildApi(overrides: Record<string, unknown> = {}) {
-  const stub = {
+  const mocks = {
     getAllWithFields: vi.fn(async () => [enriched]),
     findByIdOrSlugWithFields: vi.fn(async () => enriched),
     getByIdWithFields: vi.fn(async () => enriched),
@@ -70,9 +70,12 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     createWithResolvedDefaults: vi.fn(async () => evaluator),
     update: vi.fn(async () => evaluator),
     archive: vi.fn(async () => evaluator),
+    ...overrides,
+  };
+  const stub = {
     platformUrl: ({ projectSlug, path }: { projectSlug: string; path: string }) =>
       `https://app.langwatch.test/${projectSlug}${path}`,
-    ...overrides,
+    ...mocks,
   } as unknown as EvaluatorApi;
 
   const runtime = createRestRuntime({
@@ -93,7 +96,7 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     ],
   });
 
-  return { hono, stub };
+  return { hono, mocks };
 }
 
 const jsonHeaders = { "content-type": "application/json" };
@@ -132,12 +135,12 @@ describe("the evaluators REST family", () => {
 
   describe("when the project's evaluators are listed", () => {
     it("publishes each one with the address its editor opens at", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators");
 
       expect(response.status).toBe(200);
-      expect(stub.getAllWithFields).toHaveBeenCalledWith({ projectId: "project-1" });
+      expect(mocks.getAllWithFields).toHaveBeenCalledWith({ projectId: "project-1" });
       await expect(response.json()).resolves.toMatchObject([
         {
           id: "evaluator_1",
@@ -150,12 +153,12 @@ describe("the evaluators REST family", () => {
 
   describe("when one evaluator is read", () => {
     it("asks for it by whichever identifier the caller sent", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators/original-name");
 
       expect(response.status).toBe(200);
-      expect(stub.findByIdOrSlugWithFields).toHaveBeenCalledWith({
+      expect(mocks.findByIdOrSlugWithFields).toHaveBeenCalledWith({
         idOrSlug: "original-name",
         projectId: "project-1",
       });
@@ -180,7 +183,7 @@ describe("the evaluators REST family", () => {
   describe("when an evaluator is updated", () => {
     /** @scenario "PUT /api/evaluators/:id updates an evaluator" */
     it("sends only the fields the caller named", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
@@ -189,7 +192,7 @@ describe("the evaluators REST family", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(stub.update).toHaveBeenCalledWith({
+      expect(mocks.update).toHaveBeenCalledWith({
         id: "evaluator_1",
         projectId: "project-1",
         data: { name: "Updated Name" },
@@ -198,7 +201,7 @@ describe("the evaluators REST family", () => {
 
     /** @scenario Updated settings take effect and the evaluator type is unchanged */
     it("keeps the canonical config shape on a settings-only update", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
@@ -210,7 +213,7 @@ describe("the evaluators REST family", () => {
 
       expect(response.status).toBe(200);
       // The stored `evaluatorType` survives a body that never mentioned it.
-      expect(stub.update).toHaveBeenCalledWith({
+      expect(mocks.update).toHaveBeenCalledWith({
         id: "evaluator_1",
         projectId: "project-1",
         data: {
@@ -224,7 +227,7 @@ describe("the evaluators REST family", () => {
 
     /** @scenario "PUT /api/evaluators/:id updates an evaluator" */
     it("refuses a body that changes the evaluator's type", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
@@ -237,7 +240,7 @@ describe("the evaluators REST family", () => {
         error: "evaluator_type_immutable",
         message: expect.stringContaining("evaluatorType cannot be changed"),
       });
-      expect(stub.update).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
     });
 
     it("accepts a body that repeats the type it already has", async () => {
@@ -255,7 +258,7 @@ describe("the evaluators REST family", () => {
     });
 
     it("answers 404 without writing when the project has no such evaluator", async () => {
-      const { hono, stub } = buildApi({ findById: vi.fn(async () => void 0) });
+      const { hono, mocks } = buildApi({ findById: vi.fn(async () => void 0) });
 
       const response = await request(hono, "/api/evaluators/nonexistent-id", {
         method: "PUT",
@@ -264,29 +267,29 @@ describe("the evaluators REST family", () => {
       });
 
       expect(response.status).toBe(404);
-      expect(stub.update).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
     });
   });
 
   describe("when an evaluator is archived", () => {
     /** @scenario "DELETE /api/evaluators/:id archives an evaluator" */
     it("archives it and answers success", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await request(hono, "/api/evaluators/evaluator_1", { method: "DELETE" });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true });
-      expect(stub.archive).toHaveBeenCalledWith({ id: "evaluator_1", projectId: "project-1" });
+      expect(mocks.archive).toHaveBeenCalledWith({ id: "evaluator_1", projectId: "project-1" });
     });
 
     it("answers 404 without archiving when the project has no such evaluator", async () => {
-      const { hono, stub } = buildApi({ findById: vi.fn(async () => void 0) });
+      const { hono, mocks } = buildApi({ findById: vi.fn(async () => void 0) });
 
       const response = await request(hono, "/api/evaluators/nonexistent-id", { method: "DELETE" });
 
       expect(response.status).toBe(404);
-      expect(stub.archive).not.toHaveBeenCalled();
+      expect(mocks.archive).not.toHaveBeenCalled();
     });
   });
 
@@ -300,7 +303,7 @@ describe("the evaluators REST family", () => {
 
     /** @scenario Unknown evaluator type is rejected naming the exact field */
     it("answers 422 validation_error naming config.evaluatorType, not the whole config", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await post(hono, staleSlug);
 
@@ -309,7 +312,7 @@ describe("the evaluators REST family", () => {
         error: "validation_error",
         fields: ["config.evaluatorType"],
       });
-      expect(stub.createWithResolvedDefaults).not.toHaveBeenCalled();
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
     });
 
     /** @scenario The rejection lists every type that would have been accepted */
@@ -368,7 +371,7 @@ describe("the evaluators REST family", () => {
 
   describe("when a create names a type the catalog does have", () => {
     it("passes the body through to the application unchanged", async () => {
-      const { hono, stub } = buildApi();
+      const { hono, mocks } = buildApi();
 
       const response = await post(hono, {
         name: "quick-relevancy",
@@ -376,7 +379,7 @@ describe("the evaluators REST family", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(stub.createWithResolvedDefaults).toHaveBeenCalledWith({
+      expect(mocks.createWithResolvedDefaults).toHaveBeenCalledWith({
         projectId: "project-1",
         name: "quick-relevancy",
         config: { evaluatorType: "ragas/response_relevancy" },

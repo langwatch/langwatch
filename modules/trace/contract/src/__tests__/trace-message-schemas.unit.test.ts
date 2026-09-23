@@ -23,10 +23,9 @@ describe("messageSchemas", () => {
         const result = OpenTelemetryGenAIMessage.safeParse(message);
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.role).toBe("user");
-          expect(result.data.content).toBe("Hello, world!");
-        }
+        if (!result.success) throw new Error("unreachable: asserted above");
+        expect(result.data.role).toBe("user");
+        expect(result.data.content).toBe("Hello, world!");
       });
 
       it("validates message with rich content array", () => {

@@ -4,7 +4,9 @@
  * Set LANGWATCH_ENDPOINT and LANGWATCH_API_KEY.
  */
 import { describe, expect, it, beforeAll } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+
 import { EvaluatorNotFoundError, EvaluationsApiError } from "../errors";
 
 describe("Evaluations E2E", () => {
@@ -134,9 +136,7 @@ describe("Evaluations E2E", () => {
 
       expect(result.status).toBe("processed");
       expect(typeof result.passed).toBe("boolean");
-      if (result.details) {
-        expect(typeof result.details).toBe("string");
-      }
+      expect(result.details ?? "").toEqual(expect.any(String));
     });
   });
 });

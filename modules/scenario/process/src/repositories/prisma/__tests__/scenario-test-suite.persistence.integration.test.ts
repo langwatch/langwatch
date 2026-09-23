@@ -538,15 +538,23 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     ]);
 
     expect(archivedTestSuite.archivedAt).toEqual(expect.any(Date));
-    if ("error" in creation) {
-      expect(creation.error).toMatchObject({ code: "scenario_test_suite_not_found" });
-    } else {
-      const stored = await database().scenario.findFirstOrThrow({
-        where: { id: creation.value.id, projectId },
-      });
-      expect(stored.archivedAt).toEqual(expect.any(Date));
-      expect(archivedTestSuite.scenarioIds).toContain(creation.value.id);
-    }
+    // Either side may win the race; both outcomes leave no live case in an archived suite.
+    const settled =
+      "error" in creation
+        ? { refused: creation.error }
+        : {
+            stored: await database().scenario.findFirstOrThrow({
+              where: { id: creation.value.id, projectId },
+            }),
+            archivedWithSuite: archivedTestSuite.scenarioIds.includes(creation.value.id),
+          };
+    expect([
+      { refused: expect.objectContaining({ code: "scenario_test_suite_not_found" }) },
+      {
+        stored: expect.objectContaining({ archivedAt: expect.any(Date) }),
+        archivedWithSuite: true,
+      },
+    ]).toContainEqual(settled);
   });
 
   it("serializes test suite archive against moving a case into the test suite", async () => {
@@ -567,16 +575,27 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     });
 
     expect(archivedTestSuite.archivedAt).toEqual(expect.any(Date));
-    if ("error" in move) {
-      expect(move.error).toMatchObject({ code: "scenario_test_suite_not_found" });
-      expect(stored).toMatchObject({ testSuiteId: source.id, archivedAt: null });
-    } else {
-      expect(stored).toMatchObject({
-        testSuiteId: destination.id,
-        archivedAt: expect.any(Date),
-      });
-      expect(archivedTestSuite.scenarioIds).toContain(scenario.id);
-    }
+    // Either side may win the race; both outcomes leave no live case in an archived suite.
+    const settled = {
+      refusal: "error" in move ? move.error : undefined,
+      stored,
+      archivedWithSuite: archivedTestSuite.scenarioIds.includes(scenario.id),
+    };
+    expect([
+      {
+        refusal: expect.objectContaining({ code: "scenario_test_suite_not_found" }),
+        stored: expect.objectContaining({ testSuiteId: source.id, archivedAt: null }),
+        archivedWithSuite: false,
+      },
+      {
+        refusal: undefined,
+        stored: expect.objectContaining({
+          testSuiteId: destination.id,
+          archivedAt: expect.any(Date),
+        }),
+        archivedWithSuite: true,
+      },
+    ]).toContainEqual(settled);
     expect(await invariantBreaks()).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 import { ScenarioNotFoundError, SimulationService } from "@langwatch/scenario-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import type {
   ScenarioClock,
@@ -463,7 +464,9 @@ describe("ScenarioService", () => {
         const repository = MemoryScenarioRepository.create();
         const service = ScenarioService.create(serviceOptions(repository, "test_suite_1"));
 
-        expect(() => service.createTestSuite({ projectId: "project-a", name: "   " })).toThrow();
+        expect(() => service.createTestSuite({ projectId: "project-a", name: "   " })).toThrow(
+          ZodError,
+        );
         expect(await service.listTestSuites({ projectId: "project-a" })).toEqual([]);
       });
     });

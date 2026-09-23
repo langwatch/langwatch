@@ -37,7 +37,8 @@ const REF = {
 };
 
 const MAPPED_AT = Temporal.Instant.from("2026-05-01T00:00:00Z");
-const deriveStatus = GithubPullRequestStatusService.deriveStatus;
+const deriveStatus = (input: Parameters<typeof GithubPullRequestStatusService.deriveStatus>[0]) =>
+  GithubPullRequestStatusService.deriveStatus(input);
 type GetPullRequestInput = {
   installationId: string;
   repositoryId: string;

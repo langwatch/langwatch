@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { type PersistedEvaluationsV3State } from "@langwatch/experiment-contract";
@@ -16,7 +17,6 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -324,23 +324,21 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
           actor: { label: "user", runId: "bold-jolly-bee" },
         });
 
-        try {
-          await experiments.saveWorkbenchState({
+        await expect(
+          experiments.saveWorkbenchState({
             projectId,
             id: created.experimentId,
             state: state("The reader's own edit"),
             expectedVersion: created.version,
             actor: { label: "user" },
-          });
-          expect.unreachable("the save should have been refused");
-        } catch (error) {
-          const meta = HandledError.isHandled(error) ? error.meta : {};
-          expect(meta).toEqual({
+          }),
+        ).rejects.toMatchObject({
+          meta: {
             currentVersion: created.version + 1,
             actorLabel: "user",
             runId: "bold-jolly-bee",
-          });
-        }
+          },
+        });
       });
     });
   });

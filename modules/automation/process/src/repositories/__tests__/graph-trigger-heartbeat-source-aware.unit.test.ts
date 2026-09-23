@@ -29,10 +29,10 @@ async function decideGraphTriggerHeartbeat(input: {
   sources: HeartbeatCandidateSources;
   now: Instant;
 }) {
-  input.deps.triggerSent.findProjectsWithGraphTriggers =
-    input.sources.loadProjectsWithGraphTriggers;
-  input.deps.triggerSent.findProjectsWithOpenGraphTriggerSent =
-    input.sources.loadProjectsWithOpenGraphTriggerSent;
+  input.deps.triggerSent.findProjectsWithGraphTriggers = () =>
+    input.sources.loadProjectsWithGraphTriggers();
+  input.deps.triggerSent.findProjectsWithOpenGraphTriggerSent = () =>
+    input.sources.loadProjectsWithOpenGraphTriggerSent();
 
   return GraphTriggerHeartbeatService.create(input.deps).decide({ now: input.now });
 }

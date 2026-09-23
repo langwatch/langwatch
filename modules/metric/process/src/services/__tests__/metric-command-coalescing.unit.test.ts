@@ -44,7 +44,7 @@ function batchParamsFor({
     commandType: RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
     commandSchema: RecordMetricDataPointCommand.schema,
     handler: new RecordMetricDataPointCommand(),
-    getAggregateId: RecordMetricDataPointCommand.getAggregateId,
+    getAggregateId: (command) => RecordMetricDataPointCommand.getAggregateId(command),
     storeEventsFn,
     aggregateType: "metric" as const,
     commandName: "recordDataPoint",

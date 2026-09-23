@@ -40,9 +40,8 @@ describe("LicensePlanLimitsSchema", () => {
     const result = LicensePlanLimitsSchema.safeParse(payload);
 
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxMembersLite).toBe(5);
-    }
+    if (!result.success) throw new Error("unreachable: asserted above");
+    expect(result.data.maxMembersLite).toBe(5);
   });
 });
 
@@ -212,9 +211,8 @@ describe("validateLicense", () => {
     });
 
     expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.planInfo.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
-    }
+    if (!result.valid) throw new Error("unreachable: asserted above");
+    expect(result.planInfo.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
   });
 
   it("fails validation for invalid format", () => {
@@ -224,9 +222,8 @@ describe("validateLicense", () => {
     });
 
     expect(result.valid).toBe(false);
-    if (!result.valid) {
-      expect(result.error).toBe("Invalid license format");
-    }
+    if (result.valid) throw new Error("unreachable: asserted above");
+    expect(result.error).toBe("Invalid license format");
   });
 
   it("fails validation for invalid signature", () => {
@@ -236,9 +233,8 @@ describe("validateLicense", () => {
     });
 
     expect(result.valid).toBe(false);
-    if (!result.valid) {
-      expect(result.error).toBe("Invalid signature");
-    }
+    if (result.valid) throw new Error("unreachable: asserted above");
+    expect(result.error).toBe("Invalid signature");
   });
 
   it("fails validation for expired license", () => {
@@ -248,9 +244,8 @@ describe("validateLicense", () => {
     });
 
     expect(result.valid).toBe(false);
-    if (!result.valid) {
-      expect(result.error).toBe("License expired");
-    }
+    if (result.valid) throw new Error("unreachable: asserted above");
+    expect(result.error).toBe("License expired");
   });
 
   describe("when extracting license fields", () => {
@@ -261,9 +256,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.licenseId).toBe(BASE_LICENSE.licenseId);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.licenseId).toBe(BASE_LICENSE.licenseId);
     });
 
     it("extracts organizationName", () => {
@@ -273,9 +267,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.organizationName).toBe(BASE_LICENSE.organizationName);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.organizationName).toBe(BASE_LICENSE.organizationName);
     });
 
     it("extracts email", () => {
@@ -285,9 +278,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.email).toBe(BASE_LICENSE.email);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.email).toBe(BASE_LICENSE.email);
     });
 
     it("extracts plan.type", () => {
@@ -297,9 +289,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.type).toBe(BASE_LICENSE.plan.type);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.type).toBe(BASE_LICENSE.plan.type);
     });
 
     it("extracts plan.maxMembers", () => {
@@ -309,9 +300,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
     });
 
     it("extracts plan.maxProjects", () => {
@@ -321,9 +311,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.maxProjects).toBe(BASE_LICENSE.plan.maxProjects);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.maxProjects).toBe(BASE_LICENSE.plan.maxProjects);
     });
 
     it("extracts plan.maxMessagesPerMonth", () => {
@@ -333,11 +322,10 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.maxMessagesPerMonth).toBe(
-          BASE_LICENSE.plan.maxMessagesPerMonth,
-        );
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.maxMessagesPerMonth).toBe(
+        BASE_LICENSE.plan.maxMessagesPerMonth,
+      );
     });
 
     it("validates old licenses that include evaluationsCredit (backward compat)", () => {
@@ -350,10 +338,9 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        // The field is declared as optional on the schema, so Zod preserves its value on parse.
-        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      // The field is declared as optional on the schema, so Zod preserves its value on parse.
+      expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
     });
 
     it("extracts plan.maxWorkflows", () => {
@@ -363,9 +350,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.maxWorkflows).toBe(BASE_LICENSE.plan.maxWorkflows);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.maxWorkflows).toBe(BASE_LICENSE.plan.maxWorkflows);
     });
 
     it("extracts plan.canPublish", () => {
@@ -375,9 +361,8 @@ describe("validateLicense", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
     });
   });
 });

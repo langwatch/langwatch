@@ -1,8 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { EvaluationsFacade } from "../evaluations.facade";
-import { EvaluatorNotFoundError, EvaluationsApiError, EvaluatorCallError } from "../errors";
-import type { EvaluateResponse } from "../types";
+
 import { NoOpLogger } from "@/logger";
+
+import { EvaluatorNotFoundError, EvaluationsApiError, EvaluatorCallError } from "../errors";
+import { EvaluationsFacade } from "../evaluations.facade";
+import type { EvaluateResponse } from "../types";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -234,15 +236,12 @@ describe("EvaluationsFacade", () => {
       mockFetch.mockRejectedValueOnce(new Error("Timeout"));
 
       // The facade should throw, but we can test internal behavior via mocks
-      try {
-        await facade.evaluate("test-guardrail", {
+      await expect(
+        facade.evaluate("test-guardrail", {
           data: { input: "test" },
           asGuardrail: true,
-        });
-      } catch (error) {
-        // Expected - the error is re-thrown
-        expect(error).toBeInstanceOf(EvaluatorCallError);
-      }
+        }),
+      ).rejects.toBeInstanceOf(EvaluatorCallError);
     });
 
     it("uses slug as default span name when name not provided", async () => {

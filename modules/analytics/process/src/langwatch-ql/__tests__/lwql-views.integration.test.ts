@@ -256,13 +256,14 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
 
         // And the *named* version column is the engine's own, which is the trap
         // `stored_spans` sets: it supersedes on `StartTime`, not `UpdatedAt`.
-        if (view.dedup.versionColumn) {
-          const engineArguments = /^\w+\(([^)]*)\)/.exec(source!.engine_full)?.[1]?.split(/,\s*/);
-          expect(
-            engineArguments,
-            `${view.name} reads ${source!.engine_full}, which supersedes on nothing`,
-          ).toContain(view.dedup.versionColumn);
-        }
+        const engineArguments =
+          /^\w+\(([^)]*)\)/.exec(source!.engine_full)?.[1]?.split(/,\s*/) ?? [];
+        expect(
+          engineArguments,
+          `${view.name} reads ${source!.engine_full}, which supersedes on nothing`,
+        ).toEqual(
+          expect.arrayContaining(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+        );
       }
     });
 
@@ -670,11 +671,8 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           // A float measure is compared approximately and an integer one
           // exactly, because an integer measure landing near its total rather
           // than on it is a real failure.
-          if (column.type.startsWith("Float")) {
-            expect(actual, where).toBeCloseTo(total);
-          } else {
-            expect(actual, where).toBe(total);
-          }
+          const tolerance = column.type.startsWith("Float") ? 0.005 : 0;
+          expect(Math.abs(actual - total), where).toBeLessThanOrEqual(tolerance);
         }
       }
     });

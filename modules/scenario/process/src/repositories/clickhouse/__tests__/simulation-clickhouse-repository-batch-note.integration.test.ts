@@ -77,8 +77,6 @@ async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -98,7 +96,7 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("the note of a batch", () => {
+describe.skipIf(databaseUrl === null)("the note of a batch", () => {
   describe("when every run of the batch carries the same note", () => {
     /** @scenario "Batch history reads the note from the runs it already loads" */
     it("reports the note on the batch in the history page", async () => {
@@ -258,7 +256,7 @@ integration("the note of a batch", () => {
   });
 });
 
-integration("a batch produced by an SDK or CI run", () => {
+describe.skipIf(databaseUrl === null)("a batch produced by an SDK or CI run", () => {
   describe("when the runs set the note in their own run metadata", () => {
     /** @scenario "An external SDK batch with no run plan record still reports its note" */
     /** @scenario "A note given by an SDK or CI run is stored with the batch" */
@@ -308,7 +306,7 @@ integration("a batch produced by an SDK or CI run", () => {
   });
 });
 
-integration("the cost of reading the note", () => {
+describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
   describe("when a page of batch history is read", () => {
     /** @scenario "Reading the note keeps the run set query bounded to the page" */
     it("reads the note only in the query already bounded to the page", async () => {

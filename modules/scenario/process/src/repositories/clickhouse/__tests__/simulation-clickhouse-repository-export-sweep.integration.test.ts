@@ -86,8 +86,6 @@ async function sweep(params: Parameters<SimulationClickHouseRepository["findRuns
   return collected;
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -108,7 +106,7 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("scenario run export sweep (integration)", () => {
+describe.skipIf(databaseUrl === null)("scenario run export sweep (integration)", () => {
   describe("given runs spread across projects, sets, scenarios and dates", () => {
     const recentScenarioId = `scenario-recent-${nanoid()}`;
     const oldScenarioId = `scenario-old-${nanoid()}`;

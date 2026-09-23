@@ -133,10 +133,18 @@ describe("the model-providers read route", () => {
       const serialized = await (await get("/api/model-providers")).text();
 
       for (const keys of Object.values(STORED_CREDENTIALS)) {
-        for (const [field, value] of Object.entries(keys)) {
+        for (const field of Object.keys(keys)) {
           expect(serialized).toContain(field);
-          if (isSecretCredentialField(field)) expect(serialized).not.toContain(value);
         }
+      }
+      const secretValues = Object.values(STORED_CREDENTIALS).flatMap((keys) =>
+        Object.entries(keys).flatMap(([field, value]) =>
+          isSecretCredentialField(field) ? [value] : [],
+        ),
+      );
+      expect(secretValues.length).toBeGreaterThan(0);
+      for (const value of secretValues) {
+        expect(serialized).not.toContain(value);
       }
     });
   });

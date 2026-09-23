@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import type { Event } from "../../domain/types.ts";
 import { buildProcessManager } from "../../pipeline/processBuilder.ts";
 import type { ProcessDefinition, ProcessEventEnvelope } from "../processManager.types.ts";
@@ -117,10 +118,9 @@ describe("transient process commits", () => {
       // outbox's own uniqueness is what absorbs the redelivery, and it
       // reports the suppression instead of the commit refusing outright.
       expect(second.outcome).toBe("committed");
-      if (second.outcome === "committed") {
-        expect(second.insertedMessageKeys).toEqual([]);
-        expect(second.duplicateMessageKeys).toEqual(["process:req-2:act:noted"]);
-      }
+      if (second.outcome !== "committed") throw new Error("unreachable: asserted above");
+      expect(second.insertedMessageKeys).toEqual([]);
+      expect(second.duplicateMessageKeys).toEqual(["process:req-2:act:noted"]);
       expect(await store.findMessagesByRef({ ref: refFor("req-2") })).toHaveLength(1);
       expect(await store.findByRef({ ref: refFor("req-2") })).toBeNull();
     });

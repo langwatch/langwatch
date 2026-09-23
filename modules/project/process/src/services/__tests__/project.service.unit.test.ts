@@ -733,7 +733,8 @@ describe("ProjectService", () => {
     expect(repository.update).not.toHaveBeenCalled();
   });
 
-  const refusesBoundaryMove = async ({
+  /** Attempts the move; `outcome` is what the update resolved or rejected with. */
+  const attemptBoundaryMove = async ({
     current,
     destination,
   }: {
@@ -744,30 +745,32 @@ describe("ProjectService", () => {
     repository.findWithTeam.mockResolvedValue(current);
     repository.findActiveTeamInOrganization.mockResolvedValue(destination);
 
-    await expect(
-      createService(repository).update({
-        id: current.id,
-        organizationId: "org",
-        data: { teamId: destination.id },
-      }),
-    ).rejects.toBeInstanceOf(PersonalWorkspaceBoundaryError);
-    expect(repository.update).not.toHaveBeenCalled();
+    const outcome = await createService(repository)
+      .update({ id: current.id, organizationId: "org", data: { teamId: destination.id } })
+      .catch((error: unknown) => error);
+    return { outcome, repository };
   };
 
   /** @scenario Editing a project cannot move it out of a personal workspace */
   it("refuses to move a personal project into a shared team", async () => {
-    await refusesBoundaryMove({
+    const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
       destination: { id: "shared", isPersonal: false },
     });
+
+    expect(outcome).toBeInstanceOf(PersonalWorkspaceBoundaryError);
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   /** @scenario Editing a project cannot move it into a personal workspace */
   it("refuses to move a shared project into a personal workspace", async () => {
-    await refusesBoundaryMove({
+    const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
       destination: { id: "personal", isPersonal: true },
     });
+
+    expect(outcome).toBeInstanceOf(PersonalWorkspaceBoundaryError);
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   /** @scenario ProjectService.update changes teamId with same-org validation */

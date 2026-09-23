@@ -1,15 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { trace } from "@opentelemetry/api";
-import { ChatOpenAI } from "@langchain/openai";
-import { DynamicStructuredTool } from "@langchain/core/tools";
-import { z } from "zod";
-import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import { trace } from "@opentelemetry/api";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { z } from "zod";
+
 import { LangWatchCallbackHandler } from "../..";
+import { NoOpLogger } from "../../../../../logger";
 import { setupObservability } from "../../../../setup/node";
 import { getLangWatchTracer } from "../../../../tracer";
-import { NoOpLogger } from "../../../../../logger";
 
 const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
 
@@ -235,16 +236,15 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
       expect(span.attributes["langwatch.input"]).toBeDefined();
       expect(span.attributes["langwatch.output"]).toBeDefined();
       expect(span.status.code).toBeDefined();
-
-      const output = span.attributes["langwatch.output"] as string;
-      if (span.name.includes("data_collector")) {
-        expect(output).toContain("Data collected for:");
-      } else if (span.name.includes("data_processor")) {
-        expect(output).toContain("Processed:");
-      } else if (span.name.includes("report_generator")) {
-        expect(output).toContain("Report:");
-      }
     });
+    for (const [tool, marker] of [
+      ["data_collector", "Data collected for:"],
+      ["data_processor", "Processed:"],
+      ["report_generator", "Report:"],
+    ]) {
+      const span = toolSpans.find((candidate) => candidate.name.includes(tool!));
+      expect(span?.attributes["langwatch.output"]).toContain(marker);
+    }
     const llmSpans = finishedSpans.filter(
       (span) => span.attributes["langwatch.span.type"] === "llm",
     );
@@ -324,19 +324,16 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     );
     expect(llmSpans.length).toBeGreaterThan(0);
 
-    llmSpans.forEach((span, index) => {
+    llmSpans.forEach((span) => {
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
       expect(span.attributes["langwatch.input"]).toBeDefined();
       expect(span.attributes["langwatch.output"]).toBeDefined();
-
-      const input = span.attributes["langwatch.input"] as string;
-      if (index === 0) {
-        expect(input).toContain("renewable energy");
-      }
-      if (index > 0) {
-        expect(input).toMatch(/working on|mentioned|recall/i);
-      }
     });
+    const [firstInput, ...laterInputs] = llmSpans.map((span) => span.attributes["langwatch.input"]);
+    expect(firstInput).toContain("renewable energy");
+    for (const input of laterInputs) {
+      expect(input).toMatch(/working on|mentioned|recall/i);
+    }
     const memorySpans = finishedSpans.filter((span) => span.name.includes("memory"));
     expect(memorySpans.length).toBeGreaterThan(0);
 
@@ -344,14 +341,14 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
       expect(span.attributes["langwatch.span.type"]).toBe("tool");
       expect(span.attributes["langwatch.input"]).toBeDefined();
       expect(span.attributes["langwatch.output"]).toBeDefined();
-
-      const output = span.attributes["langwatch.output"] as string;
-      if (span.name.includes("memory_store")) {
-        expect(output).toContain("Stored:");
-      } else if (span.name.includes("memory_recall")) {
-        expect(output).toContain("Recalled");
-      }
     });
+    for (const [tool, marker] of [
+      ["memory_store", "Stored:"],
+      ["memory_recall", "Recalled"],
+    ]) {
+      const span = memorySpans.find((candidate) => candidate.name.includes(tool!));
+      expect(span?.attributes["langwatch.output"]).toContain(marker);
+    }
   }, 30000);
 
   it("handles agent error recovery and fallback chains", async () => {

@@ -155,24 +155,27 @@ describe("given the derived Postgres catalog's overrides", () => {
   });
 
   describe("when a sensitive column dodges the name rules", () => {
-    const assertStripped = ({ baseRelation, source }: { baseRelation: string; source: string }) => {
+    /** How the derived view treats `source`: recorded as stripped, and whether it is exposed. */
+    const strippingOf = ({ baseRelation, source }: { baseRelation: string; source: string }) => {
       const view = byModel.get(baseRelation);
-      expect(view, `${baseRelation} should be derived`).toBeDefined();
-      expect(
-        view!.skipColumns[source],
-        `${baseRelation}.${source} should be recorded as stripped`,
-      ).toBeDefined();
-      expect(
-        view!.columns.some((column) => column.sourceColumns.includes(source)),
-        `${baseRelation}.${source} must not be exposed`,
-      ).toBe(false);
+      return {
+        column: `${baseRelation}.${source}`,
+        derived: view !== undefined,
+        recordedAsStripped: view?.skipColumns[source] !== undefined,
+        exposed: view?.columns.some((column) => column.sourceColumns.includes(source)) ?? false,
+      };
     };
+    const stripped = (column: string) => ({
+      column,
+      derived: true,
+      recordedAsStripped: true,
+      exposed: false,
+    });
 
     it("strips GithubPullRequest.authorLogin, a raw external-person handle", () => {
-      assertStripped({
-        baseRelation: "GithubPullRequest",
-        source: "authorLogin",
-      });
+      expect(strippingOf({ baseRelation: "GithubPullRequest", source: "authorLogin" })).toEqual(
+        stripped("GithubPullRequest.authorLogin"),
+      );
     });
 
     it("strips ModelProvider.customKeys by the plural-key suffix rule", () => {
@@ -182,32 +185,27 @@ describe("given the derived Postgres catalog's overrides", () => {
     });
 
     it("strips DiscoveredPerson raw external identity", () => {
-      assertStripped({
-        baseRelation: "DiscoveredPerson",
-        source: "rawActorId",
-      });
-      assertStripped({
-        baseRelation: "DiscoveredPerson",
-        source: "displayText",
-      });
+      expect(strippingOf({ baseRelation: "DiscoveredPerson", source: "rawActorId" })).toEqual(
+        stripped("DiscoveredPerson.rawActorId"),
+      );
+      expect(strippingOf({ baseRelation: "DiscoveredPerson", source: "displayText" })).toEqual(
+        stripped("DiscoveredPerson.displayText"),
+      );
     });
 
     it("strips IngestionSource credential-bearing config", () => {
-      assertStripped({
-        baseRelation: "IngestionSource",
-        source: "parserConfig",
-      });
-      assertStripped({
-        baseRelation: "IngestionSource",
-        source: "pollerCursor",
-      });
+      expect(strippingOf({ baseRelation: "IngestionSource", source: "parserConfig" })).toEqual(
+        stripped("IngestionSource.parserConfig"),
+      );
+      expect(strippingOf({ baseRelation: "IngestionSource", source: "pollerCursor" })).toEqual(
+        stripped("IngestionSource.pollerCursor"),
+      );
     });
 
     it("strips ModelProvider.extraHeaders, raw provider auth headers", () => {
-      assertStripped({
-        baseRelation: "ModelProvider",
-        source: "extraHeaders",
-      });
+      expect(strippingOf({ baseRelation: "ModelProvider", source: "extraHeaders" })).toEqual(
+        stripped("ModelProvider.extraHeaders"),
+      );
     });
   });
 

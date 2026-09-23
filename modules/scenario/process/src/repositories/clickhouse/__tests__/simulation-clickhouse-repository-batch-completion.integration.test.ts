@@ -78,8 +78,6 @@ async function insertRows(rows: ReturnType<typeof makeRunRow>[]) {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -106,7 +104,7 @@ async function seedBatch(statuses: string[]) {
   return { scenarioSetId, batchRunId };
 }
 
-integration("the completion of a batch", () => {
+describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
   describe("given the batch still holds a queued run", () => {
     describe("when the batch aggregate is read", () => {
       /** @scenario "A batch with queued runs is not complete" */
@@ -147,7 +145,7 @@ integration("the completion of a batch", () => {
   });
 });
 
-integration("the batch-scoped run list", () => {
+describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
   describe("given runs exist in two different batches", () => {
     describe("when the list is requested with only a batch run id", () => {
       /** @scenario "A batch id alone filters the list" */

@@ -1206,9 +1206,8 @@ describe("when Langy lists the branches or the tags of the repository", () => {
     }
     const listed = bash("git branch --list 'langy/*' && pnpm typecheck");
     expect(listed.kind).toBe("ask");
-    if (listed.kind === "ask") {
-      expect(listed.segments?.[0]?.readOnly).toBe(true);
-    }
+    if (listed.kind !== "ask") throw new Error("unreachable: asserted above");
+    expect(listed.segments?.[0]?.readOnly).toBe(true);
   });
 
   /** @scenario "A listing form of a git subcommand that also writes runs" */

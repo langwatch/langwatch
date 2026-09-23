@@ -62,13 +62,12 @@ describe("events schemas", () => {
       const result = topicAssignedEventDataSchema.safeParse(data);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.topicId).toBe("topic-123");
-        expect(result.data.topicName).toBe("Customer Support");
-        expect(result.data.subtopicId).toBe("subtopic-456");
-        expect(result.data.subtopicName).toBe("Billing Questions");
-        expect(result.data.isIncremental).toBe(true);
-      }
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.topicId).toBe("topic-123");
+      expect(result.data.topicName).toBe("Customer Support");
+      expect(result.data.subtopicId).toBe("subtopic-456");
+      expect(result.data.subtopicName).toBe("Billing Questions");
+      expect(result.data.isIncremental).toBe(true);
     });
 
     it("validates topic assignment with null values", () => {
@@ -83,10 +82,9 @@ describe("events schemas", () => {
       const result = topicAssignedEventDataSchema.safeParse(data);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.topicId).toBeNull();
-        expect(result.data.subtopicId).toBeNull();
-      }
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.topicId).toBeNull();
+      expect(result.data.subtopicId).toBeNull();
     });
 
     it("rejects data with missing isIncremental field", () => {
@@ -127,10 +125,9 @@ describe("events schemas", () => {
       const result = topicAssignedEventSchema.safeParse(event);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.type).toBe(TOPIC_ASSIGNED_EVENT_TYPE);
-        expect(result.data.data.topicId).toBe("topic-123");
-      }
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.type).toBe(TOPIC_ASSIGNED_EVENT_TYPE);
+      expect(result.data.data.topicId).toBe("topic-123");
     });
 
     it("validates event with optional metadata", () => {
@@ -158,9 +155,8 @@ describe("events schemas", () => {
       const result = topicAssignedEventSchema.safeParse(event);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.metadata.processingTraceparent).toBe("00-abc123-def456-01");
-      }
+      if (!result.success) throw new Error("unreachable: asserted above");
+      expect(result.data.metadata.processingTraceparent).toBe("00-abc123-def456-01");
     });
   });
 

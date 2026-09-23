@@ -47,10 +47,11 @@ describe("provider registry parity", () => {
       });
 
       it("gives notify providers a channel string the preview/testFire endpoints accept", () => {
-        for (const p of NOTIFY_PROVIDERS) {
-          if ("channel" in p.client) {
-            expect(["email", "slack", "webhook"]).toContain(p.client.channel);
-          }
+        const channels = NOTIFY_PROVIDERS.flatMap((p) =>
+          "channel" in p.client ? [p.client.channel] : [],
+        );
+        for (const channel of channels) {
+          expect(["email", "slack", "webhook"]).toContain(channel);
         }
       });
 
@@ -329,9 +330,7 @@ describe("provider registry parity", () => {
           const survivors = filterBlockKit(blocks);
           expect(survivors.length).toBeGreaterThan(0);
           // The gated hero is indeed dropped on the default (webhook) path.
-          if (template!.gatedBlock) {
-            expect(survivors.some((b) => b.type === template!.gatedBlock)).toBe(false);
-          }
+          expect(survivors.map((b) => b.type)).not.toContain(template!.gatedBlock);
         },
       );
     });

@@ -345,12 +345,10 @@ describe("synchronous external process signals", () => {
         expect(["confirming", "expired"]).toContain(instance?.state.status);
         const messages = await store.findMessagesByRef({ ref });
         expect(messages).toHaveLength(1);
-        expect(["promote", "expire"]).toContain(messages[0]?.intentType);
-        if (instance?.state.status === "confirming") {
-          expect(messages[0]?.intentType).toBe("promote");
-        } else {
-          expect(messages[0]?.intentType).toBe("expire");
-        }
+        expect([
+          { status: "confirming", intentType: "promote" },
+          { status: "expired", intentType: "expire" },
+        ]).toContainEqual({ status: instance?.state.status, intentType: messages[0]?.intentType });
       });
     },
   );

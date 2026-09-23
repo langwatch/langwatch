@@ -85,11 +85,11 @@ describe("ArchiveSetCommand (lw#3636)", () => {
         const [event] = await handler.handle(makeArchiveSetCommand());
         const candidate: SimulationProcessingEvent = SimulationSetArchivedEventSchema.parse(event);
         expect(isSimulationSetArchivedEvent(candidate)).toBe(true);
-        if (isSimulationSetArchivedEvent(candidate)) {
-          // Type narrowing — these reads compile only when the guard works.
-          expect(candidate.data.scenarioSetId).toBe("set-1");
-          expect(candidate.data.scenarioRunIds).toHaveLength(3);
-        }
+        if (!isSimulationSetArchivedEvent(candidate))
+          throw new Error("unreachable: asserted above");
+        // Type narrowing — these reads compile only when the guard works.
+        expect(candidate.data.scenarioSetId).toBe("set-1");
+        expect(candidate.data.scenarioRunIds).toHaveLength(3);
       });
     });
   });

@@ -24,8 +24,6 @@ const now = Date.now();
 let ch: ClickHouseClient | undefined;
 let repo: ClickHouseSimulationRunStateRepository<SimulationRunState>;
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   ch = createClient({
@@ -84,32 +82,35 @@ function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
   };
 }
 
-integration("ClickHouseSimulationRunStateRepository.storeProjection", () => {
-  const context = { tenantId: createTenantId(tenantId) };
+describe.skipIf(databaseUrl === null)(
+  "ClickHouseSimulationRunStateRepository.storeProjection",
+  () => {
+    const context = { tenantId: createTenantId(tenantId) };
 
-  describe("when the next event folds right after a projection is stored", () => {
-    /** @scenario "A stored projection is readable by the next event's fold" */
-    it("reads the stored projection back without waiting", async () => {
-      const scenarioRunId = `run-readback-${nanoid()}`;
-      const data = makeStartedState(scenarioRunId);
+    describe("when the next event folds right after a projection is stored", () => {
+      /** @scenario "A stored projection is readable by the next event's fold" */
+      it("reads the stored projection back without waiting", async () => {
+        const scenarioRunId = `run-readback-${nanoid()}`;
+        const data = makeStartedState(scenarioRunId);
 
-      await repo.storeProjection(
-        {
-          id: `proj-${nanoid()}`,
-          aggregateId: scenarioRunId,
-          tenantId: createTenantId(tenantId),
-          version: new Date(now).toISOString().slice(0, 10),
-          data,
-        } as unknown as SimulationRunState,
-        context,
-      );
+        await repo.storeProjection(
+          {
+            id: `proj-${nanoid()}`,
+            aggregateId: scenarioRunId,
+            tenantId: createTenantId(tenantId),
+            version: new Date(now).toISOString().slice(0, 10),
+            data,
+          } as unknown as SimulationRunState,
+          context,
+        );
 
-      const projection = await repo.findProjection(scenarioRunId, context);
+        const projection = await repo.findProjection(scenarioRunId, context);
 
-      expect(projection).not.toBeNull();
-      expect(projection!.data.ScenarioId).toBe(data.ScenarioId);
-      expect(projection!.data.BatchRunId).toBe(data.BatchRunId);
-      expect(projection!.data.ScenarioSetId).toBe(data.ScenarioSetId);
+        expect(projection).not.toBeNull();
+        expect(projection!.data.ScenarioId).toBe(data.ScenarioId);
+        expect(projection!.data.BatchRunId).toBe(data.BatchRunId);
+        expect(projection!.data.ScenarioSetId).toBe(data.ScenarioSetId);
+      });
     });
-  });
-});
+  },
+);

@@ -32,9 +32,8 @@ describe("feedLangyDerivedCardPreview", () => {
       const state = feedAll(['{"kind": "time', opening, firstSeries]);
       expect(state.card).not.toBeNull();
       expect(state.card?.kind).toBe("timeseries");
-      if (state.card?.kind === "timeseries") {
-        expect(state.card.series[0]!.points).toHaveLength(1);
-      }
+      if (state.card?.kind !== "timeseries") throw new Error("unreachable: asserted above");
+      expect(state.card.series[0]!.points).toHaveLength(1);
     });
 
     it("grows the card as points arrive", () => {

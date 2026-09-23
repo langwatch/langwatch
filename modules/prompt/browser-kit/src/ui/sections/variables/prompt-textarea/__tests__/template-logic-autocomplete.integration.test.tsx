@@ -156,9 +156,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       fireEvent.change(textarea, {
         target: { value: "{%", selectionStart: 2 },
       });
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
+      await screen.findByTestId("template-logic-menu");
     });
 
     it("shows all template logic constructs", async () => {
@@ -471,9 +469,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       fireEvent.change(textarea, {
         target: { value: "{%", selectionStart: 2 },
       });
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
+      await screen.findByTestId("template-logic-menu");
     });
 
     it("handles ArrowDown without errors when popup is open", async () => {

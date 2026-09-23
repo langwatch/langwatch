@@ -924,11 +924,7 @@ describe("Target header alert icon integration", () => {
     // user_input SHOULD be auto-mapped to input column via SEMANTIC_EQUIVALENTS
     // user_input: ["input", ...] means user_input field maps to input column
     const userInputMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
-    expect(userInputMapping).toBeDefined();
-    expect(userInputMapping?.type).toBe("source");
-    if (userInputMapping?.type === "source") {
-      expect(userInputMapping.sourceField).toBe("input");
-    }
+    expect(userInputMapping).toMatchObject({ type: "source", sourceField: "input" });
 
     // No missing mappings - user_input was successfully mapped
     const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);

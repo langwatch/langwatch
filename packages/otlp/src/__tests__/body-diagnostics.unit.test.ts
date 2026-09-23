@@ -64,7 +64,8 @@ describe("given a trace body that cannot be decoded", () => {
         parseOtlpMetrics(body, "application/json"),
       ]) {
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.error).not.toContain(MARKER.slice(0, 6));
+        if (result.ok) throw new Error("unreachable: asserted above");
+        expect(result.error).not.toContain(MARKER.slice(0, 6));
       }
     });
   });

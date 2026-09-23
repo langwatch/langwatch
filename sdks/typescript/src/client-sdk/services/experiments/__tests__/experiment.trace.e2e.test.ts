@@ -4,14 +4,15 @@
  * within the same dataset row.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatch } from "@/client-sdk";
+import { trace } from "@opentelemetry/api";
 import {
   NodeTracerProvider,
   SimpleSpanProcessor,
   InMemorySpanExporter,
 } from "@opentelemetry/sdk-trace-node";
-import { trace } from "@opentelemetry/api";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { LangWatch } from "@/client-sdk";
 
 // Mock fetch globally
 const originalFetch = globalThis.fetch;
@@ -236,9 +237,7 @@ describe("Target Trace Isolation", () => {
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
       // Should be null or empty string, NOT "00000000000000000000000000000000"
-      if (entry.trace_id !== null) {
-        expect(entry.trace_id).not.toBe("00000000000000000000000000000000");
-      }
+      expect(entry.trace_id).not.toBe("00000000000000000000000000000000");
     }
   });
 

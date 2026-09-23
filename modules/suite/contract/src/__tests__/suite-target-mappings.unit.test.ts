@@ -70,9 +70,8 @@ describe("suiteTargetSchema", () => {
         // A run reads mappings from prompt targets only, so accepting these
         // would store a binding nothing ever applies.
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0]?.path).toEqual(["scenarioMappings"]);
-        }
+        if (result.success) throw new Error("unreachable: asserted above");
+        expect(result.error.issues[0]?.path).toEqual(["scenarioMappings"]);
       },
     );
 

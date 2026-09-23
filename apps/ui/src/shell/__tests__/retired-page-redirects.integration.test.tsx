@@ -66,83 +66,94 @@ function open(address: string) {
   return router;
 }
 
-/**
- * Asserts the whole address — path, query and hash — the reader ends on.
- */
-async function expectLands({ from, at }: { from: string; at: string }) {
-  const router = open(from);
-
-  await waitFor(
-    () => {
-      const { pathname, search, hash } = router.state.location;
-      expect(`${pathname}${search}${hash}`).toBe(at);
-    },
-    // The chrome layout above these routes is lazy, and resolving its chunk on
-    // the FIRST case in this file costs more than waitFor's 1s default — which
-    // failed only the first test and read as a route-table bug.
-    { timeout: 5000 },
-  );
-  return router;
+/** The whole address — path, query and hash — the reader is on. */
+function addressOf(router: ReturnType<typeof open>) {
+  const { pathname, search, hash } = router.state.location;
+  return `${pathname}${search}${hash}`;
 }
+
+// The chrome layout is lazy, and resolving its chunk on the FIRST case in this
+// file costs more than waitFor's 1s default, which read as a route-table bug.
+const LAZY_CHROME = { timeout: 5000 };
 
 describe("given the legacy Traces addresses", () => {
   describe("when a bookmark to the legacy Traces page is opened", () => {
     /** @scenario "The legacy Traces path lands on the Trace Explorer" */
     it("lands on the Trace Explorer", async () => {
-      await expectLands({ from: "/acme/messages", at: "/acme/traces" });
+      const router = open("/acme/messages");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/acme/traces");
+      }, LAZY_CHROME);
     });
   });
 
   describe("when the legacy Traces link carries filters", () => {
     /** @scenario "A filtered legacy Traces link keeps what it was filtered by" */
     it("keeps every filter the link was saved with", async () => {
-      await expectLands({
-        from: "/acme/messages?startDate=2026-08-01&metadata.env=prod",
-        at: "/acme/traces?startDate=2026-08-01&metadata.env=prod",
-      });
+      const router = open("/acme/messages?startDate=2026-08-01&metadata.env=prod");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/acme/traces?startDate=2026-08-01&metadata.env=prod");
+      }, LAZY_CHROME);
     });
   });
 
   describe("when a legacy trace deep link is opened", () => {
     /** @scenario "A legacy trace deep link opens the Trace Explorer" */
     it("opens the Trace Explorer drawer for that trace", async () => {
-      await expectLands({
-        from: "/acme/messages/trace-1",
-        at: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
-      });
+      const router = open("/acme/messages/trace-1");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
+        );
+      }, LAZY_CHROME);
     });
 
     it("drops the legacy tab, which the Trace Explorer has no equivalent for", async () => {
-      await expectLands({
-        from: "/acme/messages/trace-1/spans",
-        at: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
-      });
+      const router = open("/acme/messages/trace-1/spans");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
+        );
+      }, LAZY_CHROME);
     });
   });
 
   describe("when a legacy span deep link is opened", () => {
     /** @scenario "A legacy span deep link opens the Trace Explorer with the span selected" */
     it("opens the drawer with the span selected", async () => {
-      await expectLands({
-        from: "/acme/messages/trace-1/spans/span-9",
-        at: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1&drawer.span=span-9",
-      });
+      const router = open("/acme/messages/trace-1/spans/span-9");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1&drawer.span=span-9",
+        );
+      }, LAZY_CHROME);
     });
   });
 
   describe("when the canonical trace short link is opened", () => {
     it("opens the Trace Explorer drawer for that trace", async () => {
-      await expectLands({
-        from: "/acme/traces/trace-1",
-        at: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
-      });
+      const router = open("/acme/traces/trace-1");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
+        );
+      }, LAZY_CHROME);
     });
 
     it("percent-encodes a trace id that carries a reserved character", async () => {
-      await expectLands({
-        from: "/acme/traces/trace%2F1",
-        at: "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace%2F1",
-      });
+      const router = open("/acme/traces/trace%2F1");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace%2F1",
+        );
+      }, LAZY_CHROME);
     });
   });
 
@@ -172,13 +183,21 @@ describe("given the retired ops addresses", () => {
   describe("when an operator follows a saved link to the queues page", () => {
     /** @scenario A retired queues link lands on the dashboard */
     it("sends them to the ops dashboard", async () => {
-      await expectLands({ from: "/ops/queues", at: "/ops" });
+      const router = open("/ops/queues");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops");
+      }, LAZY_CHROME);
     });
   });
 
   describe("when a saved link to the scheduler page is opened", () => {
     it("lands on the schedules section of the event-sourcing workspace", async () => {
-      await expectLands({ from: "/ops/scheduler", at: "/ops/event-sourcing/schedules" });
+      const router = open("/ops/scheduler");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/event-sourcing/schedules");
+      }, LAZY_CHROME);
     });
   });
 
@@ -195,7 +214,11 @@ describe("given the retired ops addresses", () => {
 
   describe("when the backoffice entry is opened", () => {
     it("lands on the default resource", async () => {
-      await expectLands({ from: "/ops/backoffice", at: "/ops/backoffice/users" });
+      const router = open("/ops/backoffice");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/users");
+      }, LAZY_CHROME);
     });
   });
 });
@@ -203,30 +226,47 @@ describe("given the retired ops addresses", () => {
 describe("given the retired admin addresses", () => {
   describe("when the bare admin address is opened", () => {
     it("lands on the backoffice, which forwards on to its default resource", async () => {
-      await expectLands({ from: "/admin", at: "/ops/backoffice/users" });
+      const router = open("/admin");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/users");
+      }, LAZY_CHROME);
     });
   });
 
   describe("when a singular resource deep link is opened", () => {
     it("lands on the renamed resource, keeping the rest of the path", async () => {
-      await expectLands({ from: "/admin/user/u_1", at: "/ops/backoffice/users/u_1" });
+      const router = open("/admin/user/u_1");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/users/u_1");
+      }, LAZY_CHROME);
     });
 
     it("matches the resource name whatever its case", async () => {
-      await expectLands({ from: "/admin/Subscription", at: "/ops/backoffice/subscriptions" });
+      const router = open("/admin/Subscription");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/subscriptions");
+      }, LAZY_CHROME);
     });
 
     it("keeps the query string and the hash", async () => {
-      await expectLands({
-        from: "/admin/organizations?page=2#row_7",
-        at: "/ops/backoffice/organizations?page=2#row_7",
-      });
+      const router = open("/admin/organizations?page=2#row_7");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/organizations?page=2#row_7");
+      }, LAZY_CHROME);
     });
   });
 
   describe("when a resource the backoffice never took over is opened", () => {
     it("lands on the backoffice home rather than a fabricated address", async () => {
-      await expectLands({ from: "/admin/coupons/c_1", at: "/ops/backoffice/users" });
+      const router = open("/admin/coupons/c_1");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops/backoffice/users");
+      }, LAZY_CHROME);
     });
   });
 });
@@ -234,7 +274,11 @@ describe("given the retired admin addresses", () => {
 describe("given the retired personal and evaluation addresses", () => {
   describe("when the devices inventory address is opened", () => {
     it("lands on the configure page with the devices tab selected", async () => {
-      await expectLands({ from: "/me/devices", at: "/me/configure?tab=devices" });
+      const router = open("/me/devices");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/me/configure?tab=devices");
+      }, LAZY_CHROME);
     });
   });
 
@@ -242,10 +286,13 @@ describe("given the retired personal and evaluation addresses", () => {
     it.each(["/acme/evaluations/new", "/acme/evaluations/new/choose"])(
       "%s opens the evaluator category selector on the online evaluations page",
       async (from) => {
-        await expectLands({
-          from,
-          at: "/acme/online-evaluations?drawer.open=evaluatorCategorySelector",
-        });
+        const router = open(from);
+
+        await waitFor(() => {
+          expect(addressOf(router)).toBe(
+            "/acme/online-evaluations?drawer.open=evaluatorCategorySelector",
+          );
+        }, LAZY_CHROME);
       },
     );
   });
@@ -254,7 +301,11 @@ describe("given the retired personal and evaluation addresses", () => {
 describe("given a reader who followed a retired address", () => {
   describe("when they press back", () => {
     it("returns to where they came from, not to the retired address", async () => {
-      const router = await expectLands({ from: "/ops/queues", at: "/ops" });
+      const router = open("/ops/queues");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/ops");
+      }, LAZY_CHROME);
 
       await act(async () => {
         await router.navigate(-1);

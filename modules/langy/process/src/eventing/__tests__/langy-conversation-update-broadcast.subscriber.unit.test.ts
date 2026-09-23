@@ -113,8 +113,7 @@ describe("Langy conversation update broadcast subscriber", () => {
     );
     const deduplication = subscriber.options?.deduplication;
     expect(typeof deduplication).toBe("object");
-    if (typeof deduplication === "object") {
-      expect(deduplication.makeId(event)).toBe("langy-conversation-update:project_2:conv_2");
-    }
+    if (typeof deduplication !== "object") throw new Error("unreachable: asserted above");
+    expect(deduplication.makeId(event)).toBe("langy-conversation-update:project_2:conv_2");
   });
 });

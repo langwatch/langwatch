@@ -79,8 +79,6 @@ async function insertRow(row: ReturnType<typeof makeInsertRow>) {
   });
 }
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   client = createClient({
@@ -100,7 +98,7 @@ afterAll(async () => {
   client = undefined;
 });
 
-integration("getRunDataForScenarioSet() message truncation", () => {
+describe.skipIf(databaseUrl === null)("getRunDataForScenarioSet() message truncation", () => {
   describe("when a run holds more messages than the list keeps", () => {
     /** @scenario "A set-level list marks a run whose messages were trimmed" */
     it("returns the first 6 and reports the trim", async () => {

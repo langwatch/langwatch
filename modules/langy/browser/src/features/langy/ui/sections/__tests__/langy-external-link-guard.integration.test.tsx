@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,8 +73,9 @@ const destination = () => screen.getByTestId("langy-external-link-host");
 
 /** Let the interception (and any dialog it would open) settle. */
 async function settle() {
-  await waitFor(() => expect(true).toBe(true));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 beforeEach(() => {
@@ -90,7 +91,9 @@ afterEach(async () => {
   const stay = screen.queryByRole("button", { name: "Stay here" });
   if (stay) {
     fireEvent.click(stay);
-    await waitFor(() => expect(noDialog()).toBeNull());
+    await waitFor(() => {
+      if (noDialog() !== null) throw new Error("the dialog is still open");
+    });
   }
   cleanup();
   pushMock.mockClear();

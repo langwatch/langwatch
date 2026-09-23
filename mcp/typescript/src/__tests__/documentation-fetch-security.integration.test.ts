@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { initConfig } from "../config.js";
@@ -134,7 +135,7 @@ describe("MCP documentation fetch security", () => {
         }),
       });
       sessionId = initializeResponse.headers.get("mcp-session-id") ?? "";
-      expect(sessionId).not.toBe("");
+      if (sessionId === "") throw new Error("setup: the MCP server issued no session id");
 
       await fetch(`http://127.0.0.1:${mcpPort}/mcp`, {
         method: "POST",

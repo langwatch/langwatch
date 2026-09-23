@@ -106,33 +106,26 @@ describe("given the LangWatchQL view catalog", () => {
           `${view.name} pins the dedup strategy that does not deduplicate`,
         ).not.toBe("none");
 
-        if (catalogShapes.isPostgresResident(view)) {
-          // Nothing to collapse: PostgreSQL keeps one row per key, and a
-          // version column here would be a claim about an engine that is not
-          // underneath this dataset.
-          expect(
-            view.dedup.versionColumn,
-            `${view.name} is PostgreSQL-resident and has no versions to collapse`,
-          ).toBeUndefined();
-          continue;
-        }
+        // Nothing to collapse: PostgreSQL keeps one row per key, and a
+        // version column here would be a claim about an engine that is not
+        // underneath this dataset.
+        expect(
+          catalogShapes.isPostgresResident(view) ? view.dedup.versionColumn : undefined,
+          `${view.name} is PostgreSQL-resident and has no versions to collapse`,
+        ).toBeUndefined();
+        if (catalogShapes.isPostgresResident(view)) continue;
 
         // Asserted before the grant loop, not inside it: `versionColumn` is optional, and an
         // entry that forgot it would otherwise fail as "deduplicates on undefined without
         // granting it" — which reads as a broken guard rather than as the missing declaration
         // it is. An aggregating source is the one ClickHouse-resident shape with no version,
         // because its rows for a key are summed rather than superseded.
-        if (view.dedup.aggregating) {
-          expect(
-            view.dedup.versionColumn,
-            `${view.name} aggregates, so no version supersedes another and declaring one would be a claim about an engine that is not underneath it`,
-          ).toBeUndefined();
-        } else {
-          expect(
-            view.dedup.versionColumn,
-            `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
-          ).toBeDefined();
-        }
+        expect(
+          view.dedup.versionColumn === undefined,
+          view.dedup.aggregating
+            ? `${view.name} aggregates, so no version supersedes another and declaring one would be a claim about an engine that is not underneath it`
+            : `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
+        ).toBe(Boolean(view.dedup.aggregating));
 
         // A ClickHouse-resident view builds its own dedup subquery, so the same
         // columns must additionally be granted on the source table — even when
@@ -322,17 +315,17 @@ describe("given the LangWatchQL view catalog", () => {
               if ((column.joinedSourceColumns?.length ?? 0) > 0) {
                 continue;
               }
-
-              expect(
-                catalogShapes.isContentGated(column),
-                `${view.name}.${column.name} reads the non-content key ${key} but is content-gated`,
-              ).toBe(false);
-              continue;
             }
+            expect(
+              category === null && catalogShapes.isContentGated(column),
+              `${view.name}.${column.name} reads the non-content key ${key} but is content-gated`,
+            ).toBe(false);
             expect(
               column.gates,
               `${view.name}.${column.name} reads the content key ${key} without the gate the policy assigns it`,
-            ).toContain(gateForContentCategory(category));
+            ).toEqual(
+              expect.arrayContaining(category === null ? [] : [gateForContentCategory(category)]),
+            );
           }
         }
       }

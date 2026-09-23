@@ -40,9 +40,8 @@ describe("validateDashboardWidgetQueryParams", () => {
       });
 
       expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.code).toBe("dashboard_widget_query_invalid_param");
-      }
+      if (result.ok) throw new Error("unreachable: asserted above");
+      expect(result.error.code).toBe("dashboard_widget_query_invalid_param");
     });
 
     it("refuses a non-finite number", () => {
@@ -63,9 +62,8 @@ describe("validateDashboardWidgetQueryParams", () => {
       });
 
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.params).toEqual({ term: "hello" });
-      }
+      if (!result.ok) throw new Error("unreachable: asserted above");
+      expect(result.params).toEqual({ term: "hello" });
     });
   });
 });

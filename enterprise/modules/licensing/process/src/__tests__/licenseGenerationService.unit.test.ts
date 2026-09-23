@@ -143,9 +143,8 @@ describe("generateLicenseKey", () => {
         now: fromDate(baseParams.now),
       });
       expect(validated.valid).toBe(true);
-      if (validated.valid) {
-        expect(validated.licenseData.plan.webhookEndpointsEnabled).toBe(true);
-      }
+      if (!validated.valid) throw new Error("unreachable: asserted above");
+      expect(validated.licenseData.plan.webhookEndpointsEnabled).toBe(true);
     });
 
     it("generates a valid license with ENTERPRISE template limits", () => {
@@ -278,13 +277,12 @@ describe("generateLicenseKey", () => {
       });
 
       expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.licenseId).toBe(licenseData.licenseId);
-        expect(result.licenseData.email).toBe("buyer@acme.com");
-        expect(result.licenseData.organizationName).toBe("Acme Corp");
-        expect(result.licenseData.plan.type).toBe("GROWTH");
-        expect(result.licenseData.plan.maxMembers).toBe(5);
-      }
+      if (!result.valid) throw new Error("unreachable: asserted above");
+      expect(result.licenseData.licenseId).toBe(licenseData.licenseId);
+      expect(result.licenseData.email).toBe("buyer@acme.com");
+      expect(result.licenseData.organizationName).toBe("Acme Corp");
+      expect(result.licenseData.plan.type).toBe("GROWTH");
+      expect(result.licenseData.plan.maxMembers).toBe(5);
     });
 
     it("fails validation with a different public key", () => {

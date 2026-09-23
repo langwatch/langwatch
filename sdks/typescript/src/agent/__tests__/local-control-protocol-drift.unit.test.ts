@@ -4,6 +4,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -112,231 +113,232 @@ function platformNumber({ source, name }: { source: string; name: string }): num
     .reduce((left, right) => left + right, 0);
 }
 
-describe("the CLI local control protocol, given the platform's contract module", () => {
-  if (!existsSync(PLATFORM_PROTOCOL)) {
-    // A published SDK checkout carries no platform/app; the drift check runs in the monorepo.
-    it.skip("matches the platform contract (skipped: no platform tree in this checkout)", () => {
-      expect(existsSync(PLATFORM_PROTOCOL)).toBe(true);
-    });
-    return;
-  }
+/** A published SDK checkout carries no platform/app; the drift check runs in the monorepo. */
+const readIfPresent = (file: string): string =>
+  existsSync(file) ? readFileSync(file, "utf8") : "";
 
-  const platform = readFileSync(PLATFORM_PROTOCOL, "utf8");
-  const constants = readFileSync(PLATFORM_CONSTANTS, "utf8");
-  const cli = readFileSync(CLI_PROTOCOL, "utf8");
+describe.skipIf(!existsSync(PLATFORM_PROTOCOL))(
+  "the CLI local control protocol, given the platform's contract module",
+  () => {
+    const platform = readIfPresent(PLATFORM_PROTOCOL);
+    const constants = readIfPresent(PLATFORM_CONSTANTS);
+    const cli = readIfPresent(CLI_PROTOCOL);
 
-  it("speaks the same protocol version", () => {
-    const match = /export const LOCAL_CONTROL_PROTOCOL_VERSION = (\d+);/.exec(platform);
-    expect(Number(match?.[1])).toBe(LOCAL_CONTROL_PROTOCOL_VERSION);
-  });
-
-  it("knows every frame type the platform names", () => {
-    const platformTypes = [
-      ...new Set(
-        [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
-      ),
-    ].toSorted();
-    const cliTypes = [
-      ...new Set([...cli.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
-    ].toSorted();
-    expect(cliTypes).toEqual(platformTypes);
-    expect(cliTypes).toEqual([
-      "ack",
-      "call",
-      "cancel",
-      "deregister",
-      "disconnect",
-      "permission",
-      "permission_answered",
-      "permission_required",
-      "policy",
-      "refused",
-      "register",
-      "registered",
-      "result",
-    ]);
-  });
-
-  it("names every tool the platform lists", () => {
-    expect([...LOCAL_TOOL_NAMES]).toEqual(
-      stringList({ source: platform, name: "LOCAL_TOOL_NAMES" }),
-    );
-  });
-
-  describe("when the frames the CLI sends are compared", () => {
-    it("register carries the same cli, instance and workspace keys", () => {
-      expect(sorted(cliKeys({ source: cli, name: "LocalControlCli" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "cliSchema" })),
-      );
-      expect(sorted(cliKeys({ source: cli, name: "LocalRegisterInstance" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "registerInstanceSchema" })),
-      );
-      expect(sorted(cliKeys({ source: cli, name: "WorkspaceInfo" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "workspaceInfoSchema" })),
-      );
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisterFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "registerFrameSchema" })),
-        ]),
-      );
+    it("speaks the same protocol version", () => {
+      const match = /export const LOCAL_CONTROL_PROTOCOL_VERSION = (\d+);/.exec(platform);
+      expect(Number(match?.[1])).toBe(LOCAL_CONTROL_PROTOCOL_VERSION);
     });
 
-    it("ack, result and deregister carry the same keys", () => {
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalAckFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "ackFrameSchema" })),
-        ]),
-      );
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalResultFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "resultFrameSchema" })),
-        ]),
-      );
-      expect(sorted(cliKeys({ source: cli, name: "LocalCallError" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "localCallErrorSchema" })),
-      );
-      expect(sorted(cliKeys({ source: cli, name: "BashOutput" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "bashOutputSchema" })),
-      );
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalDeregisterFrame" })))).toEqual([
-        "protocol",
+    it("knows every frame type the platform names", () => {
+      const platformTypes = [
+        ...new Set(
+          [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
+        ),
+      ].toSorted();
+      const cliTypes = [
+        ...new Set([...cli.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
+      ].toSorted();
+      expect(cliTypes).toEqual(platformTypes);
+      expect(cliTypes).toEqual([
+        "ack",
+        "call",
+        "cancel",
+        "deregister",
+        "disconnect",
+        "permission",
+        "permission_answered",
+        "permission_required",
+        "policy",
+        "refused",
+        "register",
+        "registered",
+        "result",
       ]);
     });
 
-    it("permission_required carries the same keys, segments included", () => {
-      expect(sorted(cliKeys({ source: cli, name: "CommandSegment" }))).toEqual(
-        sorted(platformKeys({ source: platform, schema: "commandSegmentSchema" })),
-      );
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionRequiredFrame" }))),
-      ).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(
-            platformKeys({
-              source: platform,
-              schema: "permissionRequiredFrameSchema",
-            }),
-          ),
-        ]),
+    it("names every tool the platform lists", () => {
+      expect([...LOCAL_TOOL_NAMES]).toEqual(
+        stringList({ source: platform, name: "LOCAL_TOOL_NAMES" }),
       );
     });
 
-    it("permission_answered carries the same keys", () => {
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionAnsweredFrame" }))),
-      ).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(
-            platformKeys({
-              source: platform,
-              schema: "permissionAnsweredFrameSchema",
-            }),
-          ),
-        ]),
-      );
-    });
-
-    it("names every call error code the platform can carry", () => {
-      expect([...LOCAL_CALL_ERROR_CODES]).toEqual(
-        stringList({ source: platform, name: "LOCAL_CALL_ERROR_CODES" }),
-      );
-    });
-  });
-
-  describe("when the frames the CLI receives are compared", () => {
-    it("registered carries the same keys", () => {
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisteredFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "registeredFrameSchema" })),
-        ]),
-      );
-    });
-
-    it("refused carries the same keys and every refusal code has advice", () => {
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRefusedFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "refusedFrameSchema" })),
-        ]),
-      );
-      const codes = stringList({
-        source: platform,
-        name: "LOCAL_CONTROL_REFUSED_CODES",
-      });
-      expect(codes.length).toBeGreaterThan(0);
-      expect([...LOCAL_CONTROL_REFUSED_CODES]).toEqual(codes);
-      for (const code of codes) {
-        expect(cli, `localRefusalAdvice has no case for ${code}`).toContain(`case "${code}":`);
-      }
-    });
-
-    it("call carries the envelope keys and nothing else", () => {
-      const envelope = platformKeys({
-        source: platform,
-        schema: "callEnvelopeSchema",
-      });
-      expect(sorted(cliKeys({ source: cli, name: "LocalCallEnvelope" }))).toEqual(sorted(envelope));
-      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalCallFrame" })))).toEqual(
-        sorted([
-          "protocol",
-          ...withoutType(platformKeys({ source: platform, schema: "callFrameSchema" })),
-        ]),
-      );
-    });
-
-    it("cancel, permission, policy and disconnect carry the same keys", () => {
-      const pairs: [string, string][] = [
-        ["LocalCancelFrame", "cancelFrameSchema"],
-        ["LocalPermissionFrame", "permissionFrameSchema"],
-        ["LocalPolicyFrame", "policyFrameSchema"],
-        ["LocalDisconnectFrame", "disconnectFrameSchema"],
-      ];
-      for (const [name, schema] of pairs) {
-        expect(sorted(withoutType(cliKeys({ source: cli, name })))).toEqual(
-          sorted(["protocol", ...withoutType(platformKeys({ source: platform, schema }))]),
+    describe("when the frames the CLI sends are compared", () => {
+      it("register carries the same cli, instance and workspace keys", () => {
+        expect(sorted(cliKeys({ source: cli, name: "LocalControlCli" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "cliSchema" })),
         );
-      }
+        expect(sorted(cliKeys({ source: cli, name: "LocalRegisterInstance" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "registerInstanceSchema" })),
+        );
+        expect(sorted(cliKeys({ source: cli, name: "WorkspaceInfo" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "workspaceInfoSchema" })),
+        );
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisterFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "registerFrameSchema" })),
+          ]),
+        );
+      });
+
+      it("ack, result and deregister carry the same keys", () => {
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalAckFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "ackFrameSchema" })),
+          ]),
+        );
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalResultFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "resultFrameSchema" })),
+          ]),
+        );
+        expect(sorted(cliKeys({ source: cli, name: "LocalCallError" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "localCallErrorSchema" })),
+        );
+        expect(sorted(cliKeys({ source: cli, name: "BashOutput" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "bashOutputSchema" })),
+        );
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalDeregisterFrame" })))).toEqual(
+          ["protocol"],
+        );
+      });
+
+      it("permission_required carries the same keys, segments included", () => {
+        expect(sorted(cliKeys({ source: cli, name: "CommandSegment" }))).toEqual(
+          sorted(platformKeys({ source: platform, schema: "commandSegmentSchema" })),
+        );
+        expect(
+          sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionRequiredFrame" }))),
+        ).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(
+              platformKeys({
+                source: platform,
+                schema: "permissionRequiredFrameSchema",
+              }),
+            ),
+          ]),
+        );
+      });
+
+      it("permission_answered carries the same keys", () => {
+        expect(
+          sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionAnsweredFrame" }))),
+        ).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(
+              platformKeys({
+                source: platform,
+                schema: "permissionAnsweredFrameSchema",
+              }),
+            ),
+          ]),
+        );
+      });
+
+      it("names every call error code the platform can carry", () => {
+        expect([...LOCAL_CALL_ERROR_CODES]).toEqual(
+          stringList({ source: platform, name: "LOCAL_CALL_ERROR_CODES" }),
+        );
+      });
     });
 
-    it("names every permission decision the platform can send", () => {
-      expect([...PERMISSION_DECISIONS]).toEqual(
-        stringList({ source: platform, name: "PERMISSION_DECISIONS" }),
-      );
+    describe("when the frames the CLI receives are compared", () => {
+      it("registered carries the same keys", () => {
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisteredFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "registeredFrameSchema" })),
+          ]),
+        );
+      });
+
+      it("refused carries the same keys and every refusal code has advice", () => {
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRefusedFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "refusedFrameSchema" })),
+          ]),
+        );
+        const codes = stringList({
+          source: platform,
+          name: "LOCAL_CONTROL_REFUSED_CODES",
+        });
+        expect(codes.length).toBeGreaterThan(0);
+        expect([...LOCAL_CONTROL_REFUSED_CODES]).toEqual(codes);
+        for (const code of codes) {
+          expect(cli, `localRefusalAdvice has no case for ${code}`).toContain(`case "${code}":`);
+        }
+      });
+
+      it("call carries the envelope keys and nothing else", () => {
+        const envelope = platformKeys({
+          source: platform,
+          schema: "callEnvelopeSchema",
+        });
+        expect(sorted(cliKeys({ source: cli, name: "LocalCallEnvelope" }))).toEqual(
+          sorted(envelope),
+        );
+        expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalCallFrame" })))).toEqual(
+          sorted([
+            "protocol",
+            ...withoutType(platformKeys({ source: platform, schema: "callFrameSchema" })),
+          ]),
+        );
+      });
+
+      it("cancel, permission, policy and disconnect carry the same keys", () => {
+        const pairs: [string, string][] = [
+          ["LocalCancelFrame", "cancelFrameSchema"],
+          ["LocalPermissionFrame", "permissionFrameSchema"],
+          ["LocalPolicyFrame", "policyFrameSchema"],
+          ["LocalDisconnectFrame", "disconnectFrameSchema"],
+        ];
+        for (const [name, schema] of pairs) {
+          expect(sorted(withoutType(cliKeys({ source: cli, name })))).toEqual(
+            sorted(["protocol", ...withoutType(platformKeys({ source: platform, schema }))]),
+          );
+        }
+      });
+
+      it("names every permission decision the platform can send", () => {
+        expect([...PERMISSION_DECISIONS]).toEqual(
+          stringList({ source: platform, name: "PERMISSION_DECISIONS" }),
+        );
+      });
+
+      it("answers from the terminal with decisions the platform also knows", () => {
+        for (const decision of TERMINAL_PERMISSION_DECISIONS) {
+          expect([...PERMISSION_DECISIONS]).toContain(decision);
+        }
+        expect([...TERMINAL_PERMISSION_DECISIONS]).not.toContain("expired");
+      });
     });
 
-    it("answers from the terminal with decisions the platform also knows", () => {
-      for (const decision of TERMINAL_PERMISSION_DECISIONS) {
-        expect([...PERMISSION_DECISIONS]).toContain(decision);
-      }
-      expect([...TERMINAL_PERMISSION_DECISIONS]).not.toContain("expired");
-    });
-  });
+    describe("when the budgets the CLI copied are compared", () => {
+      it("uses the platform's numbers", () => {
+        expect(BASH_OUTPUT_CAP_BYTES).toBe(
+          platformNumber({ source: constants, name: "BASH_OUTPUT_CAP_BYTES" }),
+        );
+        expect(BASH_DEFAULT_TIMEOUT_MS).toBe(
+          platformNumber({ source: constants, name: "BASH_DEFAULT_TIMEOUT_MS" }),
+        );
+        expect(BASH_MAX_TIMEOUT_MS).toBe(
+          platformNumber({ source: constants, name: "BASH_MAX_TIMEOUT_MS" }),
+        );
+        expect(PRESENCE_HEARTBEAT_MS).toBe(
+          platformNumber({ source: constants, name: "PRESENCE_HEARTBEAT_MS" }),
+        );
+      });
 
-  describe("when the budgets the CLI copied are compared", () => {
-    it("uses the platform's numbers", () => {
-      expect(BASH_OUTPUT_CAP_BYTES).toBe(
-        platformNumber({ source: constants, name: "BASH_OUTPUT_CAP_BYTES" }),
-      );
-      expect(BASH_DEFAULT_TIMEOUT_MS).toBe(
-        platformNumber({ source: constants, name: "BASH_DEFAULT_TIMEOUT_MS" }),
-      );
-      expect(BASH_MAX_TIMEOUT_MS).toBe(
-        platformNumber({ source: constants, name: "BASH_MAX_TIMEOUT_MS" }),
-      );
-      expect(PRESENCE_HEARTBEAT_MS).toBe(
-        platformNumber({ source: constants, name: "PRESENCE_HEARTBEAT_MS" }),
-      );
+      it("writes its logs where the platform says", () => {
+        const match = /export const LOCAL_LOG_DIR = "([^"]+)";/.exec(constants);
+        expect(match?.[1]).toBe(LOCAL_LOG_DIR);
+      });
     });
-
-    it("writes its logs where the platform says", () => {
-      const match = /export const LOCAL_LOG_DIR = "([^"]+)";/.exec(constants);
-      expect(match?.[1]).toBe(LOCAL_LOG_DIR);
-    });
-  });
-});
+  },
+);

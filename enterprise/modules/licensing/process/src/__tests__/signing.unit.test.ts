@@ -23,14 +23,6 @@ const parseLicenseKey = cryptography.parseLicenseKey.bind(cryptography);
 const signLicense = cryptography.signLicense.bind(cryptography);
 const verifySignature = cryptography.verifySignature.bind(cryptography);
 
-type HandledLicenseError = Error & {
-  isHandled: true;
-  httpStatus: number;
-  fault: string;
-  tips: readonly string[];
-  serialize(): unknown;
-};
-
 const createTestLicenseData = (overrides: Partial<LicenseData> = {}): LicenseData => ({
   licenseId: "test-lic-001",
   version: 1,
@@ -175,14 +167,9 @@ const encryptedKey = () =>
 describe("signLicense, given a key it cannot sign with", () => {
   describe("when the key is not a usable signing key", () => {
     it("raises a handled error the transport layers map to a 400", () => {
-      try {
-        signLicense(createTestLicenseData(), "not-a-valid-key");
-        expect.unreachable("signing with a non-key should throw");
-      } catch (error) {
-        expect((error as HandledLicenseError).isHandled).toBe(true);
-        expect((error as HandledLicenseError).httpStatus).toBe(400);
-        expect((error as HandledLicenseError).fault).toBe("customer");
-      }
+      expect(() => signLicense(createTestLicenseData(), "not-a-valid-key")).toThrow(
+        expect.objectContaining({ isHandled: true, httpStatus: 400, fault: "customer" }),
+      );
     });
 
     it("distinguishes input that is not a PEM key", () => {
@@ -213,29 +200,35 @@ describe("signLicense, given a key it cannot sign with", () => {
   });
 });
 
+/** What `sign` threw; throws itself when `sign` returned instead. */
+function thrownBy(sign: () => unknown): unknown {
+  try {
+    sign();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected signing to throw");
+}
+
 describe("signLicense, given a key it cannot sign with, what the failure carries", () => {
   describe("when signing fails", () => {
     it("carries remediation tips for the operator", () => {
-      try {
-        signLicense(createTestLicenseData(), encryptedKey());
-        expect.unreachable("signing with an encrypted key should throw");
-      } catch (error) {
-        expect((error as HandledLicenseError).tips.length).toBeGreaterThan(0);
-      }
+      expect(() => signLicense(createTestLicenseData(), encryptedKey())).toThrow(
+        expect.objectContaining({ tips: expect.arrayContaining([expect.anything()]) }),
+      );
     });
 
     it("does not leak key material on the wire", () => {
       const publicKeyBody = TEST_PUBLIC_KEY.split("\n")[1]!;
 
-      try {
-        signLicense(createTestLicenseData(), TEST_PUBLIC_KEY);
-        expect.unreachable("signing with a public key should throw");
-      } catch (error) {
-        const serialized = JSON.stringify((error as HandledLicenseError).serialize());
-
-        expect((error as Error).message).not.toContain(publicKeyBody);
-        expect(serialized).not.toContain(publicKeyBody);
+      const failure = thrownBy(() => signLicense(createTestLicenseData(), TEST_PUBLIC_KEY));
+      expect(failure).toBeInstanceOf(LicenseSigningFailedError);
+      if (!(failure instanceof LicenseSigningFailedError)) {
+        throw new Error("unreachable: asserted above");
       }
+
+      expect(failure.message).not.toContain(publicKeyBody);
+      expect(JSON.stringify(failure.serialize())).not.toContain(publicKeyBody);
     });
   });
 });
@@ -279,10 +272,9 @@ describe("encodeLicenseKey", () => {
     const parsedLicense = parseLicenseKey(encodedKey);
 
     expect(parsedLicense).not.toBeNull();
-    if (parsedLicense) {
-      const isValid = verifySignature(parsedLicense, TEST_PUBLIC_KEY);
-      expect(isValid).toBe(true);
-    }
+    if (!parsedLicense) throw new Error("unreachable: asserted above");
+    const isValid = verifySignature(parsedLicense, TEST_PUBLIC_KEY);
+    expect(isValid).toBe(true);
   });
 });
 

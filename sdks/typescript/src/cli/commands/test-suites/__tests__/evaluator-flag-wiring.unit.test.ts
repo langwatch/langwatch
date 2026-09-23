@@ -80,9 +80,7 @@ describe("test-suite create, given the evaluator gate flags", () => {
   /** @scenario "A gate flag written before any evaluator is refused" */
   it("refuses a gate flag written before any evaluator", async () => {
     const reported = silence();
-    const exit = vi.spyOn(process, "exit").mockImplementation(((
-      code: number,
-    ) => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code: number) => {
       throw new Error(`process.exit(${code})`);
     }) as never);
 
@@ -100,7 +98,7 @@ describe("test-suite create, given the evaluator gate flags", () => {
         "--evaluator",
         "judge",
       ]),
-    ).rejects.toThrow();
+    ).rejects.toThrow("process.exit(1)");
 
     expect(exit).toHaveBeenCalledWith(1);
     expect(reported.join("\n")).toContain("must follow the --evaluator");

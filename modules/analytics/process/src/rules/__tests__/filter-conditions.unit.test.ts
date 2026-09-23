@@ -40,7 +40,6 @@ describe("clickHouseFilterConditions", () => {
     it.each([
       ["metadata.labels", "ts.Attributes['langwatch.labels']"],
       ["metadata.prompt_ids", "ts.Attributes['langwatch.prompt_ids']"],
-      ["spans.model", "ts.Models"],
     ] as const)("when %s is filtered, it checks set membership via hasAny", (field, attr) => {
       const builder = clickHouseFilterConditions[field];
       expect(builder).not.toBeNull();
@@ -50,11 +49,17 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toContain("hasAny(");
       expect(result.sql).not.toContain('"a"');
       expect(result.sql).not.toContain('"b"');
-      if (field === "spans.model") {
-        expect(result.sql).toBe(`hasAny(${attr}, {f0_values:Array(String)})`);
-      } else {
-        expect(result.sql).toContain(attr);
-      }
+      expect(result.sql).toContain(attr);
+      expect(result.params).toEqual({ f0_values: ["a", "b"] });
+    });
+
+    it("when spans.model is filtered, it checks set membership of the span models via hasAny", () => {
+      const builder = clickHouseFilterConditions["spans.model"];
+      expect(builder).not.toBeNull();
+
+      const result = builder!(["a", "b"], "f0");
+
+      expect(result.sql).toBe("hasAny(ts.Models, {f0_values:Array(String)})");
       expect(result.params).toEqual({ f0_values: ["a", "b"] });
     });
   });

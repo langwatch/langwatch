@@ -53,9 +53,8 @@ describe("suite fields", () => {
           { identifier: "golden_sql", type: "number" },
         ]);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0]?.path).toEqual([1, "identifier"]);
-        }
+        if (result.success) throw new Error("unreachable: asserted above");
+        expect(result.error.issues[0]?.path).toEqual([1, "identifier"]);
       });
     });
 
