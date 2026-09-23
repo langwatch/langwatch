@@ -629,6 +629,8 @@ $bridge_out"
     --set app.replicaCount=1 \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set app.resources.requests.memory=512Mi \
+    --set app.resources.limits.memory=2Gi \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql)"
 
@@ -641,10 +643,13 @@ $bridge_out"
   app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
     -o jsonpath='{.items[0].metadata.name}')
 
-  # Re-run the same converge the boot ran, capturing its output. On a single node
-  # the guard returns (own-cluster host count <= 1), so the run must NOT log the
-  # refusal, and it must show the config-store yield — proof the sql-mode DDL
-  # path executed against a permitted node.
+  # Run the converge and capture its output. The e2e profile runs no workers pod
+  # (values-e2e.yaml:49), which is what runs `lwql:provision` at boot in
+  # production, so this exec stands in for that boot converge (hence the raised
+  # app memory limit above — a second Node process beside the live server). On a
+  # single node the guard returns (own-cluster host count <= 1), so the run must
+  # NOT log the refusal, and it must show the config-store yield — proof the
+  # sql-mode DDL path executed against a permitted node.
   local sql_provision_out
   if sql_provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
     pass "sql-mode lwql:provision succeeds on a single node"
@@ -799,6 +804,8 @@ test_lwql_replicas() {
     --set app.replicaCount=1 \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set app.resources.requests.memory=512Mi \
+    --set app.resources.limits.memory=2Gi \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql, 3-host cluster)"
 
@@ -810,9 +817,13 @@ test_lwql_replicas() {
   pass "app pod Ready under sql mode on a multi-host cluster (refusal is non-fatal)"
 
   # (b) The refusal is logged, by name and/or its stable message, with its two
-  # counts. Re-run the same converge the boot ran and capture it: the guard logs
-  # the refusal before throwing, and selfProvisionAll swallows the throw (so the
-  # task still exits 0; `|| true` guards either way).
+  # counts. The e2e profile runs no workers pod (values-e2e.yaml:49), and the
+  # workers pod is what runs `lwql:provision` at boot in production — so nothing
+  # converges the access model on its own here. This exec stands in for that boot
+  # converge; it spawns a second Node process beside the live server, which is why
+  # the helm upgrade above raised the app memory limit to give it headroom. The
+  # guard logs the refusal before throwing, and selfProvisionAll swallows the
+  # throw (so the task still exits 0; `|| true` guards either way).
   local refuse_out
   refuse_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1) || true
   if grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError' <<<"$refuse_out"; then
