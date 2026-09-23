@@ -129,7 +129,8 @@ child.on("exit", (code) => {
 
   rmSync(home, { recursive: true, force: true });
 
-  if (failed || !ordered || !terminalOk || !terminalIsLastForTurn || !readyFirst) {
+  const smokePassed = !failed && ordered && terminalOk && terminalIsLastForTurn && readyFirst;
+  if (!smokePassed) {
     console.error("smoke: FAIL", {
       code,
       types,

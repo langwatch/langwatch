@@ -1,8 +1,58 @@
 import { useCallback } from "react";
 
-import { type DrawerViewMode, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import {
+  type DrawerViewMode,
+  type TraceHistoryEntry,
+  useDrawerStore,
+} from "../../../../behavior/drawer.store.ts";
 import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
+
+type OpenDrawer = ReturnType<typeof useDrawer>["openDrawer"];
+
+function traceDrawerParams({
+  traceId,
+  occurredAtMs,
+}: {
+  traceId: string;
+  occurredAtMs: number | undefined;
+}) {
+  return {
+    traceId,
+    ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
+  };
+}
+
+function reopenHistoryEntry({
+  entry,
+  setViewMode,
+  openDrawer,
+}: {
+  entry: TraceHistoryEntry;
+  setViewMode: (mode: DrawerViewMode) => void;
+  openDrawer: OpenDrawer;
+}): void {
+  setViewMode(entry.viewMode);
+  useDrawerStore.getState().openTrace(entry.traceId, entry.occurredAtMs ?? null);
+  openDrawer(
+    "traceV2Details",
+    traceDrawerParams({ traceId: entry.traceId, occurredAtMs: entry.occurredAtMs }),
+  );
+}
+
+function applyTargetViewMode({
+  toViewMode,
+  persistViewMode,
+  setViewMode,
+}: {
+  toViewMode: DrawerViewMode | undefined;
+  persistViewMode: boolean;
+  setViewMode: (mode: DrawerViewMode) => void;
+}): void {
+  if (!toViewMode) return;
+  if (persistViewMode) setViewMode(toViewMode);
+  else useDrawerStore.getState().setViewModeTransient(toViewMode);
+}
 
 /**
  * Trace-to-trace navigation inside the v2 drawer with a back stack.
@@ -57,17 +107,14 @@ export function useTraceDrawerNavigation() {
           viewMode: fromViewMode,
           occurredAtMs: fromTimestamp,
         });
-        if (toViewMode) {
-          if (persistViewMode) setViewMode(toViewMode);
-          else useDrawerStore.getState().setViewModeTransient(toViewMode);
-        }
+        applyTargetViewMode({ toViewMode, persistViewMode, setViewMode });
         // Push into the store immediately so drawer hooks render with the
         // right traceId/occurredAtMs before the URL change settles.
         useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
-        openDrawer("traceV2Details", {
-          traceId: toTraceId,
-          ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
-        });
+        openDrawer(
+          "traceV2Details",
+          traceDrawerParams({ traceId: toTraceId, occurredAtMs: toTimestamp }),
+        );
       });
     },
     [openDrawer, pushTraceHistory, setViewMode],
@@ -81,12 +128,7 @@ export function useTraceDrawerNavigation() {
     guardTraceEditExit(() => {
       const previous = popTraceHistory();
       if (!previous) return;
-      setViewMode(previous.viewMode);
-      useDrawerStore.getState().openTrace(previous.traceId, previous.occurredAtMs ?? null);
-      openDrawer("traceV2Details", {
-        traceId: previous.traceId,
-        ...(previous.occurredAtMs !== undefined ? { t: String(previous.occurredAtMs) } : {}),
-      });
+      reopenHistoryEntry({ entry: previous, setViewMode, openDrawer });
     });
   }, [openDrawer, popTraceHistory, setViewMode]);
 
@@ -95,12 +137,7 @@ export function useTraceDrawerNavigation() {
       guardTraceEditExit(() => {
         const target = popTraceHistoryTo(index);
         if (!target) return;
-        setViewMode(target.viewMode);
-        useDrawerStore.getState().openTrace(target.traceId, target.occurredAtMs ?? null);
-        openDrawer("traceV2Details", {
-          traceId: target.traceId,
-          ...(target.occurredAtMs !== undefined ? { t: String(target.occurredAtMs) } : {}),
-        });
+        reopenHistoryEntry({ entry: target, setViewMode, openDrawer });
       });
     },
     [openDrawer, popTraceHistoryTo, setViewMode],
