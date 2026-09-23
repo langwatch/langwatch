@@ -44,12 +44,17 @@ const SEAMS = new Map<string, { instead: string; because: string }>([
   ],
 ]);
 
-function violation(
-  file: string,
-  line: number,
-  name: string,
-  seam: { instead: string; because: string },
-): ArchitectureViolation {
+function violation({
+  file,
+  line,
+  name,
+  seam,
+}: {
+  file: string;
+  line: number;
+  name: string;
+  seam: { instead: string; because: string };
+}): ArchitectureViolation {
   return {
     policy: POLICY,
     file,
@@ -102,7 +107,7 @@ function importedSeamViolations(source: ts.SourceFile, file: string): Architectu
       if (!seam) continue;
 
       const line = source.getLineAndCharacterOfPosition(element.getStart(source)).line + 1;
-      violations.push(violation(file, line, imported, seam));
+      violations.push(violation({ file, line, name: imported, seam }));
     }
   }
 
@@ -127,7 +132,7 @@ function namespacedParseViolations(source: ts.SourceFile, file: string): Archite
 
       if (seam) {
         const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-        violations.push(violation(file, line, node.name.text, seam));
+        violations.push(violation({ file, line, name: node.name.text, seam }));
       }
     }
 

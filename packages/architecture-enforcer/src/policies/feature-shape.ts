@@ -174,12 +174,17 @@ function contractFindings(
     : [];
 }
 
-function serverFindings(
-  root: string,
-  feature: string,
-  pkg: ClassifiedPackage,
-  booted: ReadonlySet<string>,
-): FeatureShapeFinding[] {
+function serverFindings({
+  root,
+  feature,
+  pkg,
+  booted,
+}: {
+  root: string;
+  feature: string;
+  pkg: ClassifiedPackage;
+  booted: ReadonlySet<string>;
+}): FeatureShapeFinding[] {
   const src = join(pkg.root, "src");
   const findings: FeatureShapeFinding[] = [];
 
@@ -296,7 +301,7 @@ export function collectFeatureShapeFindings(
       if (pkg.kind === "contract") return [...composition, ...contractFindings(root, feature, pkg)];
 
       if (pkg.kind === "process") {
-        return [...composition, ...serverFindings(root, feature, pkg, booted)];
+        return [...composition, ...serverFindings({ root, feature, pkg, booted })];
       }
 
       if (pkg.kind === "browser") return [...composition, ...webFindings(root, feature, pkg)];

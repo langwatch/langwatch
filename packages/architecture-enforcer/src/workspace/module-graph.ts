@@ -526,12 +526,17 @@ function resolutionCacheKey(
   return specifier;
 }
 
-function resolveSpecifierUncached(
-  specifier: string,
-  file: string,
-  packages: ReadonlyMap<string, PackageManifestRecord>,
-  owningPackage: OwningPackageLookup,
-): string | undefined {
+function resolveSpecifierUncached({
+  specifier,
+  file,
+  packages,
+  owningPackage,
+}: {
+  specifier: string;
+  file: string;
+  packages: ReadonlyMap<string, PackageManifestRecord>;
+  owningPackage: OwningPackageLookup;
+}): string | undefined {
   if (specifier.startsWith(".")) return resolveRelativeModule({ file, specifier });
 
   if (specifier.startsWith("#")) return resolveSubpathImport({ specifier, file }, owningPackage);
@@ -577,7 +582,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     const key = resolutionCacheKey(specifier, file, owningPackage);
     if (resolutions.has(key)) return resolutions.get(key);
 
-    const resolved = resolveSpecifierUncached(specifier, file, packages, owningPackage);
+    const resolved = resolveSpecifierUncached({ specifier, file, packages, owningPackage });
     resolutions.set(key, resolved);
 
     return resolved;

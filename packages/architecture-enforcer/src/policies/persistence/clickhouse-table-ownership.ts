@@ -122,7 +122,17 @@ type Reader = {
   found: Access[];
 };
 
-function record(reader: Reader, node: ts.Node, table: string, write: boolean): void {
+function record({
+  reader,
+  node,
+  table,
+  write,
+}: {
+  reader: Reader;
+  node: ts.Node;
+  table: string;
+  write: boolean;
+}): void {
   if (!reader.tables.has(table)) return;
 
   const line = reader.source.getLineAndCharacterOfPosition(node.getStart(reader.source)).line + 1;
@@ -135,12 +145,14 @@ function readSql(reader: Reader, node: ts.Node): void {
 
   for (const match of text.matchAll(NAMED_TABLE)) {
     const table = match[2];
-    if (table) record(reader, node, table, !READING_VERBS.has((match[1] ?? "").toLowerCase()));
+    if (table)
+      record({ reader, node, table, write: !READING_VERBS.has((match[1] ?? "").toLowerCase()) });
   }
 
   for (const match of text.matchAll(SUBSTITUTED_TABLE)) {
     const table = reader.constants.get(match[2] ?? "");
-    if (table) record(reader, node, table, !READING_VERBS.has((match[1] ?? "").toLowerCase()));
+    if (table)
+      record({ reader, node, table, write: !READING_VERBS.has((match[1] ?? "").toLowerCase()) });
   }
 }
 
@@ -188,7 +200,7 @@ function readFile({
 
     if (ts.isCallExpression(node)) {
       const table = insertedTable(reader, node);
-      if (table) record(reader, node, table, true);
+      if (table) record({ reader, node, table, write: true });
     }
 
     ts.forEachChild(node, visit);

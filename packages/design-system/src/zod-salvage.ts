@@ -121,7 +121,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
         objectSchema instanceof z.ZodOptional ||
         objectSchema instanceof z.ZodNullable
       ) {
-        objectSchema = objectSchema._def.innerType;
+        objectSchema = objectSchema.unwrap();
       }
 
       if (objectSchema instanceof z.ZodObject) {

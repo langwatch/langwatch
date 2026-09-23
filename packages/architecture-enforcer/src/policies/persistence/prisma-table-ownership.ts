@@ -285,12 +285,17 @@ function nativeRepositoryClaims(
   return calls;
 }
 
-function readClaim(
-  claim: ClaimCall,
-  source: ts.SourceFile,
-  feature: string,
-  violations: ArchitectureViolation[],
-): Claim[] {
+function readClaim({
+  claim,
+  source,
+  feature,
+  violations,
+}: {
+  claim: ClaimCall;
+  source: ts.SourceFile;
+  feature: string;
+  violations: ArchitectureViolation[];
+}): Claim[] {
   const { call } = claim;
   const file = source.fileName;
   const line = source.getLineAndCharacterOfPosition(call.getStart(source)).line + 1;
@@ -342,7 +347,7 @@ function featureClaims(
     return [
       ...claimCalls(source, violations),
       ...nativeRepositoryClaims(source, violations),
-    ].flatMap((claim) => readClaim(claim, source, feature.id, violations));
+    ].flatMap((claim) => readClaim({ claim, source, feature: feature.id, violations }));
   });
 }
 

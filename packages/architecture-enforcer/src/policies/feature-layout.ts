@@ -478,13 +478,19 @@ function parseModule(file: string): ts.SourceFile {
  * actually declares it — through local declarations and
  * `import`/`export … from` chains — reporting if that file is private.
  */
-function resolveBindingOrigin(
-  file: string,
-  name: string,
-  pkg: ClassifiedPackage,
-  visited: Set<string>,
+function resolveBindingOrigin({
+  file,
+  name,
+  pkg,
+  visited,
   allowTestingDoubles = false,
-): boolean {
+}: {
+  file: string;
+  name: string;
+  pkg: ClassifiedPackage;
+  visited: Set<string>;
+  allowTestingDoubles?: boolean;
+}): boolean {
   const key = `${file}::${name}`;
   if (visited.has(key)) return false;
 
@@ -512,7 +518,10 @@ function resolveBindingOrigin(
     if (clause.name?.text === name) {
       const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
 
-      if (target && resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles))
+      if (
+        target &&
+        resolveBindingOrigin({ file: target, name: "default", pkg, visited, allowTestingDoubles })
+      )
         return true;
     }
 
@@ -523,7 +532,10 @@ function resolveBindingOrigin(
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         const imported = element.propertyName?.text ?? element.name.text;
 
-        if (target && resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles))
+        if (
+          target &&
+          resolveBindingOrigin({ file: target, name: imported, pkg, visited, allowTestingDoubles })
+        )
           return true;
       }
     }
@@ -543,12 +555,15 @@ function resolveBindingOrigin(
 
         const boundName = exportName(element);
 
-        if (resolveBindingOrigin(target, boundName, pkg, visited, allowTestingDoubles)) return true;
+        if (
+          resolveBindingOrigin({ file: target, name: boundName, pkg, visited, allowTestingDoubles })
+        )
+          return true;
       }
       // `export * from "./elsewhere"` may forward the name; best-effort probe.
     } else if (
       !statement.exportClause &&
-      resolveBindingOrigin(target, name, pkg, visited, allowTestingDoubles)
+      resolveBindingOrigin({ file: target, name, pkg, visited, allowTestingDoubles })
     ) {
       return true;
     }
@@ -576,7 +591,13 @@ function privateNamedExports({
   return clause.elements.filter(
     (element) =>
       !element.isTypeOnly &&
-      resolveBindingOrigin(origin, exportName(element), pkg, new Set(), allowTestingDoubles),
+      resolveBindingOrigin({
+        file: origin,
+        name: exportName(element),
+        pkg,
+        visited: new Set(),
+        allowTestingDoubles,
+      }),
   );
 }
 
@@ -609,7 +630,7 @@ function statementExposesPrivateValue({
     if (!target) return false;
 
     if (!clause || ts.isNamespaceExport(clause)) {
-      return fileExposesPrivateValue(target, pkg, visited, allowTestingDoubles);
+      return fileExposesPrivateValue({ file: target, pkg, visited, allowTestingDoubles });
     }
 
     return (
@@ -625,12 +646,17 @@ function statementExposesPrivateValue({
   );
 }
 
-function fileExposesPrivateValue(
-  file: string,
-  pkg: ClassifiedPackage,
-  visited: Set<string>,
+function fileExposesPrivateValue({
+  file,
+  pkg,
+  visited,
   allowTestingDoubles = false,
-): boolean {
+}: {
+  file: string;
+  pkg: ClassifiedPackage;
+  visited: Set<string>;
+  allowTestingDoubles?: boolean;
+}): boolean {
   if (visited.has(file)) return false;
 
   visited.add(file);
@@ -696,7 +722,9 @@ function lintPrivateServerExportsForEntry(
       if (!target) continue;
 
       if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
-        if (fileExposesPrivateValue(target, pkg, new Set(), allowTestingDoubles)) {
+        if (
+          fileExposesPrivateValue({ file: target, pkg, visited: new Set(), allowTestingDoubles })
+        ) {
           add(statement, specifierText);
         }
       } else if (ts.isNamedExports(statement.exportClause)) {
