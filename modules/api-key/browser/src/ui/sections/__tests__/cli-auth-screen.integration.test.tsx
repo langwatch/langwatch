@@ -158,12 +158,18 @@ describe("given an organization admin", () => {
   });
 
   describe("when the approval goes out", () => {
-    /** @scenario org admin defaults to organization scope */
-    it("carries an organization binding rather than a list of teams", async () => {
-      const user = userEvent.setup();
-      const host = hostFor();
+    let user: ReturnType<typeof userEvent.setup>;
+    let host: FakeApiKeyHost;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      host = hostFor();
       renderWithApiKeyHost(<CliAuthScreen />, host);
       await confirmCode(user);
+    });
+
+    /** @scenario org admin defaults to organization scope */
+    it("carries an organization binding rather than a list of teams", async () => {
       await waitFor(() =>
         expect(screen.getByTestId("selected-scopes")).toHaveTextContent("ORGANIZATION:org-1"),
       );
@@ -179,10 +185,6 @@ describe("given an organization admin", () => {
 
     /** @scenario the organization-management permissions are off by default */
     it("sends a default list with nothing that manages the organization", async () => {
-      const user = userEvent.setup();
-      const host = hostFor();
-      renderWithApiKeyHost(<CliAuthScreen />, host);
-      await confirmCode(user);
       await user.click(await screen.findByRole("button", { name: "Approve" }));
       await waitFor(() => expect(host.approvals).toHaveLength(1));
       const permissions = host.approvals[0]!.keySelection!.permissions;
@@ -201,10 +203,6 @@ describe("given an organization admin", () => {
 
     /** @scenario approval with zero scopes selected is refused */
     it("disables approve when every scope is deselected, and sends nothing", async () => {
-      const user = userEvent.setup();
-      const host = hostFor();
-      renderWithApiKeyHost(<CliAuthScreen />, host);
-      await confirmCode(user);
       await user.click(await screen.findByTestId("clear-scopes"));
       await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled());
       expect(host.approvals).toEqual([]);
@@ -317,13 +315,19 @@ describe("given the CLI asked for a project API key", () => {
   };
 
   describe("when the organization has shared projects", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+    let host: FakeApiKeyHost;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      host = hostFor({ lookup: projectLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+    });
+
     /** @scenario a user with shared projects sees personal as an explicit entry, not an implication */
     /** @scenario approving with the personal project selected returns the personal project key */
     it("sends the project the reader picked and no key selection at all", async () => {
-      const user = userEvent.setup();
-      const host = hostFor({ lookup: projectLookup });
-      renderWithApiKeyHost(<CliAuthScreen />, host);
-      await confirmCode(user);
       await user.click(await screen.findByTestId("pick-personal"));
       await user.click(screen.getByRole("button", { name: "Send API key" }));
       await waitFor(() => expect(host.approvals).toHaveLength(1));
@@ -335,10 +339,6 @@ describe("given the CLI asked for a project API key", () => {
 
     /** @scenario the no-shared-projects state offers a create-project action */
     it("offers Create project by address, naming the picked organization", async () => {
-      const user = userEvent.setup();
-      const host = hostFor({ lookup: projectLookup });
-      renderWithApiKeyHost(<CliAuthScreen />, host);
-      await confirmCode(user);
       await user.click(await screen.findByRole("button", { name: /Create project/ }));
       expect(host.drawerOpens).toEqual([
         { drawer: "createProject", params: { organizationId: "org-1" } },

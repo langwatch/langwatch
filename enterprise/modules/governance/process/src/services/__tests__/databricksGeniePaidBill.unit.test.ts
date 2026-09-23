@@ -26,6 +26,7 @@ import {
   databricksGeniePullConfigSchema,
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
+import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;
@@ -70,13 +71,14 @@ const FIRST_RUN_FLOOR_MS = Math.floor((Date.now() - 30 * ONE_DAY_MS) / ONE_DAY_M
 /** The same limit the warehouse read holds for. */
 const MAX_HOLD_MS = 7 * ONE_DAY_MS;
 
-const reply = (body: unknown, status = 200) =>
-  ({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? "" : "refused",
-    json: async () => body,
-  }) as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>;
+const reply = (body: unknown, status = 200): SsrfSafeResponse => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+  headers: { get: () => null },
+  body: null,
+  text: async () => JSON.stringify(body),
+});
 
 const WAREHOUSE_COST_COLUMNS = [
   "statement_id",

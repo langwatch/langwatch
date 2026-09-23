@@ -22,6 +22,7 @@ import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
+import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
@@ -32,13 +33,14 @@ const WAREHOUSE_ID = "095eb666b2ed2762";
 const STATEMENT_ID = "stmt-abc";
 const HOUR_MS = 60 * 60 * 1000;
 
-const reply = (body: unknown, status = 200) =>
-  ({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? "" : "refused",
-    json: async () => body,
-  }) as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>;
+const reply = (body: unknown, status = 200): SsrfSafeResponse => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+  headers: { get: () => null },
+  body: null,
+  text: async () => JSON.stringify(body),
+});
 
 const WAREHOUSE_COST_COLUMNS = [
   "statement_id",

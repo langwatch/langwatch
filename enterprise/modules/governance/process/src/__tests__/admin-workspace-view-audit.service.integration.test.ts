@@ -1,6 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
@@ -35,9 +36,17 @@ class SpyOcsf implements AdminWorkspaceViewOcsfChannel {
   }
 }
 
-const projects = {
-  ensureInternal: async () => ({ id: GOV_PROJECT_ID }),
-} as unknown as ProjectApi;
+const projects = createApiFixture<ProjectApi>({
+  ensureInternal: async () => ({
+    id: GOV_PROJECT_ID,
+    name: "Governance",
+    slug: "governance",
+    teamId: PERSONAL_TEAM_ID,
+    kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+    archivedAtMs: null,
+    traceSharingEnabled: false,
+  }),
+});
 
 describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
   const service = () =>

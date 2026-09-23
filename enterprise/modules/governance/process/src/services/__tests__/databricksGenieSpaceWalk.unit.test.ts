@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import { DatabricksGeniePullerAdapter } from "../databricks-genie-puller.service.ts";
+import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
@@ -41,13 +42,14 @@ function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAd
 
 const workspaceUrl = "https://adb-1.azuredatabricks.net";
 
-const reply = (body: unknown) =>
-  ({
-    ok: true,
-    status: 200,
-    statusText: "",
-    json: async () => body,
-  }) as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>;
+const reply = (body: unknown): SsrfSafeResponse => ({
+  ok: true,
+  status: 200,
+  json: async () => body,
+  headers: { get: () => null },
+  body: null,
+  text: async () => JSON.stringify(body),
+});
 
 const config = {
   adapter: "databricks_genie" as const,

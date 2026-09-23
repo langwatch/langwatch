@@ -31,6 +31,7 @@ import {
   genieSpacesAsAgents,
   listGenieAgents as listGenieAgentsWithHttp,
 } from "../genie-spaces.service.ts";
+import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: vi.fn(),
@@ -55,13 +56,14 @@ function listGenieAgents(input: Omit<Parameters<typeof listGenieAgentsWithHttp>[
   return listGenieAgentsWithHttp({ ...input, http: genieHttp });
 }
 
-const reply = (params: { ok: boolean; status: number; body?: unknown }) =>
-  ({
-    ok: params.ok,
-    status: params.status,
-    statusText: "",
-    json: async () => params.body ?? {},
-  }) as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>;
+const reply = (params: { ok: boolean; status: number; body?: unknown }): SsrfSafeResponse => ({
+  ok: params.ok,
+  status: params.status,
+  json: async () => params.body ?? {},
+  headers: { get: () => null },
+  body: null,
+  text: async () => JSON.stringify(params.body ?? {}),
+});
 
 const environmentUrl = "https://org1.crm.dynamics.com";
 const workspaceUrl = "https://adb-1.azuredatabricks.net";

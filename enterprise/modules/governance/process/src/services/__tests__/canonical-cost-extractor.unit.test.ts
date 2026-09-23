@@ -35,34 +35,20 @@ function buildRequest(input: {
   return {
     resourceLogs: [
       {
-        resource: {
-          attributes: input.resourceAttrs ?? [],
-          droppedAttributesCount: 0,
-        },
+        resource: { attributes: input.resourceAttrs ?? [] },
         scopeLogs: [
           {
-            scope: { name: "test-scope", version: "1" },
             logRecords: [
               {
                 timeUnixNano: input.timeUnixNano ?? "1714978800000000000",
-                observedTimeUnixNano: input.timeUnixNano ?? "1714978800000000000",
-                severityNumber: 9,
-                severityText: "INFO",
-                body: { stringValue: "" },
                 attributes: input.recordAttrs,
-                droppedAttributesCount: 0,
-                traceId: new Uint8Array(0),
-                spanId: new Uint8Array(0),
-                flags: 0,
-              } as never,
+              },
             ],
-            schemaUrl: "",
           },
         ],
-        schemaUrl: "",
       },
     ],
-  } as unknown as IExportLogsServiceRequest;
+  };
 }
 
 describe("extractCanonicalCostEvents", () => {
@@ -160,8 +146,8 @@ describe("extractCanonicalCostEvents", () => {
           recordAttrs: [
             dblKv("langwatch.cost.usd", 0.05),
             strKv("langwatch.request_id", "req_str_int"),
-            intKv("langwatch.input_tokens", "1234" as unknown as number),
-            intKv("langwatch.output_tokens", "567" as unknown as number),
+            intKv("langwatch.input_tokens", "1234"),
+            intKv("langwatch.output_tokens", "567"),
           ],
         }),
       );
@@ -227,52 +213,30 @@ describe("extractCanonicalCostEvents", () => {
       const req: IExportLogsServiceRequest = {
         resourceLogs: [
           {
-            resource: {
-              attributes: [strKv("service.name", "claude-code")],
-              droppedAttributesCount: 0,
-            },
+            resource: { attributes: [strKv("service.name", "claude-code")] },
             scopeLogs: [
               {
-                scope: { name: "test", version: "1" },
                 logRecords: [
                   {
                     timeUnixNano: "1",
-                    observedTimeUnixNano: "1",
-                    severityNumber: 9,
-                    severityText: "INFO",
-                    body: { stringValue: "" },
                     attributes: [
                       dblKv("langwatch.cost.usd", 0.01),
                       strKv("langwatch.request_id", "req_a"),
                     ],
-                    droppedAttributesCount: 0,
-                    traceId: new Uint8Array(0),
-                    spanId: new Uint8Array(0),
-                    flags: 0,
-                  } as never,
+                  },
                   {
                     timeUnixNano: "2",
-                    observedTimeUnixNano: "2",
-                    severityNumber: 9,
-                    severityText: "INFO",
-                    body: { stringValue: "" },
                     attributes: [
                       dblKv("langwatch.cost.usd", 0.02),
                       strKv("langwatch.request_id", "req_b"),
                     ],
-                    droppedAttributesCount: 0,
-                    traceId: new Uint8Array(0),
-                    spanId: new Uint8Array(0),
-                    flags: 0,
-                  } as never,
+                  },
                 ],
-                schemaUrl: "",
               },
             ],
-            schemaUrl: "",
           },
         ],
-      } as unknown as IExportLogsServiceRequest;
+      };
       const events = extractor.extract(req);
       expect(events.map((e) => e.requestId)).toEqual(["req_a", "req_b"]);
     });

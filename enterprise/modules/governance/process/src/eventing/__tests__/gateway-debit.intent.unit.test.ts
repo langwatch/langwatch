@@ -4,7 +4,7 @@
  * about which BUDGET_UPDATED change events reach the feed rather than about
  * ClickHouse or Postgres.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { GatewayBudgetLedger, GatewayResolvedBudget } from "../../app/governance.members.ts";
 import { GatewayDebitIntent, writeGatewayDebitsSchema } from "../gateway-debit.intent.ts";
@@ -55,23 +55,25 @@ function harness({
   shouldEmit,
 }: {
   budgets: GatewayResolvedBudget[];
-  shouldEmit?: ReturnType<typeof vi.fn>;
+  shouldEmit?: Mock<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>;
 }) {
   const emitBudgetUpdated = vi.fn().mockResolvedValue(undefined);
   const insert = vi.fn().mockResolvedValue(undefined);
-  const port = {
+  const shouldEmitBudgetUpdated =
+    shouldEmit ?? vi.fn<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>().mockResolvedValue(true);
+  const port: GatewayBudgetLedger = {
     resolve: vi.fn().mockResolvedValue(budgets),
     insert,
     detectCrossings: vi.fn().mockResolvedValue(undefined),
-    shouldEmitBudgetUpdated: shouldEmit ?? vi.fn().mockResolvedValue(true),
+    shouldEmitBudgetUpdated,
     emitBudgetUpdated,
-  } as unknown as GatewayBudgetLedger;
+  };
 
   return {
     intent: GatewayDebitIntent.create(port),
     emitBudgetUpdated,
     insert,
-    shouldEmit: port.shouldEmitBudgetUpdated,
+    shouldEmit: shouldEmitBudgetUpdated,
   };
 }
 
@@ -80,7 +82,9 @@ describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
     describe("when a debit lands inside an already-claimed window", () => {
       /** @scenario "A blocking budget's spend update is never held back" */
       it("emits anyway, because an enforcement decision is never held back", async () => {
-        const shouldEmit = vi.fn().mockResolvedValue(false);
+        const shouldEmit = vi
+          .fn<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>()
+          .mockResolvedValue(false);
         const { intent, emitBudgetUpdated } = harness({
           budgets: [budget("BLOCK")],
           shouldEmit,
@@ -99,7 +103,9 @@ describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
     describe("when one blocking budget sits among warn-only ones", () => {
       /** @scenario "A blocking budget's spend update is never held back" */
       it("emits for the whole set", async () => {
-        const shouldEmit = vi.fn().mockResolvedValue(false);
+        const shouldEmit = vi
+          .fn<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>()
+          .mockResolvedValue(false);
         const { intent, emitBudgetUpdated } = harness({
           budgets: [budget("WARN", "b-warn"), budget("BLOCK", "b-block")],
           shouldEmit,
@@ -117,7 +123,9 @@ describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
     describe("when the window is already claimed", () => {
       /** @scenario "Repeat updates for a warn-only budget collapse into one" */
       it("suppresses the redundant emission", async () => {
-        const shouldEmit = vi.fn().mockResolvedValue(false);
+        const shouldEmit = vi
+          .fn<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>()
+          .mockResolvedValue(false);
         const {
           intent,
           emitBudgetUpdated,
@@ -135,7 +143,9 @@ describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
 
       /** @scenario "Repeat updates for a warn-only budget collapse into one" */
       it("still writes the debit rows, so only the invalidation is deduped", async () => {
-        const shouldEmit = vi.fn().mockResolvedValue(false);
+        const shouldEmit = vi
+          .fn<GatewayBudgetLedger["shouldEmitBudgetUpdated"]>()
+          .mockResolvedValue(false);
         const { intent, insert } = harness({
           budgets: [budget("WARN")],
           shouldEmit,

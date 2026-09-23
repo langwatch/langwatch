@@ -1,7 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationHasNoTeamError,
-  type OrganizationApi,
   OrganizationService as OrganizationServiceContract,
+  type OrganizationApi,
   type AddOrganizationTeamMemberInput,
   type CreateOrganizationTeamInput,
   type OrganizationBillingProfile,
@@ -351,7 +352,11 @@ const createService = (
   ProjectService.create({
     repository,
     credentials: new FixedCredentials(),
-    organizations: organizations as unknown as OrganizationApi,
+    organizations: createApiFixture<OrganizationApi>({
+      getOldestTeamId: () => organizations.getOldestTeamId(),
+      createTeam: (input) => organizations.createTeam(input),
+      addTeamMember: (input) => organizations.addTeamMember(input),
+    }),
   });
 
 describe("ProjectService", () => {

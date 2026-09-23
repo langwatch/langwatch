@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The personal-workspace mint: one key per device, capped per tool.
@@ -120,9 +121,18 @@ function serviceOver(ledger: KeyLedger) {
   return IngestionKeyService.create({
     repository: new LedgerRepository(ledger),
     issuer: new LedgerIssuer(ledger),
-    organizations: {
-      tryFindPersonalWorkspace: async () => ({ project: { id: PROJECT_ID } }),
-    } as unknown as OrganizationService,
+    organizations: createApiFixture<OrganizationService>({
+      tryFindPersonalWorkspace: async () => ({
+        team: { id: "team-personal", name: "Personal", slug: "personal", createdAtMs: 0 },
+        project: {
+          id: PROJECT_ID,
+          name: "Personal",
+          slug: "personal",
+          apiKey: "personal-api-key",
+          createdAtMs: 0,
+        },
+      }),
+    }),
   });
 }
 
