@@ -105,6 +105,25 @@ export class CodingAgentSessionSpanProjection {
     return detectCodingAgent({ recordName: name, scopeName }) !== "unknown";
   }
 
+  private applySubagentSpawn(
+    state: CodingAgentSessionData,
+    attrs: SpanFactsView["attrs"],
+  ): CodingAgentSessionData {
+    const next = this.stateProjection.withIdentity(state, attrs);
+    const agentType =
+      this.stateProjection.string(attrs.agent_type) ??
+      this.stateProjection.string(attrs.subagent_type);
+    const agentId = this.stateProjection.string(attrs.agent_id);
+    return {
+      ...next,
+      ...(agentId !== null ? this.stateProjection.recordSubAgent(next, agentId) : {}),
+      subAgentTypes:
+        agentType !== null
+          ? this.stateProjection.addToBoundedSet(next.subAgentTypes, agentType)
+          : next.subAgentTypes,
+    };
+  }
+
   applySpanToCodingAgentSession({
     state,
     span,
@@ -159,21 +178,7 @@ export class CodingAgentSessionSpanProjection {
       });
     }
 
-    if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
-      const next = this.stateProjection.withIdentity(state, attrs);
-      const agentType =
-        this.stateProjection.string(attrs.agent_type) ??
-        this.stateProjection.string(attrs.subagent_type);
-      const agentId = this.stateProjection.string(attrs.agent_id);
-      return {
-        ...next,
-        ...(agentId !== null ? this.stateProjection.recordSubAgent(next, agentId) : {}),
-        subAgentTypes:
-          agentType !== null
-            ? this.stateProjection.addToBoundedSet(next.subAgentTypes, agentType)
-            : next.subAgentTypes,
-      };
-    }
+    if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) return this.applySubagentSpawn(state, attrs);
 
     // The time a HUMAN sat waiting to approve a tool. Pure friction: the agent was
     // idle and so was the person. Nothing else in the telemetry surfaces it.

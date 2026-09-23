@@ -10,7 +10,7 @@ import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePrompts } from "../../../../behavior/use-prompts.ts";
 import { useRenamePromptHandle } from "../../../../behavior/use-rename-prompt-handle.ts";
-import { usePromptHost } from "../../../../model/prompt-host.ts";
+import { type PromptHostApi, usePromptHost } from "../../../../model/prompt-host.ts";
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { getDisplayHandle } from "../../../../prompt-reference.ts";
@@ -22,6 +22,19 @@ interface PublishedPromptActionsProps {
   promptId: string;
   promptHandle: string | null;
   prompt?: WireVersionedPrompt | null;
+}
+
+function reportUnlessGlobal({
+  host,
+  error,
+  fallbackTitle,
+}: {
+  host: PromptHostApi;
+  error: unknown;
+  fallbackTitle: string;
+}): void {
+  if (host.isReportedGlobally(error)) return;
+  host.failed({ error, fallbackTitle });
 }
 
 /**
@@ -74,8 +87,8 @@ export function PublishedPromptActions({
         description: `Prompt "${getDisplayHandle(promptHandle)}" has been updated from source.`,
       });
     } catch (error) {
-      if (host.isReportedGlobally(error)) return;
-      host.failed({
+      reportUnlessGlobal({
+        host,
         error,
         fallbackTitle: "Couldn't update the prompt from its source",
       });
@@ -100,8 +113,7 @@ export function PublishedPromptActions({
     } catch (error) {
       // The application shows a plan-limit refusal as its own modal; asking
       // first is what keeps a reader from being told the same thing twice.
-      if (host.isReportedGlobally(error)) return;
-      host.failed({ error, fallbackTitle: "Couldn't duplicate the prompt" });
+      reportUnlessGlobal({ host, error, fallbackTitle: "Couldn't duplicate the prompt" });
     }
   }, [duplicatePrompt, project, utils, promptId, promptHandle, host]);
 
@@ -134,8 +146,7 @@ export function PublishedPromptActions({
         description: `"${getDisplayHandle(promptHandle)}" has been deleted`,
       });
     } catch (error) {
-      if (host.isReportedGlobally(error)) return;
-      host.failed({ error, fallbackTitle: "Couldn't delete the prompt" });
+      reportUnlessGlobal({ host, error, fallbackTitle: "Couldn't delete the prompt" });
     } finally {
       setIsDeleteDialogOpen(false);
     }

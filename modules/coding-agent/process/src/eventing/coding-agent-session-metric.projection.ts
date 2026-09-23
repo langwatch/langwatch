@@ -8,6 +8,19 @@ import {
 
 const MAX_METRIC_SERIES = 200;
 
+type MetricOverlayTotals = Pick<
+  CodingAgentSessionData,
+  | "linesAdded"
+  | "linesRemoved"
+  | "commits"
+  | "pullRequests"
+  | "editsAccepted"
+  | "editsRejected"
+  | "activeTimeUserSec"
+  | "activeTimeCliSec"
+  | "languagesEdited"
+>;
+
 export interface MetricFactsView {
   seriesId: string;
   metricName: string;
@@ -63,55 +76,64 @@ export class CodingAgentSessionMetricProjection {
   }
 
   private recomputeMetricOverlay(state: CodingAgentSessionData): CodingAgentSessionData {
-    let linesAdded = 0;
-    let linesRemoved = 0;
-    let commits = 0;
-    let pullRequests = 0;
-    let editsAccepted = 0;
-    let editsRejected = 0;
-    let activeTimeUserSec = 0;
-    let activeTimeCliSec = 0;
-    let languagesEdited: string[] = [];
+    const totals: MetricOverlayTotals = {
+      linesAdded: 0,
+      linesRemoved: 0,
+      commits: 0,
+      pullRequests: 0,
+      editsAccepted: 0,
+      editsRejected: 0,
+      activeTimeUserSec: 0,
+      activeTimeCliSec: 0,
+      languagesEdited: [],
+    };
 
     for (const fact of Object.values(state.metricSeries)) {
-      switch (normalizeMetricName(fact.metricName)) {
-        case "lines_of_code":
-          if (fact.type === "added") linesAdded += fact.value;
-          if (fact.type === "removed") linesRemoved += fact.value;
-          break;
-        case "commit":
-          commits += fact.value;
-          break;
-        case "pull_request":
-          pullRequests += fact.value;
-          break;
-        case "edit_decision":
-          if (fact.decision === "accept") editsAccepted += fact.value;
-          else editsRejected += fact.value;
-          if (fact.language !== null && fact.language !== "unknown") {
-            languagesEdited = this.stateProjection.addToBoundedSet(languagesEdited, fact.language);
-          }
-          break;
-        case "active_time":
-          if (fact.type === "user") activeTimeUserSec += fact.value;
-          if (fact.type === "cli") activeTimeCliSec += fact.value;
-          break;
-        default:
-          break;
-      }
+      this.accumulateMetricFact(totals, fact);
     }
 
     return {
       ...state,
-      linesAdded,
-      linesRemoved,
-      commits: Math.round(commits),
-      pullRequests: Math.round(pullRequests),
-      editsAccepted: Math.round(editsAccepted),
-      editsRejected: Math.round(editsRejected),
-      activeTimeUserSec,
-      activeTimeCliSec,
-      languagesEdited,
+      linesAdded: totals.linesAdded,
+      linesRemoved: totals.linesRemoved,
+      commits: Math.round(totals.commits),
+      pullRequests: Math.round(totals.pullRequests),
+      editsAccepted: Math.round(totals.editsAccepted),
+      editsRejected: Math.round(totals.editsRejected),
+      activeTimeUserSec: totals.activeTimeUserSec,
+      activeTimeCliSec: totals.activeTimeCliSec,
+      languagesEdited: totals.languagesEdited,
     };
+  }
+
+  private accumulateMetricFact(totals: MetricOverlayTotals, fact: MetricSeriesFact): void {
+    switch (normalizeMetricName(fact.metricName)) {
+      case "lines_of_code":
+        if (fact.type === "added") totals.linesAdded += fact.value;
+        if (fact.type === "removed") totals.linesRemoved += fact.value;
+        break;
+      case "commit":
+        totals.commits += fact.value;
+        break;
+      case "pull_request":
+        totals.pullRequests += fact.value;
+        break;
+      case "edit_decision":
+        if (fact.decision === "accept") totals.editsAccepted += fact.value;
+        else totals.editsRejected += fact.value;
+        if (fact.language !== null && fact.language !== "unknown") {
+          totals.languagesEdited = this.stateProjection.addToBoundedSet(
+            totals.languagesEdited,
+            fact.language,
+          );
+        }
+        break;
+      case "active_time":
+        if (fact.type === "user") totals.activeTimeUserSec += fact.value;
+        if (fact.type === "cli") totals.activeTimeCliSec += fact.value;
+        break;
+      default:
+        break;
+    }
   }
 }
