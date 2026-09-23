@@ -110,7 +110,7 @@ interface CommandRegistryEntry<EventType extends Event> {
  */
 function resolveCommandDomainKey<EventType extends Event>(
   cmdEntry: CommandRegistryEntry<EventType>,
-  payload: any,
+  payload: Record<string, unknown>,
 ): string {
   if (cmdEntry.options.serializeByAggregate) return cmdEntry.getAggregateId(payload);
   if (cmdEntry.getGroupKey) return cmdEntry.getGroupKey(payload);
@@ -120,7 +120,7 @@ function resolveCommandDomainKey<EventType extends Event>(
 /** Throws a `ValidationError` if `payload` fails the command's schema. */
 function validateCommandPayload<EventType extends Event>(
   cmdEntry: CommandRegistryEntry<EventType>,
-  payload: any,
+  payload: Record<string, unknown>,
 ): void {
   const validation = cmdEntry.schema.validate(payload);
   if (validation.success) return;
@@ -143,18 +143,24 @@ function buildValidatingCommandFacade<EventType extends Event>(
   registerPreflight: (
     identities: readonly { tenantId: string; aggregateId: string }[],
   ) => Promise<void>,
-): EventSourcedQueueProcessor<any> {
-  const identityOf = (payload: any) => ({
+): EventSourcedQueueProcessor<Record<string, unknown>> {
+  const identityOf = (payload: Record<string, unknown>) => ({
     tenantId: String(payload.tenantId),
     aggregateId: String(cmdEntry.getAggregateId(payload)),
   });
   return {
-    send: async (payload: any, options?: QueueSendOptions<any>) => {
+    send: async (
+      payload: Record<string, unknown>,
+      options?: QueueSendOptions<Record<string, unknown>>,
+    ) => {
       validateCommandPayload(cmdEntry, payload);
       await registerPreflight([identityOf(payload)]);
       return baseFacade.send(payload, options);
     },
-    sendBatch: async (payloads: any[], options?: QueueSendOptions<any>) => {
+    sendBatch: async (
+      payloads: Record<string, unknown>[],
+      options?: QueueSendOptions<Record<string, unknown>>,
+    ) => {
       for (const payload of payloads) validateCommandPayload(cmdEntry, payload);
       await registerPreflight(payloads.map(identityOf));
       return baseFacade.sendBatch(payloads, options);
@@ -227,16 +233,16 @@ export class QueueManager<EventType extends Event = Event> {
    * jobPath reflects pipeline topology; domainKey defaults to
    * `${aggregateType}:${aggregateId}`, overridable via a custom fn.
    */
-  private buildGroupKey({
+  private buildGroupKey<Payload>({
     jobPath,
     getTenantId,
     domainKeyFn,
   }: {
     jobPath: string;
-    getTenantId: (payload: any) => string;
-    domainKeyFn: (payload: any) => string;
-  }): (payload: any) => string {
-    return (payload: any) => `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
+    getTenantId: (payload: Payload) => string;
+    domainKeyFn: (payload: Payload) => string;
+  }): (payload: Payload) => string {
+    return (payload: Payload) => `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
   }
 
   /** The same key `buildGroupKey` produces, from an identity instead of a payload. */
@@ -312,21 +318,22 @@ export class QueueManager<EventType extends Event = Event> {
     const globalQueue = this.globalQueue;
     const pipelineName = this.pipelineName;
 
-    const stripInternal = (payload: any) => {
+    const stripInternal = (payload: Record<string, unknown>) => {
       const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
       return clean;
     };
 
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespaceDedup = (dedup: DeduplicationConfig<any>): DeduplicationConfig<any> => ({
+    const namespaceDedup = (
+      dedup: DeduplicationConfig<any>,
+    ): DeduplicationConfig<Record<string, unknown>> => ({
       ...dedup,
-      makeId: (payload: any) =>
+      makeId: (payload: Record<string, unknown>) =>
         `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
     });
 
-    const namespacedEntryDedup: DeduplicationConfig<any> | undefined = entry.deduplication
-      ? namespaceDedup(entry.deduplication)
-      : undefined;
+    const namespacedEntryDedup: DeduplicationConfig<Record<string, unknown>> | undefined =
+      entry.deduplication ? namespaceDedup(entry.deduplication) : undefined;
 
     const facade: EventSourcedQueueProcessor<P> = {
       send: async (payload: P, options?: QueueSendOptions<P>) => {
@@ -448,13 +455,13 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
-      const getTenantId = (event: any) => String(event.tenantId);
+      const getTenantId = (event: EventType) => String(event.tenantId);
       const groupKeyFn = this.buildGroupKey({
         jobPath: `${jobPath}/${handlerName}`,
         getTenantId,
         domainKeyFn: customGroupKeyFn
-          ? (event: any) => customGroupKeyFn(event)
-          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+          ? (event: EventType) => customGroupKeyFn(event)
+          : (event: EventType) => `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
@@ -463,7 +470,7 @@ export class QueueManager<EventType extends Event = Event> {
           ? undefined
           : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
         scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
-        process: async (event: any) => {
+        process: async (event: EventType) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
           });
@@ -535,13 +542,13 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = projectionDef.groupKeyFn;
-      const getTenantId = (event: any) => String(event.tenantId);
+      const getTenantId = (event: EventType) => String(event.tenantId);
       const groupKeyFn = this.buildGroupKey({
         jobPath: `${lane.jobPath}/${projectionName}`,
         getTenantId,
         domainKeyFn: customGroupKeyFn
-          ? (event: any) => customGroupKeyFn(event)
-          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+          ? (event: EventType) => customGroupKeyFn(event)
+          : (event: EventType) => `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
@@ -551,7 +558,7 @@ export class QueueManager<EventType extends Event = Event> {
           ? undefined
           : this.buildPreflightGroupKey(`${lane.jobPath}/${projectionName}`),
         scoreFn: projectionDef.scoreFn ?? ((event: any) => event.occurredAt ?? event.createdAt),
-        process: async (event: any, delivery?: JobDelivery) => {
+        process: async (event: EventType, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
             deliveryAttempt: delivery?.attempt,
@@ -571,7 +578,7 @@ export class QueueManager<EventType extends Event = Event> {
               }
             : undefined,
         coalesceMaxBatch,
-        spanAttributes: (event: any) => ({
+        spanAttributes: (event: EventType) => ({
           "projection.name": projectionName,
           "event.type": event.type,
           "event.id": event.id,
@@ -699,7 +706,7 @@ export class QueueManager<EventType extends Event = Event> {
   ): JobRegistryEntry {
     const rawDedup = resolveDeduplicationStrategy(
       cmdEntry.options.deduplication as DeduplicationStrategy<any> | undefined,
-      (payload: any) => {
+      (payload: Record<string, unknown>) => {
         const key = cmdEntry.getGroupKey
           ? cmdEntry.getGroupKey(payload)
           : cmdEntry.getAggregateId(payload);
@@ -707,11 +714,11 @@ export class QueueManager<EventType extends Event = Event> {
       },
     );
 
-    const getTenantId = (payload: any) => String(payload.tenantId);
+    const getTenantId = (payload: Record<string, unknown>) => String(payload.tenantId);
     const commandGroupKeyFn = this.buildGroupKey({
       jobPath: cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
       getTenantId,
-      domainKeyFn: (payload: any) => {
+      domainKeyFn: (payload: Record<string, unknown>) => {
         const key = resolveCommandDomainKey(cmdEntry, payload);
         return `${this.aggregateType}:${String(key)}`;
       },
@@ -762,8 +769,8 @@ export class QueueManager<EventType extends Event = Event> {
           : undefined,
       scoreFn: cmdEntry.options.serializeByAggregate
         ? () => nowInstant().epochMilliseconds
-        : (payload: any) => occurredAtScore(payload),
-      process: async (payload: any) => {
+        : (payload: Record<string, unknown>) => occurredAtScore(payload),
+      process: async (payload: Record<string, unknown>) => {
         await processCommand({ ...commandProcessParams, payload });
       },
       // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
@@ -771,7 +778,7 @@ export class QueueManager<EventType extends Event = Event> {
       // GroupQueue only drains same-`__jobName` siblings, so every payload
       // here is this command type. Left undefined otherwise (per-job path).
       processBatch: coalescesAppends
-        ? async (payloads: any[]) => {
+        ? async (payloads: Record<string, unknown>[]) => {
             await processCommandBatch({
               ...commandProcessParams,
               payloads,
@@ -819,13 +826,15 @@ export class QueueManager<EventType extends Event = Event> {
 
     for (const [subscriberName, subscriberDef] of Object.entries(subscribers)) {
       const customGroupKeyFn = subscriberDef.groupKeyFn;
-      const getTenantId = (payload: any) => String(payload.event.tenantId);
+      const getTenantId = (payload: { event: EventType; foldState: unknown }) =>
+        String(payload.event.tenantId);
       const subscriberGroupKeyFn = this.buildGroupKey({
         jobPath: `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
         getTenantId,
         domainKeyFn: customGroupKeyFn
-          ? (payload: any) => customGroupKeyFn(payload)
-          : (payload: any) => `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+          ? (payload: { event: EventType; foldState: unknown }) => customGroupKeyFn(payload)
+          : (payload: { event: EventType; foldState: unknown }) =>
+              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: subscriberGroupKeyFn,
@@ -835,8 +844,8 @@ export class QueueManager<EventType extends Event = Event> {
           : this.buildPreflightGroupKey(
               `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
             ),
-        scoreFn: (payload: any) => payload.event.createdAt,
-        process: async (payload: any) => {
+        scoreFn: (payload: { event: EventType; foldState: unknown }) => payload.event.createdAt,
+        process: async (payload: { event: EventType; foldState: unknown }) => {
           await onEvent(subscriberName, payload, {
             tenantId: payload.event.tenantId,
           });
@@ -847,7 +856,7 @@ export class QueueManager<EventType extends Event = Event> {
               this.createDefaultDeduplicationId(payload.event),
             )
           : undefined,
-        spanAttributes: (payload: any) => ({
+        spanAttributes: (payload: { event: EventType; foldState: unknown }) => ({
           "reactor.name": subscriberName,
           "event.type": payload.event.type,
           "event.id": payload.event.id,
@@ -983,27 +992,27 @@ export class QueueManager<EventType extends Event = Event> {
       return null;
     }
 
-    const getTenantId = (payload: any) => String(payload.tenantId);
+    const getTenantId = (payload: P) => String(payload.tenantId);
     const entry: JobRegistryEntry = {
       groupKeyFn: groupKeyFn
         ? this.buildGroupKey({
             jobPath: `job/${name}`,
             getTenantId,
-            domainKeyFn: groupKeyFn as any,
+            domainKeyFn: groupKeyFn,
           })
-        : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
+        : (payload: P) => `${String(payload.tenantId)}/job/${name}`,
       getTenantId,
       preflightGroupKey: groupKeyFn ? undefined : ({ tenantId }) => `${tenantId}/job/${name}`,
-      scoreFn: scoreFn ? (scoreFn as any) : (payload: any) => occurredAtScore(payload),
-      process: process as any,
+      scoreFn: scoreFn ?? ((payload: P) => occurredAtScore(payload)),
+      process,
       delay,
       deduplication: deduplication
         ? resolveDeduplicationStrategy(
-            deduplication as any,
-            (payload: any) => `${String(payload.tenantId)}:${name}`,
+            deduplication,
+            (payload: P) => `${String(payload.tenantId)}:${name}`,
           )
         : undefined,
-      spanAttributes: spanAttributes as any,
+      spanAttributes,
     };
 
     const facade = this.createFacade<P>("job", name, entry);
