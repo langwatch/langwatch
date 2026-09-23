@@ -61,6 +61,7 @@ import {
   selfHostedPostgresReaderStatements,
 } from "./selfProvisioning";
 import { withLwqlSelfProvisionLock } from "./selfProvisionLock";
+import { assertLwqlSqlModeClusterSafe } from "./sqlModeClusterGuard";
 
 // Kept under the deploy task's logger name so operator alerting keyed on it is
 // unaffected by the move out of `tasks/provisionLwql.ts`.
@@ -237,6 +238,17 @@ async function convergeClickHouse({
   // collection. `sql` mode provisions the whole model as DDL (its cluster
   // safety is gated separately by the AC9 guard).
   const includeAccessStatements = lwqlAccessModelMode() === "sql";
+  if (includeAccessStatements) {
+    // AC9: refuse sql-mode DDL on a multi-host cluster with no replicated access
+    // storage — it would reach one host only. Throws (fail-closed) unless the
+    // operator has replicated storage or the single-node bypass set.
+    await assertLwqlSqlModeClusterSafe({
+      query: async (sql) =>
+        (await (
+          await client.query({ query: sql, format: "JSONEachRow" })
+        ).json()) as Record<string, string>[],
+    });
+  }
   const result = await runClickHouseStatements({
     client,
     configStoreEntities,
