@@ -60,6 +60,68 @@ const KIND_OPTIONS: {
   },
 ];
 
+type TargetOption = { id: string; name: string };
+
+function targetOptionsFor({
+  scopeKind,
+  groups,
+  teams,
+  projects,
+  members,
+  keys,
+}: {
+  scopeKind: Exclude<ScopeKind, "ORGANIZATION">;
+  groups: readonly { id: string; name: string; memberCount: number }[];
+  teams: TargetOption[];
+  projects: TargetOption[];
+  members: readonly { id: string; name?: string | null; email?: string | null }[];
+  keys: TargetOption[];
+}): TargetOption[] {
+  switch (scopeKind) {
+    case "GROUP":
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.memberCount === 1 ? `${g.name} (1 member)` : `${g.name} (${g.memberCount} members)`,
+      }));
+    case "TEAM":
+      return teams;
+    case "PROJECT":
+      return projects;
+    case "PRINCIPAL":
+      return members.map((m) => ({
+        id: m.id,
+        name: m.name ?? m.email ?? m.id,
+      }));
+    case "VIRTUAL_KEY":
+      return keys.map((k) => ({ id: k.id, name: k.name }));
+  }
+}
+
+function budgetScope({
+  scopeKind,
+  organizationId,
+  targetId,
+}: {
+  scopeKind: ScopeKind;
+  organizationId: string;
+  targetId: string;
+}) {
+  switch (scopeKind) {
+    case "ORGANIZATION":
+      return { kind: "ORGANIZATION" as const, organizationId };
+    case "GROUP":
+      return { kind: "GROUP" as const, groupId: targetId };
+    case "TEAM":
+      return { kind: "TEAM" as const, teamId: targetId };
+    case "PROJECT":
+      return { kind: "PROJECT" as const, projectId: targetId };
+    case "PRINCIPAL":
+      return { kind: "PRINCIPAL" as const, principalUserId: targetId };
+    case "VIRTUAL_KEY":
+      return { kind: "VIRTUAL_KEY" as const, virtualKeyId: targetId };
+  }
+}
+
 export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCreateDrawerProps) {
   const toaster = useGatewayToaster();
   const { project, team, organization } = useOrganizationTeamProject();
@@ -202,22 +264,14 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
   const targetOptions: { id: string; name: string }[] | null =
     scopeKind === "ORGANIZATION"
       ? null
-      : scopeKind === "GROUP"
-        ? (groupsQuery.data ?? []).map((g) => ({
-            id: g.id,
-            name:
-              g.memberCount === 1 ? `${g.name} (1 member)` : `${g.name} (${g.memberCount} members)`,
-          }))
-        : scopeKind === "TEAM"
-          ? teams
-          : scopeKind === "PROJECT"
-            ? projects
-            : scopeKind === "PRINCIPAL"
-              ? (membersQuery.data ?? []).map((m) => ({
-                  id: m.id,
-                  name: m.name ?? m.email ?? m.id,
-                }))
-              : activeKeys.map((k) => ({ id: k.id, name: k.name }));
+      : targetOptionsFor({
+          scopeKind,
+          groups: groupsQuery.data ?? [],
+          teams,
+          projects,
+          members: membersQuery.data ?? [],
+          keys: activeKeys,
+        });
 
   const targetsLoading =
     (scopeKind === "GROUP" && groupsQuery.isLoading) ||
@@ -244,18 +298,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
     }
     setSubmitError(null);
     try {
-      const scope =
-        scopeKind === "ORGANIZATION"
-          ? { kind: "ORGANIZATION" as const, organizationId: organization.id }
-          : scopeKind === "GROUP"
-            ? { kind: "GROUP" as const, groupId: targetId }
-            : scopeKind === "TEAM"
-              ? { kind: "TEAM" as const, teamId: targetId }
-              : scopeKind === "PROJECT"
-                ? { kind: "PROJECT" as const, projectId: targetId }
-                : scopeKind === "PRINCIPAL"
-                  ? { kind: "PRINCIPAL" as const, principalUserId: targetId }
-                  : { kind: "VIRTUAL_KEY" as const, virtualKeyId: targetId };
+      const scope = budgetScope({ scopeKind, organizationId: organization.id, targetId });
       await createMutation.mutateAsync({
         organizationId: organization.id,
         name,

@@ -194,13 +194,9 @@ function namedScopes({
       projectNames.set(project.id, project.name);
     }
   }
-  return scopes.map((scope) => ({
-    ...scope,
-    name:
-      scope.scopeType === "ORGANIZATION"
-        ? organization?.name
-        : scope.scopeType === "TEAM"
-          ? teamNames.get(scope.scopeId)
-          : projectNames.get(scope.scopeId),
-  }));
+  return scopes.map((scope) => {
+    if (scope.scopeType === "ORGANIZATION") return { ...scope, name: organization?.name };
+    if (scope.scopeType === "TEAM") return { ...scope, name: teamNames.get(scope.scopeId) };
+    return { ...scope, name: projectNames.get(scope.scopeId) };
+  });
 }

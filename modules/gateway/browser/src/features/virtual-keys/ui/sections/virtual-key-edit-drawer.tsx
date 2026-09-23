@@ -323,6 +323,7 @@ export function VirtualKeyEditDrawer({
     try {
       const access = providerAccessToConfig(providerAccess, eligible);
       const trimmedLimit = budget.limitUsd.trim();
+      const clearedBudget = hadManagedBudget ? null : undefined;
       await updateMutation.mutateAsync({
         organizationId,
         id: vk.id,
@@ -340,9 +341,7 @@ export function VirtualKeyEditDrawer({
               limitUsd: trimmedLimit,
               window: budget.window,
             }
-          : hadManagedBudget
-            ? null
-            : undefined,
+          : clearedBudget,
         config: {
           providersAllowed: access.providersAllowed,
           modelsAllowed: access.modelsAllowed,

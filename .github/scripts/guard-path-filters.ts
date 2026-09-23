@@ -267,8 +267,9 @@ const matches = (pattern: string, target: string): boolean => {
   if (pattern === target) return true;
   // `pkg/**` covers `pkg/anything`; the trailing `/` is kept out of the
   // prefix so it can never cover `pkgother/`.
-  if (pattern.endsWith("/**") && target.startsWith(pattern.slice(0, -2))) {
-    return true;
+  if (pattern.endsWith("/**")) {
+    const prefix = pattern.slice(0, -2);
+    if (target.startsWith(prefix)) return true;
   }
   return globToRegExp(pattern).test(target);
 };
