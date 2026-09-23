@@ -4,7 +4,7 @@ import type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
-} from "../../repositories/observe/event-explorer.repository.ts";
+} from "../event-explorer.repository.ts";
 
 /**
  * The read this repository issues, as it asks for it. Narrower than the driver

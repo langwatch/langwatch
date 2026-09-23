@@ -10,7 +10,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { BugReport } from "@langwatch/ops-contract";
+import { BugReportRateLimitedError, type BugReport } from "@langwatch/ops-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -23,7 +23,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
 import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
 import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
-import { BugReportRateLimitedError } from "../../services/bug-report-intake.service.ts";
 import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

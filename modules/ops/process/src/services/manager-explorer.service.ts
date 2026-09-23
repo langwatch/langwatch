@@ -15,8 +15,8 @@ import type {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
-import type { ProcessAuditRepository } from "../repositories/process/ops-audit.repository.ts";
-import type { ProcessOpsRepository } from "../repositories/process/process-ops.repository.ts";
+import type { ProcessAuditRepository } from "../repositories/ops-audit.repository.ts";
+import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
 
 /**
  * One global knob each: wake past due means the worker is starved/dead,

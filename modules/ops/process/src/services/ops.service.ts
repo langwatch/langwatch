@@ -36,7 +36,7 @@ import {
   type QueueSummaryInfo,
 } from "@langwatch/ops-contract";
 
-import type { AnomalyStateRepository } from "../repositories/observe/anomaly.repository.ts";
+import type { AnomalyStateRepository } from "../repositories/anomaly.repository.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
 import type { AdminBackofficeService } from "./admin-backoffice.service.ts";
 import type { BlobStoreService } from "./blob-store.service.ts";

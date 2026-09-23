@@ -4,13 +4,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { runUsageReport } from "../ops-usage-report.intent.ts";
+import { runUsageReport, USAGE_REPORT_PROCESS_NAME } from "../ops-usage-report.intent.ts";
 import { buildOpsUsageReportPipeline } from "../ops-usage-report.pipeline.ts";
-import {
-  USAGE_REPORT_PROCESS_NAME,
-  usageReportWake,
-  type UsageReportScheduleState,
-} from "../ops-usage-report.process.ts";
+import { usageReportWake, type UsageReportScheduleState } from "../ops-usage-report.process.ts";
 
 const at = (iso: string) => Date.parse(iso);
 

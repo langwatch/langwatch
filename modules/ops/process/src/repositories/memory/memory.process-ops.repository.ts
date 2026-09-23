@@ -8,7 +8,7 @@ import type {
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
 
-import { ProcessOpsRepository, type ProcessNameCounts } from "../process/process-ops.repository.ts";
+import { ProcessOpsRepository, type ProcessNameCounts } from "../process-ops.repository.ts";
 import type { MemoryOpsStore, MemoryOutboxRow } from "./memory.ops.store.ts";
 
 /** One redrive or discard sweep moves at most this many rows, as the stored one does. */

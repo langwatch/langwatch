@@ -9,7 +9,7 @@ import {
 } from "@langwatch/ops-contract";
 
 import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
-import { OpsSnapshotRepository } from "../observe/ops-snapshot.repository.ts";
+import { OpsSnapshotRepository } from "../ops-snapshot.repository.ts";
 
 /**
  * The `{snapshot}` hash tag is load-bearing: the fenced write below reads

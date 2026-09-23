@@ -2,7 +2,7 @@ import { generate } from "@langwatch/ksuid";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { SchedulerAuditRepository } from "../process/ops-audit.repository.ts";
+import { SchedulerAuditRepository } from "../ops-audit.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const SCHEDULER_AUDIT_KSUID_RESOURCE = "schedaudit";

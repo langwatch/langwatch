@@ -7,7 +7,7 @@ import type {
   OpsBlobSummary,
 } from "@langwatch/ops-contract";
 
-import type { BlobStoreRepository } from "../repositories/admin/blob-store.repository.ts";
+import type { BlobStoreRepository } from "../repositories/blob-store.repository.ts";
 
 const logger = createLogger("langwatch:ops:blob-store");
 

@@ -7,7 +7,10 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import {
+  migrateTestClickHouseOnce,
+  startTestClickHouseEndpoints,
+} from "@langwatch/test-harness/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseMigrateTask } from "../clickhouse-migrate.task.ts";
@@ -33,22 +36,14 @@ describe("given a ClickHouse database the migrations have run against", () => {
     await migrateTestClickHouseOnce({
       url: provisioned.url,
       migrate: async () => {
-        // CLICKHOUSE_CLUSTER switches every engine to its Replicated form,
-        // which needs a Keeper no test server has.
-        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-        delete process.env.CLICKHOUSE_CLUSTER;
-        try {
-          await ClickHouseMigrateTask.createFromConfig({
-            config: {
-              buildTime: false,
-              skipped: false,
-              sharedUrl: provisioned.url,
-              privateEndpoints: [],
-            },
-          }).execute();
-        } finally {
-          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-        }
+        await ClickHouseMigrateTask.createFromConfig({
+          config: {
+            buildTime: false,
+            skipped: false,
+            sharedUrl: provisioned.url,
+            privateEndpoints: [],
+          },
+        }).execute();
       },
     });
 

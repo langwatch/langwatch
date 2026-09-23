@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 
-import { USAGE_REPORT_PROCESS_NAME } from "./ops-usage-report.process.ts";
-
 const logger = createLogger("langwatch:workers:usageStatsWorker");
+
+export const USAGE_REPORT_PROCESS_NAME = "usageReport" as const;
 
 /** One outbox row per day of bookkeeping, pruned like every other recurring process's. */
 const REPORT_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

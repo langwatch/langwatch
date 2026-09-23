@@ -18,7 +18,7 @@ import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-
 import type {
   OpsExplainClientResolution,
   OpsExplainClients,
-} from "../repositories/observe/ops-explain.repository.ts";
+} from "../repositories/ops-explain.repository.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";

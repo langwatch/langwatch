@@ -8,14 +8,13 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { AdminAccessService } from "../admin-access.service.ts";
 import {
-  AdminAuditSink,
   ImpersonationRepository,
-  ImpersonationService,
   type ImpersonationTarget,
   type ImpersonationWindow,
-} from "../impersonation.service.ts";
+} from "../../repositories/impersonation.repository.ts";
+import { AdminAccessService } from "../admin-access.service.ts";
+import { AdminAuditSink, ImpersonationService } from "../impersonation.service.ts";
 
 class InMemoryImpersonationRepository extends ImpersonationRepository {
   window: ImpersonationWindow | null = null;

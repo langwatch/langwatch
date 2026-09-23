@@ -10,7 +10,7 @@ import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generate
 import { type Instant, toDate } from "@langwatch/time";
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
-import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
 import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
 import {
   type AdminDatabase,

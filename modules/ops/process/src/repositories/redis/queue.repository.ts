@@ -28,7 +28,7 @@ import type { ChainableCommander, Cluster } from "ioredis";
 
 import { type QueuePayloadDecoder } from "../../app/ops.app.ts";
 import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules.ts";
-import { QueueRepository } from "../process/queue.repository.ts";
+import { QueueRepository } from "../queue.repository.ts";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -36,7 +36,7 @@ import type {
   JobEntry,
   ParkedTenantsPage,
   ReconcileResult,
-} from "../process/queue.repository.ts";
+} from "../queue.repository.ts";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 

@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type { OpsSnapshotRepository } from "../repositories/observe/ops-snapshot.repository.ts";
+import type { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository.ts";
 
 const logger = createLogger("langwatch:ops:snapshot-reader");
 

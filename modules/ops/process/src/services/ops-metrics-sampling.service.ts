@@ -15,7 +15,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
+import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
 const logger = createLogger("langwatch:ops:metrics-sampling");

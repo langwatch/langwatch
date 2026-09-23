@@ -23,8 +23,8 @@ import type {
 import { nowInstant } from "@langwatch/time";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import { BlobStoreRepository } from "../admin/blob-store.repository.ts";
-import type { BlobDeleteResult } from "../admin/blob-store.repository.ts";
+import { BlobStoreRepository } from "../blob-store.repository.ts";
+import type { BlobDeleteResult } from "../blob-store.repository.ts";
 
 /** Dry-run eval, so the browser reports the same verdict the runner would act on. */
 const previewScript = new CachedLuaScript(BLOB_SWEEP_LUA);

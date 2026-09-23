@@ -218,20 +218,31 @@ function parseNonNegativeInt(value: string, label: string): number {
   return num;
 }
 
+const DEFAULT_HOT_DAYS_VARIABLE = "CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS";
+
+/** Every variable `resolveHotDays` reads: each table's own, then the global default. */
+export const HOT_DAYS_VARIABLES: readonly string[] = [
+  ...TABLE_TTL_CONFIG.map((entry) => entry.envVar),
+  DEFAULT_HOT_DAYS_VARIABLE,
+];
+
 /**
  * Resolves hot-storage days for a table: per-table env var, then the global
  * default env var (`CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`), then the
  * hardcoded default in `TABLE_TTL_CONFIG`.
  */
-export function resolveHotDays(config: TableTTLEntry): number {
-  const perTable = process.env[config.envVar];
+export function resolveHotDays(
+  config: TableTTLEntry,
+  overrides: Readonly<Record<string, string | undefined>> = {},
+): number {
+  const perTable = overrides[config.envVar];
   if (perTable !== undefined && perTable !== "") {
     return parseNonNegativeInt(perTable, config.envVar);
   }
 
-  const globalDefault = process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS;
+  const globalDefault = overrides[DEFAULT_HOT_DAYS_VARIABLE];
   if (globalDefault !== undefined && globalDefault !== "") {
-    return parseNonNegativeInt(globalDefault, "CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS");
+    return parseNonNegativeInt(globalDefault, DEFAULT_HOT_DAYS_VARIABLE);
   }
 
   return config.hardcodedDefault;
@@ -317,6 +328,11 @@ function isRetentionOnlyEligible(
 interface ReconcileOptions {
   connectionUrl?: string;
   database?: string;
+  clusterName?: string;
+  /** `CLICKHOUSE_COLD_STORAGE_ENABLED=true`: tiered tables get the cold-storage MOVE clause. */
+  coldStorageEnabled?: boolean;
+  /** The operator's hot-days overrides, keyed by the variables in `HOT_DAYS_VARIABLES`. */
+  hotDayOverrides?: Readonly<Record<string, string | undefined>>;
   verbose?: boolean;
 }
 
@@ -339,7 +355,7 @@ export const TIERED_STORAGE_POLICY = "local_primary";
  * differ, with `materialize_ttl_after_modify = 0` to keep it metadata-only.
  */
 export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void> {
-  const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
+  const connectionUrl = options.connectionUrl;
   if (!connectionUrl) {
     logger.info("CLICKHOUSE_URL not configured, skipping TTL reconciliation.");
     return;
@@ -350,9 +366,9 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
   // platform's retention enforcement and must run on every deployment, or
   // ingestion stamps `_retention_days` but nothing ever deletes. Gate the
   // tiered-storage rewrite on the env flag; let retention TTL always reconcile.
-  const coldStorageEnabled = process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
+  const coldStorageEnabled = options.coldStorageEnabled ?? false;
 
-  const config = parseConnectionUrl(connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
   const client = createClient({ url: config.databaseUrl });
 
   try {
@@ -418,7 +434,7 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
 
       const engineFull = tableInfo.engine_full;
 
-      const desiredDays = resolveHotDays(tableConfig);
+      const desiredDays = resolveHotDays(tableConfig, options.hotDayOverrides);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);

@@ -8,13 +8,13 @@ import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
-import { UNAVAILABLE_UI_SCOPE, UiScope, useUiScope, type UiActiveScope } from "./scope.ts";
+import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
 import type { UiFeatureApiTransport } from "./transport.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
-export { UiScope, UNAVAILABLE_UI_SCOPE, useUiScope, type UiActiveScope };
+export { UiScope, type UiActiveScope };
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -460,3 +460,20 @@ export type UiSessionSource = (input: {
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
 }) => UiSessionCapabilities;
+
+class UnavailableUiScope extends UiScope {
+  activeScope(): never {
+    throw new UiCapabilityUnavailableError("scope");
+  }
+}
+
+/** The default for a composition that named no scope source. Refuses by name. */
+export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
+
+/**
+ * Where this screen is standing. Mounted outside a shell it reads the refusing
+ * port, which names the missing capability rather than inventing a scope.
+ */
+export function useUiScope(): UiScope {
+  return useOptionalUiCapabilities()?.scope ?? UNAVAILABLE_UI_SCOPE;
+}

@@ -8,7 +8,7 @@ import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-c
 import type { UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
-import { AdminBackofficeRepository } from "../../../repositories/admin/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../../../repositories/admin-backoffice.repository.ts";
 import { AdminAuditSink } from "../../impersonation.service.ts";
 
 export const backofficeOperator: UserProfile = {
@@ -25,6 +25,12 @@ export const backofficeOperator: UserProfile = {
 };
 
 export class AuthStub implements BrowserSessionApi {
+  requestNewAccountVerification(): never {
+    throw new Error("unused");
+  }
+  sendMyAddressConfirmation(): never {
+    throw new Error("unused");
+  }
   findDialableIdentityProviderOrigins(): never {
     throw new Error("unused");
   }

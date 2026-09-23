@@ -4,7 +4,6 @@
  * Spec: specs/ui/api-boot-wait.feature
  */
 
-import type { UiSessionReading } from "@langwatch/auth-browser/session";
 import { useUiApiWait, UI_API_HEALTH_PATH } from "@langwatch/browser-host/navigation";
 import { hashKey, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
@@ -51,7 +50,7 @@ export function UiApiWaitingGate({
     [queryClient, sessionQueryKey],
   );
   const readReading = useCallback(
-    () => queryClient.getQueryData<UiSessionReading>(sessionQueryKey),
+    () => queryClient.getQueryData<Readonly<{ unreachable?: boolean }>>(sessionQueryKey),
     [queryClient, sessionQueryKey],
   );
   const reading = useSyncExternalStore(subscribe, readReading, readReading);

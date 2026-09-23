@@ -7,13 +7,13 @@
 import type { Anomaly } from "@langwatch/ops-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryAnomalyRateTrackerRepository } from "../memory/memory.anomaly-rate-tracker.repository.ts";
-import { MemoryAnomalyStateRepository } from "../memory/memory.anomaly-state.repository.ts";
-import { MemoryOpsStore } from "../memory/memory.ops.store.ts";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../observe/anomaly.repository.ts";
+} from "../anomaly.repository.ts";
+import { MemoryAnomalyRateTrackerRepository } from "../memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryAnomalyStateRepository } from "../memory/memory.anomaly-state.repository.ts";
+import { MemoryOpsStore } from "../memory/memory.ops.store.ts";
 
 const FIXED_NOW = 1_760_000_000_000;
 

@@ -1,11 +1,10 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { SubmitBugReport } from "@langwatch/ops-contract";
+import { BugReportRateLimitedError, type SubmitBugReport } from "@langwatch/ops-contract";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 
 import type { BugReportNotifier, BugReportRateLimiter } from "../app/ops.app.ts";
-import type { BugReportRepository } from "../repositories/admin/bug-report.repository.ts";
+import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");
 
@@ -14,15 +13,6 @@ const logger = createLogger("langwatch:bug-reports");
  * purpose: the reporter may be struggling because setup failed, so a report
  * must never require a working login. An API key only adds a project link.
  */
-
-export class BugReportRateLimitedError extends HandledError {
-  constructor() {
-    super("agent_report_rate_limited", "Too many reports, try again later", {
-      httpStatus: 429,
-      fault: "customer",
-    });
-  }
-}
 
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
 const RATE_LIMIT_MAX_PER_WINDOW = 10;

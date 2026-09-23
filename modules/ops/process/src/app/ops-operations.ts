@@ -6,7 +6,7 @@ import type { Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import { NullBlobStoreRepository } from "../repositories/admin/blob-store.repository.ts";
+import { NullBlobStoreRepository } from "../repositories/blob-store.repository.ts";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
 import { PrismaAdminUserMapper } from "../repositories/prisma/prisma.admin-user.mapper.ts";
 import {
@@ -19,11 +19,11 @@ import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
 } from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
-import { NullQueueRepository } from "../repositories/process/queue.repository.ts";
-import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
+import { NullQueueRepository } from "../repositories/queue.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
+import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
 import {
   type AdminAccess,
   AdminAccessService,

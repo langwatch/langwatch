@@ -14,7 +14,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
-import type { ReplayRepository } from "../repositories/process/replay.repository.ts";
+import type { ReplayRepository } from "../repositories/replay.repository.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 
 const logger = createLogger("langwatch:ops:replay-service");

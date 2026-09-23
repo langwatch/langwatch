@@ -15,30 +15,28 @@ import { TRPCError } from "@trpc/server";
 
 import type { RateLimiter } from "../ports.ts";
 import type { SessionCaller, SessionReader } from "../rest/credential.ts";
+import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
-  auditScopeIds,
+  createTrpcRuntimePolicy,
+  type TrpcAuthorizationDecisions,
+  type TrpcAuthorizationDenial,
+  type TrpcRequestLike,
+} from "./policy.ts";
+import {
   bindTrpcFact,
   browserSessionFact,
   callerAddressFact,
   createTrpcErrorFormatter,
   createTrpcRuntime,
-  createTrpcRuntimePolicy,
-  isAuditLogExempt,
-  redactAuditArgs,
-  trpcFailureTraceIds,
   TrpcRootDefinition,
-  type TrpcAuthorizationDecisions,
-  type TrpcAuthorizationDenial,
   type TrpcErrorCausePayload,
   type TrpcFactBinding,
   type TrpcMountOptions,
-  type TrpcRequestLike,
   type TrpcRoot,
   type TrpcRuntime,
   type TrpcRuntimeMembers,
-  type TrpcThrottle,
-  type TrpcThrottlePolicy,
-} from "./index.ts";
+} from "./runtime.ts";
+import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
 
 /** The signed-in person, as the procedures that render one read it. */
 export type TrpcSessionUser = Readonly<{

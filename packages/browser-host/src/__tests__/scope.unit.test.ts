@@ -4,8 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { UiCapabilityUnavailableError } from "../capabilities.ts";
-import { UiScope, UNAVAILABLE_UI_SCOPE } from "../scope.ts";
+import { UiCapabilityUnavailableError, UNAVAILABLE_UI_SCOPE } from "../capabilities.ts";
+import { UiScope } from "../scope.ts";
 
 class SomewhereScope extends UiScope {
   activeScope() {

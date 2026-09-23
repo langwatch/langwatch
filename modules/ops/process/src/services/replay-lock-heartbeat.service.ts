@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { ReplayRepository } from "../repositories/process/replay.repository.ts";
+import type { ReplayRepository } from "../repositories/replay.repository.ts";
 
 const logger = createLogger("langwatch:ops:replay-lock-heartbeat");
 

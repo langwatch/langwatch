@@ -1,6 +1,6 @@
 import type { ProcessStore } from "@langwatch/eventing";
 
-import type { BugReportRepository } from "./admin/bug-report.repository.ts";
+import type { BugReportRepository } from "./bug-report.repository.ts";
 
 /**
  * The rows this module owns in the platform's own database — the support

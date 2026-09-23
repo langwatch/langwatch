@@ -122,7 +122,10 @@ export interface OpsApi {
   getBlobStoreStats(): Promise<OpsBlobStoreStats>;
   listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
   findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
-  runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport>;
+  /** A real sweep destroys blobs, so it asks the operator's confirmation; a dry run does not. */
+  runBlobCleanup(
+    input: RunBlobCleanupInput & { operator: OpsOperator | null; confirm?: string | undefined },
+  ): Promise<BlobSweepReport>;
   deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
   listAnomalies(): Promise<Anomaly[]>;
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;

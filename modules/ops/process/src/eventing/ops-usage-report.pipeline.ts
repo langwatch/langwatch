@@ -11,8 +11,8 @@ import { nowInstant } from "@langwatch/time";
 
 import type { OpsApp } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
-import type { UsageReportRunDeps } from "./ops-usage-report.intent.ts";
-import { USAGE_REPORT_PROCESS_NAME, usageReportPM } from "./ops-usage-report.process.ts";
+import { USAGE_REPORT_PROCESS_NAME, type UsageReportRunDeps } from "./ops-usage-report.intent.ts";
+import { usageReportPM } from "./ops-usage-report.process.ts";
 
 export const USAGE_REPORT_PIPELINE_NAME = "ops_usage_report";
 

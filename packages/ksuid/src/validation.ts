@@ -1,5 +1,4 @@
 import { PREFIX_REGEX } from "./constants.ts";
-import { Instance } from "./instance.ts";
 
 /**
  * Error thrown when validation fails
@@ -88,18 +87,6 @@ export function checkClass<T>(
 ): asserts value is T {
   if (!(value instanceof classType)) {
     throw new ValidationError(`${field} must be an instance of ${classType.name}`);
-  }
-}
-
-/**
- * Validates that a value is an Instance object
- * @param field - The field name for error messages
- * @param value - The value to validate
- * @throws {ValidationError} If the value is not an Instance
- */
-export function checkInstance(field: string, value: unknown): asserts value is Instance {
-  if (!(value instanceof Instance)) {
-    throw new ValidationError(`${field} must be an instance of Instance`);
   }
 }
 

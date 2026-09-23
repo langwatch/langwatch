@@ -1,4 +1,4 @@
-import { checkUint, checkUint8Array } from "./validation.ts";
+import { checkUint, checkUint8Array, ValidationError } from "./validation.ts";
 
 /**
  * Instance scheme identifiers for different types of instance detection
@@ -106,5 +106,17 @@ export class Instance {
       this._scheme === other._scheme &&
       this._identifier.every((byte, i) => byte === other._identifier[i])
     );
+  }
+}
+
+/**
+ * Validates that a value is an Instance object
+ * @param field - The field name for error messages
+ * @param value - The value to validate
+ * @throws {ValidationError} If the value is not an Instance
+ */
+export function checkInstance(field: string, value: unknown): asserts value is Instance {
+  if (!(value instanceof Instance)) {
+    throw new ValidationError(`${field} must be an instance of Instance`);
   }
 }

@@ -8,7 +8,7 @@ import {
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
-import { AnomalyStateRepository } from "../observe/anomaly.repository.ts";
+import { AnomalyStateRepository } from "../anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:anomalyState");
 

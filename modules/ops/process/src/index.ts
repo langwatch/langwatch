@@ -14,13 +14,13 @@ export type {
   OpsProcessRef,
   OpsReplayRunner,
 } from "./app/ops.app.ts";
-export type { BugReportRepository } from "./repositories/admin/bug-report.repository.ts";
+export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export type { OpsOperationsOptions } from "./app/ops-operations.ts";
 export type { SchedulerWakeRedis } from "./repositories/redis/redis.scheduler-wake.repository.ts";
 export type { OpsSnapshotRedis } from "./app/ops.app.ts";
-export type { ProcessControlAction } from "./repositories/process/ops-audit.repository.ts";
-export type { ScheduledJobRecord } from "./repositories/process/scheduler-ops.repository.ts";
+export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
+export type { ScheduledJobRecord } from "./repositories/scheduler-ops.repository.ts";
 export type { SchedulerWake } from "./app/ops.app.ts";
 export {
   type AdminAccess,
@@ -55,13 +55,13 @@ export type { OpsReplayRuntimeFactory, OpsReplayRuntime } from "./app/ops.app.ts
 export type {
   AggregateDiscoveryRow,
   RawEventRow,
-} from "./repositories/observe/event-explorer.repository.ts";
-export type { ProcessNameCounts } from "./repositories/process/process-ops.repository.ts";
-export type { ReplayRepository } from "./repositories/process/replay.repository.ts";
+} from "./repositories/event-explorer.repository.ts";
+export type { ProcessNameCounts } from "./repositories/process-ops.repository.ts";
+export type { ReplayRepository } from "./repositories/replay.repository.ts";
 export type {
   OpsExplainClientResolution,
   OpsExplainClients,
-} from "./repositories/observe/ops-explain.repository.ts";
+} from "./repositories/ops-explain.repository.ts";
 
 /** Public intake for the reports customers' coding agents file. */
 export type {
@@ -95,7 +95,7 @@ export {
   type ProcessManagerPurgeReport,
 } from "./tasks/process-manager-purge.task.ts";
 export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prisma.process-manager-purge.repository.ts";
-export type { ProcessManagerPurgeTarget } from "./repositories/process/process-manager-purge.repository.ts";
+export type { ProcessManagerPurgeTarget } from "./repositories/process-manager-purge.repository.ts";
 
 // The transport declarations the process mounts. Each is inert: it names its
 // routes or procedures, the access each is reached behind, and the facts the

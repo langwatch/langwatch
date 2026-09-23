@@ -17,7 +17,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
+import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";

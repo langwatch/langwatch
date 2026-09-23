@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const clickhouseMocks = vi.hoisted(() => {
   const client = {
@@ -19,16 +19,14 @@ vi.mock("@clickhouse/client", () => ({
 import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttl.reconciler.ts";
 
 describe("reconcileTTL()", () => {
-  const envBackup = {
-    CLICKHOUSE_COLD_STORAGE_ENABLED: process.env.CLICKHOUSE_COLD_STORAGE_ENABLED,
-  };
+  let coldStorageEnabled: boolean;
 
   beforeEach(() => {
     vi.clearAllMocks();
     // These regressions cover the tiered-storage path (cold + retention TTL),
     // which only emits the cold MOVE clause when the operator has explicitly
     // enabled it. Force the flag on so the assertions about cold TTL still hit.
-    process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = "true";
+    coldStorageEnabled = true;
     clickhouseMocks.client.query.mockResolvedValue({
       json: async () => [
         {
@@ -43,18 +41,10 @@ describe("reconcileTTL()", () => {
     clickhouseMocks.client.close.mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
-    if (envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED === undefined) {
-      delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
-    } else {
-      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
-    }
-  });
-
   describe("when a tiered table has current cold-storage TTL but no retention TTL", () => {
     /** @scenario Existing tiered tables receive missing retention TTL */
     it("adds the retention TTL without removing cold-storage TTL", async () => {
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
 
       expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
         query: expect.stringContaining("toDateTime(EndTime) + INTERVAL 49 DAY TO VOLUME 'cold'"),
@@ -89,17 +79,11 @@ describe("reconcileTTL()", () => {
       });
 
       // Operator bumps hot-days for stored_spans from 49 to 30 via env var
-      const originalEnv = process.env.CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS;
-      process.env.CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS = "30";
-      try {
-        await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
-      } finally {
-        if (originalEnv === undefined) {
-          delete process.env.CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS;
-        } else {
-          process.env.CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS = originalEnv;
-        }
-      }
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled,
+        hotDayOverrides: { CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS: "30" },
+      });
 
       const calls = clickhouseMocks.client.command.mock.calls;
       const modifyTtlCall = calls.find((c) => /MODIFY TTL/.test((c[0] as { query: string }).query));
@@ -121,7 +105,7 @@ describe("reconcileTTL()", () => {
      * the DELETE TTL. Retention must reconcile independent of that flag.
      */
     it("still installs the retention DELETE TTL even without cold-storage MOVE", async () => {
-      delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
+      coldStorageEnabled = false;
 
       // Table currently has no retention TTL at all, even though it's on the
       // tiered policy. Without cold-storage management we should still install
@@ -137,7 +121,7 @@ describe("reconcileTTL()", () => {
         ],
       });
 
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
 
       const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
         /MODIFY TTL/.test((c[0] as { query: string }).query),
@@ -177,7 +161,7 @@ describe("reconcileTTL()", () => {
         ],
       });
 
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
 
       const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
         /MODIFY TTL/.test((c[0] as { query: string }).query),
@@ -193,17 +177,11 @@ describe("reconcileTTL()", () => {
      * ("INCORRECT_QUERY"). The emitted ALTER must therefore carry no ON CLUSTER.
      */
     it("issues the ALTER without an ON CLUSTER clause", async () => {
-      const originalCluster = process.env.CLICKHOUSE_CLUSTER;
-      process.env.CLICKHOUSE_CLUSTER = "main";
-      try {
-        await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
-      } finally {
-        if (originalCluster === undefined) {
-          delete process.env.CLICKHOUSE_CLUSTER;
-        } else {
-          process.env.CLICKHOUSE_CLUSTER = originalCluster;
-        }
-      }
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled,
+        clusterName: "main",
+      });
 
       const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
         /MODIFY TTL/.test((c[0] as { query: string }).query),

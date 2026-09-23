@@ -10,7 +10,7 @@ import {
 import { Temporal, toEpochMs } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AdminBackofficeRepository } from "../repositories/admin/admin-backoffice.repository.ts";
+import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 

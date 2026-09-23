@@ -8,7 +8,7 @@ import type {
 import type {
   EventExplorerRepository,
   RawEventRow,
-} from "../../repositories/observe/event-explorer.repository.ts";
+} from "../../repositories/event-explorer.repository.ts";
 import { EventExplorerService } from "../event-explorer.service.ts";
 
 const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [

@@ -7,7 +7,7 @@ import type { AnomalyHardTierAlert } from "../app/ops.app.ts";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../repositories/observe/anomaly.repository.ts";
+} from "../repositories/anomaly.repository.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
 import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 

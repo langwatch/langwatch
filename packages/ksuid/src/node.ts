@@ -1,7 +1,7 @@
-import { Instance } from "./instance.ts";
+import { checkInstance, Instance } from "./instance.ts";
 import type { Ksuid } from "./ksuid.ts";
 import { getRandomBytes, detectPlatform } from "./platform.ts";
-import { checkPrefix, checkInstance, checkNonEmptyString } from "./validation.ts";
+import { checkPrefix, checkNonEmptyString } from "./validation.ts";
 
 // Factory function to create Ksuid instances
 export type KsuidFactory = (

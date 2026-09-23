@@ -1,13 +1,13 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
 import {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../../repositories/observe/anomaly.repository.ts";
+} from "../../repositories/anomaly.repository.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 import { percentile } from "../../rules/ops-anomaly-percentile.rules.ts";
 import {

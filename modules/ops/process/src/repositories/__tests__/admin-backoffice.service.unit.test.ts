@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
 import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
 import { AdminAuditSink } from "../../services/impersonation.service.ts";
-import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
 
 const user: UserProfile = {
   id: "user-1",
@@ -26,6 +26,12 @@ const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
 class AuthFake implements BrowserSessionApi {
+  requestNewAccountVerification(): never {
+    throw new Error("unused");
+  }
+  sendMyAddressConfirmation(): never {
+    throw new Error("unused");
+  }
   findDialableIdentityProviderOrigins(): never {
     throw new Error("unused");
   }

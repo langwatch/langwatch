@@ -2,7 +2,7 @@ import { type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contr
 import { describe, expect, it, vi } from "vitest";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../app/ops.app.ts";
-import { ReplayRepository } from "../../repositories/process/replay.repository.ts";
+import { ReplayRepository } from "../../repositories/replay.repository.ts";
 import { ReplayService } from "../replay.service.ts";
 
 class ReplayRepositoryStub extends ReplayRepository {

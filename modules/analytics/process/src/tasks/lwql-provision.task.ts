@@ -418,7 +418,10 @@ export async function runLwqlProvisioningTask({
   }
 
   const names = lwqlProvisioning.names({ connection });
-  const { database: sourceDatabase } = parseConnectionUrl();
+  const { database: sourceDatabase } = parseConnectionUrl({
+    connectionUrl: source.CLICKHOUSE_URL,
+    clusterName: source.CLICKHOUSE_CLUSTER,
+  });
 
   if (selfProvision.requested) {
     await selfProvisionAll({ database, source, request: selfProvision, names, sourceDatabase });

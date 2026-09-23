@@ -4,8 +4,6 @@ import { z } from "zod";
 import { isUsageReportDue } from "../rules/usage-report-schedule.rules.ts";
 import { runUsageReport, type UsageReportRunDeps } from "./ops-usage-report.intent.ts";
 
-export const USAGE_REPORT_PROCESS_NAME = "usageReport" as const;
-
 /** Hourly, so the report goes on the first wake after 12:00 UTC and a restart never skips a day. */
 export const USAGE_REPORT_WAKE_INTERVAL_MS = 60 * 60 * 1000;
 

@@ -2,7 +2,7 @@ import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwa
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
-import { type ReplayRepository } from "../../repositories/process/replay.repository.ts";
+import { type ReplayRepository } from "../replay.repository.ts";
 
 const REPLAY_LOCK_KEY = "ops:replay:lock";
 const REPLAY_STATUS_KEY = "ops:replay:status";

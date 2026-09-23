@@ -13,7 +13,7 @@ import type {
   DrainPreview,
   JobEntry,
   QueueRepository,
-} from "../repositories/process/queue.repository.ts";
+} from "../repositories/queue.repository.ts";
 import { NullQueueAuditSink } from "./null.queue-audit-sink.service.ts";
 import type { QueueAuditSink } from "./queue-audit-sink.service.ts";
 

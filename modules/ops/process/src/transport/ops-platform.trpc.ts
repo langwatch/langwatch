@@ -105,9 +105,9 @@ export const opsPlatformTrpcTransport = defineTrpcRouter(OpsApi, opsPlatformTrpc
   .handle(({ app, input, actor }, operator) => {
     app.admitOperator(operator, "ops:manage");
 
-    if (!input.dryRun) app.requireDestructiveOperator(operator, input.confirm);
-
     return app.runBlobCleanup({
+      operator,
+      confirm: input.confirm,
       dryRun: input.dryRun,
       // Opaque id, not email: the audit trail must trace the actor without
       // carrying personal data into the log stream.

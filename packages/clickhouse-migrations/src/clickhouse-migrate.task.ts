@@ -2,8 +2,8 @@ import { ClickHouseSchemaLock, parseRoutingTable } from "@langwatch/clickhouse-c
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import { runMigrations } from "./goose.migration-runner.ts";
-import { reconcileTTL } from "./ttl.reconciler.ts";
+import { GOOSE_INHERITED_VARIABLES, runMigrations } from "./goose.migration-runner.ts";
+import { HOT_DAYS_VARIABLES, reconcileTTL } from "./ttl.reconciler.ts";
 
 const logger = createLogger("langwatch:task:clickhouse-migrate");
 
@@ -22,13 +22,41 @@ export type ClickHouseMigrationTaskConfig = {
   skipped: boolean;
   sharedUrl?: string;
   privateEndpoints: readonly ClickHouseMigrationEndpoint[];
+  settings?: ClickHouseMigrationSettings;
+};
+
+/** What every endpoint is migrated with, parsed from the task's input once. */
+export type ClickHouseMigrationSettings = {
+  clusterName?: string;
+  coldStorageEnabled: boolean;
+  hotDayOverrides: Readonly<Record<string, string | undefined>>;
+  childEnvironment: Readonly<Record<string, string | undefined>>;
+};
+
+const NO_SETTINGS: ClickHouseMigrationSettings = {
+  coldStorageEnabled: false,
+  hotDayOverrides: {},
+  childEnvironment: {},
 };
 
 /** Explicit task-local adapter over goose and TTL reconciliation. */
 export class GooseClickHouseMigrationExecutor {
-  async migrate(url: string): Promise<void> {
-    await runMigrations({ connectionUrl: url, verbose: true });
-    await reconcileTTL({ connectionUrl: url, verbose: true });
+  async migrate({
+    url,
+    settings,
+  }: {
+    url: string;
+    settings: ClickHouseMigrationSettings;
+  }): Promise<void> {
+    const { clusterName, coldStorageEnabled, hotDayOverrides, childEnvironment } = settings;
+    await runMigrations({ connectionUrl: url, clusterName, childEnvironment, verbose: true });
+    await reconcileTTL({
+      connectionUrl: url,
+      clusterName,
+      coldStorageEnabled,
+      hotDayOverrides,
+      verbose: true,
+    });
   }
 }
 
@@ -127,7 +155,10 @@ export class ClickHouseMigrateTask extends Task {
       );
     }
     try {
-      await this.executor.migrate(endpoint.url);
+      await this.executor.migrate({
+        url: endpoint.url,
+        settings: this.config.settings ?? NO_SETTINGS,
+      });
     } catch (error) {
       if (endpoint.organizationId !== undefined) {
         logger.error(
@@ -171,5 +202,20 @@ export function resolveClickHouseMigrationTaskConfig(
     skipped: source.SKIP_CLICKHOUSE_MIGRATE === "true",
     ...(source.CLICKHOUSE_URL === undefined ? {} : { sharedUrl: source.CLICKHOUSE_URL }),
     privateEndpoints,
+    settings: {
+      ...(source.CLICKHOUSE_CLUSTER ? { clusterName: source.CLICKHOUSE_CLUSTER } : {}),
+      coldStorageEnabled: source.CLICKHOUSE_COLD_STORAGE_ENABLED === "true",
+      hotDayOverrides: pickDefined(source, HOT_DAYS_VARIABLES),
+      childEnvironment: pickDefined(source, GOOSE_INHERITED_VARIABLES),
+    },
   };
+}
+
+function pickDefined(
+  source: Record<string, string | undefined>,
+  names: readonly string[],
+): Record<string, string> {
+  return Object.fromEntries(
+    names.flatMap((name) => (source[name] === undefined ? [] : [[name, source[name]]])),
+  );
 }

@@ -16,7 +16,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../app/ops-operations.ts";
 import type { QueuePayloadDecoder } from "../app/ops.app.ts";
-import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
+import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 
@@ -45,6 +45,12 @@ class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
 }
 
 class NoopAuthService implements BrowserSessionApi {
+  requestNewAccountVerification(): never {
+    throw new Error("unused");
+  }
+  sendMyAddressConfirmation(): never {
+    throw new Error("unused");
+  }
   findDialableIdentityProviderOrigins(): never {
     throw new Error("unused");
   }

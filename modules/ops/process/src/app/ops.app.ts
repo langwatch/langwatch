@@ -33,7 +33,7 @@ import {
 } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -87,6 +87,12 @@ import {
   type OpsMigrationOverview,
   type OpsMigrationTargetedRunResult,
   type OpsOperator,
+  OpsConfirmationRequiredError,
+  OpsImpersonatedOperatorRefusedError,
+  OpsOperatorRequiredError,
+  OpsOperatorSecretRequiredError,
+  OpsOperatorSessionRequiredError,
+  OpsUnknownFeatureFlagError,
   type OpsOperatorPermission,
   type OpsPipelineRegistrations,
   type OpsScope,
@@ -127,7 +133,7 @@ import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contra
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
-import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
+import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
@@ -546,104 +552,6 @@ export interface OpsBadgeReading {
   dlqCount: number;
   /** Null when no snapshot collector is running: "we cannot say", not "all clear". */
   computedAt: OpsApiGetBadgeCountsOutput["computedAt"];
-}
-
-/**
- * Unreachable behind an authenticated procedure, kept anyway: a guard whose
- * strictest branch is the one a missing session bypasses is fail-open in
- * shape, and this stands in front of irreversible members work.
- */
-export class OpsOperatorSessionRequiredError extends HandledError {
-  declare readonly code: "ops_operator_session_required";
-
-  constructor() {
-    super("ops_operator_session_required", "This action needs a signed-in session.", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "OpsOperatorSessionRequiredError";
-  }
-}
-
-/**
- * The operator scope falls back to the impersonator's own grant, so
- * `ops:manage` is inherited by an impersonation session — the wrong posture
- * for irreversible surgery, since the audit trail would name the impersonated account.
- */
-export class OpsImpersonatedOperatorRefusedError extends HandledError {
-  declare readonly code: "ops_impersonated_operator_refused";
-
-  constructor() {
-    super(
-      "ops_impersonated_operator_refused",
-      "This action cannot be run from an impersonated session. Sign in directly to continue.",
-      { httpStatus: 403, fault: "customer" },
-    );
-    this.name = "OpsImpersonatedOperatorRefusedError";
-  }
-}
-
-/**
- * The damage these writes do is silent — deleting a blob completes the job
- * that referenced it without its handler running — so the confirmation makes
- * the act deliberate. The ops UI dialog is not this guard: procedures are callable directly.
- */
-export class OpsConfirmationRequiredError extends HandledError {
-  declare readonly code: "ops_confirmation_required";
-
-  constructor() {
-    super("ops_confirmation_required", "This action needs to be confirmed before it can run", {
-      httpStatus: 400,
-      fault: "customer",
-    });
-    this.name = "OpsConfirmationRequiredError";
-  }
-}
-
-/**
- * Reads are deliberately permissive — the catalogue surfaces orphan rows so
- * they can be deleted — but a write to an unregistered key would store a
- * value nothing ever reads.
- */
-export class OpsUnknownFeatureFlagError extends HandledError {
-  declare readonly code: "ops_feature_flag_unknown";
-
-  constructor(key: string) {
-    super("ops_feature_flag_unknown", `Unknown feature flag key: ${key}`, {
-      httpStatus: 400,
-      fault: "customer",
-      meta: { key },
-    });
-    this.name = "OpsUnknownFeatureFlagError";
-  }
-}
-
-/**
- * The whole platform tier is decided by the operator allow-list, not by an
- * RBAC grain an id in the input could be checked at — so this refusal is the
- * module's own, not a scope decision the door could have made.
- */
-export class OpsOperatorRequiredError extends HandledError {
-  declare readonly code: "permission_denied";
-
-  constructor(permission: OpsOperatorPermission) {
-    super("permission_denied", "This is an operator-only surface.", {
-      httpStatus: 403,
-      fault: "customer",
-      meta: { permission },
-    });
-    this.name = "OpsOperatorRequiredError";
-  }
-}
-
-/** No operator secret was presented, or the presented one did not match. */
-export class OpsOperatorSecretRequiredError extends HandledError {
-  declare readonly code: "unauthorized";
-
-  constructor() {
-    super("unauthorized", "Unauthorized", { httpStatus: 401, fault: "customer" });
-    this.name = "OpsOperatorSecretRequiredError";
-  }
 }
 
 export class OpsApp implements OpsApi {
@@ -1101,8 +1009,17 @@ export class OpsApp implements OpsApi {
   findBlob(input: Parameters<OpsService["findBlob"]>[0]) {
     return this.#dependencies.ops.findBlob(input);
   }
-  runBlobCleanup(input: Parameters<OpsService["runBlobCleanup"]>[0]) {
-    return this.#dependencies.ops.runBlobCleanup(input);
+  async runBlobCleanup({
+    operator,
+    confirm,
+    ...command
+  }: Parameters<OpsService["runBlobCleanup"]>[0] & {
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }) {
+    if (!command.dryRun) this.requireDestructiveOperator(operator, confirm);
+
+    return this.#dependencies.ops.runBlobCleanup(command);
   }
   deleteBlob(input: Parameters<OpsService["deleteBlob"]>[0]) {
     return this.#dependencies.ops.deleteBlob(input);

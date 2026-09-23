@@ -9,10 +9,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type {
-  ProcessNameCounts,
-  ProcessOpsRepository,
-} from "../../repositories/process/process-ops.repository.ts";
+import type { ProcessNameCounts, ProcessOpsRepository } from "../process-ops.repository.ts";
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;

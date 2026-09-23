@@ -4,7 +4,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
-import { AnomalyRateTrackerRepository } from "../observe/anomaly.repository.ts";
+import { AnomalyRateTrackerRepository } from "../anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");
 

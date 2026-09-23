@@ -7,7 +7,7 @@ import {
   ImpersonationRepository,
   type ImpersonationTarget,
   type ImpersonationWindow,
-} from "../../services/impersonation.service.ts";
+} from "../impersonation.repository.ts";
 
 export type AdminDatabase = PrismaClient;
 

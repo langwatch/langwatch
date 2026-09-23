@@ -5,8 +5,14 @@ const stubs = vi.hoisted(() => ({
   runMigrations: vi.fn(async () => undefined),
 }));
 
-vi.mock("../goose.migration-runner.ts", () => ({ runMigrations: stubs.runMigrations }));
-vi.mock("../ttl.reconciler.ts", () => ({ reconcileTTL: stubs.reconcileTTL }));
+vi.mock("../goose.migration-runner.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  runMigrations: stubs.runMigrations,
+}));
+vi.mock("../ttl.reconciler.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  reconcileTTL: stubs.reconcileTTL,
+}));
 
 import {
   ClickHouseMigrateTask,
@@ -34,30 +40,30 @@ describe("clickhouse-migrate task", () => {
       },
     }).execute();
 
-    expect(stubs.runMigrations).toHaveBeenNthCalledWith(1, {
-      connectionUrl: "http://shared:8123",
-      verbose: true,
-    });
-    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(1, {
-      connectionUrl: "http://shared:8123",
-      verbose: true,
-    });
-    expect(stubs.runMigrations).toHaveBeenNthCalledWith(2, {
-      connectionUrl: "http://private:8123",
-      verbose: true,
-    });
-    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(2, {
-      connectionUrl: "http://private:8123",
-      verbose: true,
-    });
-    expect(stubs.runMigrations).toHaveBeenNthCalledWith(3, {
-      connectionUrl: "http://other-private:8123",
-      verbose: true,
-    });
-    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(3, {
-      connectionUrl: "http://other-private:8123",
-      verbose: true,
-    });
+    expect(stubs.runMigrations).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ connectionUrl: "http://shared:8123", verbose: true }),
+    );
+    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ connectionUrl: "http://shared:8123", verbose: true }),
+    );
+    expect(stubs.runMigrations).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ connectionUrl: "http://private:8123", verbose: true }),
+    );
+    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ connectionUrl: "http://private:8123", verbose: true }),
+    );
+    expect(stubs.runMigrations).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ connectionUrl: "http://other-private:8123", verbose: true }),
+    );
+    expect(stubs.reconcileTTL).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ connectionUrl: "http://other-private:8123", verbose: true }),
+    );
     expect(stubs.runMigrations).toHaveBeenCalledTimes(3);
     expect(stubs.reconcileTTL).toHaveBeenCalledTimes(3);
   });
@@ -87,6 +93,34 @@ describe("clickhouse-migrate task", () => {
       skipped: false,
       sharedUrl: "http://shared:8123",
       privateEndpoints: [{ organizationId: "org_1", url: "http://private:8123" }],
+      settings: { coldStorageEnabled: false, hotDayOverrides: {}, childEnvironment: {} },
+    });
+  });
+
+  it("migrates every endpoint with the cluster, cold-storage and hot-days settings the input named", async () => {
+    await ClickHouseMigrateTask.create({
+      source: {
+        CLICKHOUSE_URL: "http://shared:8123",
+        CLICKHOUSE_CLUSTER: "main",
+        CLICKHOUSE_COLD_STORAGE_ENABLED: "true",
+        CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS: "30",
+        PATH: "/usr/bin",
+        UNRELATED_SECRET: "never-forwarded",
+      },
+    }).execute();
+
+    expect(stubs.runMigrations).toHaveBeenCalledExactlyOnceWith({
+      connectionUrl: "http://shared:8123",
+      clusterName: "main",
+      childEnvironment: { PATH: "/usr/bin" },
+      verbose: true,
+    });
+    expect(stubs.reconcileTTL).toHaveBeenCalledExactlyOnceWith({
+      connectionUrl: "http://shared:8123",
+      clusterName: "main",
+      coldStorageEnabled: true,
+      hotDayOverrides: { CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS: "30" },
+      verbose: true,
     });
   });
 
@@ -131,14 +165,12 @@ describe("clickhouse-migrate task", () => {
         source: { CLICKHOUSE_URL: "http://shared:8123" },
       }).execute();
 
-      expect(stubs.runMigrations).toHaveBeenCalledExactlyOnceWith({
-        connectionUrl: "http://shared:8123",
-        verbose: true,
-      });
-      expect(stubs.reconcileTTL).toHaveBeenCalledExactlyOnceWith({
-        connectionUrl: "http://shared:8123",
-        verbose: true,
-      });
+      expect(stubs.runMigrations).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ connectionUrl: "http://shared:8123", verbose: true }),
+      );
+      expect(stubs.reconcileTTL).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ connectionUrl: "http://shared:8123", verbose: true }),
+      );
     });
 
     it("runs nothing when no endpoint is configured at all", async () => {

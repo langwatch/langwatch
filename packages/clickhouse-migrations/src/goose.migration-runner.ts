@@ -55,9 +55,23 @@ export function messageForSpawnError(message: string): string {
 export interface GooseOptions {
   connectionUrl?: string;
   database?: string; // Optional database override (takes precedence over URL path)
+  /** `CLICKHOUSE_CLUSTER`, parsed by the caller; set, every engine is Replicated. */
+  clusterName?: string;
+  /** The system variables goose inherits (PATH, HOME, USER, SHELL, LANG, LC_ALL, TERM). */
+  childEnvironment?: Readonly<Record<string, string | undefined>>;
   migrationsDir?: string;
   verbose?: boolean;
 }
+
+export const GOOSE_INHERITED_VARIABLES = [
+  "PATH",
+  "HOME",
+  "USER",
+  "SHELL",
+  "LANG",
+  "LC_ALL",
+  "TERM",
+] as const;
 
 export interface ClickHouseConfig {
   database: string;
@@ -109,12 +123,15 @@ function validateIdentifier(name: string, label: string): void {
   }
 }
 
-export function parseConnectionUrl(
-  connectionUrl?: string,
-  databaseOverride?: string,
-): ClickHouseConfig {
-  const url = connectionUrl ?? process.env.CLICKHOUSE_URL;
-
+export function parseConnectionUrl({
+  connectionUrl: url,
+  database: databaseOverride,
+  clusterName,
+}: {
+  connectionUrl?: string;
+  database?: string;
+  clusterName?: string;
+}): ClickHouseConfig {
   if (!url) {
     throw new MigrationError("CLICKHOUSE_URL environment variable is not set", "preflight");
   }
@@ -136,7 +153,6 @@ export function parseConnectionUrl(
   }
   validateIdentifier(database, "database name");
 
-  const clusterName = process.env.CLICKHOUSE_CLUSTER || undefined;
   if (clusterName) {
     validateIdentifier(clusterName, "cluster name");
   }
@@ -174,7 +190,7 @@ export function parseConnectionUrl(
     serverUrl,
     databaseUrl,
     gooseConnectionString,
-    clusterName,
+    clusterName: clusterName || undefined,
   };
 }
 
@@ -366,9 +382,11 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
 
 function buildMigrationEnvVars({
   config,
+  childEnvironment = {},
   allowDimensionsOutsideSortingKey = false,
 }: {
   config: ClickHouseConfig;
+  childEnvironment?: Readonly<Record<string, string | undefined>>;
   /**
    * Append the compatibility setting to every CREATE TABLE. Only the phase
    * that replays migrations up to LAST_MIGRATION_NEEDING_DIMENSION_COMPAT
@@ -378,14 +396,7 @@ function buildMigrationEnvVars({
 }): NodeJS.ProcessEnv {
   // In Replicated databases, use empty args - the DB handles replication automatically
   const vars: Record<string, string | undefined> = {
-    // System vars
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    SHELL: process.env.SHELL,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-    TERM: process.env.TERM,
+    ...Object.fromEntries(GOOSE_INHERITED_VARIABLES.map((name) => [name, childEnvironment[name]])),
 
     // ClickHouse vars
     CLICKHOUSE_DATABASE: config.database,
@@ -454,6 +465,7 @@ function executeGoose({
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars({
     config,
+    childEnvironment: options.childEnvironment,
     allowDimensionsOutsideSortingKey,
   });
 
@@ -521,7 +533,7 @@ function executeGoose({
 }
 
 export async function migrateUp(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
 
   logger.debug("Running ClickHouse migrations...");
 
@@ -554,7 +566,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
 }
 
 export async function migrateDown(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
 
   logger.info("Rolling back last ClickHouse migration...");
 
@@ -567,7 +579,7 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
 }
 
 export async function migrateReset(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
 
   logger.info("Resetting all ClickHouse migrations...");
 
@@ -580,17 +592,17 @@ export async function migrateReset(options: GooseOptions = {}): Promise<string> 
 }
 
 export async function getMigrateVersion(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
   return executeGoose({ command: ["version"], config, options });
 }
 
 export async function getMigrateStatus(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl, options.database);
+  const config = parseConnectionUrl(options);
   return executeGoose({ command: ["status"], config, options });
 }
 
 export async function runMigrations(options: GooseOptions = {}): Promise<void> {
-  const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
+  const connectionUrlStr = options.connectionUrl;
   if (!connectionUrlStr) {
     logger.info("CLICKHOUSE_URL not configured, skipping ClickHouse migrations.");
     return;

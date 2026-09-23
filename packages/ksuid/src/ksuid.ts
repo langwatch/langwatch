@@ -1,8 +1,8 @@
-import { DECODED_LEN, ENCODED_LEN, KSUID_REGEX } from "./constants.ts";
-import { Instance } from "./instance.ts";
-import { checkPrefix, checkUint, checkInstance } from "./validation.ts";
 import { encode, decode } from "./base62.ts";
+import { DECODED_LEN, ENCODED_LEN, KSUID_REGEX } from "./constants.ts";
+import { checkInstance, Instance } from "./instance.ts";
 import type { ParsedKsuid } from "./types.ts";
+import { checkPrefix, checkUint } from "./validation.ts";
 
 /**
  * A K-Sortable Unique IDentifier (KSUID): globally unique, k-sortable, with an

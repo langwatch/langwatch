@@ -3,7 +3,6 @@
  * different question from "who is here" and settles on its own schedule.
  */
 
-import { UiCapabilityUnavailableError, useOptionalUiCapabilities } from "./capabilities.ts";
 import type { UiScopeHost } from "./use-organization-team-project.ts";
 
 /** The organization and project the current page is about. */
@@ -24,21 +23,4 @@ export abstract class UiScope {
   scopeHost(): UiScopeHost | undefined {
     return void 0;
   }
-}
-
-class UnavailableUiScope extends UiScope {
-  activeScope(): never {
-    throw new UiCapabilityUnavailableError("scope");
-  }
-}
-
-/** The default for a composition that named no scope source. Refuses by name. */
-export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
-
-/**
- * Where this screen is standing. Mounted outside a shell it reads the refusing
- * port, which names the missing capability rather than inventing a scope.
- */
-export function useUiScope(): UiScope {
-  return useOptionalUiCapabilities()?.scope ?? UNAVAILABLE_UI_SCOPE;
 }

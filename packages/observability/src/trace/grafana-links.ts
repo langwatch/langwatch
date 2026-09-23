@@ -1,6 +1,5 @@
 /**
  * Grafana Explore deep links: pure builders that take id + config → URL.
- * Server-only `…FromEnv` helpers read GRAFANA_BASE_URL.
  */
 
 export const DEFAULT_TEMPO_DATASOURCE_UID = "tempo";
@@ -161,33 +160,4 @@ export function grafanaGroupLogsUrl(groupId: string, config: GrafanaDeepLinkConf
     ],
     range: { from: config.from ?? DEFAULT_FROM, to: config.to ?? DEFAULT_TO },
   });
-}
-
-/**
- * Resolves the deep-link config server-side: `GRAFANA_BASE_URL` comes from
- * haven locally or ops in production, and datasource uids default to the
- * LGTM bundle's. Undefined on the client, so the href is built server-side and passed down.
- */
-export function grafanaConfigFromEnv(): {
-  baseUrl?: string;
-  tempoDatasourceUid?: string;
-  lokiDatasourceUid?: string;
-} {
-  return {
-    baseUrl: process.env.GRAFANA_BASE_URL,
-    tempoDatasourceUid: process.env.GRAFANA_TEMPO_DATASOURCE_UID,
-    lokiDatasourceUid: process.env.GRAFANA_LOKI_DATASOURCE_UID,
-  };
-}
-
-/**
- * Grafana trace link resolved from environment: safe to spread into errors since
- * Grafana is access-controlled.
- */
-export function grafanaTraceUrlFromEnv(traceId: string | undefined): string | undefined {
-  if (!traceId) return undefined;
-  const { baseUrl, tempoDatasourceUid } = grafanaConfigFromEnv();
-  if (!baseUrl) return undefined;
-  // null (malformed base URL) coalesces to undefined so it stays safe to spread.
-  return grafanaTraceUrl(traceId, { baseUrl, tempoDatasourceUid }) ?? undefined;
 }
