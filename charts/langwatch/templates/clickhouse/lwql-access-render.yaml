@@ -18,14 +18,31 @@
   identity lands in every replica's `users_xml` store.
 
   Patterns reused, nothing new invented (AC7): the app image run as a deploy-time
-  hook Job (like the stored-objects upgrade hooks), a dedicated ServiceAccount +
-  namespaced Role (like those hooks), and the app Secret for the LWQL passwords.
+  Job, a dedicated ServiceAccount + namespaced Role (like the stored-objects
+  upgrade hooks), and the app Secret for the LWQL passwords.
 
   Why the Job writes the Secret through the Kubernetes API rather than the chart
   templating it (AC8e): only the app image can render the catalog, so the file
   contents are not known at chart-render time. The app image ships node + curl
   but no kubectl, so the writer is a small node script that PUTs/POSTs the Secret
   with the pod's ServiceAccount token — no extra tooling image.
+
+  Why a MAIN-PHASE Job, not a pre-install hook. The render reads the same LWQL
+  env the app reads — LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD and
+  DATABASE_URL — which live in the app Secret and the PostgreSQL Secret, both
+  created in the release's main phase. A pre-install hook runs BEFORE any main
+  resource exists, so on a first install those Secrets are absent and the hook
+  Job fails (verified: helm aborts with "failed pre-install ... Job Failed").
+  Helm's install order applies Secrets and RBAC before Jobs, and a Job before
+  the StatefulSet is APPLIED but helm --wait then waits for both concurrently:
+  the Job renders and writes the access Secret while the ClickHouse pods sit in
+  ContainerCreating (their optional subPath mount has nothing to resolve yet),
+  and once the Secret exists the kubelet re-syncs the optional volume and the
+  pods start. So a plain main-phase Job both sees its inputs and lands its output
+  before the pods finish coming up, on install and upgrade alike. The Job name
+  carries .Release.Revision because a Job's pod template is immutable — a
+  stable-named Job could not be updated on `helm upgrade`; a fresh name each
+  revision sidesteps that, and helm prunes the previous revision's Job.
 
   Why no `SYSTEM RELOAD CONFIG` hook and no per-secret checksum: ClickHouse 25.10
   hot-reloads users.d and config.d from disk within ~3s of a file change
@@ -45,8 +62,8 @@
 */}}
 {{- if .Values.clickhouse.chartManaged }}
 {{- $name := printf "%s-lwql-access-render" .Release.Name }}
+{{- $jobName := printf "%s-lwql-access-render-%d" .Release.Name (.Release.Revision | int) }}
 {{- $secretName := include "langwatch.lwql.accessSecretName" . }}
-{{- $appSecret := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -54,10 +71,6 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-10"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -65,10 +78,6 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-10"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 rules:
   # Read, replace and patch ONLY the one access Secret, by name (AC5: the Role is
   # scoped to that single Secret name).
@@ -91,10 +100,6 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-10"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 subjects:
   - kind: ServiceAccount
     name: {{ $name }}
@@ -107,18 +112,14 @@ roleRef:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ $name }}
+  # Name carries the revision because a Job's pod template is immutable — a
+  # fresh name each `helm upgrade` avoids the immutable-field error, and helm
+  # prunes the previous revision's Job.
+  name: {{ $jobName }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
-  annotations:
-    # Weight -5: after the SA/Role/RoleBinding (-10) so the token can write the
-    # Secret, and still before the ClickHouse StatefulSet (a normal, post-hook
-    # resource) so the Secret exists before the first pod mounts it.
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  backoffLimit: 1
+  backoffLimit: 2
   activeDeadlineSeconds: 300
   ttlSecondsAfterFinished: 600
   template:

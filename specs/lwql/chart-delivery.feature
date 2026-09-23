@@ -22,7 +22,7 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
   @e2e
   Scenario: The access model is delivered by one Job into one Secret, mounted once per pod
     Given the chart is rendered with chart-managed ClickHouse and lwql.enabled
-    Then a pre-install and pre-upgrade hook Job runs the application image and renders the access files
+    Then a deploy-time Job runs the application image and renders the access files
     And the Job's ServiceAccount may only create the access Secret and get, update or patch it by name
     And every ClickHouse pod mounts the access Secret at the users.d and config.d paths
     And no chart template renders any part of the access model itself

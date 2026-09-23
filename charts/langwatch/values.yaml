@@ -2024,9 +2024,12 @@ clickhouse:
   # ClickHouse pod mounts them here. Nested single-file (subPath) mounts, so they
   # coexist with the files ch-config renders into config.d / users.d at startup.
   #
-  # optional:true keeps a pod bootable even if the render Secret is briefly
-  # absent (the Job always writes it first as a pre-install/pre-upgrade hook).
-  # The secretName is tpl-rendered by the subchart, so .Release.Name resolves;
+  # optional:true is load-bearing: on a first install the render Job (a
+  # main-phase Job) has not written the Secret yet when these pods are created,
+  # so the pods sit in ContainerCreating until the kubelet re-syncs the volume
+  # once the Job writes it. Without optional:true the missing Secret would hard-
+  # fail the volume instead of retrying. The secretName is tpl-rendered by the
+  # subchart, so .Release.Name resolves;
   # it must equal langwatch.lwql.accessSecretName (<release>-lwql-clickhouse-access).
   ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod (LWQL access Secret by default).
   extraVolumes:

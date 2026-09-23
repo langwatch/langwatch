@@ -259,17 +259,26 @@ $(cat "$err")"
     return
   fi
 
-  # One render Job that runs the app image and renders the access files.
-  if ! grep -q "name: lw-lwql-access-render" "$out"; then
-    fail "topology-no-job" "no lw-lwql-access-render Job/ServiceAccount/Role rendered on chart-managed ClickHouse."
+  # One render Job (revision-suffixed name) that runs the app image and renders
+  # the access files. It is a MAIN-PHASE Job, not a hook: the render reads the
+  # app + PostgreSQL Secrets, which only exist in the main phase, so a pre-install
+  # hook would fail on a first install.
+  if ! grep -qE "name: lw-lwql-access-render-[0-9]+" "$out"; then
+    fail "topology-no-job" "no revision-named lw-lwql-access-render-<n> Job rendered on chart-managed ClickHouse."
   fi
   if ! grep -q "renderLwqlAccessConfig" "$out"; then
     fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."
   fi
-  # It must be a pre-install AND pre-upgrade hook so the Secret exists before the
-  # StatefulSet mounts it, on both install and upgrade.
-  if ! grep -q 'helm.sh/hook: pre-install,pre-upgrade' "$out"; then
-    fail "topology-hook" "the access-render resources are not pre-install,pre-upgrade hooks."
+  # Guard the exact regression this design fixes: the render resources must NOT
+  # be helm hooks (a pre-install hook cannot read the main-phase Secrets it
+  # needs). Scope the check to just this template so a sibling hook elsewhere in
+  # the chart cannot trip it.
+  local only="${TMPDIR:-/tmp}/lwql-render-only.yaml"
+  if helm template lw . --set autogen.enabled=true \
+       --show-only templates/clickhouse/lwql-access-render.yaml >"$only" 2>/dev/null; then
+    if grep -q 'helm.sh/hook:' "$only"; then
+      fail "topology-is-hook" "the access-render resources are helm hooks; they must be main-phase so the render sees the app/PostgreSQL Secrets on a first install."
+    fi
   fi
   # The Role is scoped to the one Secret name for get/update/patch (create cannot
   # be name-scoped in Kubernetes RBAC, so it is a separate namespaced rule).
@@ -310,4 +319,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one pre-install/pre-upgrade render Job with a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"
+echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one main-phase (non-hook) render Job with a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"

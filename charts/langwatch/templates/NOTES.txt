@@ -348,8 +348,8 @@ ClickHouse depends on the posture:
 {{- if .Values.clickhouse.chartManaged }}
 
   Chart-managed ClickHouse (this release): RENDERED delivery. A deploy-time
-  Job ({{ .Release.Name }}-lwql-access-render) runs the app image, renders the
-  access model, and writes it into the Secret
+  Job ({{ .Release.Name }}-lwql-access-render-<revision>) runs the app image,
+  renders the access model, and writes it into the Secret
   {{ .Release.Name }}-lwql-clickhouse-access. Every ClickHouse pod mounts it at
   users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
   restricted identity, its profile, grants, row policies and the `lwql_postgres`
