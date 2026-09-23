@@ -600,6 +600,9 @@ config.graceDays })` — each receiving the narrowest slice that answers its
 question. Internal services never declare dependencies and are never
 auto-built; a `create()` that gets painful is a module doing too much, not
 a reason for a container.
+A factory under `repositories/` or `services/` that assembles collaborators is
+composition in the wrong folder: it moves into `create()`, and another process
+reaches the module through its API, never through its factories (2026-09-23).
 
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
@@ -941,6 +944,13 @@ never thinks about resolution at all. The per-module resolver adapters
   declares for its own implementation.
 - A path parameter is named for what it identifies (`:virtualKeyId`, never `:id`). A route main already
   publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23).
+- A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
+  the REST runtime with `Retry-After` (2026-09-23).
+- An action that takes no body declares an empty input schema from its contract; the runtime reads an
+  absent body as that empty object, so a bodiless call keeps working (2026-09-23).
+- A protocol route (SCIM) renders its protocol's error bodies through its protocol response, never a
+  `RestErrorHandler`. A JSON route never borrows the protocol kind to reach the request: the caller
+  arrives as `actor`/`scope` from the runtime's credential authentication (2026-09-23).
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
