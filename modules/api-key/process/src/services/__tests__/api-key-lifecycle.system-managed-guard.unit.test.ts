@@ -6,6 +6,8 @@ import { LANGY_SESSION_API_KEY_NAME, ApiKeyNotFoundError } from "@langwatch/api-
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 
@@ -24,14 +26,25 @@ function makeRepository(name: string): ApiKeyRepository {
     createdByDeviceLabel: null,
     permissionMode: "all",
     revokedAt: null,
+    parentApiKeyId: null,
+    lookupId: "lookup",
+    expiresAt: null,
+    revocationCause: null,
+    lastUsedAt: null,
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
     roleBindings: [],
     hashedSecret: "hashed",
-  } as unknown as StoredApiKey;
-  return {
-    findByIdInOrganization: vi.fn().mockResolvedValue(row),
-    update: vi.fn().mockRejectedValue(new Error("must not be reached")),
-    revoke: vi.fn().mockRejectedValue(new Error("must not be reached")),
-  } as unknown as ApiKeyRepository;
+  };
+  return Object.assign(MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }), {
+    findByIdInOrganization: vi
+      .fn<ApiKeyRepository["findByIdInOrganization"]>()
+      .mockResolvedValue(row),
+    update: vi.fn<ApiKeyRepository["update"]>().mockRejectedValue(new Error("must not be reached")),
+    revoke: vi.fn<ApiKeyRepository["revoke"]>().mockRejectedValue(new Error("must not be reached")),
+  });
 }
 
 function makeService(name: string) {

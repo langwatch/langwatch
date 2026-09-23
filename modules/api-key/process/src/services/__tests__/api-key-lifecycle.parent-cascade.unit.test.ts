@@ -7,6 +7,8 @@ import { ApiKeyAlreadyRevokedError, isApiKeyRevocationCause } from "@langwatch/a
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 
@@ -25,6 +27,7 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
     createdByDeviceLabel: "laptop",
     parentApiKeyId: null,
     permissionMode: "restricted",
+    expiresAt: null,
     revokedAt: null,
     revocationCause: null,
     lookupId: "lookup",
@@ -36,7 +39,7 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
     hashedSecret: "hashed",
     roleBindings: [],
     ...overrides,
-  } as unknown as StoredApiKey;
+  };
 }
 
 function makeService({ children }: { children: { id: string }[] }) {
@@ -46,18 +49,23 @@ function makeService({ children }: { children: { id: string }[] }) {
     rows.set(child.id, keyRow({ id: child.id, parentApiKeyId: LOGIN_ID, name: "ingest key" }));
   }
 
-  const findLiveChildren = vi.fn(async () => children);
-  const revoke = vi.fn(async ({ id, cause }: { id: string; cause: string }) => {
+  const findLiveChildren = vi.fn<ApiKeyRepository["findLiveChildren"]>(async () => children);
+  const revoke = vi.fn<ApiKeyRepository["revoke"]>(async ({ id, cause }) => {
     const row = rows.get(id)!;
     const revoked = { ...row, revokedAt: new Date(), revocationCause: cause };
     rows.set(id, revoked);
     return revoked;
   });
-  const repository = {
-    findByIdInOrganization: vi.fn(async ({ id }: { id: string }) => rows.get(id) ?? null),
-    revoke,
-    findLiveChildren,
-  } as unknown as ApiKeyRepository;
+  const repository = Object.assign(
+    MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
+    {
+      findByIdInOrganization: vi.fn<ApiKeyRepository["findByIdInOrganization"]>(
+        async ({ id }) => rows.get(id) ?? null,
+      ),
+      revoke,
+      findLiveChildren,
+    },
+  );
 
   const dependencies = {
     authz: { listApiKeyBindings: async () => [] } as never,
