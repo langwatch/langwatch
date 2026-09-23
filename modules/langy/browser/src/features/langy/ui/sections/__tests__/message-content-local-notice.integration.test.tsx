@@ -57,7 +57,7 @@ function message({ role }: { role: "system" | "user" }): UIMessage {
     id: `m-${role}`,
     role,
     parts: [{ type: "text", text: NOTICE_TEXT }],
-  } as unknown as UIMessage;
+  };
 }
 
 function renderMessage(uiMessage: UIMessage) {

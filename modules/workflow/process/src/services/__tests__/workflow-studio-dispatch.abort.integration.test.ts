@@ -5,16 +5,35 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
+import {
+  parseStudioWorkflow,
+  type StudioClientEvent,
+  type StudioServerEvent,
+} from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WorkflowStudioStream } from "../../channels/nlp-lambda.channel.ts";
 import { WorkflowStudioDispatchService } from "../workflow-studio-dispatch.service.ts";
 
-const blockedCell = {
+const blockedCell: StudioClientEvent = {
   type: "execute_component",
-  payload: { trace_id: "trace-1", node_id: "node-1", inputs: {} },
-} as unknown as StudioClientEvent;
+  payload: {
+    trace_id: "trace-1",
+    node_id: "node-1",
+    inputs: {},
+    workflow: parseStudioWorkflow({
+      workflow_id: "wf-1",
+      spec_version: "1.4",
+      name: "blocked",
+      icon: "x",
+      description: "x",
+      version: "1.0",
+      nodes: [],
+      edges: [],
+      state: {},
+    }),
+  },
+};
 
 /** A stream port answering with whichever reader a scenario hands it. */
 class FixedStream implements WorkflowStudioStream {
@@ -40,11 +59,12 @@ describe("given a studio run streaming from a slow model", () => {
       const cancel = vi.fn(async () => undefined);
       // A read that never resolves: only the abort race can end the loop, so
       // reaching cancel proves the pending read was interrupted.
-      const reader = {
+      const reader: ReadableStreamDefaultReader<Uint8Array> = {
         read: () => new Promise<never>(() => undefined),
         cancel,
         releaseLock: vi.fn(),
-      } as unknown as ReadableStreamDefaultReader<Uint8Array>;
+        closed: Promise.resolve(undefined),
+      };
       const onEvent = vi.fn<(event: StudioServerEvent) => void>();
       let stopped = false;
 
@@ -77,11 +97,12 @@ describe("given a studio run that finishes before any stop", () => {
         },
       });
       const source = stream.getReader();
-      const reader = {
+      const reader: ReadableStreamDefaultReader<Uint8Array> = {
         read: () => source.read(),
         cancel,
         releaseLock: vi.fn(),
-      } as unknown as ReadableStreamDefaultReader<Uint8Array>;
+        closed: Promise.resolve(undefined),
+      };
       const onEvent = vi.fn<(event: StudioServerEvent) => void>();
 
       await dispatch(reader).postEvent({

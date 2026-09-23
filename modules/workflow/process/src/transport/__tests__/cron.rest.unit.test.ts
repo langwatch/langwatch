@@ -5,6 +5,7 @@
  * the process: one shared-secret door, and the two literal addresses the
  * running CronJob already curls.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler, type RestIdentity } from "@langwatch/api/rest";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -37,7 +38,7 @@ function mountCron(cleanupOldLambdas: () => Promise<void>) {
   // No `credential` here: each route raises `internalSecret` for itself, which
   // is what the process's own shared-secret mount does.
   const hono = runtime.mount(cronRest.router(), {
-    app: () => ({ cleanupOldLambdas }) as unknown as WorkflowApi,
+    app: () => createApiFixture<WorkflowApi>({ cleanupOldLambdas }),
     onError: renderRefusal,
   });
 

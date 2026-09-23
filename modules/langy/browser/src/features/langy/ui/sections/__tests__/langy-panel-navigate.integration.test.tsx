@@ -253,7 +253,11 @@ function renderPanel() {
   return render(<LangySidecar />, { wrapper: Wrapper });
 }
 
-const sendOptions = {
+const sendOptions: Parameters<ChatTransport<UIMessage>["sendMessages"]>[0] = {
+  trigger: "submit-message",
+  chatId: "chat-1",
+  messageId: undefined,
+  abortSignal: undefined,
   messages: [
     {
       id: "message-1",
@@ -261,7 +265,7 @@ const sendOptions = {
       parts: [{ type: "text", text: "show me a run" }],
     },
   ],
-} as unknown as Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
+};
 
 beforeEach(() => {
   chatRef.messages = [];

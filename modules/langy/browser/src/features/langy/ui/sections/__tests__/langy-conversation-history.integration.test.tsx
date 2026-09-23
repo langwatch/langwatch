@@ -768,14 +768,16 @@ describe("LangyPanel conversation history", () => {
         lastActivityAtMs: 100_000 - index,
       }));
 
-      it("renders one bounded page and loads older rows on demand", async () => {
+      beforeEach(async () => {
         installScenario({
           conversations: pagedConversations,
           messagesById: {},
         });
         renderPanel();
         await openHistory();
+      });
 
+      it("renders one bounded page and loads older rows on demand", async () => {
         await waitFor(() => {
           expect(screen.getAllByRole("listitem")).toHaveLength(30);
         });
@@ -794,13 +796,6 @@ describe("LangyPanel conversation history", () => {
       });
 
       it("searches on the server and can find a row beyond the first page", async () => {
-        installScenario({
-          conversations: pagedConversations,
-          messagesById: {},
-        });
-        renderPanel();
-        await openHistory();
-
         await userEvent.type(await screen.findByPlaceholderText("Search chats"), "Needle");
 
         await waitFor(() => {
@@ -831,10 +826,13 @@ describe("LangyPanel conversation history", () => {
     });
 
     describe("when the user clicks 'New chat'", () => {
-      it("clears the message stream", async () => {
+      beforeEach(async () => {
         installScenario({ conversations, messagesById });
         renderPanel();
         await recentsTrigger();
+      });
+
+      it("clears the message stream", async () => {
         chatRef.setMessages.mockClear();
         await userEvent.click(screen.getByRole("button", { name: /new chat/i }));
         await waitFor(() => {
@@ -845,9 +843,6 @@ describe("LangyPanel conversation history", () => {
       });
 
       it("keeps the prior conversation in the recent list", async () => {
-        installScenario({ conversations, messagesById });
-        renderPanel();
-        await recentsTrigger();
         await userEvent.click(screen.getByRole("button", { name: /new chat/i }));
         await openHistory();
         expect(await findRecentOption(/Newest chat/i)).toBeInTheDocument();

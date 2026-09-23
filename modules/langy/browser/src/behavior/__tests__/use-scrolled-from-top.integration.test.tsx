@@ -5,7 +5,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import type { RefObject } from "react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { useScrolledFromTop } from "../use-scrolled-from-top.ts";
 
@@ -22,20 +22,20 @@ function scrollTo(el: HTMLElement, top: number) {
 
 describe("useScrolledFromTop", () => {
   describe("when the scroller sits at the very top", () => {
-    it("reports nothing scrolled off above", () => {
-      const el = makeScroller();
+    let el: HTMLElement;
+    let result: { current: boolean };
+
+    beforeEach(() => {
+      el = makeScroller();
       const ref: RefObject<HTMLElement | null> = { current: el };
+      ({ result } = renderHook(() => useScrolledFromTop(ref)));
+    });
 
-      const { result } = renderHook(() => useScrolledFromTop(ref));
-
+    it("reports nothing scrolled off above", () => {
       expect(result.current).toBe(false);
     });
 
     it("treats sub-pixel residue at the top as still at the top", () => {
-      const el = makeScroller();
-      const ref: RefObject<HTMLElement | null> = { current: el };
-      const { result } = renderHook(() => useScrolledFromTop(ref));
-
       act(() => scrollTo(el, 0.5));
 
       expect(result.current).toBe(false);

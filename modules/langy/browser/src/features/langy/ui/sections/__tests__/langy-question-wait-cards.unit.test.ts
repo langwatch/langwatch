@@ -26,7 +26,10 @@ const QUESTIONS = [
 ];
 
 function toolCallWithWait(
-  over: { status?: "pending" | "answered"; answers?: unknown } = {},
+  over: {
+    status?: "pending" | "answered";
+    answers?: NonNullable<LangyTurnToolCall["wait"]>["answers"];
+  } = {},
 ): LangyTurnToolCall {
   return {
     toolCallId: "call_q1",
@@ -53,7 +56,7 @@ function toolCallWithWait(
       answeredBy: null,
       answeredAt: null,
     },
-  } as unknown as LangyTurnToolCall;
+  };
 }
 
 describe("given a turn this tab adopted, so it reads no live stream", () => {

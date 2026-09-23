@@ -227,13 +227,13 @@ describe("given a plain HTTP NLP target instead of a Lambda ARN", () => {
     it("never stages and posts the body inline", async () => {
       const lambda = new RecordingLambda();
       const staging = new RecordingStaging();
-      const call = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+      const call = vi.fn<typeof fetch>(async () => new Response('{"ok":true}', { status: 200 }));
       const subject = NlpInvokeTransportAdapter.create({
         target: "http://localhost:5561",
         config: BASE_CONFIG,
         lambda,
         staging,
-        fetch: call as unknown as typeof fetch,
+        fetch: call,
       });
 
       await subject.send({

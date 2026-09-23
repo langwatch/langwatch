@@ -48,7 +48,19 @@ class RecordingWorkflowService {
 
   saveVersion(input: SaveWorkflowVersionCommand): Promise<WorkflowVersion> {
     this.saved.push(input);
-    return Promise.resolve({ id: "version-1" } as unknown as WorkflowVersion);
+    return Promise.resolve({
+      id: "version-1",
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "",
+      authorId: null,
+      parentId: null,
+      dsl: { version: "1", name: "x", nodes: [], edges: [] },
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    });
   }
 }
 

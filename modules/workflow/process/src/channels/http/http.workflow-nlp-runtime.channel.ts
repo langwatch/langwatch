@@ -217,4 +217,4 @@ export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime
 export const NLP_KEEP_ALIVE_EVENT: StudioClientEvent = {
   type: "is_alive",
   payload: {},
-} as unknown as StudioClientEvent;
+};

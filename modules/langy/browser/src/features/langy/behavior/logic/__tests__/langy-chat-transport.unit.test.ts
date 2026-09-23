@@ -4,7 +4,7 @@
  * turn-start to `useChat().error`.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   createLangyChatTransport,
@@ -63,11 +63,16 @@ function makeTransport(
   return { transport: createLangyChatTransport(deps), onIds };
 }
 
-const options = (over: Record<string, unknown> = {}) =>
-  ({
-    messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
-    ...over,
-  }) as unknown as Parameters<ReturnType<typeof createLangyChatTransport>["sendMessages"]>[0];
+type SendOptions = Parameters<ReturnType<typeof createLangyChatTransport>["sendMessages"]>[0];
+
+const options = (over: Partial<SendOptions> = {}): SendOptions => ({
+  trigger: "submit-message",
+  chatId: "chat-1",
+  messageId: undefined,
+  abortSignal: undefined,
+  messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+  ...over,
+});
 
 describe("createLangyChatTransport", () => {
   beforeEach(() => {
@@ -262,12 +267,17 @@ describe("createLangyChatTransport", () => {
       return opts;
     }
 
-    it("routes a plan snapshot to onSignal and retires the cold-start status once", async () => {
-      const onSignal = vi.fn();
+    let onSignal: Mock<NonNullable<LangyChatTransportDeps["onSignal"]>>;
+    let onData: (entry: unknown) => void;
+
+    beforeEach(async () => {
+      onSignal = vi.fn();
       const { transport } = makeTransport({ conversationId: null }, { onSignal });
       await transport.sendMessages(options());
-      const { onData } = streamHandlers();
+      ({ onData } = streamHandlers());
+    });
 
+    it("routes a plan snapshot to onSignal and retires the cold-start status once", async () => {
       // The manager's cold-window placeholder, then the first real output (plan).
       onData({ type: "status", status: "Starting Langy…" });
       onData({
@@ -289,10 +299,6 @@ describe("createLangyChatTransport", () => {
       // A replayed stream re-delivers the readiness placeholder after the
       // answer is already on screen; the flag is what lets the panel suppress
       // it there instead of rendering "Thinking…" under the visible reply.
-      const onSignal = vi.fn();
-      const { transport } = makeTransport({ conversationId: null }, { onSignal });
-      await transport.sendMessages(options());
-      const { onData } = streamHandlers();
 
       onData({ type: "status", status: "Thinking…" });
       onData({ type: "delta", text: "Sure —" });
@@ -312,11 +318,6 @@ describe("createLangyChatTransport", () => {
     });
 
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
-      const onSignal = vi.fn();
-      const { transport } = makeTransport({ conversationId: null }, { onSignal });
-      await transport.sendMessages(options());
-      const { onData } = streamHandlers();
-
       // First output fires the one-shot cold-start clear…
       onData({ type: "delta", text: "Looking…" });
       onSignal.mockClear();
@@ -347,21 +348,21 @@ describe("createLangyChatTransport", () => {
       };
     }
 
-    it("reports reason 'end' for the genuine end-of-turn frame", async () => {
-      const onTurnSettled = vi.fn();
+    let onTurnSettled: Mock<NonNullable<LangyChatTransportDeps["onTurnSettled"]>>;
+
+    beforeEach(async () => {
+      onTurnSettled = vi.fn();
       const { transport } = makeTransport({}, { onTurnSettled });
       await transport.sendMessages(options());
+    });
 
+    it("reports reason 'end' for the genuine end-of-turn frame", async () => {
       handlers().onData({ type: "end" });
 
       expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
     });
 
     it("reports reason 'error' for an error frame", async () => {
-      const onTurnSettled = vi.fn();
-      const { transport } = makeTransport({}, { onTurnSettled });
-      await transport.sendMessages(options());
-
       handlers().onData({ type: "error", error: "it broke" });
 
       expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({
@@ -372,9 +373,6 @@ describe("createLangyChatTransport", () => {
     it("reports reason 'closed' for a silent subscription completion", async () => {
       // A quiet worker's stream closing is NOT the answer finishing — the
       // caller must keep trusting the durable fold, so the reason says so.
-      const onTurnSettled = vi.fn();
-      const { transport } = makeTransport({}, { onTurnSettled });
-      await transport.sendMessages(options());
 
       handlers().onComplete();
 
@@ -384,10 +382,6 @@ describe("createLangyChatTransport", () => {
     });
 
     it("settles exactly once even when the close races the end frame", async () => {
-      const onTurnSettled = vi.fn();
-      const { transport } = makeTransport({}, { onTurnSettled });
-      await transport.sendMessages(options());
-
       handlers().onData({ type: "end" });
       handlers().onComplete();
 
@@ -495,6 +489,17 @@ describe("createLangyChatTransport", () => {
       return { chunks, done };
     }
 
+    let chunks: ReturnType<typeof collect>["chunks"];
+    let done: Promise<void>;
+    let onData: (entry: unknown) => void;
+
+    beforeEach(async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = await transport.sendMessages(options());
+      ({ chunks, done } = collect(stream));
+      ({ onData } = streamHandlers());
+    });
+
     /**
      * A turn's prose is the paragraphs between its calls. Held in ONE text part
      * for the whole turn, the parts array said "all the text, then all the
@@ -503,14 +508,6 @@ describe("createLangyChatTransport", () => {
      */
     /** @scenario "A tool card sits between the paragraphs it ran between" */
     it("closes the paragraph a call interrupts and opens a new one after it", async () => {
-      const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
-        type: string;
-        id?: string;
-      }>;
-      const { chunks, done } = collect(stream);
-      const { onData } = streamHandlers();
-
       onData({ type: "delta", text: "Looking at the failures." });
       onData({
         type: "tool",
@@ -552,14 +549,6 @@ describe("createLangyChatTransport", () => {
      * two, and the card would still be back where the call began.
      */
     it("leaves the open paragraph alone when a call reports its output", async () => {
-      const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
-        type: string;
-        id?: string;
-      }>;
-      const { chunks, done } = collect(stream);
-      const { onData } = streamHandlers();
-
       onData({
         type: "tool",
         id: "t1",
@@ -592,14 +581,6 @@ describe("createLangyChatTransport", () => {
     });
 
     it("opens no paragraph at all for a turn that only ran tools", async () => {
-      const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
-        type: string;
-        id?: string;
-      }>;
-      const { chunks, done } = collect(stream);
-      const { onData } = streamHandlers();
-
       onData({
         type: "tool",
         id: "t1",

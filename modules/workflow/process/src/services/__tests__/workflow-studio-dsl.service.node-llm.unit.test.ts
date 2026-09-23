@@ -1,6 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderWorkflowStudioDslService } from "../workflow-studio-dsl.service.ts";
@@ -18,7 +18,7 @@ function signatureNode(llmValue: unknown) {
 }
 
 function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
-  return {
+  return parseStudioWorkflow({
     spec_version: "1.5",
     workflow_id: "wf-1",
     name: "Test",
@@ -31,7 +31,7 @@ function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
     edges: [],
     state: {},
     ...overrides,
-  } as unknown as StudioWorkflow;
+  });
 }
 
 function buildAdapter(resolveModelForFeature: ModelProviderApi["resolveModelForFeature"]) {

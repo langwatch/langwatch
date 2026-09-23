@@ -102,11 +102,13 @@ afterEach(async () => {
 
 describe("given an answer linking somewhere that is not LangWatch", () => {
   describe("when the link is clicked", () => {
-    /** @scenario Clicking an off-site link asks first */
-    it("shows where it goes instead of opening it", async () => {
+    beforeEach(() => {
       renderAnswer("See [the pricing page](https://example.com/pricing).");
       whenClicked("the pricing page");
+    });
 
+    /** @scenario Clicking an off-site link asks first */
+    it("shows where it goes instead of opening it", async () => {
       await theDialog();
       expect(destination().textContent).toBe("example.com");
       expect(window.open).not.toHaveBeenCalled();
@@ -115,9 +117,6 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
 
     /** @scenario Clicking an off-site link asks first */
     it("shows the whole address under the host", async () => {
-      renderAnswer("See [the pricing page](https://example.com/pricing).");
-      whenClicked("the pricing page");
-
       await theDialog();
       expect(screen.getByTestId("langy-external-link-url").textContent).toBe(
         "https://example.com/pricing",

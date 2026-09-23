@@ -238,7 +238,9 @@ describe("the scope reset's coverage", () => {
 
         langy().resetForScope({ ...scopeA, projectId: "project-b" });
 
-        const after = useLangyStore.getState() as unknown as Record<string, unknown>;
+        const after: Record<string, unknown> = Object.fromEntries(
+          Object.entries(useLangyStore.getState()),
+        );
         const scoped = Object.entries(initial).filter(
           ([key, value]) => typeof value !== "function" && !SURVIVORS.includes(key),
         );

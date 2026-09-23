@@ -270,11 +270,15 @@ describe("given the Langy panel is open", () => {
   });
 
   describe("given the recents list is showing", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(() => {
+      user = userEvent.setup();
+      renderPanel();
+    });
+
     /** @scenario "Choosing a conversation hands the panel back" */
     it("returns to the message column on the chosen conversation", async () => {
-      const user = userEvent.setup();
-      renderPanel();
-
       await user.click(await screen.findByRole("button", { name: "Recent chats" }));
       const row = await screen.findByRole("button", {
         name: /Debugging the trace pipeline/,
@@ -290,9 +294,6 @@ describe("given the Langy panel is open", () => {
 
     /** @scenario "Leaving the recents list without choosing" */
     it("returns to the message column on Back, Escape, or New chat, without picking anything", async () => {
-      const user = userEvent.setup();
-      renderPanel();
-
       await user.click(await screen.findByRole("button", { name: "Recent chats" }));
       await user.click(await screen.findByRole("button", { name: "Back to chat" }));
 
