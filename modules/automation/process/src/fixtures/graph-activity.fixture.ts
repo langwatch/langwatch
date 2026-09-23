@@ -172,6 +172,24 @@ type PrismaDoubleSeed = {
   suppressions?: { projectId: string; triggerId: string | null; email: string }[];
 };
 
+function matches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
+  return Object.entries(where).every(([key, value]) => {
+    if (key === "OR") {
+      return (value as Record<string, unknown>[]).some((clause) => matches(row, clause));
+    }
+    if (key === "id" && typeof value === "string") return row.id === value;
+    return row[key] === value;
+  });
+}
+
+function isSameTraceSent(row: Record<string, unknown>, entry: Record<string, unknown>): boolean {
+  return (
+    row.triggerId === entry.triggerId &&
+    row.projectId === entry.projectId &&
+    row.traceId === entry.traceId
+  );
+}
+
 /**
  * The tables this path reads and writes, held in arrays. Filtering is
  * deliberately literal -- enumerated `where` shapes, not a generic
@@ -184,15 +202,6 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
   const triggerSent: Record<string, unknown>[] = [];
   const reads = { triggerFindMany: 0 };
   let nextId = 1;
-
-  const matches = (row: Record<string, unknown>, where: Record<string, unknown>): boolean =>
-    Object.entries(where).every(([key, value]) => {
-      if (key === "OR") {
-        return (value as Record<string, unknown>[]).some((clause) => matches(row, clause));
-      }
-      if (key === "id" && typeof value === "string") return row.id === value;
-      return row[key] === value;
-    });
 
   const prisma = {
     trigger: {
@@ -238,12 +247,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
       createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
         let count = 0;
         for (const entry of data) {
-          const duplicate = triggerSent.some(
-            (row) =>
-              row.triggerId === entry.triggerId &&
-              row.projectId === entry.projectId &&
-              row.traceId === entry.traceId,
-          );
+          const duplicate = triggerSent.some((row) => isSameTraceSent(row, entry));
           if (duplicate) continue;
           triggerSent.push({ id: `sent-${nextId++}`, createdAt: FROZEN_ROW_AT, ...entry });
           count += 1;

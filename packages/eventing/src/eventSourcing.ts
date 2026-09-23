@@ -267,7 +267,11 @@ export class EventSourcing {
    * composition to delete — the difference between them is precisely the
    * capability whichever one lost would have taken with it.
    */
-  private describeDuplicateRegistration(incoming: StaticPipelineDefinition<any, any, any>): string {
+  private describeDuplicateRegistration<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(incoming: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): string {
     const existing = this._definitions.find(
       (registered) => registered.metadata.name === incoming.metadata.name,
     );
@@ -280,8 +284,12 @@ export class EventSourcing {
   }
 
   /** One registration's capabilities, as a line a boot failure can carry. */
-  private describeDefinition(
-    definition: StaticPipelineDefinition<any, any, any> | undefined,
+  private describeDefinition<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands> | undefined,
   ): string {
     if (!definition) return "an earlier registration this runtime kept no definition for";
     const subscribers =
@@ -319,28 +327,7 @@ export class EventSourcing {
         ? Record<string, EventSourcedQueueProcessor<any>>
         : CommandsToProcessors<Commands>
     >;
-    // One runtime, one registration per pipeline name; collision is fatal at boot.
-    if (this.pipelines.has(definition.metadata.name)) {
-      throw new Error(this.describeDuplicateRegistration(definition));
-    }
-    if (definition.processManagers.size > 0) {
-      if (this._processManagerMode === "producer-only") {
-        this.declineProcessManagers(definition);
-      } else {
-        this.requireProcessStore();
-      }
-    }
-    try {
-      createEventCatalogue([
-        ...this._definitions.map((registered) => registered.aggregate),
-        definition.aggregate,
-      ]);
-    } catch (error) {
-      const registered = this._definitions.map((existing) => existing.metadata.name).join(", ");
-      throw new Error(
-        `Registering pipeline "${definition.metadata.name}" failed against the already-registered [${registered}]: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    this.assertRegistrable(definition);
     this._definitions.push(definition);
 
     if (!this._enabled || !this.eventStore) {
@@ -419,10 +406,7 @@ export class EventSourcing {
 
     // Get command dispatchers
     const commandProcessors = pipeline.service.getCommandQueues();
-    const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
-    for (const [commandName, processor] of commandProcessors.entries()) {
-      dispatchers[commandName] = processor;
-    }
+    const dispatchers = Object.fromEntries(commandProcessors);
 
     const result = Object.assign(pipeline, {
       commands: dispatchers,
@@ -473,10 +457,44 @@ export class EventSourcing {
     this.initializeStores();
   }
 
+  /** Refuses, before anything is built, a definition this runtime cannot take. */
+  private assertRegistrable<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): void {
+    // One runtime, one registration per pipeline name; collision is fatal at boot.
+    if (this.pipelines.has(definition.metadata.name)) {
+      throw new Error(this.describeDuplicateRegistration(definition));
+    }
+    if (definition.processManagers.size > 0) {
+      if (this._processManagerMode === "producer-only") {
+        this.declineProcessManagers(definition);
+      } else {
+        this.requireProcessStore();
+      }
+    }
+    try {
+      createEventCatalogue([
+        ...this._definitions.map((registered) => registered.aggregate),
+        definition.aggregate,
+      ]);
+    } catch (error) {
+      const registered = this._definitions.map((existing) => existing.metadata.name).join(", ");
+      throw new Error(
+        `Registering pipeline "${definition.metadata.name}" failed against the already-registered [${registered}]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   /**
    * Record that this process declines to run the given process managers.
    */
-  private declineProcessManagers(definition: StaticPipelineDefinition<any, any, any>): void {
+  private declineProcessManagers<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): void {
     const declined = [...definition.processManagers.keys()].filter(
       (name) => !this._unrunProcessManagers.has(name),
     );
@@ -822,7 +840,8 @@ export class EventSourcing {
 function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
->(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
+  Commands extends RegisteredCommand,
+>(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>) {
   // Pass class instances directly — do NOT spread.
   // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(

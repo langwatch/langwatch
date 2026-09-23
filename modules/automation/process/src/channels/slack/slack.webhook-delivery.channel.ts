@@ -56,24 +56,15 @@ interface TriggerData {
   fullTrace: TraceRecord;
 }
 
-async function deliverSlackWebhook(
-  {
-    triggerWebhook,
-    triggerData,
-    triggerName,
-    projectSlug,
-    triggerType,
-    triggerMessage,
-    baseHost,
-  }: SlackWebhookRequest,
-  transport: SlackWebhookTransport,
-): Promise<void> {
-  // Defense-in-depth: never dispatch to anything that is not a genuine Slack
-  // incoming-webhook endpoint, even if an older trigger stored an arbitrary
-  // URL before the slackActionParamsSchema check landed. A bad URL can never
-  // become valid on retry, so the shared guard classifies this non-retryable.
-  assertSlackWebhookUrl(triggerWebhook, triggerName);
-
+function formatTraceLinks({
+  triggerData,
+  triggerMessage,
+  projectSlug,
+  baseHost,
+}: Pick<
+  SlackWebhookRequest,
+  "triggerData" | "triggerMessage" | "projectSlug" | "baseHost"
+>): string[] {
   const traceIds = triggerData
     .map((data) => {
       return {
@@ -133,6 +124,28 @@ async function deliverSlackWebhook(
       }
      `;
   });
+  return traceLinks;
+}
+
+async function deliverSlackWebhook(
+  {
+    triggerWebhook,
+    triggerData,
+    triggerName,
+    projectSlug,
+    triggerType,
+    triggerMessage,
+    baseHost,
+  }: SlackWebhookRequest,
+  transport: SlackWebhookTransport,
+): Promise<void> {
+  // Defense-in-depth: never dispatch to anything that is not a genuine Slack
+  // incoming-webhook endpoint, even if an older trigger stored an arbitrary
+  // URL before the slackActionParamsSchema check landed. A bad URL can never
+  // become valid on retry, so the shared guard classifies this non-retryable.
+  assertSlackWebhookUrl(triggerWebhook, triggerName);
+
+  const traceLinks = formatTraceLinks({ triggerData, triggerMessage, projectSlug, baseHost });
 
   const alertIcon = (alertType: AlertType | null) => {
     switch (alertType) {

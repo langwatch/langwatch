@@ -93,10 +93,13 @@ export class DisabledPipeline<
     >;
 
     // Create a proxy that returns DisabledQueueProcessor for any command
-    this.commands = new Proxy({} as Record<string, EventSourcedQueueProcessor<any>>, {
-      get: (_, commandName) => {
-        return new DisabledQueueProcessor(name, String(commandName));
+    this.commands = new Proxy<DisabledPipeline["commands"]>(
+      {},
+      {
+        get: (_, commandName) => {
+          return new DisabledQueueProcessor(name, String(commandName));
+        },
       },
-    });
+    );
   }
 }

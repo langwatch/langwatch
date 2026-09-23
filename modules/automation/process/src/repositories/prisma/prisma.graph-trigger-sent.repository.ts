@@ -90,14 +90,10 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
         ? graph.series
         : [];
     const index = parseSeriesIndex(input.seriesName);
-    const metric =
-      Number.isInteger(index) &&
-      index >= 0 &&
-      typeof series[index] === "object" &&
-      series[index] !== null &&
-      "metric" in series[index]
-        ? series[index].metric
-        : undefined;
+    const entry: unknown = series[index];
+    const indexInRange = Number.isInteger(index) && index >= 0;
+    const entryHasMetric = typeof entry === "object" && entry !== null && "metric" in entry;
+    const metric = indexInRange && entryHasMetric ? entry.metric : undefined;
     return typeof metric === "string" ? findMetricSource(metric) : undefined;
   }
 
@@ -217,15 +213,15 @@ function uniqueStrings(rows: unknown[], key: string): string[] {
 
 function findMetricSource(metric: string): "trace" | "evaluation" | undefined {
   if (metric.startsWith("evaluations.")) return "evaluation";
-  if (
-    metric.startsWith("metadata.") ||
-    metric.startsWith("performance.") ||
-    metric.startsWith("events.") ||
-    metric.startsWith("sentiment.") ||
-    metric.startsWith("threads.") ||
-    metric.startsWith("topics.") ||
-    metric.startsWith("traces.")
-  )
-    return "trace";
+  const traceMetricPrefixes = [
+    "metadata.",
+    "performance.",
+    "events.",
+    "sentiment.",
+    "threads.",
+    "topics.",
+    "traces.",
+  ];
+  if (traceMetricPrefixes.some((prefix) => metric.startsWith(prefix))) return "trace";
   return undefined;
 }
