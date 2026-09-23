@@ -1422,9 +1422,14 @@ load_images() {
     kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
   else
     # Derive the chart default the same way the workflow's Resolve step does.
-    local repo tag default_image
-    repo=$(helm show values "$CHART_DIR" 2>/dev/null | awk '/^ *repository:/{print $2; exit}')
-    tag=$(helm show values "$CHART_DIR" 2>/dev/null | awk '/^ *tag:/{print $2; exit}')
+    # Read helm's (multi-KB) output ONCE into a variable, then extract with
+    # here-strings: piping it straight into `awk '...exit'` makes awk close the
+    # pipe on the first match while helm is still writing, and under `pipefail`
+    # (set at the top) the SIGPIPE fails the $(...) and set -e aborts (exit 141).
+    local repo tag default_image values
+    values=$(helm show values "$CHART_DIR" 2>/dev/null) || values=""
+    repo=$(awk '/^ *repository:/{print $2; exit}' <<<"$values")
+    tag=$(awk '/^ *tag:/{print $2; exit}' <<<"$values")
     default_image="${repo}:${tag}"
     if [[ -n "$repo" && -n "$tag" ]] && docker image inspect "$default_image" &>/dev/null 2>&1; then
       info "Tagging chart default $default_image as langwatch/langwatch:local and loading into Kind"

@@ -465,7 +465,7 @@ test_lwql() {
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
   # Use the first pod for queries (same data visible on all replicas)
   local pod
-  pod=$(echo "$pods" | head -1)
+  pod=$(head -1 <<<"$pods")
 
   # ClickHouse access model — DELIVERED as rendered users.d/config.d files in the
   # <release>-lwql-clickhouse-access Secret, mounted on every replica (issue
@@ -1182,10 +1182,15 @@ main() {
   local ch_values="${CHART_DIR}/../clickhouse-serverless/values.yaml"
   setup_kind "$ch_values"
 
-  # Build and load the app image into Kind
-  local app_repo app_tag app_image
-  app_repo=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "repository:" | awk '{print $2}')
-  app_tag=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "tag:" | head -1 | awk '{print $2}')
+  # Build and load the app image into Kind. Read helm's (multi-KB) output ONCE
+  # into a variable, then extract images.app.{repository,tag} — the first
+  # repository/tag pair — with here-strings. Piping straight into an early-exit
+  # `awk '...exit'`/`head -1` closes the pipe while helm is still writing, and
+  # under pipefail the SIGPIPE fails the $(...) and set -e aborts (exit 141).
+  local app_repo app_tag app_image values
+  values=$(helm show values "$CHART_DIR" 2>/dev/null) || values=""
+  app_repo=$(awk '/^ *repository:/{print $2; exit}' <<<"$values")
+  app_tag=$(awk '/^ *tag:/{print $2; exit}' <<<"$values")
   app_image="${app_repo}:${app_tag}"
   if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
