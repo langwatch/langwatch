@@ -537,10 +537,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   // Build a query string from the highest-signal axes available on this trace.
   // Service + status are usually present; root span name is a strong cluster
   // signal. We quote bare strings to keep liqe happy with spaces/dashes.
-  const findSimilarQuery = useMemo(
-    () => buildFindSimilarQuery(trace),
-    [trace.serviceName, trace.status, trace.traceName],
-  );
+  const findSimilarQuery = useMemo(() => buildFindSimilarQuery(trace), [trace]);
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
     guardTraceEditExit(() => {
@@ -553,10 +550,7 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   // Title fallback chain: explicit traceName attribute → root span name (the server
   // populates `trace.name` from it) → trace ID prefix as a last resort.
-  const { titleText, titleIsFallback } = useMemo(
-    () => resolveHeaderTitle(trace),
-    [trace.traceName, trace.name, trace.traceId],
-  );
+  const { titleText, titleIsFallback } = useMemo(() => resolveHeaderTitle(trace), [trace]);
 
   const chipDefs = useTraceHeaderChipDefs(trace, {
     onSelectSpan: selectSpan,

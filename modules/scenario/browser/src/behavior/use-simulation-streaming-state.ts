@@ -1,6 +1,6 @@
 import type { CompactStreamingEvent } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 export interface StreamingMessage {
   messageId: string;
@@ -20,25 +20,23 @@ export type StreamingEventPayload = CompactStreamingEvent;
  * Manages optimistic streaming state from SSE events.
  */
 export function useSimulationStreamingState(scenarioRunId?: string) {
-  const storeRef = useRef(createStreamingStore());
+  const [store] = useState(createStreamingStore);
 
   // Cancel RAF and clear buffers on unmount
   useEffect(() => {
-    return () => storeRef.current.destroy();
-  }, []);
+    return () => store.destroy();
+  }, [store]);
 
   const streamingMessages = useSyncExternalStore(
-    storeRef.current.subscribe,
-    storeRef.current.getSnapshot,
-    storeRef.current.getSnapshot,
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
   );
 
   const handleStreamingEvent = useCallback(
     (payload: StreamingEventPayload) => {
       if (scenarioRunId && payload.r && payload.r !== scenarioRunId) return;
       if (!payload.m) return;
-
-      const store = storeRef.current;
 
       switch (payload.e) {
         case "S":
@@ -58,12 +56,15 @@ export function useSimulationStreamingState(scenarioRunId?: string) {
           return;
       }
     },
-    [scenarioRunId],
+    [scenarioRunId, store],
   );
 
-  const clearCompleted = useCallback((serverMessageIds: string[]) => {
-    storeRef.current.clearByIds(serverMessageIds);
-  }, []);
+  const clearCompleted = useCallback(
+    (serverMessageIds: string[]) => {
+      store.clearByIds(serverMessageIds);
+    },
+    [store],
+  );
 
   return { streamingMessages, handleStreamingEvent, clearCompleted };
 }

@@ -83,7 +83,7 @@ export function HomePagePicker({ organizationId }: Props) {
       });
     }
     return opts;
-  }, [stateQuery.data?.firstProjectSlug, resolverQuery.data?.persona]);
+  }, [resolverQuery.data?.firstProjectSlug, resolverQuery.data?.persona]);
 
   const selected = useMemo<OptionValue>(() => {
     const pin = stateQuery.data?.lastHomePath;

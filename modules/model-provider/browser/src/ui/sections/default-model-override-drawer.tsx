@@ -290,7 +290,6 @@ async function persistConfig({
   copy,
   editingId,
   host,
-  onSaved,
   saveMutation,
   scopes,
   utils,
@@ -299,7 +298,6 @@ async function persistConfig({
   copy: { failureTitle: string; successTitle: string };
   editingId: string | undefined;
   host: ReturnType<typeof useModelProviderHost>;
-  onSaved: () => void;
   saveMutation: {
     mutateAsync(input: {
       id?: string;
@@ -322,7 +320,6 @@ async function persistConfig({
       // Best-effort refresh; the save itself already succeeded.
     }
     host.succeeded({ title: copy.successTitle });
-    onSaved();
 
     return true;
   } catch (err) {
@@ -363,18 +360,16 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     teams: [],
     projects: [],
   };
-  const features: FeatureProjection[] = dataQuery.data?.features ?? [];
+  const features = useMemo<FeatureProjection[]>(
+    () => dataQuery.data?.features ?? [],
+    [dataQuery.data?.features],
+  );
 
   // Treat the drawer as always-open while mounted - the registry only
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
   // pops the URL param and unmounts.
   const open = true;
   const onClose = closeDrawer;
-  const onSaved = () => {
-    // No-op: the save mutation invalidates both queries on success.
-    // Kept as a name to preserve the previous prop-driven contract for
-    // future callers that might want to react to a successful save.
-  };
 
   // Ask the server what the cascade would resolve for each role +
   // feature key if the picked scopes had nothing set. The drawer uses
@@ -470,7 +465,6 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         copy,
         editingId,
         host,
-        onSaved,
         saveMutation,
         scopes,
         utils,
@@ -479,7 +473,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [canSave, saveMutation, editingId, hasAnyKey, config, scopes, utils, host, onSaved, onClose]);
+  }, [canSave, saveMutation, editingId, hasAnyKey, config, scopes, utils, host, onClose]);
 
   return (
     <Drawer.Root

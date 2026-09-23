@@ -48,10 +48,11 @@ export function useLangyLocalRecord({
   );
 
   const refetch = query.refetch;
+  const cursorKey = cursor ? `${cursor.acceptedAt}:${cursor.eventId}` : null;
   useEffect(() => {
-    if (!cursor) return;
+    if (cursorKey === null) return;
     void refetch();
-  }, [cursor?.acceptedAt, cursor?.eventId, refetch]);
+  }, [cursorKey, refetch]);
 
   // The folder connecting is what the code access card has to hear about, and
   // on the turn the connect itself started this browser has no live entry to

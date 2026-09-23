@@ -71,7 +71,7 @@ export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.Rea
         },
       );
     },
-    [createTeam, organization, queryClient, closeDrawer],
+    [createTeam, organization, queryClient, closeDrawer, toaster],
   );
 
   return (

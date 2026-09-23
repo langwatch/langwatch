@@ -54,6 +54,7 @@ function useRelatedEntities(
 ) {
   const [related, setRelated] = useState<RelatedAgentEntities | null>(null);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
+  const { onGetRelated, onError } = props;
   useEffect(() => {
     if (!agentToDelete) {
       setRelated(null);
@@ -62,15 +63,14 @@ function useRelatedEntities(
     let active = true;
     setRelated(null);
     setIsLoadingRelated(true);
-    void props
-      .onGetRelated(agentToDelete.id)
+    void onGetRelated(agentToDelete.id)
       .then((value) => {
         if (active) setRelated(value);
       })
       .catch((error: unknown) => {
         if (active) {
           setAgentToDelete(null);
-          props.onError(error);
+          onError(error);
         }
       })
       .finally(() => {
@@ -79,7 +79,7 @@ function useRelatedEntities(
     return () => {
       active = false;
     };
-  }, [agentToDelete, props.onGetRelated, props.onError]);
+  }, [agentToDelete, onGetRelated, onError, setAgentToDelete]);
 
   return { related, isLoadingRelated };
 }

@@ -900,7 +900,7 @@ function LangyPanel({
           void utils.langy.messages.invalidate();
         },
       }),
-    [],
+    [utils, actionHandlersRef],
   );
 
   // Seed the picker with the model the gate currently resolves to. Once the
@@ -1315,14 +1315,7 @@ function LangyPanel({
       cursor: snapshotEventCursor,
       currentTurnId: snapshotCurrentTurnId,
     });
-  }, [
-    activeConversationId,
-    projectId,
-    utils,
-    snapshotEventCursor?.acceptedAt,
-    snapshotEventCursor?.eventId,
-    snapshotCurrentTurnId,
-  ]);
+  }, [activeConversationId, projectId, utils, snapshotEventCursor, snapshotCurrentTurnId]);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the

@@ -69,12 +69,15 @@ export function ComparisonConfigForm({
     draftRef.current = draft;
   }, [draft]);
 
-  const update = (patch: Partial<ComparisonEvaluatorConfig>) => {
-    const next = { ...draftRef.current, ...patch };
-    draftRef.current = next;
-    setDraft(next);
-    onChange(next);
-  };
+  const update = useCallback(
+    (patch: Partial<ComparisonEvaluatorConfig>) => {
+      const next = { ...draftRef.current, ...patch };
+      draftRef.current = next;
+      setDraft(next);
+      onChange(next);
+    },
+    [onChange],
+  );
 
   return (
     <VStack align="stretch" gap={3}>
@@ -115,7 +118,7 @@ function VariantsMultiSelect({
   update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
   targets: TargetConfig[];
 }) {
-  const selected = draft.variants ?? [];
+  const selected = useMemo(() => draft.variants ?? [], [draft.variants]);
   const remaining = targets.filter((t) => !selected.includes(t.id));
   const outputPaths = draft.variantOutputPaths ?? {};
 
@@ -462,7 +465,7 @@ function GoldenAnswerSection({
       hasGoldenAnswer: watchedHasGoldenAnswer,
       ...(watchedHasGoldenAnswer === false ? { goldenField: "" } : {}),
     });
-  }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer]);
+  }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer, update]);
 
   // Mirrors the same dataset-column picker prompt variable mappings use, so
   // "Golden field" reads and behaves like every other source.field selector
@@ -646,7 +649,10 @@ function MetricsSection({
     control: formContext?.control,
     name: "settings.include_metrics",
   }) as Metric[] | undefined;
-  const current = (watchedMetrics ?? draft.includeMetrics ?? []) as Metric[];
+  const current = useMemo(
+    (): Metric[] => watchedMetrics ?? draft.includeMetrics ?? [],
+    [watchedMetrics, draft.includeMetrics],
+  );
 
   const toggle = useCallback(
     ({ metric, on }: { metric: Metric; on: boolean }) => {

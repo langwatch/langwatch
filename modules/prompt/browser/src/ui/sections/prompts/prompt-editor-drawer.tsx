@@ -492,6 +492,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     _onMappingsChangeProp,
     modelMetadata,
     resolvedDefaultModel,
+    onLocalConfigChange,
+    targetId,
   ]);
 
   // Backfill the model once resolvedDefaultModel arrives AFTER the init effect above already

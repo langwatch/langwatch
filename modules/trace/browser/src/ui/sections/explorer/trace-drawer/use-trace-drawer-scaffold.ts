@@ -58,7 +58,10 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // `useTraceHeader` uses React Query's `keepPreviousData`, so the previous trace's
   // data lingers until the new fetch resolves.
   const trace = headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
-  const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
+  const spanTree = useMemo(
+    () => (spanTreeQuery.data && trace ? spanTreeQuery.data : []),
+    [spanTreeQuery.data, trace],
+  );
   // Show the full-shell skeleton whenever we have a traceId in the URL but no result
   // yet — including the moment before the project context has loaded and the query is
   // still disabled.

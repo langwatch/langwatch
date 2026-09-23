@@ -171,7 +171,7 @@ export function LangyTimeseriesCard({ output, projectSlug }: CapabilityCardInput
  * The plot itself, without a card around it.
  */
 export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
-  const series = payload.series ?? [];
+  const series = useMemo(() => payload.series ?? [], [payload.series]);
   const rows = useMemo(() => toWideRows(series), [series]);
   const peak = useMemo(() => peakOf(series), [series]);
   const format = valueFormatter(payload.unit);

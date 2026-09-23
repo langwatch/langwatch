@@ -46,7 +46,7 @@ export function useRoutingPolicyMutations({
       toaster.create({ title, type: "success" });
       onSaved?.();
     },
-    [refetch, onSaved],
+    [refetch, onSaved, toaster],
   );
 
   const create = api.routingPolicy.create.useMutation({

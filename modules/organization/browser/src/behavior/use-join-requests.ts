@@ -60,7 +60,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
         },
       );
     },
-    [organizationId, queryClient],
+    [organizationId, queryClient, toaster, showErrorToast],
   );
 
   return { answeringId, answer };
@@ -167,7 +167,7 @@ function useDomainJoinSetting({
         },
       );
     },
-    [organizationId, queryClient, setJoiningMutation],
+    [organizationId, queryClient, setJoiningMutation, toaster, showErrorToast],
   );
 
   return {

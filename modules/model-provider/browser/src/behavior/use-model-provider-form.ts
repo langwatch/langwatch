@@ -426,19 +426,21 @@ export function useModelProviderForm(
   );
 
   // --- Cross-hook coordination: gateway toggle wires credential keys → extra headers ---
+  const { ensureApiKeyHeader } = extraHeadersHook;
   const handleGatewayToggle = useCallback(
     (useGateway: boolean) => {
       const needsApiKeyHeader = provider.provider === "azure" && useGateway;
-      if (needsApiKeyHeader) extraHeadersHook.ensureApiKeyHeader();
+      if (needsApiKeyHeader) ensureApiKeyHeader();
     },
-    [provider.provider, extraHeadersHook.ensureApiKeyHeader],
+    [provider.provider, ensureApiKeyHeader],
   );
 
+  const { setUseApiGateway: setCredentialsUseApiGateway } = credentialKeysHook;
   const setUseApiGateway = useCallback(
     (use: boolean) => {
-      credentialKeysHook.setUseApiGateway(use, handleGatewayToggle);
+      setCredentialsUseApiGateway(use, handleGatewayToggle);
     },
-    [credentialKeysHook.setUseApiGateway, handleGatewayToggle],
+    [setCredentialsUseApiGateway, handleGatewayToggle],
   );
 
   // --- Single reset effect ---

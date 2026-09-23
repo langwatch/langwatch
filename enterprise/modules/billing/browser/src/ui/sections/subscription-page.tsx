@@ -144,11 +144,12 @@ export function SubscriptionPage() {
   const isTieredLegacyPaidPlan =
     isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
 
+  const planType = plan?.type;
   useEffect(() => {
-    if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
+    if (isTieredLegacyPaidPlan && planType && isAnnualTieredPlan(planType)) {
       setBillingPeriod("annual");
     }
-  }, [isTieredLegacyPaidPlan, plan?.type]);
+  }, [isTieredLegacyPaidPlan, planType]);
 
   const parsedPlan = plan ? parseGrowthSeatPlanType(plan.type) : null;
   const effectiveBillingPeriod: BillingInterval = parsedPlan

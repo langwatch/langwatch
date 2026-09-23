@@ -462,7 +462,7 @@ export const useOpenTargetEditor = () => {
       openDrawer,
       trpcUtils.agents.getById,
       project?.id,
-      project?.slug,
+      isDatasetSource,
     ],
   );
 

@@ -351,7 +351,7 @@ export const useVariableMenu = ({
       setButtonMenuMode(true);
       setMenuOpen(true);
     },
-    [localValue, menuOpen, buttonMenuMode, closeMenu],
+    [localValue, menuOpen, buttonMenuMode, closeMenu, lastUserCursorPosRef],
   );
 
   return {

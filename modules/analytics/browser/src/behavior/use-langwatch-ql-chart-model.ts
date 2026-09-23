@@ -21,7 +21,7 @@ import type {
   LangWatchQLVegaConfig,
 } from "@langwatch/analytics-contract/visualization";
 import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
-import { useMemo, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 
 import {
   type LangWatchQLVegaViewState,
@@ -58,8 +58,17 @@ export function useLangWatchQLChartModel({
   // reload produces a new `datasets` object on every render, and keying on
   // its identity would re-run the bundled schema validation and the full
   // policy walk for a specification that did not change.
-  const rowCountsByDataset = rowCounts(datasets);
-  const rowCountsKey = JSON.stringify(rowCountsByDataset);
+  const currentRowCounts = rowCounts(datasets);
+  const rowCountsKey = JSON.stringify(currentRowCounts);
+  const [keyedRowCounts, setKeyedRowCounts] = useState({
+    key: rowCountsKey,
+    counts: currentRowCounts,
+  });
+  if (keyedRowCounts.key !== rowCountsKey) {
+    setKeyedRowCounts({ key: rowCountsKey, counts: currentRowCounts });
+  }
+  const rowCountsByDataset =
+    keyedRowCounts.key === rowCountsKey ? keyedRowCounts.counts : currentRowCounts;
 
   const validation = useMemo(
     () =>
@@ -68,7 +77,7 @@ export function useLangWatchQLChartModel({
         columnsByDataset,
         rowCountsByDataset,
       }),
-    [spec, columnsByDataset, rowCountsKey],
+    [spec, columnsByDataset, rowCountsByDataset],
   );
 
   const scan = useMemo(() => {

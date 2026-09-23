@@ -97,7 +97,7 @@ export const AddOrEditAnnotationScore = ({
         );
         break;
     }
-  }, [existingAnnotationScore.data?.id, existingAnnotationScore.data?.updatedAt]);
+  }, [existingAnnotationScore.data, reset]);
 
   const [scoreTypeOptions, setScoreTypeOptions] = useState<string[]>([""]);
   const [defaultRadioOption, setDefaultRadioOption] = useState<string>("");

@@ -214,9 +214,12 @@ export function SpotlightPopover({
   const boxRef = useRef<HTMLDivElement>(null);
   const [measuredHeight, setMeasuredHeight] = useState(0);
   useEffect(() => {
-    const h = boxRef.current?.offsetHeight ?? 0;
-    if (h > 0 && h !== measuredHeight) setMeasuredHeight(h);
-  });
+    const box = boxRef.current;
+    if (!box) return;
+    const observer = new ResizeObserver(() => setMeasuredHeight(box.offsetHeight));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
 
   // Position calculation — place below the anchor by default; flip to
   // above when too close to the bottom of the viewport.

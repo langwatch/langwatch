@@ -27,9 +27,10 @@ export type ExtraFooterComponentsProps = {
 };
 
 export function ExtraFooterComponents(props: ExtraFooterComponentsProps) {
+  const { configureCrispBubble, isSaas } = props;
   useEffect(() => {
-    props.configureCrispBubble(props.isSaas);
-  }, [props.configureCrispBubble, props.isSaas]);
+    configureCrispBubble(isSaas);
+  }, [configureCrispBubble, isSaas]);
 
   if (!props.isSaas) return null;
 
@@ -60,51 +61,37 @@ function sanitizeForJs(value: string): string {
 export function SignedInExtraFooterComponents(
   props: ExtraFooterComponentsProps & { user: SaasBrowserUser },
 ) {
+  const { analytics, environment, organization, project, runtime, user } = props;
   const hasTracked = useRef(false);
   const hasUpdatedLastLogin = useRef(false);
 
   useEffect(() => {
-    if (!props.user.email || !props.organization?.name || hasTracked.current) return;
-    return props.analytics.identifyReo({
-      user: props.user,
-      organization: props.organization,
+    if (!user.email || !organization?.name || hasTracked.current) return;
+    return analytics.identifyReo({
+      user,
+      organization,
       onIdentified: () => {
         hasTracked.current = true;
       },
     });
-  }, [props.analytics, props.user.email, props.user.name, props.organization?.name]);
+  }, [analytics, user, organization]);
 
   useEffect(() => {
-    if (
-      !props.organization ||
-      !props.project ||
-      hasUpdatedLastLogin.current ||
-      props.user.impersonator
-    )
-      return;
+    if (!organization || !project || hasUpdatedLastLogin.current || user.impersonator) return;
     hasUpdatedLastLogin.current = true;
-    props.runtime.updateLastLogin();
-  }, [props.organization?.id, props.project?.id, props.runtime, props.user.impersonator]);
+    runtime.updateLastLogin();
+  }, [organization, project, runtime, user.impersonator]);
 
   useEffect(() => {
-    if (!props.organization || !props.project || props.user.impersonator) return;
-    return props.analytics.trackDashboardOpen({
-      user: props.user,
-      organization: props.organization,
-      project: props.project,
-      environment: props.environment,
-    });
-  }, [props.analytics, props.environment, props.organization?.id, props.project?.id, props.user]);
+    if (!organization || !project || user.impersonator) return;
+    return analytics.trackDashboardOpen({ user, organization, project, environment });
+  }, [analytics, environment, organization, project, user]);
 
   useEffect(() => {
-    if (!props.user.impersonator) {
-      props.analytics.identifyPostHogUser({
-        user: props.user,
-        organization: props.organization,
-        project: props.project,
-      });
+    if (!user.impersonator) {
+      analytics.identifyPostHogUser({ user, organization, project });
     }
-  }, [props.analytics, props.organization?.id, props.project?.id, props.user]);
+  }, [analytics, organization, project, user]);
 
   if (!props.organization || !props.project) return null;
 

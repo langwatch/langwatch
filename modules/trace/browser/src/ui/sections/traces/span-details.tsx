@@ -83,7 +83,7 @@ export function SpanDetails({
     }
 
     return null;
-  }, [span.params, span.span_id, span.parent_id, allSpans]);
+  }, [span.params, span.span_id, allSpans]);
 
   return (
     <VStack flexGrow={1} gap={3} align="start">

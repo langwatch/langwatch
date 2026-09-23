@@ -64,7 +64,7 @@ export default function ExperimentsWorkbenchPage() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, setName, datasets, targets, reset, autosaveStatus, addEvaluator, removeEvaluator } =
+  const { name, setName, datasets, targets, reset, autosaveStatus, addEvaluator } =
     useEvaluationsV3Store((state) => ({
       name: state.name,
       setName: state.setName,
@@ -73,7 +73,6 @@ export default function ExperimentsWorkbenchPage() {
       reset: state.reset,
       autosaveStatus: state.ui.autosaveStatus,
       addEvaluator: state.addEvaluator,
-      removeEvaluator: state.removeEvaluator,
     }));
 
   // The columns as their own headers name them, which is also how a run's
@@ -344,7 +343,6 @@ export default function ExperimentsWorkbenchPage() {
     createDatasetRecords,
     utils,
     addEvaluator,
-    removeEvaluator,
     executeEvaluation,
     openDrawer,
   ]);

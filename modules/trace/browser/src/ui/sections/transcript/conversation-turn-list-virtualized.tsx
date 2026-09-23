@@ -112,7 +112,7 @@ export function VirtualizedTurnList({
   useEffect(() => {
     if (turns.length === 0) return;
     virtualizer.scrollToIndex(turns.length - 1, { align: "end" });
-  }, [totalTurns, virtualizer]);
+  }, [totalTurns, turns.length, virtualizer]);
 
   return (
     <Box

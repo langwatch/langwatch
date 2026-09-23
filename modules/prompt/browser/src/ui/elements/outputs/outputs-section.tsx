@@ -454,7 +454,7 @@ const JsonSchemaDialog = ({
   useEffect(() => {
     const code = JSON.stringify(value, null, 2);
     setCode(code);
-    checkForErrors(code);
+    setError(checkForJsonSchemaErrors(code));
   }, [value, open]);
 
   const checkForErrors = useCallback(

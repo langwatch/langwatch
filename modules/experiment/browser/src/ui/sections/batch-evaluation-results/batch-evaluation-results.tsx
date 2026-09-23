@@ -427,13 +427,12 @@ export function BatchEvaluationResults({
 
   const [chartsVisible, setChartsVisible] = useState(defaultChartsVisible);
 
-  // Update charts visibility when charts become available/unavailable
-  // We don't want to re-render when canShowCharts changes.
-  useEffect(() => {
-    if (canShowCharts && !chartsVisible) {
-      setChartsVisible(true);
-    }
-  }, [canShowCharts]);
+  // Charts that just became available open visible; a later hide by the user sticks.
+  const [chartsWereAvailable, setChartsWereAvailable] = useState(canShowCharts);
+  if (canShowCharts !== chartsWereAvailable) {
+    setChartsWereAvailable(canShowCharts);
+    if (canShowCharts) setChartsVisible(true);
+  }
 
   // Build chart data for single run (when not in compare mode but has 2+ targets)
   const singleRunChartData = useMemo(() => {

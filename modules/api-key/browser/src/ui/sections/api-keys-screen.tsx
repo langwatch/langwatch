@@ -163,7 +163,7 @@ export default function ApiKeysScreen() {
   // service API keys. They render in two separate labeled sections. `!= null`
   // catches both null and undefined so keys without the field stay in the
   // regular list.
-  const allApiKeys = apiKeys.data ?? [];
+  const allApiKeys = useMemo(() => apiKeys.data ?? [], [apiKeys.data]);
   const ingestionKeys = useMemo(
     () => allApiKeys.filter((k) => k.ingestSourceType != null),
     [allApiKeys],

@@ -84,7 +84,10 @@ export function TargetVariablesPanel({
     [target.inputs],
   );
 
-  const datasetMappings = target.mappings[activeDatasetId] ?? {};
+  const datasetMappings = useMemo(
+    () => target.mappings[activeDatasetId] ?? {},
+    [target.mappings, activeDatasetId],
+  );
   const mappings = useMemo(() => toVariableMappings(datasetMappings), [datasetMappings]);
 
   const usedFields = useMemo(() => getUsedFields(target), [target]);

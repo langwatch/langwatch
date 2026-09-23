@@ -156,12 +156,6 @@ export function EvaluateModalContent({
     name: "commitMessage",
   });
 
-  useEffect(() => {
-    if (!evaluateOn) {
-      form.setValue("evaluateOn", total && total > 50 ? splitOptions[1]! : splitOptions[0]!);
-    }
-  }, [form, total, evaluateOn]);
-
   const datasetName = entryNode?.data.dataset?.name;
   const trainSize = entryNode?.data.train_size ?? 0.8;
   const testSize = entryNode?.data.test_size ?? 0.2;
@@ -174,32 +168,43 @@ export function EvaluateModalContent({
       testSize,
     },
   );
-  const splitOptions: DatasetSplitOption[] = [
-    {
-      label: "Full dataset",
-      value: "full",
-      description: `Full ${datasetName} dataset`,
-    },
-    {
-      label: "Test entries",
-      value: "test",
-      description: isPercentage
-        ? `${Math.round(testSize * 100)}% of ${datasetName} dataset`
-        : `${test.length} entries`,
-    },
-    {
-      label: "Train entries",
-      value: "train",
-      description: isPercentage
-        ? `${Math.round(trainSize * 100)}% of ${datasetName} dataset`
-        : `${train.length} entries`,
-    },
-    {
-      label: "Specific entry",
-      value: "specific",
-      description: `Specific entry from ${datasetName} dataset`,
-    },
-  ];
+  const testCount = test.length;
+  const trainCount = train.length;
+  const splitOptions = useMemo<DatasetSplitOption[]>(
+    () => [
+      {
+        label: "Full dataset",
+        value: "full",
+        description: `Full ${datasetName} dataset`,
+      },
+      {
+        label: "Test entries",
+        value: "test",
+        description: isPercentage
+          ? `${Math.round(testSize * 100)}% of ${datasetName} dataset`
+          : `${testCount} entries`,
+      },
+      {
+        label: "Train entries",
+        value: "train",
+        description: isPercentage
+          ? `${Math.round(trainSize * 100)}% of ${datasetName} dataset`
+          : `${trainCount} entries`,
+      },
+      {
+        label: "Specific entry",
+        value: "specific",
+        description: `Specific entry from ${datasetName} dataset`,
+      },
+    ],
+    [datasetName, isPercentage, testSize, trainSize, testCount, trainCount],
+  );
+
+  useEffect(() => {
+    if (!evaluateOn) {
+      form.setValue("evaluateOn", total && total > 50 ? splitOptions[1]! : splitOptions[0]!);
+    }
+  }, [form, total, evaluateOn, splitOptions]);
 
   const estimatedTotal = useMemo(() => {
     if (evaluateOn?.value === "full") {

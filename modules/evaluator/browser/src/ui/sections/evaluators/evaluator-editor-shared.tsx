@@ -583,7 +583,7 @@ export function useEvaluatorEditorController(
     project?.id,
     evaluatorId,
     evaluatorType,
-    isWorkflowEvaluator,
+    isPersistedEvaluator,
     isValid,
     form,
     createMutation,

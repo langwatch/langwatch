@@ -269,7 +269,7 @@ export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const actions = useDlqActions();
 
-  const groups = dlqQuery.data ?? [];
+  const groups = useMemo(() => dlqQuery.data ?? [], [dlqQuery.data]);
   const shownGroups = useMemo(() => filterDlqGroups(groups, filterText), [groups, filterText]);
   const processDead = processDeadQuery.data ?? [];
   const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);

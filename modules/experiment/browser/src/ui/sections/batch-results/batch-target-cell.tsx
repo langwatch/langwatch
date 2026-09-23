@@ -127,6 +127,12 @@ export function BatchTargetCell({
 
   useEscapeKey({ enabled: isOutputExpanded, onEscape: handleCloseExpanded });
 
+  // Use shared utility for consistent output formatting
+  // Handles the "single output key" unwrap rule:
+  // - {output: "hello"} -> "hello"
+  // - {pizza: false} -> '{"pizza": false}' (formatted JSON)
+  const rawOutput = formatTargetOutput(targetOutput.output);
+
   // Copy output to clipboard
   const handleCopyOutput = useCallback(() => {
     if (rawOutput) {
@@ -134,13 +140,7 @@ export function BatchTargetCell({
       setHasCopied(true);
       setTimeout(() => setHasCopied(false), 2000);
     }
-  }, []);
-
-  // Use shared utility for consistent output formatting
-  // Handles the "single output key" unwrap rule:
-  // - {output: "hello"} -> "hello"
-  // - {pizza: false} -> '{"pizza": false}' (formatted JSON)
-  const rawOutput = formatTargetOutput(targetOutput.output);
+  }, [rawOutput]);
 
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
   const displayOutput = isTruncated ? rawOutput.slice(0, MAX_DISPLAY_CHARS) : rawOutput;

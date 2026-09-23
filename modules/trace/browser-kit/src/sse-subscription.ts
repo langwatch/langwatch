@@ -106,10 +106,10 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
     if (!enabled) {
       hasConnectedRef.current = false;
       setConnectionState("disconnected");
-      logger.debug({ input }, "SSE subscription disabled");
+      logger.debug("SSE subscription disabled");
     } else {
       setConnectionState((s) => (s === "disconnected" ? "connecting" : s));
-      logger.debug({ input }, "SSE subscription enabled");
+      logger.debug("SSE subscription enabled");
     }
   }, [enabled]);
 

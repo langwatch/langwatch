@@ -24,7 +24,7 @@ function SharedTraceView() {
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
 
   const trace = shared?.header ?? null;
-  const spanTree = shared?.spanTree ?? [];
+  const spanTree = useMemo(() => shared?.spanTree ?? [], [shared?.spanTree]);
 
   const selectedSpan = useMemo(
     () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),

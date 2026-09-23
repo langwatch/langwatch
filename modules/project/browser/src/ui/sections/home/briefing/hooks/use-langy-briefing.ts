@@ -858,7 +858,6 @@ export function useLangyBriefing(): LangyBriefingResult {
     summaries.isLoading,
     summaries.isFetching,
     recent.data,
-    recent.isLoading,
     recent.isFetching,
     analytics.data,
     analytics.isLoading,

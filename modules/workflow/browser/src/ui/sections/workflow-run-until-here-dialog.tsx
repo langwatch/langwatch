@@ -3,7 +3,7 @@ import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-cont
 import { Dialog } from "@langwatch/design-system/dialog";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store.ts";
@@ -80,7 +80,7 @@ export function WorkflowRunUntilHereDialog({
 
   const entryNode = getWorkflowEntryNode(nodes);
   const targetNode = nodes.find((node) => node.id === untilNodeId);
-  const fields = entryNode?.data.outputs ?? [];
+  const fields = useMemo(() => entryNode?.data.outputs ?? [], [entryNode?.data.outputs]);
   const dataset = entryNode?.data.dataset;
 
   const [view, setView] = useState<"fields" | "table">("fields");

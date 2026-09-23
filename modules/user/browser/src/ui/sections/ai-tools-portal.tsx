@@ -50,7 +50,7 @@ export function AiToolsPortal() {
 
   // No cast: the procedure map declares the same `AiToolEntry` these tiles
   // name, so the read lands typed.
-  const entries: AiToolEntry[] = listQuery.data ?? [];
+  const entries = useMemo<AiToolEntry[]>(() => listQuery.data ?? [], [listQuery.data]);
 
   const grouped = useMemo(() => {
     const byType: Record<AiToolEntry["type"], AiToolEntry[]> = {

@@ -154,7 +154,7 @@ export function useLandingRedirect(): void {
       // travels with it.
       carryLangyConversation({
         destination: landingDestination({
-          resolved: toResolvedHome(resolved),
+          resolved: toResolvedHome({ data: resolved.data, isError: resolved.isError }),
           isReachableLoading,
           reachableProducts,
           rememberedProduct: organization

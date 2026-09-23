@@ -657,6 +657,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     mappings,
     handleMappingChange,
     openDrawer,
+    form,
+    threadIdleTimeout,
   ]);
 
   const handleSelectEvaluator = useCallback(() => {
@@ -771,7 +773,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
 
     openDrawer("evaluatorList", {});
-  }, [name, level, sample, preconditions, openDrawer, handleMappingChange, threadIdleTimeout]);
+  }, [
+    name,
+    level,
+    sample,
+    preconditions,
+    openDrawer,
+    handleMappingChange,
+    threadIdleTimeout,
+    form,
+  ]);
 
   const handleLevelChange = useCallback(
     (details: { value: string | null }) => {

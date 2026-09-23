@@ -921,6 +921,7 @@ export function EvaluationsV3Table({
     isDatasetSource,
     handleComparisonEvaluatorSave,
     handlePendingComparisonChange,
+    addOrReplaceTarget,
   ]);
 
   // Re-hydrate the comparison editor's flow context after a full page reload.
@@ -1164,7 +1165,7 @@ export function EvaluationsV3Table({
   }, [execute, selectedRows]);
 
   // Get columns from active dataset, filtering out hidden columns
-  const allDatasetColumns = activeDataset?.columns ?? [];
+  const allDatasetColumns = useMemo(() => activeDataset?.columns ?? [], [activeDataset?.columns]);
   const datasetColumns = useMemo(
     () => allDatasetColumns.filter((col) => !ui.hiddenColumns.has(col.name)),
     [allDatasetColumns, ui.hiddenColumns],
@@ -1271,18 +1272,7 @@ export function EvaluationsV3Table({
     })
     .map((r) => r.id)
     .join(",");
-  const targetIds = useMemo(
-    () =>
-      targets
-        .slice()
-        .toSorted((a, b) => {
-          if (a.type === "evaluator" && b.type !== "evaluator") return 1;
-          if (a.type !== "evaluator" && b.type === "evaluator") return -1;
-          return 0;
-        })
-        .map((r) => r.id),
-    [targetIdsKey],
-  );
+  const targetIds = useMemo(() => targetIdsKey.split(",").filter(Boolean), [targetIdsKey]);
 
   // Which target columns are comparisons, so they can be given a wider default.
   // Keyed on comparison-ness (not just the id list) so switching an evaluator
@@ -1298,7 +1288,15 @@ export function EvaluationsV3Table({
 
   // Similarly stabilize dataset columns - include type in key so icon updates when type changes
   const datasetColumnsKey = datasetColumns.map((c) => `${c.id}:${c.type}`).join(",");
-  const stableDatasetColumns = useMemo(() => datasetColumns, [datasetColumnsKey]);
+  const [keyedDatasetColumns, setKeyedDatasetColumns] = useState({
+    key: datasetColumnsKey,
+    columns: datasetColumns,
+  });
+  if (keyedDatasetColumns.key !== datasetColumnsKey) {
+    setKeyedDatasetColumns({ key: datasetColumnsKey, columns: datasetColumns });
+  }
+  const stableDatasetColumns =
+    keyedDatasetColumns.key === datasetColumnsKey ? keyedDatasetColumns.columns : datasetColumns;
 
   // Stabilize comparison evaluators — only those considered configured (see
   // isComparisonConfigured above). Key on the ordered variants list so the

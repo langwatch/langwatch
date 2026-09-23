@@ -68,7 +68,7 @@ export function DeployPromptDialog({
   const deleteTag = api.promptTags.delete.useMutation();
   const utils = api.useUtils();
 
-  const versions = versionsQuery.data ?? [];
+  const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
   const latestVersion = versions.reduce(
     (max: any, v: any) => (!max || v.version > max.version ? v : max),

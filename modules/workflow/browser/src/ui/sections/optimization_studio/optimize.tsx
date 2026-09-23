@@ -13,7 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api,api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
+import { api, api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -31,6 +31,7 @@ import {
   FormProvider,
   type UseFormReturn,
   useForm,
+  useWatch,
 } from "react-hook-form";
 
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
@@ -173,8 +174,10 @@ export function OptimizeModalContent({
     preview: true,
   });
 
-  const optimizer = OPTIMIZERS[form.watch("optimizer").value];
-  const params = form.watch("params");
+  const optimizerChoice = useWatch({ control: form.control, name: "optimizer" });
+  const optimizer = OPTIMIZERS[optimizerChoice.value];
+  const params = useWatch({ control: form.control, name: "params" });
+  const llmConfig = useWatch({ control: form.control, name: "params.llm" });
 
   useEffect(() => {
     if (!optimizer) return;
@@ -357,8 +360,6 @@ export function OptimizeModalContent({
         : !hasEvaluator
           ? "You need at least one evaluator node in your workflow to run optimizations"
           : false;
-
-  const llmConfig = form.watch("params.llm");
 
   return (
     <FormProvider {...form}>

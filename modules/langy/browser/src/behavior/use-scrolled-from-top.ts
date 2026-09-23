@@ -1,34 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+// Scroll does not bubble, but it does capture: one document listener follows
+// whichever element is behind the ref, including one swapped in on remount.
+function subscribeToScroll(onScroll: () => void): () => void {
+  document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+  return () => document.removeEventListener("scroll", onScroll, { capture: true });
+}
 
 /**
  * Whether a scroll container has content scrolled off above its top edge.
  */
 export function useScrolledFromTop(scrollRef: React.RefObject<HTMLElement | null>): boolean {
-  const [isScrolledFromTop, setIsScrolledFromTop] = useState(false);
-  const subscribedRef = useRef<HTMLElement | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
-
-  // No dependency array on purpose: the guard is a cheap ref identity check,
-  // and every commit is exactly when a swapped-in scroller can have appeared.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el === subscribedRef.current) return;
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = null;
-    subscribedRef.current = el;
-    if (!el) {
-      setIsScrolledFromTop(false);
-      return;
-    }
-    // A pixel of slack: fractional zoom and smooth-scroll settling can leave
-    // sub-pixel residue at the top, which must still count as "at the top".
-    const update = () => setIsScrolledFromTop(el.scrollTop > 1);
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    unsubscribeRef.current = () => el.removeEventListener("scroll", update);
-  });
-
-  useEffect(() => () => unsubscribeRef.current?.(), []);
-
-  return isScrolledFromTop;
+  // A pixel of slack: fractional zoom and smooth-scroll settling can leave
+  // sub-pixel residue at the top, which must still count as "at the top".
+  const readScrolledFromTop = () => (scrollRef.current?.scrollTop ?? 0) > 1;
+  return useSyncExternalStore(subscribeToScroll, readScrolledFromTop, () => false);
 }

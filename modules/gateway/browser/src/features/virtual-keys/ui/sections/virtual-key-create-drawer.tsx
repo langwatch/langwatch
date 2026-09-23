@@ -161,7 +161,10 @@ export function VirtualKeyCreateDrawer({
   );
   const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
 
-  const providers = (orgProvidersQuery.data ?? []) as OrgModelProvider[];
+  const providers = useMemo(
+    (): OrgModelProvider[] => orgProvidersQuery.data ?? [],
+    [orgProvidersQuery.data],
+  );
   const policies = (policiesQuery.data ?? []) as {
     id: string;
     name: string;

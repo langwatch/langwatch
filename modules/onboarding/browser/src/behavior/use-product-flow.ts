@@ -73,7 +73,7 @@ export function useProductFlow() {
     if (inferred && inferred !== selectedProduct) {
       setSelectedProduct(inferred);
     }
-  }, [router.query.product, router.query.step, selectedProduct]);
+  }, [router.query.product, router.query.step, router.asPath, selectedProduct]);
 
   // Screen ID mapping for URL query parameters
   const screenIdMap = useMemo(() => {

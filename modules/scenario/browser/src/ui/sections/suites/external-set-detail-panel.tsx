@@ -173,10 +173,7 @@ export function ExternalSetDetailPanel({
   }, [filters, scenarioOptions, setFilters]);
 
   // Apply filters to raw run data
-  const filteredRuns = useMemo(
-    () => filterExternalRuns(runData, filters),
-    [runData, filters.scenarioId, filters.passFailStatus],
-  );
+  const filteredRuns = useMemo(() => filterExternalRuns(runData, filters), [runData, filters]);
 
   // Group filtered runs by batch (for groupBy "none")
   const batchRuns = useMemo(() => {

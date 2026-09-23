@@ -86,6 +86,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     { enabled: false },
   );
 
+  const { refetch: refetchDiscover } = discoverQuery;
   const lastDiscoverKey = useRef("");
   useEffect(() => {
     if (!canDiscover) return;
@@ -96,7 +97,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     if (key === lastDiscoverKey.current) return;
     lastDiscoverKey.current = key;
 
-    void discoverQuery.refetch().then((result) => {
+    void refetchDiscover().then((result) => {
       if (result.data) {
         const relevant = new Set(
           result.data.projections.filter((p) => p.aggregateCount > 0).map((p) => p.projectionName),
@@ -104,8 +105,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
         setSelectedProjections(relevant);
       }
     });
-  }, [canDiscover, allTenants, tenantIds, since]);
-  // react-hooks/exhaustive-deps
+  }, [canDiscover, allTenants, tenantIds, since, refetchDiscover]);
 
   const projectionMetaByName = useMemo(
     () => new Map((projectionsQuery.data?.projections ?? []).map((p) => [p.projectionName, p])),

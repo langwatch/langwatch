@@ -2,7 +2,7 @@ import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
 import { MoreVertical } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   LuBraces,
   LuCopy,
@@ -124,7 +124,10 @@ export function TraceOverflowMenu({
   }, [project, traceId, isPinned, pinMutation, unpinMutation]);
 
   const conversationTurns = useConversationTurns(conversationId);
-  const conversationTraceIds = conversationTurns.data?.items.map((t) => t.traceId) ?? [];
+  const conversationTraceIds = useMemo(
+    () => conversationTurns.data?.items.map((t) => t.traceId) ?? [],
+    [conversationTurns.data],
+  );
   const hasConversation = !!conversationId && conversationTraceIds.length > 1;
 
   const handleAddTrace = useCallback(() => {

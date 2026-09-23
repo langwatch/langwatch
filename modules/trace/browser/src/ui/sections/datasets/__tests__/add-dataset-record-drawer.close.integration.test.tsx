@@ -116,8 +116,7 @@ function OpenFromTrace() {
   useEffect(() => {
     openDrawer("traceV2Details", { traceId: "trace-1", t: "1700000000" });
     openDrawer("addDatasetRecord", { traceId: "trace-1" });
-    // Opening is a one-shot setup, not a reaction to anything that changes.
-  }, []);
+  }, [openDrawer]);
   return null;
 }
 
@@ -128,7 +127,7 @@ function OpenFromSelection() {
     openDrawer("addDatasetRecord", {
       selectedTraceIds: ["trace-1", "trace-2"],
     });
-  }, []);
+  }, [openDrawer]);
   return null;
 }
 

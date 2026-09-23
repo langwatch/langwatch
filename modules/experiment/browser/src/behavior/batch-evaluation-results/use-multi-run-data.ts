@@ -89,9 +89,8 @@ export const useMultiRunData = ({
     { enabled: enabled && !!runIds[7], refetchInterval },
   );
 
-  const queries = [run0, run1, run2, run3, run4, run5, run6, run7];
-
   const runs: RunWithColor[] = useMemo(() => {
+    const queries = [run0, run1, run2, run3, run4, run5, run6, run7];
     return runIds.slice(0, 8).map((runId, idx) => ({
       runId,
       // Use stable color from map, or fallback to index-based color
@@ -100,7 +99,7 @@ export const useMultiRunData = ({
       isLoading: queries[idx]?.isLoading ?? false,
       error: queries[idx]?.error ?? null,
     }));
-  }, [runIds, queries, runColorMap]);
+  }, [runIds, run0, run1, run2, run3, run4, run5, run6, run7, runColorMap]);
 
   const isLoading = runs.some((r) => r.isLoading);
   const isAllLoaded = runs.every((r) => !r.isLoading && r.data !== null);

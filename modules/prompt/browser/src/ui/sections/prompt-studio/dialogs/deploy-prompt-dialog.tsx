@@ -68,7 +68,7 @@ export function DeployPromptDialog({
   const utils = promptApi.useUtils();
   const host = usePromptHost();
 
-  const versions = versionsQuery.data ?? [];
+  const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
   const latestVersion = versions.reduce<(typeof versions)[number] | null>(
     (max, v) => (!max || v.version > max.version ? v : max),
@@ -142,7 +142,17 @@ export function DeployPromptDialog({
     } finally {
       setIsSaving(false);
     }
-  }, [tagsQuery.data, tagSelections, allTags, assignTag, projectId, configId, onClose, utils]);
+  }, [
+    tagsQuery.data,
+    tagSelections,
+    allTags,
+    assignTag,
+    projectId,
+    configId,
+    onClose,
+    utils,
+    host,
+  ]);
 
   const versionItems = useMemo(
     () =>

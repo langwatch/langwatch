@@ -191,9 +191,10 @@ export default function AnnotationScoresScreen() {
 
   const deleteAnnotationScore = annotationScoresApi.annotationScore.delete.useMutation();
 
+  const { refetch: refetchAnnotationScores } = getAllAnnotationScores;
   useEffect(() => {
-    void getAllAnnotationScores.refetch();
-  }, [isAnnotationDrawerOpen]);
+    void refetchAnnotationScores();
+  }, [isAnnotationDrawerOpen, refetchAnnotationScores]);
 
   const handleToggleScore = (scoreId: string, active: boolean) => {
     toggleAnnotationScore.mutate(

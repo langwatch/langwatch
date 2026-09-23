@@ -137,11 +137,13 @@ export const useSession = (
 
   const status: SessionStatus = isPending ? "loading" : data ? "authenticated" : "unauthenticated";
 
+  const required = options?.required;
+  const onUnauthenticated = options?.onUnauthenticated;
   useEffect(() => {
-    if (options?.required && status === "unauthenticated" && options.onUnauthenticated) {
-      options.onUnauthenticated();
+    if (required && status === "unauthenticated" && onUnauthenticated) {
+      onUnauthenticated();
     }
-  }, [options?.required, options?.onUnauthenticated, status]);
+  }, [required, onUnauthenticated, status]);
 
   const update = useCallback(async () => {
     // Force a fresh fetch (bypass inflight dedup) and notify all subscribers

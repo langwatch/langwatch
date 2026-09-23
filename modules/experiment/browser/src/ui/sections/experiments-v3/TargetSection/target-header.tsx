@@ -151,7 +151,7 @@ export const TargetHeader = memo(function TargetHeader({
   // For comparison column-targets, resolve every variant's display name so the
   // mini-summary at the right can say "{winner} wins" rather than just "wins",
   // and so the tooltip can break the tally down per variant.
-  const targetComparison = toComparisonConfig(target);
+  const targetComparison = useMemo(() => toComparisonConfig(target), [target]);
   const variantIds = targetComparison?.variants;
   const allTargets = useEvaluationsV3Store((state) => state.targets);
   const variantTargets = useMemo(
@@ -244,7 +244,7 @@ export const TargetHeader = memo(function TargetHeader({
             effectiveRowCount,
           )
         : computeTargetAggregates(target.id, results, evaluators, effectiveRowCount),
-    [target, results, evaluators, effectiveRowCount],
+    [target, targetComparison, results, evaluators, effectiveRowCount],
   );
 
   const comparisonAggregate = useMemo(() => {

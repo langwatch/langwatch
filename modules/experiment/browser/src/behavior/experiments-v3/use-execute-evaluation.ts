@@ -716,7 +716,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
       await execute(scope);
     },
-    [execute, updateEvaluatorResult],
+    [execute],
   );
 
   return {

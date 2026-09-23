@@ -53,7 +53,7 @@ vi.mock("../scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
-    }, [open]);
+    }, [open, onConfirm]);
     return null;
   },
 }));
@@ -415,13 +415,13 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       const user = userEvent.setup();
       renderWithTarget({ type: "workflow", id: "workflow-agent-input-only" });
       await user.click(screen.getByTestId("save-and-run-button"));
-      await waitFor(() => {
-        expect(mocks.mockRunScenario).toHaveBeenCalled();
-      });
     });
 
     /** @scenario Run gate passes for workflow agent with input-only mapping */
     it("proceeds with the run without opening the mapping drawer", async () => {
+      await waitFor(() => {
+        expect(mocks.mockRunScenario).toHaveBeenCalled();
+      });
       expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith(
         "agentWorkflowEditor",
         expect.anything(),
@@ -430,6 +430,9 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
 
     /** @scenario Run gate emits no mapping warning when input is mapped */
     it("does not show a mapping warning toast", async () => {
+      await waitFor(() => {
+        expect(mocks.mockRunScenario).toHaveBeenCalled();
+      });
       expect(mockToasterCreate).not.toHaveBeenCalledWith(
         expect.objectContaining({ title: "Configure scenario mappings" }),
       );

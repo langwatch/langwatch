@@ -87,7 +87,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   // once their text finishes typing (see TypewriterHero).
   useEffect(
     () => scheduleStageAdvance({ drawerOpen, setStage, stageDef }),
-    [stage, stageDef.holdMs, stageDef.next, stageDef.typewriter, setStage, drawerOpen],
+    [stageDef, setStage, drawerOpen],
   );
 
   // Reset the journey on unmount so re-entry (e.g. via the toolbar's
@@ -111,7 +111,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 
   const handleAdvanceManual = useCallback(
     () => advanceStageManually({ setStage, stageDef }),
-    [stageDef.next, stageDef.showDensitySpotlight, setStage],
+    [stageDef, setStage],
   );
 
   // If the user has already confirmed a density in a past journey,
@@ -121,7 +121,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   // it on entry so the user goes straight to the aurora beat.
   useEffect(() => {
     skipConfirmedDensityStage({ setStage, stageDef });
-  }, [stage, stageDef.showDensitySpotlight, stageDef.next, setStage]);
+  }, [stageDef, setStage]);
 
   // (The body data attribute that drives the drawer/sidebar glow
   // CSS now lives in `OnboardingHost` via `BodyStageAttribute`.)
@@ -176,7 +176,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 
   const handleTypewriterDone = useCallback(
     () => advanceAfterTypewriter({ setStage, stageDef }),
-    [stageDef.cta, stageDef.next, setStage],
+    [stageDef, setStage],
   );
 
   if (!project || !organization) {

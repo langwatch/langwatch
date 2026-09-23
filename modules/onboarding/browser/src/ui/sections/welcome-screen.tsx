@@ -209,8 +209,19 @@ export const WelcomeScreen: React.FC = () => {
       return;
     }
     setOnboardingNeeded(false);
-    void router.push(welcomeDestination({ decision, returnTo, landing }));
-  }, [organizationIsLoading, organizations, project?.slug, returnTo, created, takeover, landing]);
+    const destination = welcomeDestination({ decision, returnTo, landing });
+    if (destination === router.asPath) return;
+    void router.push(destination);
+  }, [
+    organizationIsLoading,
+    organizations,
+    project?.slug,
+    returnTo,
+    created,
+    takeover,
+    landing,
+    router,
+  ]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();

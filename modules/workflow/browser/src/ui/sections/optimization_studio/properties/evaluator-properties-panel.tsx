@@ -84,6 +84,7 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
   );
 
   const updateMutation = api.evaluators.update.useMutation();
+  const { refetch: refetchEvaluator } = evaluatorQuery;
 
   const config = evaluatorQuery.data?.config as {
     evaluatorType?: string;
@@ -92,7 +93,7 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
 
   const evaluatorType = config?.evaluatorType;
   const dbName = evaluatorQuery.data?.name ?? "";
-  const dbSettings = config?.settings ?? {};
+  const dbSettings = useMemo(() => config?.settings ?? {}, [config?.settings]);
 
   const evaluatorDef = evaluatorType
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
@@ -252,11 +253,20 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
       {
         onSuccess: () => {
           setNode({ id: node.id, data: { localConfig: undefined } });
-          void evaluatorQuery.refetch();
+          void refetchEvaluator();
         },
       },
     );
-  }, [project?.id, evaluatorId, evaluatorType, form, updateMutation, setNode, node.id]);
+  }, [
+    project?.id,
+    evaluatorId,
+    evaluatorType,
+    form,
+    updateMutation,
+    setNode,
+    node.id,
+    refetchEvaluator,
+  ]);
 
   const handleDiscard = useCallback(() => {
     debouncedSetLocalConfig.cancel();

@@ -26,7 +26,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
@@ -231,7 +231,7 @@ export function FieldsDefinition({
   // dataset attach, or the evaluator toggle). Keyed on a content signature, not
   // the array reference, so a fresh reference each render can't loop; guarded
   // against an already-matching form so the user's own edits never replace mid-typing.
-  const currentFields = node.data[field] ?? [];
+  const currentFields = useMemo(() => node.data[field] ?? [], [node.data, field]);
   const fieldsSignature = JSON.stringify(
     currentFields.map((f) => [f.identifier, f.type, f.optional ?? false]),
   );

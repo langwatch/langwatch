@@ -55,7 +55,7 @@ vi.mock("../scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
-    }, [open]);
+    }, [open, onConfirm]);
     return null;
   },
 }));

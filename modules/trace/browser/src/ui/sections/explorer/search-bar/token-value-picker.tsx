@@ -53,18 +53,17 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
   // as text (not just filter the list) — clicking a chip should let you tweak
   // the value directly, as well as pick from the dropdown. Re-seeds whenever
   // the picker opens for a different chip.
+  const anchorKey = anchor ? `${anchor.field}:${anchor.location.start}` : null;
+  const anchorValue = anchor?.currentValue;
   useEffect(() => {
-    setFilter(anchor?.currentValue ?? "");
+    setFilter(anchorValue ?? "");
     setActiveIndex(0);
-    filterSeededAnchorKey.current = anchor ? `${anchor.field}:${anchor.location.start}` : null;
-  }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
+    filterSeededAnchorKey.current = anchorKey;
+  }, [anchorKey, anchorValue]);
 
   // Deferred to the next frame so focus wins the race against the chip-click that opened the
   // picker — a plain `autoFocus` fires mid-mount and the opening click can steal it right back.
-  useEffect(
-    () => (anchor ? focusAndSelectValue(inputRef) : undefined),
-    [anchor?.field, anchor?.location.start],
-  );
+  useEffect(() => (anchorKey ? focusAndSelectValue(inputRef) : undefined), [anchorKey]);
 
   // Resolve this chip's field to a categorical descriptor. Lifted above the
   // value memo so the server-search hook's `enabled` can depend on it.
@@ -100,7 +99,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
 
   const values = useMemo(
     () => pickerValues({ cat, filter, pristine, serverValues: serverSearch.values }),
-    [anchor, cat, pristine, serverSearch.values, filter],
+    [cat, pristine, serverSearch.values, filter],
   );
 
   // On open, move the highlight onto the current value's row so ↑↓ starts from where

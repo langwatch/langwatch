@@ -148,6 +148,7 @@ export function useHandleSavePrompt() {
     tabId,
     utils.prompts.getByIdOrHandle,
     nextVersion,
+    host,
   ]);
 
   return { handleSaveVersion };

@@ -191,7 +191,7 @@ export function LangyComposerPalette({
       itemToValue: (item) => item.value,
       itemToString: (item) => item.label,
     });
-  }, [items, query, mode, registeredTargets]);
+  }, [items, query, mode]);
 
   /** The groups actually present, in display order. */
   const groups = useMemo(() => {

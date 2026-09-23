@@ -14,7 +14,7 @@ export function AnomaliesCard() {
     onSuccess: () => query.refetch(),
   });
 
-  const anomalies = query.data?.anomalies ?? [];
+  const anomalies = useMemo(() => query.data?.anomalies ?? [], [query.data?.anomalies]);
   const hasAny = anomalies.length > 0;
   const hasError = query.isError && !query.isFetching;
   const hardCount = useMemo(() => anomalies.filter((a) => a.tier === "hard").length, [anomalies]);

@@ -71,8 +71,9 @@ export const useSectionPresenceStore = create<SectionPresenceState>((set) => ({
 export function useSyncSectionPresence(value: { traceId: string; tab: "summary" | "span" }): void {
   const setPresence = useSectionPresenceStore((s) => s.set);
   const clearPresence = useSectionPresenceStore((s) => s.clear);
+  const { traceId, tab } = value;
   useEffect(() => {
-    setPresence(value);
+    setPresence({ traceId, tab });
     return () => clearPresence();
-  }, [value.traceId, value.tab, setPresence, clearPresence]);
+  }, [traceId, tab, setPresence, clearPresence]);
 }
