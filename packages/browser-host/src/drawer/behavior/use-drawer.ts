@@ -15,7 +15,7 @@ import type {
   UiDrawerRegistry,
 } from "../model/drawer-registry.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
-import { drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
+import { type DrawerRouter, drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
 
 const logger = createLogger("useDrawer");
 
@@ -400,6 +400,92 @@ function isUrlSerializable(value: unknown): boolean {
 // Main Hook
 // ============================================================================
 
+// Records an open on the navigation stack: reset, replace the top, or push forward.
+function pushDrawerStack({
+  drawer,
+  params,
+  currentDrawerNow,
+  query,
+  resetStack,
+  replaceCurrentInStack,
+}: {
+  drawer: DrawerType;
+  params: Record<string, unknown>;
+  currentDrawerNow: string | undefined;
+  query: DrawerRouter["query"];
+  resetStack?: boolean;
+  replaceCurrentInStack?: boolean;
+}): void {
+  if (resetStack || !currentDrawerNow) {
+    // Reset stack - fresh start with no back navigation
+    drawerStack = [{ drawer, params }];
+    return;
+  }
+  if (replaceCurrentInStack && drawerStack.length > 0) {
+    // Replace the current entry in the stack (useful for flow callbacks)
+    // This makes "back" skip the replaced drawer
+    drawerStack.pop();
+    drawerStack.push({ drawer, params });
+    return;
+  }
+  // A drawer is already open - navigating forward, push to stack. An empty
+  // stack means the drawer came from a deep link or outlived a reload, so seed
+  // it from the address bar (not the router snapshot, which can still name a
+  // drawer the reader has since dismissed) so back navigation can return there.
+  if (drawerStack.length === 0) {
+    const openInUrl = openDrawerInLocation();
+    if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
+  }
+
+  snapshotTopEntryParams({ currentDrawerNow, query });
+
+  // A drawer appears in the stack once: opening one already in it returns to
+  // that entry instead of stacking a second copy. Without this, trace →
+  // dataset → trace would leave closing the trace walking back into a dataset
+  // drawer the reader had already left behind.
+  const existingIndex = drawerStack.findIndex((entry) => entry.drawer === drawer);
+  if (existingIndex !== -1) drawerStack.length = existingIndex;
+
+  drawerStack.push({ drawer, params });
+}
+
+// Snapshot current URL params for the top-of-stack drawer so goBack
+// restores the full state (e.g. selectedTab set after initial open)
+function snapshotTopEntryParams({
+  currentDrawerNow,
+  query,
+}: {
+  currentDrawerNow: string;
+  query: DrawerRouter["query"];
+}): void {
+  const topEntry = drawerStack[drawerStack.length - 1];
+  if (topEntry?.drawer !== currentDrawerNow) return;
+  const currentUrlParams: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (key.startsWith("drawer.") && key !== "drawer.open") {
+      currentUrlParams[key.replace("drawer.", "")] = value;
+    }
+  }
+  topEntry.params = currentUrlParams;
+}
+
+function warnNonSerializableProps({
+  drawer,
+  params,
+}: {
+  drawer: DrawerType;
+  params: Record<string, unknown>;
+}): void {
+  const badKeys = Object.entries(params)
+    .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
+    .map(([k]) => k);
+  if (badKeys.length === 0) return;
+  logger.warn(
+    `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}. ` +
+      `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
+  );
+}
+
 /**
  * Manages drawer state via URL params, with a navigation stack for the back
  * button. Generic over the registry so a caller naming the application's
@@ -503,57 +589,15 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
         return;
       }
 
-      // Manage drawer stack for navigation history
-      if (resetStack || !currentDrawerNow) {
-        // Reset stack - fresh start with no back navigation
-        drawerStack = [{ drawer: effectiveDrawer, params: allParams }];
-      } else if (replaceCurrentInStack && drawerStack.length > 0) {
-        // Replace the current entry in the stack (useful for flow callbacks)
-        // This makes "back" skip the replaced drawer
-        drawerStack.pop();
-        drawerStack.push({ drawer: effectiveDrawer, params: allParams });
-      } else {
-        // A drawer is already open - navigating forward, push to stack. An empty
-        // stack means the drawer came from a deep link or outlived a reload, so seed
-        // it from the address bar (not the router snapshot, which can still name a
-        // drawer the reader has since dismissed) so back navigation can return there.
-        if (drawerStack.length === 0) {
-          const openInUrl = openDrawerInLocation();
-          if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
-        }
-
-        // Snapshot current URL params for the top-of-stack drawer so goBack
-        // restores the full state (e.g. selectedTab set after initial open)
-        const topEntry = drawerStack[drawerStack.length - 1];
-        if (topEntry && topEntry.drawer === currentDrawerNow) {
-          const currentUrlParams: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(router.query)) {
-            if (key.startsWith("drawer.") && key !== "drawer.open") {
-              currentUrlParams[key.replace("drawer.", "")] = value;
-            }
-          }
-          topEntry.params = currentUrlParams;
-        }
-
-        // A drawer appears in the stack once: opening one already in it returns to
-        // that entry instead of stacking a second copy. Without this, trace →
-        // dataset → trace would leave closing the trace walking back into a dataset
-        // drawer the reader had already left behind.
-        const existingIndex = drawerStack.findIndex((entry) => entry.drawer === effectiveDrawer);
-        if (existingIndex !== -1) drawerStack.length = existingIndex;
-
-        drawerStack.push({ drawer: effectiveDrawer, params: allParams });
-      }
-
-      const badKeys = Object.entries(allParams)
-        .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
-        .map(([k]) => k);
-      if (badKeys.length > 0) {
-        logger.warn(
-          `Non-serializable props passed to drawer "${effectiveDrawer}": ${badKeys.join(", ")}. ` +
-            `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
-        );
-      }
+      pushDrawerStack({
+        drawer: effectiveDrawer,
+        params: allParams,
+        currentDrawerNow,
+        query: router.query,
+        resetStack,
+        replaceCurrentInStack,
+      });
+      warnNonSerializableProps({ drawer: effectiveDrawer, params: allParams });
 
       updateDrawerUrl(effectiveDrawer, allParams, { replace });
     },

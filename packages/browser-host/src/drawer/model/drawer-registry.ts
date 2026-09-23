@@ -128,7 +128,7 @@ export type DrawerPropsOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>>
 export type DrawerCallbacksOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = {
   [
     K in keyof DrawerPropsOf<R, T> as DrawerPropsOf<R, T>[K] extends
-      | ((...args: any[]) => any)
+      | ((...args: never[]) => unknown)
       | undefined
       ? K
       : never

@@ -905,6 +905,71 @@ function rowMarkersFor({
   };
 }
 
+function compareLeadingThenPinned({
+  a,
+  b,
+  leading,
+  pinnedKeys,
+}: {
+  a: string;
+  b: string;
+  leading: Set<string>;
+  pinnedKeys: Set<string>;
+}): number {
+  const aLead = leading.has(a) ? 0 : 1;
+  const bLead = leading.has(b) ? 0 : 1;
+  if (aLead !== bLead) return aLead - bLead;
+  const aPin = pinnedKeys.has(a) ? 0 : 1;
+  const bPin = pinnedKeys.has(b) ? 0 : 1;
+  if (aPin !== bPin) return aPin - bPin;
+  return a.localeCompare(b);
+}
+
+function correctedAttributes({
+  attributes,
+  edits,
+  spanId,
+}: {
+  attributes: AttributeTableProps["attributes"];
+  edits: Record<string, unknown> | undefined;
+  spanId: AttributeTableProps["spanId"];
+}) {
+  const flat = flattenAttributes(attributes);
+  // Attributes the correction adds are rows in their own right.
+  for (const [key, value] of Object.entries(edits ?? {})) {
+    if (value === null) continue;
+    flat[key] = value;
+  }
+  // Prepend the span id as a synthetic, copyable first row. A real
+  // `span_id` attribute (vanishingly unlikely) still wins via the spread.
+  return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
+}
+
+function keysTheCorrectionRemoved({
+  attributes,
+  correctedFrom,
+}: {
+  attributes: AttributeTableProps["attributes"];
+  correctedFrom: AttributeTableProps["correctedFrom"];
+}): Record<string, unknown> {
+  if (!correctedFrom) return {};
+  const corrected = flattenAttributes(attributes);
+  const captured = flattenAttributes(correctedFrom);
+  return Object.fromEntries(Object.entries(captured).filter(([key]) => !(key in corrected)));
+}
+
+function withRemovedRows({
+  correctedFlat,
+  removedKeys,
+}: {
+  correctedFlat: ReturnType<typeof correctedAttributes>;
+  removedKeys: Record<string, unknown>;
+}) {
+  const removedRows = Object.entries(removedKeys).filter(([key]) => !(key in correctedFlat));
+  if (removedRows.length === 0) return correctedFlat;
+  return { ...correctedFlat, ...Object.fromEntries(removedRows) };
+}
+
 function AttrSection({
   title,
   attributes,
@@ -967,15 +1032,9 @@ function AttrSection({
   );
   const sortedEntries = useMemo(
     () =>
-      Object.entries(flat).toSorted(([a], [b]) => {
-        const aLead = leading.has(a) ? 0 : 1;
-        const bLead = leading.has(b) ? 0 : 1;
-        if (aLead !== bLead) return aLead - bLead;
-        const aPin = pinnedKeys.has(a) ? 0 : 1;
-        const bPin = pinnedKeys.has(b) ? 0 : 1;
-        if (aPin !== bPin) return aPin - bPin;
-        return a.localeCompare(b);
-      }),
+      Object.entries(flat).toSorted(([a], [b]) =>
+        compareLeadingThenPinned({ a, b, leading, pinnedKeys }),
+      ),
     [flat, pinnedKeys, leading],
   );
 
@@ -1194,38 +1253,28 @@ export function AttributeTable({
 
   // Keys the capture had that the correction does not. They keep their captured
   // value so the struck-through row still shows what is being taken away.
-  const removedKeys = useMemo(() => {
-    if (!correctedFrom) return {};
-    const corrected = flattenAttributes(attributes);
-    const captured = flattenAttributes(correctedFrom);
-    return Object.fromEntries(Object.entries(captured).filter(([key]) => !(key in corrected)));
-  }, [attributes, correctedFrom]);
+  const removedKeys = useMemo(
+    () => keysTheCorrectionRemoved({ attributes, correctedFrom }),
+    [attributes, correctedFrom],
+  );
 
   // What the span carries once the correction is applied, which is what copying
   // and the JSON view quote: an attribute the correction took away must not
   // travel back out as one the span still has.
-  const correctedFlat = useMemo(() => {
-    const flat = flattenAttributes(attributes);
-    // Attributes the correction adds are rows in their own right.
-    for (const [key, value] of Object.entries(editing?.edits ?? {})) {
-      if (value === null) continue;
-      flat[key] = value;
-    }
-    // Prepend the span id as a synthetic, copyable first row. A real
-    // `span_id` attribute (vanishingly unlikely) still wins via the spread.
-    return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
-  }, [attributes, spanId, editing?.edits]);
+  const correctedFlat = useMemo(
+    () => correctedAttributes({ attributes, edits: editing?.edits, spanId }),
+    [attributes, spanId, editing?.edits],
+  );
 
   // The rows the table lists: everything the corrected span carries, plus the
   // keys it took away. Those keep their captured value so the struck-through
   // row still shows what is being taken away, and a correction that re-adds one
   // under a different value still reads as that value. Rows sort by key, so
   // where a row goes in makes no difference to where it lands.
-  const flatAttrs = useMemo(() => {
-    const removedRows = Object.entries(removedKeys).filter(([key]) => !(key in correctedFlat));
-    if (removedRows.length === 0) return correctedFlat;
-    return { ...correctedFlat, ...Object.fromEntries(removedRows) };
-  }, [correctedFlat, removedKeys]);
+  const flatAttrs = useMemo(
+    () => withRemovedRows({ correctedFlat, removedKeys }),
+    [correctedFlat, removedKeys],
+  );
   const flatResAttrs = useMemo(
     () => (resourceAttributes ? flattenAttributes(resourceAttributes) : undefined),
     [resourceAttributes],

@@ -10,6 +10,11 @@ interface DimInputs {
   isPlaceholderData: boolean;
 }
 
+// A rolling window's bounds drift every tick, so its key holds the label alone.
+function unlessRolling<T>(label: unknown, bound: T): T | null {
+  return label ? null : bound;
+}
+
 /**
  * Coordinates the "view switching" dim signal + refresh pulse for the trace list. We
  * dim only when the user explicitly switches view (filter, sort, page, pageSize, or a
@@ -35,8 +40,8 @@ export function useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }
   const prevRef = useRef({
     queryText,
     timeRangeLabel,
-    timeRangeFrom: timeRangeLabel ? null : timeRangeFrom,
-    timeRangeTo: timeRangeLabel ? null : timeRangeTo,
+    timeRangeFrom: unlessRolling(timeRangeLabel, timeRangeFrom),
+    timeRangeTo: unlessRolling(timeRangeLabel, timeRangeTo),
     page,
     pageSize,
     sortColumnId,
@@ -51,8 +56,8 @@ export function useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }
     const next = {
       queryText,
       timeRangeLabel,
-      timeRangeFrom: timeRangeLabel ? null : timeRangeFrom,
-      timeRangeTo: timeRangeLabel ? null : timeRangeTo,
+      timeRangeFrom: unlessRolling(timeRangeLabel, timeRangeFrom),
+      timeRangeTo: unlessRolling(timeRangeLabel, timeRangeTo),
       page,
       pageSize,
       sortColumnId,
@@ -114,8 +119,6 @@ export function useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }
       pulse();
       return;
     }
-    if (!wantsRefresh && wasRefreshingRef.current) {
-      wasRefreshingRef.current = false;
-    }
+    if (!wantsRefresh) wasRefreshingRef.current = false;
   }, [wantsRefresh, pulse]);
 }
