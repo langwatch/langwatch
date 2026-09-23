@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { ScimDirectoryConnection } from "@langwatch/enterprise-scim-contract";
-import type { IdentityApi } from "@langwatch/identity-contract";
+import type { IdentityApi, OrganizationSsoConnection } from "@langwatch/identity-contract";
 
 /**
  * The one thing SCIM asks Identity about connections: which ones this
@@ -18,9 +18,7 @@ export class ScimConnectionsService {
   }
 
   async findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]> {
-    const connections = await this.identity
-      .ssoConnectionReads()
-      .findForOrganization({ organizationId: input.organizationId });
+    const connections = await this.findHeldConnections(input);
 
     return connections.map((connection) => ({
       connectionId: connection.connectionId,
@@ -28,5 +26,12 @@ export class ScimConnectionsService {
       type: connection.type,
       state: connection.state,
     }));
+  }
+
+  /** Every connection the organization holds, as identity answers it, whatever its state. */
+  findHeldConnections(input: { organizationId: string }): Promise<OrganizationSsoConnection[]> {
+    return this.identity
+      .ssoConnectionReads()
+      .findForOrganization({ organizationId: input.organizationId });
   }
 }

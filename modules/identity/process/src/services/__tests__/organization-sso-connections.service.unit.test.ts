@@ -19,6 +19,8 @@ function connection({
   state,
   createdAtMs,
   verifiedDomains = [],
+  replacesConnectionId = null,
+  migrationPhase = null,
 }: {
   connectionId: string;
   organizationId: string;
@@ -26,6 +28,8 @@ function connection({
   state: SsoConnectionState["state"];
   createdAtMs: number;
   verifiedDomains?: string[];
+  replacesConnectionId?: string | null;
+  migrationPhase?: SsoConnectionState["migrationPhase"];
 }): SsoConnectionState {
   const empty = emptySsoConnection({ connectionId });
   return {
@@ -34,6 +38,8 @@ function connection({
     state,
     createdAtMs,
     verifiedDomains,
+    replacesConnectionId,
+    migrationPhase,
     idpMetadata: { ...empty.idpMetadata, providerId },
   };
 }
@@ -83,8 +89,32 @@ describe("given a peer module asking which connections an organization holds", (
           verifiedDomains: ["acme.com"],
           type: "oidc",
           state: "ACTIVE",
+          replacesConnectionId: null,
+          migrationPhase: null,
         },
       ]);
+    });
+
+    it("answers which connection a replacement replaces, and where its cutover stands", async () => {
+      const service = serviceOver([
+        connection({
+          connectionId: "ssoc_direct",
+          organizationId: ACME,
+          providerId: "okta",
+          state: "ACTIVE",
+          createdAtMs: 2,
+          replacesConnectionId: "ssoc_legacy",
+          migrationPhase: "FINALIZING",
+        }),
+      ]);
+
+      const [replacement] = await service.findForOrganization({ organizationId: ACME });
+
+      expect(replacement).toMatchObject({
+        connectionId: "ssoc_direct",
+        replacesConnectionId: "ssoc_legacy",
+        migrationPhase: "FINALIZING",
+      });
     });
 
     it("never carries another organization's connection", async () => {

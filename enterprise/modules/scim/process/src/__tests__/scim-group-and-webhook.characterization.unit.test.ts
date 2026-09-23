@@ -84,6 +84,7 @@ class ScimServiceFake extends ScimService {
   readonly listTokens: ScimService["listTokens"] = vi.fn();
   readonly revokeToken: ScimService["revokeToken"] = vi.fn();
   readonly verifyToken: ScimService["verifyToken"] = vi.fn();
+  readonly recordTokenUse: ScimService["recordTokenUse"] = vi.fn();
   readonly getUser: ScimService["getUser"] = vi.fn();
   readonly replaceUser: ScimService["replaceUser"] = vi.fn();
   readonly updateUser: ScimService["updateUser"] = vi.fn();
@@ -143,7 +144,7 @@ describe("SCIM characterization: Auth0 webhook", () => {
       // The relay is past the credential, so nothing here asks the retirement
       // anything: it refuses a delivery at `admit`, which this never reaches.
       retirement: ScimConnectionRetirementService.create({
-        connections: { findConnections: async () => [] },
+        connections: { findHeldConnections: async () => [] },
         tokens: service,
       }),
       webhookSecret: () => undefined,

@@ -18,6 +18,9 @@ const RETIRED_STATES: ReadonlySet<string> = new Set(["DISCARDED", "TORN_DOWN"]);
 /** Going, not gone: its grace can still be served, so its tokens stay. */
 const RETIRING_STATES: ReadonlySet<string> = new Set(["TEARDOWN_PENDING"]);
 
+/** A replacement at these phases has retired its predecessor's directory writes, as on main. */
+const RETIRING_REPLACEMENT_PHASES: ReadonlySet<string> = new Set(["FINALIZING", "FINALIZED"]);
+
 /** The one thing retirement does to this module's rows. */
 export interface ScimTokenRetirement {
   revokeTokensForConnection(input: {
@@ -28,7 +31,7 @@ export interface ScimTokenRetirement {
 
 export class ScimConnectionRetirementService {
   static create(deps: {
-    connections: Pick<ScimConnectionsService, "findConnections">;
+    connections: Pick<ScimConnectionsService, "findHeldConnections">;
     tokens: ScimTokenRetirement;
   }): ScimConnectionRetirementService {
     return new ScimConnectionRetirementService(deps);
@@ -36,7 +39,7 @@ export class ScimConnectionRetirementService {
 
   private constructor(
     private readonly deps: {
-      connections: Pick<ScimConnectionsService, "findConnections">;
+      connections: Pick<ScimConnectionsService, "findHeldConnections">;
       tokens: ScimTokenRetirement;
     },
   ) {}
@@ -45,6 +48,7 @@ export class ScimConnectionRetirementService {
    * Whether a credential naming this connection may still write, as main's
    * `connectionAcceptsDirectoryWrites` answered by state. Refusing a gone
    * connection retires its tokens too, so the sync history says it ended.
+   * A replacement that has begun finalizing refuses its predecessor too.
    */
   async admits({
     organizationId,
@@ -53,12 +57,18 @@ export class ScimConnectionRetirementService {
     organizationId: string;
     connectionId: string;
   }): Promise<boolean> {
-    const held = (await this.deps.connections.findConnections({ organizationId })).find(
-      (connection) => connection.connectionId === connectionId,
-    );
+    const connections = await this.deps.connections.findHeldConnections({ organizationId });
+    const held = connections.find((connection) => connection.connectionId === connectionId);
 
     if (held && RETIRING_STATES.has(held.state)) return false;
-    if (held && !RETIRED_STATES.has(held.state)) return true;
+    if (held && !RETIRED_STATES.has(held.state)) {
+      return !connections.some(
+        (connection) =>
+          connection.replacesConnectionId === connectionId &&
+          connection.migrationPhase !== null &&
+          RETIRING_REPLACEMENT_PHASES.has(connection.migrationPhase),
+      );
+    }
 
     await this.deps.tokens.revokeTokensForConnection({ organizationId, connectionId });
 

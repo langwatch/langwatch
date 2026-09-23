@@ -136,6 +136,8 @@ describe("the scimToken tRPC namespace", () => {
               verifiedDomains: [],
               type: "oidc",
               state: "ACTIVE",
+              replacesConnectionId: null,
+              migrationPhase: null,
             },
             {
               connectionId: "ssoconn_2",
@@ -144,6 +146,8 @@ describe("the scimToken tRPC namespace", () => {
               verifiedDomains: [],
               type: "oidc",
               state: "DRAFT",
+              replacesConnectionId: null,
+              migrationPhase: null,
             },
           ],
         });
@@ -171,6 +175,8 @@ describe("the scimToken tRPC namespace", () => {
               verifiedDomains: [],
               type: "oidc",
               state: "ACTIVE",
+              replacesConnectionId: null,
+              migrationPhase: null,
             },
           ],
         });
@@ -215,6 +221,8 @@ describe("the scimToken tRPC namespace", () => {
             verifiedDomains: [],
             type: "oidc",
             state: "ACTIVE",
+            replacesConnectionId: null,
+            migrationPhase: null,
           },
         ],
       });

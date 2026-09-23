@@ -76,5 +76,7 @@ function toOrganizationConnection(state: SsoConnectionState): OrganizationSsoCon
     verifiedDomains: state.verifiedDomains,
     type: state.type,
     state: state.state,
+    replacesConnectionId: state.replacesConnectionId,
+    migrationPhase: state.migrationPhase,
   };
 }

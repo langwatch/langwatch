@@ -28,6 +28,8 @@ function connection(overrides: Partial<OrganizationSsoConnection> = {}): Organiz
     verifiedDomains: ["acme.com"],
     type: "oidc",
     state: "ACTIVE",
+    replacesConnectionId: null,
+    migrationPhase: null,
     ...overrides,
   };
 }

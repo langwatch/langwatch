@@ -1,4 +1,8 @@
-import type { SsoConnectionLifecycleState, SsoConnectionType } from "./connection.ts";
+import type {
+  SsoConnectionLifecycleState,
+  SsoConnectionType,
+  SsoMigrationPhase,
+} from "./connection.ts";
 
 /**
  * What happened to one connection, as a reader reads it (ADR-117 §5, D05).
@@ -44,4 +48,8 @@ export interface OrganizationSsoConnection {
    *  registration: the word a card shows beside the name. */
   type: SsoConnectionType;
   state: SsoConnectionLifecycleState;
+  /** The grandfathered connection this one replaces, or null. */
+  replacesConnectionId: string | null;
+  /** Where the cutover stands; null outside a migration pair. */
+  migrationPhase: SsoMigrationPhase | null;
 }

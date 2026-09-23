@@ -330,7 +330,7 @@ Feature: Enterprise SCIM package boundary
       Then the answer is application/scim+json at 403 saying the token can no longer write through its connection
       And nothing is written, the token is not marked used, and the refusal is filed on the request log
 
-    @unimplemented
+    @unit
     Scenario: A token whose connection is replaced by one that has begun finalizing cannot write
       Given a valid token issued against a connection still live
       And a replacement for that connection whose migration is finalizing or finalized

@@ -71,6 +71,20 @@ function heldConnection(state: OrganizationSsoConnection["state"]): Organization
     verifiedDomains: [],
     type: "oidc",
     state,
+    replacesConnectionId: null,
+    migrationPhase: null,
+  };
+}
+
+/** The direct connection that replaces the token's own, at one phase of its cutover. */
+function replacementAt(
+  migrationPhase: OrganizationSsoConnection["migrationPhase"],
+): OrganizationSsoConnection {
+  return {
+    ...heldConnection("ACTIVE"),
+    connectionId: "ssoc_replacement",
+    replacesConnectionId: RETIRED_CONNECTION_ID,
+    migrationPhase,
   };
 }
 
@@ -344,6 +358,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
             verifiedDomains: [],
             type: "oidc",
             state: "ACTIVE",
+            replacesConnectionId: null,
+            migrationPhase: null,
           },
         ],
       });
@@ -409,6 +425,47 @@ describe("given a directory holding this organization's SCIM bearer token", () =
           organizationId: ORGANIZATION_ID,
           connectionId: RETIRED_CONNECTION_ID,
         });
+      },
+    );
+
+    /** @scenario "A token whose connection is replaced by one that has begun finalizing cannot write" */
+    it.each(["FINALIZING", "FINALIZED"] as const)(
+      "refuses a write through a live connection whose replacement is %s, before any write or use",
+      async (phase) => {
+        const scim = new RetiredConnectionDirectory();
+        const api = mount({
+          scim,
+          connections: [replacementAt(phase), heldConnection("ACTIVE")],
+        });
+
+        await expectMainWire(await deleteUser(api), 403, MAIN_WIRE.connectionNotWritable);
+        expect(scim.deleteUser).not.toHaveBeenCalled();
+        expect(scim.recordTokenUse).not.toHaveBeenCalled();
+        expect(scim.recordRequest).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          connectionId: RETIRED_CONNECTION_ID,
+          method: "DELETE",
+          resource: "Users/:id",
+          status: 403,
+          reason: "forbidden",
+          detail: "This directory token can no longer write through its single sign-on connection",
+        });
+      },
+    );
+
+    /** @scenario "A token whose connection is replaced by one that has begun finalizing cannot write" */
+    it.each(["SETUP", "GRACE_LEGACY", "GRACE_DIRECT"] as const)(
+      "admits a write while its replacement is only at %s, as main did",
+      async (phase) => {
+        const scim = new RetiredConnectionDirectory();
+        scim.deleteUser.mockResolvedValue(undefined);
+        const api = mount({
+          scim,
+          connections: [replacementAt(phase), heldConnection("ACTIVE")],
+        });
+
+        expect((await deleteUser(api)).status).toBe(204);
+        expect(scim.recordTokenUse).toHaveBeenCalledWith({ tokenId: "scim_token_1" });
       },
     );
 

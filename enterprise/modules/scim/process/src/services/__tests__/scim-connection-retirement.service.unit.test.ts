@@ -20,13 +20,25 @@ function connection(state: string, connectionId = CONNECTION_ID): OrganizationSs
     verifiedDomains: [],
     type: "oidc",
     state: state as OrganizationSsoConnection["state"],
+    replacesConnectionId: null,
+    migrationPhase: null,
+  };
+}
+
+function replacementAt(
+  migrationPhase: OrganizationSsoConnection["migrationPhase"],
+): OrganizationSsoConnection {
+  return {
+    ...connection("ACTIVE", "ssoc_direct"),
+    replacesConnectionId: CONNECTION_ID,
+    migrationPhase,
   };
 }
 
 function retirement(held: OrganizationSsoConnection[]) {
   const revokeTokensForConnection = vi.fn(async () => ({ revoked: 2 }));
   const service = ScimConnectionRetirementService.create({
-    connections: { findConnections: async () => held },
+    connections: { findHeldConnections: async () => held },
     tokens: { revokeTokensForConnection },
   });
 
@@ -65,6 +77,28 @@ describe("given a connection the organization still holds", () => {
     await expect(rejected.admits()).resolves.toBe(true);
     expect(rejected.revokeTokensForConnection).not.toHaveBeenCalled();
   });
+});
+
+describe("given a live connection another connection replaces", () => {
+  /** @scenario "A token whose connection is replaced by one that has begun finalizing cannot write" */
+  it.each(["FINALIZING", "FINALIZED"] as const)(
+    "refuses the credential once the replacement is %s, and leaves teardown to retire its tokens",
+    async (phase) => {
+      const replaced = retirement([replacementAt(phase), connection("ACTIVE")]);
+
+      await expect(replaced.admits()).resolves.toBe(false);
+      expect(replaced.revokeTokensForConnection).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["SETUP", "GRACE_LEGACY", "GRACE_DIRECT"] as const)(
+    "admits it while the replacement is only at %s",
+    async (phase) => {
+      const grace = retirement([replacementAt(phase), connection("ACTIVE")]);
+
+      await expect(grace.admits()).resolves.toBe(true);
+    },
+  );
 });
 
 describe("given a connection the organization has taken away", () => {
