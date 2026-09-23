@@ -67,6 +67,11 @@ const isFailedRow = ({
   evaluations: EvaluationItem[];
 }): boolean => Boolean(entry.error) || evaluations.some(isFailedEvaluation);
 
+function hasNumericStatus(error: unknown): error is { status: number } {
+  if (typeof error !== "object" || error === null) return false;
+  return "status" in error && typeof error.status === "number";
+}
+
 export async function handleExperimentResults(params: {
   runId: string;
   experimentSlug?: string;
@@ -93,15 +98,9 @@ export async function handleExperimentResults(params: {
     )) as EvaluationRunResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status =
-      error instanceof LangWatchApiError
-        ? error.status
-        : error &&
-            typeof error === "object" &&
-            "status" in error &&
-            typeof (error as { status?: unknown }).status === "number"
-          ? (error as { status: number }).status
-          : undefined;
+    let status: number | undefined;
+    if (error instanceof LangWatchApiError) status = error.status;
+    else if (hasNumericStatus(error)) status = error.status;
     if (status === 404 || (status === undefined && /404|not found/i.test(message))) {
       return [
         `# Evaluation Results: ${params.runId}`,

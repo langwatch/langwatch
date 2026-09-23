@@ -46,14 +46,14 @@ export function resolveDocumentationUrl(kind: DocumentationKind, input?: string)
     throw documentationUrlError(namespace);
   }
 
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "langwatch.ai" ||
-    url.port !== "" ||
-    url.username !== "" ||
-    url.password !== "" ||
-    !url.pathname.startsWith(`${namespace}/`)
-  ) {
+  const isTrustedDocumentationUrl =
+    url.protocol === "https:" &&
+    url.hostname === "langwatch.ai" &&
+    url.port === "" &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname.startsWith(`${namespace}/`);
+  if (!isTrustedDocumentationUrl) {
     throw documentationUrlError(namespace);
   }
 

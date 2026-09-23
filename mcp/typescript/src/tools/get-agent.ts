@@ -1,4 +1,8 @@
-import { getAgent as apiGetAgent, type AgentParameterSpec } from "../langwatch-api-agents.js";
+import {
+  getAgent as apiGetAgent,
+  type AgentInstance,
+  type AgentParameterSpec,
+} from "../langwatch-api-agents.js";
 
 export const describeParameter = ({
   name,
@@ -15,6 +19,15 @@ export const describeParameter = ({
   const suffix = description ? `: ${description}` : "";
   return `- **${name}** (${parts.join(", ")})${suffix}`;
 };
+
+function instancesSection(instances: AgentInstance[]): string[] {
+  const lines = [`\n## Instances (${instances.length})\n`];
+  for (const instance of instances) {
+    const label = instance.label ? ` (${instance.label})` : "";
+    lines.push(`- ${instance.hostname || instance.id}${label}, connected ${instance.connectedAt}`);
+  }
+  return lines;
+}
 
 /**
  * Handles the platform_get_agent MCP tool invocation.
@@ -45,13 +58,7 @@ export async function handleGetAgent({ id }: { id: string }): Promise<string> {
   }
 
   if (agent.instances && agent.instances.length > 0) {
-    lines.push(`\n## Instances (${agent.instances.length})\n`);
-    for (const instance of agent.instances) {
-      const label = instance.label ? ` (${instance.label})` : "";
-      lines.push(
-        `- ${instance.hostname || instance.id}${label}, connected ${instance.connectedAt}`,
-      );
-    }
+    lines.push(...instancesSection(agent.instances));
   }
 
   if (agent.config && Object.keys(agent.config).length > 0) {

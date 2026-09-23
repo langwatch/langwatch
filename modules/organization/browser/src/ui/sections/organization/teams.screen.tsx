@@ -700,6 +700,59 @@ function InlineDepartment({
   );
 }
 
+function TeamMemberRoleControls({
+  member,
+  organizationId,
+  canManage,
+  removing,
+  onChangeRole,
+  onRemove,
+}: {
+  member: TeamData["directMembers"][number];
+  organizationId: string;
+  canManage: boolean;
+  removing: boolean;
+  onChangeRole: (change: { bindingId: string; role: string; customRoleId?: string }) => void;
+  onRemove: (bindingId: string) => void;
+}) {
+  const roleBadge = (
+    <Badge colorPalette={roleBadgeColor(member.role)} size="sm">
+      {member.customRoleName ?? member.role}
+    </Badge>
+  );
+  if (member.viaGroupId) {
+    return (
+      <>
+        {roleBadge}
+        <Link href="/settings/groups" fontSize="xs" color="purple.400">
+          via {member.viaGroupName}
+        </Link>
+      </>
+    );
+  }
+  const bindingId = member.bindingId;
+  if (!canManage || !bindingId) return roleBadge;
+  return (
+    <>
+      <RoleSelect
+        value={member.role}
+        customRoleId={member.customRoleId}
+        organizationId={organizationId}
+        onChange={(role, customRoleId) => onChangeRole({ bindingId, role, customRoleId })}
+      />
+      <Button
+        size="xs"
+        variant="ghost"
+        color="gray.400"
+        loading={removing}
+        onClick={() => onRemove(bindingId)}
+      >
+        <X size={14} />
+      </Button>
+    </>
+  );
+}
+
 function TeamCard({
   team,
   organizationId,
@@ -829,50 +882,26 @@ function TeamCard({
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
-                    {m.viaGroupId ? (
-                      <>
-                        <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                          {m.customRoleName ?? m.role}
-                        </Badge>
-                        <Link href="/settings/groups" fontSize="xs" color="purple.400">
-                          via {m.viaGroupName}
-                        </Link>
-                      </>
-                    ) : canManage && m.bindingId ? (
-                      <>
-                        <RoleSelect
-                          value={m.role}
-                          customRoleId={m.customRoleId}
-                          organizationId={organizationId}
-                          onChange={(role, customRoleId) =>
-                            updateBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                              role: role as any,
-                              customRoleId,
-                            })
-                          }
-                        />
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="gray.400"
-                          loading={deleteBinding.isPending}
-                          onClick={() =>
-                            deleteBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                            })
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </>
-                    ) : (
-                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                        {m.customRoleName ?? m.role}
-                      </Badge>
-                    )}
+                    <TeamMemberRoleControls
+                      member={m}
+                      organizationId={organizationId}
+                      canManage={canManage}
+                      removing={deleteBinding.isPending}
+                      onChangeRole={({ bindingId, role, customRoleId }) =>
+                        updateBinding.mutate({
+                          organizationId,
+                          bindingId,
+                          role: role as any,
+                          customRoleId,
+                        })
+                      }
+                      onRemove={(bindingId) =>
+                        deleteBinding.mutate({
+                          organizationId,
+                          bindingId,
+                        })
+                      }
+                    />
                   </HStack>
                 ))
               )}

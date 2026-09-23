@@ -12,6 +12,36 @@ function getGroupedData(bucket: AnalyticsBucket, groupBy: string): GroupedData |
   return undefined;
 }
 
+function periodTable({
+  currentPeriod,
+  groupBy,
+}: {
+  currentPeriod: AnalyticsBucket[];
+  groupBy: string | undefined;
+}): string[] {
+  if (currentPeriod.length === 0) return ["No data available for this period."];
+  if (groupBy && currentPeriod.some((b) => getGroupedData(b, groupBy) !== undefined)) {
+    const lines = ["| Date | Group | Value |", "|------|-------|-------|"];
+    for (const bucket of currentPeriod) {
+      const groups = getGroupedData(bucket, groupBy);
+      if (!groups) continue;
+      for (const [groupKey, metrics] of Object.entries(groups)) {
+        const value = Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
+        lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
+      }
+    }
+    return lines;
+  }
+  const lines = ["| Date | Value |", "|------|-------|"];
+  for (const bucket of currentPeriod) {
+    const value =
+      Object.entries(bucket).find(([k]) => k !== "date" && typeof bucket[k] === "number")?.[1] ??
+      "N/A";
+    lines.push(`| ${bucket.date} | ${value} |`);
+  }
+  return lines;
+}
+
 /**
  * Handles the get_analytics MCP tool: queries analytics timeseries and
  * formats them as an AI-readable markdown table.
@@ -53,33 +83,9 @@ export async function handleGetAnalytics(params: {
   if (params.groupBy) lines.push(`Grouped by: ${params.groupBy}`);
   lines.push("");
 
-  const currentPeriod = result.currentPeriod ?? [];
-  if (currentPeriod.length === 0) {
-    lines.push("No data available for this period.");
-  } else if (
-    params.groupBy &&
-    currentPeriod.some((b) => getGroupedData(b, params.groupBy!) !== undefined)
-  ) {
-    lines.push("| Date | Group | Value |");
-    lines.push("|------|-------|-------|");
-    for (const bucket of currentPeriod) {
-      const groups = getGroupedData(bucket, params.groupBy);
-      if (!groups) continue;
-      for (const [groupKey, metrics] of Object.entries(groups)) {
-        const value = Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
-        lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
-      }
-    }
-  } else {
-    lines.push("| Date | Value |");
-    lines.push("|------|-------|");
-    for (const bucket of currentPeriod) {
-      const value =
-        Object.entries(bucket).find(([k]) => k !== "date" && typeof bucket[k] === "number")?.[1] ??
-        "N/A";
-      lines.push(`| ${bucket.date} | ${value} |`);
-    }
-  }
+  lines.push(
+    ...periodTable({ currentPeriod: result.currentPeriod ?? [], groupBy: params.groupBy }),
+  );
 
   lines.push("\n> Tip: Use `discover_schema` to see all available metrics and aggregation types.");
 
