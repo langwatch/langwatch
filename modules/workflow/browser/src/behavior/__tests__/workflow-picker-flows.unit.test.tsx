@@ -100,17 +100,24 @@ beforeEach(() => {
 });
 
 describe("Workflow prompt picker flow", () => {
-  /** @scenario "Node selection transitions use named drawer host ports" */
-  it("updates and selects a dropped node, while the app port owns drawer effects", () => {
-    let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerController = {
+  let callbacks: PromptPickerCallbacks | undefined;
+  let port: PromptPickerController;
+  let mounted: ReturnType<typeof mountHook<ReturnType<typeof useWorkflowPromptPickerFlow>>>;
+
+  beforeEach(() => {
+    callbacks = undefined;
+    port = {
       register: (registered) => {
         callbacks = registered;
       },
       open: vi.fn(),
       close: vi.fn(),
     };
-    const mounted = mountHook(() => useWorkflowPromptPickerFlow(port));
+    mounted = mountHook(() => useWorkflowPromptPickerFlow(port));
+  });
+
+  /** @scenario "Node selection transitions use named drawer host ports" */
+  it("updates and selects a dropped node, while the app port owns drawer effects", () => {
     const result = mounted.getValue();
 
     act(() => result.handlePromptDragEnd(dragItem));
@@ -134,16 +141,6 @@ describe("Workflow prompt picker flow", () => {
 
   /** @scenario "Node selection transitions use named drawer host ports" */
   it("clears and selects the placeholder when creating a new prompt", () => {
-    let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerController = {
-      register: (registered) => {
-        callbacks = registered;
-      },
-      open: vi.fn(),
-      close: vi.fn(),
-    };
-    const mounted = mountHook(() => useWorkflowPromptPickerFlow(port));
-
     act(() => mounted.getValue().handlePromptDragEnd(dragItem));
     act(() => callbacks?.onCreateNew());
 
@@ -155,16 +152,6 @@ describe("Workflow prompt picker flow", () => {
 
   /** @scenario "Node selection transitions use named drawer host ports" */
   it("deletes a cancelled prompt placeholder", () => {
-    let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerController = {
-      register: (registered) => {
-        callbacks = registered;
-      },
-      open: vi.fn(),
-      close: vi.fn(),
-    };
-    const mounted = mountHook(() => useWorkflowPromptPickerFlow(port));
-
     act(() => mounted.getValue().handlePromptDragEnd(dragItem));
     act(() => callbacks?.onClose());
 

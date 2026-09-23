@@ -19,23 +19,23 @@ const traceWith = ({
   traceId: string;
   spanId: string;
   parentId?: string | null;
-}): Trace =>
-  ({
-    trace_id: traceId,
-    project_id: "project_1",
-    input: { value: "hello" },
-    output: { value: "world" },
-    timestamps: { started_at: 0, inserted_at: 0 },
-    spans: [
-      {
-        span_id: spanId,
-        parent_id: parentId,
-        trace_id: traceId,
-        type: "span",
-        timestamps: { started_at: 0, finished_at: 0 },
-      },
-    ],
-  }) as unknown as Trace;
+}): Trace => ({
+  trace_id: traceId,
+  project_id: "project_1",
+  metadata: {},
+  input: { value: "hello" },
+  output: { value: "world" },
+  timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
+  spans: [
+    {
+      span_id: spanId,
+      parent_id: parentId,
+      trace_id: traceId,
+      type: "span",
+      timestamps: { started_at: 0, finished_at: 0 },
+    },
+  ],
+});
 
 describe("given a trace the evaluation is running against", () => {
   describe("when its ids are the OTel ones", () => {

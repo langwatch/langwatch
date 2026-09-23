@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.service.ts";
@@ -7,13 +8,7 @@ import { createEvaluationProcessingPipeline } from "../evaluation-processing.ser
 const producer = () =>
   EvaluationProcessingProducerAdapter.createPipeline({
     processName: "langwatch-api",
-  }) as unknown as {
-    metadata: { name: string; commands: readonly { name: string }[] };
-    foldProjections: Map<
-      string,
-      { definition: { store: { store(state: unknown, context: unknown): Promise<void> } } }
-    >;
-  };
+  });
 
 /** The consumer's, built from stores and handlers a caller would supply. */
 const consumer = () =>
@@ -46,7 +41,12 @@ describe("given a process that only SENDS evaluation commands", () => {
     it("refuses by name instead of reporting a write that never happened", async () => {
       const [projection] = [...producer().foldProjections.values()];
 
-      await expect(projection!.definition.store.store({}, {})).rejects.toThrow(
+      await expect(
+        projection!.definition.store.store(
+          {},
+          { aggregateId: "evaluation-1", tenantId: createTenantId("project-1") },
+        ),
+      ).rejects.toThrow(
         /langwatch-api registered the evaluation_processing pipeline as a producer only/,
       );
     });

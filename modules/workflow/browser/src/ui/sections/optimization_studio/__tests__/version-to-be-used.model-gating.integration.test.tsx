@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockResolvedDefault, mockGenerateMutate } = vi.hoisted(() => ({
   mockResolvedDefault: {
@@ -102,12 +102,16 @@ describe("given the save-version fields are rendered", () => {
   });
 
   describe("when no Fast model resolves at any scope", () => {
-    /** @scenario Opening the save-version drawer with no Fast model fires no generation and no toast */
-    it("does not auto-fire generation and shows the sparkles button", async () => {
+    let sparkles: HTMLElement;
+
+    beforeEach(async () => {
       mockResolvedDefault.current = null;
       render(<Harness />);
+      sparkles = await screen.findByTestId("generate-commit-message-button");
+    });
 
-      const sparkles = await screen.findByTestId("generate-commit-message-button");
+    /** @scenario Opening the save-version drawer with no Fast model fires no generation and no toast */
+    it("does not auto-fire generation and shows the sparkles button", async () => {
       expect(sparkles).toBeInTheDocument();
       // Past the effect + debounce window: still no request.
       await new Promise((resolve) => setTimeout(resolve, 30));
@@ -115,11 +119,7 @@ describe("given the save-version fields are rendered", () => {
     });
 
     /** @scenario Clicking the sparkles button without a Fast model surfaces the info toast */
-    it("sends the generation request only on sparkles click", async () => {
-      mockResolvedDefault.current = null;
-      render(<Harness />);
-
-      const sparkles = await screen.findByTestId("generate-commit-message-button");
+    it("sends the generation request only on sparkles click", () => {
       fireEvent.click(sparkles);
 
       // The request fires; the resulting MODEL_NOT_CONFIGURED error is
@@ -130,11 +130,13 @@ describe("given the save-version fields are rendered", () => {
   });
 
   describe("when a Fast model resolves for the project", () => {
-    /** @scenario A configured Fast model still auto-generates the description */
-    it("auto-fires generation and keeps a regenerate button available", async () => {
+    beforeEach(() => {
       mockResolvedDefault.current = { model: "openai/gpt-5-mini" };
       render(<Harness />);
+    });
 
+    /** @scenario A configured Fast model still auto-generates the description */
+    it("auto-fires generation and keeps a regenerate button available", async () => {
       await waitFor(() => {
         expect(mockGenerateMutate).toHaveBeenCalledTimes(1);
       });
@@ -145,13 +147,9 @@ describe("given the save-version fields are rendered", () => {
 
     /** @scenario Clicking the sparkles button with a configured model regenerates the description */
     it("re-fires generation when the regenerate button is clicked", async () => {
-      mockResolvedDefault.current = { model: "openai/gpt-5-mini" };
-      render(<Harness />);
-
       await waitFor(() => {
         expect(mockGenerateMutate).toHaveBeenCalledTimes(1);
       });
-
       fireEvent.click(screen.getByTestId("generate-commit-message-button"));
       expect(mockGenerateMutate).toHaveBeenCalledTimes(2);
     });

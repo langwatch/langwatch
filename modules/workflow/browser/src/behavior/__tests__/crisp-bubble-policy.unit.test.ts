@@ -7,7 +7,7 @@ import {
  * @vitest-environment jsdom
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 
@@ -148,12 +148,17 @@ describe("crispBubblePolicy", () => {
   });
 
   describe("when crisp inserts its container into the DOM", () => {
+    let fake: FakeCrisp;
+    let before: number;
+
+    beforeEach(() => {
+      fake = installFakeCrisp();
+      installPolicy();
+      before = hideCount(fake);
+    });
+
     /** @scenario Crisp re-inserting its widget into the page re-hides the bubble */
     it("re-pushes chat:hide when the container appears", async () => {
-      const fake = installFakeCrisp();
-      installPolicy();
-      const before = hideCount(fake);
-
       const container = document.createElement("div");
       container.className = "crisp-client";
       document.body.appendChild(container);
@@ -164,10 +169,6 @@ describe("crispBubblePolicy", () => {
     });
 
     it("ignores unrelated nodes appended to the body", async () => {
-      const fake = installFakeCrisp();
-      installPolicy();
-      const before = hideCount(fake);
-
       const portal = document.createElement("div");
       portal.className = "chakra-portal";
       document.body.appendChild(portal);

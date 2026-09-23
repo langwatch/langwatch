@@ -152,11 +152,7 @@ export class EvaluationExecutionService {
 
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.
-    const parentCausalityDepth = maxCausalityDepthOfSpans(
-      trace.spans as unknown as {
-        attributes?: Record<string, unknown> | null;
-      }[],
-    );
+    const parentCausalityDepth = maxCausalityDepthOfSpans(trace.spans);
 
     const result = await this.runEvaluation({
       projectId,

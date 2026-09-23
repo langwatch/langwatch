@@ -1,6 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
+import type { EvaluationLangevals, EvaluationModelEnv } from "../../app/evaluation.members.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
@@ -24,34 +28,42 @@ function buildTrace(overrides: Partial<Trace> = {}): Trace {
 
 function buildService(
   overrides: {
-    resolveForEvaluator?: ReturnType<typeof vi.fn>;
-    evaluate?: ReturnType<typeof vi.fn>;
+    resolveForEvaluator?: Mock<EvaluationModelEnv["resolveForEvaluator"]>;
+    evaluate?: Mock<EvaluationLangevals["evaluate"]>;
   } = {},
 ) {
-  const resolveForEvaluator = overrides.resolveForEvaluator ?? vi.fn().mockResolvedValue({});
+  const resolveForEvaluator =
+    overrides.resolveForEvaluator ??
+    vi.fn<EvaluationModelEnv["resolveForEvaluator"]>().mockResolvedValue({});
   const evaluate =
     overrides.evaluate ??
-    vi.fn().mockResolvedValue({ status: "processed", score: 0.95, passed: true });
+    vi
+      .fn<EvaluationLangevals["evaluate"]>()
+      .mockResolvedValue({ status: "processed", score: 0.95, passed: true });
 
   const traceService = {
     getTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
     getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
-  } as never;
-  const spanDigest = { format: vi.fn().mockResolvedValue("") } as never;
+  };
+  const spanDigest = { format: vi.fn().mockResolvedValue("") };
   const modelEnvResolver = { resolveForEvaluator };
   const langevalsClient = { evaluate };
 
-  const deps = {
+  const deps: EvaluationExecutionDeps = {
     traceService,
     spanDigest,
     modelEnvResolver,
     langevalsClient,
-    workflows: {} as never,
-    evaluators: { augmentResult: ({ result }: { result: unknown }) => result },
-    workflowExecutor: {} as never,
+    workflows: createApiFixture<WorkflowApi>({}),
+    evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
+    workflowExecutor: {
+      runEvaluationWorkflow: () => {
+        throw new Error("the judge path never runs an evaluation workflow");
+      },
+    },
     installEnvironment: {},
-  } as unknown as EvaluationExecutionDeps;
+  };
 
   return { service: EvaluationExecutionService.create(deps), resolveForEvaluator, evaluate };
 }
