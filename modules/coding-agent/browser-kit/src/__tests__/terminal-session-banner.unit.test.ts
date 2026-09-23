@@ -3,13 +3,29 @@ import { describe, expect, it } from "vitest";
 
 import { deriveSessionBanner } from "../model/trace/terminal-session-banner.ts";
 
-function modelSpan(model: string, atMs: number): SpanDetail {
+function span(over: Partial<SpanDetail>): SpanDetail {
   return {
+    spanId: "s1",
+    parentSpanId: null,
+    name: "claude_code.llm_request",
+    type: "llm",
+    startTimeMs: 1,
+    endTimeMs: 1,
+    durationMs: 0,
+    status: "ok",
+    params: {},
+    events: [],
+    ...over,
+  };
+}
+
+function modelSpan(model: string, atMs: number): SpanDetail {
+  return span({
     spanId: `llm-${atMs}`,
     name: "claude_code.llm_request",
     startTimeMs: atMs,
     params: { "gen_ai.request.model": model },
-  } as unknown as SpanDetail;
+  });
 }
 
 describe("deriveSessionBanner", () => {
@@ -63,7 +79,7 @@ describe("deriveSessionBanner", () => {
     it("stays unknown instead of wearing another agent's badge", () => {
       const banner = deriveSessionBanner({
         resourceAttributes: {},
-        spans: [{ name: "some.custom.span", params: {} } as unknown as SpanDetail],
+        spans: [span({ name: "some.custom.span", params: {} })],
       });
       expect(banner.agent).toBe("unknown");
     });
@@ -74,12 +90,12 @@ describe("deriveSessionBanner", () => {
       const banner = deriveSessionBanner({
         resourceAttributes: {},
         spans: [
-          {
+          span({
             spanId: "s1",
             name: "chat gpt-5-mini",
             startTimeMs: 1,
             params: {},
-          } as unknown as SpanDetail,
+          }),
         ],
       });
       expect(banner.agent).toBe("copilot");
@@ -91,12 +107,12 @@ describe("deriveSessionBanner", () => {
       const banner = deriveSessionBanner({
         resourceAttributes: { "service.name": "claude-code" },
         spans: [
-          {
+          span({
             spanId: "s1",
             name: "claude_code.llm_request",
             startTimeMs: 1,
             params: { gen_ai: { request: { model: "claude-sonnet-5" } } },
-          } as unknown as SpanDetail,
+          }),
         ],
       });
       expect(banner.model).toBe("claude-sonnet-5");
@@ -108,12 +124,12 @@ describe("deriveSessionBanner", () => {
       const banner = deriveSessionBanner({
         resourceAttributes: { "service.name": "gemini-cli" },
         spans: [
-          {
+          span({
             spanId: "s1",
             name: "llm_call",
             startTimeMs: 1,
             params: { "gen_ai.request.model": "gemini-3.5-flash" },
-          } as unknown as SpanDetail,
+          }),
         ],
       });
       expect(banner.model).toBe("gemini-3.5-flash");
@@ -121,12 +137,12 @@ describe("deriveSessionBanner", () => {
       const copilot = deriveSessionBanner({
         resourceAttributes: { "service.name": "copilot-cli" },
         spans: [
-          {
+          span({
             spanId: "s2",
             name: "chat gpt-5-mini",
             startTimeMs: 1,
             params: { "gen_ai.request.model": "gpt-5-mini" },
-          } as unknown as SpanDetail,
+          }),
         ],
       });
       expect(copilot.model).toBe("gpt-5-mini");

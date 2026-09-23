@@ -1,10 +1,18 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type QueueSendOptions, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TRACK_EVENT_SPAN_NAME,
+  type OtlpKeyValue,
+  type OtlpSpan,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
@@ -77,34 +85,64 @@ function foldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData 
     updatedAt: Date.now(),
     attributes: { "langwatch.origin": "app" },
     ...overrides,
-  } as unknown as TraceSummaryData;
+  };
+}
+
+function otlpSpan({
+  spanId,
+  name,
+  attributes,
+}: {
+  spanId: string;
+  name: string;
+  attributes: OtlpKeyValue[];
+}): OtlpSpan {
+  return {
+    traceId: "trace-1",
+    spanId,
+    parentSpanId: null,
+    name,
+    kind: 1,
+    startTimeUnixNano: "1700000000000000000",
+    endTimeUnixNano: "1700000001000000000",
+    attributes,
+    events: [],
+    links: [],
+    status: { code: null, message: null },
+    flags: null,
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
 }
 
 function spanEvent(
   options: {
     spanName?: string;
-    attributes?: { key: string; value: unknown }[];
+    attributes?: OtlpKeyValue[];
   } = {},
 ): TraceProcessingEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
-      span: {
-        name: options.spanName ?? "openai.chat",
+      span: otlpSpan({
         spanId: "span-1",
-        parentSpanId: null,
+        name: options.spanName ?? "openai.chat",
         attributes: options.attributes ?? [],
-      },
+      }),
+      resource: null,
+      instrumentationScope: null,
+      piiRedactionLevel: "STRICT",
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 function originResolvedEvent(): TraceProcessingEvent {
@@ -112,14 +150,14 @@ function originResolvedEvent(): TraceProcessingEvent {
     id: "event-2",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.origin_resolved",
-    version: 1,
-    data: {},
+    type: ORIGIN_RESOLVED_EVENT_TYPE,
+    version: ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
+    data: { origin: "application", reason: "explicit" },
     metadata: { traceId: "trace-1" },
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 function monitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
@@ -177,7 +215,7 @@ function subscriber(options: {
     }
   }
   const built = createEvaluationTriggerSubscriber({
-    featureFlags: { isEnabled } as unknown as FeatureFlagApi,
+    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }),
     monitors: new Monitors(),
     evaluation: dispatch,
     metrics,
@@ -191,7 +229,7 @@ async function run(
   state: TraceSummaryData,
 ): Promise<void> {
   const context: TriggerContext<TraceSummaryData> = {
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     aggregateId: "trace-1",
     state,
   };
@@ -358,7 +396,7 @@ describe("createEvaluationTriggerSubscriber", () => {
       it("refuses the event before it is enqueued", () => {
         const { built } = subscriber({});
         const context: TriggerContext<TraceSummaryData> = {
-          tenantId: "tenant-1",
+          tenantId: createTenantId("tenant-1"),
           aggregateId: "trace-1",
           state: foldState(),
         };
@@ -516,7 +554,7 @@ describe("createEvaluationTriggerSubscriber", () => {
         );
 
         expect(dispatch.sent[0]!.data).toMatchObject({
-          tenantId: "tenant-1",
+          tenantId: createTenantId("tenant-1"),
           traceId: "trace-1",
           threadId: "thread-1",
           userId: "user-1",
@@ -590,14 +628,20 @@ function topicAssignedEvent(): TraceProcessingEvent {
     id: "event-topic",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
     type: TOPIC_ASSIGNED_EVENT_TYPE,
-    version: 1,
-    data: {},
+    version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+    data: {
+      topicId: null,
+      topicName: null,
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
     metadata: {},
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 describe("createEvaluationTriggerSubscriber — origin, cutoff and processing-cap dispatch", () => {
@@ -830,7 +874,7 @@ describe("evaluationTrigger relevance check", () => {
   }): boolean => {
     const { built } = subscriber({});
     const context: TriggerContext<TraceSummaryData> = {
-      tenantId: "tenant-1",
+      tenantId: createTenantId("tenant-1"),
       aggregateId: "trace-1",
       state,
     };

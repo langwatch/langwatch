@@ -1,8 +1,16 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type QueueSendOptions, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
-import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  type OtlpKeyValue,
+  type OtlpSpan,
+  type TraceProcessingEvent,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,6 +26,34 @@ import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscri
  * fires more than once by design, so identity must ignore the freshly minted
  * `evaluationId`, or dedup never matches and the customer gets double-billed.
  */
+
+function otlpSpan({
+  spanId,
+  name,
+  attributes,
+}: {
+  spanId: string;
+  name: string;
+  attributes: OtlpKeyValue[];
+}): OtlpSpan {
+  return {
+    traceId: "trace-1",
+    spanId,
+    parentSpanId: null,
+    name,
+    kind: 1,
+    startTimeUnixNano: "1700000000000000000",
+    endTimeUnixNano: "1700000001000000000",
+    attributes,
+    events: [],
+    links: [],
+    status: { code: null, message: null },
+    flags: null,
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
+}
 
 function foldState(): TraceSummaryData {
   return {
@@ -62,7 +98,7 @@ function foldState(): TraceSummaryData {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     attributes: { "langwatch.origin": "app" },
-  } as unknown as TraceSummaryData;
+  };
 }
 
 function spanEvent(): TraceProcessingEvent {
@@ -70,16 +106,19 @@ function spanEvent(): TraceProcessingEvent {
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
-      span: { name: "openai.chat", spanId: "span-1", parentSpanId: null, attributes: [] },
+      span: otlpSpan({ spanId: "span-1", name: "openai.chat", attributes: [] }),
+      resource: null,
+      instrumentationScope: null,
+      piiRedactionLevel: "STRICT",
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 const monitor: MonitorSummary = {
@@ -125,13 +164,13 @@ class Monitors implements TraceEvaluationMonitor {
 
 async function deliverTwice(dispatch: Dispatch): Promise<void> {
   const built = createEvaluationTriggerSubscriber({
-    featureFlags: { isEnabled: vi.fn(async () => false) } as unknown as FeatureFlagApi,
+    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: vi.fn(async () => false) }),
     monitors: new Monitors(),
     evaluation: dispatch,
     metrics: new LoopMetrics(),
   });
   const context: TriggerContext<TraceSummaryData> = {
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     aggregateId: "trace-1",
     state: foldState(),
   };

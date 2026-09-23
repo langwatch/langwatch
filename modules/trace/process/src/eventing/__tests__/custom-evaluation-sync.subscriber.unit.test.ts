@@ -1,9 +1,13 @@
-import type { TriggerContext } from "@langwatch/eventing";
-import type {
-  TraceSummaryData,
-  SpanReceivedEvent,
-  TraceProcessingEvent,
-  OtlpSpan,
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+  type TraceSummaryData,
+  type SpanReceivedEvent,
+  type TraceProcessingEvent,
+  type OtlpSpan,
 } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,7 +42,7 @@ function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
@@ -96,11 +100,11 @@ function createSpanReceivedEvent(
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
       span,
       resource: null,
@@ -109,7 +113,7 @@ function createSpanReceivedEvent(
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
     ...overrides,
-  } as unknown as SpanReceivedEvent;
+  };
 }
 
 function createNonSpanEvent(): TraceProcessingEvent {
@@ -117,14 +121,20 @@ function createNonSpanEvent(): TraceProcessingEvent {
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.topic_assigned",
-    version: 1,
-    data: {},
+    type: TOPIC_ASSIGNED_EVENT_TYPE,
+    version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+    data: {
+      topicId: null,
+      topicName: null,
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
     metadata: {},
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 function createContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
@@ -171,7 +181,7 @@ describe("extractEvaluationsFromSpan", () => {
             attributes: [{ key: "json_encoded_event", value: { stringValue: "not json" } }],
           },
         ],
-      } as unknown as OtlpSpan;
+      };
 
       expect(CustomEvaluationSync.extractEvaluationsFromSpan(span)).toHaveLength(0);
     });

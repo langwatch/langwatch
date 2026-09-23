@@ -5,7 +5,7 @@
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
-import type { Logger } from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { TraceSpanDedupConnection } from "../../services/trace-span-dedup.service.ts";
@@ -14,12 +14,7 @@ import {
   buildTraceProcessRegistrationCommands,
 } from "../trace-composition.build.ts";
 
-const silentLogger = {
-  debug: () => void 0,
-  info: () => void 0,
-  warn: () => void 0,
-  error: () => void 0,
-} as unknown as Logger;
+const { logger: silentLogger } = createTestLogger();
 
 /**
  * An `EventSourcing` that records what a composition asked of it.

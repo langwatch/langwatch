@@ -22,7 +22,7 @@ function span(over: Partial<SpanDetail>): SpanDetail {
     params: {},
     events: [],
     ...over,
-  } as unknown as SpanDetail;
+  };
 }
 
 function event(spanId: string, attributes: Record<string, string>, name = "tool.output") {

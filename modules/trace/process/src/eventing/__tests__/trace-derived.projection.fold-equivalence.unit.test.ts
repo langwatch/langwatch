@@ -1,7 +1,14 @@
+import { createTenantId } from "@langwatch/eventing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TRACE_NAME_CHANGED_EVENT_TYPE,
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+  type LogRecordReceivedEvent,
+  type TopicAssignedEvent,
+  type TraceNameChangedEvent,
 } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -91,12 +98,15 @@ function logRecordEvent({
 }: {
   eventId: string;
   occurredAt: number;
-}): FoldEvent {
+}): LogRecordReceivedEvent {
   return {
     id: eventId,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
-    tenantId: TENANT,
+    version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    createdAt: occurredAt,
     occurredAt,
     data: {
       traceId: TRACE_ID,
@@ -112,15 +122,18 @@ function logRecordEvent({
       piiRedactionLevel: "DISABLED",
     },
     metadata: {},
-  } as unknown as FoldEvent;
+  };
 }
 
-function topicAssignedEvent(eventId: string, occurredAt: number): FoldEvent {
+function topicAssignedEvent(eventId: string, occurredAt: number): TopicAssignedEvent {
   return {
     id: eventId,
     type: TOPIC_ASSIGNED_EVENT_TYPE,
-    tenantId: TENANT,
+    version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    createdAt: occurredAt,
     occurredAt,
     data: {
       topicId: "topic-eq",
@@ -130,19 +143,22 @@ function topicAssignedEvent(eventId: string, occurredAt: number): FoldEvent {
       isIncremental: false,
     },
     metadata: {},
-  } as unknown as FoldEvent;
+  };
 }
 
-function renameEvent(eventId: string, occurredAt: number): FoldEvent {
+function renameEvent(eventId: string, occurredAt: number): TraceNameChangedEvent {
   return {
     id: eventId,
     type: TRACE_NAME_CHANGED_EVENT_TYPE,
-    tenantId: TENANT,
+    version: TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    createdAt: occurredAt,
     occurredAt,
-    data: { traceId: TRACE_ID, newName: "Renamed by a human" },
+    data: { traceId: TRACE_ID, newName: "Renamed by a human", changedByUserId: null },
     metadata: {},
-  } as unknown as FoldEvent;
+  };
 }
 
 /** A renamed trace whose later spans keep arriving, some starting earlier. */

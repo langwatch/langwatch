@@ -14,8 +14,14 @@ vi.mock("@langwatch/observability", () => ({
 /** The injected product-analytics sink; the subscriber never reaches a client itself. */
 const mockTrackServerEvent = vi.fn();
 
-import type { TriggerContext } from "@langwatch/eventing";
-import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  type OtlpSpan,
+  type TraceProcessingEvent,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 
 import {
   type ProjectMetadataSubscriberDeps,
@@ -69,24 +75,44 @@ function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummar
   };
 }
 
+function otlpSpan(): OtlpSpan {
+  return {
+    traceId: "trace-1",
+    spanId: "span-1",
+    parentSpanId: null,
+    name: "main",
+    kind: 1,
+    startTimeUnixNano: "1700000000000000000",
+    endTimeUnixNano: "1700000001000000000",
+    attributes: [],
+    events: [],
+    links: [],
+    status: { code: null, message: null },
+    flags: null,
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
+}
+
 function createEvent(tenantId: string): TraceProcessingEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId,
+    tenantId: createTenantId(tenantId),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
-      span: {} as any,
+      span: otlpSpan(),
       resource: null,
       instrumentationScope: null,
       piiRedactionLevel: "STRICT",
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 function createContext(

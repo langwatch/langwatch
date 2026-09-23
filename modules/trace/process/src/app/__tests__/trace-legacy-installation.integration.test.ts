@@ -51,13 +51,27 @@ function bootTraceApp(options: {
   resolveToken: (token: string) => ResolvedApiKeyCredential | null;
 }) {
   const findById = vi.fn(async () => void 0);
-  const apiKeys = {
+  const apiKeys = createApiFixture<ApiKeyApi>({
     findResolvedToken: vi.fn(async ({ token }: { token: string }) => options.resolveToken(token)),
     markUsed: vi.fn(),
-  } as unknown as ApiKeyApi;
-  const authz = {
+  });
+  const authz = createApiFixture<AuthzApi>({
     hasApiKeyPermission: vi.fn(async () => true),
-  } as unknown as AuthzApi;
+  });
+  const unread = () => Promise.reject(new Error("this suite reads a trace only by id"));
+  const read: TraceLegacyRead = {
+    findById,
+    getAllTracesForProject: unread,
+    getTracesWithSpans: unread,
+    getTracesByThreadId: unread,
+    getTracesWithSpansByThreadIds: unread,
+    getEvaluationsMultiple: unread,
+    findEvaluationInputs: unread,
+    getTopicCounts: unread,
+    getCustomersAndLabels: unread,
+    getDistinctFieldNames: unread,
+    findSpanForPromptStudio: unread,
+  };
 
   const app = TraceApp.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
@@ -66,7 +80,7 @@ function bootTraceApp(options: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
       },
-      read: { findById } as unknown as TraceLegacyRead,
+      read,
       spans: {} as TracesSpanReader,
       summary: {} as TraceSummaryReader,
       list: {} as TracesListReader,
