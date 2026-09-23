@@ -34,12 +34,12 @@ function harness() {
   const heads = new InMemoryHeads();
   const ledger = new RecordingLedger();
   const service = IdentityService.create(
-    IdentityGuardsService.create(
+    IdentityGuardsService.create({
       heads,
       users,
-      new InMemoryReservations(),
-      CryptoIdentifierIdentityAdapter.create(),
-    ),
+      reservations: new InMemoryReservations(),
+      identifiers: CryptoIdentifierIdentityAdapter.create(),
+    }),
     ledger,
   );
   return { heads, ledger, service };

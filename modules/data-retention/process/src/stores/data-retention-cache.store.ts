@@ -32,24 +32,38 @@ export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
     prefix?: string;
     now?: () => number;
   }): RedisDataRetentionCacheStore {
-    return new RedisDataRetentionCacheStore(
-      options.redis ?? null,
-      options.ttlMs,
-      options.prefix ?? "retention-policy:",
-      options.now ?? Date.now,
-    );
+    return new RedisDataRetentionCacheStore({
+      redis: options.redis ?? null,
+      ttlMs: options.ttlMs,
+      prefix: options.prefix ?? "retention-policy:",
+      now: options.now ?? Date.now,
+    });
   }
 
   private readonly memory = new Map<string, MemoryEntry>();
   private readonly ttlSeconds: number;
 
-  private constructor(
-    private readonly redis: DataRetentionRedis | null,
-    private readonly ttlMs: number,
-    private readonly prefix: string,
-    private readonly now: () => number,
-  ) {
+  private readonly redis: DataRetentionRedis | null;
+  private readonly ttlMs: number;
+  private readonly prefix: string;
+  private readonly now: () => number;
+
+  private constructor({
+    redis,
+    ttlMs,
+    prefix,
+    now,
+  }: {
+    redis: DataRetentionRedis | null;
+    ttlMs: number;
+    prefix: string;
+    now: () => number;
+  }) {
     super();
+    this.redis = redis;
+    this.ttlMs = ttlMs;
+    this.prefix = prefix;
+    this.now = now;
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 

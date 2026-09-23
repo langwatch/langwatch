@@ -111,9 +111,12 @@ export function createGovernanceInternalProjectService(options: {
  * composition seam rather than in a repository that constructed services.
  */
 export const PrismaGovernanceInternalProjectRepository = {
-  create(options: { database: PrismaProjectDatabase; teams: ProjectOldestTeam }) {
+  create(options: { database: PrismaProjectDatabase; teams: ProjectOldestTeam }): {
+    build: () => GovernanceInternalProjectService;
+  } {
     return {
-      build: () => createGovernanceInternalProjectService(options),
+      build: (): GovernanceInternalProjectService =>
+        createGovernanceInternalProjectService(options),
     };
   },
 };

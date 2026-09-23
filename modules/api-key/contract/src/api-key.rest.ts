@@ -5,7 +5,11 @@
  */
 import { z } from "zod";
 
-import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
+import {
+  apiKeyPermissionFormatSchema,
+  apiKeyRoleSchema,
+  apiKeyScopeTypeSchema,
+} from "./api-key.ts";
 
 const restBindingSchema = z.object({
   id: z.string().min(1),
@@ -36,7 +40,7 @@ export const apiKeyRestDetailSchema = z.object({
   assignedToUserId: z.string().nullable(),
   createdByUserId: z.string().nullable(),
   permissionMode: z.string(),
-  permissions: z.array(apiKeyPermissionSchema),
+  permissions: z.array(apiKeyPermissionFormatSchema),
   bindings: z.array(restWritableBindingSchema),
 });
 export type ApiKeyRestDetail = z.infer<typeof apiKeyRestDetailSchema>;

@@ -18,13 +18,31 @@ import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 
 export class DataPrivacyService {
-  private constructor(
-    private readonly repository: DataPrivacyPolicyRepository,
-    private readonly cache: DataPrivacyPolicyCacheService,
-    private readonly resolution: DataPrivacyResolutionService,
-    private readonly projects: ProjectApi,
-    private readonly organizations: OrganizationApi,
-  ) {}
+  private readonly repository: DataPrivacyPolicyRepository;
+  private readonly cache: DataPrivacyPolicyCacheService;
+  private readonly resolution: DataPrivacyResolutionService;
+  private readonly projects: ProjectApi;
+  private readonly organizations: OrganizationApi;
+
+  private constructor({
+    repository,
+    cache,
+    resolution,
+    projects,
+    organizations,
+  }: {
+    repository: DataPrivacyPolicyRepository;
+    cache: DataPrivacyPolicyCacheService;
+    resolution: DataPrivacyResolutionService;
+    projects: ProjectApi;
+    organizations: OrganizationApi;
+  }) {
+    this.repository = repository;
+    this.cache = cache;
+    this.resolution = resolution;
+    this.projects = projects;
+    this.organizations = organizations;
+  }
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
@@ -39,17 +57,17 @@ export class DataPrivacyService {
       options.now,
     );
 
-    return new DataPrivacyService(
-      options.repository,
+    return new DataPrivacyService({
+      repository: options.repository,
       cache,
-      DataPrivacyResolutionService.create({
+      resolution: DataPrivacyResolutionService.create({
         repository: options.repository,
         projects: options.projects,
         cache,
       }),
-      options.projects,
-      options.organizations,
-    );
+      projects: options.projects,
+      organizations: options.organizations,
+    });
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {

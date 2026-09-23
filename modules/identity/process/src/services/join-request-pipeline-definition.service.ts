@@ -20,6 +20,7 @@ import {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import type { ZodType } from "zod";
 
 import {
   runExpireRequest,
@@ -132,7 +133,7 @@ function mountRequestLifecycle(
 ): ProcessManagerHandledStage<
   JoinRequestEvent,
   JoinRequestLifecycleState,
-  Record<string, IntentSpec<any>>
+  Record<string, IntentSpec<ZodType>>
 > {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)

@@ -1,7 +1,7 @@
 import type { SsoConnection } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { MemorySsoConnectionReadRepository } from "../../repositories/memory/memory.sso-connection.repositories.ts";
 import { MemorySsoDomainOwnershipRepository } from "../../repositories/memory/memory.sso-domain-ownership.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../../repositories/prisma/prisma.sso-connection-projection.repository.ts";

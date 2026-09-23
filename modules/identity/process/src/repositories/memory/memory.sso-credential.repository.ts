@@ -2,7 +2,7 @@ import type { SsoCredentialKind } from "@langwatch/identity-contract";
 
 import { newSsoCredentialId } from "../../rules/sso-connection-id.rules.ts";
 import { type SsoCredentialRead, SsoCredentialRepository } from "../sso-credential.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The vault's twin: the same write-once reference, held in the store. */
 export class MemorySsoCredentialRepository extends SsoCredentialRepository {

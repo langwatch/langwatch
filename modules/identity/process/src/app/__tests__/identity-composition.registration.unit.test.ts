@@ -11,7 +11,7 @@ import {
   SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { buildIdentityInfrastructure } from "../identity-composition.build.ts";
 
@@ -131,14 +131,20 @@ describe("given a process that drains the identity pipelines", () => {
   });
 
   describe("when its install phase has registered the complete definitions", () => {
-    /** @scenario "Identity's commands reach the registration the process made" */
-    it("answers each verb with a sender off the process's own registration", async () => {
-      const runtime = recordingRuntime();
-      const infrastructure = infrastructureFor({
+    let runtime: ReturnType<typeof recordingRuntime>;
+    let infrastructure: ReturnType<typeof infrastructureFor>;
+
+    beforeEach(() => {
+      runtime = recordingRuntime();
+      infrastructure = infrastructureFor({
         eventing: runtime.eventing,
         registersPipelines: false,
       });
       runtime.installProcessRegistration(IDENTITY_PIPELINE_NAME, ["attachIdentifier"]);
+    });
+
+    /** @scenario "Identity's commands reach the registration the process made" */
+    it("answers each verb with a sender off the process's own registration", async () => {
       runtime.installProcessRegistration(JOIN_REQUEST_PIPELINE_NAME, ["approveJoin"]);
 
       const attach = await infrastructure.eventing.tryPipelineCommand({
@@ -169,13 +175,6 @@ describe("given a process that drains the identity pipelines", () => {
 
     /** @scenario "A verb the module does not publish stays uncommandable" */
     it("answers null for a command outside identity's verb lists", async () => {
-      const runtime = recordingRuntime();
-      const infrastructure = infrastructureFor({
-        eventing: runtime.eventing,
-        registersPipelines: false,
-      });
-      runtime.installProcessRegistration(IDENTITY_PIPELINE_NAME, ["attachIdentifier"]);
-
       await expect(
         infrastructure.eventing.tryPipelineCommand({
           pipeline: IDENTITY_PIPELINE_NAME,

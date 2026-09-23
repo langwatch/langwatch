@@ -45,6 +45,42 @@ export function memberTarget(member: OrganizationTeamMemberInput): {
   }
 }
 
+function planMemberChange({
+  member,
+  byUser,
+  plan,
+}: {
+  member: OrganizationTeamMemberInput;
+  byUser: ReadonlyMap<string, AuthzAccessBinding[]>;
+  plan: TeamMembershipPlan;
+}): void {
+  const bindings = byUser.get(member.userId) ?? [];
+  if (bindings.length === 0) {
+    plan.membersToAdd.push(member);
+    return;
+  }
+
+  const displayed = [...bindings].toSorted(
+    (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
+  )[0]!;
+  const target = memberTarget(member);
+  if (displayed.role === target.role && displayed.customRoleId === target.customRoleId) {
+    return;
+  }
+
+  const targetAlreadyHeld = bindings.some(
+    (binding) =>
+      binding.id !== displayed.id &&
+      binding.role === target.role &&
+      binding.customRoleId === target.customRoleId,
+  );
+  if (targetAlreadyHeld) {
+    plan.bindingIdsToRemove.push(displayed.id);
+  } else {
+    plan.bindingsToChange.push({ bindingId: displayed.id, ...target });
+  }
+}
+
 export function planTeamMembership(
   currentBindings: AuthzAccessBinding[],
   members: OrganizationTeamMemberInput[],
@@ -73,31 +109,7 @@ export function planTeamMembership(
   }
 
   for (const member of members) {
-    const bindings = byUser.get(member.userId) ?? [];
-    if (bindings.length === 0) {
-      plan.membersToAdd.push(member);
-      continue;
-    }
-
-    const displayed = [...bindings].toSorted(
-      (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
-    )[0]!;
-    const target = memberTarget(member);
-    if (displayed.role === target.role && displayed.customRoleId === target.customRoleId) {
-      continue;
-    }
-
-    const targetAlreadyHeld = bindings.some(
-      (binding) =>
-        binding.id !== displayed.id &&
-        binding.role === target.role &&
-        binding.customRoleId === target.customRoleId,
-    );
-    if (targetAlreadyHeld) {
-      plan.bindingIdsToRemove.push(displayed.id);
-    } else {
-      plan.bindingsToChange.push({ bindingId: displayed.id, ...target });
-    }
+    planMemberChange({ member, byUser, plan });
   }
 
   return plan;

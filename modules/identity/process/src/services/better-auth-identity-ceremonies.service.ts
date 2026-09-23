@@ -68,23 +68,47 @@ interface UserRow {
  * `forceAllowId: true` so live attach and the backfill derive the same id.
  */
 export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
-  static create(
-    heads: IdentityHeadsRepository,
-    users: IdentityUsersRepository,
-    identity: IdentityCeremonyWrites,
-    isLatched: IdentityUserGate,
-    clock: IdentityCeremonyClock,
-  ): IdentityCeremoniesAdapter {
-    return new IdentityCeremoniesAdapter(heads, users, identity, isLatched, clock);
+  static create({
+    heads,
+    users,
+    identity,
+    isLatched,
+    clock,
+  }: {
+    heads: IdentityHeadsRepository;
+    users: IdentityUsersRepository;
+    identity: IdentityCeremonyWrites;
+    isLatched: IdentityUserGate;
+    clock: IdentityCeremonyClock;
+  }): IdentityCeremoniesAdapter {
+    return new IdentityCeremoniesAdapter({ heads, users, identity, isLatched, clock });
   }
 
-  private constructor(
-    private readonly heads: IdentityHeadsRepository,
-    private readonly users: IdentityUsersRepository,
-    private readonly identity: IdentityCeremonyWrites,
-    private readonly isLatched: IdentityUserGate,
-    private readonly clock: IdentityCeremonyClock,
-  ) {}
+  private readonly heads: IdentityHeadsRepository;
+  private readonly users: IdentityUsersRepository;
+  private readonly identity: IdentityCeremonyWrites;
+  private readonly isLatched: IdentityUserGate;
+  private readonly clock: IdentityCeremonyClock;
+
+  private constructor({
+    heads,
+    users,
+    identity,
+    isLatched,
+    clock,
+  }: {
+    heads: IdentityHeadsRepository;
+    users: IdentityUsersRepository;
+    identity: IdentityCeremonyWrites;
+    isLatched: IdentityUserGate;
+    clock: IdentityCeremonyClock;
+  }) {
+    this.heads = heads;
+    this.users = users;
+    this.identity = identity;
+    this.isLatched = isLatched;
+    this.clock = clock;
+  }
 
   /**
    * An `Account` row is about to be created: attach the identifier it

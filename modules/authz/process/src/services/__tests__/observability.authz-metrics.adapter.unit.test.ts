@@ -2,19 +2,24 @@
  * Spec: modules/authz/specs/grants-command-dispatch.feature
  */
 import { Registry } from "prom-client";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { ObservabilityAuthzMetricsAdapter } from "../authz-metrics.service.ts";
 import { ObservabilityAuthzRevocationAdapter } from "../authz-revocation-telemetry.service.ts";
 
 describe("ObservabilityAuthzMetricsAdapter", () => {
   describe("given a process registry", () => {
+    let registry: Registry;
+    let metrics: ObservabilityAuthzMetricsAdapter;
+
+    beforeEach(() => {
+      registry = new Registry();
+      metrics = ObservabilityAuthzMetricsAdapter.create({ registry });
+      metrics.revocationCounter("revocation").inc();
+    });
+
     /** @scenario "The two AuthZ series are described once for every process" */
     it("renders both series into the registry it was given, and no other", async () => {
-      const registry = new Registry();
-      const metrics = ObservabilityAuthzMetricsAdapter.create({ registry });
-
-      metrics.revocationCounter("revocation").inc();
       metrics.engineGateReadFailureCounter().inc();
 
       const scrape = await registry.metrics();
@@ -26,10 +31,6 @@ describe("ObservabilityAuthzMetricsAdapter", () => {
 
     /** @scenario "The two AuthZ series are described once for every process" */
     it("keeps one cause per label rather than one series per cause", async () => {
-      const registry = new Registry();
-      const metrics = ObservabilityAuthzMetricsAdapter.create({ registry });
-
-      metrics.revocationCounter("revocation").inc();
       metrics.revocationCounter("offboard").inc();
       metrics.revocationCounter("offboard").inc();
 

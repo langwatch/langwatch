@@ -13,7 +13,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SsoBreakGlassWarningChannel } from "../../channels/sso-break-glass-warning.channel.ts";
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { MemorySsoBreakGlassRepository } from "../../repositories/memory/memory.sso-break-glass.repository.ts";
 import { breakGlassHolderEligibility } from "../../rules/break-glass-eligibility.rules.ts";
 import { SsoBreakGlassService } from "../sso-break-glass.service.ts";

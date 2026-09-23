@@ -62,103 +62,120 @@ import { z } from "zod";
  * time) over the payloads `@langwatch/identity-contract` declares.
  */
 
-export const connectionRegisteredEventSchema = EventSchema.extend({
+export const connectionRegisteredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_REGISTERED_EVENT_TYPE),
   data: connectionRegisteredPayloadSchema,
 });
 export type ConnectionRegisteredEvent = z.infer<typeof connectionRegisteredEventSchema>;
 
-export const domainClaimedEventSchema = EventSchema.extend({
+export const domainClaimedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIMED_EVENT_TYPE),
   data: domainClaimedPayloadSchema,
 });
 export type DomainClaimedEvent = z.infer<typeof domainClaimedEventSchema>;
 
-export const domainClaimApprovedEventSchema = EventSchema.extend({
+export const domainClaimApprovedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIM_APPROVED_EVENT_TYPE),
   data: domainClaimApprovedPayloadSchema,
 });
 export type DomainClaimApprovedEvent = z.infer<typeof domainClaimApprovedEventSchema>;
 
-export const domainClaimRejectedEventSchema = EventSchema.extend({
+export const domainClaimRejectedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIM_REJECTED_EVENT_TYPE),
   data: domainClaimRejectedPayloadSchema,
 });
 export type DomainClaimRejectedEvent = z.infer<typeof domainClaimRejectedEventSchema>;
 
-export const connectionDiscardedEventSchema = EventSchema.extend({
+export const connectionDiscardedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_DISCARDED_EVENT_TYPE),
   data: connectionDiscardedPayloadSchema,
 });
 export type ConnectionDiscardedEvent = z.infer<typeof connectionDiscardedEventSchema>;
 
-export const verificationRequestedEventSchema = EventSchema.extend({
+export const verificationRequestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(VERIFICATION_REQUESTED_EVENT_TYPE),
   data: verificationRequestedPayloadSchema,
 });
 export type VerificationRequestedEvent = z.infer<typeof verificationRequestedEventSchema>;
 
-export const domainAttestedEventSchema = EventSchema.extend({
+export const domainAttestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
   data: domainAttestedPayloadSchema,
 });
 export type DomainAttestedEvent = z.infer<typeof domainAttestedEventSchema>;
 
-export const domainWithdrawnEventSchema = EventSchema.extend({
+export const domainWithdrawnEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_WITHDRAWN_EVENT_TYPE),
   data: domainWithdrawnPayloadSchema,
 });
 export type DomainWithdrawnEvent = z.infer<typeof domainWithdrawnEventSchema>;
 
-export const domainVerifiedEventSchema = EventSchema.extend({
+export const domainVerifiedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
   data: domainVerifiedPayloadSchema,
 });
 export type DomainVerifiedEvent = z.infer<typeof domainVerifiedEventSchema>;
 
-export const domainProofWaveredEventSchema = EventSchema.extend({
+export const domainProofWaveredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_WAVERED_EVENT_TYPE),
   data: domainProofWaveredPayloadSchema,
 });
 export type DomainProofWaveredEvent = z.infer<typeof domainProofWaveredEventSchema>;
 
-export const domainProofLapsedEventSchema = EventSchema.extend({
+export const domainProofLapsedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_LAPSED_EVENT_TYPE),
   data: domainProofLapsedPayloadSchema,
 });
 export type DomainProofLapsedEvent = z.infer<typeof domainProofLapsedEventSchema>;
 
-export const domainProofRecoveredEventSchema = EventSchema.extend({
+export const domainProofRecoveredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_RECOVERED_EVENT_TYPE),
   data: domainProofRecoveredPayloadSchema,
 });
 export type DomainProofRecoveredEvent = z.infer<typeof domainProofRecoveredEventSchema>;
 
-export const connectionActivatedEventSchema = EventSchema.extend({
+export const connectionActivatedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
   data: connectionActivatedPayloadSchema,
 });
 export type ConnectionActivatedEvent = z.infer<typeof connectionActivatedEventSchema>;
 
-export const connectionSuspendedEventSchema = EventSchema.extend({
+export const connectionSuspendedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_SUSPENDED_EVENT_TYPE),
   data: connectionSuspendedPayloadSchema,
 });
 export type ConnectionSuspendedEvent = z.infer<typeof connectionSuspendedEventSchema>;
 
-export const connectionResumedEventSchema = EventSchema.extend({
+export const connectionResumedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_RESUMED_EVENT_TYPE),
   data: connectionResumedPayloadSchema,
 });
 export type ConnectionResumedEvent = z.infer<typeof connectionResumedEventSchema>;
 
-export const teardownRequestedEventSchema = EventSchema.extend({
+export const teardownRequestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TEARDOWN_REQUESTED_EVENT_TYPE),
   data: teardownRequestedPayloadSchema,
 });
 export type TeardownRequestedEvent = z.infer<typeof teardownRequestedEventSchema>;
 
-export const connectionTornDownEventSchema = EventSchema.extend({
+export const connectionTornDownEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(CONNECTION_TORN_DOWN_EVENT_TYPE),
   data: connectionTornDownPayloadSchema,
 });
@@ -314,7 +331,7 @@ export class SsoConnectionStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): SsoConnectionState {
     return emptySsoConnection({ connectionId: "" });
   }
 

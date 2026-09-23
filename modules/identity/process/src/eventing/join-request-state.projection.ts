@@ -26,31 +26,36 @@ import { z } from "zod";
  * time) over the payloads `@langwatch/identity-contract` declares.
  */
 
-export const joinRequestedEventSchema = EventSchema.extend({
+export const joinRequestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
   data: joinRequestedPayloadSchema,
 });
 export type JoinRequestedEvent = z.infer<typeof joinRequestedEventSchema>;
 
-export const joinApprovedEventSchema = EventSchema.extend({
+export const joinApprovedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(JOIN_APPROVED_EVENT_TYPE),
   data: joinApprovedPayloadSchema,
 });
 export type JoinApprovedEvent = z.infer<typeof joinApprovedEventSchema>;
 
-export const joinRejectedEventSchema = EventSchema.extend({
+export const joinRejectedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(JOIN_REJECTED_EVENT_TYPE),
   data: joinRejectedPayloadSchema,
 });
 export type JoinRejectedEvent = z.infer<typeof joinRejectedEventSchema>;
 
-export const joinExpiredEventSchema = EventSchema.extend({
+export const joinExpiredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(JOIN_EXPIRED_EVENT_TYPE),
   data: joinExpiredPayloadSchema,
 });
 export type JoinExpiredEvent = z.infer<typeof joinExpiredEventSchema>;
 
-export const joinWithdrawnEventSchema = EventSchema.extend({
+export const joinWithdrawnEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(JOIN_WITHDRAWN_EVENT_TYPE),
   data: joinWithdrawnPayloadSchema,
 });
@@ -118,7 +123,7 @@ export class JoinRequestStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): JoinRequestAggregateState {
     return emptyJoinRequest({ joinRequestId: "" });
   }
 

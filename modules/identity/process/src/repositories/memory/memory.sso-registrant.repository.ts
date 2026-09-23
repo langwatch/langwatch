@@ -1,7 +1,7 @@
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 
 import type { SsoRegistrantReadRepository } from "../sso-registrant.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const HELD_STATES = new Set(["VERIFIED", "PRIMARY"]);
 

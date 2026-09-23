@@ -41,15 +41,39 @@ export const RECENT_INVOICES_LIMIT = 4;
  * never creates clients, reads configuration, or touches application globals.
  */
 export class BillingSubscriptionService {
-  private constructor(
-    private readonly repository: BillingSubscription,
-    private readonly organizationRepository: BillingAccountFactsRepository,
-    private readonly stripe: Stripe,
-    private readonly itemCalculator: SubscriptionItemCalculatorService,
-    private readonly seatEventService: SeatEventSubscriptionService | undefined,
-    private readonly notifier: BillingSubscriptionNotifier,
-    private readonly stripeErrors: StripeErrorTranslator,
-  ) {}
+  private readonly repository: BillingSubscription;
+  private readonly organizationRepository: BillingAccountFactsRepository;
+  private readonly stripe: Stripe;
+  private readonly itemCalculator: SubscriptionItemCalculatorService;
+  private readonly seatEventService: SeatEventSubscriptionService | undefined;
+  private readonly notifier: BillingSubscriptionNotifier;
+  private readonly stripeErrors: StripeErrorTranslator;
+
+  private constructor({
+    repository,
+    organizationRepository,
+    stripe,
+    itemCalculator,
+    seatEventService,
+    notifier,
+    stripeErrors,
+  }: {
+    repository: BillingSubscription;
+    organizationRepository: BillingAccountFactsRepository;
+    stripe: Stripe;
+    itemCalculator: SubscriptionItemCalculatorService;
+    seatEventService: SeatEventSubscriptionService | undefined;
+    notifier: BillingSubscriptionNotifier;
+    stripeErrors: StripeErrorTranslator;
+  }) {
+    this.repository = repository;
+    this.organizationRepository = organizationRepository;
+    this.stripe = stripe;
+    this.itemCalculator = itemCalculator;
+    this.seatEventService = seatEventService;
+    this.notifier = notifier;
+    this.stripeErrors = stripeErrors;
+  }
 
   static create(options: {
     repository: BillingSubscription;
@@ -61,15 +85,15 @@ export class BillingSubscriptionService {
     /** Classifies a payment-provider failure; the process supplies Stripe's. */
     stripeErrors: StripeErrorTranslator;
   }): BillingSubscriptionService {
-    return new BillingSubscriptionService(
-      options.repository,
-      options.organizationRepository,
-      options.stripe,
-      options.itemCalculator,
-      options.seatEventService,
-      options.notifier,
-      options.stripeErrors,
-    );
+    return new BillingSubscriptionService({
+      repository: options.repository,
+      organizationRepository: options.organizationRepository,
+      stripe: options.stripe,
+      itemCalculator: options.itemCalculator,
+      seatEventService: options.seatEventService,
+      notifier: options.notifier,
+      stripeErrors: options.stripeErrors,
+    });
   }
 
   async findLastNonCancelledSubscription(

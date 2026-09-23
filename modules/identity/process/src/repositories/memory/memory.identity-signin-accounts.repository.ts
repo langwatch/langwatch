@@ -2,7 +2,7 @@ import type {
   IdentitySignInAccountsRepository,
   LegacySignInAccount,
 } from "../identity-signin-accounts.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /**
  * The legacy branch in memory. Seeded rather than derived: the legacy tables

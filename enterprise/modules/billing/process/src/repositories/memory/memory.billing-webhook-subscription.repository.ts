@@ -8,7 +8,7 @@ import {
   BillingWebhookSubscription,
 } from "../billing-webhook-subscription.repository.ts";
 import type { BillingSubscription, BillingSubscriptionRecord } from "../subscription.repository.ts";
-import type { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /**
  * The webhook's view of the subscription aggregate. `missing_subscription`

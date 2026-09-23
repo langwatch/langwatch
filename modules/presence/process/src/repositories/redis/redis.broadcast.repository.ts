@@ -190,7 +190,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     tenantId: string,
     event: string,
     eventType: BroadcastEventType = "trace_updated",
-  ) {
+  ): Promise<void> {
     if (!this.active) throw new BroadcasterNotActiveError();
 
     // When Redis is available, publish to Redis only — the subscriber
@@ -291,7 +291,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     return emitter;
   }
 
-  cleanupTenantEmitter(tenantId: string) {
+  cleanupTenantEmitter(tenantId: string): void {
     const emitter = this.eventEmitters.get(tenantId);
     if (!emitter) return;
 
@@ -305,7 +305,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     return Array.from(this.eventEmitters.keys());
   }
 
-  async close() {
+  async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
 

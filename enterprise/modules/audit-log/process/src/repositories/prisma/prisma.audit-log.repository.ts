@@ -1,6 +1,7 @@
 import {
   auditLogHistoryEntrySchema,
   type AuditLogEntry,
+  type AuditLogHistoryEntry,
   type ListAuditLogEntityHistoryInput,
 } from "@langwatch/audit-log-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
@@ -32,7 +33,7 @@ export class PrismaAuditLogRepository
     });
   }
 
-  async findEntityHistory(input: ListAuditLogEntityHistoryInput) {
+  async findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
     const entries = await this.prisma.auditLog.findMany({
       where: {
         projectId: input.projectId,

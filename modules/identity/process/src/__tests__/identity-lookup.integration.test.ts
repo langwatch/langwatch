@@ -3,8 +3,8 @@ import type { IdentifierFact, SsoConnectionState } from "@langwatch/identity-con
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
+import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import {
   IdentityLookupRefusedError,

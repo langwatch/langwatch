@@ -60,13 +60,31 @@ class VouchedOriginUnresolvableError extends Error {
  * would otherwise make a registration form a reachability oracle.
  */
 export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel {
-  private constructor(
-    private readonly validate: SsrfUrlValidator,
-    private readonly validateVouched: SsrfUrlValidator,
-    private readonly dialableInternalOrigins: () => readonly string[],
-    private readonly fetchValidated: FencedDiscoveryFetch,
-    private readonly tls: EgressTlsPolicy,
-  ) {}
+  private readonly validate: SsrfUrlValidator;
+  private readonly validateVouched: SsrfUrlValidator;
+  private readonly dialableInternalOrigins: () => readonly string[];
+  private readonly fetchValidated: FencedDiscoveryFetch;
+  private readonly tls: EgressTlsPolicy;
+
+  private constructor({
+    validate,
+    validateVouched,
+    dialableInternalOrigins,
+    fetchValidated,
+    tls,
+  }: {
+    validate: SsrfUrlValidator;
+    validateVouched: SsrfUrlValidator;
+    dialableInternalOrigins: () => readonly string[];
+    fetchValidated: FencedDiscoveryFetch;
+    tls: EgressTlsPolicy;
+  }) {
+    this.validate = validate;
+    this.validateVouched = validateVouched;
+    this.dialableInternalOrigins = dialableInternalOrigins;
+    this.fetchValidated = fetchValidated;
+    this.tls = tls;
+  }
 
   static create(options: {
     policy: SsoDomainProofEgressPolicy;
@@ -76,17 +94,19 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
     validateVouched?: SsrfUrlValidator;
     fetchValidated?: FencedDiscoveryFetch;
   }): HttpsSsoIssuerDiscoveryChannel {
-    return new HttpsSsoIssuerDiscoveryChannel(
-      options.validate ??
+    return new HttpsSsoIssuerDiscoveryChannel({
+      validate:
+        options.validate ??
         createSsrfUrlValidator({
           blockLocal: options.policy.blockLocal,
           allowedHosts: [...options.policy.allowedHosts],
         }),
-      options.validateVouched ?? createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] }),
-      options.dialableInternalOrigins ?? (() => []),
-      options.fetchValidated ?? fetchValidatedDestination,
-      { rejectUnauthorized: options.policy.verifyTls },
-    );
+      validateVouched:
+        options.validateVouched ?? createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] }),
+      dialableInternalOrigins: options.dialableInternalOrigins ?? (() => []),
+      fetchValidated: options.fetchValidated ?? fetchValidatedDestination,
+      tls: { rejectUnauthorized: options.policy.verifyTls },
+    });
   }
 
   /**

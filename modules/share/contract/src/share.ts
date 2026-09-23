@@ -27,7 +27,7 @@ export const shareLinkSchema = z
   .strict();
 export type ShareLink = z.infer<typeof shareLinkSchema>;
 
-export const shareWithProjectSchema = shareLinkSchema.extend({
+export const shareWithProjectSchema = shareLinkSchema.safeExtend({
   project: z
     .object({
       traceSharingEnabled: z.boolean(),
@@ -58,7 +58,7 @@ export const shareResourceInputSchema = z
 export type ShareResourceInput = z.infer<typeof shareResourceInputSchema>;
 
 export const createShareInputSchema = shareResourceInputSchema
-  .extend({
+  .safeExtend({
     visibility: shareVisibilitySchema.optional(),
     expiresAt: z.date().nullable().optional(),
     maxViews: z.number().int().positive().nullable().optional(),

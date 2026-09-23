@@ -116,16 +116,16 @@ export class AuthzService extends AuthzServiceContract {
   static create(options: AuthzServiceOptions): AuthzService {
     const collector = AuthzCollectorService.create({ reader: options.repository });
 
-    return new AuthzService(
+    return new AuthzService({
       collector,
-      AuthzBindingReaderService.create({
+      bindingReader: AuthzBindingReaderService.create({
         bindings: options.bindings,
         listing: options.listing,
       }),
-      AuthzGrantSnapshotService.create(collector, options),
-      AuthzScopeLineageService.create({ repository: options.repository }),
+      snapshots: AuthzGrantSnapshotService.create(collector, options),
+      scopeLineage: AuthzScopeLineageService.create({ repository: options.repository }),
       options,
-    );
+    });
   }
 
   private readonly engine = new AuthzEngine();
@@ -134,14 +134,31 @@ export class AuthzService extends AuthzServiceContract {
 
   private readonly gate: AuthzPermissionGateService;
 
-  private constructor(
-    private readonly collector: AuthzCollectorService,
-    private readonly bindingReader: AuthzBindingReaderService,
-    private readonly snapshots: AuthzGrantSnapshotService,
-    private readonly scopeLineage: AuthzScopeLineageService,
-    private readonly options: AuthzServiceOptions,
-  ) {
+  private readonly collector: AuthzCollectorService;
+  private readonly bindingReader: AuthzBindingReaderService;
+  private readonly snapshots: AuthzGrantSnapshotService;
+  private readonly scopeLineage: AuthzScopeLineageService;
+  private readonly options: AuthzServiceOptions;
+
+  private constructor({
+    collector,
+    bindingReader,
+    snapshots,
+    scopeLineage,
+    options,
+  }: {
+    collector: AuthzCollectorService;
+    bindingReader: AuthzBindingReaderService;
+    snapshots: AuthzGrantSnapshotService;
+    scopeLineage: AuthzScopeLineageService;
+    options: AuthzServiceOptions;
+  }) {
     super();
+    this.collector = collector;
+    this.bindingReader = bindingReader;
+    this.snapshots = snapshots;
+    this.scopeLineage = scopeLineage;
+    this.options = options;
     this.idDecisions = AuthzIdDecisionsService.create({
       engine: this.engine,
       collector,

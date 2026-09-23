@@ -3,6 +3,8 @@ import {
   AuthzApi,
   type AuthzListTeamMemberBindingsInput,
   type AuthzTeamMemberBinding,
+  type AuthzAccessBreakdownOutput,
+  type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -21,6 +23,25 @@ import {
   OrganizationCapabilityUnavailableError,
   OrganizationNotFoundForTeamError,
   type OrganizationUsageCount,
+  type OrganizationApiCreateInvitationsInput,
+  type OrganizationInviteCreated,
+  type OrganizationApiInviteScope,
+  type OrganizationInviteResent,
+  type OrganizationListedInvite,
+  type OrganizationInviteAccepted,
+  type OrganizationPendingInviteApplied,
+  type JoinRequestMine,
+  type JoinRequestFiled,
+  type JoinRequestPending,
+  type JoinRequestJoiningChanged,
+  type JoinRequestAdmitted,
+  type JoinRequestAutomaticJoins,
+  type OnboardingInitializeOrganizationInput,
+  type OrganizationInitialized,
+  type OrganizationProvisioningSummary,
+  type OrganizationRestMemberSummary,
+  type OrganizationRestMemberTeamBinding,
+  type OrganizationSettings,
   type AddOrganizationGroupBindingInput,
   type AddOrganizationTeamMemberInput,
   type ApplyOrganizationGroupEditsInput,
@@ -85,8 +106,7 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
-import type { PaginatedProjects, Project } from "@langwatch/project-contract";
+import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -516,15 +536,24 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Sign-up: the caller's first organization and its first team. */
   createAndAssign(
-    input: Omit<Parameters<OrganizationMembershipService["createAndAssign"]>[0], "userId">,
+    input: Readonly<{
+      orgName?: string;
+      phoneNumber?: string;
+      signUpData?: Record<string, unknown>;
+      primaryIntent?: OrganizationIntent | null;
+      userDisplayName?: string | null;
+    }>,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationMembershipService["createAndAssign"]> {
+  ): Promise<{
+    organization: { id: string; name: string };
+    team: { id: string; slug: string; name: string };
+  }> {
     return this.#dependencies.membership.createAndAssign({ ...input, userId: by.id });
   }
 
   /** Removes one seat, attributed to the caller who asked for it. */
   deleteMember(
-    input: Omit<Parameters<OrganizationMembershipService["deleteMember"]>[0], "actingUserId">,
+    input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
   ): Promise<void> {
     return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
@@ -535,7 +564,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
    * operator by more than their id.
    */
   setMemberDisabled(
-    input: Omit<Parameters<OrganizationMembershipService["setMemberDisabled"]>[0], "actingUser">,
+    input: Readonly<{ organizationId: string; userId: string; disabled: boolean }>,
     by: (OrganizationCaller & { name?: string | null; email?: string | null }) | null,
   ): Promise<void> {
     return this.#dependencies.membership.setMemberDisabled({
@@ -557,7 +586,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Every organization the caller can reach, fully loaded. */
   getAllForUser(
-    input: Omit<Parameters<OrganizationMembershipService["getAllForUser"]>[0], "userId">,
+    input: Readonly<{ isDemo: boolean; demoProjectUserId: string; demoProjectId: string }>,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]> {
     return this.#dependencies.membership.getAllForUser({ ...input, userId: by.id });
@@ -620,11 +649,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }
   }
 
-  getSettings(input: { organizationId: string }) {
+  getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     return this.#dependencies.organizations.getSettings(input);
   }
 
-  listMembers(input: Parameters<OrganizationMembershipService["listMembers"]>[0]) {
+  listMembers(input: {
+    organizationId: string;
+    includeDisabled?: boolean;
+    offset?: number;
+    limit?: number;
+  }): Promise<{ members: OrganizationRestMemberSummary[]; totalCount: number }> {
     return this.#dependencies.membership.listMembers(input).then((result) => ({
       ...result,
       members: result.members.map((member) => ({
@@ -634,26 +668,30 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }));
   }
 
-  getMember(input: Parameters<OrganizationMembershipService["getMember"]>[0]) {
+  getMember(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }> {
     return this.#dependencies.membership.getMember(input).then((member) => ({
       ...member,
       ...organizationMemberDatesFromDate(member),
     }));
   }
 
-  createForProvisioning(
-    input: Parameters<OrganizationMembershipService["createForProvisioning"]>[0],
-  ) {
+  createForProvisioning(input: { name: string; slug?: string }): Promise<{
+    organization: { id: string; name: string };
+    team: { id: string; slug: string; name: string };
+  }> {
     return this.#dependencies.membership.createForProvisioning(input);
   }
 
-  listProvisioningSummaries() {
+  listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return this.#dependencies.membership
       .listProvisioningSummaries()
       .then((summaries) => summaries.map(organizationProvisioningSummaryFromDate));
   }
 
-  findProvisioningSummary(organizationId: string) {
+  findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
     return this.#dependencies.membership
       .findProvisioningSummary(organizationId)
       .then((summary) =>
@@ -668,7 +706,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       userName: string | null;
       userEmail: string | null;
     }>,
-  ) {
+  ): Promise<AuthzAccessBreakdownOutput> {
     return this.#dependencies.permissions.getAccessBreakdown(input);
   }
 
@@ -681,7 +719,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     name: string;
     slug?: string;
     adminApiKeyName?: string;
-  }) {
+  }): Promise<{
+    organization: { id: string; name: string; slug: string };
+    team: { id: string; slug: string; name: string };
+    adminApiKey: { id: string; token: string };
+  }> {
     const created = await this.createForProvisioning({
       name: input.name,
       ...(input.slug !== undefined ? { slug: input.slug } : {}),
@@ -748,15 +790,17 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.findRepresentatives(input);
   }
 
-  deleteProvisionedOrganization(
-    input: Parameters<OrganizationMembershipService["deleteProvisionedOrganization"]>[0],
-  ) {
+  deleteProvisionedOrganization(input: { organizationId: string }): Promise<void> {
     return this.#dependencies.membership.deleteProvisionedOrganization(input);
   }
 
   createMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
-  ): ReturnType<OrganizationMembershipService["createMembership"]> {
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+    }>,
+  ): Promise<"created" | "already-present"> {
     return this.#dependencies.membership.createMembership(input);
   }
 
@@ -802,10 +846,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** One organization with its members and each member's teams. */
   findOrganizationWithMembers(
-    input: Omit<
-      Parameters<OrganizationMembershipService["findOrganizationWithMembers"]>[0],
-      "userId"
-    >,
+    input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams | null> {
     return this.#dependencies.membership.findOrganizationWithMembers({
@@ -816,7 +857,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** One member, redacted to what the calling member may see. */
   findMemberById(
-    input: Omit<Parameters<OrganizationMembershipService["findMemberById"]>[0], "currentUserId">,
+    input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
     return this.#dependencies.membership.findMemberById({ ...input, currentUserId: by.id });
@@ -895,10 +936,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Changes one member's role inside one team. */
   updateTeamMemberRole(
-    input: Omit<
-      Parameters<OrganizationMembershipService["updateTeamMemberRole"]>[0],
-      "currentUserId"
-    >,
+    input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#dependencies.membership.updateTeamMemberRole({
@@ -909,9 +947,15 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** Changes one member's organization role, with its team-role fallout. */
   changeMemberRole(
-    input: Omit<Parameters<OrganizationMembershipService["changeMemberRole"]>[0], "currentUserId">,
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      role: OrganizationUserRole;
+      teamRoleUpdates?: { teamId: string; userId: string; role: string; customRoleId?: string }[];
+      planUser?: { id: string; name?: string | null; email?: string | null };
+    }>,
     by: OrganizationCaller | null,
-  ): ReturnType<OrganizationMembershipService["changeMemberRole"]> {
+  ): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }> {
     return this.#dependencies.membership.changeMemberRole({
       ...input,
       currentUserId: by?.id ?? null,
@@ -920,7 +964,18 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** The organization's audit trail, one page at a time. */
   getAuditLogs(
-    input: Parameters<OrganizationMembershipService["getAuditLogs"]>[0],
+    input: Readonly<{
+      organizationId: string;
+      projectId?: string;
+      userId?: string;
+      pageOffset: number;
+      pageSize: number;
+      action?: string;
+      startDate?: number;
+      endDate?: number;
+      targetKind?: string;
+      targetId?: string;
+    }>,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.#dependencies.membership.getAuditLogs(input);
   }
@@ -1249,9 +1304,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   createInvitations(
-    input: Parameters<OrganizationInvitationDoorService["create"]>[0],
+    input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationInvitationDoorService["create"]> {
+  ): Promise<OrganizationInviteCreated[]> {
     return this.#invitations.create(input, by);
   }
 
@@ -1259,28 +1314,26 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#invitations.revoke(input);
   }
 
-  resendInvitation(
-    input: Readonly<{ organizationId: string; inviteId: string }>,
-  ): ReturnType<OrganizationInvitationDoorService["resend"]> {
+  resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent> {
     return this.#invitations.resend(input);
   }
 
   listPendingInvitations(
     input: Readonly<{ organizationId: string }>,
-  ): ReturnType<OrganizationInvitationDoorService["list"]> {
+  ): Promise<OrganizationListedInvite[]> {
     return this.#invitations.list(input);
   }
 
   acceptInvitation(
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationInvitationDoorService["accept"]> {
+  ): Promise<OrganizationInviteAccepted> {
     return this.#invitations.accept(input, by);
   }
 
   applyPendingInvite(
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
-  ): ReturnType<OrganizationInvitationDoorService["applyPending"]> {
+  ): Promise<OrganizationPendingInviteApplied> {
     return this.#invitations.applyPending(input);
   }
 
@@ -1319,7 +1372,18 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
    * so a project-scoped grant cannot widen a read to rows outside it.
    */
   async readAuditLogs(
-    input: Parameters<OrganizationMembershipService["getAuditLogs"]>[0],
+    input: Readonly<{
+      organizationId: string;
+      projectId?: string;
+      userId?: string;
+      pageOffset: number;
+      pageSize: number;
+      action?: string;
+      startDate?: number;
+      endDate?: number;
+      targetKind?: string;
+      targetId?: string;
+    }>,
     by: OrganizationCaller,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     await this.#members.plans.assertAuditLogsAllowed({
@@ -1518,15 +1582,13 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#joinRequests.lookup(input);
   }
 
-  listOwnJoinRequests(
-    input: Readonly<{ userId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["listOwn"]> {
+  listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine> {
     return this.#joinRequests.listOwn(input);
   }
 
   fileJoinRequest(
     input: Readonly<{ userId: string; organizationId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["file"]> {
+  ): Promise<JoinRequestFiled> {
     return this.#joinRequests.file(input);
   }
 
@@ -1536,7 +1598,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   listPendingJoinRequests(
     input: Readonly<{ organizationId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["listPending"]> {
+  ): Promise<JoinRequestPending> {
     return this.#joinRequests.listPending(input);
   }
 
@@ -1552,15 +1614,18 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#joinRequests.reject(input);
   }
 
-  readJoiningPolicy(
-    input: Readonly<{ organizationId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["readJoining"]> {
+  readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining> {
     return this.#joinRequests.readJoining(input);
   }
 
   setJoiningPolicy(
-    input: Parameters<OrganizationJoinDoorService["setJoining"]>[0],
-  ): ReturnType<OrganizationJoinDoorService["setJoining"]> {
+    input: Readonly<{
+      organizationId: string;
+      domainJoin: JoinRequestJoining["domainJoin"];
+      domains: readonly string[];
+      actorUserId: string;
+    }>,
+  ): Promise<JoinRequestJoiningChanged> {
     return this.#joinRequests.setJoining(input);
   }
 
@@ -1572,24 +1637,22 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#joinRequests.dismissOffer(input);
   }
 
-  admitAutomatically(
-    input: Readonly<{ userId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["admitAutomatically"]> {
+  admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
     return this.#joinRequests.admitAutomatically(input);
   }
 
   listAutomaticJoins(
     input: Readonly<{ organizationId: string }>,
-  ): ReturnType<OrganizationJoinDoorService["listAutomaticJoins"]> {
+  ): Promise<JoinRequestAutomaticJoins> {
     return this.#joinRequests.listAutomaticJoins(input);
   }
 
   // -- the sign-up ceremony --------------------------------------------------
 
   initializeOrganization(
-    input: Parameters<OrganizationOnboardingService["initialize"]>[0],
+    input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationOnboardingService["initialize"]> {
+  ): Promise<OrganizationInitialized> {
     return this.#onboarding.initialize(input, by);
   }
 

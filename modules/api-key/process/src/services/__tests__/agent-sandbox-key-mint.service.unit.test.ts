@@ -1,9 +1,9 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Unit coverage for the sandbox key the runs of one project share: what it asks for, whose
  * credential it is, when it is reused, and what a failed mint does to the run.
  * Spec: specs/agent-cache/agent-cache.feature
  */
-
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,7 @@ const create = vi.fn();
 // The mint takes the composed capabilities now rather than building one from a
 // Prisma client, so the doubles are the capabilities themselves and no module
 // needs spying on.
-const apiKeys = { create } as unknown as ApiKeyApi;
+const apiKeys = createApiFixture<ApiKeyApi>({ create });
 
 /** The share as a process holds it: whatever was last held, for as long as the test runs. */
 class MemoryShare extends AgentSandboxKeyShareRepository {

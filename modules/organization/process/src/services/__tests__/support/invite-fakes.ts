@@ -229,13 +229,9 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     const invite = this.invitesById.get(inviteId);
     const notExpired =
       invite?.expiration === null || (invite?.expiration ?? new Date(0)) > new Date();
-    if (
-      !invite ||
-      invite.organizationId !== organizationId ||
-      invite.inviteCode !== inviteCode ||
-      invite.status !== "PENDING" ||
-      !notExpired
-    ) {
+    if (!invite) return 0;
+    const matches = invite.organizationId === organizationId && invite.inviteCode === inviteCode;
+    if (!matches || invite.status !== "PENDING" || !notExpired) {
       return 0;
     }
 

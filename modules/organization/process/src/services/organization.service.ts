@@ -73,19 +73,51 @@ import { OrganizationTeamMembersService } from "./organization-team-members.serv
 import { PersonalWorkspaceService } from "./personal-workspace.service.ts";
 
 export class OrganizationService extends OrganizationServiceContract {
-  private constructor(
-    private readonly repository: OrganizationRepository,
-    private readonly teams: TeamRepository,
-    private readonly groups: GroupRepository,
-    private readonly identities: PersonalWorkspaceIdentity,
-    private readonly teamIdentities: TeamIdentity,
-    private readonly groupIdentities: GroupIdentity,
-    private readonly authz: AuthzApi,
-    private readonly grants: AuthzApi,
-    private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined,
-    private readonly settingsSecrets: OrganizationSettingsSecret,
-  ) {
+  private readonly repository: OrganizationRepository;
+  private readonly teams: TeamRepository;
+  private readonly groups: GroupRepository;
+  private readonly identities: PersonalWorkspaceIdentity;
+  private readonly teamIdentities: TeamIdentity;
+  private readonly groupIdentities: GroupIdentity;
+  private readonly authz: AuthzApi;
+  private readonly grants: AuthzApi;
+  private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined;
+  private readonly settingsSecrets: OrganizationSettingsSecret;
+
+  private constructor({
+    repository,
+    teams,
+    groups,
+    identities,
+    teamIdentities,
+    groupIdentities,
+    authz,
+    grants,
+    diagnostics,
+    settingsSecrets,
+  }: {
+    repository: OrganizationRepository;
+    teams: TeamRepository;
+    groups: GroupRepository;
+    identities: PersonalWorkspaceIdentity;
+    teamIdentities: TeamIdentity;
+    groupIdentities: GroupIdentity;
+    authz: AuthzApi;
+    grants: AuthzApi;
+    diagnostics: PersonalWorkspaceDiagnostics | undefined;
+    settingsSecrets: OrganizationSettingsSecret;
+  }) {
     super();
+    this.repository = repository;
+    this.teams = teams;
+    this.groups = groups;
+    this.identities = identities;
+    this.teamIdentities = teamIdentities;
+    this.groupIdentities = groupIdentities;
+    this.authz = authz;
+    this.grants = grants;
+    this.diagnostics = diagnostics;
+    this.settingsSecrets = settingsSecrets;
     this.groupService = OrganizationGroupService.create({
       groups,
       groupIdentities,
@@ -255,18 +287,18 @@ export class OrganizationService extends OrganizationServiceContract {
     diagnostics?: PersonalWorkspaceDiagnostics;
     settingsSecrets: OrganizationSettingsSecret;
   }): OrganizationService {
-    return new OrganizationService(
-      options.repository,
-      options.teams,
-      options.groups,
-      options.identities,
-      options.teamIdentities,
-      options.groupIdentities,
-      options.authz,
-      options.grants,
-      options.diagnostics,
-      options.settingsSecrets,
-    );
+    return new OrganizationService({
+      repository: options.repository,
+      teams: options.teams,
+      groups: options.groups,
+      identities: options.identities,
+      teamIdentities: options.teamIdentities,
+      groupIdentities: options.groupIdentities,
+      authz: options.authz,
+      grants: options.grants,
+      diagnostics: options.diagnostics,
+      settingsSecrets: options.settingsSecrets,
+    });
   }
 
   getOldestTeamId(input: GetOldestTeamInput): Promise<string> {

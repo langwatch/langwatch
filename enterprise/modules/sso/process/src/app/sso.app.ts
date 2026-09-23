@@ -239,18 +239,29 @@ export class SsoApp implements SsoApiContract {
   readonly #auditLog: AuditLogApi;
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
 
-  private constructor(
-    gate: SsoGateService,
-    connections: SsoConnectionLedger,
-    ceremony: SsoDomainCeremonyLedger,
-    selfServe: SsoSetupCommandLedger,
-    breakGlass: SsoBreakGlassLedger,
-    history: SsoConnectionHistoryReads,
-    setup: SsoSetupReads,
-    configuration: SsoConfiguration,
-    logger: SsoActivityLogger,
-    dependencies: SsoSetup["dependencies"],
-  ) {
+  private constructor({
+    gate,
+    connections,
+    ceremony,
+    selfServe,
+    breakGlass,
+    history,
+    setup,
+    configuration,
+    logger,
+    dependencies,
+  }: {
+    gate: SsoGateService;
+    connections: SsoConnectionLedger;
+    ceremony: SsoDomainCeremonyLedger;
+    selfServe: SsoSetupCommandLedger;
+    breakGlass: SsoBreakGlassLedger;
+    history: SsoConnectionHistoryReads;
+    setup: SsoSetupReads;
+    configuration: SsoConfiguration;
+    logger: SsoActivityLogger;
+    dependencies: SsoSetup["dependencies"];
+  }) {
     this.#gate = gate;
     this.#connections = connections;
     this.#ceremony = ceremony;
@@ -326,27 +337,29 @@ export class SsoApp implements SsoApiContract {
       revoke: (input) => ways().revoke(input),
     };
     const configuration = await resolveConfiguration(config, members, secrets);
-    return new SsoApp(
-      SsoGateService.create({
+    return new SsoApp({
+      gate: SsoGateService.create({
         configuration,
         licensing: dependencies.licensing,
         logger: members.logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
       connections,
-      domains,
+      ceremony: domains,
       selfServe,
       breakGlass,
-      { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
-      {
+      history: {
+        getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input),
+      },
+      setup: {
         getSetup: (input) => dependencies.identity.ssoSetup().getSetup(input),
         getMigrationProgress: (input) =>
           dependencies.identity.ssoSetup().getMigrationProgress(input),
       },
       configuration,
-      members.logger,
+      logger: members.logger,
       dependencies,
-    );
+    });
   }
 
   /**
@@ -413,117 +426,160 @@ export class SsoApp implements SsoApiContract {
     input: ListSsoConnectionsInput,
     by: SsoOperator,
   ): Promise<BackofficeSsoConnectionPage> {
-    return this.#audited(
+    return this.#audited({
       by,
-      "getAll",
-      { page: input.page, pageSize: input.pageSize, hasSearch: Boolean(input.search) },
-      () => this.#connections.list(input),
-    );
+      action: "getAll",
+      args: { page: input.page, pageSize: input.pageSize, hasSearch: Boolean(input.search) },
+      command: () => this.#connections.list(input),
+    });
   }
 
   async findConnection(
     input: SsoConnectionByIdInput,
     by: SsoOperator,
   ): Promise<BackofficeSsoConnection | undefined> {
-    return this.#audited(
+    return this.#audited({
       by,
-      "getById",
-      { connectionId: input.connectionId },
-      async () => (await this.#connections.findById(input)) ?? undefined,
-    );
+      action: "getById",
+      args: { connectionId: input.connectionId },
+      command: async () => (await this.#connections.findById(input)) ?? undefined,
+    });
   }
 
   async registerConnection(input: RegisterSsoConnectionInput, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "register", { ...input }, (operator) =>
-      this.#connections.registerConnection({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "register",
+      args: { ...input },
+      command: (operator) => this.#connections.registerConnection({ ...input, operator }),
+    });
   }
 
   async claimDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "claimDomain", { ...input }, (operator) =>
-      this.#connections.claimDomain({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "claimDomain",
+      args: { ...input },
+      command: (operator) => this.#connections.claimDomain({ ...input, operator }),
+    });
   }
 
   async approveDomainClaim(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "approveDomainClaim", { ...input }, (operator) =>
-      this.#connections.approveDomainClaim({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "approveDomainClaim",
+      args: { ...input },
+      command: (operator) => this.#connections.approveDomainClaim({ ...input, operator }),
+    });
   }
 
   async rejectDomainClaim(input: RejectSsoDomainClaimInput, by: SsoOperator): Promise<void> {
     // The note is an operator's prose about a customer and audit rows outlive
     // the decision, so the command carries it and the audit row does not.
     const { note: _note, ...recorded } = input;
-    await this.#audited(by, "rejectDomainClaim", recorded, (operator) =>
-      this.#connections.rejectDomainClaim({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "rejectDomainClaim",
+      args: recorded,
+      command: (operator) => this.#connections.rejectDomainClaim({ ...input, operator }),
+    });
   }
 
   async attestDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "attestDomain", { ...input }, (operator) =>
-      this.#connections.attestDomain({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "attestDomain",
+      args: { ...input },
+      command: (operator) => this.#connections.attestDomain({ ...input, operator }),
+    });
   }
 
   async activateConnection(input: ActivateSsoConnectionInput, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "activate", { ...input }, (operator) =>
-      this.#connections.activateConnection({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "activate",
+      args: { ...input },
+      command: (operator) => this.#connections.activateConnection({ ...input, operator }),
+    });
   }
 
   async suspendConnection(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "suspend", { ...input }, (operator) =>
-      this.#connections.suspendConnection({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "suspend",
+      args: { ...input },
+      command: (operator) => this.#connections.suspendConnection({ ...input, operator }),
+    });
   }
 
   async resumeConnection(input: SsoConnectionTarget, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "resume", { ...input }, (operator) =>
-      this.#connections.resumeConnection({ ...input, operator }),
-    );
+    await this.#audited({
+      by,
+      action: "resume",
+      args: { ...input },
+      command: (operator) => this.#connections.resumeConnection({ ...input, operator }),
+    });
   }
 
   async requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void> {
-    await this.#audited(by, "requestTeardown", { ...input }, (operator) =>
-      this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS }),
-    );
+    await this.#audited({
+      by,
+      action: "requestTeardown",
+      args: { ...input },
+      command: (operator) =>
+        this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS }),
+    });
   }
 
   setupClaimDomain(
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainClaimOutcome> {
-    return this.#attempted(by, "claimDomain", input, (actor) =>
-      this.#ceremony.claimDomain(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "claimDomain",
+      args: input,
+      ceremony: (actor) => this.#ceremony.claimDomain(input, actor),
+    });
   }
 
   setupProveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProof> {
-    return this.#attempted(by, "proveDomain", input, (actor) =>
-      this.#ceremony.proveDomain(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "proveDomain",
+      args: input,
+      ceremony: (actor) => this.#ceremony.proveDomain(input, actor),
+    });
   }
 
   setupRemoveDomain(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<void> {
-    return this.#attempted(by, "removeDomain", input, (actor) =>
-      this.#ceremony.removeDomain(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "removeDomain",
+      args: input,
+      ceremony: (actor) => this.#ceremony.removeDomain(input, actor),
+    });
   }
 
   setupCheckDomainRecord(
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainProved> {
-    return this.#attempted(by, "checkDomainRecord", input, (actor) =>
-      this.#ceremony.checkDomainRecord(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "checkDomainRecord",
+      args: input,
+      ceremony: (actor) => this.#ceremony.checkDomainRecord(input, actor),
+    });
   }
 
   setupCheckDomainFile(input: SsoSetupDomainInput, by: SsoAdministrator): Promise<SsoDomainProved> {
-    return this.#attempted(by, "checkDomainFile", input, (actor) =>
-      this.#ceremony.checkDomainFile(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "checkDomainFile",
+      args: input,
+      ceremony: (actor) => this.#ceremony.checkDomainFile(input, actor),
+    });
   }
 
   /**
@@ -537,15 +593,15 @@ export class SsoApp implements SsoApiContract {
   ): Promise<SsoSetupRegistered> {
     await this.#requireEnterprisePlan(input.organizationId);
 
-    return this.#attempted(
+    return this.#attempted({
       by,
-      "register",
-      {
+      action: "register",
+      args: {
         organizationId: input.organizationId,
         providerId: input.providerId,
         protocol: input.idp.protocol,
       },
-      (actor) =>
+      ceremony: (actor) =>
         this.#selfServe.register(
           {
             organizationId: input.organizationId,
@@ -554,7 +610,7 @@ export class SsoApp implements SsoApiContract {
           },
           actor,
         ),
-    );
+    });
   }
 
   /** Registering a replacement is registering, so it is gated like one. */
@@ -564,16 +620,16 @@ export class SsoApp implements SsoApiContract {
   ): Promise<SsoSetupRegistered> {
     await this.#requireEnterprisePlan(input.organizationId);
 
-    return this.#attempted(
+    return this.#attempted({
       by,
-      "startLegacyMigration",
-      {
+      action: "startLegacyMigration",
+      args: {
         organizationId: input.organizationId,
         connectionId: input.legacyConnectionId,
         providerId: input.providerId,
         protocol: input.idp.protocol,
       },
-      (actor) =>
+      ceremony: (actor) =>
         this.#selfServe.startLegacyMigration(
           {
             organizationId: input.organizationId,
@@ -583,7 +639,7 @@ export class SsoApp implements SsoApiContract {
           },
           actor,
         ),
-    );
+    });
   }
 
   /**
@@ -597,9 +653,12 @@ export class SsoApp implements SsoApiContract {
   ): Promise<void> {
     if (input.route === "direct") await this.#requireEnterprisePlan(input.organizationId);
 
-    await this.#attempted(by, "selectMigrationRoute", { ...input }, (actor) =>
-      this.#selfServe.selectMigrationRoute(input, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "selectMigrationRoute",
+      args: { ...input },
+      ceremony: (actor) => this.#selfServe.selectMigrationRoute(input, actor),
+    });
   }
 
   /**
@@ -614,9 +673,12 @@ export class SsoApp implements SsoApiContract {
   ): Promise<void> {
     await this.#requireEnterprisePlan(input.organizationId);
 
-    await this.#attempted(by, "finalizeLegacyMigration", { ...input }, (actor) =>
-      this.#selfServe.finalizeLegacyMigration(input, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "finalizeLegacyMigration",
+      args: { ...input },
+      ceremony: (actor) => this.#selfServe.finalizeLegacyMigration(input, actor),
+    });
   }
 
   /**
@@ -626,9 +688,12 @@ export class SsoApp implements SsoApiContract {
    * beside it is for.
    */
   async setupRename(input: SsoSetupRenameInput, by: SsoAdministrator): Promise<void> {
-    await this.#attempted(by, "rename", { ...input }, (actor) =>
-      this.#selfServe.rename(input, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "rename",
+      args: { ...input },
+      ceremony: (actor) => this.#selfServe.rename(input, actor),
+    });
   }
 
   /**
@@ -638,16 +703,20 @@ export class SsoApp implements SsoApiContract {
   async setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void> {
     await this.#requireEnterprisePlan(input.organizationId);
 
-    await this.#attempted(by, "setArrivals", { ...input }, (actor) =>
-      this.#selfServe.setArrivals(
-        {
-          organizationId: input.organizationId,
-          connectionId: input.connectionId,
-          arrivalPolicy: input.policy,
-        },
-        actor,
-      ),
-    );
+    await this.#attempted({
+      by,
+      action: "setArrivals",
+      args: { ...input },
+      ceremony: (actor) =>
+        this.#selfServe.setArrivals(
+          {
+            organizationId: input.organizationId,
+            connectionId: input.connectionId,
+            arrivalPolicy: input.policy,
+          },
+          actor,
+        ),
+    });
   }
 
   /**
@@ -658,9 +727,12 @@ export class SsoApp implements SsoApiContract {
   async setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void> {
     await this.#requireEnterprisePlan(input.organizationId);
 
-    await this.#attempted(by, "activate", { ...input }, (actor) =>
-      this.#selfServe.activate(input, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "activate",
+      args: { ...input },
+      ceremony: (actor) => this.#selfServe.activate(input, actor),
+    });
   }
 
   /** Ungated, like the removal below it: a lapsed plan must never be the
@@ -669,15 +741,22 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupConnectionInput,
     by: SsoAdministrator,
   ): Promise<void> {
-    await this.#attempted(by, "discardConnection", { ...input }, (actor) =>
-      this.#selfServe.discardConnection(input, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "discardConnection",
+      args: { ...input },
+      ceremony: (actor) => this.#selfServe.discardConnection(input, actor),
+    });
   }
 
   async setupRemoveConnection(input: SsoSetupRemovalInput, by: SsoAdministrator): Promise<void> {
-    await this.#attempted(by, "removeConnection", { ...input }, (actor) =>
-      this.#selfServe.removeConnection({ ...input, graceMs: TEARDOWN_GRACE_MS }, actor),
-    );
+    await this.#attempted({
+      by,
+      action: "removeConnection",
+      args: { ...input },
+      ceremony: (actor) =>
+        this.#selfServe.removeConnection({ ...input, graceMs: TEARDOWN_GRACE_MS }, actor),
+    });
   }
 
   /**
@@ -703,18 +782,24 @@ export class SsoApp implements SsoApiContract {
     input: SsoBreakGlassGrantInput,
     by: SsoAdministrator,
   ): Promise<SsoBreakGlassBinding> {
-    return this.#attempted(by, "grantBreakGlass", { ...input }, (actor) =>
-      this.#breakGlass.grant(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "grantBreakGlass",
+      args: { ...input },
+      ceremony: (actor) => this.#breakGlass.grant(input, actor),
+    });
   }
 
   setupRenewBreakGlass(
     input: SsoBreakGlassRenewalInput,
     by: SsoAdministrator,
   ): Promise<SsoBreakGlassRenewal> {
-    return this.#attempted(by, "renewBreakGlass", { ...input }, (actor) =>
-      this.#breakGlass.renew(input, actor),
-    );
+    return this.#attempted({
+      by,
+      action: "renewBreakGlass",
+      args: { ...input },
+      ceremony: (actor) => this.#breakGlass.renew(input, actor),
+    });
   }
 
   /** Ending one is identity's refusal to make while it is the last way in. */
@@ -722,9 +807,12 @@ export class SsoApp implements SsoApiContract {
     input: SsoBreakGlassBindingInput,
     by: SsoAdministrator,
   ): Promise<SsoBreakGlassBinding> {
-    return this.#attempted(by, "revokeBreakGlass", { ...input }, () =>
-      this.#breakGlass.revoke(input),
-    );
+    return this.#attempted({
+      by,
+      action: "revokeBreakGlass",
+      args: { ...input },
+      ceremony: () => this.#breakGlass.revoke(input),
+    });
   }
 
   /**
@@ -743,12 +831,17 @@ export class SsoApp implements SsoApiContract {
    * session the surface authenticated; the row names the operator borrowing
    * that access where there is one.
    */
-  async #attempted<T>(
-    by: SsoAdministrator,
-    action: string,
-    args: Record<string, string | number | null> & { organizationId: string },
-    ceremony: (actor: SsoSelfServeActor) => Promise<T>,
-  ): Promise<T> {
+  async #attempted<T>({
+    by,
+    action,
+    args,
+    ceremony,
+  }: {
+    by: SsoAdministrator;
+    action: string;
+    args: Record<string, string | number | null> & { organizationId: string };
+    ceremony: (actor: SsoSelfServeActor) => Promise<T>;
+  }): Promise<T> {
     await this.#auditLog.record({
       userId: by.impersonatorId ?? by.id,
       organizationId: args.organizationId,
@@ -765,12 +858,17 @@ export class SsoApp implements SsoApiContract {
    * Gate, run, then record. The row says the ledger answered, so a refusal at
    * the gate and a command the ledger threw on both leave nothing behind.
    */
-  async #audited<T>(
-    by: SsoOperator,
-    action: string,
-    args: Record<string, unknown>,
-    command: (operator: SsoConnectionLedgerOperator) => Promise<T>,
-  ): Promise<T> {
+  async #audited<T>({
+    by,
+    action,
+    args,
+    command,
+  }: {
+    by: SsoOperator;
+    action: string;
+    args: Record<string, unknown>;
+    command: (operator: SsoConnectionLedgerOperator) => Promise<T>;
+  }): Promise<T> {
     const operator = await this.#requireOperator(by);
     const answer = await command(operator);
     const connectionId = typeof args.connectionId === "string" ? args.connectionId : undefined;

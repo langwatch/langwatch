@@ -32,22 +32,40 @@ class SsoGateTimeoutError extends Error {
 export class SsoGateService {
   private memoizedGate: Promise<boolean> | null = null;
 
-  private constructor(
-    private readonly configuration: SsoConfiguration,
-    private readonly licensing: LicensingApi,
-    private readonly logger: SsoGateLogger,
-    private readonly providerMountInspector: SsoProviderMountInspector,
-    private readonly evaluationTimeoutMs: number,
-  ) {}
+  private readonly configuration: SsoConfiguration;
+  private readonly licensing: LicensingApi;
+  private readonly logger: SsoGateLogger;
+  private readonly providerMountInspector: SsoProviderMountInspector;
+  private readonly evaluationTimeoutMs: number;
+
+  private constructor({
+    configuration,
+    licensing,
+    logger,
+    providerMountInspector,
+    evaluationTimeoutMs,
+  }: {
+    configuration: SsoConfiguration;
+    licensing: LicensingApi;
+    logger: SsoGateLogger;
+    providerMountInspector: SsoProviderMountInspector;
+    evaluationTimeoutMs: number;
+  }) {
+    this.configuration = configuration;
+    this.licensing = licensing;
+    this.logger = logger;
+    this.providerMountInspector = providerMountInspector;
+    this.evaluationTimeoutMs = evaluationTimeoutMs;
+  }
 
   static create(options: SsoGateServiceOptions): SsoGateService {
-    return new SsoGateService(
-      options.configuration,
-      options.licensing,
-      options.logger,
-      options.providerMountInspector,
-      options.evaluationTimeoutMs ?? 5_000,
-    );
+    return new SsoGateService({
+      configuration: options.configuration,
+      licensing: options.licensing,
+      logger: options.logger,
+      providerMountInspector: options.providerMountInspector,
+      evaluationTimeoutMs: options.evaluationTimeoutMs ?? 5_000,
+    });
   }
 
   async platformAllowed(): Promise<boolean> {

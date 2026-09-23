@@ -1,5 +1,5 @@
 import { IdentityLatchRepository } from "../identity-latch.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The latch twin: a set of finalized user ids, seeded directly by tests. */
 export class MemoryIdentityLatchRepository extends IdentityLatchRepository {

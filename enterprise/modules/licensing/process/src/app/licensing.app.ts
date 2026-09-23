@@ -47,6 +47,12 @@ import {
   licensingSecrets,
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
+  type IssuedLicensePage,
+  type LicenseStatus,
+  type PlanInfo,
+  type SeatChangeResult,
+  type SignedIssuedLicense,
+  type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
 import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { PrismaUsageMembershipRepository } from "@langwatch/entitlement-process";
@@ -219,14 +225,21 @@ export class LicensingApp implements LicensingApiContract {
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
 
-  private constructor(
-    service: LicenseService,
-    runtime: LicensingRuntime,
-    entitlements: LicensingEntitlementSourceAdapter,
-    registry: LicenseRegistryParts,
-    install: ConnectInstallParts,
-    isSaas: boolean,
-  ) {
+  private constructor({
+    service,
+    runtime,
+    entitlements,
+    registry,
+    install,
+    isSaas,
+  }: {
+    service: LicenseService;
+    runtime: LicensingRuntime;
+    entitlements: LicensingEntitlementSourceAdapter;
+    registry: LicenseRegistryParts;
+    install: ConnectInstallParts;
+    isSaas: boolean;
+  }) {
     this.#isSaas = isSaas;
     this.#service = service;
     this.#entitlements = entitlements;
@@ -297,15 +310,15 @@ export class LicensingApp implements LicensingApiContract {
       configuration: LicenseServiceConfiguration.create(),
       instanceLicenseKey,
     });
-    const app = new LicensingApp(
+    const app = new LicensingApp({
       service,
       runtime,
-      LicensingEntitlementSourceAdapter.create({
+      entitlements: LicensingEntitlementSourceAdapter.create({
         licensing: service,
         mode: members.isSaas ? "cloud" : "self-hosted",
       }),
-      registryParts,
-      connectInstallParts({
+      registry: registryParts,
+      install: connectInstallParts({
         infrastructure:
           connect ??
           (members.prisma
@@ -324,19 +337,19 @@ export class LicensingApp implements LicensingApiContract {
         config,
         logger: logger ?? members.logger,
       }),
-      members.isSaas,
-    );
+      isSaas: members.isSaas,
+    });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
     return app;
   }
 
-  resolve(input: ResolvePlanInput) {
+  resolve(input: ResolvePlanInput): Promise<PlanInfo> {
     return this.#entitlements.resolve(input);
   }
 
   /** The license an organization is running on, its plan and its usage. */
-  getLicenseStatus(organizationId: string) {
+  getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
     return this.#service.getLicenseStatus(organizationId);
   }
 
@@ -363,7 +376,9 @@ export class LicensingApp implements LicensingApiContract {
   /**
    * Validates a pasted key and stores it, answering the plan it grants.
    */
-  async uploadLicense(input: Readonly<{ organizationId: string; licenseKey: string }>) {
+  async uploadLicense(
+    input: Readonly<{ organizationId: string; licenseKey: string }>,
+  ): Promise<PlanInfo> {
     const result = await this.#service.validateAndStoreLicense({
       organizationId: input.organizationId,
       licenseKey: input.licenseKey,
@@ -376,7 +391,10 @@ export class LicensingApp implements LicensingApiContract {
   }
 
   /** Redeems an activation code with LangWatch and stores the license it minted. */
-  async activateLicenseWithCode(input: { organizationId: string; code: string }) {
+  async activateLicenseWithCode(input: {
+    organizationId: string;
+    code: string;
+  }): Promise<PlanInfo> {
     const { licenseKey } = await this.#refresh.redeemActivationCode({ code: input.code });
     return this.uploadLicense({ organizationId: input.organizationId, licenseKey });
   }
@@ -444,20 +462,23 @@ export class LicensingApp implements LicensingApiContract {
     return this.#service.inspectPlatformAccess();
   }
 
-  getActivePlan(organizationId: string) {
+  getActivePlan(organizationId: string): Promise<PlanInfo> {
     return this.#service.getActivePlan(organizationId);
   }
 
-  getSelfHostedPlan(organizationId: string) {
+  getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
     return this.#service.getSelfHostedPlan(organizationId);
   }
 
-  validateAndStoreLicense(input: { organizationId: string; licenseKey: string }) {
+  validateAndStoreLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+  }): Promise<StoreLicenseResult> {
     return this.#service.validateAndStoreLicense(input);
   }
 
   /** The license registry (ADR-156). Composed on LangWatch Cloud alone. */
-  issueLicense(input: IssueLicenseInput) {
+  issueLicense(input: IssueLicenseInput): Promise<SignedIssuedLicense> {
     return this.#registry.issue({
       ...input,
       expiresAt: Temporal.Instant.from(input.expiresAt),
@@ -468,15 +489,23 @@ export class LicensingApp implements LicensingApiContract {
     licenseKey: string;
     source: Extract<IssuedLicenseSource, "PURCHASE" | "SCRIPT">;
     organizationId?: string;
-  }) {
+  }): Promise<IssuedLicenseView> {
     return this.#registry.record(input);
   }
 
-  registerLegacyLicense(input: { licenseKey: string; organizationId: string; operatorId: string }) {
+  registerLegacyLicense(input: {
+    licenseKey: string;
+    organizationId: string;
+    operatorId: string;
+  }): Promise<IssuedLicenseView> {
     return this.#registry.registerLegacy(input);
   }
 
-  revokeIssuedLicense(input: { id: string; operatorId: string; reason: string }) {
+  revokeIssuedLicense(input: {
+    id: string;
+    operatorId: string;
+    reason: string;
+  }): Promise<IssuedLicenseView> {
     return this.#registry.revoke(input);
   }
 
@@ -487,34 +516,48 @@ export class LicensingApp implements LicensingApiContract {
     maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;
-  }) {
+  }): Promise<SignedIssuedLicense> {
     return this.#registry.reissue({
       ...input,
       expiresAt: Temporal.Instant.from(input.expiresAt),
     });
   }
 
-  changeLicenseSeats(input: { id: string; maxMembers: number; operatorId: string }) {
+  changeLicenseSeats(input: {
+    id: string;
+    maxMembers: number;
+    operatorId: string;
+  }): Promise<SeatChangeResult> {
     return this.#registry.changeSeats(input);
   }
 
-  resetLicenseInstanceBinding(input: { id: string }) {
+  resetLicenseInstanceBinding(input: { id: string }): Promise<IssuedLicenseView> {
     return this.#registry.resetInstanceBinding(input);
   }
 
-  updateLicenseTerms(input: { id: string; operatorId: string } & LicenseTermsInput) {
+  updateLicenseTerms(
+    input: { id: string; operatorId: string } & LicenseTermsInput,
+  ): Promise<IssuedLicenseView> {
     return this.#registry.updateTerms(input);
   }
 
-  linkLicenseToOrganization(input: { id: string; organizationId: string; operatorId: string }) {
+  linkLicenseToOrganization(input: {
+    id: string;
+    organizationId: string;
+    operatorId: string;
+  }): Promise<IssuedLicenseView> {
     return this.#registry.linkToOrganization(input);
   }
 
-  getIssuedLicense(input: { id: string }) {
+  getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView> {
     return this.#registry.getById(input);
   }
 
-  listIssuedLicenses(input: { page: number; pageSize: number; search?: string }) {
+  listIssuedLicenses(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<IssuedLicensePage> {
     return this.#registry.list(input);
   }
 
@@ -553,15 +596,22 @@ export class LicensingApp implements LicensingApiContract {
     return this.#install.getStatus(input.organizationId);
   }
 
-  findEnabledConnectServices(input: { organizationId: string }) {
+  findEnabledConnectServices(input: { organizationId: string }): Promise<ConnectService[]> {
     return this.#install.findEnabledServices(input.organizationId);
   }
 
-  setConnectService(input: { organizationId: string; service: string; enabled: boolean }) {
+  setConnectService(input: {
+    organizationId: string;
+    service: string;
+    enabled: boolean;
+  }): Promise<{ enabledServices: ConnectService[] }> {
     return this.#install.setService(input);
   }
 
-  setConnectCap(input: { organizationId: string; capUsd: number }) {
+  setConnectCap(input: {
+    organizationId: string;
+    capUsd: number;
+  }): Promise<{ capUsd: number; maximumCapUsd: number }> {
     return this.#install.setCap(input);
   }
 

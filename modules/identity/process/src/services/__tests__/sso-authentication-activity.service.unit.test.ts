@@ -7,7 +7,7 @@
 import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { MemorySsoMigrationEvidenceRepository } from "../../repositories/memory/memory.sso-migration-evidence.repository.ts";
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
 import { SsoAuthenticationActivityService } from "../sso-authentication-activity.service.ts";

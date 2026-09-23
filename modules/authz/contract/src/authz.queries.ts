@@ -52,7 +52,7 @@ export type AuthzResolveScopeInput = AuthzScopeIds;
 export const authzResolveScopeOutputSchema = authzScopeRefSchema.nullable();
 export type AuthzResolveScopeOutput = z.infer<typeof authzResolveScopeOutputSchema>;
 
-export const authzCheckByIdsInputSchema = authzScopeIdsSchema.extend({
+export const authzCheckByIdsInputSchema = authzScopeIdsSchema.safeExtend({
   principal: authzPrincipalRefSchema,
   permission: authzPermissionSchema,
   ceiling: z.boolean().optional(),

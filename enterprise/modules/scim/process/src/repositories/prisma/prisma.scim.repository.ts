@@ -127,6 +127,19 @@ function isScimDatabase(value: object): value is ScimDatabase {
   );
 }
 
+function roleBindingScopeFilter(
+  scope: ScimGrantBindingScope,
+):
+  | { userId: string; scopeType: "ORGANIZATION"; scopeId: string }
+  | { userId: string }
+  | { groupId: string } {
+  if (scope.kind === "organization-membership") {
+    return { userId: scope.userId, scopeType: "ORGANIZATION", scopeId: scope.organizationId };
+  }
+  if (scope.kind === "member-offboarding") return { userId: scope.userId };
+  return { groupId: scope.groupId };
+}
+
 /** Strict generated-Prisma implementation of the SCIM persistence port. */
 export class PrismaScimRepository extends ScimRepository {
   private constructor(private readonly prisma: ScimDatabase) {
@@ -512,15 +525,7 @@ export class PrismaScimRepository extends ScimRepository {
     return this.prisma.roleBinding.findMany({
       where: {
         organizationId: scope.organizationId,
-        ...(scope.kind === "organization-membership"
-          ? {
-              userId: scope.userId,
-              scopeType: "ORGANIZATION",
-              scopeId: scope.organizationId,
-            }
-          : scope.kind === "member-offboarding"
-            ? { userId: scope.userId }
-            : { groupId: scope.groupId }),
+        ...roleBindingScopeFilter(scope),
       },
       select: {
         id: true,

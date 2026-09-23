@@ -45,10 +45,10 @@ export class PostgresIdentityUserMigrationsAdapter {
     const secrets = IdentitySecretCarryService.create(
       PrismaIdentitySecretCarryRepository.create(database),
     );
-    const backfill = IdentityBackfillService.create(
-      PrismaIdentityBackfillRepository.create(database),
-      PrismaIdentityUsersRepository.create(database),
-      IdentityService.create(
+    const backfill = IdentityBackfillService.create({
+      reads: PrismaIdentityBackfillRepository.create(database),
+      users: PrismaIdentityUsersRepository.create(database),
+      identity: IdentityService.create(
         guards.identityGuards,
         IdentityLedgerWriterAdapter.create({
           projectionStore: PrismaIdentityProjectionRepository.create({
@@ -59,8 +59,8 @@ export class PostgresIdentityUserMigrationsAdapter {
         }),
       ),
       secrets,
-      IdentityBackfillPlanService.create(CryptoIdentifierIdentityAdapter.create()),
-    );
+      plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityAdapter.create()),
+    });
 
     return [
       IdentityIdentifierBackfillMigrationAdapter.create(backfill),

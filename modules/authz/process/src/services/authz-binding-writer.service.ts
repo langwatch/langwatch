@@ -32,6 +32,33 @@ import type {
   AuthzBindingScopeRow,
 } from "../repositories/authz-binding.repository.ts";
 
+function assertScopeCanGrantRole({
+  binding,
+  rolesById,
+}: {
+  binding: AuthzBindingWrite;
+  rolesById: ReadonlyMap<string, { permissions: unknown }>;
+}): void {
+  if (binding.scopeType === "ORGANIZATION" || !binding.customRoleId) {
+    return;
+  }
+
+  const role = rolesById.get(binding.customRoleId);
+  const permissions = Array.isArray(role?.permissions)
+    ? role.permissions.filter((permission): permission is string => typeof permission === "string")
+    : [];
+  const exclusivePermission = permissions.find(
+    (permission) =>
+      !bindingScopeCanGrantPermission({
+        scopeType: binding.scopeType,
+        permission,
+      }),
+  );
+  if (exclusivePermission) {
+    throw new OrgExclusivePermissionScopeError(exclusivePermission, binding.scopeType);
+  }
+}
+
 export class AuthzBindingWriterService {
   static create(options: {
     bindings: AuthzBindingRepository;
@@ -369,26 +396,7 @@ export class AuthzBindingWriterService {
     }
 
     for (const binding of customBindings) {
-      if (binding.scopeType === "ORGANIZATION" || !binding.customRoleId) {
-        continue;
-      }
-
-      const role = rolesById.get(binding.customRoleId);
-      const permissions = Array.isArray(role?.permissions)
-        ? role.permissions.filter(
-            (permission): permission is string => typeof permission === "string",
-          )
-        : [];
-      const exclusivePermission = permissions.find(
-        (permission) =>
-          !bindingScopeCanGrantPermission({
-            scopeType: binding.scopeType,
-            permission,
-          }),
-      );
-      if (exclusivePermission) {
-        throw new OrgExclusivePermissionScopeError(exclusivePermission, binding.scopeType);
-      }
+      assertScopeCanGrantRole({ binding, rolesById });
     }
   }
 

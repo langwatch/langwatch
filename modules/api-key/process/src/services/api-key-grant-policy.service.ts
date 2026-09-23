@@ -1,6 +1,6 @@
 import {
   ApiKeyScopeViolationError,
-  apiKeyPermissionSchema,
+  apiKeyPermissionFormatSchema,
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -11,6 +11,14 @@ type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }
   | { type: "team"; id: string; organizationId: string }
   | { type: "project"; id: string; teamId: string; organizationId: string };
+
+function builtInRolePermission(binding: ApiKeyScope): string {
+  const organizationScoped = binding.scopeType === "ORGANIZATION";
+  if (binding.role === "ADMIN")
+    return organizationScoped ? "organization:manage" : "project:manage";
+  if (binding.role === "MEMBER") return organizationScoped ? "organization:view" : "project:update";
+  return "project:view";
+}
 
 export class ApiKeyGrantPolicyService {
   static create(options: ApiKeyDependencies): ApiKeyGrantPolicyService {
@@ -93,7 +101,7 @@ export class ApiKeyGrantPolicyService {
     }
 
     for (const permission of input.permissions ?? []) {
-      if (!apiKeyPermissionSchema.safeParse(permission).success) {
+      if (!apiKeyPermissionFormatSchema.safeParse(permission).success) {
         throw new ApiKeyScopeViolationError(
           `Invalid permission format "${permission}" — must match resource:action`,
         );
@@ -217,17 +225,7 @@ export class ApiKeyGrantPolicyService {
     rawPermissions: string[],
   ): Promise<string[]> {
     if (binding.role !== "CUSTOM") {
-      return [
-        binding.role === "ADMIN"
-          ? binding.scopeType === "ORGANIZATION"
-            ? "organization:manage"
-            : "project:manage"
-          : binding.role === "MEMBER"
-            ? binding.scopeType === "ORGANIZATION"
-              ? "organization:view"
-              : "project:update"
-            : "project:view",
-      ];
+      return [builtInRolePermission(binding)];
     }
 
     if (rawPermissions.length > 0) {

@@ -4,7 +4,7 @@
 import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../memory-identity.store.ts";
+import { MemoryIdentityStore } from "../memory.identity.store.ts";
 import { MemorySsoDomainReproofTargetRepository } from "../memory.sso-domain-reproof.repository.ts";
 
 const T0 = 1_725_000_000_000;

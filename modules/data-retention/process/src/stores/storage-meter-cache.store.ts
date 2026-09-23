@@ -40,27 +40,44 @@ export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
     refreshPrefix?: string;
     now?: () => number;
   }): RedisStorageMeterCacheStore {
-    return new RedisStorageMeterCacheStore(
-      options.redis ?? null,
-      options.ttlMs,
-      options.prefix ?? "storage-meter:v2:",
-      options.refreshPrefix ?? "storage-meter:refresh:",
-      options.now ?? Date.now,
-    );
+    return new RedisStorageMeterCacheStore({
+      redis: options.redis ?? null,
+      ttlMs: options.ttlMs,
+      prefix: options.prefix ?? "storage-meter:v2:",
+      refreshPrefix: options.refreshPrefix ?? "storage-meter:refresh:",
+      now: options.now ?? Date.now,
+    });
   }
 
   private readonly memory = new Map<string, MemoryEntry>();
   private readonly locks = new Map<string, number>();
   private readonly ttlSeconds: number;
 
-  private constructor(
-    private readonly redis: StorageMeterRedis | null,
-    private readonly ttlMs: number,
-    private readonly prefix: string,
-    private readonly refreshPrefix: string,
-    private readonly now: () => number,
-  ) {
+  private readonly redis: StorageMeterRedis | null;
+  private readonly ttlMs: number;
+  private readonly prefix: string;
+  private readonly refreshPrefix: string;
+  private readonly now: () => number;
+
+  private constructor({
+    redis,
+    ttlMs,
+    prefix,
+    refreshPrefix,
+    now,
+  }: {
+    redis: StorageMeterRedis | null;
+    ttlMs: number;
+    prefix: string;
+    refreshPrefix: string;
+    now: () => number;
+  }) {
     super();
+    this.redis = redis;
+    this.ttlMs = ttlMs;
+    this.prefix = prefix;
+    this.refreshPrefix = refreshPrefix;
+    this.now = now;
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 

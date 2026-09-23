@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `InviteServiceOrganizationInvitations` maps `InviteService`'s method names onto
  * the port the door reads; the app still refuses a role it composed none for.
@@ -264,7 +265,7 @@ describe("given a deployment that composed no invitation service", () => {
           organizations: {} as unknown as ServerOrganizationAppDependencies["organizations"],
           membership: {} as unknown as ServerOrganizationAppDependencies["membership"],
           projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
-          permissions: {} as unknown as AuthzApi,
+          permissions: createApiFixture<AuthzApi>({}),
         },
       });
 

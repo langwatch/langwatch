@@ -121,33 +121,28 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
     });
 
     describe("when a seed would lower a budget", () => {
+      let sql: string;
+
+      beforeEach(async () => {
+        const { repository, executeRaw } = build();
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: seeds(1),
+        });
+        sql = statement(executeRaw);
+      });
+
       // Views are never refunded (decision 22). The guard lives in the UPDATE
       // itself rather than a filter resolved by an earlier SELECT, so a
       // consume landing mid-flight cannot be walked back.
       /** @scenario "A view budget is raised on a re-run, never lowered" */
       it("raises only where the seed is strictly higher", async () => {
-        const { repository, executeRaw } = build();
-
-        await repository.seedResourceGrantUsage({
-          organizationId: ORG,
-          seeds: seeds(1),
-        });
-
-        const sql = statement(executeRaw);
         expect(sql).toContain('ON CONFLICT ("grantId") DO UPDATE');
         expect(sql).toContain('WHERE "GrantUsage"."viewCount" < EXCLUDED."viewCount"');
       });
 
       /** @scenario "A view budget is raised on a re-run, never lowered" */
       it("leaves a usage row that disagrees about where it lives alone", async () => {
-        const { repository, executeRaw } = build();
-
-        await repository.seedResourceGrantUsage({
-          organizationId: ORG,
-          seeds: seeds(1),
-        });
-
-        const sql = statement(executeRaw);
         expect(sql).toContain('AND "GrantUsage"."organizationId" = EXCLUDED."organizationId"');
         expect(sql).toContain('AND "GrantUsage"."projectId" = EXCLUDED."projectId"');
       });

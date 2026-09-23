@@ -32,49 +32,57 @@ import { z } from "zod";
  * time) over the payloads `@langwatch/identity-contract` declares.
  */
 
-export const scimTokenIssuedEventSchema = EventSchema.extend({
+export const scimTokenIssuedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_TOKEN_ISSUED_EVENT_TYPE),
   data: scimTokenIssuedPayloadSchema,
 });
 export type ScimTokenIssuedEvent = z.infer<typeof scimTokenIssuedEventSchema>;
 
-export const scimUserPushedEventSchema = EventSchema.extend({
+export const scimUserPushedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_USER_PUSHED_EVENT_TYPE),
   data: scimUserPushedPayloadSchema,
 });
 export type ScimUserPushedEvent = z.infer<typeof scimUserPushedEventSchema>;
 
-export const scimGroupMappedEventSchema = EventSchema.extend({
+export const scimGroupMappedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_GROUP_MAPPED_EVENT_TYPE),
   data: scimGroupMappedPayloadSchema,
 });
 export type ScimGroupMappedEvent = z.infer<typeof scimGroupMappedEventSchema>;
 
-export const scimApplyFailedEventSchema = EventSchema.extend({
+export const scimApplyFailedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_FAILED_EVENT_TYPE),
   data: scimApplyFailedPayloadSchema,
 });
 export type ScimApplyFailedEvent = z.infer<typeof scimApplyFailedEventSchema>;
 
-export const scimApplyRecoveredEventSchema = EventSchema.extend({
+export const scimApplyRecoveredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_RECOVERED_EVENT_TYPE),
   data: scimApplyRecoveredPayloadSchema,
 });
 export type ScimApplyRecoveredEvent = z.infer<typeof scimApplyRecoveredEventSchema>;
 
-export const scimApplyRetiredEventSchema = EventSchema.extend({
+export const scimApplyRetiredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_RETIRED_EVENT_TYPE),
   data: scimApplyRetiredPayloadSchema,
 });
 export type ScimApplyRetiredEvent = z.infer<typeof scimApplyRetiredEventSchema>;
 
-export const scimApplyRedrivenEventSchema = EventSchema.extend({
+export const scimApplyRedrivenEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_REDRIVEN_EVENT_TYPE),
   data: scimApplyRedrivenPayloadSchema,
 });
 export type ScimApplyRedrivenEvent = z.infer<typeof scimApplyRedrivenEventSchema>;
 
-export const scimTokenRevokedEventSchema = EventSchema.extend({
+export const scimTokenRevokedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(SCIM_TOKEN_REVOKED_EVENT_TYPE),
   data: scimTokenRevokedPayloadSchema,
 });
@@ -148,7 +156,7 @@ export class ScimSyncStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): ScimSyncState {
     return emptyScimSync({ scimSyncId: "" });
   }
 

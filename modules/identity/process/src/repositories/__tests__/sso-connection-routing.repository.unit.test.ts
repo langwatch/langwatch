@@ -2,7 +2,7 @@ import type { SsoConnection } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
 import { ssoMethodDialWith } from "../../rules/sso-method-dial.rules.ts";
-import { MemoryIdentityStore } from "../memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../memory/memory.identity.store.ts";
 import { MemorySsoConnectionRoutingRepository } from "../memory/memory.sso-connection-routing.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../prisma/prisma.sso-connection-projection.repository.ts";
 import {
@@ -281,7 +281,7 @@ describe.each(tiers)("SSO connection routing ($name)", ({ build }) => {
     });
   });
 
-  describe("a migration pair", () => {
+  describe("given a migration pair", () => {
     const pair = (
       migrationPhase: "SETUP" | "GRACE_LEGACY" | "GRACE_DIRECT" | "FINALIZING" | "FINALIZED",
     ): SsoConnection[] => [

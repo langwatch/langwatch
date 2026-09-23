@@ -112,13 +112,13 @@ function harness(options?: {
   });
 
   const carried: string[] = [];
-  const service = IdentityBackfillService.create(
-    {
+  const service = IdentityBackfillService.create({
+    reads: {
       tryFindUser: async () => user,
       findAccountRows: async () => accounts,
       findIdentifierRows: async () => [...rows.values()],
     },
-    {
+    users: {
       storeUserHashKeyIfMissing: async (args) => {
         minted.push(args);
       },
@@ -130,11 +130,11 @@ function harness(options?: {
       findAddressStanding: async () =>
         user ? { email: user.email ?? null, emailVerified: true, holders: 1 } : null,
     },
-    { attachIdentifier, verifyIdentifier, detachIdentifier },
+    identity: { attachIdentifier, verifyIdentifier, detachIdentifier },
     // The latch's secret carry (ADR-116 §4). Recorded rather than performed:
     // WHEN it runs is this pass's contract — only for a user the proof
     // finalized — and WHAT it copies is its own suite's.
-    IdentitySecretCarryService.create({
+    secrets: IdentitySecretCarryService.create({
       findAccountSecretPairs: async () => {
         carried.push("looked");
         return [];
@@ -142,9 +142,9 @@ function harness(options?: {
       insertCredentialIfMissing: async () => true,
       overwriteCredential: async () => undefined,
     }),
-    IdentityBackfillPlanService.create(identifierIdentity),
-    { now: () => 1_800_000_000_000 },
-  );
+    plan: IdentityBackfillPlanService.create(identifierIdentity),
+    deps: { now: () => 1_800_000_000_000 },
+  });
 
   return {
     service,

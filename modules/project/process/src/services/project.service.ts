@@ -73,15 +73,39 @@ export class ProjectService {
     return this.repository.findPaths(input);
   }
 
-  private constructor(
-    private readonly metadata: ProjectMetadataService,
-    private readonly repository: ProjectRepository,
-    private readonly credentials: ProjectCredentials,
-    private readonly organizations: OrganizationApi,
-    private readonly keyMap?: ProjectKeyMap,
-    private readonly storedObjects?: ProjectStoredObjects,
-    private readonly diagnostics?: ProjectDiagnostics,
-  ) {}
+  private readonly metadata: ProjectMetadataService;
+  private readonly repository: ProjectRepository;
+  private readonly credentials: ProjectCredentials;
+  private readonly organizations: OrganizationApi;
+  private readonly keyMap?: ProjectKeyMap;
+  private readonly storedObjects?: ProjectStoredObjects;
+  private readonly diagnostics?: ProjectDiagnostics;
+
+  private constructor({
+    metadata,
+    repository,
+    credentials,
+    organizations,
+    keyMap,
+    storedObjects,
+    diagnostics,
+  }: {
+    metadata: ProjectMetadataService;
+    repository: ProjectRepository;
+    credentials: ProjectCredentials;
+    organizations: OrganizationApi;
+    keyMap?: ProjectKeyMap;
+    storedObjects?: ProjectStoredObjects;
+    diagnostics?: ProjectDiagnostics;
+  }) {
+    this.metadata = metadata;
+    this.repository = repository;
+    this.credentials = credentials;
+    this.organizations = organizations;
+    this.keyMap = keyMap;
+    this.storedObjects = storedObjects;
+    this.diagnostics = diagnostics;
+  }
 
   static create(options: {
     repository: ProjectRepository;
@@ -91,18 +115,18 @@ export class ProjectService {
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
   }): ProjectService {
-    return new ProjectService(
-      ProjectMetadataService.create({
+    return new ProjectService({
+      metadata: ProjectMetadataService.create({
         repository: options.repository,
         ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
       }),
-      options.repository,
-      options.credentials,
-      options.organizations,
-      options.keyMap,
-      options.storedObjects,
-      options.diagnostics,
-    );
+      repository: options.repository,
+      credentials: options.credentials,
+      organizations: options.organizations,
+      keyMap: options.keyMap,
+      storedObjects: options.storedObjects,
+      diagnostics: options.diagnostics,
+    });
   }
 
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {

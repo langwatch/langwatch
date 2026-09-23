@@ -3,7 +3,7 @@ import {
   SsoConnectionRegistrationRepository,
   type SsoConnectionRegistrationSlot,
 } from "../sso-connection-registration.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The slot table beside the connection heads; the rule is the Postgres twin's. */
 export class MemorySsoConnectionRegistrationRepository extends SsoConnectionRegistrationRepository {

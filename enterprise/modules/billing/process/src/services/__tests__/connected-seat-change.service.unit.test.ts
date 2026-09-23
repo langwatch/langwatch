@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import type { ConnectedBillingAccountRecord } from "../../repositories/connected-billing.repository.ts";
-import { MemoryBillingStore } from "../../repositories/memory/memory-billing.store.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 import { ConnectedSeatChangeService } from "../connected-seat-change.service.ts";
 

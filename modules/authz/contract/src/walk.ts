@@ -147,6 +147,17 @@ export function findResourceGrantStep({
   };
 }
 
+function unreachedDenialReason({
+  liteMember,
+  hadAnyPath,
+}: {
+  liteMember: boolean;
+  hadAnyPath: boolean;
+}): "lite-member-restricted" | "no-binding" | "no-membership" {
+  if (liteMember) return "lite-member-restricted";
+  return hadAnyPath ? "no-binding" : "no-membership";
+}
+
 /** No step granted: name the gate the caller can act on. */
 export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzDecision {
   // Checked before everything else: a disabled seat is the reason NO path
@@ -162,11 +173,9 @@ export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzD
   return {
     ...base,
     allowed: false,
-    denialReason:
-      grants.organizationRole === "EXTERNAL"
-        ? "lite-member-restricted"
-        : hadAnyPath
-          ? "no-binding"
-          : "no-membership",
+    denialReason: unreachedDenialReason({
+      liteMember: grants.organizationRole === "EXTERNAL",
+      hadAnyPath,
+    }),
   };
 }

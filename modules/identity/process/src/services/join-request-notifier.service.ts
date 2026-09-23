@@ -35,24 +35,45 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     plans?: JoinRequestNotifierPlans;
     memberships?: JoinRequestNotifierMemberships;
   }): EmailJoinRequestNotifierAdapter {
-    return new EmailJoinRequestNotifierAdapter(
-      options.audience,
-      options.context,
-      options.mail,
-      options.baseHost,
-      options.plans,
-      options.memberships,
-    );
+    return new EmailJoinRequestNotifierAdapter({
+      audience: options.audience,
+      context: options.context,
+      mail: options.mail,
+      baseHost: options.baseHost,
+      plans: options.plans,
+      memberships: options.memberships,
+    });
   }
 
-  private constructor(
-    private readonly audience: JoinRequestAudience,
-    private readonly context: PrismaJoinRequestNotificationContextRepository,
-    private readonly mail: JoinRequestNotificationMail,
-    private readonly baseHost: string,
-    private readonly plans: JoinRequestNotifierPlans | undefined,
-    private readonly memberships: JoinRequestNotifierMemberships | undefined,
-  ) {}
+  private readonly audience: JoinRequestAudience;
+  private readonly context: PrismaJoinRequestNotificationContextRepository;
+  private readonly mail: JoinRequestNotificationMail;
+  private readonly baseHost: string;
+  private readonly plans: JoinRequestNotifierPlans | undefined;
+  private readonly memberships: JoinRequestNotifierMemberships | undefined;
+
+  private constructor({
+    audience,
+    context,
+    mail,
+    baseHost,
+    plans,
+    memberships,
+  }: {
+    audience: JoinRequestAudience;
+    context: PrismaJoinRequestNotificationContextRepository;
+    mail: JoinRequestNotificationMail;
+    baseHost: string;
+    plans: JoinRequestNotifierPlans | undefined;
+    memberships: JoinRequestNotifierMemberships | undefined;
+  }) {
+    this.audience = audience;
+    this.context = context;
+    this.mail = mail;
+    this.baseHost = baseHost;
+    this.plans = plans;
+    this.memberships = memberships;
+  }
 
   async requestArrived({
     joinRequestId,

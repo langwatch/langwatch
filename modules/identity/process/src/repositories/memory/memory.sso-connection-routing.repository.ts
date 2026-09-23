@@ -8,7 +8,7 @@ import {
 } from "../../rules/sso-connection-routing.rules.ts";
 import type { SsoMethodDial } from "../../rules/sso-method-dial.rules.ts";
 import { SsoConnectionRoutingRepository } from "../sso-connection-routing.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** A connection nobody may be sent to any more. */
 const GONE = new Set(["DISCARDED", "TORN_DOWN"]);

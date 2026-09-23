@@ -110,7 +110,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
         const originalValue = span.attributes[0]!.value.stringValue;
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe(originalValue);
         expect(batchSpy).not.toHaveBeenCalled();
@@ -123,7 +127,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
         const originalValue = span.attributes[0]!.value.stringValue;
 
-        await service.redactSpan(span, null, "ESSENTIAL");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "ESSENTIAL",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe(originalValue);
         expect(batchSpy).not.toHaveBeenCalled();
@@ -138,7 +146,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
         const originalValue = span.attributes[0]!.value.stringValue;
 
-        await service.redactSpan(span, null, "DISABLED");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "DISABLED",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe(originalValue);
         expect(batchSpy).not.toHaveBeenCalled();
@@ -154,7 +166,11 @@ describe("OtlpSpanPiiRedactionService", () => {
             { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
           ]);
 
-          await service.redactSpan(span, null, level);
+          await service.redactSpan({
+            span,
+            resource: null,
+            piiRedactionLevel: level,
+          });
 
           expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
         },
@@ -168,7 +184,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
@@ -181,7 +201,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
@@ -196,7 +220,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
@@ -215,7 +243,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
         expect(span.attributes[1]!.value.stringValue).toBe("[REDACTED]");
@@ -238,7 +270,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
         expect(span.attributes[1]!.value.stringValue).toBe("[REDACTED]");
@@ -253,7 +289,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           { key: "other.key", value: { stringValue: "third" } },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(batchSpy).toHaveBeenCalledTimes(1);
         expect(batchSpy.mock.calls[0]![0]).toEqual(["first", "second", "third"]);
@@ -265,7 +305,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         const statusAttr = span.attributes.find(
           (a) => a.key === "langwatch.reserved.pii_redaction_status",
@@ -278,7 +322,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           { key: "gen_ai.usage.input_tokens", value: { intValue: 123 } },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.intValue).toBe(123);
         expect(span.attributes[0]!.value.stringValue).toBeUndefined();
@@ -288,14 +336,24 @@ describe("OtlpSpanPiiRedactionService", () => {
       it("handles attributes with null or undefined stringValue", async () => {
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: null } }]);
 
-        await expect(service.redactSpan(span, null, "STRICT")).resolves.not.toThrow();
+        await expect(
+          service.redactSpan({
+            span,
+            resource: null,
+            piiRedactionLevel: "STRICT",
+          }),
+        ).resolves.not.toThrow();
         expect(batchSpy).not.toHaveBeenCalled();
       });
 
       it("passes correct options to batchClearPII including piiRedactionLevel and mainMethod", async () => {
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
-        await service.redactSpan(span, null, "ESSENTIAL");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "ESSENTIAL",
+        });
 
         expect(batchSpy).toHaveBeenCalledTimes(1);
         expect(batchSpy.mock.calls[0]?.[0]).toEqual(["test"]);
@@ -304,7 +362,11 @@ describe("OtlpSpanPiiRedactionService", () => {
       it("does not redact span.name", async () => {
         const span = createMockOtlpSpan([]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.name).toBe("test-span");
       });
@@ -326,7 +388,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ];
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.events[0]!.name).toBe("event-name");
         expect(span.events[0]!.attributes[0]!.value.stringValue).toBe("[REDACTED]");
@@ -337,7 +403,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         const span = createMockOtlpSpan([]);
         span.status = { message: "error: user john@example.com not found" };
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.status.message).toBe("[REDACTED]");
       });
@@ -360,7 +430,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ];
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.links[0]!.attributes[0]!.value.stringValue).toBe("[REDACTED]");
         expect(span.links[0]!.attributes[1]!.value.stringValue).toBe("[REDACTED]");
@@ -382,7 +456,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           },
         ]);
 
-        await service.redactSpan(span, resource, "STRICT");
+        await service.redactSpan({
+          span,
+          resource,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
         expect(resource.attributes[0]!.value.stringValue).toBe("[REDACTED]");
@@ -397,7 +475,11 @@ describe("OtlpSpanPiiRedactionService", () => {
           { key: "gen_ai.prompt", value: { stringValue: "content" } },
         ]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       });
@@ -407,7 +489,11 @@ describe("OtlpSpanPiiRedactionService", () => {
       it("sets enforced to false in test environment (default mock)", async () => {
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
-        await service.redactSpan(span, null, "STRICT");
+        await service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(batchSpy).toHaveBeenCalled();
         expect(batchSpy.mock.calls[0]?.[0]).toEqual(["test"]);
@@ -427,9 +513,13 @@ describe("OtlpSpanPiiRedactionService", () => {
         });
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
-        await expect(errorService.redactSpan(span, null, "STRICT")).rejects.toThrow(
-          "PII service unavailable",
-        );
+        await expect(
+          errorService.redactSpan({
+            span,
+            resource: null,
+            piiRedactionLevel: "STRICT",
+          }),
+        ).rejects.toThrow("PII service unavailable");
       });
     });
   });
@@ -458,7 +548,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "gen_ai.prompt", value: { stringValue: oversizedValue } },
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       expect(span.attributes[0]!.value.stringValue).toBe(oversizedValue);
       expect(maxLengthBatchSpy).not.toHaveBeenCalled();
@@ -471,7 +565,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "gen_ai.prompt", value: { stringValue: oversizedValue } },
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       const statusAttr = span.attributes.find(
         (a) => a.key === "langwatch.reserved.pii_redaction_status",
@@ -486,7 +584,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "gen_ai.prompt", value: { stringValue: exactValue } },
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       expect(maxLengthBatchSpy).toHaveBeenCalledTimes(1);
@@ -505,7 +607,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "langwatch.input", value: { stringValue: normalValue } },
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       expect(span.attributes[0]!.value.stringValue).toBe(oversizedValue);
       expect(span.attributes[1]!.value.stringValue).toBe("[REDACTED]");
@@ -525,7 +631,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "langwatch.input", value: { stringValue: oversized2 } },
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       expect(maxLengthBatchSpy).not.toHaveBeenCalled();
       const statusAttr = span.attributes.find(
@@ -542,7 +652,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "attr.b", value: { stringValue: "bbbbbb" } }, // 6 chars; cumulative 12 (skipped)
       ]);
 
-      await maxLengthService.redactSpan(span, null, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+      });
 
       // First fits within budget, second is skipped
       expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
@@ -566,7 +680,11 @@ describe("OtlpSpanPiiRedactionService", () => {
         { key: "resource.attr", value: { stringValue: "bbbbbb" } }, // 6 chars, would exceed
       ]);
 
-      await maxLengthService.redactSpan(span, resource, "STRICT");
+      await maxLengthService.redactSpan({
+        span,
+        resource,
+        piiRedactionLevel: "STRICT",
+      });
 
       expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
       expect(resource.attributes[0]!.value.stringValue).toBe("bbbbbb");

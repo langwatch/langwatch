@@ -206,15 +206,11 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     expiresAt: Instant;
   }): Promise<void> {
     const key = this.#database.keys().find((row) => row.id === input.id);
-    if (
-      !key ||
-      key.organizationId !== input.organizationId ||
-      key.userId !== input.userId ||
-      !key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ||
-      key.revokedAt !== null
-    ) {
-      return;
-    }
+    if (!key) return;
+    const ownedByCaller =
+      key.organizationId === input.organizationId && key.userId === input.userId;
+    if (!ownedByCaller) return;
+    if (!key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) || key.revokedAt !== null) return;
     this.#database.replaceKey({ ...key, expiresAt: toDate(input.expiresAt) });
   }
 

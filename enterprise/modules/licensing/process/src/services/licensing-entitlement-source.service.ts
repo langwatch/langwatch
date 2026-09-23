@@ -2,6 +2,7 @@ import {
   floorAtOssBaseline,
   type EntitlementSource,
   type LicensingService,
+  type PlanInfo,
   type ResolvePlanInput,
 } from "@langwatch/enterprise-licensing-contract";
 
@@ -50,7 +51,7 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
     private readonly mode: LicensingEntitlementSourceAdapterMode,
   ) {}
 
-  async resolve(input: ResolvePlanInput) {
+  async resolve(input: ResolvePlanInput): Promise<PlanInfo> {
     if (this.mode === "cloud") {
       return this.licensing.getActivePlan(input.organizationId);
     }

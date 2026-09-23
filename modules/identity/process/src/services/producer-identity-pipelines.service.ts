@@ -178,24 +178,24 @@ export class IdentityProducerPipelinesAdapter {
         pipeline,
         "identifier",
       ),
-      identityGuards: IdentityGuardsService.create(
-        producerOnlyReads<IdentityHeadsRepository>({
+      identityGuards: IdentityGuardsService.create({
+        heads: producerOnlyReads<IdentityHeadsRepository>({
           processName: this.processName,
           pipeline,
           name: "identity heads",
         }),
-        producerOnlyReads<IdentityUsersRepository>({
+        users: producerOnlyReads<IdentityUsersRepository>({
           processName: this.processName,
           pipeline,
           name: "identity users",
         }),
-        producerOnlyReads<IdentityReservationRepository>({
+        reservations: producerOnlyReads<IdentityReservationRepository>({
           processName: this.processName,
           pipeline,
           name: "identifier reservations",
         }),
-        CryptoIdentifierIdentityAdapter.create(),
-      ),
+        identifiers: CryptoIdentifierIdentityAdapter.create(),
+      }),
       mfaProjectionStore: new ProducerOnlyStateProjectionStore<MfaFoldState>(
         this.processName,
         pipeline,

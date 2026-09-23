@@ -9,6 +9,46 @@ import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
+async function recordScopeName({
+  binding,
+  resolvedOrganizationId,
+  options,
+  names,
+}: {
+  binding: ApiKeyBinding;
+  resolvedOrganizationId: string | undefined;
+  options: ApiKeyDependencies;
+  names: {
+    orgName: Map<string, string>;
+    teamName: Map<string, string>;
+    projectName: Map<string, string>;
+    activeProjectIds: Set<string>;
+  };
+}): Promise<void> {
+  if (binding.scopeType === "ORGANIZATION") {
+    const organization = await options.organizations.getBillingProfile({
+      organizationId: binding.scopeId,
+    });
+    names.orgName.set(binding.scopeId, organization.name);
+  }
+
+  if (binding.scopeType === "TEAM" && resolvedOrganizationId) {
+    const team = await options.organizations.getTeam({
+      organizationId: resolvedOrganizationId,
+      teamId: binding.scopeId,
+    });
+    names.teamName.set(binding.scopeId, team.name);
+  }
+
+  if (binding.scopeType === "PROJECT") {
+    const project = await options.projects.findById(binding.scopeId);
+    if (project) {
+      names.projectName.set(project.id, project.name);
+      names.activeProjectIds.add(project.id);
+    }
+  }
+}
+
 export class ApiKeyEnrichmentService {
   static create(
     options: ApiKeyDependencies & { repository: ApiKeyRepository },
@@ -52,28 +92,12 @@ export class ApiKeyEnrichmentService {
     }
 
     for (const binding of bindings) {
-      if (binding.scopeType === "ORGANIZATION") {
-        const organization = await this.options.organizations.getBillingProfile({
-          organizationId: binding.scopeId,
-        });
-        orgName.set(binding.scopeId, organization.name);
-      }
-
-      if (binding.scopeType === "TEAM" && resolvedOrganizationId) {
-        const team = await this.options.organizations.getTeam({
-          organizationId: resolvedOrganizationId,
-          teamId: binding.scopeId,
-        });
-        teamName.set(binding.scopeId, team.name);
-      }
-
-      if (binding.scopeType === "PROJECT") {
-        const project = await this.options.projects.findById(binding.scopeId);
-        if (project) {
-          projectName.set(project.id, project.name);
-          activeProjectIds.add(project.id);
-        }
-      }
+      await recordScopeName({
+        binding,
+        resolvedOrganizationId,
+        options: this.options,
+        names: { orgName, teamName, projectName, activeProjectIds },
+      });
     }
 
     return {

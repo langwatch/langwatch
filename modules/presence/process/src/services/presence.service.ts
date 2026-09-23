@@ -20,14 +20,35 @@ import type { PresenceRepository } from "../repositories/presence.repository.ts"
 export const PRESENCE_TTL_SECONDS = 30;
 
 export class PresenceService {
-  private constructor(
-    private readonly repository: PresenceRepository,
-    private readonly broadcast: PresenceBroadcast,
-    private readonly projects: ProjectApi,
-    private readonly diagnostics: PresenceDiagnostics,
-    private readonly ttlSeconds: number,
-    private readonly now: () => number,
-  ) {}
+  private readonly repository: PresenceRepository;
+  private readonly broadcast: PresenceBroadcast;
+  private readonly projects: ProjectApi;
+  private readonly diagnostics: PresenceDiagnostics;
+  private readonly ttlSeconds: number;
+  private readonly now: () => number;
+
+  private constructor({
+    repository,
+    broadcast,
+    projects,
+    diagnostics,
+    ttlSeconds,
+    now,
+  }: {
+    repository: PresenceRepository;
+    broadcast: PresenceBroadcast;
+    projects: ProjectApi;
+    diagnostics: PresenceDiagnostics;
+    ttlSeconds: number;
+    now: () => number;
+  }) {
+    this.repository = repository;
+    this.broadcast = broadcast;
+    this.projects = projects;
+    this.diagnostics = diagnostics;
+    this.ttlSeconds = ttlSeconds;
+    this.now = now;
+  }
 
   static create(options: {
     repository: PresenceRepository;
@@ -42,14 +63,14 @@ export class PresenceService {
       throw new RangeError("ttlSeconds must be a positive safe integer");
     }
 
-    return new PresenceService(
-      options.repository,
-      options.broadcast,
-      options.projects,
-      options.diagnostics,
+    return new PresenceService({
+      repository: options.repository,
+      broadcast: options.broadcast,
+      projects: options.projects,
+      diagnostics: options.diagnostics,
       ttlSeconds,
-      options.now ?? (() => nowInstant().epochMilliseconds),
-    );
+      now: options.now ?? (() => nowInstant().epochMilliseconds),
+    });
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {

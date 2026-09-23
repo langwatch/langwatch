@@ -238,13 +238,12 @@ export class OrganizationGroupService {
         onDuplicate: "reject",
       });
     } catch (error) {
-      if (
-        error instanceof DuplicateBindingError ||
-        (typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "role_binding_already_exists")
-      ) {
+      if (error instanceof DuplicateBindingError) {
+        throw new GroupBindingAlreadyExistsError();
+      }
+      const code =
+        typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+      if (code === "role_binding_already_exists") {
         throw new GroupBindingAlreadyExistsError();
       }
 

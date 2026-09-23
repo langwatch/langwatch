@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
@@ -77,7 +78,7 @@ function dataPrivacyReturning(policy: ResolvedDataPrivacy | Error): DataPrivacyR
 }
 
 const flagsSaying = (disabled: boolean): FeatureFlagApi =>
-  ({ isEnabled: async () => disabled }) as unknown as FeatureFlagApi;
+  createApiFixture<FeatureFlagApi>({ isEnabled: async () => disabled });
 
 function spanWith(attributes: { key: string; value: { stringValue: string } }[]): OtlpSpan {
   return {
@@ -129,7 +130,12 @@ describe("given a tenant whose policy resolves to the essential level", () => {
       { key: "langwatch.input", value: { stringValue: "mail ana@example.com" } },
     ]);
 
-    await serviceWith({ transport }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    await serviceWith({ transport }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(attributeValue(span, "langwatch.input")).toBe("mail [EMAIL_ADDRESS]");
     expect(transport.presidioCalls).toEqual([]);
@@ -161,7 +167,12 @@ describe("given a tenant whose policy resolves to the essential level", () => {
       droppedAttributesCount: 0,
     } as unknown as OtlpResource;
 
-    await serviceWith({ transport }).redactSpan(span, resource, "ESSENTIAL", TENANT);
+    await serviceWith({ transport }).redactSpan({
+      span,
+      resource,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(span.events[0]!.attributes[0]!.value.stringValue).toBe("[EMAIL_ADDRESS]");
     expect(span.links[0]!.attributes[0]!.value.stringValue).toBe("[EMAIL_ADDRESS]");
@@ -183,7 +194,12 @@ describe("given a tenant whose policy resolves to the strict level", () => {
     await serviceWith({
       transport,
       policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
     expect(transport.presidioCalls[0]!.texts).toEqual(["Ana Silva at [EMAIL_ADDRESS]"]);
@@ -202,7 +218,12 @@ describe("given a tenant whose policy resolves to the strict level", () => {
       policy: resolvedPolicy({
         pii: { level: "strict", entities: [], exceptPatterns: ["ops@example\\.com"] },
       }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls[0]!.entities).toEqual([
       "LOCATION",
@@ -227,7 +248,12 @@ describe("given a tenant whose policy resolves to a custom selection", () => {
       policy: resolvedPolicy({
         pii: { level: "custom", entities: ["EMAIL_ADDRESS", "PERSON"], exceptPatterns: [] },
       }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls[0]!.entities).toEqual(["PERSON"]);
   });
@@ -242,7 +268,12 @@ describe("given a tenant whose policy resolves to a custom selection", () => {
       policy: resolvedPolicy({
         pii: { level: "custom", entities: ["EMAIL_ADDRESS"], exceptPatterns: [] },
       }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toEqual([]);
     expect(attributeValue(span, "langwatch.input")).toBe("[EMAIL_ADDRESS]");
@@ -255,7 +286,12 @@ describe("given the per-request level and the resolved policy disagree", () => {
     const transport = new FakePiiAnalysis();
     const span = spanWith([{ key: "langwatch.input", value: { stringValue: "Ana Silva" } }]);
 
-    await serviceWith({ transport }).redactSpan(span, null, "STRICT", TENANT);
+    await serviceWith({ transport }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
   });
@@ -268,7 +304,12 @@ describe("given the per-request level and the resolved policy disagree", () => {
     await serviceWith({
       transport,
       policy: resolvedPolicy({ pii: { level: "disabled", entities: [], exceptPatterns: [] } }),
-    }).redactSpan(span, null, "STRICT", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toEqual([]);
     expect(attributeValue(span, "langwatch.input")).toBe("ana@example.com");
@@ -287,7 +328,12 @@ describe("given the strict analysis service cannot run", () => {
       transport,
       isLangevalsConfigured: false,
       policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(attributeValue(span, PRIVACY_PII_INCOMPLETE_MARKER_ATTR)).toBe("strict");
     expect(attributeValue(span, "langwatch.input")).toBe("Ana Silva at [EMAIL_ADDRESS]");
@@ -303,8 +349,18 @@ describe("given the strict analysis service cannot run", () => {
       policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
     });
 
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(
       span.attributes.filter((a) => a.key === PRIVACY_PII_INCOMPLETE_MARKER_ATTR),
@@ -324,7 +380,12 @@ describe("given the strict analysis service cannot run", () => {
         transport,
         isProduction: true,
         policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
-      }).redactSpan(span, null, "ESSENTIAL", TENANT),
+      }).redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      }),
     ).rejects.toThrow("analysis down");
   });
 
@@ -341,7 +402,12 @@ describe("given the strict analysis service cannot run", () => {
     await serviceWith({
       transport,
       policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(attributeValue(span, "langwatch.input")).toBe("Ana Silva at [EMAIL_ADDRESS]");
     expect(attributeValue(span, PRIVACY_PII_INCOMPLETE_MARKER_ATTR)).toBe("strict");
@@ -354,7 +420,11 @@ describe("given no policy can be resolved for the span", () => {
     const transport = new FakePiiAnalysis();
     const span = spanWith([{ key: "langwatch.input", value: { stringValue: "ana@example.com" } }]);
 
-    await serviceWith({ transport }).redactSpan(span, null, "ESSENTIAL");
+    await serviceWith({ transport }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
     expect(transport.presidioCalls[0]!.level).toBe("ESSENTIAL");
@@ -365,12 +435,12 @@ describe("given no policy can be resolved for the span", () => {
     const transport = new FakePiiAnalysis();
     const span = spanWith([{ key: "langwatch.input", value: { stringValue: "ana@example.com" } }]);
 
-    await serviceWith({ transport, policy: new Error("database down") }).redactSpan(
+    await serviceWith({ transport, policy: new Error("database down") }).redactSpan({
       span,
-      null,
-      "ESSENTIAL",
-      TENANT,
-    );
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
   });
@@ -380,12 +450,12 @@ describe("given no policy can be resolved for the span", () => {
     const transport = new FakePiiAnalysis();
     const span = spanWith([{ key: "langwatch.input", value: { stringValue: "ana@example.com" } }]);
 
-    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan(
+    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan({
       span,
-      null,
-      "ESSENTIAL",
-      TENANT,
-    );
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
   });
@@ -401,7 +471,12 @@ describe("given no policy can be resolved for the span", () => {
         nativePolicyEnforced: false,
         isLangevalsConfigured: false,
         isProduction: true,
-      }).redactSpan(span, null, "ESSENTIAL", TENANT),
+      }).redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      }),
     ).rejects.toThrow("LANGEVALS_ENDPOINT is not set");
   });
 
@@ -410,12 +485,12 @@ describe("given no policy can be resolved for the span", () => {
     const transport = new FakePiiAnalysis();
     const span = spanWith([{ key: "langwatch.input", value: { stringValue: "ana@example.com" } }]);
 
-    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan(
+    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan({
       span,
-      null,
-      "DISABLED",
-      TENANT,
-    );
+      resource: null,
+      piiRedactionLevel: "DISABLED",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toEqual([]);
     expect(attributeValue(span, "langwatch.input")).toBe("ana@example.com");
@@ -433,7 +508,12 @@ describe("given the operations kill switch for strict analysis is on", () => {
       flagDisabled: true,
       isLangevalsConfigured: false,
       policy: resolvedPolicy({ pii: { level: "strict", entities: [], exceptPatterns: [] } }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toEqual([]);
     expect(attributeValue(span, PRIVACY_PII_INCOMPLETE_MARKER_ATTR)).toBe("strict");
@@ -453,7 +533,12 @@ describe("given a span whose text exceeds the batch budget", () => {
       transport,
       nativePolicyEnforced: false,
       maxAttributeLength: 50,
-    }).redactSpan(span, null, "STRICT", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls[0]!.texts).toEqual(["Ana Silva"]);
     expect(attributeValue(span, ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS)).toBe("partial");
@@ -468,7 +553,12 @@ describe("given a span whose text exceeds the batch budget", () => {
       transport,
       nativePolicyEnforced: false,
       maxAttributeLength: 50,
-    }).redactSpan(span, null, "STRICT", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(attributeValue(span, ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS)).toBe("none");
   });
@@ -482,7 +572,12 @@ describe("given a span whose text exceeds the batch budget", () => {
       transport,
       nativePolicyEnforced: false,
       maxAttributeLength: Number.NaN,
-    }).redactSpan(span, null, "STRICT", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls[0]!.texts).toEqual(["Ana Silva"]);
   });
@@ -495,12 +590,12 @@ describe("given the analysis service answers with the wrong number of results", 
     const span = spanWith([{ key: "a", value: { stringValue: "Ana Silva" } }]);
 
     await expect(
-      serviceWith({ transport, nativePolicyEnforced: false }).redactSpan(
+      serviceWith({ transport, nativePolicyEnforced: false }).redactSpan({
         span,
-        null,
-        "STRICT",
-        TENANT,
-      ),
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      }),
     ).rejects.toThrow("Incomplete PII batch");
   });
 
@@ -509,12 +604,12 @@ describe("given the analysis service answers with the wrong number of results", 
     const transport = new FakePiiAnalysis({ presidio: () => [null] });
     const span = spanWith([{ key: "a", value: { stringValue: "nothing here" } }]);
 
-    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan(
+    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan({
       span,
-      null,
-      "STRICT",
-      TENANT,
-    );
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(attributeValue(span, "a")).toBe("nothing here");
   });
@@ -526,12 +621,12 @@ describe("given the analysis method is Google DLP", () => {
     const transport = new FakePiiAnalysis({ presidioThrows: new Error("presidio down") });
     const span = spanWith([{ key: "a", value: { stringValue: "Ana Silva" } }]);
 
-    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan(
+    await serviceWith({ transport, nativePolicyEnforced: false }).redactSpan({
       span,
-      null,
-      "STRICT",
-      TENANT,
-    );
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.dlpCalls).toHaveLength(1);
     expect(attributeValue(span, "a")).toBe("[REDACTED]");
@@ -547,7 +642,12 @@ describe("given the analysis method is Google DLP", () => {
       policy: resolvedPolicy({
         pii: { level: "strict", entities: [], exceptPatterns: ["ops@example\\.com"] },
       }),
-    }).redactSpan(span, null, "ESSENTIAL", TENANT);
+    }).redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
 
     expect(transport.dlpCalls[0]!.exceptPatterns).toEqual(["ops@example\\.com"]);
   });
@@ -567,7 +667,12 @@ describe("given a service built without a feature-flag service", () => {
       dataPrivacy: dataPrivacyReturning(resolvedPolicy()),
     });
 
-    await service.redactSpan(span, null, "STRICT", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(transport.presidioCalls).toHaveLength(1);
   });

@@ -19,6 +19,7 @@ import {
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -362,12 +363,12 @@ export class IdentityApp implements IdentityApi {
       engineProvider: engineProviders,
     });
     const reservations = setup.repositories.reservations;
-    const identityGuards = IdentityGuardsService.create(
-      setup.repositories.heads,
-      setup.repositories.users,
+    const identityGuards = IdentityGuardsService.create({
+      heads: setup.repositories.heads,
+      users: setup.repositories.users,
       reservations,
-      CryptoIdentifierIdentityAdapter.create(),
-    );
+      identifiers: CryptoIdentifierIdentityAdapter.create(),
+    });
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
     const latch = CachedIdentityLatch.create({
       repository: setup.repositories.latch,
@@ -378,25 +379,25 @@ export class IdentityApp implements IdentityApi {
     const isLatched = latch.gate();
     const emails = IdentityEmailService.create(setup.repositories.heads, isLatched);
     const identity = IdentityService.create(identityGuards, infrastructure.ledger);
-    const verification = VerificationCeremonyService.create(
-      setup.repositories.verification,
-      setup.repositories.heads,
+    const verification = VerificationCeremonyService.create({
+      store: setup.repositories.verification,
+      heads: setup.repositories.heads,
       identity,
-      { isLatched },
-    );
+      deps: { isLatched },
+    });
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,
       identity,
       reservations,
     });
     const secrets = IdentitySecretCarryService.create(infrastructure.secrets);
-    const backfill = IdentityBackfillService.create(
-      setup.repositories.backfill,
-      setup.repositories.users,
+    const backfill = IdentityBackfillService.create({
+      reads: setup.repositories.backfill,
+      users: setup.repositories.users,
       identity,
       secrets,
-      IdentityBackfillPlanService.create(CryptoIdentifierIdentityAdapter.create()),
-    );
+      plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityAdapter.create()),
+    });
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
@@ -678,7 +679,7 @@ export class IdentityApp implements IdentityApi {
     return this.#parts.newbornSweep;
   }
 
-  userMigrations() {
+  userMigrations(): readonly SystemMigration[] {
     return [
       IdentityIdentifierBackfillMigrationAdapter.create(this.#parts.backfill),
       IdentitySecretHealMigrationAdapter.create(this.#parts.secrets),

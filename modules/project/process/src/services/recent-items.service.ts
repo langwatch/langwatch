@@ -58,12 +58,12 @@ export class RecentItemsService {
     const entries = Array.from(entityMap.values()).slice(0, params.limit);
 
     for (const entry of entries) {
-      const item = await this.hydrateEntity(
-        entry.type,
-        entry.id,
-        entry.timestamp,
-        params.projectId,
-      );
+      const item = await this.hydrateEntity({
+        type: entry.type,
+        id: entry.id,
+        timestamp: entry.timestamp,
+        projectId: params.projectId,
+      });
       if (item) {
         recentItems.push(item);
       }
@@ -88,12 +88,17 @@ export class RecentItemsService {
   /**
    * Hydrate an entity with its details
    */
-  private async hydrateEntity(
-    type: RecentItemType,
-    id: string,
-    timestamp: Instant,
-    projectId: string,
-  ): Promise<RecentItem | null> {
+  private async hydrateEntity({
+    type,
+    id,
+    timestamp,
+    projectId,
+  }: {
+    type: RecentItemType;
+    id: string;
+    timestamp: Instant;
+    projectId: string;
+  }): Promise<RecentItem | null> {
     const resolved = await this.tryResolveEntity(type, id, projectId);
     if (!resolved) {
       return null;

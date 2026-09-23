@@ -6,7 +6,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryConnectedStatementMailChannel } from "../../channels/memory/memory.connected-statement-mail.channel.ts";
-import { MemoryBillingStore } from "../../repositories/memory/memory-billing.store.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 import { previousMonthStart } from "../../rules/connected-statement.rules.ts";
 import {

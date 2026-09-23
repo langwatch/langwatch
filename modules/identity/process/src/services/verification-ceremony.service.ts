@@ -42,21 +42,40 @@ export interface VerificationCeremonyDeps {
 export class VerificationCeremonyService {
   private readonly now: () => number;
 
-  static create(
-    store: IdentityVerificationRepository,
-    heads: IdentityHeadsRepository,
-    identity: IdentityVerificationWrites,
-    deps: VerificationCeremonyDeps,
-  ): VerificationCeremonyService {
-    return new VerificationCeremonyService(store, heads, identity, deps);
+  static create({
+    store,
+    heads,
+    identity,
+    deps,
+  }: {
+    store: IdentityVerificationRepository;
+    heads: IdentityHeadsRepository;
+    identity: IdentityVerificationWrites;
+    deps: VerificationCeremonyDeps;
+  }): VerificationCeremonyService {
+    return new VerificationCeremonyService({ store, heads, identity, deps });
   }
 
-  private constructor(
-    private readonly store: IdentityVerificationRepository,
-    private readonly heads: IdentityHeadsRepository,
-    private readonly identity: IdentityVerificationWrites,
-    private readonly deps: VerificationCeremonyDeps,
-  ) {
+  private readonly store: IdentityVerificationRepository;
+  private readonly heads: IdentityHeadsRepository;
+  private readonly identity: IdentityVerificationWrites;
+  private readonly deps: VerificationCeremonyDeps;
+
+  private constructor({
+    store,
+    heads,
+    identity,
+    deps,
+  }: {
+    store: IdentityVerificationRepository;
+    heads: IdentityHeadsRepository;
+    identity: IdentityVerificationWrites;
+    deps: VerificationCeremonyDeps;
+  }) {
+    this.store = store;
+    this.heads = heads;
+    this.identity = identity;
+    this.deps = deps;
     this.now = deps.now ?? Date.now;
   }
 

@@ -81,9 +81,9 @@ function harness(options?: {
     landFold();
     return [];
   });
-  const service = VerificationCeremonyService.create(
+  const service = VerificationCeremonyService.create({
     store,
-    {
+    heads: {
       tryFindIdentifier: async ({ identifierId }) =>
         identifierId === WORK || identifierId === PERSONAL
           ? fact({
@@ -100,12 +100,12 @@ function harness(options?: {
       tryFindActiveIdentifierByValue: async () => null,
       tryFindIdentifierIdForAccount: async () => null,
     },
-    { verifyIdentifier: verifyIdentifier as never },
-    {
+    identity: { verifyIdentifier: verifyIdentifier as never },
+    deps: {
       isLatched: async () => options?.latched ?? true,
       ...(options?.now ? { now: options.now } : {}),
     },
-  );
+  });
   return { store, service, verifyIdentifier, projection, landFold };
 }
 

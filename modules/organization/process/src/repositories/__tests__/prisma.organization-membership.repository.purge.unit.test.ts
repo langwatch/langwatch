@@ -8,6 +8,12 @@ import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organiz
 
 const ORGANIZATION_ID = "org_acme";
 
+const expectedPurgeWhere = (model: string): Record<string, string> => {
+  if (model === "organization") return { id: ORGANIZATION_ID };
+  if (model === "systemMigrationTenantState") return { tenantId: ORGANIZATION_ID };
+  return { organizationId: ORGANIZATION_ID };
+};
+
 function purgingPrisma() {
   const deletions: { model: string; where: Record<string, unknown> }[] = [];
   const deleteManyFor = (model: string) =>
@@ -77,13 +83,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
         // The organization row itself is keyed by id, the migration state row
         // by the tenant id it tracks; everything else by the organization it
         // belongs to.
-        expect(deletion.where).toEqual(
-          deletion.model === "organization"
-            ? { id: ORGANIZATION_ID }
-            : deletion.model === "systemMigrationTenantState"
-              ? { tenantId: ORGANIZATION_ID }
-              : { organizationId: ORGANIZATION_ID },
-        );
+        expect(deletion.where).toEqual(expectedPurgeWhere(deletion.model));
       }
     });
 

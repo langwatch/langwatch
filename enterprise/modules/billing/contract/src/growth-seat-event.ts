@@ -146,7 +146,7 @@ export const createCheckoutLineItems = ({
   currency: Currency;
   interval: BillingInterval;
   prices: StripePriceMap;
-}) => {
+}): { price: string; quantity?: number }[] => {
   if (coreMembers < 1) {
     throw new InvalidSeatCountError(coreMembers);
   }

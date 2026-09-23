@@ -18,6 +18,7 @@ import {
   type PaginatedProjects,
   type Project,
   type ProjectIdentity,
+  type ProjectPath,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -46,7 +47,7 @@ export class PrismaProjectRepository
   extends PrismaRepository.for("Project", "Team")
   implements ProjectRepository
 {
-  async findPaths(input: { projectIds: string[] }) {
+  async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     const projects = await this.prisma.project.findMany({
       where: { id: { in: input.projectIds } },
       select: {

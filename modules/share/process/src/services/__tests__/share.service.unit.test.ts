@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -97,8 +98,8 @@ describe("ShareService", () => {
     } as unknown as ShareCacheRepository;
     service = ShareService.create({
       repository: repo,
-      dataRetention: dataRetention as unknown as DataRetentionApi,
-      permissions: permissions as unknown as AuthzApi,
+      dataRetention: createApiFixture<DataRetentionApi>(dataRetention),
+      permissions: createApiFixture<AuthzApi>(permissions),
       projects,
       cache,
     });

@@ -55,6 +55,12 @@ type ShareServiceOptions = {
   cache: ShareCacheRepository;
 };
 
+function compareKeys(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 export class ShareService {
   readonly #options: ShareServiceOptions;
 
@@ -85,11 +91,12 @@ export class ShareService {
     }
 
     // Either kill switch makes the link indistinguishable from a bad token.
-    if (
-      share.resourceType === "TRACE" &&
-      !(share.project.team.organization.traceSharingEnabled && share.project.traceSharingEnabled)
-    ) {
-      throw new ShareLinkNotFoundError();
+    if (share.resourceType === "TRACE") {
+      const sharingEnabled =
+        share.project.team.organization.traceSharingEnabled && share.project.traceSharingEnabled;
+      if (!sharingEnabled) {
+        throw new ShareLinkNotFoundError();
+      }
     }
 
     // Audience is checked before expiry so outsiders do not learn link state.
@@ -393,7 +400,7 @@ export class ShareService {
 
     const entries = Object.entries(value)
       .filter(([, entry]) => entry !== void 0)
-      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+      .toSorted(([left], [right]) => compareKeys(left, right));
     const properties = entries.map(
       ([key, entry]) => `${JSON.stringify(key)}:${ShareService.#stableStringify(entry)}`,
     );

@@ -253,12 +253,11 @@ describe("given the application the composition builds", () => {
     it("serves each browser member the map names, and refuses the rest by name", () => {
       const reference = provided(application().app);
 
-      for (const [member, served] of Object.entries(BROWSER_MEMBERS_SERVED)) {
-        if (served) {
-          expect(typeof Reflect.get(reference, member)).toBe("function");
-          continue;
-        }
-
+      const members = Object.entries(BROWSER_MEMBERS_SERVED);
+      for (const [member] of members.filter(([, served]) => served)) {
+        expect(typeof Reflect.get(reference, member)).toBe("function");
+      }
+      for (const [member] of members.filter(([, served]) => !served)) {
         expect(() => Reflect.get(reference, member)).toThrow(
           `exposes operations only: ${member} is not callable`,
         );

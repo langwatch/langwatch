@@ -9,7 +9,7 @@ import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
 } from "../sso-connection.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const VERIFIED = "VERIFIED";
 

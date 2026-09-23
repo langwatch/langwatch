@@ -8,7 +8,7 @@ import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "../join-request.repository.ts";
-import { MemoryIdentityStore } from "./memory-identity.store.ts";
+import { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const PENDING = "PENDING";
 

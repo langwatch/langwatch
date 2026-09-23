@@ -21,9 +21,11 @@ type Delegate = {
 };
 
 const scopeOrganizationRowSchema = z.object({ id: z.string(), name: z.string() }).strict();
-const scopeTeamRowSchema = scopeOrganizationRowSchema.extend({ isPersonal: z.boolean() }).strict();
+const scopeTeamRowSchema = scopeOrganizationRowSchema
+  .safeExtend({ isPersonal: z.boolean() })
+  .strict();
 const scopeProjectRowSchema = scopeTeamRowSchema
-  .extend({ team: z.object({ isPersonal: z.boolean(), name: z.string() }).strict() })
+  .safeExtend({ team: z.object({ isPersonal: z.boolean(), name: z.string() }).strict() })
   .strict();
 const groupMemberRowSchema = z.object({ groupId: z.string(), userId: z.string() }).strict();
 const userGroupRowSchema = z

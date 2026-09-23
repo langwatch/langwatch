@@ -6,7 +6,7 @@ import {
   type BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,
 } from "../organization/billing-report-organization.repository.ts";
-import type { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** The one pricing model that makes a month reportable at all. */
 const USAGE_BILLED = "SEAT_EVENT";

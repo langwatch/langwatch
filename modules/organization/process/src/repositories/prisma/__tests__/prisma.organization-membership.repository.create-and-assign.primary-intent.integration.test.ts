@@ -153,7 +153,7 @@ describe.skipIf(!DB_URL)(
       });
     });
 
-    describe("result shape parity across intents (I4)", () => {
+    describe("when the result shape is compared across intents (I4)", () => {
       it("returns the same shape regardless of declared intent", async () => {
         const governance = await createOrg({
           primaryIntent: "AGENT_GOVERNANCE",

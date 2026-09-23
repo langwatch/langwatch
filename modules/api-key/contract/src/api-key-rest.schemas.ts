@@ -6,7 +6,11 @@
 import { z } from "zod";
 
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
-import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
+import {
+  apiKeyPermissionFormatSchema,
+  apiKeyRoleSchema,
+  apiKeyScopeTypeSchema,
+} from "./api-key.ts";
 
 const bindingSchema = z.object({
   role: apiKeyRoleSchema.describe(
@@ -20,7 +24,7 @@ const bindingSchema = z.object({
 export type ApiKeyRestBinding = z.infer<typeof bindingSchema>;
 
 const permissionsSchema = z
-  .array(apiKeyPermissionSchema)
+  .array(apiKeyPermissionFormatSchema)
   .describe(
     "Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant.",
   );

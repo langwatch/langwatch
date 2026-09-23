@@ -60,24 +60,24 @@ function harness() {
   };
 
   const identity = IdentityService.create(
-    IdentityGuardsService.create(
+    IdentityGuardsService.create({
       heads,
       users,
-      new InMemoryReservations(),
-      CryptoIdentifierIdentityAdapter.create(),
-    ),
+      reservations: new InMemoryReservations(),
+      identifiers: CryptoIdentifierIdentityAdapter.create(),
+    }),
     ledger,
   );
-  const ceremonies = IdentityCeremoniesAdapter.create(
+  const ceremonies = IdentityCeremoniesAdapter.create({
     heads,
     users,
     identity,
-    async () => gateOpen.value,
-    {
+    isLatched: async () => gateOpen.value,
+    clock: {
       now: () => T0,
       newCommandId: newIdentityCommandId,
     },
-  );
+  });
 
   const auth = betterAuth({
     baseURL: "http://localhost:3000",

@@ -1,5 +1,5 @@
 import { auditLogJsonValueSchema } from "@langwatch/audit-log-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
+import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { z } from "zod";
 
 import type {
@@ -44,11 +44,17 @@ export class AgentAuditLogIdsMigration implements SystemMigration {
     this.#repository = repository;
   }
 
-  static create(repository: AgentAuditLogMigrationRepository) {
+  static create(repository: AgentAuditLogMigrationRepository): AgentAuditLogIdsMigration {
     return new AgentAuditLogIdsMigration(repository);
   }
 
-  async migrateTenant({ tenantId, signal }: { tenantId: string; signal?: AbortSignal }) {
+  async migrateTenant({
+    tenantId,
+    signal,
+  }: {
+    tenantId: string;
+    signal?: AbortSignal;
+  }): Promise<TenantMigrationOutcome> {
     const report = await this.run({ execute: true, projectId: tenantId, signal });
     const skipped = report.actions.some((action) => action.skipped > 0);
     return { status: skipped ? ("migrated" as const) : ("finalized" as const), report };

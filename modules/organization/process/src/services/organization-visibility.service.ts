@@ -313,12 +313,12 @@ export class OrganizationVisibilityService {
       team.members = team.members.filter(
         (member) => member.userId === userId || member.userId === demoProjectUserId,
       );
-      team.members = OrganizationMembershipService.enrichTeamWithRoleBindings(
+      team.members = OrganizationMembershipService.enrichTeamWithRoleBindings({
         team,
         userId,
-        [...bindings],
-        organization.id,
-      ).members;
+        userRoleBindings: [...bindings],
+        organizationId: organization.id,
+      }).members;
 
       if (isDemoOrganization) return true;
       return isExternal ? team.members.some((member) => member.userId === userId) : true;

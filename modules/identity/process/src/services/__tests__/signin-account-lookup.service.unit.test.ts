@@ -6,8 +6,8 @@ import { emptyIdentityHeads, type IdentifierFact } from "@langwatch/identity-con
 import { describe, expect, it } from "vitest";
 
 import { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentitySignInAccountsRepository } from "../../repositories/memory/memory.identity-signin-accounts.repository.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SignInAccountLookupService } from "../signin-account-lookup.service.ts";
 
 /** Only the two reads the lookup makes; the rest of the port is unreachable here. */

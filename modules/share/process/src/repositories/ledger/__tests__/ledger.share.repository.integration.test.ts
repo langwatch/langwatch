@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Tests ledger atomicity and constraints that mocks cannot substitute for real Postgres.
@@ -67,7 +68,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
 
   /** The mint and revoke halves are never reached: every case here is a read
    *  or an accounting write, and either would be a different suite. */
-  const authz = {
+  const authz = createApiFixture<AuthzApi>({
     isOnEngine: async () => true,
     attachResourceGrant: async () => {
       throw new Error("this suite mints nothing");
@@ -75,7 +76,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
     revokeResourceGrants: async () => {
       throw new Error("this suite revokes nothing");
     },
-  } as unknown as AuthzApi;
+  });
 
   /** The project peer answers the organisation the seeded rows sit in. */
   const projects = { findOrganizationId: async () => organization.id };

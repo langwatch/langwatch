@@ -8,7 +8,7 @@ import {
   type BillingSubscriptionWithOrganization,
   BillingSubscription,
 } from "../subscription.repository.ts";
-import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory.billing.store.ts";
 
 const SUBSCRIPTION_KSUID_RESOURCE = "sub";
 const ACTIVE = "ACTIVE";

@@ -8,8 +8,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoRegistrantReadsService } from "../sso-registrant-reads.service.ts";
 
 const ORG = "org_acme";

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ShareLink } from "@langwatch/share-contract";
 import { Temporal } from "@langwatch/time";
@@ -86,7 +87,7 @@ function buildRepository({
     repository: LedgerShareRepository.create({
       head,
       grants,
-      authz: authz as unknown as AuthzApi,
+      authz: createApiFixture<AuthzApi>(authz),
       projects,
     }),
   };

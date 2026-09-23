@@ -71,14 +71,35 @@ export interface ConnectedBillingTerms {
 }
 
 export class ConnectedBillingService {
-  private constructor(
-    private readonly repository: ConnectedBillingRepository,
-    private readonly invoicing: ConnectedInvoicingChannel,
-    private readonly terms: ConnectedBillingTerms,
-    private readonly isSaas: boolean,
-    private readonly bankDetails: () => string | null,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly repository: ConnectedBillingRepository;
+  private readonly invoicing: ConnectedInvoicingChannel;
+  private readonly terms: ConnectedBillingTerms;
+  private readonly isSaas: boolean;
+  private readonly bankDetails: () => string | null;
+  private readonly now: () => Instant;
+
+  private constructor({
+    repository,
+    invoicing,
+    terms,
+    isSaas,
+    bankDetails,
+    now,
+  }: {
+    repository: ConnectedBillingRepository;
+    invoicing: ConnectedInvoicingChannel;
+    terms: ConnectedBillingTerms;
+    isSaas: boolean;
+    bankDetails: () => string | null;
+    now: () => Instant;
+  }) {
+    this.repository = repository;
+    this.invoicing = invoicing;
+    this.terms = terms;
+    this.isSaas = isSaas;
+    this.bankDetails = bankDetails;
+    this.now = now;
+  }
 
   static create(input: {
     repository: ConnectedBillingRepository;
@@ -90,14 +111,14 @@ export class ConnectedBillingService {
     bankDetails: () => string | null;
     now?: () => Instant;
   }): ConnectedBillingService {
-    return new ConnectedBillingService(
-      input.repository,
-      input.invoicing,
-      input.terms,
-      input.isSaas,
-      input.bankDetails,
-      input.now ?? nowInstant,
-    );
+    return new ConnectedBillingService({
+      repository: input.repository,
+      invoicing: input.invoicing,
+      terms: input.terms,
+      isSaas: input.isSaas,
+      bankDetails: input.bankDetails,
+      now: input.now ?? nowInstant,
+    });
   }
 
   /**

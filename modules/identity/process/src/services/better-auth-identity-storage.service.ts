@@ -114,7 +114,7 @@ export interface IdentityStorageAdapterDeps {
    * deploy of the entrance from changing anything on its own.
    */
   birth: IdentityBirth;
-  passkeyRemoval: PasskeyRemovalPort;
+  passkeyRemoval: PasskeyRemoval;
 }
 
 export type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user";
@@ -124,7 +124,7 @@ export type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user
  * Decision and deletion share one serializable transaction: two removals
  * reading the same stale set could both proceed and lock the user out.
  */
-export interface PasskeyRemovalPort {
+export interface PasskeyRemoval {
   deleteIfAnotherWayInRemains(args: { passkeyId: string }): Promise<PasskeyRemovalOutcome>;
 }
 
@@ -257,14 +257,9 @@ function identityCustomAdapter({
         return null;
       }
       const clause = canonical[0];
-      if (
-        clause === undefined ||
-        clause.field !== "id" ||
-        (clause.operator !== undefined && clause.operator.toLowerCase() !== "eq") ||
-        (clause.connector !== undefined && clause.connector.toUpperCase() !== "AND")
-      ) {
-        return null;
-      }
+      if (clause === undefined || clause.field !== "id") return null;
+      if (clause.operator !== undefined && clause.operator.toLowerCase() !== "eq") return null;
+      if (clause.connector !== undefined && clause.connector.toUpperCase() !== "AND") return null;
       return typeof clause.value === "string" ? clause.value : null;
     };
 
@@ -505,15 +500,9 @@ function identityCustomAdapter({
       where: readonly CleanedWhere[],
     ): Promise<CleanedWhere[]> => {
       const clause = where[0];
-      if (
-        where.length !== 1 ||
-        clause === undefined ||
-        getDefaultFieldName({ model, field: clause.field }) !== "email" ||
-        clause.operator !== "eq" ||
-        typeof clause.value !== "string"
-      ) {
-        return [...where];
-      }
+      if (where.length !== 1 || clause === undefined) return [...where];
+      if (getDefaultFieldName({ model, field: clause.field }) !== "email") return [...where];
+      if (clause.operator !== "eq" || typeof clause.value !== "string") return [...where];
       const resolved = await resolution.tryResolveByIdentifierValue({
         normalizedValue: normalizeIdentifierValue(clause.value),
       });

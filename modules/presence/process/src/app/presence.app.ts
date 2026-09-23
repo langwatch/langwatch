@@ -14,6 +14,8 @@ import {
   type PresenceSession,
   type PresenceTenantEmitter,
   type PresenceUser,
+  type PresenceCursorEvent,
+  type PresenceEvent,
 } from "@langwatch/presence-contract";
 import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -75,13 +77,19 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
   readonly #emitters: PresenceEmitter;
   readonly #broadcast: PresenceBroadcast;
 
-  private constructor(
-    presence: PresenceService,
-    stream: PresenceStreamService,
-    users: UserApi,
-    emitters: PresenceEmitter,
-    broadcast: PresenceBroadcast,
-  ) {
+  private constructor({
+    presence,
+    stream,
+    users,
+    emitters,
+    broadcast,
+  }: {
+    presence: PresenceService;
+    stream: PresenceStreamService;
+    users: UserApi;
+    emitters: PresenceEmitter;
+    broadcast: PresenceBroadcast;
+  }) {
     this.#presence = presence;
     this.#stream = stream;
     this.#users = users;
@@ -111,13 +119,13 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
       diagnostics,
     });
 
-    return new PresenceApp(
+    return new PresenceApp({
       presence,
-      PresenceStreamService.create({ presence, emitters }),
-      dependencies.users,
+      stream: PresenceStreamService.create({ presence, emitters }),
+      users: dependencies.users,
       emitters,
       broadcast,
-    );
+    });
   }
 
   /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
@@ -170,11 +178,13 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     });
   }
 
-  events(input: PresenceProjectInput & { signal?: AbortSignal }) {
+  events(input: PresenceProjectInput & { signal?: AbortSignal }): AsyncGenerator<PresenceEvent> {
     return this.#stream.events(input);
   }
 
-  cursors(input: PresenceCursorSubscription & { signal?: AbortSignal }) {
+  cursors(
+    input: PresenceCursorSubscription & { signal?: AbortSignal },
+  ): AsyncGenerator<PresenceCursorEvent> {
     return this.#stream.cursors(input);
   }
 

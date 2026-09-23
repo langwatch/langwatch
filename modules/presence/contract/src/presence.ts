@@ -92,7 +92,7 @@ export const presenceCursorPayloadSchema = z
   .strict();
 export type PresenceCursorPayload = z.infer<typeof presenceCursorPayloadSchema>;
 
-export const presenceCursorEventSchema = presenceCursorPayloadSchema.extend({
+export const presenceCursorEventSchema = presenceCursorPayloadSchema.safeExtend({
   projectId: z.string().min(1),
   sessionId: z.string().min(1),
   user: presenceUserSchema,

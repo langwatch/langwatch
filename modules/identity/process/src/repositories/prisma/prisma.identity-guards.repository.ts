@@ -55,12 +55,12 @@ export class PostgresIdentityGuardsAdapter {
     const { database } = this.options;
     const reservations = PrismaIdentityReservationRepository.create(database);
     return {
-      identityGuards: IdentityGuardsService.create(
-        PrismaIdentityHeadsRepository.create(database),
-        PrismaIdentityUsersRepository.create(database),
+      identityGuards: IdentityGuardsService.create({
+        heads: PrismaIdentityHeadsRepository.create(database),
+        users: PrismaIdentityUsersRepository.create(database),
         reservations,
-        CryptoIdentifierIdentityAdapter.create(),
-      ),
+        identifiers: CryptoIdentifierIdentityAdapter.create(),
+      }),
       mfaGuards: MfaGuardsService.create(PrismaMfaEnrollmentRepository.create(database)),
       reservations,
     };

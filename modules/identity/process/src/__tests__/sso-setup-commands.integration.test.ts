@@ -13,8 +13,8 @@ import {
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { SsoCredentialRead } from "../repositories/sso-credential.repository.ts";
 import { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";

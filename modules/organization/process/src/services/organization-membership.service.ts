@@ -92,12 +92,17 @@ export class OrganizationMembershipService {
       id: string;
       projects: { id: string }[];
     },
-  >(
-    team: T,
-    userId: string,
-    userRoleBindings: AuthzBindingForSynthesis[],
-    organizationId: string,
-  ): T {
+  >({
+    team,
+    userId,
+    userRoleBindings,
+    organizationId,
+  }: {
+    team: T;
+    userId: string;
+    userRoleBindings: AuthzBindingForSynthesis[];
+    organizationId: string;
+  }): T {
     const teamProjectIds = new Set(team.projects.map((p) => p.id));
     // TEAM scope takes precedence over PROJECT scope so the synthesized role is
     // deterministic when a user has both kinds of binding for the same team.

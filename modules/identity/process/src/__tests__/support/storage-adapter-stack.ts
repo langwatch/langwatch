@@ -22,7 +22,7 @@ import {
 } from "../../services/better-auth-identity-ceremonies.service.ts";
 import {
   BetterAuthIdentityStorageAdapter,
-  type PasskeyRemovalPort,
+  type PasskeyRemoval,
 } from "../../services/better-auth-identity-storage.service.ts";
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
@@ -149,7 +149,7 @@ export function identityStack({
   withDatabaseHooks?: boolean;
   /** Use the named fixture that represents the current Prisma account shape. */
   schemaBoundLegacy?: boolean;
-  passkeyRemoval?: PasskeyRemovalPort;
+  passkeyRemoval?: PasskeyRemoval;
 } = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
@@ -218,25 +218,25 @@ export function identityStack({
     [...migrationState.values()].includes("finalized");
 
   const identity = IdentityService.create(
-    IdentityGuardsService.create(
+    IdentityGuardsService.create({
       heads,
       users,
       reservations,
-      CryptoIdentifierIdentityAdapter.create(),
-    ),
+      identifiers: CryptoIdentifierIdentityAdapter.create(),
+    }),
     ledger,
   );
 
-  const ceremonies = IdentityCeremoniesAdapter.create(
+  const ceremonies = IdentityCeremoniesAdapter.create({
     heads,
     users,
     identity,
     // The ceremonies fork on the SAME question the adapter does, and a
     // newborn whose adapter routed to identity while their ceremony declined
     // would get a legacy `Account` row anyway (ADR-116 §3).
-    BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
-    { now: () => T0, newCommandId: newIdentityCommandId },
-  );
+    isLatched: BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
+    clock: { now: () => T0, newCommandId: newIdentityCommandId },
+  });
 
   /**
    * the waited append first, then the row writes, then the projection.

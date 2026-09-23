@@ -8,7 +8,7 @@ import {
   type LookupMembershipRow,
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /**
  * The lookup twin. Identifiers and connections come off the shared store;

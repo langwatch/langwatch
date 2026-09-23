@@ -315,7 +315,7 @@ const resolvedIdentity = projectIdentitySchema.parse({
 
 /** The project directory a key service reads, over one in-memory peer. */
 function projectPeer(memory: MemoryProjects): ProjectApi {
-  return {
+  return createApiFixture<ProjectApi>({
     getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     findWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     findIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
@@ -326,7 +326,7 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
     rotateLegacyApiKey: (input: { projectId: string; token: string }) =>
       memory.rotateLegacyApiKey(input),
     findPersonalWorkspaceOwner: () => memory.findPersonalWorkspaceOwner(),
-  } as unknown as ProjectApi;
+  });
 }
 
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
@@ -646,13 +646,13 @@ describe("API-key service", () => {
     const organizations = createApiFixture<OrganizationApi>({
       tryFindPersonalWorkspace: vi.fn().mockResolvedValue(null),
     });
-    const projects = {
+    const projects = createApiFixture<ProjectApi>({
       getWithTeam: vi.fn().mockResolvedValue({
         archivedAt: null,
         team: { id: "team-1", organizationId: "org-1" },
       }),
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectApi;
+    });
     const service = createService(
       new MemoryApiKeys(),
       dependencies({ authz, organizations, projects }),
@@ -744,11 +744,11 @@ describe("API-key service", () => {
       data: [resolvedProject, { ...resolvedProject, id: "project-2" }],
       hasMore: false,
     });
-    const projects = {
+    const projects = createApiFixture<ProjectApi>({
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes,
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectApi;
+    });
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "scoped",
@@ -776,10 +776,10 @@ describe("API-key service", () => {
   it("returns all projects when the key and owner ceiling allow organization view", async () => {
     const repository = new MemoryApiKeys();
     const listActiveByScopes = vi.fn();
-    const projects = {
+    const projects = createApiFixture<ProjectApi>({
       listActiveByScopes,
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectApi;
+    });
     const service = createService(repository, dependencies({ projects }));
     const created = await service.create({
       name: "organization",
@@ -805,11 +805,11 @@ describe("API-key service", () => {
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
     });
-    const projects = {
+    const projects = createApiFixture<ProjectApi>({
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: true }),
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectApi;
+    });
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "too-wide",

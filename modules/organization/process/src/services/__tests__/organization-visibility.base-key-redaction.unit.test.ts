@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -46,12 +47,12 @@ function organizationPayload(): FullyLoadedOrganization[] {
  * never granted here — the base key is gated on the project, not on the organization.
  */
 function testPermissions(granted: readonly string[]): AuthzApi {
-  return {
+  return createApiFixture<AuthzApi>({
     hasPermission: vi.fn(async (check: { permission: string }) =>
       granted.includes(check.permission),
     ),
     listBindingsForSynthesis: vi.fn(async () => []),
-  } as unknown as AuthzApi;
+  });
 }
 
 function visibility(granted: readonly string[]) {

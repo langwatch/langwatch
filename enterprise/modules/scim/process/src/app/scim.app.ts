@@ -382,7 +382,13 @@ export class ScimApp implements ScimApiContract {
     if (entitlement.status === "plan_not_entitled") {
       // Recorded, unlike the 401s above: a lapsed plan is a credential we
       // recognize, so we know whose page it belongs on.
-      this.#refused(input, entitlement, 403, "plan_not_entitled", ENTERPRISE_FEATURE_ERRORS.SCIM);
+      this.#refused({
+        asked: input,
+        scope: entitlement,
+        status: 403,
+        reason: "plan_not_entitled",
+        detail: ENTERPRISE_FEATURE_ERRORS.SCIM,
+      });
 
       throw scimRefusal(403, ENTERPRISE_FEATURE_ERRORS.SCIM);
     }
@@ -396,7 +402,13 @@ export class ScimApp implements ScimApiContract {
         connectionId: entitlement.connectionId,
       }))
     ) {
-      this.#refused(input, entitlement, 403, "forbidden", CONNECTION_NOT_WRITABLE);
+      this.#refused({
+        asked: input,
+        scope: entitlement,
+        status: 403,
+        reason: "forbidden",
+        detail: CONNECTION_NOT_WRITABLE,
+      });
 
       throw scimRefusal(403, CONNECTION_NOT_WRITABLE);
     }
@@ -432,29 +444,45 @@ export class ScimApp implements ScimApiContract {
   // ── The platform operator's oversight (ADR-122) ─────────────────────────
 
   listOversightSyncs(input: ListOversightSyncsInput, by: ScimOperator): Promise<OversightSyncList> {
-    return this.#overseen(by, "getAll", { page: input.page }, (oversight) => oversight.list(input));
+    return this.#overseen({
+      by,
+      action: "getAll",
+      args: { page: input.page },
+      act: (oversight) => oversight.list(input),
+    });
   }
 
   findOversightSync(input: OversightConnectionInput, by: ScimOperator): Promise<OversightSync[]> {
-    return this.#overseen(by, "getById", { ...input }, (oversight) => oversight.find(input));
+    return this.#overseen({
+      by,
+      action: "getById",
+      args: { ...input },
+      act: (oversight) => oversight.find(input),
+    });
   }
 
   findDirectoryIdentities(
     input: OversightConnectionInput,
     by: ScimOperator,
   ): Promise<DirectoryIdentityRow[]> {
-    return this.#overseen(by, "directoryIdentities", { ...input }, (oversight) =>
-      oversight.findDirectoryIdentities(input),
-    );
+    return this.#overseen({
+      by,
+      action: "directoryIdentities",
+      args: { ...input },
+      act: (oversight) => oversight.findDirectoryIdentities(input),
+    });
   }
 
   redriveRetiredApply(
     input: RedriveRetiredApplyInput,
     by: ScimOperator,
   ): Promise<RedriveRetiredApplyResult> {
-    return this.#overseen(by, "redriveRetiredApply", { ...input }, (oversight, operator) =>
-      oversight.redriveRetiredApply({ ...input, operator }),
-    );
+    return this.#overseen({
+      by,
+      action: "redriveRetiredApply",
+      args: { ...input },
+      act: (oversight, operator) => oversight.redriveRetiredApply({ ...input, operator }),
+    });
   }
 
   /**
@@ -462,12 +490,17 @@ export class ScimApp implements ScimApiContract {
    * that then failed is still in the trail. Anyone off the staff list gets a
    * 404 that says nothing about why; an impersonator is checked, not the user.
    */
-  async #overseen<T>(
-    by: ScimOperator,
-    action: string,
-    args: Record<string, string | number>,
-    act: (oversight: ScimOversightService, operator: { userId: string }) => Promise<T>,
-  ): Promise<T> {
+  async #overseen<T>({
+    by,
+    action,
+    args,
+    act,
+  }: {
+    by: ScimOperator;
+    action: string;
+    args: Record<string, string | number>;
+    act: (oversight: ScimOversightService, operator: { userId: string }) => Promise<T>;
+  }): Promise<T> {
     const userId = by.impersonatorId ?? by.id;
     const oversight = this.#oversight;
     const isOperator = this.#operators ? await this.#operators(userId) : false;
@@ -488,13 +521,19 @@ export class ScimApp implements ScimApiContract {
    * was meant for — but only where the door said what was being asked for.
    * Naming the resource is the whole of what makes the row readable.
    */
-  #refused(
-    asked: { method?: string | undefined; path?: string | undefined },
-    scope: { organizationId: string; connectionId: string | null },
-    status: number,
-    reason: ScimRefusalReason,
-    detail: string,
-  ): void {
+  #refused({
+    asked,
+    scope,
+    status,
+    reason,
+    detail,
+  }: {
+    asked: { method?: string | undefined; path?: string | undefined };
+    scope: { organizationId: string; connectionId: string | null };
+    status: number;
+    reason: ScimRefusalReason;
+    detail: string;
+  }): void {
     if (asked.method === void 0 || asked.path === void 0) return;
 
     void this.#scim.recordRequest({
@@ -551,7 +590,13 @@ export class ScimApp implements ScimApiContract {
     startIndex?: number | undefined;
     count?: number | undefined;
   }): Promise<ScimListResponse<ScimUser>> {
-    return this.#served(input, "GET", "Users", 200, () => this.#scim.listUsers(input));
+    return this.#served({
+      scope: input,
+      method: "GET",
+      resource: "Users",
+      answered: 200,
+      work: () => this.#scim.listUsers(input),
+    });
   }
 
   createUser(input: {
@@ -568,13 +613,23 @@ export class ScimApp implements ScimApiContract {
       schema: scimCreateUserRequestSchema,
     });
 
-    return this.#served(input, "POST", "Users", 201, () =>
-      this.#scim.createUser({ ...scope, request }),
-    );
+    return this.#served({
+      scope: input,
+      method: "POST",
+      resource: "Users",
+      answered: 201,
+      work: () => this.#scim.createUser({ ...scope, request }),
+    });
   }
 
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser> {
-    return this.#served(input, "GET", "Users/:id", 200, () => this.#scim.getUser(input));
+    return this.#served({
+      scope: input,
+      method: "GET",
+      resource: "Users/:id",
+      answered: 200,
+      work: () => this.#scim.getUser(input),
+    });
   }
 
   replaceUser(input: {
@@ -592,9 +647,13 @@ export class ScimApp implements ScimApiContract {
       schema: scimCreateUserRequestSchema,
     });
 
-    return this.#served(input, "PUT", "Users/:id", 200, () =>
-      this.#scim.replaceUser({ ...scope, request }),
-    );
+    return this.#served({
+      scope: input,
+      method: "PUT",
+      resource: "Users/:id",
+      answered: 200,
+      work: () => this.#scim.replaceUser({ ...scope, request }),
+    });
   }
 
   updateUser(input: {
@@ -612,9 +671,13 @@ export class ScimApp implements ScimApiContract {
       schema: scimPatchRequestSchema,
     });
 
-    return this.#served(input, "PATCH", "Users/:id", 200, () =>
-      this.#scim.updateUser({ ...scope, patchRequest }),
-    );
+    return this.#served({
+      scope: input,
+      method: "PATCH",
+      resource: "Users/:id",
+      answered: 200,
+      work: () => this.#scim.updateUser({ ...scope, patchRequest }),
+    });
   }
 
   deleteUser(input: {
@@ -622,7 +685,13 @@ export class ScimApp implements ScimApiContract {
     id: string;
     connectionId?: string | null | undefined;
   }): Promise<void> {
-    return this.#served(input, "DELETE", "Users/:id", 204, () => this.#scim.deleteUser(input));
+    return this.#served({
+      scope: input,
+      method: "DELETE",
+      resource: "Users/:id",
+      answered: 204,
+      work: () => this.#scim.deleteUser(input),
+    });
   }
 
   /**
@@ -632,13 +701,19 @@ export class ScimApp implements ScimApiContract {
    * never awaited and never fails the request: `recordRequest` swallows and
    * logs its own failure, and a refusal keeps the refusal the caller was owed.
    */
-  async #served<T>(
-    scope: { organizationId: string; connectionId?: string | null | undefined },
-    method: string,
-    resource: string,
-    answered: number,
-    work: () => Promise<T>,
-  ): Promise<T> {
+  async #served<T>({
+    scope,
+    method,
+    resource,
+    answered,
+    work,
+  }: {
+    scope: { organizationId: string; connectionId?: string | null | undefined };
+    method: string;
+    resource: string;
+    answered: number;
+    work: () => Promise<T>;
+  }): Promise<T> {
     const request = {
       organizationId: scope.organizationId,
       connectionId: scope.connectionId ?? null,
@@ -673,7 +748,13 @@ export class ScimApp implements ScimApiContract {
     count?: number | undefined;
     excludeMembers?: boolean | undefined;
   }): Promise<ScimListResponse<ScimGroup>> {
-    return this.#served(input, "GET", "Groups", 200, () => this.#scim.listGroups(input));
+    return this.#served({
+      scope: input,
+      method: "GET",
+      resource: "Groups",
+      answered: 200,
+      work: () => this.#scim.listGroups(input),
+    });
   }
 
   createGroup(input: {
@@ -690,9 +771,13 @@ export class ScimApp implements ScimApiContract {
       schema: scimCreateGroupRequestSchema,
     });
 
-    return this.#served(input, "POST", "Groups", 201, () =>
-      this.#scim.createGroup({ ...scope, request }),
-    );
+    return this.#served({
+      scope: input,
+      method: "POST",
+      resource: "Groups",
+      answered: 201,
+      work: () => this.#scim.createGroup({ ...scope, request }),
+    });
   }
 
   getGroup(input: {
@@ -701,7 +786,13 @@ export class ScimApp implements ScimApiContract {
     connectionId?: string | null | undefined;
     excludeMembers?: boolean | undefined;
   }): Promise<ScimGroup> {
-    return this.#served(input, "GET", "Groups/:id", 200, () => this.#scim.getGroup(input));
+    return this.#served({
+      scope: input,
+      method: "GET",
+      resource: "Groups/:id",
+      answered: 200,
+      work: () => this.#scim.getGroup(input),
+    });
   }
 
   replaceGroup(input: {
@@ -719,9 +810,13 @@ export class ScimApp implements ScimApiContract {
       schema: scimReplaceGroupRequestSchema,
     });
 
-    return this.#served(input, "PUT", "Groups/:id", 200, () =>
-      this.#scim.replaceGroup({ ...scope, request }),
-    );
+    return this.#served({
+      scope: input,
+      method: "PUT",
+      resource: "Groups/:id",
+      answered: 200,
+      work: () => this.#scim.replaceGroup({ ...scope, request }),
+    });
   }
 
   updateGroup(input: {
@@ -739,9 +834,13 @@ export class ScimApp implements ScimApiContract {
       schema: scimPatchRequestSchema,
     });
 
-    return this.#served(input, "PATCH", "Groups/:id", 200, () =>
-      this.#scim.updateGroup({ ...scope, patchRequest }),
-    );
+    return this.#served({
+      scope: input,
+      method: "PATCH",
+      resource: "Groups/:id",
+      answered: 200,
+      work: () => this.#scim.updateGroup({ ...scope, patchRequest }),
+    });
   }
 
   deleteGroup(input: {
@@ -749,7 +848,13 @@ export class ScimApp implements ScimApiContract {
     externalScimId: string;
     connectionId?: string | null | undefined;
   }): Promise<void> {
-    return this.#served(input, "DELETE", "Groups/:id", 204, () => this.#scim.deleteGroup(input));
+    return this.#served({
+      scope: input,
+      method: "DELETE",
+      resource: "Groups/:id",
+      answered: 204,
+      work: () => this.#scim.deleteGroup(input),
+    });
   }
 
   // ── The directory's log stream ───────────────────────────────────────────

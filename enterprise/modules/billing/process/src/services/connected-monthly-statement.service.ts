@@ -77,12 +77,27 @@ export type MonthlyStatementRunSummary = {
 };
 
 export class ConnectedMonthlyStatementService {
-  private constructor(
-    private readonly repository: ConnectedBillingRepository,
-    private readonly sources: ConnectedStatementSources,
-    private readonly mail: ConnectedStatementMailChannel,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly repository: ConnectedBillingRepository;
+  private readonly sources: ConnectedStatementSources;
+  private readonly mail: ConnectedStatementMailChannel;
+  private readonly now: () => Instant;
+
+  private constructor({
+    repository,
+    sources,
+    mail,
+    now,
+  }: {
+    repository: ConnectedBillingRepository;
+    sources: ConnectedStatementSources;
+    mail: ConnectedStatementMailChannel;
+    now: () => Instant;
+  }) {
+    this.repository = repository;
+    this.sources = sources;
+    this.mail = mail;
+    this.now = now;
+  }
 
   static create(input: {
     repository: ConnectedBillingRepository;
@@ -90,12 +105,12 @@ export class ConnectedMonthlyStatementService {
     mail: ConnectedStatementMailChannel;
     now?: () => Instant;
   }): ConnectedMonthlyStatementService {
-    return new ConnectedMonthlyStatementService(
-      input.repository,
-      input.sources,
-      input.mail,
-      input.now ?? nowInstant,
-    );
+    return new ConnectedMonthlyStatementService({
+      repository: input.repository,
+      sources: input.sources,
+      mail: input.mail,
+      now: input.now ?? nowInstant,
+    });
   }
 
   /** One tick: the month that has just ended, for every connected customer. */

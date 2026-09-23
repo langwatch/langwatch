@@ -18,6 +18,25 @@ export type DataRetentionDirectoryDatabase = Pick<
   "project" | "team" | "organization"
 >;
 
+function projectsInScopeWhere({
+  scope,
+  organizationId,
+}: {
+  scope: ScopeAssignment;
+  organizationId: string;
+}):
+  | { id: string; team: { organizationId: string }; archivedAt: null }
+  | { teamId: string; team: { organizationId: string }; archivedAt: null }
+  | { team: { organizationId: string }; archivedAt: null } {
+  if (scope.scopeType === "PROJECT") {
+    return { id: scope.scopeId, team: { organizationId }, archivedAt: null };
+  }
+  if (scope.scopeType === "TEAM") {
+    return { teamId: scope.scopeId, team: { organizationId }, archivedAt: null };
+  }
+  return { team: { organizationId }, archivedAt: null };
+}
+
 export class PrismaDataRetentionDirectoryRepository implements DataRetentionDirectoryReader {
   static create(database: DataRetentionDirectoryDatabase): PrismaDataRetentionDirectoryRepository {
     return new PrismaDataRetentionDirectoryRepository(database);
@@ -116,12 +135,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
   }): Promise<readonly { id: string; teamId: string }[]> {
     // The organization constraint is what makes a foreign scopeId resolve to
     // nothing, whichever tier the scope names.
-    const where =
-      scope.scopeType === "PROJECT"
-        ? { id: scope.scopeId, team: { organizationId }, archivedAt: null }
-        : scope.scopeType === "TEAM"
-          ? { teamId: scope.scopeId, team: { organizationId }, archivedAt: null }
-          : { team: { organizationId }, archivedAt: null };
+    const where = projectsInScopeWhere({ scope, organizationId });
 
     return this.database.project.findMany({
       where,

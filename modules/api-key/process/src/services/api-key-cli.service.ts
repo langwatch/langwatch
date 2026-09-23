@@ -26,15 +26,30 @@ export class ApiKeyCliService {
     policy: ApiKeyGrantPolicyService,
     lifecycle: ApiKeyLifecycleService,
   ): ApiKeyCliService {
-    return new ApiKeyCliService(options.repository, options, policy, lifecycle);
+    return new ApiKeyCliService({ repository: options.repository, options, policy, lifecycle });
   }
 
-  private constructor(
-    private readonly repository: ApiKeyRepository,
-    private readonly options: ApiKeyDependencies,
-    private readonly policy: ApiKeyGrantPolicyService,
-    private readonly lifecycle: ApiKeyLifecycleService,
-  ) {}
+  private readonly repository: ApiKeyRepository;
+  private readonly options: ApiKeyDependencies;
+  private readonly policy: ApiKeyGrantPolicyService;
+  private readonly lifecycle: ApiKeyLifecycleService;
+
+  private constructor({
+    repository,
+    options,
+    policy,
+    lifecycle,
+  }: {
+    repository: ApiKeyRepository;
+    options: ApiKeyDependencies;
+    policy: ApiKeyGrantPolicyService;
+    lifecycle: ApiKeyLifecycleService;
+  }) {
+    this.repository = repository;
+    this.options = options;
+    this.policy = policy;
+    this.lifecycle = lifecycle;
+  }
 
   async validateCliSelection(input: {
     userId: string;
@@ -218,12 +233,13 @@ export class ApiKeyCliService {
       organizationId: input.organizationId,
     });
     for (const key of keys) {
+      if (!key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX)) continue;
+      if (key.createdByDeviceLabel !== input.deviceLabel || key.id === input.exceptApiKeyId) {
+        continue;
+      }
       if (
-        !key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ||
-        key.createdByDeviceLabel !== input.deviceLabel ||
-        key.id === input.exceptApiKeyId ||
-        (input.createdBefore &&
-          Temporal.Instant.compare(fromDate(key.createdAt), input.createdBefore) >= 0)
+        input.createdBefore &&
+        Temporal.Instant.compare(fromDate(key.createdAt), input.createdBefore) >= 0
       ) {
         continue;
       }

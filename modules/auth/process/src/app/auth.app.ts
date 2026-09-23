@@ -265,16 +265,25 @@ export class AuthApp implements AuthApiContract {
     return [...this.#dialableIdentityProviderOrigins];
   }
 
-  private constructor(
-    sessions: BrowserSessionService,
-    cliSessions: CliDeviceSessionService,
-    signUp: SignUpVerificationService | null,
-    members: AuthInfrastructure,
-    dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
-    legacySsoAccess: LegacySsoAccessService,
-    federatedAccounts: FederatedAccountReadsService,
-    signInSecurity: SignInSecuritySettingsService,
-  ) {
+  private constructor({
+    sessions,
+    cliSessions,
+    signUp,
+    members,
+    dependencies,
+    legacySsoAccess,
+    federatedAccounts,
+    signInSecurity,
+  }: {
+    sessions: BrowserSessionService;
+    cliSessions: CliDeviceSessionService;
+    signUp: SignUpVerificationService | null;
+    members: AuthInfrastructure;
+    dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
+    legacySsoAccess: LegacySsoAccessService;
+    federatedAccounts: FederatedAccountReadsService;
+    signInSecurity: SignInSecuritySettingsService;
+  }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
     this.#signUp = signUp;
@@ -303,21 +312,21 @@ export class AuthApp implements AuthApiContract {
       now,
     });
 
-    const app = new AuthApp(
+    const app = new AuthApp({
       sessions,
-      CliDeviceSessionService.create({
+      cliSessions: CliDeviceSessionService.create({
         store: repositories.cliSessions,
       }),
-      signUpVerification({ members, repositories, now, users: dependencies.users }),
+      signUp: signUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
-      { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
-      LegacySsoAccessService.create({
+      dependencies: { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
+      legacySsoAccess: LegacySsoAccessService.create({
         accounts: accountRows,
         memberships: legacyAccessMemberships(dependencies.organizations),
         connections: legacyAccessConnections(dependencies.identity),
       }),
-      FederatedAccountReadsService.create({ accounts: accountRows }),
-      SignInSecuritySettingsService.create({
+      federatedAccounts: FederatedAccountReadsService.create({ accounts: accountRows }),
+      signInSecurity: SignInSecuritySettingsService.create({
         settings: repositories.signInSecurity,
         locks: repositories.signInLocks,
         members: signInSecurityMembers(dependencies.organizations),
@@ -325,7 +334,7 @@ export class AuthApp implements AuthApiContract {
         evidence: auditedReleaseEvidence(dependencies.auditLog),
         sessions,
       }),
-    );
+    });
 
     app.#offersPasskeys = config.passkeysEnabled;
     app.#offersTwoStepVerification = config.mfaEnrollmentOpen;

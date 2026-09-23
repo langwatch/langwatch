@@ -9,7 +9,7 @@ import {
   type ConnectedSeatChangeRecord,
   ConnectedBillingRepository,
 } from "../connected-billing.repository.ts";
-import type { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /**
  * The in-memory twin of connected billing's stored rows, over the one billing

@@ -146,7 +146,7 @@ describe("ScimSyncLifecycleService", () => {
     });
   });
 
-  describe("the command envelope", () => {
+  describe("given the command envelope", () => {
     it("keeps one directory-sync history per organization", async () => {
       await lifecycle.userPushed({
         organizationId: ORGANIZATION,

@@ -54,11 +54,17 @@ const createMockDb = ({
 type OrderableRow = { id: string; createdAt: Date };
 type OrderByClause = Record<string, "asc" | "desc">;
 
+const compareAscending = <V>(left: V, right: V): number => {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+};
+
 const compareByClause = (a: OrderableRow, b: OrderableRow, clause: OrderByClause): number => {
   const [field, direction] = Object.entries(clause)[0] as ["id" | "createdAt", "asc" | "desc"];
   const left = a[field];
   const right = b[field];
-  const ascending = left < right ? -1 : left > right ? 1 : 0;
+  const ascending = compareAscending(left, right);
   return direction === "desc" ? -ascending : ascending;
 };
 

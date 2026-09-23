@@ -5,7 +5,11 @@
 import { z } from "zod";
 
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
-import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
+import {
+  apiKeyPermissionFormatSchema,
+  apiKeyRoleSchema,
+  apiKeyScopeTypeSchema,
+} from "./api-key.ts";
 
 /**
  * The binding shape the drawers post — narrower than the contract's
@@ -37,7 +41,7 @@ export const apiKeyTrpcCreateInputSchema = z
     permissionMode: z.enum(API_KEY_PERMISSION_MODES).default("all"),
     keyType: z.enum(["personal", "service"]).default("personal"),
     assignedToUserId: z.string().optional(),
-    permissions: z.array(apiKeyPermissionSchema).optional(),
+    permissions: z.array(apiKeyPermissionFormatSchema).optional(),
     bindings: z.array(roleBindingSchema).max(20),
   })
   .superRefine(refineRestrictedPermissions);
@@ -50,7 +54,7 @@ export const apiKeyTrpcUpdateInputSchema = z
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(500).nullish(),
     permissionMode: z.enum(API_KEY_PERMISSION_MODES).optional(),
-    permissions: z.array(apiKeyPermissionSchema).optional(),
+    permissions: z.array(apiKeyPermissionFormatSchema).optional(),
     bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
   })
   .superRefine(refineRestrictedPermissions);

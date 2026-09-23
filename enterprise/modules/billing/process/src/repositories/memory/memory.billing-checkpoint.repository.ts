@@ -4,7 +4,7 @@ import {
   type BillingCheckpoint,
   BillingCheckpointRepository,
 } from "../billing-checkpoint.repository.ts";
-import { MemoryBillingStore } from "./memory-billing.store.ts";
+import { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** The state a month starts in, before the roll-up has reported anything. */
 const UNREPORTED: BillingCheckpoint = {

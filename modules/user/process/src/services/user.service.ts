@@ -42,14 +42,32 @@ import { UserAvatarCodecService } from "./user-avatar.service.ts";
 
 export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
-  private constructor(
-    private readonly repository: UserRepository,
-    private readonly organizations: OrganizationApi,
-    private readonly avatarStorage: UserAvatarStorage,
-    /** The issuer every credential account row this service mints is stored under. */
-    private readonly credentialIssuer: string,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly repository: UserRepository;
+  private readonly organizations: OrganizationApi;
+  private readonly avatarStorage: UserAvatarStorage;
+  /** The issuer every credential account row this service mints is stored under. */
+  private readonly credentialIssuer: string;
+  private readonly now: () => Instant;
+
+  private constructor({
+    repository,
+    organizations,
+    avatarStorage,
+    credentialIssuer,
+    now,
+  }: {
+    repository: UserRepository;
+    organizations: OrganizationApi;
+    avatarStorage: UserAvatarStorage;
+    credentialIssuer: string;
+    now: () => Instant;
+  }) {
+    this.repository = repository;
+    this.organizations = organizations;
+    this.avatarStorage = avatarStorage;
+    this.credentialIssuer = credentialIssuer;
+    this.now = now;
+  }
 
   static create(options: {
     repository: UserRepository;
@@ -58,13 +76,13 @@ export class UserService {
     credentialIssuer: string;
     now?: () => Instant;
   }): UserService {
-    return new UserService(
-      options.repository,
-      options.organizations,
-      options.avatarStorage,
-      options.credentialIssuer,
-      options.now ?? nowInstant,
-    );
+    return new UserService({
+      repository: options.repository,
+      organizations: options.organizations,
+      avatarStorage: options.avatarStorage,
+      credentialIssuer: options.credentialIssuer,
+      now: options.now ?? nowInstant,
+    });
   }
 
   countUsage(): Promise<UserUsageCount> {

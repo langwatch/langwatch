@@ -13,8 +13,8 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import type { IdentityService } from "../identity.service.ts";
 import { SsoLegacyIdentityRetirementService } from "../sso-legacy-identity-retirement.service.ts";
 

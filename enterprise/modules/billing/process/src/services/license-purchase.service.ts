@@ -90,12 +90,27 @@ export type CheckoutLineItems = {
 
 /** Generates and delivers a license purchased through Stripe Checkout. */
 export class LicensePurchaseService {
-  private constructor(
-    private readonly delivery: LicensePurchaseDelivery,
-    private readonly generateLicense: LicenseGenerator,
-    private readonly licenseFeatures: LicenseFeaturesResolver | undefined,
-    private readonly errorReporter: BillingErrorReporter,
-  ) {}
+  private readonly delivery: LicensePurchaseDelivery;
+  private readonly generateLicense: LicenseGenerator;
+  private readonly licenseFeatures: LicenseFeaturesResolver | undefined;
+  private readonly errorReporter: BillingErrorReporter;
+
+  private constructor({
+    delivery,
+    generateLicense,
+    licenseFeatures,
+    errorReporter,
+  }: {
+    delivery: LicensePurchaseDelivery;
+    generateLicense: LicenseGenerator;
+    licenseFeatures: LicenseFeaturesResolver | undefined;
+    errorReporter: BillingErrorReporter;
+  }) {
+    this.delivery = delivery;
+    this.generateLicense = generateLicense;
+    this.licenseFeatures = licenseFeatures;
+    this.errorReporter = errorReporter;
+  }
 
   static create(options: {
     delivery: LicensePurchaseDelivery;
@@ -104,12 +119,12 @@ export class LicensePurchaseService {
     licenseFeatures?: LicenseFeaturesResolver;
     errorReporter?: BillingErrorReporter;
   }): LicensePurchaseService {
-    return new LicensePurchaseService(
-      options.delivery,
-      options.generateLicense,
-      options.licenseFeatures,
-      options.errorReporter ?? NullBillingErrorReporter.create(),
-    );
+    return new LicensePurchaseService({
+      delivery: options.delivery,
+      generateLicense: options.generateLicense,
+      licenseFeatures: options.licenseFeatures,
+      errorReporter: options.errorReporter ?? NullBillingErrorReporter.create(),
+    });
   }
 
   async handle({

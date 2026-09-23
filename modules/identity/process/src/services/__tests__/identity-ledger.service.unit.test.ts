@@ -125,12 +125,12 @@ function harness(overrides?: {
   const appended: IdentityEvent[][] = [];
   const staged: unknown[] = [];
   const order: string[] = [];
-  const guards = IdentityGuardsService.create(
-    new ProjectionHeads(store),
-    inMemoryIdentityUsers(),
-    inMemoryIdentityReservations(),
-    CryptoIdentifierIdentityAdapter.create(),
-  );
+  const guards = IdentityGuardsService.create({
+    heads: new ProjectionHeads(store),
+    users: inMemoryIdentityUsers(),
+    reservations: inMemoryIdentityReservations(),
+    identifiers: CryptoIdentifierIdentityAdapter.create(),
+  });
 
   const sender = {
     send: vi.fn(async (data: unknown) => {

@@ -31,43 +31,50 @@ import { z } from "zod";
  * carry a secret or a backup code, because none of the payloads it extends has a field for one.
  */
 
-export const mfaEnrolledEventSchema = EventSchema.extend({
+export const mfaEnrolledEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(MFA_ENROLLED_EVENT_TYPE),
   data: mfaEnrolledPayloadSchema,
 });
 export type MfaEnrolledEvent = z.infer<typeof mfaEnrolledEventSchema>;
 
-export const mfaConfirmedEventSchema = EventSchema.extend({
+export const mfaConfirmedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(MFA_CONFIRMED_EVENT_TYPE),
   data: mfaConfirmedPayloadSchema,
 });
 export type MfaConfirmedEvent = z.infer<typeof mfaConfirmedEventSchema>;
 
-export const mfaEnrollmentExpiredEventSchema = EventSchema.extend({
+export const mfaEnrollmentExpiredEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(MFA_ENROLLMENT_EXPIRED_EVENT_TYPE),
   data: mfaEnrollmentExpiredPayloadSchema,
 });
 export type MfaEnrollmentExpiredEvent = z.infer<typeof mfaEnrollmentExpiredEventSchema>;
 
-export const mfaDisabledEventSchema = EventSchema.extend({
+export const mfaDisabledEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(MFA_DISABLED_EVENT_TYPE),
   data: mfaDisabledPayloadSchema,
 });
 export type MfaDisabledEvent = z.infer<typeof mfaDisabledEventSchema>;
 
-export const backupCodeConsumedEventSchema = EventSchema.extend({
+export const backupCodeConsumedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(BACKUP_CODE_CONSUMED_EVENT_TYPE),
   data: backupCodeConsumedPayloadSchema,
 });
 export type BackupCodeConsumedEvent = z.infer<typeof backupCodeConsumedEventSchema>;
 
-export const backupCodesRegeneratedEventSchema = EventSchema.extend({
+export const backupCodesRegeneratedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(BACKUP_CODES_REGENERATED_EVENT_TYPE),
   data: backupCodesRegeneratedPayloadSchema,
 });
 export type BackupCodesRegeneratedEvent = z.infer<typeof backupCodesRegeneratedEventSchema>;
 
-export const mfaVerificationFailedEventSchema = EventSchema.extend({
+export const mfaVerificationFailedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(MFA_VERIFICATION_FAILED_EVENT_TYPE),
   data: mfaVerificationFailedPayloadSchema,
 });
@@ -137,7 +144,7 @@ export class MfaEnrollmentStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): MfaEnrollmentState {
     return emptyMfaEnrollment({ userId: "" });
   }
 

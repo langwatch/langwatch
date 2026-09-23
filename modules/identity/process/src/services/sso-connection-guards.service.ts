@@ -199,11 +199,12 @@ export class SsoConnectionGuardsService {
   async claimDomain(data: ClaimDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, CLAIM_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (
-      state.claimedDomains.includes(domain) ||
-      state.approvedDomains.includes(domain) ||
-      state.verifiedDomains.includes(domain)
-    ) {
+    const alreadyClaimed = [
+      state.claimedDomains,
+      state.approvedDomains,
+      state.verifiedDomains,
+    ].some((domains) => domains.includes(domain));
+    if (alreadyClaimed) {
       return [];
     }
     // Checked after the retry short-circuit, so a repeated claim never spends

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { BillingWebhookOrganization } from "../billing-webhook-organization.repository.ts";
-import type { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /**
  * The four organization reads and writes a Stripe webhook makes, over the same

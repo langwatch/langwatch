@@ -6,7 +6,7 @@ import {
 } from "@langwatch/identity-contract";
 
 import { SsoBreakGlassRepository } from "../sso-break-glass.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The ways back in, in memory, with the Prisma twin's refusal semantics. */
 export class MemorySsoBreakGlassRepository extends SsoBreakGlassRepository {

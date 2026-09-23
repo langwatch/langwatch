@@ -5,7 +5,7 @@ import type {
   SsoAuthenticationRecord,
   SsoMigrationEvidenceRepository,
 } from "../sso-migration-evidence.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The same evidence over the store's identifier and activity rows. */
 export class MemorySsoMigrationEvidenceRepository implements SsoMigrationEvidenceRepository {

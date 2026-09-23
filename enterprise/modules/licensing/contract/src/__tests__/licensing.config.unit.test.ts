@@ -25,7 +25,7 @@ describe("licensing server configuration", () => {
     });
   });
 
-  describe("the connect endpoints", () => {
+  describe("given the connect endpoints", () => {
     describe("given an https endpoint", () => {
       it("accepts it", () => {
         expect(

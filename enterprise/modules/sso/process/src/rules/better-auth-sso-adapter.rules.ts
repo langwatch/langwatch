@@ -41,7 +41,7 @@ function profilePicture(...candidates: readonly unknown[]): string | undefined {
 }
 
 const fallbackNameImplementation = {
-  execute(profile: Record<string, any>): string {
+  execute(profile: Record<string, unknown>): string {
     return (
       (typeof profile.name === "string" && profile.name.trim()) ||
       (typeof profile.nickname === "string" && profile.nickname.trim()) ||
@@ -122,7 +122,7 @@ const socialProviderImplementation = {
         clientId: configuration.googleClientId,
         clientSecret: configuration.googleClientSecret,
         mapProfileToUser: (profile) => ({
-          name: fallbackName(profile as Record<string, any>),
+          name: fallbackName({ ...profile }),
           email: (profile as { email?: string }).email,
           image: (profile as { picture?: string }).picture,
         }),
@@ -138,7 +138,7 @@ const socialProviderImplementation = {
         clientId: configuration.githubClientId,
         clientSecret: configuration.githubClientSecret,
         mapProfileToUser: (profile) => ({
-          name: fallbackName(profile as Record<string, any>),
+          name: fallbackName({ ...profile }),
           email: (profile as { email?: string }).email,
           image: (profile as { avatar_url?: string }).avatar_url,
         }),
@@ -154,7 +154,7 @@ const socialProviderImplementation = {
         clientId: configuration.gitlabClientId,
         clientSecret: configuration.gitlabClientSecret,
         mapProfileToUser: (profile) => ({
-          name: fallbackName(profile as Record<string, any>),
+          name: fallbackName(profile as Record<string, unknown>),
           email: (profile as { email?: string }).email,
           image: (profile as { avatar_url?: string }).avatar_url,
         }),
@@ -172,7 +172,7 @@ const socialProviderImplementation = {
         clientSecret: configuration.azureAdClientSecret,
         tenantId: configuration.azureAdTenantId,
         mapProfileToUser: (profile) => ({
-          name: fallbackName(profile as Record<string, any>),
+          name: fallbackName(profile as Record<string, unknown>),
           email:
             (
               profile as {
@@ -523,7 +523,7 @@ const genericOAuthImplementation = {
 };
 
 /** BetterAuth-specific Enterprise SSO configuration adapter. */
-export function fallbackName(profile: Record<string, any>): string {
+export function fallbackName(profile: Record<string, unknown>): string {
   return fallbackNameImplementation.execute(profile);
 }
 

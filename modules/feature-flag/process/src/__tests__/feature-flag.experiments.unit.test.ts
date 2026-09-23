@@ -9,7 +9,7 @@ import {
   UnknownFeatureFlagExperimentError,
   type FeatureFlagExperiment,
 } from "@langwatch/feature-flag-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
@@ -77,16 +77,21 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when the person opts themselves in", () => {
-    /** @scenario "A person joins an experiment for themselves" */
-    it("turns on for them", async () => {
-      const { service, makeAvailable } = harness();
-      await makeAvailable();
+    let service: ReturnType<typeof harness>["service"];
+
+    beforeEach(async () => {
+      const built = harness();
+      service = built.service;
+      await built.makeAvailable();
       await service.setUserExperimentEnrolment({
         flagKey: FLAG,
         target: PROJECT_TARGET,
         enrolled: true,
       });
+    });
 
+    /** @scenario "A person joins an experiment for themselves" */
+    it("turns on for them", async () => {
       const [entry] = await service.resolveExperimentCatalogue(PROJECT_TARGET);
 
       expect(entry).toMatchObject({
@@ -97,14 +102,6 @@ describe("given an experiment that is available", () => {
     });
 
     it("shows in the resolved browser map too", async () => {
-      const { service, makeAvailable } = harness();
-      await makeAvailable();
-      await service.setUserExperimentEnrolment({
-        flagKey: FLAG,
-        target: PROJECT_TARGET,
-        enrolled: true,
-      });
-
       await expect(service.resolveFrontendFlags(PROJECT_TARGET)).resolves.toMatchObject({
         [FLAG]: true,
       });

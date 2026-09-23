@@ -217,22 +217,22 @@ export class UserApp implements UserApi {
   }): UserApp {
     const now = members.now;
 
-    return new UserApp(
-      UserService.create({
+    return new UserApp({
+      users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
         avatarStorage: members.avatarStorage,
         credentialIssuer: CREDENTIAL_ISSUER,
         ...(now ? { now } : {}),
       }),
-      UserCredentialService.create({
+      credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords: members.passwords,
       }),
       dependencies,
       members,
       facts,
-    );
+    });
   }
 
   readonly #users: UserService;
@@ -242,13 +242,19 @@ export class UserApp implements UserApi {
   readonly #members: UserInfrastructure;
   readonly #facts: UserFacts;
 
-  private constructor(
-    users: UserService,
-    credentials: UserCredentialService,
-    dependencies: UserAppDependencies,
-    members: UserInfrastructure,
-    facts: UserFacts,
-  ) {
+  private constructor({
+    users,
+    credentials,
+    dependencies,
+    members,
+    facts,
+  }: {
+    users: UserService;
+    credentials: UserCredentialService;
+    dependencies: UserAppDependencies;
+    members: UserInfrastructure;
+    facts: UserFacts;
+  }) {
     this.#users = users;
     this.#credentials = credentials;
     this.#account = UserAccountService.create(dependencies);

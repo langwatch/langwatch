@@ -163,7 +163,7 @@ describe("given a project API key that names no user", () => {
     });
   });
 
-  describe("the published API document", () => {
+  describe("given the published API document", () => {
     it("leaves both guided routes out, because only Langy's CLI calls them", () => {
       const hidden = onboardingRest.router().routes.map((route) => route.docs?.hide);
 

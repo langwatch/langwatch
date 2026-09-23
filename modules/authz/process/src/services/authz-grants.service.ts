@@ -97,25 +97,39 @@ const RESOURCE_SCOPE_REJECTION =
 
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
-    return new AuthzGrantsService(
+    return new AuthzGrantsService({
       options,
-      AuthzBindingWriterService.create({
+      bindingWriter: AuthzBindingWriterService.create({
         bindings: options.bindings,
         ledger: options.ledger,
         newBindingId: options.newBindingId,
       }),
-      AuthzOffboardingService.create(options.repository),
-      AuthzGrantGuardsService.create({ repository: options.repository }),
-    );
+      offboarding: AuthzOffboardingService.create(options.repository),
+      guards: AuthzGrantGuardsService.create({ repository: options.repository }),
+    });
   }
 
-  private constructor(
-    private readonly options: AuthzGrantsServiceOptions,
-    private readonly bindingWriter: AuthzBindingWriterService,
-    private readonly offboarding: AuthzOffboardingService,
-    private readonly guards: AuthzGrantGuardsService,
-  ) {
+  private readonly options: AuthzGrantsServiceOptions;
+  private readonly bindingWriter: AuthzBindingWriterService;
+  private readonly offboarding: AuthzOffboardingService;
+  private readonly guards: AuthzGrantGuardsService;
+
+  private constructor({
+    options,
+    bindingWriter,
+    offboarding,
+    guards,
+  }: {
+    options: AuthzGrantsServiceOptions;
+    bindingWriter: AuthzBindingWriterService;
+    offboarding: AuthzOffboardingService;
+    guards: AuthzGrantGuardsService;
+  }) {
     super();
+    this.options = options;
+    this.bindingWriter = bindingWriter;
+    this.offboarding = offboarding;
+    this.guards = guards;
   }
 
   /** INSERT (who, role, where) — visible on the next check. */

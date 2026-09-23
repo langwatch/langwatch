@@ -259,7 +259,11 @@ export class AuthzApp implements AuthzApi {
   clearPendingAdmission: AuthzApi["clearPendingAdmission"] = (a) =>
     this.admissions().clearPendingAdmission(a);
 
-  hasProjectPermission(a: { userId: string; projectId: string; permission: AuthzPermission }) {
+  hasProjectPermission(a: {
+    userId: string;
+    projectId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean> {
     return this.#permissions.hasPermission(a);
   }
   /**

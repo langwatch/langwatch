@@ -3,7 +3,7 @@ import type {
   SsoDomainReproofTarget,
   SsoDomainReproofTargetRepository,
 } from "../sso-domain-reproof.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const REPROOF_STATES = ["VERIFIED", "ACTIVE"];
 

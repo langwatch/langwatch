@@ -7,8 +7,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "../../repositories/sso-credential.repository.ts";
 import type { SsoConnectionService } from "../sso-connection.service.ts";

@@ -236,12 +236,12 @@ export class BillingApp implements BillingApi {
     by: BillingStaff | null,
   ): Promise<ConnectedBillingOverview> {
     const staff = this.#admitStaff(by);
-    await this.#record(
+    await this.#record({
       staff,
-      "connectedBilling.get",
-      { organizationId: input.organizationId },
-      input.organizationId,
-    );
+      action: "connectedBilling.get",
+      args: { organizationId: input.organizationId },
+      organizationId: input.organizationId,
+    });
     return this.#overview.getOverview(input);
   }
 
@@ -256,17 +256,17 @@ export class BillingApp implements BillingApi {
       termEndsAt: Temporal.Instant.from(input.termEndsAt),
       operatorId: staff.id,
     });
-    await this.#record(
+    await this.#record({
       staff,
-      "connectedBilling.onboard",
-      {
+      action: "connectedBilling.onboard",
+      args: {
         organizationId: input.organizationId,
         seats: input.seats,
         commitUsdCents: input.commitUsdCents,
         termEndsAt: input.termEndsAt,
       },
-      input.organizationId,
-    );
+      organizationId: input.organizationId,
+    });
     return this.#overview.viewAccount(account);
   }
 
@@ -279,12 +279,12 @@ export class BillingApp implements BillingApi {
       ...input,
       operatorId: staff.id,
     });
-    await this.#record(
+    await this.#record({
       staff,
-      "connectedBilling.addCommit",
-      { organizationId: input.organizationId, amountUsdCents: input.amountUsdCents },
-      input.organizationId,
-    );
+      action: "connectedBilling.addCommit",
+      args: { organizationId: input.organizationId, amountUsdCents: input.amountUsdCents },
+      organizationId: input.organizationId,
+    });
     return this.#overview.viewCreditGrant(grant);
   }
 
@@ -299,16 +299,16 @@ export class BillingApp implements BillingApi {
       termEndsAt: Temporal.Instant.from(input.termEndsAt),
       operatorId: staff.id,
     });
-    await this.#record(
+    await this.#record({
       staff,
-      "connectedBilling.renew",
-      {
+      action: "connectedBilling.renew",
+      args: {
         organizationId: input.organizationId,
         commitUsdCents: input.commitUsdCents,
         termEndsAt: input.termEndsAt,
       },
-      input.organizationId,
-    );
+      organizationId: input.organizationId,
+    });
     return this.#overview.viewAccount(account);
   }
 
@@ -318,12 +318,12 @@ export class BillingApp implements BillingApi {
   ): Promise<RenewalCompletion> {
     const staff = this.#admitStaff(by);
     const outcome = await this.#connectedBilling().billing.completeRenewalIfDue(input);
-    await this.#record(
+    await this.#record({
       staff,
-      "connectedBilling.completeRenewalIfDue",
-      { organizationId: input.organizationId, outcome },
-      input.organizationId,
-    );
+      action: "connectedBilling.completeRenewalIfDue",
+      args: { organizationId: input.organizationId, outcome },
+      organizationId: input.organizationId,
+    });
     return outcome;
   }
 
@@ -342,12 +342,17 @@ export class BillingApp implements BillingApi {
     });
   }
 
-  #record(
-    staff: BillingStaff,
-    action: string,
-    args: RecordAuditLogCommand["args"],
-    organizationId: string,
-  ): Promise<void> {
+  #record({
+    staff,
+    action,
+    args,
+    organizationId,
+  }: {
+    staff: BillingStaff;
+    action: string;
+    args: RecordAuditLogCommand["args"];
+    organizationId: string;
+  }): Promise<void> {
     return this.#auditLog.record({
       userId: staff.id,
       action,

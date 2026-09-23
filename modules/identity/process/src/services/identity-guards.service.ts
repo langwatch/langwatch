@@ -70,21 +70,41 @@ export function detachStrandsUser({
  * (ADR-116 §6). The heads answer for latched users; `User.email` answers for
  */
 export class IdentityGuardsService {
-  static create(
-    heads: IdentityHeadsRepository,
-    users: IdentityUsersRepository,
-    reservations: IdentityReservationRepository,
-    identifiers: IdentifierIdentity,
-  ): IdentityGuardsService {
-    return new IdentityGuardsService(heads, users, reservations, identifiers);
+  static create({
+    heads,
+    users,
+    reservations,
+    identifiers,
+  }: {
+    heads: IdentityHeadsRepository;
+    users: IdentityUsersRepository;
+    reservations: IdentityReservationRepository;
+    identifiers: IdentifierIdentity;
+  }): IdentityGuardsService {
+    return new IdentityGuardsService({ heads, users, reservations, identifiers });
   }
 
-  private constructor(
-    private readonly heads: IdentityHeadsRepository,
-    private readonly users: IdentityUsersRepository,
-    private readonly reservations: IdentityReservationRepository,
-    private readonly identifiers: IdentifierIdentity,
-  ) {}
+  private readonly heads: IdentityHeadsRepository;
+  private readonly users: IdentityUsersRepository;
+  private readonly reservations: IdentityReservationRepository;
+  private readonly identifiers: IdentifierIdentity;
+
+  private constructor({
+    heads,
+    users,
+    reservations,
+    identifiers,
+  }: {
+    heads: IdentityHeadsRepository;
+    users: IdentityUsersRepository;
+    reservations: IdentityReservationRepository;
+    identifiers: IdentifierIdentity;
+  }) {
+    this.heads = heads;
+    this.users = users;
+    this.reservations = reservations;
+    this.identifiers = identifiers;
+  }
 
   /**
    * Take the address lock, or refuse (ADR-116 §6).

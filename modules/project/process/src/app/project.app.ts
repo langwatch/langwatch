@@ -22,6 +22,8 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
   type ProjectUsageCount,
+  type ProjectPath,
+  type SearchProjectsResult,
 } from "@langwatch/project-contract";
 import type * as projectContractModule from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
@@ -98,7 +100,7 @@ type ServedBrowserApi = Pick<
  * member throws at first request, which `implements` turns into a build failure.
  */
 export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ServedBrowserApi {
-  listPaths(input: { projectIds: string[] }) {
+  listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     return this.#projectService.listPaths(input);
   }
 
@@ -119,14 +121,21 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   readonly #authorization: AuthzApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
-  private constructor(
-    projectService: ProjectApplicationService,
-    operations: ProjectOperationsService,
-    apiKeys: ApiKeyApi,
-    authorization: AuthzApi,
-    encryption: ProjectProcessMembers["encryption"],
-    logger: ProjectProcessMembers["logger"],
-  ) {
+  private constructor({
+    projectService,
+    operations,
+    apiKeys,
+    authorization,
+    encryption,
+    logger,
+  }: {
+    projectService: ProjectApplicationService;
+    operations: ProjectOperationsService;
+    apiKeys: ApiKeyApi;
+    authorization: AuthzApi;
+    encryption: ProjectProcessMembers["encryption"];
+    logger: ProjectProcessMembers["logger"];
+  }) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#apiKeys = apiKeys;
@@ -149,14 +158,14 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
       topicClustering: members.topicClustering,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
     });
-    return new ProjectApp(
-      projects,
+    return new ProjectApp({
+      projectService: projects,
       operations,
-      dependencies.apiKeys,
-      dependencies.authorization,
-      members.encryption,
-      members.logger,
-    );
+      apiKeys: dependencies.apiKeys,
+      authorization: dependencies.authorization,
+      encryption: members.encryption,
+      logger: members.logger,
+    });
   }
 
   /**
@@ -289,7 +298,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return { token: created.token, apiKeyId: created.apiKey.id };
   }
 
-  isPresenceEnabled(input: { projectId: string }) {
+  isPresenceEnabled(input: { projectId: string }): Promise<boolean> {
     return this.#projectService.isPresenceEnabled(input);
   }
 
@@ -297,19 +306,23 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return this.#projectService.findOrganizationId(projectId);
   }
 
-  findSummaryById(projectId: string) {
+  findSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> {
     return this.#projectService.findSummaryById(projectId);
   }
 
-  searchByQuery(input: { query: string; organizationId?: string; limit?: number }) {
+  searchByQuery(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
     return this.#projectService.searchByQuery(input);
   }
 
-  findById(id: string) {
+  findById(id: string): Promise<Project | null> {
     return this.#projectService.findById(id);
   }
 
-  getOrganizationId(projectId: string) {
+  getOrganizationId(projectId: string): Promise<string> {
     return this.#projectService.getOrganizationId(projectId);
   }
 
@@ -334,7 +347,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return this.#projectService.listByTeam(input);
   }
 
-  listNamesByIds(input: projectContractModule.ProjectNamesByIdsInput) {
+  listNamesByIds(input: projectContractModule.ProjectNamesByIdsInput): Promise<ProjectIdentity[]> {
     return this.#projectService.listNamesByIds(input);
   }
 
@@ -345,7 +358,9 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     return this.#projectService.countUsage(input);
   }
 
-  listIdsByOrganization(input: projectContractModule.ProjectIdsByOrganizationInput) {
+  listIdsByOrganization(
+    input: projectContractModule.ProjectIdsByOrganizationInput,
+  ): Promise<string[]> {
     return this.#projectService.listIdsByOrganization(input);
   }
 

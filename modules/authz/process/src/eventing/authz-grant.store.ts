@@ -993,7 +993,8 @@ export class AuthzLedgerMapper {
       "id",
       "organizationId",
     ]);
-    if (Object.keys(where).some((key) => !known.has(key))) return null;
+    const keys = Object.keys(where);
+    if (keys.some((key) => !known.has(key))) return null;
 
     const grantWhere: AuthzGrantFilter = { organizationId };
 

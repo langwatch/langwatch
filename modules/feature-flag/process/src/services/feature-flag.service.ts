@@ -37,14 +37,35 @@ import type { OrganizationCreatedAtCacheService } from "./organization-created-a
 
 /** Resolution, experiments and the operator store, over this feature's own repositories. */
 export class FeatureFlagService {
-  private constructor(
-    private readonly rows: FeatureFlagRowStore,
-    private readonly repository: FeatureFlagRepository,
-    private readonly experiments: FeatureFlagExperimentRepository,
-    private readonly config: FeatureFlagConfig,
-    private readonly registry: FeatureFlagRegistry,
-    private readonly organizationAges: OrganizationCreatedAtCacheService,
-  ) {}
+  private readonly rows: FeatureFlagRowStore;
+  private readonly repository: FeatureFlagRepository;
+  private readonly experiments: FeatureFlagExperimentRepository;
+  private readonly config: FeatureFlagConfig;
+  private readonly registry: FeatureFlagRegistry;
+  private readonly organizationAges: OrganizationCreatedAtCacheService;
+
+  private constructor({
+    rows,
+    repository,
+    experiments,
+    config,
+    registry,
+    organizationAges,
+  }: {
+    rows: FeatureFlagRowStore;
+    repository: FeatureFlagRepository;
+    experiments: FeatureFlagExperimentRepository;
+    config: FeatureFlagConfig;
+    registry: FeatureFlagRegistry;
+    organizationAges: OrganizationCreatedAtCacheService;
+  }) {
+    this.rows = rows;
+    this.repository = repository;
+    this.experiments = experiments;
+    this.config = config;
+    this.registry = registry;
+    this.organizationAges = organizationAges;
+  }
 
   static create(options: {
     rows: FeatureFlagRowStore;
@@ -54,14 +75,14 @@ export class FeatureFlagService {
     registry: FeatureFlagRegistry;
     organizationAges: OrganizationCreatedAtCacheService;
   }): FeatureFlagService {
-    return new FeatureFlagService(
-      options.rows,
-      options.repository,
-      options.experiments,
-      options.config,
-      options.registry,
-      options.organizationAges,
-    );
+    return new FeatureFlagService({
+      rows: options.rows,
+      repository: options.repository,
+      experiments: options.experiments,
+      config: options.config,
+      registry: options.registry,
+      organizationAges: options.organizationAges,
+    });
   }
 
   async isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> {

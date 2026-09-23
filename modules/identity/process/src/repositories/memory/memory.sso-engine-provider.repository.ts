@@ -1,6 +1,6 @@
 import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
 import { SsoEngineProviderRepository } from "../sso-engine-provider.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The engine's provider rows, held in the store. */
 export class MemorySsoEngineProviderRepository extends SsoEngineProviderRepository {

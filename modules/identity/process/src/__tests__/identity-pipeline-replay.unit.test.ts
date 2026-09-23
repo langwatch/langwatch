@@ -95,12 +95,12 @@ describe("identity pipeline", () => {
       const pipeline = eventSourcing.register(
         IdentityPipelineDefinitionAdapter.create({
           identityProjectionStore: store,
-          identityGuards: IdentityGuardsService.create(
-            new ProjectionHeads(store),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+          identityGuards: IdentityGuardsService.create({
+            heads: new ProjectionHeads(store),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
           // Two-step verification rides this same pipeline (D06); this test
           // exercises the identifier half, so its store is never reached.
           mfaProjectionStore: new InMemoryStateStore() as never,

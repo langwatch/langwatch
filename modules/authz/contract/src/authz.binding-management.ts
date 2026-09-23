@@ -134,7 +134,7 @@ export const authzLegacyAccessNoticeInputSchema = z
   .strict();
 export type AuthzLegacyAccessNoticeInput = z.infer<typeof authzLegacyAccessNoticeInputSchema>;
 
-export const authzCreateBindingInputSchema = authzBindingWriteSchema.extend({
+export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend({
   organizationId: z.string().min(1),
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),

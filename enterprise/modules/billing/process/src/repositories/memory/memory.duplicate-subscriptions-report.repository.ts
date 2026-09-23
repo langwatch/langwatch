@@ -4,7 +4,7 @@ import {
   DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
 } from "../duplicate-subscriptions-report.repository.ts";
-import type { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** The report's one SELECT, over the subscriptions the store already holds. */
 export class MemoryDuplicateSubscriptionsReportRepository extends DuplicateSubscriptionsReportRepository {

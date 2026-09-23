@@ -32,6 +32,7 @@ import {
   type ApiKeyCallerReadInput,
   apiKeyServerConfig,
   type ApiKeyServerConfig,
+  type CliKeyScopeSummary,
 } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
@@ -92,6 +93,19 @@ export type UpdateApiKeyRequest = Readonly<{
   bindings?: UpdateApiKeyInput["bindings"];
 }>;
 
+function scopeNames(
+  scopeType: string,
+  names: {
+    orgName: Map<string, string>;
+    teamName: Map<string, string>;
+    projectName: Map<string, string>;
+  },
+): Map<string, string> {
+  if (scopeType === "ORGANIZATION") return names.orgName;
+  if (scopeType === "TEAM") return names.teamName;
+  return names.projectName;
+}
+
 export class ApiKeyApp implements ApiKeyApi {
   static readonly contract = ApiKeyApi;
   static readonly dependencies: ApiKeyDependencies = {
@@ -143,10 +157,10 @@ export class ApiKeyApp implements ApiKeyApi {
    * credential on the wire into a caller. Everything below is the MANAGEMENT surface — a
    * signed-in member listing, minting and retiring keys in an organization they belong to.
    */
-  async create(input: CreateApiKeyInput) {
+  async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     return this.#service.create(input);
   }
-  async update(input: UpdateApiKeyInput) {
+  async update(input: UpdateApiKeyInput): Promise<ApiKey> {
     return this.#service.update(input);
   }
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
@@ -174,16 +188,16 @@ export class ApiKeyApp implements ApiKeyApi {
   markUsed(input: { id: string }): void {
     this.#service.markUsed(input);
   }
-  async list(input: { userId: string; organizationId: string }) {
+  async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {
     return this.#service.list(input);
   }
-  async listAll(input: { organizationId: string }) {
+  async listAll(input: { organizationId: string }): Promise<ApiKey[]> {
     return this.#service.listAll(input);
   }
   async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {
     return this.#service.listForCaller(input);
   }
-  async revoke(input: RevokeApiKeyInput) {
+  async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {
     return this.#service.revoke(input);
   }
   async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
@@ -212,44 +226,60 @@ export class ApiKeyApp implements ApiKeyApi {
       permission: "organization:manage",
     });
   }
-  async findById(input: { id: string }) {
+  async findById(input: { id: string }): Promise<ApiKey | null> {
     return this.#service.findById(input);
   }
   async getByIdForCaller(input: ApiKeyCallerReadInput): Promise<ApiKeyDetail> {
     return this.#service.getByIdForCaller(input);
   }
-  async findNameByIdInOrg(input: { id: string; organizationId: string }) {
+  async findNameByIdInOrg(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<ApiKeyName | null> {
     return this.#service.findNameByIdInOrg(input);
   }
-  async getUserBindings(input: { userId: string; organizationId: string }) {
+  async getUserBindings(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<ApiKeyBinding[]> {
     return this.#service.getUserBindings(input);
   }
-  async getOrgProjects(input: { organizationId: string }) {
+  async getOrgProjects(input: { organizationId: string }): Promise<ApiKeyProject[]> {
     return this.#service.getOrgProjects(input);
   }
-  async getOrgTeams(input: { organizationId: string }) {
+  async getOrgTeams(input: { organizationId: string }): Promise<ApiKeyTeam[]> {
     return this.#service.getOrgTeams(input);
   }
-  async getOrgMembers(input: { organizationId: string }) {
+  async getOrgMembers(input: { organizationId: string }): Promise<ApiKeyUser[]> {
     return this.#service.getOrgMembers(input);
   }
-  async findIngestionKey(input: { organizationId: string; projectId: string; sourceType: string }) {
+  async findIngestionKey(input: {
+    organizationId: string;
+    projectId: string;
+    sourceType: string;
+  }): Promise<ApiKey | null> {
     return this.#service.findIngestionKey(input);
   }
-  async listIngestionKeysForProject(input: { organizationId: string; projectId: string }) {
+  async listIngestionKeysForProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<ApiKey[]> {
     return this.#service.listIngestionKeysForProject(input);
   }
-  async findByLookupId(input: { lookupId: string }) {
+  async findByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
     return this.#service.findByLookupId(input);
   }
   async validateCliSelection(input: {
     userId: string;
     organizationId: string;
     selection: CliKeySelection;
-  }) {
+  }): Promise<CliKeySelection> {
     return this.#service.validateCliSelection(input);
   }
-  async findDefaultCliSelection(input: { userId: string; organizationId: string }) {
+  async findDefaultCliSelection(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CliKeySelection | null> {
     return this.#service.findDefaultCliSelection(input);
   }
   async mintCliLoginKey(input: {
@@ -260,7 +290,7 @@ export class ApiKeyApp implements ApiKeyApi {
     sessionStartedAtMs?: number;
     maxSessionDurationDays?: number;
     refreshWindowMs?: number;
-  }) {
+  }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
     return this.#service.mintCliLoginKey(input);
   }
   async revokeCliLoginKeysForDevice(input: {
@@ -322,11 +352,7 @@ export class ApiKeyApp implements ApiKeyApi {
       .map((b) => ({
         ...b,
         scopeName:
-          b.scopeType === "ORGANIZATION"
-            ? (orgName.get(b.scopeId) ?? null)
-            : b.scopeType === "TEAM"
-              ? (teamName.get(b.scopeId) ?? null)
-              : (projectName.get(b.scopeId) ?? null),
+          scopeNames(b.scopeType, { orgName, teamName, projectName }).get(b.scopeId) ?? null,
         customRoleName: b.customRoleId ? (customRoleName.get(b.customRoleId) ?? null) : null,
       }));
   }
@@ -429,11 +455,7 @@ export class ApiKeyApp implements ApiKeyApi {
         scopeType: rb.scopeType,
         scopeId: rb.scopeId,
         scopeName:
-          rb.scopeType === "ORGANIZATION"
-            ? (orgName.get(rb.scopeId) ?? null)
-            : rb.scopeType === "TEAM"
-              ? (teamName.get(rb.scopeId) ?? null)
-              : (projectName.get(rb.scopeId) ?? null),
+          scopeNames(rb.scopeType, { orgName, teamName, projectName }).get(rb.scopeId) ?? null,
       })),
     }));
   }

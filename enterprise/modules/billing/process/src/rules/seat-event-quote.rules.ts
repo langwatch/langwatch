@@ -15,11 +15,11 @@ export type InviteInput = {
 
 export type SeatEventDatabase = {
   subscription: {
-    findMany(args: any): Promise<any[]>;
-    updateMany(args: any): Promise<{ count: number }>;
-    update(args: any): Promise<any>;
+    findMany(args: unknown): Promise<any[]>;
+    updateMany(args: unknown): Promise<{ count: number }>;
+    update(args: unknown): Promise<any>;
   };
-  organizationInvite: { deleteMany(args: any): Promise<{ count: number }> };
+  organizationInvite: { deleteMany(args: unknown): Promise<{ count: number }> };
   $transaction<T>(run: (transaction: any) => Promise<T>): Promise<T>;
 };
 
@@ -33,7 +33,9 @@ export type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
 /**
  * The two money figures a seat quote reports, read off a previewed invoice.
  */
-export const quotedAmounts = (preview: AlwaysInvoicePreview) => {
+export const quotedAmounts = (
+  preview: AlwaysInvoicePreview,
+): { prorationCents: number; creditAppliedCents: number } => {
   const invoiceTotalCents = preview.total;
   const isCredit = invoiceTotalCents < 0;
 
@@ -44,6 +46,13 @@ export const quotedAmounts = (preview: AlwaysInvoicePreview) => {
     // reported for a credit — nothing is drawn down by one.
     creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amount_due,
   };
+};
+
+type SeatChangeParams = {
+  cancel_at_period_end?: false;
+  items: { id: string; quantity: number }[];
+  proration_behavior: "always_invoice";
+  proration_date: number;
 };
 
 /**
@@ -60,13 +69,8 @@ export const seatChangeParams = ({
   seatItem: Stripe.SubscriptionItem;
   quantity: number;
   prorationDate: number;
-}) => {
-  const params: {
-    cancel_at_period_end?: false;
-    items: { id: string; quantity: number }[];
-    proration_behavior: "always_invoice";
-    proration_date: number;
-  } = {
+}): SeatChangeParams => {
+  const params: SeatChangeParams = {
     items: [{ id: seatItem.id, quantity }],
     proration_behavior: "always_invoice",
     // Prorations are priced by the moment they are applied, so a quote issued
@@ -91,7 +95,7 @@ export const QUOTE_VALIDITY_SECONDS = 15 * 60;
 /**
  * The instant to price a seat change at.
  */
-export const resolveProrationDate = (quotedAt: number | undefined) => {
+export const resolveProrationDate = (quotedAt: number | undefined): number => {
   const now = Math.floor(nowInstant().epochMilliseconds / 1000);
   if (quotedAt === undefined) {
     return now;

@@ -59,12 +59,17 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 /**
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
-const runGoogleDlpBatch = (
-  transport: PiiAnalysis,
-  texts: string[],
-  piiRedactionLevel: PIIRedactionLevel,
-  exceptPatterns?: readonly string[],
-): Promise<(string | null)[]> =>
+const runGoogleDlpBatch = ({
+  transport,
+  texts,
+  piiRedactionLevel,
+  exceptPatterns,
+}: {
+  transport: PiiAnalysis;
+  texts: string[];
+  piiRedactionLevel: PIIRedactionLevel;
+  exceptPatterns?: readonly string[];
+}): Promise<(string | null)[]> =>
   Promise.all(
     texts.map(async (text) => {
       return transport.tryClearGoogleDlp({
@@ -83,7 +88,12 @@ const batchClearPII = async (
   const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
 
   if (mainMethod === "google_dlp") {
-    return runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch({
+      transport,
+      texts,
+      piiRedactionLevel,
+      exceptPatterns,
+    });
   }
 
   try {
@@ -94,7 +104,12 @@ const batchClearPII = async (
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
     // re-redact a value an exception kept.
-    return runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch({
+      transport,
+      texts,
+      piiRedactionLevel,
+      exceptPatterns,
+    });
   }
 };
 

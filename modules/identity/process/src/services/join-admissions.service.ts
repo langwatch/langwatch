@@ -11,7 +11,9 @@ import type { JoinRequestListReadRepository } from "../repositories/join-request
  * the policy's own resolver id marks an admission nobody approved.
  */
 export class JoinAdmissionsService implements JoinAdmissionsApi {
-  static create(reads: Pick<JoinRequestListReadRepository, "findApprovedForMembers">) {
+  static create(
+    reads: Pick<JoinRequestListReadRepository, "findApprovedForMembers">,
+  ): JoinAdmissionsService {
     return new JoinAdmissionsService(reads);
   }
 

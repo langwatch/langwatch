@@ -6,7 +6,7 @@
 import { sealedProviderConfigCipher, type SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { MemorySsoCredentialRepository } from "../../repositories/memory/memory.sso-credential.repository.ts";
 import { MemorySsoEngineProviderRepository } from "../../repositories/memory/memory.sso-engine-provider.repository.ts";
 import { SsoEngineProviderService } from "../sso-engine-provider.service.ts";

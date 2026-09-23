@@ -238,7 +238,9 @@ describe("given a process that registered no join-request pipeline", () => {
       });
       const { command, facts } = requestJoin();
 
-      await expect(writer.commit({ command, facts })).rejects.toThrow();
+      await expect(writer.commit({ command, facts })).rejects.toThrow(
+        "join request ledger cannot stage",
+      );
 
       expect(tryLoad).not.toHaveBeenCalled();
     });

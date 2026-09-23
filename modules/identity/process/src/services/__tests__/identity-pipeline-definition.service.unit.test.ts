@@ -101,12 +101,12 @@ describe("identity event aggregate type", () => {
       {
         label: "attach",
         handler: new AttachIdentifierCommand(
-          IdentityGuardsService.create(
-            new HeadsOf(emptyIdentityHeads({ userId: USER })),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+          IdentityGuardsService.create({
+            heads: new HeadsOf(emptyIdentityHeads({ userId: USER })),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
         ),
         data: {
           ...base,
@@ -123,17 +123,17 @@ describe("identity event aggregate type", () => {
       {
         label: "verify",
         handler: new VerifyIdentifierCommand(
-          IdentityGuardsService.create(
-            new HeadsOf({
+          IdentityGuardsService.create({
+            heads: new HeadsOf({
               userId: USER,
               identifiers: {
                 idf_1: fact({ state: "ATTACHED", verifiedAtMs: null }),
               },
             }),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
         ),
         data: {
           ...base,
@@ -146,36 +146,36 @@ describe("identity event aggregate type", () => {
       {
         label: "mark primary",
         handler: new MarkPrimaryCommand(
-          IdentityGuardsService.create(
-            new HeadsOf(held),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+          IdentityGuardsService.create({
+            heads: new HeadsOf(held),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
         ),
         data: { ...base, commandId: "idcmd_3", identifierId: "idf_1" },
       },
       {
         label: "detach",
         handler: new DetachIdentifierCommand(
-          IdentityGuardsService.create(
-            new HeadsOf(held),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+          IdentityGuardsService.create({
+            heads: new HeadsOf(held),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
         ),
         data: { ...base, commandId: "idcmd_4", identifierId: "idf_2" },
       },
       {
         label: "erase",
         handler: new EraseUserCommand(
-          IdentityGuardsService.create(
-            new HeadsOf(held),
-            inMemoryIdentityUsers(),
-            inMemoryIdentityReservations(),
-            CryptoIdentifierIdentityAdapter.create(),
-          ),
+          IdentityGuardsService.create({
+            heads: new HeadsOf(held),
+            users: inMemoryIdentityUsers(),
+            reservations: inMemoryIdentityReservations(),
+            identifiers: CryptoIdentifierIdentityAdapter.create(),
+          }),
         ),
         data: { ...base, commandId: "idcmd_5" },
       },
@@ -199,12 +199,12 @@ describe("identity event aggregate type", () => {
     /** @scenario "A retried command dedupes at the event store" */
     it("keys idempotency as commandId:index so a retry dedupes", async () => {
       const handler = new AttachIdentifierCommand(
-        IdentityGuardsService.create(
-          new HeadsOf(emptyIdentityHeads({ userId: USER })),
-          inMemoryIdentityUsers(),
-          inMemoryIdentityReservations(),
-          CryptoIdentifierIdentityAdapter.create(),
-        ),
+        IdentityGuardsService.create({
+          heads: new HeadsOf(emptyIdentityHeads({ userId: USER })),
+          users: inMemoryIdentityUsers(),
+          reservations: inMemoryIdentityReservations(),
+          identifiers: CryptoIdentifierIdentityAdapter.create(),
+        }),
       );
       const data = {
         ...base,

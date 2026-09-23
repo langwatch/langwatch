@@ -196,6 +196,12 @@ export const authzLedgerBindingAttachSchema = z
   .strict();
 export type AuthzLedgerBindingAttach = z.infer<typeof authzLedgerBindingAttachSchema>;
 
+function ledgerPrincipalId(principal: AuthzLedgerBindingPrincipal): string {
+  if ("userId" in principal) return principal.userId;
+  if ("groupId" in principal) return principal.groupId;
+  return principal.apiKeyId;
+}
+
 /** Stable identity shared by compatibility reconcilers and the server ledger. */
 export function authzBindingIdentityKey({
   principal,
@@ -210,12 +216,7 @@ export function authzBindingIdentityKey({
   role: string;
   customRoleId: string | null;
 }): string {
-  const principalId =
-    "userId" in principal
-      ? principal.userId
-      : "groupId" in principal
-        ? principal.groupId
-        : principal.apiKeyId;
+  const principalId = ledgerPrincipalId(principal);
   const roleIdentity = customRoleId === null ? `builtin:${role}` : `custom:${customRoleId}`;
   return [principalId, scopeType, scopeId, roleIdentity].join("\u001f");
 }

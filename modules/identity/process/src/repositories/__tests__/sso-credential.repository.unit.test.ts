@@ -1,7 +1,7 @@
 import type { Encryption } from "@langwatch/process-stores/members";
 import { describe, expect, it } from "vitest";
 
-import { MemoryIdentityStore } from "../memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../memory/memory.identity.store.ts";
 import { MemorySsoCredentialRepository } from "../memory/memory.sso-credential.repository.ts";
 import {
   type PrismaSsoCredentialDatabase,

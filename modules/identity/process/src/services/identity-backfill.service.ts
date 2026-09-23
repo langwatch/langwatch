@@ -43,27 +43,52 @@ export interface IdentityBackfillServiceDeps {
  * D01 — the identifier backfill for ONE user (ADR-101 §6): every sign-in
  */
 export class IdentityBackfillService {
-  static create(
-    reads: IdentityBackfillRepository,
-    users: IdentityUsersRepository,
-    identity: IdentityAdoptionWrites,
-    secrets: IdentitySecretCarryService,
-    plan: IdentityBackfillPlanService,
-    deps: IdentityBackfillServiceDeps = {},
-  ): IdentityBackfillService {
-    return new IdentityBackfillService(reads, users, identity, secrets, plan, deps);
+  static create({
+    reads,
+    users,
+    identity,
+    secrets,
+    plan,
+    deps = {},
+  }: {
+    reads: IdentityBackfillRepository;
+    users: IdentityUsersRepository;
+    identity: IdentityAdoptionWrites;
+    secrets: IdentitySecretCarryService;
+    plan: IdentityBackfillPlanService;
+    deps?: IdentityBackfillServiceDeps;
+  }): IdentityBackfillService {
+    return new IdentityBackfillService({ reads, users, identity, secrets, plan, deps });
   }
 
   private readonly now: () => number;
 
-  private constructor(
-    private readonly reads: IdentityBackfillRepository,
-    private readonly users: IdentityUsersRepository,
-    private readonly identity: IdentityAdoptionWrites,
-    private readonly secrets: IdentitySecretCarryService,
-    private readonly plan: IdentityBackfillPlanService,
-    deps: IdentityBackfillServiceDeps = {},
-  ) {
+  private readonly reads: IdentityBackfillRepository;
+  private readonly users: IdentityUsersRepository;
+  private readonly identity: IdentityAdoptionWrites;
+  private readonly secrets: IdentitySecretCarryService;
+  private readonly plan: IdentityBackfillPlanService;
+
+  private constructor({
+    reads,
+    users,
+    identity,
+    secrets,
+    plan,
+    deps,
+  }: {
+    reads: IdentityBackfillRepository;
+    users: IdentityUsersRepository;
+    identity: IdentityAdoptionWrites;
+    secrets: IdentitySecretCarryService;
+    plan: IdentityBackfillPlanService;
+    deps: IdentityBackfillServiceDeps;
+  }) {
+    this.reads = reads;
+    this.users = users;
+    this.identity = identity;
+    this.secrets = secrets;
+    this.plan = plan;
     this.now = deps.now ?? Date.now;
   }
 

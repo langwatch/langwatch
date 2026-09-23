@@ -45,13 +45,13 @@ function harness(options?: {
     eraseUser: vi.fn(async () => []),
   };
   let minted = 0;
-  const ceremonies = IdentityCeremoniesAdapter.create(
+  const ceremonies = IdentityCeremoniesAdapter.create({
     heads,
     users,
-    identity as never,
-    async () => options?.latched ?? true,
-    { now: () => T0, newCommandId: () => `idcmd_${++minted}` },
-  );
+    identity: identity as never,
+    isLatched: async () => options?.latched ?? true,
+    clock: { now: () => T0, newCommandId: () => `idcmd_${++minted}` },
+  });
   return { ceremonies, identity, users, heads };
 }
 

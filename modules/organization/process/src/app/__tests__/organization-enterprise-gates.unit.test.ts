@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -69,7 +70,7 @@ function application(options: { enterprise: boolean }) {
       organizations: organizations as unknown as ServerOrganizationAppDependencies["organizations"],
       membership: membership as unknown as ServerOrganizationAppDependencies["membership"],
       projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
-      permissions: { hasPermission: vi.fn(async () => true) } as unknown as AuthzApi,
+      permissions: createApiFixture<AuthzApi>({ hasPermission: vi.fn(async () => true) }),
     },
     members: { plans },
   });

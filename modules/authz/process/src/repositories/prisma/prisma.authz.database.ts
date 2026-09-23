@@ -1,14 +1,14 @@
 type PostgresAuthzDelegate = {
-  findFirst?(args: unknown): Promise<any>;
-  findUnique?(args: unknown): Promise<any>;
-  findMany?(args: unknown): Promise<any[]>;
+  findFirst?(args: unknown): Promise<unknown>;
+  findUnique?(args: unknown): Promise<unknown>;
+  findMany?(args: unknown): Promise<unknown[]>;
   count?(args: unknown): Promise<number>;
-  create?(args: unknown): Promise<any>;
-  createMany?(args: unknown): Promise<any>;
-  update?(args: unknown): Promise<any>;
-  updateMany?(args: unknown): Promise<any>;
-  deleteMany?(args: unknown): Promise<any>;
-  upsert?(args: unknown): Promise<any>;
+  create?(args: unknown): Promise<unknown>;
+  createMany?(args: unknown): Promise<unknown>;
+  update?(args: unknown): Promise<unknown>;
+  updateMany?(args: unknown): Promise<unknown>;
+  deleteMany?(args: unknown): Promise<unknown>;
+  upsert?(args: unknown): Promise<unknown>;
 };
 
 /**
@@ -34,5 +34,5 @@ export abstract class PostgresAuthzDatabase {
   abstract readonly team: PostgresAuthzDelegate;
   abstract readonly teamUser: PostgresAuthzDelegate;
   abstract readonly user: PostgresAuthzDelegate;
-  abstract readonly $transaction: (...args: any[]) => Promise<any>;
+  abstract readonly $transaction: (...args: any[]) => Promise<unknown>;
 }

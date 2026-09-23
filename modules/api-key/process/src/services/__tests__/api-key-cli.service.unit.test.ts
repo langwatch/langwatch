@@ -235,7 +235,7 @@ describe("given a CLI login key mint", () => {
     });
   });
 
-  describe("extendCliLoginKeyExpiry", () => {
+  describe("when a CLI login key's expiry is extended", () => {
     /** @scenario "A session's login-key expiry tracks the sooner of the refresh window and the org ceiling" */
     it("moves the key's expiry to the new refresh window through the repository", async () => {
       const { service, extendLoginKeyExpiry } = serviceWith({});

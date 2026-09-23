@@ -6,7 +6,9 @@ export const apiKeyRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type ApiKeyRole = z.infer<typeof apiKeyRoleSchema>;
 export const apiKeyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
 export type ApiKeyScopeType = z.infer<typeof apiKeyScopeTypeSchema>;
-export const apiKeyPermissionSchema = z.string().regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
+export const apiKeyPermissionFormatSchema = z
+  .string()
+  .regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
 export const apiKeyScopeSchema = z
   .object({
     scopeType: apiKeyScopeTypeSchema,
@@ -68,7 +70,7 @@ const apiKeyMutationShape = {
   description: z.string().nullable().optional(),
   expiresAt: z.date().nullable().optional(),
   permissionMode: z.string().default("all"),
-  permissions: z.array(apiKeyPermissionSchema).optional(),
+  permissions: z.array(apiKeyPermissionFormatSchema).optional(),
   bindings: z.array(apiKeyScopeSchema),
   ingestSourceType: z.string().min(1).nullable().optional(),
   ingestionTemplateId: z.string().min(1).nullable().optional(),
@@ -92,7 +94,7 @@ export const updateApiKeyInputSchema = z
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
     permissionMode: z.string().optional(),
-    permissions: z.array(apiKeyPermissionSchema).optional(),
+    permissions: z.array(apiKeyPermissionFormatSchema).optional(),
     bindings: z.array(apiKeyScopeSchema).optional(),
   })
   .strict();
@@ -124,7 +126,7 @@ export const apiKeyVerificationSchema = z
   .strict();
 export type ApiKeyVerification = z.infer<typeof apiKeyVerificationSchema>;
 export const apiKeyDetailSchema = z
-  .object({ ...apiKeySchema.shape, permissions: z.array(apiKeyPermissionSchema) })
+  .object({ ...apiKeySchema.shape, permissions: z.array(apiKeyPermissionFormatSchema) })
   .strict();
 export type ApiKeyDetail = z.infer<typeof apiKeyDetailSchema>;
 export type ApiKeyName = { name: string; revoked: boolean };
@@ -159,7 +161,7 @@ export type CliKeyBindingSelection = z.infer<typeof cliKeyBindingSelectionSchema
 export const cliKeySelectionSchema = z
   .object({
     bindings: z.array(cliKeyBindingSelectionSchema),
-    permissions: z.array(apiKeyPermissionSchema),
+    permissions: z.array(apiKeyPermissionFormatSchema),
   })
   .strict();
 export type CliKeySelection = z.infer<typeof cliKeySelectionSchema>;

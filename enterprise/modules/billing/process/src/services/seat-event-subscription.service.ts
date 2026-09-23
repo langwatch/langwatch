@@ -31,12 +31,27 @@ import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.s
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 
 export class SeatEventSubscriptionService {
-  private constructor(
-    private readonly stripe: Stripe,
-    private readonly db: SeatEventDatabase,
-    private readonly prices: StripePriceMap,
-    private readonly customerCurrency: StripeCustomerCurrencyService,
-  ) {}
+  private readonly stripe: Stripe;
+  private readonly db: SeatEventDatabase;
+  private readonly prices: StripePriceMap;
+  private readonly customerCurrency: StripeCustomerCurrencyService;
+
+  private constructor({
+    stripe,
+    db,
+    prices,
+    customerCurrency,
+  }: {
+    stripe: Stripe;
+    db: SeatEventDatabase;
+    prices: StripePriceMap;
+    customerCurrency: StripeCustomerCurrencyService;
+  }) {
+    this.stripe = stripe;
+    this.db = db;
+    this.prices = prices;
+    this.customerCurrency = customerCurrency;
+  }
 
   static create(options: {
     stripe: Stripe;
@@ -44,12 +59,12 @@ export class SeatEventSubscriptionService {
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }): SeatEventSubscriptionService {
-    return new SeatEventSubscriptionService(
-      options.stripe,
-      options.database,
-      options.prices,
-      options.customerCurrency,
-    );
+    return new SeatEventSubscriptionService({
+      stripe: options.stripe,
+      db: options.database,
+      prices: options.prices,
+      customerCurrency: options.customerCurrency,
+    });
   }
 
   /**

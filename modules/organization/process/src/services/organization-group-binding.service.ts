@@ -24,6 +24,15 @@ type GroupBindingWrite = {
   scopeId: OrganizationGroupBindingInput["scopeId"];
 };
 
+function bindingScopeIds(binding: {
+  scopeType: string;
+  scopeId: string;
+}): { organizationId: string } | { teamId: string } | { projectId: string } {
+  if (binding.scopeType === "ORGANIZATION") return { organizationId: binding.scopeId };
+  if (binding.scopeType === "TEAM") return { teamId: binding.scopeId };
+  return { projectId: binding.scopeId };
+}
+
 export class OrganizationGroupBindingService {
   static create(dependencies: OrganizationGroupDependencies): OrganizationGroupBindingService {
     return new OrganizationGroupBindingService(dependencies);
@@ -101,13 +110,7 @@ export class OrganizationGroupBindingService {
     }[],
   ): Promise<void> {
     for (const binding of bindings) {
-      const scope = await this.authz.tryResolveScope(
-        binding.scopeType === "ORGANIZATION"
-          ? { organizationId: binding.scopeId }
-          : binding.scopeType === "TEAM"
-            ? { teamId: binding.scopeId }
-            : { projectId: binding.scopeId },
-      );
+      const scope = await this.authz.tryResolveScope(bindingScopeIds(binding));
       const resolvedOrganizationId =
         scope?.type === "organization" ? scope.id : scope?.organizationId;
       if (!scope || resolvedOrganizationId !== organizationId) {

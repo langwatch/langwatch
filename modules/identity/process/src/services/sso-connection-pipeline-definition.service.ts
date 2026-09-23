@@ -19,6 +19,7 @@ import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import type { ZodType } from "zod";
 
 import { runCompleteTeardown } from "../eventing/connection-teardown.intent.ts";
 import {
@@ -180,7 +181,7 @@ function mountTeardownGrace(
 ): ProcessManagerHandledStage<
   SsoConnectionEvent,
   ConnectionTeardownState,
-  Record<string, IntentSpec<any>>
+  Record<string, IntentSpec<ZodType>>
 > {
   return pm
     .state<ConnectionTeardownState>(CONNECTION_TEARDOWN_INITIAL_STATE)
@@ -205,7 +206,7 @@ function mountDomainProofNotification(
 ): ProcessManagerHandledStage<
   SsoConnectionEvent,
   SsoDomainProofNotificationState,
-  Record<string, IntentSpec<any>>
+  Record<string, IntentSpec<ZodType>>
 > {
   return pm
     .state<SsoDomainProofNotificationState>(SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE)

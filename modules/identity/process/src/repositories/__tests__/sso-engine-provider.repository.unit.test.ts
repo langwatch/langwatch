@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
-import { MemoryIdentityStore } from "../memory/memory-identity.store.ts";
+import { MemoryIdentityStore } from "../memory/memory.identity.store.ts";
 import { MemorySsoEngineProviderRepository } from "../memory/memory.sso-engine-provider.repository.ts";
 import {
   type PrismaSsoEngineProviderDatabase,

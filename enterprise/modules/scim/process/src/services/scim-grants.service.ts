@@ -39,6 +39,17 @@ export type DesiredScimGrant = {
   scopeId: AuthzLedgerBindingAttach["scopeId"];
 };
 
+function grantPrincipal(grant: {
+  userId?: string | null;
+  groupId?: string | null;
+  apiKeyId?: string | null;
+}): { userId: string } | { groupId: string } | { apiKeyId: string } {
+  if (grant.userId) return { userId: grant.userId };
+  if (grant.groupId) return { groupId: grant.groupId };
+  if (grant.apiKeyId) return { apiKeyId: grant.apiKeyId };
+  throw new Error("a SCIM grant names no principal");
+}
+
 /**
  * A grant's identity as the projection's partial unique indexes define it -
  * `authzBindingIdentityKey` (@langwatch/authz-contract). Two rows with the same key
@@ -53,16 +64,7 @@ function grantKey(grant: {
   role: string;
   customRoleId: string | null;
 }): string {
-  const principal = grant.userId
-    ? ({ userId: grant.userId } as const)
-    : grant.groupId
-      ? ({ groupId: grant.groupId } as const)
-      : grant.apiKeyId
-        ? ({ apiKeyId: grant.apiKeyId } as const)
-        : null;
-  if (!principal) {
-    throw new Error("a SCIM grant names no principal");
-  }
+  const principal = grantPrincipal(grant);
 
   return authzBindingIdentityKey({
     principal,

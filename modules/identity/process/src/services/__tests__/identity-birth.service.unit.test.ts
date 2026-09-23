@@ -67,12 +67,12 @@ function harness(overrides?: {
   const forgetGate = vi.fn();
 
   const service = IdentityBirthService.create({
-    guards: IdentityGuardsService.create(
+    guards: IdentityGuardsService.create({
       heads,
-      inMemoryIdentityUsers(),
+      users: inMemoryIdentityUsers(),
       reservations,
-      CryptoIdentifierIdentityAdapter.create(),
-    ),
+      identifiers: CryptoIdentifierIdentityAdapter.create(),
+    }),
     ledger,
     rows,
     reservations,

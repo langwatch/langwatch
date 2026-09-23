@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The gate that makes `/api/user-avatar` safe to read broadly, through the
@@ -144,14 +145,14 @@ function mountAvatars(
     onRead?: () => void;
   } = {},
 ) {
-  const app = {
+  const app = createApiFixture<UserApi>({
     countAvatarRead: async () => options.allowance ?? { allowed: true, resetAt: 0 },
     readAvatarObject: async () => {
       options.onRead?.();
 
       return read;
     },
-  } as unknown as UserApi;
+  });
 
   const runtime = createRestRuntime({
     identity: {

@@ -3,7 +3,7 @@ import {
   verifiedDomainCanBeShared,
 } from "../../rules/sso-domain-ownership.rules.ts";
 import { SsoDomainOwnershipRepository } from "../sso-domain-ownership.repository.ts";
-import type { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /**
  * The memory tier derives ownership from the heads, so there is nothing to

@@ -8,6 +8,8 @@ import {
   definePipeline,
   type Event,
   type StaticPipelineDefinition,
+  type Projection,
+  type RegisteredCommand,
 } from "@langwatch/eventing";
 
 import {
@@ -32,7 +34,11 @@ export class BillingReportingPipeline {
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
   ) {}
 
-  buildProcessing(): StaticPipelineDefinition<Event, any, any> {
+  buildProcessing(): StaticPipelineDefinition<
+    Event,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
       ...this.deps,
       selfDispatch: (data) => {

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
@@ -79,11 +80,11 @@ const PNG =
 function createService() {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
-  const organizations = {
+  const organizations = createApiFixture<OrganizationApi>({
     ensurePersonalWorkspace: vi.fn(async () => ({
       project: { id: "project-1" },
     })),
-  } as unknown as OrganizationApi;
+  });
   return {
     service: UserService.create({
       repository,
@@ -329,11 +330,11 @@ describe("given a user whose photo came from their identity provider", () => {
       }));
     }
     const repository = new StatefulRepository();
-    const organizations = {
+    const organizations = createApiFixture<OrganizationApi>({
       ensurePersonalWorkspace: vi.fn<() => Promise<{ project: { id: string } }>>(async () => ({
         project: { id: "project-1" },
       })),
-    } as unknown as OrganizationApi;
+    });
     return {
       service: UserService.create({
         repository,

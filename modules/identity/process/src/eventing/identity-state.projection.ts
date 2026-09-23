@@ -31,43 +31,50 @@ import { z } from "zod";
  * how it travels the event log is the framework's, and this file is where the two meet.
  */
 
-export const identifierAttachedEventSchema = EventSchema.extend({
+export const identifierAttachedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(IDENTIFIER_ATTACHED_EVENT_TYPE),
   data: identifierAttachedPayloadSchema,
 });
 export type IdentifierAttachedEvent = z.infer<typeof identifierAttachedEventSchema>;
 
-export const identifierVerifiedEventSchema = EventSchema.extend({
+export const identifierVerifiedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(IDENTIFIER_VERIFIED_EVENT_TYPE),
   data: identifierVerifiedPayloadSchema,
 });
 export type IdentifierVerifiedEvent = z.infer<typeof identifierVerifiedEventSchema>;
 
-export const identifierDeadEndedEventSchema = EventSchema.extend({
+export const identifierDeadEndedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(IDENTIFIER_DEAD_ENDED_EVENT_TYPE),
   data: identifierDeadEndedPayloadSchema,
 });
 export type IdentifierDeadEndedEvent = z.infer<typeof identifierDeadEndedEventSchema>;
 
-export const primaryChangedEventSchema = EventSchema.extend({
+export const primaryChangedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(PRIMARY_CHANGED_EVENT_TYPE),
   data: primaryChangedPayloadSchema,
 });
 export type PrimaryChangedEvent = z.infer<typeof primaryChangedEventSchema>;
 
-export const identifierDetachedEventSchema = EventSchema.extend({
+export const identifierDetachedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(IDENTIFIER_DETACHED_EVENT_TYPE),
   data: identifierDetachedPayloadSchema,
 });
 export type IdentifierDetachedEvent = z.infer<typeof identifierDetachedEventSchema>;
 
-export const userErasedEventSchema = EventSchema.extend({
+export const userErasedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(USER_ERASED_EVENT_TYPE),
   data: userErasedPayloadSchema,
 });
 export type UserErasedEvent = z.infer<typeof userErasedEventSchema>;
 
-export const linkProposedEventSchema = EventSchema.extend({
+export const linkProposedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LINK_PROPOSED_EVENT_TYPE),
   data: linkProposedPayloadSchema,
 });
@@ -137,7 +144,7 @@ export class IdentityStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): IdentityHeads {
     return emptyIdentityHeads({ userId: "" });
   }
 
