@@ -80,6 +80,7 @@ import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import {
   type LwqlReconvergenceWatch,
+  lwqlAccessModelMode,
   lwqlAccessModelOwner,
   lwqlSelfProvisionInputs,
   selfProvisionAll,
@@ -209,6 +210,10 @@ let lwqlReconvergenceWatch: LwqlReconvergenceWatch | null = null;
 function armLwqlReconvergenceWatch(): void {
   const lwqlInputs = lwqlSelfProvisionInputs();
   if (!lwqlInputs || process.env.SKIP_LWQL_PROVISION === "true") return;
+  // Rendered mode ships the access model as per-pod config, so there is no
+  // config-store→SQL-store handover window to wait out and nothing to
+  // reconverge — the watch is only meaningful in `sql` mode (#8258).
+  if (lwqlAccessModelMode() !== "sql") return;
   lwqlReconvergenceWatch = startLwqlReconvergenceWatch({
     probe: lwqlAccessModelOwner,
     converge: () => selfProvisionAll(lwqlInputs),

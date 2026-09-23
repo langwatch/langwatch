@@ -73,6 +73,27 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
   namedCollection: "lwql_postgres",
 } as const;
 
+/** How this deployment delivers the LangWatchQL access model (#8258). */
+export type LwqlAccessModelMode = "rendered" | "sql";
+
+/**
+ * How this deployment delivers the LangWatchQL access model (#8258), read in
+ * one place so the converge and the server's reconvergence watch agree.
+ *
+ * `rendered` (the default when unset) ships the access model as per-pod
+ * `users.d` / `config.d` config the chart mounts on every replica, so the
+ * converge provisions only the structural objects (database, key-map table, app
+ * functions, views, postgres-engine tables) and skips every access statement,
+ * and the server does not arm the reconvergence watch. `sql` provisions the
+ * access model as DDL on the one server behind the service (BYO), the pre-#8258
+ * behaviour plus the AC9 cluster guard.
+ */
+export function lwqlAccessModelMode(
+  env: NodeJS.ProcessEnv = process.env,
+): LwqlAccessModelMode {
+  return env.LWQL_ACCESS_MODEL_MODE === "sql" ? "sql" : "rendered";
+}
+
 /** Everything the provisioning task needs beyond the serving connection. */
 export interface LwqlSelfProvisionEnv {
   /** The restricted connection, identical to what the executor serves with. */
@@ -157,6 +178,7 @@ export function selfHostedClickHouseProvisioningStatements({
   sourceDatabase,
   postgres,
   includeAppFunctions = true,
+  includeAccessStatements = true,
 }: {
   names: LangWatchQLNames;
   restrictedPassword: string;
@@ -167,6 +189,16 @@ export function selfHostedClickHouseProvisioningStatements({
   };
   /** See {@link canProvisionAppFunctions}. */
   includeAppFunctions?: boolean;
+  /**
+   * Whether the access statements (the restricted user, the settings profile,
+   * every grant, both row policies and the named collection) are emitted as
+   * DDL. `false` is the `rendered` mode ({@link lwqlAccessModelMode}): they ship
+   * as per-pod `users.d` / `config.d` config, so the converge provisions only
+   * the structural objects — the database, the app functions, the key-map
+   * table, the postgres-engine tables and the views. Default `true` keeps the
+   * `sql` mode output unchanged.
+   */
+  includeAccessStatements?: boolean;
 }): string[] {
   if (names.database !== sourceDatabase) {
     throw new Error(
@@ -183,17 +215,23 @@ export function selfHostedClickHouseProvisioningStatements({
       password: restrictedPassword,
       lwqlTables: [],
       includeAppFunctions,
+      includeAccessStatements,
     }),
-    ...postgresNamedCollectionStatements({
-      connection: {
-        collection,
-        host: postgres.endpoint.host,
-        port: postgres.endpoint.port,
-        database: postgres.endpoint.database,
-        user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
-        password: postgres.readerPassword,
-      },
-    }),
+    // The named collection is an access statement — in rendered mode it ships as
+    // config.d/lwql-named-collection.yaml, so the postgres-engine tables below
+    // still reference `lwql_postgres` and find it in the server config.
+    ...(includeAccessStatements
+      ? postgresNamedCollectionStatements({
+          connection: {
+            collection,
+            host: postgres.endpoint.host,
+            port: postgres.endpoint.port,
+            database: postgres.endpoint.database,
+            user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
+            password: postgres.readerPassword,
+          },
+        })
+      : []),
     ...lwqlPostgresViews(LWQL_VIEW_CATALOG).map(
       (view) => `DROP TABLE IF EXISTS ${qualified(names, view.sourceTable)}`,
     ),
@@ -202,6 +240,7 @@ export function selfHostedClickHouseProvisioningStatements({
       names,
       sourceDatabase,
       dedup: SHIPPED_LWQL_DEDUP,
+      includeAccessStatements,
     }),
   ];
 }

@@ -940,16 +940,26 @@ export function lwqlViewSetupStatements({
   sourceDatabase,
   views = LWQL_VIEW_CATALOG,
   dedup,
+  includeAccessStatements = true,
 }: {
   names: LangWatchQLNames;
   sourceDatabase: string;
   views?: readonly LangWatchQLViewDefinition[];
   dedup: LangWatchQLDedupStrategy;
+  /**
+   * Whether the access statements (the source-table row policies and every
+   * grant) are emitted. `false` is the `rendered` mode (#8258): those ship as
+   * per-pod `users.d` config, so only the `CREATE VIEW` statements are
+   * provisioned here. Default `true` keeps the `sql` mode output unchanged.
+   */
+  includeAccessStatements?: boolean;
 }): string[] {
+  const viewStatements = views.map((view) =>
+    lwqlViewStatement({ names, sourceDatabase, view, dedup }),
+  );
+  if (!includeAccessStatements) return viewStatements;
   return [
-    ...views.map((view) =>
-      lwqlViewStatement({ names, sourceDatabase, view, dedup }),
-    ),
+    ...viewStatements,
     // Row policies BEFORE the grants they constrain, and this order is
     // load-bearing rather than cosmetic. In ClickHouse a table carrying a
     // `SELECT` grant and no row policy returns every row, so grants-first

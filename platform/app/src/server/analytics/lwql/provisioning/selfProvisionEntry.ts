@@ -53,6 +53,7 @@ import {
 import {
   canProvisionAppFunctions,
   type LwqlSelfProvisionEnv,
+  lwqlAccessModelMode,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   probeAppFunctionStore,
@@ -230,6 +231,12 @@ async function convergeClickHouse({
   });
 
   const includeAppFunctions = await appFunctionsProvisionable(client);
+  // In `rendered` mode (the default) the access statements ship as per-pod
+  // config the chart mounts, so the converge provisions only the structural
+  // objects and skips the user, profile, grants, row policies and named
+  // collection. `sql` mode provisions the whole model as DDL (its cluster
+  // safety is gated separately by the AC9 guard).
+  const includeAccessStatements = lwqlAccessModelMode() === "sql";
   const result = await runClickHouseStatements({
     client,
     configStoreEntities,
@@ -242,6 +249,7 @@ async function convergeClickHouse({
         readerPassword: selfProvision.postgresReaderPassword,
       },
       includeAppFunctions,
+      includeAccessStatements,
     }),
   });
   if (result.skipped.length > 0) {

@@ -38,6 +38,7 @@ export {
 } from "./selfProvisionEntry";
 export {
   canProvisionAppFunctions,
+  lwqlAccessModelMode,
   lwqlSelfProvisionFromEnv,
   probeAppFunctionStore,
 } from "./selfProvisioning";
