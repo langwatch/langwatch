@@ -107,16 +107,22 @@ emit("app_unprovisioned_legs", app_unprovisioned)
 # same "optional suite" failure continue-on-error causes. Counted on the e2e
 # job's steps only; the job-level draft gate `if:` is not a step.
 def runs_suite_script(run):
-    # An executable invocation, not a substring: a non-comment line whose
-    # command is the matrix.script expression (optionally a ./path prefix), so a
-    # commented-out `# ${{ matrix.script }}` never counts.
-    for line in run.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if re.match(r'^(\./\S*)?\$\{\{\s*matrix\.script\s*\}\}', stripped):
-            return True
-    return False
+    # An unconditional, unmasked invocation. After dropping blank and comment
+    # lines the block must be exactly one line, and that line must be exactly
+    # the invocation (optional `./path` prefix, then `${{ matrix.script }}`,
+    # nothing after but whitespace). This rejects `${{ matrix.script }} || true`,
+    # a trailing second command, or a preceding `set +e` — each of which would
+    # let a failing suite pass unnoticed. A commented-out invocation never
+    # counts.
+    meaningful = [
+        line.strip() for line in run.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    return (
+        len(meaningful) == 1
+        and re.match(r'^(\./\S*)?\$\{\{\s*matrix\.script\s*\}\}\s*$', meaningful[0])
+        is not None
+    )
 
 suite_steps = [
     s for s in e2e["steps"]
