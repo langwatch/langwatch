@@ -395,12 +395,12 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
             },
             format: "JSONEachRow",
           });
-          const items = await this.enrichItemCosts(
+          const items = await this.enrichItemCosts({
             client,
-            input.projectId,
-            await itemsResult.json<ItemRow>(),
+            projectId: input.projectId,
+            items: await itemsResult.json<ItemRow>(),
             range,
-          );
+          });
           return mapRunWithItems(run, items, input.projectId);
         } catch (error) {
           this.options.telemetry.error(
@@ -532,12 +532,12 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
       breakdownsByKey.set(key, existing);
     }
     return rows.map((row) =>
-      mapRun(
+      mapRun({
         row,
-        versions[row.WorkflowVersionId ?? ""] ?? null,
-        breakdownsByKey.get(runKey(row.ExperimentId, row.RunId)),
-        costsByKey.get(runKey(row.ExperimentId, row.RunId)),
-      ),
+        workflowVersion: versions[row.WorkflowVersionId ?? ""] ?? null,
+        breakdown: breakdownsByKey.get(runKey(row.ExperimentId, row.RunId)),
+        costs: costsByKey.get(runKey(row.ExperimentId, row.RunId)),
+      }),
     );
   }
 
@@ -548,12 +548,17 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     return this.options.workflowVersions.findByIds({ projectId, versionIds });
   }
 
-  private async enrichItemCosts(
-    client: ExperimentClickHouseClient,
-    projectId: string,
-    items: ItemRow[],
-    range: { minOccurredAt: string; maxOccurredAt: string },
-  ): Promise<ItemRow[]> {
+  private async enrichItemCosts({
+    client,
+    projectId,
+    items,
+    range,
+  }: {
+    client: ExperimentClickHouseClient;
+    projectId: string;
+    items: ItemRow[];
+    range: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<ItemRow[]> {
     const traceIds = [
       ...new Set(
         items
@@ -654,12 +659,17 @@ function timestamps(row: RunRow): {
   };
 }
 
-function mapRun(
-  row: RunRow,
-  workflowVersion: ExperimentRunWorkflowVersion | null,
-  breakdown: BreakdownRow[] | undefined,
-  costs: CostRow | undefined,
-): ExperimentRun {
+function mapRun({
+  row,
+  workflowVersion,
+  breakdown,
+  costs,
+}: {
+  row: RunRow;
+  workflowVersion: ExperimentRunWorkflowVersion | null;
+  breakdown: BreakdownRow[] | undefined;
+  costs: CostRow | undefined;
+}): ExperimentRun {
   const evaluations: ExperimentRun["summary"]["evaluations"] = {};
   for (const item of breakdown ?? []) {
     evaluations[item.EvaluatorId] = {

@@ -189,14 +189,14 @@ export class WorkflowEvaluationService {
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
         : WorkflowEvaluationService.attachedDataset({ entry, workflowName: workflow.name });
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData(
+    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
       projectId,
-      datasetRef,
-      [target],
-      [],
-      this.dependencies.services,
-      { data, datasetId: resolvedDatasetId, parameters },
-    );
+      dataset: datasetRef,
+      targets: [target],
+      evaluators: [],
+      services: this.dependencies.services,
+      inputs: { data, datasetId: resolvedDatasetId, parameters },
+    });
     if ("error" in dataResult) {
       throw new EvaluationInputError(dataResult.error, dataResult.status);
     }

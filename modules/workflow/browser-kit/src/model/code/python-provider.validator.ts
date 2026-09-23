@@ -28,7 +28,19 @@ const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
 function isTripleQuote(value: string | false): value is '"""' | "'''" {
   return value === '"""' || value === "'''";
 }
-function addError(state: State, monaco: Monaco, message: string, line: number, col: number): void {
+function addError({
+  state,
+  monaco,
+  message,
+  line,
+  col,
+}: {
+  state: State;
+  monaco: Monaco;
+  message: string;
+  line: number;
+  col: number;
+}): void {
   state.markers.push({
     severity: monaco.MarkerSeverity.Error,
     message,
@@ -50,7 +62,19 @@ function scanString(state: State, line: string, col: number): number {
   }
   return col + (line[col] === "\\" ? 2 : 1);
 }
-function scanBracket(state: State, monaco: Monaco, ch: string, line: number, col: number): void {
+function scanBracket({
+  state,
+  monaco,
+  ch,
+  line,
+  col,
+}: {
+  state: State;
+  monaco: Monaco;
+  ch: string;
+  line: number;
+  col: number;
+}): void {
   if (ch === "(" || ch === "[" || ch === "{") {
     state.stack.push({ ch, line, col });
     return;
@@ -59,12 +83,22 @@ function scanBracket(state: State, monaco: Monaco, ch: string, line: number, col
   if (!expected) return;
   const top = state.stack[state.stack.length - 1];
   if (!top || top.ch !== expected) {
-    addError(state, monaco, `Unmatched closing '${ch}'`, line, col);
+    addError({ state, monaco, message: `Unmatched closing '${ch}'`, line, col });
     return;
   }
   state.stack.pop();
 }
-function scanSyntaxLine(state: State, monaco: Monaco, line: string, lineIndex: number): void {
+function scanSyntaxLine({
+  state,
+  monaco,
+  line,
+  lineIndex,
+}: {
+  state: State;
+  monaco: Monaco;
+  line: string;
+  lineIndex: number;
+}): void {
   let col = 0;
   while (col < line.length) {
     if (state.inString) {
@@ -84,11 +118,21 @@ function scanSyntaxLine(state: State, monaco: Monaco, line: string, lineIndex: n
       col += 1;
       continue;
     }
-    scanBracket(state, monaco, ch, lineIndex, col);
+    scanBracket({ state, monaco, ch, line: lineIndex, col });
     col += 1;
   }
 }
-function checkLine(state: State, monaco: Monaco, line: string, lineIndex: number): void {
+function checkLine({
+  state,
+  monaco,
+  line,
+  lineIndex,
+}: {
+  state: State;
+  monaco: Monaco;
+  line: string;
+  lineIndex: number;
+}): void {
   if (state.inString === '"' || state.inString === "'") {
     state.markers.push({
       severity: monaco.MarkerSeverity.Error,
@@ -115,8 +159,8 @@ function checkLine(state: State, monaco: Monaco, line: string, lineIndex: number
 function scanPythonSyntax(lines: string[], monaco: Monaco): editor.IMarkerData[] {
   const state: State = { inString: false, markers: [], stack: [] };
   for (const [index, line] of lines.entries()) {
-    scanSyntaxLine(state, monaco, line, index);
-    checkLine(state, monaco, line, index);
+    scanSyntaxLine({ state, monaco, line, lineIndex: index });
+    checkLine({ state, monaco, line, lineIndex: index });
   }
   if (isTripleQuote(state.inString)) {
     const lastLine = lines.length - 1;
@@ -130,7 +174,7 @@ function scanPythonSyntax(lines: string[], monaco: Monaco): editor.IMarkerData[]
     });
   }
   for (const open of state.stack)
-    addError(state, monaco, `Unclosed '${open.ch}'`, open.line, open.col);
+    addError({ state, monaco, message: `Unclosed '${open.ch}'`, line: open.line, col: open.col });
   return state.markers;
 }
 function addScaffoldMarkers(markers: editor.IMarkerData[], monaco: Monaco, source: string): void {
@@ -149,12 +193,17 @@ function addScaffoldMarkers(markers: editor.IMarkerData[], monaco: Monaco, sourc
     endColumn: 2,
   });
 }
-function addOutputMarkers(
-  markers: editor.IMarkerData[],
-  monaco: Monaco,
-  source: string,
-  contractRef: ContractRef,
-): void {
+function addOutputMarkers({
+  markers,
+  monaco,
+  source,
+  contractRef,
+}: {
+  markers: editor.IMarkerData[];
+  monaco: Monaco;
+  source: string;
+  contractRef: ContractRef;
+}): void {
   for (const field of contractRef.current.outputs) {
     const escaped = field.identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (new RegExp(`['"]${escaped}['"]`).test(source)) continue;
@@ -169,12 +218,17 @@ function addOutputMarkers(
     });
   }
 }
-function addTypeMarkers(
-  markers: editor.IMarkerData[],
-  monaco: Monaco,
-  model: editor.ITextModel,
-  contractRef: ContractRef,
-): void {
+function addTypeMarkers({
+  markers,
+  monaco,
+  model,
+  contractRef,
+}: {
+  markers: editor.IMarkerData[];
+  monaco: Monaco;
+  model: editor.ITextModel;
+  contractRef: ContractRef;
+}): void {
   const result = findLastReturnDict(model.getValue());
   if (!result) return;
   for (const entry of parseSimpleDictEntries(result.body)) {
@@ -196,18 +250,23 @@ function addTypeMarkers(
     });
   }
 }
-function validateModel(
-  monaco: Monaco,
-  contractRef: ContractRef,
-  owner: string,
-  model: editor.ITextModel,
-): void {
+function validateModel({
+  monaco,
+  contractRef,
+  owner,
+  model,
+}: {
+  monaco: Monaco;
+  contractRef: ContractRef;
+  owner: string;
+  model: editor.ITextModel;
+}): void {
   if (model.getLanguageId() !== "python") return;
   const source = model.getValue();
   const markers = scanPythonSyntax(source.split("\n"), monaco);
   addScaffoldMarkers(markers, monaco, source);
-  addOutputMarkers(markers, monaco, source, contractRef);
-  addTypeMarkers(markers, monaco, model, contractRef);
+  addOutputMarkers({ markers, monaco, source, contractRef });
+  addTypeMarkers({ markers, monaco, model, contractRef });
   monaco.editor.setModelMarkers(model, owner, markers);
 }
 function watchModel(
@@ -221,7 +280,8 @@ function watchModel(
 export function registerValidator(monaco: Monaco, contractRef: ContractRef): ValidatorHandle {
   const owner = "langwatch-python-lint";
   const disposers: IDisposable[] = [];
-  const validate = (model: editor.ITextModel) => validateModel(monaco, contractRef, owner, model);
+  const validate = (model: editor.ITextModel) =>
+    validateModel({ monaco, contractRef, owner, model });
   const created = monaco.editor.onDidCreateModel((model: editor.ITextModel) =>
     watchModel(model, validate, disposers),
   );

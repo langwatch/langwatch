@@ -94,20 +94,30 @@ export class ExperimentConnectedCellService {
     sleep?: (ms: number) => Promise<void>;
     now?: () => number;
   }): ExperimentConnectedCellService {
-    return new ExperimentConnectedCellService(
+    return new ExperimentConnectedCellService({
       cells,
-      dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
-      sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
-      now ?? (() => nowInstant().epochMilliseconds),
-    );
+      dispatch: dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
+      sleep: sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
+      now: now ?? (() => nowInstant().epochMilliseconds),
+    });
   }
 
-  private constructor(
-    private readonly cells: ExperimentCellExecutionService,
-    private readonly dispatch: ConnectedDispatch,
-    private readonly sleep: (ms: number) => Promise<void>,
-    private readonly now: () => number,
-  ) {}
+  private readonly cells: ExperimentCellExecutionService;
+  private readonly dispatch: ConnectedDispatch;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly now: () => number;
+
+  private constructor(options: {
+    cells: ExperimentCellExecutionService;
+    dispatch: ConnectedDispatch;
+    sleep: (ms: number) => Promise<void>;
+    now: () => number;
+  }) {
+    this.cells = options.cells;
+    this.dispatch = options.dispatch;
+    this.sleep = options.sleep;
+    this.now = options.now;
+  }
 
   /**
    * The agent as the dispatcher reads it, budget-capped the same way the

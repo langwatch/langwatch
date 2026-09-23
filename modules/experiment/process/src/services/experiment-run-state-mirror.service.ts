@@ -29,12 +29,22 @@ export class ExperimentRunStateMirrorService implements RunStateMirror {
   private runId: string | undefined;
   private ended = false;
 
-  private constructor(
-    private readonly projectId: string,
-    private readonly experimentId: string | undefined,
-    private readonly experimentSlug: string,
-    private readonly progress: ExperimentRunProgressRepository,
-  ) {}
+  private readonly projectId: string;
+  private readonly experimentId: string | undefined;
+  private readonly experimentSlug: string;
+  private readonly progress: ExperimentRunProgressRepository;
+
+  private constructor(options: {
+    projectId: string;
+    experimentId: string | undefined;
+    experimentSlug: string;
+    progress: ExperimentRunProgressRepository;
+  }) {
+    this.projectId = options.projectId;
+    this.experimentId = options.experimentId;
+    this.experimentSlug = options.experimentSlug;
+    this.progress = options.progress;
+  }
 
   static create(options: {
     projectId: string;
@@ -43,12 +53,12 @@ export class ExperimentRunStateMirrorService implements RunStateMirror {
     /** Where the frames are mirrored so a poll on another process finds them. */
     progress: ExperimentRunProgressRepository;
   }): ExperimentRunStateMirrorService {
-    return new ExperimentRunStateMirrorService(
-      options.projectId,
-      options.experimentId,
-      options.experimentSlug,
-      options.progress,
-    );
+    return new ExperimentRunStateMirrorService({
+      projectId: options.projectId,
+      experimentId: options.experimentId,
+      experimentSlug: options.experimentSlug,
+      progress: options.progress,
+    });
   }
 
   async record(event: EvaluationV3Event): Promise<void> {

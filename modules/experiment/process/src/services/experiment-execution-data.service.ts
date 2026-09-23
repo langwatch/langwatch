@@ -361,14 +361,21 @@ export class ExperimentExecutionDataService {
    * workflow and evaluator its targets name. A missing target is reported as the sentinel error
    * shape rather than run around, so a deleted target stops the run instead of emptying a column.
    */
-  static async loadExecutionData(
-    projectId: string,
-    dataset: DatasetInput,
-    targets: TargetForLoading[],
-    evaluators: EvaluatorForLoading[],
-    services: ExecutionDataServices,
-    inputs?: ExecutionDataInputs,
-  ): Promise<LoadedExecutionData | { error: string; status: number }> {
+  static async loadExecutionData({
+    projectId,
+    dataset,
+    targets,
+    evaluators,
+    services,
+    inputs,
+  }: {
+    projectId: string;
+    dataset: DatasetInput;
+    targets: TargetForLoading[];
+    evaluators: EvaluatorForLoading[];
+    services: ExecutionDataServices;
+    inputs?: ExecutionDataInputs;
+  }): Promise<LoadedExecutionData | { error: string; status: number }> {
     const baseDataset = await ExperimentExecutionDataService.resolveBaseDataset({
       projectId,
       dataset,

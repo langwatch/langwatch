@@ -171,7 +171,7 @@ export class GatewayConfigMaterialiserService {
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
     const upstream = await this.upstreamOf(vk.organizationId);
     const ownSlots = providers.map((mp, index) =>
-      buildProviderSlot(mp, index, this.credentials, this.assembly),
+      buildProviderSlot({ mp, index, credentialReader: this.credentials, assembly: this.assembly }),
     );
     // LangWatch goes last: a customer credential keeps serving the models it serves.
     const slots = upstream

@@ -40,14 +40,14 @@ const load = (
   tier: "free" | "paid" | "enterprise",
   rowCount: number,
 ): Promise<Awaited<ReturnType<typeof ExperimentExecutionDataService.loadExecutionData>>> =>
-  ExperimentExecutionDataService.loadExecutionData(
-    PROJECT_ID,
-    { type: "inline", columns: [] },
-    [],
-    [],
-    services(tier),
-    { data: rows(rowCount) },
-  );
+  ExperimentExecutionDataService.loadExecutionData({
+    projectId: PROJECT_ID,
+    dataset: { type: "inline", columns: [] },
+    targets: [],
+    evaluators: [],
+    services: services(tier),
+    inputs: { data: rows(rowCount) },
+  });
 
 describe("loadExecutionData row bound", () => {
   it.each([

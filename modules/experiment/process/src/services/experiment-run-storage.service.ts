@@ -64,13 +64,13 @@ export class ExperimentRunStorageService {
       }
     }
 
-    return new ExperimentRunStorageService(
+    return new ExperimentRunStorageService({
       commands,
       evaluationReporting,
       dispatches,
       cellTraceIds,
       completedTargetOutputs,
-    );
+    });
   }
 
   private chDispatchFailures = 0;
@@ -78,13 +78,25 @@ export class ExperimentRunStorageService {
   private readonly producedTargetKeys = new Set<string>();
   private readonly completedTargetEvaluatorScores = new Map<string, VariantEvaluatorScore[]>();
 
-  private constructor(
-    private readonly commands: ExperimentService,
-    private readonly evaluationReporting: ExperimentEvaluationReporting,
-    private readonly dispatches: ExperimentResultDispatchService,
-    private readonly cellTraceIds: Map<string, string>,
-    private readonly completedTargetOutputs: Map<string, SeededTargetOutput>,
-  ) {}
+  private readonly commands: ExperimentService;
+  private readonly evaluationReporting: ExperimentEvaluationReporting;
+  private readonly dispatches: ExperimentResultDispatchService;
+  private readonly cellTraceIds: Map<string, string>;
+  private readonly completedTargetOutputs: Map<string, SeededTargetOutput>;
+
+  private constructor(options: {
+    commands: ExperimentService;
+    evaluationReporting: ExperimentEvaluationReporting;
+    dispatches: ExperimentResultDispatchService;
+    cellTraceIds: Map<string, string>;
+    completedTargetOutputs: Map<string, SeededTargetOutput>;
+  }) {
+    this.commands = options.commands;
+    this.evaluationReporting = options.evaluationReporting;
+    this.dispatches = options.dispatches;
+    this.cellTraceIds = options.cellTraceIds;
+    this.completedTargetOutputs = options.completedTargetOutputs;
+  }
 
   get outputs(): Map<string, SeededTargetOutput> {
     return this.completedTargetOutputs;

@@ -309,12 +309,17 @@ export function resolvePolicySideOfBundle(
   };
 }
 
-export function buildProviderSlot(
-  mp: ModelProvider,
-  index: number,
-  credentialReader: GatewayModelProviderCredentials,
-  assembly: GatewayConfigAssembly,
-): ProviderSlot {
+export function buildProviderSlot({
+  mp,
+  index,
+  credentialReader,
+  assembly,
+}: {
+  mp: ModelProvider;
+  index: number;
+  credentialReader: GatewayModelProviderCredentials;
+  assembly: GatewayConfigAssembly;
+}): ProviderSlot {
   const credentials = assembly.buildCredentials(mp, credentialReader);
   const customKeys = credentialReader.readCustomKeys(mp.customKeys);
   // Base-URL override the gateway consumes (mapProvider in bifrost.go):

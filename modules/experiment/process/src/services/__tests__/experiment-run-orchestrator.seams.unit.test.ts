@@ -78,13 +78,13 @@ describe("given two datasets where the active one is not the first", () => {
   describe("when the run builds its cells", () => {
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("reads the mapping bucket of the active dataset", () => {
-      const cells = ExperimentRunOrchestratorService.generateCells(
-        twoDatasetState(),
-        createTestDataset(1),
-        {
+      const cells = ExperimentRunOrchestratorService.generateCells({
+        state: twoDatasetState(),
+        datasetRows: createTestDataset(1),
+        scope: {
           type: "full",
         },
-      );
+      });
 
       expect(cells).toHaveLength(1);
       expect(cells[0]?.datasetEntry._datasetId).toBe("dataset-active");
@@ -92,13 +92,13 @@ describe("given two datasets where the active one is not the first", () => {
 
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("resolves the evaluator's inputs instead of dispatching an empty payload", () => {
-      const cells = ExperimentRunOrchestratorService.generateCells(
-        twoDatasetState(),
-        createTestDataset(1),
-        {
+      const cells = ExperimentRunOrchestratorService.generateCells({
+        state: twoDatasetState(),
+        datasetRows: createTestDataset(1),
+        scope: {
           type: "full",
         },
-      );
+      });
 
       expect(
         ExperimentRunOrchestratorService.buildEvaluatorInputs(cells[0]!, "eval-1", {

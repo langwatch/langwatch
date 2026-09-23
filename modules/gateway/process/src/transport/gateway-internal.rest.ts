@@ -249,7 +249,11 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
       if (!resolution.ok) {
         const refusal = LICENSE_TOKEN_REFUSALS[resolution.code];
-        logAuthDecision(headers["x-langwatch-gateway-node"], resolution.code, refusal.status);
+        logAuthDecision({
+          request: headers["x-langwatch-gateway-node"],
+          code: resolution.code,
+          status: refusal.status,
+        });
 
         return refuse(refusal.status, {
           type: resolution.code,
@@ -269,18 +273,22 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     const parseRejection = virtualKeyParseRejection(presented.data.key_presented);
     if (parseRejection) {
-      logAuthDecision(
-        headers["x-langwatch-gateway-node"],
-        parseRejection.code,
-        parseRejection.status,
-      );
+      logAuthDecision({
+        request: headers["x-langwatch-gateway-node"],
+        code: parseRejection.code,
+        status: parseRejection.status,
+      });
 
       return refuse(parseRejection.status, { ...parseRejection });
     }
 
     const vk = await app.findVirtualKeyBySecret(presented.data.key_presented);
     if (!vk) {
-      logAuthDecision(headers["x-langwatch-gateway-node"], "virtual_key_not_found", 401);
+      logAuthDecision({
+        request: headers["x-langwatch-gateway-node"],
+        code: "virtual_key_not_found",
+        status: 401,
+      });
 
       return refuse(401, {
         type: "invalid_api_key",
@@ -294,12 +302,12 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       expiresAt: vk.expiresAt,
     });
     if (statusRejection) {
-      logAuthDecision(
-        headers["x-langwatch-gateway-node"],
-        statusRejection.code,
-        statusRejection.status,
-        { vkId: vk.id },
-      );
+      logAuthDecision({
+        request: headers["x-langwatch-gateway-node"],
+        code: statusRejection.code,
+        status: statusRejection.status,
+        detail: { vkId: vk.id },
+      });
 
       return refuse(statusRejection.status, { ...statusRejection });
     }

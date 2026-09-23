@@ -277,27 +277,44 @@ export type GatewayBudgetDatabase = Pick<
 >;
 
 export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
-  constructor(
-    private readonly prisma: GatewayBudgetDatabase,
-    private readonly changeEvents = new PrismaGatewayChangeEventsRepository(prisma),
-    private readonly auditLog = new PrismaGatewayAuditRepository(prisma),
-    private readonly scopeReach = PrismaGatewayBudgetScopeReachRepository.create(prisma),
-    private readonly chRepo?: GatewayBudgetSpend,
-  ) {
+  private readonly prisma: GatewayBudgetDatabase;
+  private readonly changeEvents: PrismaGatewayChangeEventsRepository;
+  private readonly auditLog: PrismaGatewayAuditRepository;
+  private readonly scopeReach: PrismaGatewayBudgetScopeReachRepository;
+  private readonly chRepo?: GatewayBudgetSpend;
+
+  constructor({
+    prisma,
+    changeEvents = new PrismaGatewayChangeEventsRepository(prisma),
+    auditLog = new PrismaGatewayAuditRepository(prisma),
+    scopeReach = PrismaGatewayBudgetScopeReachRepository.create(prisma),
+    chRepo,
+  }: {
+    prisma: GatewayBudgetDatabase;
+    changeEvents?: PrismaGatewayChangeEventsRepository;
+    auditLog?: PrismaGatewayAuditRepository;
+    scopeReach?: PrismaGatewayBudgetScopeReachRepository;
+    chRepo?: GatewayBudgetSpend;
+  }) {
     super();
+    this.prisma = prisma;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+    this.scopeReach = scopeReach;
+    this.chRepo = chRepo;
   }
 
   static create(
     database: GatewayBudgetDatabase,
     chRepo?: GatewayBudgetSpend,
   ): PrismaGatewayBudgetRepository {
-    return new PrismaGatewayBudgetRepository(
-      database,
-      new PrismaGatewayChangeEventsRepository(database),
-      new PrismaGatewayAuditRepository(database),
-      PrismaGatewayBudgetScopeReachRepository.create(database),
+    return new PrismaGatewayBudgetRepository({
+      prisma: database,
+      changeEvents: new PrismaGatewayChangeEventsRepository(database),
+      auditLog: new PrismaGatewayAuditRepository(database),
+      scopeReach: PrismaGatewayBudgetScopeReachRepository.create(database),
       chRepo,
-    );
+    });
   }
 
   async resolveApplicableBudgets(

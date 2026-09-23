@@ -196,14 +196,14 @@ export class ExperimentWorkbenchRunService {
 
     const { ports, progress } = runLoopOf(this.runLoop);
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData(
+    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
       projectId,
-      input.dataset,
-      input.targets,
-      input.evaluators,
-      this.runLoop.services,
-      { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
-    );
+      dataset: input.dataset,
+      targets: input.targets,
+      evaluators: input.evaluators,
+      services: this.runLoop.services,
+      inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
+    });
     if ("error" in dataResult) {
       return { kind: "refused", status: dataResult.status, error: dataResult.error };
     }

@@ -21,12 +21,17 @@ export class ExperimentTargetDataService {
   }
 
   /** Which loaded prompt, agent or workflow a target actually runs. */
-  static loadedDataForTarget(
-    targetConfig: TargetConfig,
-    loadedPrompts: Map<string, VersionedPrompt>,
-    loadedAgents: Map<string, TypedAgent>,
-    loadedWorkflows?: Map<string, LoadedWorkflow>,
-  ): {
+  static loadedDataForTarget({
+    targetConfig,
+    loadedPrompts,
+    loadedAgents,
+    loadedWorkflows,
+  }: {
+    targetConfig: TargetConfig;
+    loadedPrompts: Map<string, VersionedPrompt>;
+    loadedAgents: Map<string, TypedAgent>;
+    loadedWorkflows?: Map<string, LoadedWorkflow>;
+  }): {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
     workflow?: LoadedWorkflow;

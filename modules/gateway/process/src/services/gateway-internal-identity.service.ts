@@ -32,12 +32,17 @@ export function computeGatewaySignature(secret: string, canonical: string): stri
   return createHmac("sha256", secret).update(canonical).digest("hex");
 }
 
-export function logAuthDecision(
-  request: Request | string | undefined,
-  code: string,
-  status: number,
-  detail?: Record<string, unknown>,
-): void {
+export function logAuthDecision({
+  request,
+  code,
+  status,
+  detail,
+}: {
+  request: Request | string | undefined;
+  code: string;
+  status: number;
+  detail?: Record<string, unknown>;
+}): void {
   logger.warn(
     {
       code,
@@ -77,16 +82,21 @@ export class GatewayInternalIdentity implements RestIdentity {
   identify({ request, rawBody }: { request: Request; rawBody?: string | Uint8Array }): RestCaller {
     const secret = this.#secret;
     if (!secret) {
-      logAuthDecision(request, "gateway_internal_secret_missing", 500);
+      logAuthDecision({ request, code: "gateway_internal_secret_missing", status: 500 });
       throw new GatewayInternalAuthenticationUnavailableError();
     }
 
     const presentedSig = request.headers.get("X-LangWatch-Gateway-Signature");
     const presentedTs = request.headers.get("X-LangWatch-Gateway-Timestamp");
     if (!presentedSig || !presentedTs) {
-      logAuthDecision(request, "missing_signature", 401, {
-        hasSignature: Boolean(presentedSig),
-        hasTimestamp: Boolean(presentedTs),
+      logAuthDecision({
+        request,
+        code: "missing_signature",
+        status: 401,
+        detail: {
+          hasSignature: Boolean(presentedSig),
+          hasTimestamp: Boolean(presentedTs),
+        },
       });
 
       throw new GatewayInternalAuthenticationError(
@@ -108,14 +118,14 @@ export class GatewayInternalIdentity implements RestIdentity {
     const a = Buffer.from(expected);
     const b = Buffer.from(presentedSig);
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      logAuthDecision(request, "invalid_signature", 401);
+      logAuthDecision({ request, code: "invalid_signature", status: 401 });
 
       throw new GatewayInternalAuthenticationError("invalid_signature", "signature mismatch");
     }
 
     const ts = Number.parseInt(presentedTs, 10);
     if (!Number.isFinite(ts)) {
-      logAuthDecision(request, "invalid_timestamp", 401, { presentedTs });
+      logAuthDecision({ request, code: "invalid_timestamp", status: 401, detail: { presentedTs } });
 
       throw new GatewayInternalAuthenticationError(
         "invalid_timestamp",
@@ -125,7 +135,12 @@ export class GatewayInternalIdentity implements RestIdentity {
 
     const now = Math.floor(nowInstant().epochMilliseconds / 1000);
     if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
-      logAuthDecision(request, "timestamp_out_of_window", 401, { driftSeconds: now - ts });
+      logAuthDecision({
+        request,
+        code: "timestamp_out_of_window",
+        status: 401,
+        detail: { driftSeconds: now - ts },
+      });
 
       throw new GatewayInternalAuthenticationError(
         "timestamp_out_of_window",

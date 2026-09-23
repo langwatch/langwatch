@@ -132,7 +132,10 @@ export class ExperimentRunDriverService {
   private static async prepareRun(input: OrchestratorInput): Promise<PreparedRun> {
     const { projectId, scope, state, datasetRows, ports } = input;
     const runId = input.runId ?? generateHumanReadableId();
-    const cells = ExperimentRunOrchestratorService.generateCells(state, datasetRows, scope, {
+    const cells = ExperimentRunOrchestratorService.generateCells({
+      state,
+      datasetRows,
+      scope,
       seedTargetOutputs: input.seedTargetOutputs,
     });
 
@@ -238,12 +241,12 @@ export class ExperimentRunDriverService {
   }): AsyncGenerator<EvaluationV3Event> {
     const { projectId, ports, workflows, datasetColumns, loadedEvaluators } = input;
     const loadedData = {
-      ...ExperimentTargetDataService.loadedDataForTarget(
-        cell.targetConfig,
-        input.loadedPrompts,
-        input.loadedAgents,
-        input.loadedWorkflows,
-      ),
+      ...ExperimentTargetDataService.loadedDataForTarget({
+        targetConfig: cell.targetConfig,
+        loadedPrompts: input.loadedPrompts,
+        loadedAgents: input.loadedAgents,
+        loadedWorkflows: input.loadedWorkflows,
+      }),
       evaluators: loadedEvaluators,
       sandboxApiKey: run.sandboxApiKey,
     };
@@ -280,16 +283,16 @@ export class ExperimentRunDriverService {
       });
     }
 
-    return ExperimentRunOrchestratorService.executeCell(
+    return ExperimentRunOrchestratorService.executeCell({
       cell,
       projectId,
       ports,
       datasetColumns,
       loadedData,
       workflows,
-      run.resultMapperConfig,
+      resultMapperConfig: run.resultMapperConfig,
       isAborted,
-    );
+    });
   }
 
   /**

@@ -113,17 +113,22 @@ export class ExperimentRunOrchestratorService {
   ): number[] => cellPlan.resolveScopedRowIndices(input);
 
   /** Generates all cells to execute for the scope. See {@link ExperimentCellPlanService}. */
-  static generateCells = (
-    state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
-    datasetRows: Record<string, unknown>[],
-    scope: ExecutionScope,
-    options: { seedTargetOutputs?: Record<string, SeededTargetOutput> } = {},
-  ): ExecutionCell[] =>
+  static generateCells = ({
+    state,
+    datasetRows,
+    scope,
+    seedTargetOutputs,
+  }: {
+    state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
+    datasetRows: Record<string, unknown>[];
+    scope: ExecutionScope;
+    seedTargetOutputs?: Record<string, SeededTargetOutput>;
+  }): ExecutionCell[] =>
     cellPlan.generateCells({
       state,
       datasetRows,
       scope,
-      seedTargetOutputs: options.seedTargetOutputs,
+      seedTargetOutputs,
     });
 
   /** How many cells a scope dispatches. See {@link ExperimentCellPlanService}. */
@@ -243,16 +248,25 @@ export class ExperimentRunOrchestratorService {
   };
 
   /** Executes a single cell and yields events. See {@link ExperimentCellExecutionService}. */
-  static async *executeCell(
-    cell: ExecutionCell,
-    projectId: string,
-    ports: ExperimentRunCollaborators,
-    datasetColumns: { id: string; name: string; type: string }[],
-    loadedData: LoadedCellData,
-    workflows: WorkflowApi,
-    resultMapperConfig?: ResultMapperConfig,
-    isAborted?: () => Promise<boolean>,
-  ): AsyncGenerator<EvaluationV3Event> {
+  static async *executeCell({
+    cell,
+    projectId,
+    ports,
+    datasetColumns,
+    loadedData,
+    workflows,
+    resultMapperConfig,
+    isAborted,
+  }: {
+    cell: ExecutionCell;
+    projectId: string;
+    ports: ExperimentRunCollaborators;
+    datasetColumns: { id: string; name: string; type: string }[];
+    loadedData: LoadedCellData;
+    workflows: WorkflowApi;
+    resultMapperConfig?: ResultMapperConfig;
+    isAborted?: () => Promise<boolean>;
+  }): AsyncGenerator<EvaluationV3Event> {
     yield* cellExecution(ports, workflows).executeCell({
       cell,
       projectId,

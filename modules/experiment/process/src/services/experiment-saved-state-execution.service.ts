@@ -150,14 +150,14 @@ export class ExperimentSavedStateExecutionService {
 
     const { experimentId, workbenchState, dataset } = saved;
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData(
+    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
       projectId,
       dataset,
-      workbenchState.targets,
-      workbenchState.evaluators,
+      targets: workbenchState.targets,
+      evaluators: workbenchState.evaluators,
       services,
-      runInputs ?? {},
-    );
+      inputs: runInputs ?? {},
+    });
     if ("error" in dataResult) {
       return { error: dataResult.error, status: dataResult.status };
     }

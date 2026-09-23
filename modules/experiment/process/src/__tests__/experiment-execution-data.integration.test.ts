@@ -280,17 +280,17 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await ExperimentExecutionDataService.loadExecutionData(
-        PROJECT_ID,
-        {
+      const result = await ExperimentExecutionDataService.loadExecutionData({
+        projectId: PROJECT_ID,
+        dataset: {
           type: "inline",
           columns: [],
           inline: { columns: [], records: {} },
         },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-        { ...services(), agents: agentApi(agentService) },
-      );
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+        services: { ...services(), agents: agentApi(agentService) },
+      });
 
       if ("error" in result) {
         throw new Error(`loadExecutionData failed: ${result.error}`);
@@ -334,17 +334,17 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await ExperimentExecutionDataService.loadExecutionData(
-        PROJECT_ID,
-        {
+      const result = await ExperimentExecutionDataService.loadExecutionData({
+        projectId: PROJECT_ID,
+        dataset: {
           type: "inline",
           columns: [],
           inline: { columns: [], records: {} },
         },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-        { ...services(), agents: agentApi(agentService) },
-      );
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+        services: { ...services(), agents: agentApi(agentService) },
+      });
 
       if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
       expect(result.error).toContain("no committed version");
@@ -357,17 +357,17 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing agent", async () => {
         const missingAgentId = `test_agent_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.loadExecutionData(
-          PROJECT_ID,
-          {
+        const result = await ExperimentExecutionDataService.loadExecutionData({
+          projectId: PROJECT_ID,
+          dataset: {
             type: "inline",
             columns: [],
             inline: { columns: [], records: {} },
           },
-          [{ type: "agent", dbAgentId: missingAgentId }],
-          [],
-          services(),
-        );
+          targets: [{ type: "agent", dbAgentId: missingAgentId }],
+          evaluators: [],
+          services: services(),
+        });
 
         if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
         expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
@@ -397,20 +397,20 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         });
         expect(second.version).toBe(2);
 
-        const result = await ExperimentExecutionDataService.loadExecutionData(
-          PROJECT_ID,
-          {
+        const result = await ExperimentExecutionDataService.loadExecutionData({
+          projectId: PROJECT_ID,
+          dataset: {
             type: "inline",
             columns: [],
             inline: { columns: [], records: {} },
           },
-          [
+          targets: [
             { type: "prompt", promptId: created.id, promptVersionNumber: 1 },
             { type: "prompt", promptId: created.id, promptVersionNumber: 2 },
           ],
-          [],
-          { ...services(), prompts: promptService },
-        );
+          evaluators: [],
+          services: { ...services(), prompts: promptService },
+        });
 
         if ("error" in result) {
           throw new Error(`loadExecutionData failed: ${result.error}`);
@@ -443,17 +443,17 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing evaluator", async () => {
         const missingEvaluatorId = `test_eval_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.loadExecutionData(
-          PROJECT_ID,
-          {
+        const result = await ExperimentExecutionDataService.loadExecutionData({
+          projectId: PROJECT_ID,
+          dataset: {
             type: "inline",
             columns: [],
             inline: { columns: [], records: {} },
           },
-          [],
-          [{ dbEvaluatorId: missingEvaluatorId }],
-          services(),
-        );
+          targets: [],
+          evaluators: [{ dbEvaluatorId: missingEvaluatorId }],
+          services: services(),
+        });
 
         if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
         expect(result.error).toBe(`Evaluator "${missingEvaluatorId}" not found`);

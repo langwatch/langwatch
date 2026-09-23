@@ -18,12 +18,17 @@ function hoverContents(
   };
 }
 
-function attributeHover(
-  model: editor.ITextModel,
-  position: Position,
-  wordEndColumn: number,
-  contractRef: ContractRef,
-) {
+function attributeHover({
+  model,
+  position,
+  wordEndColumn,
+  contractRef,
+}: {
+  model: editor.ITextModel;
+  position: Position;
+  wordEndColumn: number;
+  contractRef: ContractRef;
+}) {
   const line = model.getValueInRange({
     startLineNumber: position.lineNumber,
     startColumn: 1,
@@ -61,7 +66,12 @@ export function registerHover(monaco: Monaco, contractRef: ContractRef): IDispos
       // — so `secrets.YEA_BOI` resolves correctly when the cursor is mid-word.
       // Naïvely concatenating `lineBefore + word.word` double-counted the
       // partial typed prefix and produced bogus attribute paths.
-      const attribute = attributeHover(model, position, word.endColumn, contractRef);
+      const attribute = attributeHover({
+        model,
+        position,
+        wordEndColumn: word.endColumn,
+        contractRef,
+      });
       if (attribute) return attribute;
       // Bare identifier — node input, output, or builtin (in that order).
       const input = contractRef.current.inputs.find((f) => f.identifier === word.word);

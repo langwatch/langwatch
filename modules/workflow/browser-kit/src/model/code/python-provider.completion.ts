@@ -34,12 +34,17 @@ function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionI
   }
 }
 
-function memberCompletion(
-  monaco: Monaco,
-  module: PyModule | null,
-  member: PyMember,
-  range: IRange,
-): languages.CompletionItem {
+function memberCompletion({
+  monaco,
+  module,
+  member,
+  range,
+}: {
+  monaco: Monaco;
+  module: PyModule | null;
+  member: PyMember;
+  range: IRange;
+}): languages.CompletionItem {
   const label = member.name;
   const moduleHeader = module ? `${module.name}.${member.name}` : member.name;
   const sig = member.signature ?? label;
@@ -88,7 +93,9 @@ export function registerCompletion(monaco: Monaco, contractRef: ContractRef): ID
         const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : void 0;
         if (mod) {
           return {
-            suggestions: mod.members.map((m) => memberCompletion(monaco, mod, m, replaceRange)),
+            suggestions: mod.members.map((m) =>
+              memberCompletion({ monaco, module: mod, member: m, range: replaceRange }),
+            ),
           };
         }
       }
@@ -134,7 +141,9 @@ export function registerCompletion(monaco: Monaco, contractRef: ContractRef): ID
         const mod = imports.get(owner);
         if (mod) {
           return {
-            suggestions: mod.members.map((m) => memberCompletion(monaco, mod, m, replaceRange)),
+            suggestions: mod.members.map((m) =>
+              memberCompletion({ monaco, module: mod, member: m, range: replaceRange }),
+            ),
           };
         }
         return { suggestions: [] };
