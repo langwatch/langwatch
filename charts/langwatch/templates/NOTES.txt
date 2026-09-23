@@ -354,7 +354,9 @@ ClickHouse depends on the posture:
   users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
   restricted identity, its profile, grants, row policies and the `lwql_postgres`
   named collection land on EVERY replica — not just the one behind the Service.
-  No access SQL DDL runs, and the ClickHouse identity holds no ACCESS MANAGEMENT.
+  No access SQL DDL runs, and the restricted langwatch_lwql identity holds no
+  ACCESS MANAGEMENT. (The image still grants the `default` admin user
+  access_management; rendered delivery never uses it — only `sql` mode does.)
   On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
   each re-mounts the freshly rendered Secret.
 
