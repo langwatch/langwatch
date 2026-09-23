@@ -164,7 +164,23 @@ async function conversation(input: {
 }
 
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
-const notFoundAnswer = (): Response => new Response("404 Not Found", { status: 404 });
+const HONO_NOT_FOUND = {
+  status: 404,
+  mediaType: "text/plain;charset=UTF-8",
+  body: "404 Not Found",
+} as const;
+
+/** The worker's own wire: the key's owner is read off the request's credential. */
+const LOCAL_ANSWER = {
+  produces: "application/json",
+  because: "The local worker's identity bridge reads the key's owner off the project credential.",
+} as const;
+
+/** The long-poll wire, where the worker reads Hono's bare 404 as "still running". */
+const LOCAL_POLL_ANSWER = {
+  produces: ["application/json", "text/plain;charset=UTF-8"],
+  because: "The local worker's long-poll reads a bare 404 as an answer still pending.",
+} as const;
 
 /** Parses and validates a JSON body a composed schema can't declare via `.withInput()`. */
 function parseJsonBody<T extends z.ZodType>(raw: string, schema: T): z.infer<T> {
@@ -190,12 +206,12 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .get("/api/langy/local/workspace", "langyLocalWorkspace")
   .withPermission(LOCAL_PERMISSION)
   .withQuery(langyLocalWorkspaceQuerySchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_ANSWER)
   .withDocs({
     description: "The code access card's own status document, as the command line reads it.",
   })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, input, request }, members) => {
+  .handle(async ({ app, input, request, response }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const conversationId = input.conversationId ?? "";
     await conversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
@@ -210,16 +226,21 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     const preference = await members.users().tryReadPreference(auth.userId);
     const github = await members.github().readInstallation(auth.projectId);
 
-    return Response.json(
-      workspaceStatusSchema.parse({
-        connected: connected !== null,
-        ...(connected ? { workspace: connected.workspace } : {}),
-        codeAccessPreference: preference === "github" ? "github" : null,
-        github,
-        ...(pendingRequest ? { pendingRequest: ControlRequestService.toWire(pendingRequest) } : {}),
-      }),
-      { status: 200 },
-    );
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(
+        workspaceStatusSchema.parse({
+          connected: connected !== null,
+          ...(connected ? { workspace: connected.workspace } : {}),
+          codeAccessPreference: preference === "github" ? "github" : null,
+          github,
+          ...(pendingRequest
+            ? { pendingRequest: ControlRequestService.toWire(pendingRequest) }
+            : {}),
+        }),
+      ),
+    });
   })
 
   // ── the control request the card renders ──────────────────────────────────
@@ -228,10 +249,10 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withPermission(LOCAL_PERMISSION)
   .withInput(langyLocalCreateRequestBodySchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_ANSWER)
   .withDocs({ description: "The recorded request and the command that approves it." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, input, request }, members) => {
+  .handle(async ({ app, input, request, response }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const resolvedConversation = await conversation({
       app,
@@ -258,13 +279,16 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       command: SHARE_CONTROL_COMMAND,
     });
 
-    return Response.json(
-      createControlRequestResponseSchema.parse({
-        request: ControlRequestService.toWire(localRequest),
-        command: SHARE_CONTROL_COMMAND,
-      }),
-      { status: 200 },
-    );
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(
+        createControlRequestResponseSchema.parse({
+          request: ControlRequestService.toWire(localRequest),
+          command: SHARE_CONTROL_COMMAND,
+        }),
+      ),
+    });
   })
 
   // ── one local tool call ───────────────────────────────────────────────────
@@ -276,10 +300,10 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // exactly as this route always has.
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_ANSWER)
   .withDocs({ description: "The started call's own id." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, raw, request }, members) => {
+  .handle(async ({ app, raw, request, response }, members) => {
     const body = parseJsonBody(raw, langyLocalStartCallRequestSchema);
     const auth = await resolveLocalCaller({ request, members });
     const resolvedConversation = await conversation({
@@ -319,20 +343,24 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       call: { tool: body.tool, params: body.params } as never,
       timeoutMs,
     });
-    return Response.json({ callId: call.callId }, { status: 200 });
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ callId: call.callId }),
+    });
   })
 
   .get("/api/langy/local/calls/:id", "langyLocalReadCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_POLL_ANSWER)
   .withDocs({ description: "The call's answer, or a plain 404 while it is still running." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, input, request, signal }, members) => {
+  .handle(async ({ app, input, request, response, signal }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
-    if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
+    if (!call || call.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
     await conversation({
       app,
       conversationId: call.conversationId,
@@ -345,21 +373,25 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       holdMs: CALL_POLL_HOLD_MS,
       signal,
     });
-    if (!answer) return notFoundAnswer();
-    return Response.json(answer, { status: 200 });
+    if (!answer) return response.write(HONO_NOT_FOUND);
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(answer),
+    });
   })
 
   .post("/api/langy/local/calls/:id/cancel", "langyLocalCancelCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_POLL_ANSWER)
   .withDocs({ description: "The cancelled call's own id." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, input, request }, members) => {
+  .handle(async ({ app, input, request, response }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
-    if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
+    if (!call || call.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
     await conversation({
       app,
       conversationId: call.conversationId,
@@ -372,7 +404,11 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       conversationId: call.conversationId,
       turnId: call.turnId,
     });
-    return Response.json({ callId: call.callId, cancelled: true }, { status: 200 });
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ callId: call.callId, cancelled: true }),
+    });
   })
 
   // ── the question the worker asks ──────────────────────────────────────────
@@ -382,10 +418,10 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // Same composed-schema reason as `/local/calls` above.
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_ANSWER)
   .withDocs({ description: "The started wait's own id." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, raw, request }, members) => {
+  .handle(async ({ app, raw, request, response }, members) => {
     const body = parseJsonBody(raw, langyLocalStartWaitRequestSchema);
     const auth = await resolveLocalCaller({ request, members });
     await conversation({
@@ -402,20 +438,24 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       ...(body.toolCallId ? { toolCallId: body.toolCallId } : {}),
       questions: body.questions,
     });
-    return Response.json({ waitId: wait.waitId }, { status: 200 });
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ waitId: wait.waitId }),
+    });
   })
 
   .get("/api/langy/waits/:id", "langyLocalReadWait")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", LOCAL_POLL_ANSWER)
   .withDocs({ description: "The answered question, or a plain 404 while it is still waiting." })
   .withMiddleware(langyLocalRestMembers)
-  .handle(async ({ app, input, request, signal }, members) => {
+  .handle(async ({ app, input, request, response, signal }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
     const wait = await runtime.waits.read(input.id);
-    if (!wait || wait.projectId !== auth.projectId) return notFoundAnswer();
+    if (!wait || wait.projectId !== auth.projectId) return response.write(HONO_NOT_FOUND);
     await conversation({
       app,
       conversationId: wait.conversationId,
@@ -428,8 +468,12 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       holdMs: CALL_POLL_HOLD_MS,
       signal,
     });
-    if (!answer) return notFoundAnswer();
-    return Response.json(answer, { status: 200 });
+    if (!answer) return response.write(HONO_NOT_FOUND);
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(answer),
+    });
   })
 
   .build();

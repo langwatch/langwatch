@@ -6,7 +6,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestProtocolProducer,
+} from "@langwatch/api/rest";
 import {
   GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
@@ -60,6 +64,13 @@ export const GithubInstallApi = moduleApi<GithubInstallApi>()("github");
 
 const logger = createLogger("langwatch:api:github");
 
+/** The answer a GitHub App flow writes: status, media type, body and headers, as given. */
+type GithubAnswer = Parameters<RestProtocolProducer["write"]>[0];
+
+const INSTALL_PROTOCOL_REASON =
+  "GitHub App install, setup and webhook callbacks answer GitHub's own redirects, popup " +
+  "documents and bare JSON bodies, which a registered App already depends on.";
+
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
@@ -94,13 +105,20 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .get("/api/github/install", "startGithubInstallation")
   .withQuery(githubInstallStartQuerySchema)
   .withPermission("organization:manage", { at: "route", param: "organizationId" })
-  .withRawResponse({ produces: ["application/json"] })
-  .handle(async ({ app, request, actor }) => startInstallation({ app, request, userId: actor.id }))
+  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .handle(async ({ app, request, actor, response }) =>
+    response.write(await startInstallation({ app, request, userId: actor.id })),
+  )
 
   .get("/api/github/setup", "completeGithubInstallation")
   .withAccess(publicRoute({ reason: SETUP_PUBLIC_REASON }))
-  .withRawResponse({ produces: ["text/html", "application/json"] })
-  .handle(async ({ app, request }) => completeInstallation({ app, request }))
+  .withResponse("protocol", {
+    produces: ["text/html", "application/json"],
+    because: INSTALL_PROTOCOL_REASON,
+  })
+  .handle(async ({ app, request, response }) =>
+    response.write(await completeInstallation({ app, request })),
+  )
 
   .post("/api/github/webhook", "receiveGithubWebhook")
   // The body IS the evidence: the HMAC is computed over the exact bytes GitHub
@@ -108,8 +126,10 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
-  .withRawResponse({ produces: ["application/json"] })
-  .handle(async ({ app, request, raw }) => receiveWebhook({ app, request, raw }))
+  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .handle(async ({ app, request, raw, response }) =>
+    response.write(await receiveWebhook({ app, request, raw })),
+  )
 
   // `/api/github-langy/setup` and `/api/github-langy/webhook` are an external
   // contract, held by the hosted App and by every self-hosted App an operator
@@ -118,15 +138,22 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   // registration we do not own.
   .get("/api/github-langy/setup", "completeGithubInstallationOnLegacyPath")
   .withAccess(publicRoute({ reason: SETUP_PUBLIC_REASON }))
-  .withRawResponse({ produces: ["text/html", "application/json"] })
-  .handle(async ({ app, request }) => completeInstallation({ app, request }))
+  .withResponse("protocol", {
+    produces: ["text/html", "application/json"],
+    because: INSTALL_PROTOCOL_REASON,
+  })
+  .handle(async ({ app, request, response }) =>
+    response.write(await completeInstallation({ app, request })),
+  )
 
   .post("/api/github-langy/webhook", "receiveGithubWebhookOnLegacyPath")
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
-  .withRawResponse({ produces: ["application/json"] })
-  .handle(async ({ app, request, raw }) => receiveWebhook({ app, request, raw }))
+  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .handle(async ({ app, request, raw, response }) =>
+    response.write(await receiveWebhook({ app, request, raw })),
+  )
   .build();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,15 +161,12 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
 // and the popup document a `mode=popup` flow closes itself from.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function jsonAnswer(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
+function jsonAnswer(body: unknown, status: GithubAnswer["status"]): GithubAnswer {
+  return { status, mediaType: "application/json", body: JSON.stringify(body) };
 }
 
-function redirectTo(location: string): Response {
-  return new Response(null, { status: 302, headers: { location } });
+function redirectTo(location: string): GithubAnswer {
+  return { status: 302, mediaType: "text/html; charset=UTF-8", body: null, headers: { location } };
 }
 
 const POPUP_CSP =
@@ -153,15 +177,13 @@ const POPUP_CSP =
   "form-action 'none'; " +
   "frame-ancestors 'none'";
 
-function popupAnswer(body: string, status: number): Response {
-  return new Response(body, {
+function popupAnswer(body: string, status: GithubAnswer["status"]): GithubAnswer {
+  return {
     status,
-    headers: {
-      "content-type": "text/html; charset=UTF-8",
-      "content-security-policy": POPUP_CSP,
-      "x-frame-options": "DENY",
-    },
-  });
+    mediaType: "text/html; charset=UTF-8",
+    body,
+    headers: { "content-security-policy": POPUP_CSP, "x-frame-options": "DENY" },
+  };
 }
 
 /** The query the flow reads for itself, because its door declares none. */
@@ -181,7 +203,7 @@ async function startInstallation({
   app: GithubInstallApi;
   request: Request;
   userId: string;
-}): Promise<Response> {
+}): Promise<GithubAnswer> {
   const service = app.github();
 
   if (!service.getAppConfig().configured) {
@@ -307,7 +329,7 @@ async function completeInstallation({
 }: {
   app: GithubInstallApi;
   request: Request;
-}): Promise<Response> {
+}): Promise<GithubAnswer> {
   const service = app.github();
   const query = queryOf(request);
   const state = service.verifyInstallState(query.get("state"));
@@ -338,7 +360,7 @@ async function recordInstallation({
   app: GithubInstallApi;
   state: GithubInstallStatePayload;
   installationId: string;
-}): Promise<Response> {
+}): Promise<GithubAnswer> {
   const service = app.github();
   const returnTo = safeReturnTo(state.returnTo);
   let accountLogin: string;
@@ -389,7 +411,7 @@ async function rejectUnauthorizedSetup({
   app: GithubInstallApi;
   request: Request;
   state: GithubInstallStatePayload;
-}): Promise<Response | null> {
+}): Promise<GithubAnswer | null> {
   // Re-bind the session to the state's user.
   const session = await app.resolveSession({ request });
 
@@ -448,8 +470,8 @@ function setupError({
   app: GithubInstallApi;
   state: GithubInstallStatePayload | null;
   errorMessage: string;
-  status: number;
-}): Response {
+  status: GithubAnswer["status"];
+}): GithubAnswer {
   if (state && state.mode === "redirect") {
     return redirectTo(withGithubError(safeReturnTo(state.returnTo), errorMessage));
   }
@@ -596,7 +618,7 @@ async function receiveWebhook({
   app: GithubInstallApi;
   request: Request;
   raw: string;
-}): Promise<Response> {
+}): Promise<GithubAnswer> {
   const service = app.github();
   const secret = service.getAppConfig().webhookSecret;
 

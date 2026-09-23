@@ -82,8 +82,6 @@ export const TERMINAL_MESSAGE_STATUSES: ReadonlySet<string> = new Set([
 ]);
 
 export const GENIE_MESSAGE_SPAN_NAME = "databricks_genie.message" as const;
-/** One per generated-query attachment; listed by the TurnSteps strip. */
-export const GENIE_QUERY_SPAN_NAME = "databricks_genie.query" as const;
 /** Provenance value under `langwatch.source` (Decision 8). */
 export const GENIE_PROVENANCE_SOURCE = "databricks_genie" as const;
 /**

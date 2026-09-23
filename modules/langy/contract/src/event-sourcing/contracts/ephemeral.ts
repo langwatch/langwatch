@@ -1,5 +1,6 @@
-import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "@langwatch/langy-contract";
 import { z } from "zod";
+
+import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "../../constants.ts";
 
 /**
  * Live-transport-only signals: status/progress during turns, never persisted

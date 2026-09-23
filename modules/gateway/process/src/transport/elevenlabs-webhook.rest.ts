@@ -34,19 +34,23 @@ export const elevenLabsWebhookRest = defineRestRouter(GatewayApi)
   .withRawBody("text")
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess({ kind: "public", reason: WEBHOOK_PUBLIC_REASON })
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", {
+    produces: "application/json",
+    because:
+      "ElevenLabs reads its own delivery acknowledgement, status and body, as the provider defines it.",
+  })
   .withMiddleware(elevenLabsSignature)
-  .handle(async ({ app, input, raw }, headers) => {
+  .handle(async ({ app, input, raw, response }, headers) => {
     const answer = await app.receiveElevenLabsWebhook({
       modelProviderId: input.modelProviderId,
       rawBody: raw,
       signature: headers.signature,
     });
 
-    return {
+    return response.write({
       status: answer.status,
-      headers: { "Content-Type": "application/json" },
+      mediaType: "application/json",
       body: JSON.stringify(answer.body),
-    };
+    });
   })
   .build();

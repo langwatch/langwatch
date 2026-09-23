@@ -7,6 +7,8 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
+  type RestAnswer,
+  type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import {
   LangyApi,
@@ -60,7 +62,14 @@ export const langyTurnsMembers = defineRestMiddleware(
 );
 
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
-const darkAnswer = (): Response => new Response("404 Not Found", { status: 404 });
+const HONO_NOT_FOUND = {
+  status: 404,
+  mediaType: "text/plain;charset=UTF-8",
+  body: "404 Not Found",
+} as const;
+
+/** What a turn route publishes: its JSON answers, and the dark surface's bare 404. */
+const TURN_PRODUCES = ["application/json", "text/plain;charset=UTF-8"] as const;
 
 function requestedWaitSeconds(request: Request): number | null {
   const prefer = request.headers.get("prefer");
@@ -110,10 +119,11 @@ async function startTurn(input: {
   app: LangyApi;
   members: LangyTurnsRestMembers;
   request: Request;
+  response: RestProtocolProducer<typeof TURN_PRODUCES>;
   raw: string;
   conversationId: string | null;
-}): Promise<Response> {
-  const { app, members, request, conversationId } = input;
+}): Promise<RestAnswer<"protocol">> {
+  const { app, members, request, response, conversationId } = input;
   // The door already resolved this key and enforced `langy:create` as its
   // ceiling; reading its answer back here asks the key store nothing twice.
   const resolved: LangyIdentityToken = projectCredentialOfRequest(request);
@@ -121,7 +131,7 @@ async function startTurn(input: {
     resolved,
     flag: LANGY_API_KEY_TURNS_FLAG,
   });
-  if (caller.dark) return darkAnswer();
+  if (caller.dark) return response.write(HONO_NOT_FOUND);
 
   const actor = await members.callers.resolveActor({ userId: caller.userId });
   if (!actor.ok) throw new LangyApiIdentityDeniedError("langy_api_actor_missing", actor.message);
@@ -165,28 +175,31 @@ async function startTurn(input: {
       // authorized, accepted and settled - and `status`/`error` carry the
       // turn's own outcome. Failure here is a domain result, not a transport
       // refusal.
-      return Response.json(
-        {
+      return response.write({
+        status: 200,
+        mediaType: "application/json",
+        body: JSON.stringify({
           ...result,
           status: settlement.outcome,
           error: settlement.error,
           reply: settlement.succeeded
             ? { role: "assistant" as const, text: settlement.text }
             : null,
-        },
-        {
-          status: 200,
-          // RFC 7240 §3: echo the applied value - it is how a caller asking
-          // for more than MAX_WAIT_SECONDS learns what they actually got.
-          headers: { "Preference-Applied": `wait=${waitSeconds}` },
-        },
-      );
+        }),
+        // RFC 7240 §3: echo the applied value - it is how a caller asking
+        // for more than MAX_WAIT_SECONDS learns what they actually got.
+        headers: { "Preference-Applied": `wait=${waitSeconds}` },
+      });
     }
   }
 
   // 202, not 200: the turn is accepted and dispatched, and the assistant's
   // answer does not exist yet. The caller polls or streams for it.
-  return Response.json(result, { status: 202 });
+  return response.write({
+    status: 202,
+    mediaType: "application/json",
+    body: JSON.stringify(result),
+  });
 }
 
 /** A turn answers 202, or 200 with the settled reply, or a dark 404. */
@@ -203,27 +216,28 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
   .post("/api/langy/conversations", "startLangyConversationTurn")
   .withPermission("langy:create")
   .withRawBody("text")
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Start a Langy conversation with one turn. ${TURN_ANSWER}` })
   .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, raw, request }, members) =>
-    startTurn({ app, members, request, raw, conversationId: null }),
+  .handle(async ({ app, raw, request, response }, members) =>
+    startTurn({ app, members, request, response, raw, conversationId: null }),
   )
 
   .post("/api/langy/conversations/:conversationId/messages", "continueLangyConversationTurn")
   .withPermission("langy:create")
   .withParams(langyRestConversationParamsSchema)
   .withRawBody("text")
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: TURN_PRODUCES, because: TURN_ANSWER })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({ description: `Continue one Langy conversation with a turn. ${TURN_ANSWER}` })
   .withMiddleware(langyTurnsMembers)
-  .handle(async ({ app, input, raw, request }, members) =>
+  .handle(async ({ app, input, raw, request, response }, members) =>
     startTurn({
       app,
       members,
       request,
+      response,
       raw,
       conversationId: input.conversationId,
     }),

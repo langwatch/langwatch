@@ -19,7 +19,9 @@ import {
 } from "../rules/genie-message.rules.ts";
 import * as ConversationTraceAssemblyService from "./conversation-trace-assembly-service.rules.ts";
 import type { OtlpJsonAttr, OtlpJsonSpan } from "./conversation-trace-assembly-service.rules.ts";
-import { GENIE_QUERY_SPAN_NAME } from "./genie-trace-mapper-service.rules.ts";
+
+/** One per generated-query attachment; listed by the TurnSteps strip. */
+export const GENIE_QUERY_SPAN_NAME = "databricks_genie.query" as const;
 
 /** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */
 export function thoughtTypeOf(thought: GenieThought): string {

@@ -21,10 +21,10 @@ import { TraceSpanCostMatchingService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { KNOWN_AGENT_IDENTITIES } from "../../rules/conversation-trace-assembly-service.rules.ts";
+import { GENIE_QUERY_SPAN_NAME } from "../../rules/genie-span-attributes-service.rules.ts";
 import {
   GENIE_AGENT_MODEL,
   GENIE_MESSAGE_SPAN_NAME,
-  GENIE_QUERY_SPAN_NAME,
   GENIE_ROUTING_PROFILE,
 } from "../../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../../rules/genie-trace-mapper-service.rules.ts";

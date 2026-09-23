@@ -88,7 +88,17 @@ export const langyUiActionsRestMembers = defineRestMiddleware(
 );
 
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
-const notFoundAnswer = (): Response => new Response("404 Not Found", { status: 404 });
+const HONO_NOT_FOUND = {
+  status: 404,
+  mediaType: "text/plain;charset=UTF-8",
+  body: "404 Not Found",
+} as const;
+
+/** The CLI's wire: the action outcome as JSON, or the dark surface's bare 404. */
+const UI_ACTIONS_ANSWER = {
+  produces: ["application/json", "text/plain;charset=UTF-8"],
+  because: "The CLI reads a bare 404 as the rollout being dark for the project.",
+} as const;
 
 export const langyUiActionsRest = defineRestRouter(LangyApi)
   .withNamespace("langy")
@@ -100,20 +110,20 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
   .withAccess(deferredScope({ reason: AUTH_REASON }))
   .withRawBody("text")
   .withBodyLimit({ maxBytes: MAX_ACTION_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", UI_ACTIONS_ANSWER)
   .withDocs({
     description:
       "The dispatch answers the action service's own outcome, and a plain 404 when the " +
       "rollout is dark for the project.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ raw, request }, members) => {
+  .handle(async ({ raw, request, response }, members) => {
     const resolved = projectCredentialOfRequest(request);
     const caller = await LangyRestCallerService.create({
       featureFlags: members.featureFlags(),
       actors: members.actors(),
     }).resolve({ resolved, flag: LANGY_UI_ACTIONS_FLAG });
-    if (caller.dark) return notFoundAnswer();
+    if (caller.dark) return response.write(HONO_NOT_FOUND);
 
     let parsedRaw: unknown;
     try {
@@ -154,28 +164,34 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       ...(experimentSlug ? { experimentSlug } : {}),
       notFound: () => new LangyConversationNotFoundError(conversationId),
     });
-    return Response.json(outcome, { status: 200 });
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(outcome),
+    });
   })
 
   .get("/api/langy/ui/actions", "langyUiActionsList")
   .withAccess(deferredScope({ reason: AUTH_REASON }))
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", UI_ACTIONS_ANSWER)
   .withDocs({
     description:
       "The catalogue publishes each action's own draft-07 payload schema, which the CLI " +
       "reads as it stands.",
   })
   .withMiddleware(langyUiActionsRestMembers)
-  .handle(async ({ request }, members) => {
+  .handle(async ({ request, response }, members) => {
     const resolved = projectCredentialOfRequest(request);
     const caller = await LangyRestCallerService.create({
       featureFlags: members.featureFlags(),
       actors: members.actors(),
     }).resolve({ resolved, flag: LANGY_UI_ACTIONS_FLAG });
-    if (caller.dark) return notFoundAnswer();
+    if (caller.dark) return response.write(HONO_NOT_FOUND);
 
-    return Response.json(
-      {
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({
         actions: members
           .actions()
           .list()
@@ -191,9 +207,8 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
               reused: "inline",
             }),
           })),
-      },
-      { status: 200 },
-    );
+      }),
+    });
   })
 
   .build();

@@ -72,6 +72,13 @@ function accessOf(members: LangyLocalControlRestMembers): ControlRequestAccessSe
   });
 }
 
+/** The folder's own frame wire, and the terminal's key resolved to a user. */
+const CONTROL_ANSWER = {
+  produces: "application/json",
+  because:
+    "The local folder reads its refusals as protocol frames and its key's user off the credential.",
+} as const;
+
 export const langyLocalControlRest = defineRestRouter(LangyApi)
   .withNamespace("langy")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -93,13 +100,13 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "control socket and answers refusals as protocol frames",
   })
   .withRawBody("text")
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description:
       "The registered frame with its instance token, or the refused frame with its reason.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ raw, request }, members) => {
+  .handle(async ({ raw, request, response }, members) => {
     let body: unknown;
     try {
       body = JSON.parse(raw);
@@ -108,17 +115,18 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
     }
     const frame = registerFrameSchema.safeParse(body);
     if (!frame.success) {
-      return Response.json(
-        {
+      return response.write({
+        status: 422,
+        mediaType: "application/json",
+        body: JSON.stringify({
           frame: {
             type: "refused" as const,
             protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
             code: "protocol_invalid" as const,
             message: `The body must be a register frame with protocol ${LOCAL_CONTROL_PROTOCOL_VERSION}.`,
           },
-        },
-        { status: 422 },
-      );
+        }),
+      });
     }
     const authorization = request.headers.get("authorization");
     const projectId = request.headers.get("x-project-id");
@@ -128,19 +136,24 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       frame: frame.data,
     });
     if (!outcome.ok) {
-      return Response.json(
-        {
+      return response.write({
+        status: 403,
+        mediaType: "application/json",
+        body: JSON.stringify({
           frame: {
             type: "refused" as const,
             protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
             code: outcome.code,
             message: outcome.message,
           },
-        },
-        { status: 403 },
-      );
+        }),
+      });
     }
-    return Response.json({ frame: outcome.reply, instanceToken: outcome.token }, { status: 200 });
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ frame: outcome.reply, instanceToken: outcome.token }),
+    });
   })
 
   .get("/api/langy/control/connect/poll", "langyControlConnectPoll")
@@ -151,19 +164,29 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "control socket and answers refusals as protocol frames",
   })
   .withQuery(langyControlPollQuerySchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description: "The frames waiting for the folder, or 410 when the instance token is not known.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ input, request, signal }, members) => {
+  .handle(async ({ input, request, signal, response }, members) => {
     const answer = await members.longPoll().poll({
       token: request.headers.get(INSTANCE_TOKEN_HEADER) ?? "",
       inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean),
       signal,
     });
-    if (!answer.ok) return Response.json({ frames: [] }, { status: 410 });
-    return Response.json({ frames: answer.frames }, { status: 200 });
+    if (!answer.ok) {
+      return response.write({
+        status: 410,
+        mediaType: "application/json",
+        body: JSON.stringify({ frames: [] }),
+      });
+    }
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ frames: answer.frames }),
+    });
   })
 
   .post("/api/langy/control/connect/frames", "langyControlConnectFrames")
@@ -174,12 +197,12 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "control socket and answers refusals as protocol frames",
   })
   .withRawBody("text")
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description: "How many frames were taken, or 410 when the instance token is not known.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ raw, request }, members) => {
+  .handle(async ({ raw, request, response }, members) => {
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(raw);
@@ -187,20 +210,36 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       parsedBody = null;
     }
     const body = langyControlFramesBodySchema.safeParse(parsedBody);
-    if (!body.success) return Response.json({ accepted: 0 }, { status: 422 });
+    if (!body.success) {
+      return response.write({
+        status: 422,
+        mediaType: "application/json",
+        body: JSON.stringify({ accepted: 0 }),
+      });
+    }
     const answer = await members.longPoll().frames({
       token: request.headers.get(INSTANCE_TOKEN_HEADER) ?? "",
       frames: body.data.frames,
     });
-    if (!answer.ok) return Response.json({ accepted: 0 }, { status: 410 });
-    return Response.json({ accepted: body.data.frames.length }, { status: 200 });
+    if (!answer.ok) {
+      return response.write({
+        status: 410,
+        mediaType: "application/json",
+        body: JSON.stringify({ accepted: 0 }),
+      });
+    }
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify({ accepted: body.data.frames.length }),
+    });
   })
 
   // ── requests: the developer's own key, resolved to a user ─────────────────
 
   .get("/api/langy/control/requests", "listLangyControlRequests")
   .withPermission("langy:view")
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description:
       "List the open requests Langy made for a folder of mine, on every project I can read. Only the " +
@@ -208,21 +247,24 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "it was made.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ request }, members) => {
+  .handle(async ({ request, response }, members) => {
     const requests = await accessOf(members).listReadable({ userId: controlUser(request) });
-    return Response.json(
-      listControlRequestsResponseSchema.parse({
-        requests: requests.map((r) => ControlRequestService.toWire(r)),
-      }),
-      { status: 200 },
-    );
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(
+        listControlRequestsResponseSchema.parse({
+          requests: requests.map((r) => ControlRequestService.toWire(r)),
+        }),
+      ),
+    });
   })
 
   .post("/api/langy/control/requests/:requestId/approve", "approveLangyControlRequest")
   .withPermission("langy:create")
   .withParams(langyControlIdParamsSchema)
   .withInput(approveControlRequestBodySchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description:
       "Approve one request and share the current folder with the conversation that asked. " +
@@ -230,7 +272,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "again. A request is single use: a second approval is refused.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ input, request }, members) => {
+  .handle(async ({ input, request, response }, members) => {
     const userId = controlUser(request);
     const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
@@ -241,35 +283,38 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       requestId: addressed.id,
       userId,
     });
-    return Response.json(
-      approveControlRequestResponseSchema.parse({
-        sessionKey: approved.sessionKey,
-        endpoint: (members.baseHost ?? "").replace(/\/+$/, ""),
-        conversation: {
-          id: approved.request.conversationId,
-          title: approved.request.conversationTitle,
-          url: conversationUrl(
-            approved.request.conversationId,
-            members.baseHost,
-            approved.projectSlug,
-          ),
-        },
-      }),
-      { status: 200 },
-    );
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(
+        approveControlRequestResponseSchema.parse({
+          sessionKey: approved.sessionKey,
+          endpoint: (members.baseHost ?? "").replace(/\/+$/, ""),
+          conversation: {
+            id: approved.request.conversationId,
+            title: approved.request.conversationTitle,
+            url: conversationUrl(
+              approved.request.conversationId,
+              members.baseHost,
+              approved.projectSlug,
+            ),
+          },
+        }),
+      ),
+    });
   })
 
   .post("/api/langy/control/requests/:requestId/cancel", "cancelLangyControlRequest")
   .withPermission("langy:create")
   .withParams(langyControlIdParamsSchema)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", CONTROL_ANSWER)
   .withDocs({
     description:
       "Refuse one request from the terminal. The card in the chat reads that sharing was " +
       "cancelled, and Langy's next turn offers the choice again.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ input, request }, members) => {
+  .handle(async ({ input, request, response }, members) => {
     const userId = controlUser(request);
     const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
@@ -277,12 +322,13 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       permission: "langy:create",
     });
     await members.runtime().requests.cancel({ requestId: addressed.id, userId });
-    return Response.json(
-      langyControlCancelResultSchema.parse({ id: input.requestId, cancelled: true }),
-      {
-        status: 200,
-      },
-    );
+    return response.write({
+      status: 200,
+      mediaType: "application/json",
+      body: JSON.stringify(
+        langyControlCancelResultSchema.parse({ id: input.requestId, cancelled: true }),
+      ),
+    });
   })
 
   .build();

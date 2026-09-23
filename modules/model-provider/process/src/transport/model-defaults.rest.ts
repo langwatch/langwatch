@@ -120,6 +120,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .put("/:modelDefaultId", "putApiModelDefaultsById")
   .withParams(modelDefaultsRestParamsSchema)
   .withInput(updateModelDefaultConfigInputSchema)
+  .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
   .withMiddleware(modelDefaultsRestCredential)
   .withDocs({
@@ -145,6 +146,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
 
   .delete("/:modelDefaultId", "deleteApiModelDefaultsById")
   .withParams(modelDefaultsRestParamsSchema)
+  .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
   .withMiddleware(modelDefaultsRestCredential)
   .withDocs({

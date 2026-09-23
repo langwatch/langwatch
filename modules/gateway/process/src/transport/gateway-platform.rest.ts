@@ -826,6 +826,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .get("/providers", "getApiGatewayV1Providers")
   .withPermission("gatewayProviders:view")
+  .withOutput(z.void())
   .withDocs({
     summary: "List provider bindings",
     description:
@@ -840,6 +841,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .post("/providers", "postApiGatewayV1Providers")
   .withPermission("gatewayProviders:manage")
+  .withOutput(z.void())
   .withDocs({
     summary: "Bind a model provider to the gateway",
     description:
@@ -855,6 +857,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .patch("/providers/:id", "patchApiGatewayV1ProvidersById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayProviders:update")
+  .withOutput(z.void())
   .withDocs({
     summary: "Update provider binding",
     description: "Retired. The advanced gateway fields are patched on the model provider itself.",
@@ -869,6 +872,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .delete("/providers/:id", "deleteApiGatewayV1ProvidersById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayProviders:manage")
+  .withOutput(z.void())
   .withDocs({
     summary: "Disable provider binding",
     description: "Retired. Disabling the underlying model provider is the replacement.",
