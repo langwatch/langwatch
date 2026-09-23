@@ -63,11 +63,12 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
 
-# The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
-# 697s and `e2e: overlays` to 348s — and without a group every push to a chart
-# PR left its predecessors running to completion alongside it. Same rule as
-# langwatch-app-ci: supersede on a PR branch, never on main, because every
-# commit that lands on main has to keep its own validation.
+# The e2e jobs here are the most expensive in the repo — the single `e2e:
+# infra` leg ran to 697s before it was split into the parallel `core` /
+# `external` legs, and `e2e: overlays` runs to 348s — and without a group every
+# push to a chart PR left its predecessors running to completion alongside it.
+# Same rule as langwatch-app-ci: supersede on a PR branch, never on main,
+# because every commit that lands on main has to keep its own validation.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -194,6 +195,17 @@ jobs:
         if: "!cancelled()"
         run: ./tests/stored-objects-upgrade-ordering.sh
 
+      # The hook lifecycle invariants a review bot re-derives by eye every
+      # round — a hook Job's ServiceAccount and secretKeyRef Secrets must be
+      # lower-weight hooks in the same phase, every pre-upgrade hook needs a
+      # pre-rollback twin, no template reads an undeclared value, no subchart
+      # mount rides parent extraVolumes. `helm template` sees all of it in
+      # seconds; a 35-minute e2e never did. (This script arrives in a separate
+      # commit; the step may fail until it lands — expected.)
+      - name: "assert hook lifecycle invariants"
+        if: "!cancelled()"
+        run: bash tests/lifecycle.sh
+
       # Design C rests on one Secret name resolving identically on both sides:
       # the app reads the langwatch_lwql password from exactly the Secret the
       # ClickHouse pod mounts to create that identity. The two names come from
@@ -222,6 +234,16 @@ jobs:
       - name: "assert Connect emits nothing by default and reaches both workloads when on"
         if: "!cancelled()"
         run: ./tests/connect-env.sh
+
+      # The e2e job below is split into independent matrix legs sharing one
+      # image build. That structure is a CI invariant with no cluster to prove
+      # it: every suite on main runs in exactly one leg, fail-fast is off, and
+      # nothing is continue-on-error. This reads the workflow YAML and asserts
+      # it, so a suite dropped from every leg or a re-introduced fail-fast fails
+      # here in seconds rather than by a missing [PASS] line nobody counted.
+      - name: "assert e2e workflow matrix shape"
+        if: "!cancelled()"
+        run: ./tests/chart-workflow-matrix.sh
 
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,
@@ -264,34 +286,17 @@ jobs:
           pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
           pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
 
-  e2e:
-    name: "e2e: ${{ matrix.name }}"
-    # These two legs are the most expensive jobs in the repository — `e2e:
-    # infra` runs to 697s and `e2e: overlays` to 348s, both building images and
-    # standing up a kind cluster — so a draft releases the slots and they come
-    # back on ready_for_review.
-    #
-    # This matters most for the release-please pull requests, which touch
-    # `charts/**` and `package.json` on every merge to main and so fire this
-    # workflow every time. Twelve workflows already skip their heavy jobs on a
-    # draft via detect-changes' `heavy` output; this one has no gate job to
-    # read it from, which left it the last heavy thing running on a version
-    # bump.
+  # Every image the e2e legs install is built exactly once here and handed to
+  # them as artifacts. The old `infra` leg rebuilt the app image — the
+  # expensive one — from scratch on its own runner; splitting it into three
+  # legs would have rebuilt that image three times. `docker save` +
+  # upload-artifact, then download-artifact + `docker load` in each leg, pays a
+  # ~1-2 GiB round-trip per image, still far cheaper than two extra app builds.
+  # Retention is one day: these are throwaway CI intermediates.
+  build-images:
+    name: "build images"
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    needs: render
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: infra
-            script: make test-e2e
-            cluster: lw-test
-            build_app: true
-          - name: overlays
-            script: make test-e2e-overlays
-            cluster: lw-overlay
-            build_app: false
     defaults:
       run:
         working-directory: charts/langwatch
@@ -300,22 +305,127 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - name: Build clickhouse-serverless image
-        run: docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
       - name: Resolve app image
-        if: matrix.build_app
         run: |
           APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
           APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
-        if: matrix.build_app
         run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
         run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
+      - name: Build clickhouse-serverless image
+        run: docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
+      - name: Save images to tarballs
+        run: |
+          mkdir -p "${RUNNER_TEMP}/images"
+          docker save "$APP_IMAGE" -o "${RUNNER_TEMP}/images/app.tar"
+          docker save langwatch/ai-gateway:e2e -o "${RUNNER_TEMP}/images/gateway.tar"
+          docker save langwatch/clickhouse-serverless:next -o "${RUNNER_TEMP}/images/clickhouse.tar"
+      - name: Upload app image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-app
+          path: ${{ runner.temp }}/images/app.tar
+          retention-days: 1
+      - name: Upload gateway image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-gateway
+          path: ${{ runner.temp }}/images/gateway.tar
+          retention-days: 1
+      - name: Upload clickhouse-serverless image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-clickhouse
+          path: ${{ runner.temp }}/images/clickhouse.tar
+          retention-days: 1
+
+  e2e:
+    name: "e2e: ${{ matrix.name }}"
+    # The chart's e2e is three independent legs sharing one image build (the
+    # `build-images` job above). It used to be a single `infra` leg that ran
+    # every suite serially — 697s on main, ~35 min with the LWQL suites — where
+    # one failing suite hid every suite after it, and each push rebuilt the app
+    # image. Now `core` runs the install-dependent chain, `external` runs the
+    # suites that do their own installs, and `overlays` is unchanged; each gets
+    # its own kind cluster, `fail-fast: false` keeps a failure in one leg from
+    # cancelling the others, and the three run in parallel so the slowest leg —
+    # not their sum — is the wall time.
+    #
+    # These legs are among the most expensive jobs in the repository — they
+    # stand up a kind cluster and load images — so a draft releases the slots
+    # and they come back on ready_for_review. This matters most for the
+    # release-please pull requests, which touch `charts/**` and `package.json`
+    # on every merge to main and so fire this workflow every time. Twelve
+    # workflows already skip their heavy jobs on a draft via detect-changes'
+    # `heavy` output; this one has no gate job to read it from, which left it
+    # the last heavy thing running on a version bump.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    needs: [render, build-images]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The install-dependent chain: each suite builds on the release the
+          # previous one left running, so they must stay in one leg in order.
+          - name: core
+            script: make test-e2e E2E_SUITES="test_install test_clickhouse test_clickhouse_url_secret test_postgresql test_redis test_resources test_app test_lwql test_workers test_metrics_collection test_upgrade_strategy_boundary test_upgrade"
+            cluster: lw-core
+            needs_app: true
+          # Each of these does its own install and shares nothing with the
+          # chain, so they run as their own leg. None enables the app or workers
+          # (app.replicaCount stays 0 in values-e2e and no hook Job uses the app
+          # image), so this leg needs only the gateway and clickhouse images.
+          - name: external
+            script: make test-e2e E2E_SUITES="test_external_clickhouse test_lwql_external_postgres_secret_guard test_cold_storage_and_backup"
+            cluster: lw-external
+            needs_app: false
+          - name: overlays
+            script: make test-e2e-overlays
+            cluster: lw-overlay
+            needs_app: false
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - name: Download clickhouse-serverless image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-clickhouse
+          path: ${{ runner.temp }}/images
+      - name: Download gateway image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-gateway
+          path: ${{ runner.temp }}/images
+      - name: Download app image
+        if: matrix.needs_app
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-app
+          path: ${{ runner.temp }}/images
+      - name: Load images into Docker
+        run: |
+          docker load -i "${RUNNER_TEMP}/images/clickhouse.tar"
+          docker load -i "${RUNNER_TEMP}/images/gateway.tar"
+          if [ "${{ matrix.needs_app }}" = "true" ]; then
+            docker load -i "${RUNNER_TEMP}/images/app.tar"
+          fi
+      - name: Resolve app image
+        if: matrix.needs_app
+        run: |
+          APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
+          APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
+          echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}
@@ -323,7 +433,7 @@ jobs:
         run: |
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
           kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
-          if [ "${{ matrix.build_app }}" = "true" ]; then
+          if [ "${{ matrix.needs_app }}" = "true" ]; then
             kind load docker-image "$APP_IMAGE" --name ${{ matrix.cluster }}
           fi
       - run: ${{ matrix.script }}
@@ -333,12 +443,15 @@ jobs:
       - name: Show pod status on failure
         if: failure()
         run: |
-          NS=$(kubectl get ns -o name 2>/dev/null | grep -o 'lw-test\|lw-overlay' | head -1)
-          [ -z "$NS" ] && exit 0
-          kubectl -n "$NS" get pods -o wide 2>/dev/null || true
-          kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
-          kubectl -n "$NS" describe pods 2>/dev/null || true
-          for POD in $(kubectl -n "$NS" get pods -o name 2>/dev/null); do
-            kubectl -n "$NS" logs "$POD" --all-containers --prefix --tail=-1 2>/dev/null || true
-            kubectl -n "$NS" logs "$POD" --all-containers --prefix --previous --tail=-1 2>/dev/null || true
+          # Every leg's suites run in namespace lw-test; the external leg's
+          # secret-guard suite also uses lwql-secret-guard. Dump each that exists.
+          for NS in $(kubectl get ns -o name 2>/dev/null | grep -oE 'lw-test|lw-overlay|lwql-secret-guard' | sort -u); do
+            echo "===== namespace ${NS} ====="
+            kubectl -n "$NS" get pods -o wide 2>/dev/null || true
+            kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+            kubectl -n "$NS" describe pods 2>/dev/null || true
+            for POD in $(kubectl -n "$NS" get pods -o name 2>/dev/null); do
+              kubectl -n "$NS" logs "$POD" --all-containers --prefix --tail=-1 2>/dev/null || true
+              kubectl -n "$NS" logs "$POD" --all-containers --prefix --previous --tail=-1 2>/dev/null || true
+            done
           done
