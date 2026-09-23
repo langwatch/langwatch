@@ -3054,6 +3054,21 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
     "EventId",
   ]),
   clickhouseView("suite_runs", ["TenantId", "ProjectionId"]),
+  // ClickHouse tables deliberately excluded (absent = unqueryable):
+  //   gateway_budget_scope_totals_mv (MaterializedView) — materialised-view
+  //     object; its target table is included
+  //   goose_db_version (MergeTree) — the goose migration-version table, engine-
+  //     internal tooling state — no tenant column at all
+  //   instant_eval_runs (ReplacingMergeTree) — the state of an Instant Eval run
+  //     while it is running: its progress, its spend and the statement it was
+  //     started from. Read through the runs API, which is where a run is started
+  //     and watched; what the run produced is the judgments dataset
+  //   lwql_api_key_tenant_map (MergeTree) — access-control plumbing, not
+  //     customer telemetry — holds key hashes the row policy reads to self-filter;
+  //     the policy already scopes it, so exposing it would leak the isolation
+  //     mechanism for no customer benefit
+  //   simulation_run_metrics_rollup_mv (MaterializedView) — materialised-view
+  //     object; its target table is included
   ...LWQL_POSTGRES_CATALOG,
 ];
 

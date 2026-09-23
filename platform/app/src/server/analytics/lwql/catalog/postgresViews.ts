@@ -192,4 +192,29 @@ export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
   postgresView("WebhookEndpointDelivery"),
   postgresView("WorkflowVersion"),
   postgresView("Workflow"),
+  // Prisma models deliberately excluded (absent = unqueryable), grouped by reason:
+  //   No owning tenant column:
+  //     Account, AccountCredential, BugReport, ConnectedCreditGrant,
+  //     ConnectedInvoice, ConnectedSeatChange, ConnectedStatement,
+  //     FeatureFlag, IdempotencyReceipt, Identifier,
+  //     IdentifierReservation, IdentityProjectionCursor, InstanceIdentity,
+  //     MfaEnrollment, Passkey, ScimDirectoryUser, ScimExternalId,
+  //     ScimUserResource, SelfHostedInstanceReport, Session,
+  //     SignInAttemptLock, SsoAuthenticationActivity, TwoFactor, User,
+  //     VerificationToken
+  //   Internal-only tenant:
+  //     SystemMigrationEnrollment, SystemMigrationTenantState
+  //   Access-control plumbing:
+  //     AnnotationQueueMembers, ApiKey, CustomRole, Grant, GrantUsage,
+  //     Group, GroupMembership, JoinRequest, Organization,
+  //     OrganizationInvite, OrganizationUser, PlatformToolPolicy,
+  //     ProjectSecret, Role, RoleBinding, ScimRequestLog, ScimSyncState,
+  //     ScimToken, SsoActivationRecoveryReservation, SsoBreakGlassBinding,
+  //     SsoConnection, SsoConnectionRegistrationSlot,
+  //     SsoConnectionReproofCursor, SsoCredential, SsoProvider,
+  //     SsoVerifiedDomain, SsoVerifiedDomainHolder, Team, TeamUser
+  //   Permission-gated (not analytics:view):
+  //     ActivationCode, AuditLog, BillingMeterCheckpoint,
+  //     ConnectedBillingAccount, Invoice, InvoiceItem, IssuedLicense,
+  //     SelfHostedInstance, Subscription, WebhookEndpoint
 ];
