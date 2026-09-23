@@ -65,7 +65,10 @@ export const GithubInstallApi = moduleApi<GithubInstallApi>()("github");
 const logger = createLogger("langwatch:api:github");
 
 /** The answer a GitHub App flow writes: status, media type, body and headers, as given. */
-type GithubAnswer = Parameters<RestProtocolProducer["write"]>[0];
+const GITHUB_MEDIA_TYPES = ["application/json", "text/html; charset=UTF-8"] as const;
+type GithubAnswer = Omit<Parameters<RestProtocolProducer["write"]>[0], "mediaType"> & {
+  mediaType: (typeof GITHUB_MEDIA_TYPES)[number];
+};
 
 const INSTALL_PROTOCOL_REASON =
   "GitHub App install, setup and webhook callbacks answer GitHub's own redirects, popup " +
@@ -105,7 +108,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .get("/api/github/install", "startGithubInstallation")
   .withQuery(githubInstallStartQuerySchema)
   .withPermission("organization:manage", { at: "route", param: "organizationId" })
-  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .withResponse("protocol", { produces: GITHUB_MEDIA_TYPES, because: INSTALL_PROTOCOL_REASON })
   .handle(async ({ app, request, actor, response }) =>
     response.write(await startInstallation({ app, request, userId: actor.id })),
   )
@@ -113,7 +116,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .get("/api/github/setup", "completeGithubInstallation")
   .withAccess(publicRoute({ reason: SETUP_PUBLIC_REASON }))
   .withResponse("protocol", {
-    produces: ["text/html", "application/json"],
+    produces: GITHUB_MEDIA_TYPES,
     because: INSTALL_PROTOCOL_REASON,
   })
   .handle(async ({ app, request, response }) =>
@@ -126,7 +129,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
-  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .withResponse("protocol", { produces: GITHUB_MEDIA_TYPES, because: INSTALL_PROTOCOL_REASON })
   .handle(async ({ app, request, raw, response }) =>
     response.write(await receiveWebhook({ app, request, raw })),
   )
@@ -139,7 +142,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .get("/api/github-langy/setup", "completeGithubInstallationOnLegacyPath")
   .withAccess(publicRoute({ reason: SETUP_PUBLIC_REASON }))
   .withResponse("protocol", {
-    produces: ["text/html", "application/json"],
+    produces: GITHUB_MEDIA_TYPES,
     because: INSTALL_PROTOCOL_REASON,
   })
   .handle(async ({ app, request, response }) =>
@@ -150,7 +153,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
-  .withResponse("protocol", { produces: ["application/json"], because: INSTALL_PROTOCOL_REASON })
+  .withResponse("protocol", { produces: GITHUB_MEDIA_TYPES, because: INSTALL_PROTOCOL_REASON })
   .handle(async ({ app, request, raw, response }) =>
     response.write(await receiveWebhook({ app, request, raw })),
   )
