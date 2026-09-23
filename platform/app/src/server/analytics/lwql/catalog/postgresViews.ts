@@ -17,7 +17,7 @@
  * imports {@link LWQL_POSTGRES_CATALOG} to spread into `LWQL_VIEW_CATALOG`; the
  * six formerly-hand-written views are overrides in `./postgresOverrides/core.ts`.
  *
- * @see ./derivePostgresCatalog.ts — the per-model builder these entries call
+ * @see ./defineCatalogModel.ts — the per-model builder these entries call
  * @see ./postgresOverrides — per-model refinements to the safe defaults
  * @see specs/lwql/postgres-catalog.feature
  */
@@ -25,7 +25,7 @@
 import {
   defineCatalogModel,
   type PostgresDatasetOverride,
-} from "./derivePostgresCatalog";
+} from "./defineCatalogModel";
 import { CONTENT_POSTGRES_OVERRIDES } from "./postgresOverrides/content";
 import { CORE_POSTGRES_OVERRIDES } from "./postgresOverrides/core";
 import { DESCRIPTIONS_POSTGRES_OVERRIDES } from "./postgresOverrides/descriptions";
@@ -59,7 +59,7 @@ function mergePostgresOverride(
   };
 }
 
-/** Every override file's maps, merged model-by-model into the single map the derivation reads. */
+/** Every override file's maps, merged model-by-model into the single map the builder reads. */
 function mergePostgresOverrides(
   maps: readonly Readonly<Record<string, PostgresDatasetOverride>>[],
 ): Record<string, PostgresDatasetOverride> {

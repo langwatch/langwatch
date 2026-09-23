@@ -1,6 +1,6 @@
 /**
  * The six views that used to be hand-written in `postgresViews.ts`, now as
- * overrides on the derivation.
+ * overrides on the per-model builder.
  *
  * They exist so the exposed names, descriptions and column aliases callers,
  * docs and the Go manifest already depend on stay byte-for-byte what they were
@@ -11,11 +11,11 @@
  * output) are now *gated* rather than absent, so a caller with content access
  * can read them and one without cannot.
  *
- * @see ../derivePostgresCatalog.ts — the derivation these refine
+ * @see ../defineCatalogModel.ts — the per-model builder these refine
  * @see ../postgresViews.ts — where they are assembled into the catalog
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** The six formerly-hand-written views, keyed by their Prisma model name. */
 export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> =

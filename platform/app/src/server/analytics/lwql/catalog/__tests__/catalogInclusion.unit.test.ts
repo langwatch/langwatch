@@ -15,8 +15,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { ColumnsManifest } from "../columnsManifest";
+import { defineCatalogModel } from "../defineCatalogModel";
 import { defineCatalogTable } from "../defineDatasetFromTable";
-import { defineCatalogModel } from "../derivePostgresCatalog";
 import { LWQL_VIEW_CATALOG } from "../lwqlViews";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import type { PrismaManifest } from "../prismaSchema";

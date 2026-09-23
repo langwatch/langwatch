@@ -2,18 +2,18 @@
  * Per-model published-description overrides, for the models whose sanitized
  * Prisma doc comment still reads wrong for a customer.
  *
- * {@link ../derivePostgresCatalog#sanitizeDescription} produces a clean first
+ * {@link ../defineCatalogModel#sanitizeDescription} produces a clean first
  * sentence for almost every model. A few open their comment with prose that
  * survives sanitizing but still names an internal model or ClickHouse-side
  * concept, or whose only concise phrasing used the word "nothing" (banned in
  * published docs). Each entry here restates the dataset in one customer-facing
- * sentence; the derivation supplies everything else.
+ * sentence; the builder supplies everything else.
  *
- * @see ../derivePostgresCatalog.ts#sanitizeDescription — the default this refines
+ * @see ../defineCatalogModel.ts#sanitizeDescription — the default this refines
  * @see ../postgresViews.ts — where these are assembled into the catalog
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** Description-only refinements, keyed by Prisma model name. */
 export const DESCRIPTIONS_POSTGRES_OVERRIDES: Record<

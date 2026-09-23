@@ -1,16 +1,16 @@
 /**
- * The Postgres catalog derivation: tenant scope, safe defaults and label
+ * The Postgres catalog per-model builder: tenant scope, safe defaults and label
  * columns.
  *
  * These bind the @unit scenarios of `specs/lwql/postgres-catalog.feature` that
  * are about the per-model build itself — naming/type helpers move to
- * `./derivePostgresCatalog.naming.unit.test.ts`, override handling (the six
+ * `./defineCatalogModel.naming.unit.test.ts`, override handling (the six
  * formerly-hand-written views, re-admits) to
- * `./derivePostgresCatalog.overrides.unit.test.ts`, the opt-in negative case
+ * `./defineCatalogModel.overrides.unit.test.ts`, the opt-in negative case
  * lives in `./catalogInclusion.unit.test.ts`, and the content-gating and
  * ground-truth scenarios bind elsewhere.
  *
- * @see ../derivePostgresCatalog.ts — the code under test
+ * @see ../defineCatalogModel.ts — the code under test
  * @see specs/lwql/postgres-catalog.feature
  */
 
@@ -24,7 +24,7 @@ import {
   isStrippedByDefault,
   resolveTenantScope,
   sanitizeDescription,
-} from "../derivePostgresCatalog";
+} from "../defineCatalogModel";
 import { LWQL_POSTGRES_CATALOG } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
 
@@ -192,7 +192,7 @@ describe("given the derived Postgres catalog", () => {
      * Prisma flattens an enum and a free-text `String` to the same ClickHouse
      * `String`, so a label would be gated `output` by the name-blind default and
      * — because the validator gates a bare name catalog-wide — withhold the same
-     * name on the ClickHouse half. The derivation recognises the two label shapes
+     * name on the ClickHouse half. The builder recognises the two label shapes
      * explicitly so they stay ungated.
      */
     it("leaves an enum column ungated", () => {

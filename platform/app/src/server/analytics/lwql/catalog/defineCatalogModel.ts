@@ -271,7 +271,7 @@ export function isStrippedByDefault(name: string): string | undefined {
 /**
  * Postgres String columns whose value is a categorical label, not free text.
  *
- * The ClickHouse derivation tells a label from a body by its *type*: a label is
+ * The ClickHouse builder tells a label from a body by its *type*: a label is
  * a `LowCardinality(String)`, which {@link ./defineDatasetFromTable#isContentType}
  * reads as "not content" and leaves ungated. Prisma carries no such wrapper — an
  * enum and a free-text `String` both map to a plain `String` (see

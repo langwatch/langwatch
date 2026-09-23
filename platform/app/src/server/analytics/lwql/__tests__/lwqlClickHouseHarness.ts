@@ -74,7 +74,7 @@ import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
 import { migrateUp } from "../../../clickhouse/goose";
 import { lwqlTenantCapability } from "../capability";
-import type { DerivedPostgresView } from "../catalog/derivePostgresCatalog";
+import type { DerivedPostgresView } from "../catalog/defineCatalogModel";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { LWQL_POSTGRES_CATALOG } from "../catalog/postgresViews";
 import { LWQL_PRISMA_MANIFEST } from "../catalog/prismaManifest";
@@ -2181,7 +2181,7 @@ const PG_MIGRATIONS_DIR = join(process.cwd(), "prisma/migrations");
  * Every application migration concatenated in apply order, as one SQL script.
  *
  * The real schema, not a hand-written stand-in: the catalog is *derived* from
- * the application's models now, so a base relation the derivation names — a
+ * the application's models now, so a base relation the builder names — a
  * column, a NOT NULL, an enum, a `@map`'d name — must be the shipped one or the
  * proof proves nothing. Prisma migrations are plain SQL, so replaying them
  * through `psql -f` reproduces exactly what production runs.

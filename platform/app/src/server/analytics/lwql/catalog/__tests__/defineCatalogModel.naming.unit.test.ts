@@ -1,12 +1,12 @@
 /**
- * The Postgres catalog derivation's naming and type-mapping helpers: model
+ * The Postgres catalog builder's naming and type-mapping helpers: model
  * name → view name, field name → column name, Prisma type → ClickHouse type.
  *
- * Split out of `./derivePostgresCatalog.unit.test.ts` (which covers tenant
+ * Split out of `./defineCatalogModel.unit.test.ts` (which covers tenant
  * scope, safe defaults and overrides) to keep each file under the repo's
  * per-file line budget for new test files.
  *
- * @see ../derivePostgresCatalog.ts — the code under test
+ * @see ../defineCatalogModel.ts — the code under test
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,7 +14,7 @@ import {
   clickHouseTypeFor,
   exposedColumnName,
   postgresDatasetName,
-} from "../derivePostgresCatalog";
+} from "../defineCatalogModel";
 import type { PrismaField } from "../prismaSchema";
 
 const scalarField = (over: Partial<PrismaField>): PrismaField => ({

@@ -3,11 +3,11 @@
  * formerly-hand-written views, topic clustering internals, re-admit reasons and
  * name-rule-dodging columns.
  *
- * Split out of `./derivePostgresCatalog.unit.test.ts` (which covers naming,
+ * Split out of `./defineCatalogModel.unit.test.ts` (which covers naming,
  * tenant scope and safe defaults) to keep each file under the repo's per-file
  * line budget for new test files.
  *
- * @see ../derivePostgresCatalog.ts — the code under test
+ * @see ../defineCatalogModel.ts — the code under test
  * @see specs/lwql/postgres-catalog.feature
  */
 
@@ -17,7 +17,7 @@ import {
   type DerivedPostgresView,
   defineCatalogModel,
   type PostgresDatasetOverride,
-} from "../derivePostgresCatalog";
+} from "../defineCatalogModel";
 import {
   LWQL_POSTGRES_ALL_OVERRIDES,
   LWQL_POSTGRES_CATALOG,
