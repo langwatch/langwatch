@@ -27,9 +27,7 @@ import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlDictionaryAuditQuery,
-  lwqlGrantStatement,
   lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
 } from "../provisioning/accessModel";
 import {
   lwqlViewSetupStatements,
@@ -43,6 +41,8 @@ import {
   expectTenantScopedRead,
   expectZeroRowsWithControl,
   type LangWatchQLClickHouseHarness,
+  lwqlHarnessGrantStatement,
+  lwqlHarnessRowPolicyStatement,
   recordSeedControl,
   runStatement,
   selectRows,
@@ -138,9 +138,10 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantsWithoutPolicy = rows.map((row) => row.TenantId);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          lwqlHarnessRowPolicyStatement({
             names: harness.names,
-            lwqlTable: spans,
+            table: spans.table,
+            tenantColumn: spans.tenantColumn,
           }),
         ]);
       }
@@ -1117,8 +1118,14 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
           `CREATE VIEW ${database}.${invokerView} SQL SECURITY INVOKER ` +
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
-          lwqlGrantStatement({ names: harness.names, table: definerView }),
-          lwqlGrantStatement({ names: harness.names, table: invokerView }),
+          lwqlHarnessGrantStatement({
+            names: harness.names,
+            table: definerView,
+          }),
+          lwqlHarnessGrantStatement({
+            names: harness.names,
+            table: invokerView,
+          }),
         ]);
 
         definerTenants = (

@@ -47,20 +47,17 @@
 
 import { assertIdentifier, clickHouseLiteral } from "../sqlText";
 
-// The access-statement builders moved to `./accessModelDdl.ts` (issue #8258),
-// where they consume the shared access-model definition alongside the users.d
-// YAML emitter. Re-exported here so every existing importer is unchanged; the
-// move is byte-identical, proven by `__tests__/accessModelDdl.fixture.unit.test.ts`.
+// The access model is single-sourced from the typed definition (issue #8258):
+// `renderLwqlAccessModelDdl` / `renderLwqlNamedCollectionDdl` over
+// `buildLwqlAccessModelDefinition` are the only access DDL in the codebase. The
+// per-statement builders were deleted. What remains in `./accessModelDdl.ts` and
+// is re-exported here is the structural setup, the DROP-policy helper (used to
+// prove the row policy is load-bearing), and the shared predicate templates.
 export {
   dropLangWatchQLRowPolicyStatement,
   LWQL_KEY_MAP_SELF_FILTER_TEMPLATE,
   LWQL_TENANT_PREDICATE_TEMPLATE,
   lwqlClickHouseSetupStatements,
-  lwqlGrantStatement,
-  lwqlKeyMapRowPolicyStatement,
-  lwqlRestrictedUserStatement,
-  lwqlRowPolicyStatement,
-  lwqlSettingsProfileStatement,
 } from "./accessModelDdl";
 
 /**

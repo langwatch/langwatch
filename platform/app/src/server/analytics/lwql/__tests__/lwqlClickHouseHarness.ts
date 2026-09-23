@@ -85,6 +85,7 @@ import {
   lwqlPhysicalColumn,
   lwqlPostgresViews,
 } from "../catalog/types";
+import type { LangWatchQLResourceLimits } from "../limits";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
@@ -93,8 +94,12 @@ import {
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
-  lwqlRowPolicyStatement,
 } from "../provisioning/accessModel";
+import {
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "../provisioning/accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../provisioning/accessModelDefinition";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
@@ -104,7 +109,6 @@ import {
 import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../provisioning/clickhouseStatementRunner";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "../provisioning/postgresMapping";
 import { postgresModelSeedStatements } from "./lwqlPostgresModelSeed";
@@ -232,6 +236,154 @@ export const LWQL_FACT_TABLES: LangWatchQLTable[] = [
   { table: "traces", tenantColumn: "TenantId" },
   { table: "spans", tenantColumn: "TenantId" },
 ];
+
+/**
+ * A synthetic fact-resident view over a harness fixture table.
+ *
+ * The fixture tables (`traces`, `spans`) are not in the shipped catalog, so the
+ * harness feeds the ONE access-model emitter ({@link renderLwqlAccessModelDdl})
+ * a synthetic view per table to provision its tenant policy and grant — there is
+ * no per-statement builder any more (#8258). `name === sourceTable`, so the
+ * view's whole-object SELECT grant lands on the fixture table itself, matching
+ * the whole-table grant the harness issued before the builders were deleted.
+ */
+function syntheticFactView(table: LangWatchQLTable): LangWatchQLViewDefinition {
+  return {
+    name: table.table,
+    sourceTable: table.table,
+    description: `harness fixture view over ${table.table}`,
+    gates: [],
+    grain: `one ${table.table} row`,
+    grainColumns: ["TenantId"],
+    joinKeys: [],
+    freshness: "test",
+    tenantColumn:
+      table.tenantColumn === "TenantId" ? undefined : table.tenantColumn,
+    dedup: { strategy: "none", keyColumns: ["TenantId"] },
+    columns: [
+      {
+        name: "TenantId",
+        type: "String",
+        description: "owning tenant",
+        gates: [],
+        sourceColumns: [table.tenantColumn],
+      },
+    ],
+  };
+}
+
+/**
+ * The named-collection stub the harness carries in a definition when it is not
+ * rendering the collection itself (only {@link renderLwqlNamedCollectionDdl}
+ * reads it, and the base setup does not call that).
+ */
+const HARNESS_NAMED_COLLECTION_STUB = {
+  collection: "lwql_postgres",
+  host: "unused",
+  port: 0,
+  database: "unused",
+  user: "unused",
+  password: "unused",
+} as const;
+
+/** The sha256 hex the restricted user is identified by (never the plaintext). */
+const RESTRICTED_PASSWORD_SHA256_HEX = (): string =>
+  createHash("sha256").update(RESTRICTED_PASSWORD).digest("hex");
+
+/**
+ * One table's tenant row policy, rendered through the single access-model
+ * emitter (#8258) — the replacement for the deleted `lwqlRowPolicyStatement`
+ * builder. The isolation suites drop a policy to prove it is load-bearing, then
+ * re-create it with exactly this statement.
+ */
+export function lwqlHarnessRowPolicyStatement({
+  names,
+  table,
+  tenantColumn = "TenantId",
+  sourceDatabase,
+}: {
+  names: LangWatchQLNames;
+  table: string;
+  tenantColumn?: string;
+  sourceDatabase?: string;
+}): string {
+  const definition = buildLwqlAccessModelDefinition({
+    names,
+    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
+    sourceDatabase: sourceDatabase ?? names.database,
+    views: [syntheticFactView({ table, tenantColumn })],
+  });
+  const policy = renderLwqlAccessModelDdl(definition).find((statement) =>
+    statement.startsWith(`CREATE ROW POLICY OR REPLACE ${table}_tenant `),
+  );
+  if (!policy) {
+    throw new Error(`lwql harness: no row policy rendered for ${table}`);
+  }
+  return policy;
+}
+
+/**
+ * A whole-object `GRANT SELECT` on one table, rendered through the single
+ * access-model emitter (#8258) — the replacement for the deleted
+ * `lwqlGrantStatement` builder. A synthetic view named after the table yields
+ * the emitter's whole-object view grant.
+ */
+export function lwqlHarnessGrantStatement({
+  names,
+  table,
+  database,
+}: {
+  names: LangWatchQLNames;
+  table: string;
+  database?: string;
+}): string {
+  const db = database ?? names.database;
+  const definition = buildLwqlAccessModelDefinition({
+    names,
+    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
+    sourceDatabase: names.database,
+    views: [syntheticFactView({ table, tenantColumn: "TenantId" })],
+  });
+  const grant = renderLwqlAccessModelDdl(definition).find(
+    (statement) =>
+      statement === `GRANT SELECT ON ${db}.${table} TO ${names.restrictedUser}`,
+  );
+  if (!grant) {
+    throw new Error(
+      `lwql harness: no whole-object grant rendered for ${table}`,
+    );
+  }
+  return grant;
+}
+
+/**
+ * The whole access model for a harness, rendered from the shared definition —
+ * the single source production runs (#8258). The profile, restricted user,
+ * key-map policy+grant, and each fixture table's policy+grant, all through
+ * {@link renderLwqlAccessModelDdl}. A suite re-applies this to converge the
+ * profile under new `limits` (the scan-ceiling proof) without re-running the
+ * structural objects.
+ */
+export function lwqlHarnessAccessModelStatements({
+  harness,
+  limits,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  limits?: LangWatchQLResourceLimits;
+}): string[] {
+  return renderLwqlAccessModelDdl(
+    buildLwqlAccessModelDefinition({
+      names: harness.names,
+      passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+      namedCollection: HARNESS_NAMED_COLLECTION_STUB,
+      sourceDatabase: harness.factDatabase,
+      limits,
+      views: harness.lwqlTables.map(syntheticFactView),
+    }),
+  );
+}
 
 /**
  * Where the fact tables the proof reads come from.
@@ -436,18 +588,27 @@ export async function startLangWatchQLClickHouse({
     );
   }
 
-  await applyAsAdmin(
+  // The access model is single-sourced from the definition now (#8258): the
+  // setup statements carry only the structural objects, and the profile, user,
+  // key-map policy+grant and every fixture table's policy+grant come from
+  // renderLwqlAccessModelDdl over one definition. For a migrated run
+  // `lwqlTables` is empty, so the emitter yields just profile/user/key-map and
+  // the real catalog's policies are applied later by the suite.
+  const accessDefinition = buildLwqlAccessModelDefinition({
+    names,
+    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
     // sourceDatabase mirrors provisionLwql.ts: production passes one
     // sourceDatabase to both the setup and the view statements, so the key
     // map (and its row policies) live in the facts database, not always
     // names.database.
-    lwqlClickHouseSetupStatements({
-      names,
-      password: RESTRICTED_PASSWORD,
-      lwqlTables,
-      sourceDatabase: factDatabase,
-    }),
-  );
+    sourceDatabase: factDatabase,
+    views: lwqlTables.map(syntheticFactView),
+  });
+  await applyAsAdmin([
+    ...lwqlClickHouseSetupStatements({ names, sourceDatabase: factDatabase }),
+    ...renderLwqlAccessModelDdl(accessDefinition),
+  ]);
 
   await seedKeyMap({ admin, names, keyMapDatabase: factDatabase });
   if (facts === "migrated") {
@@ -2634,19 +2795,27 @@ export async function mapPostgresIntoClickHouse({
     }),
   );
   const collection = lwqlTestNamedCollection(harness.names);
+  // One definition drives both the named collection and the per-table row
+  // policies, through the single access-model emitter (#8258). The mapped tables
+  // are not in the shipped catalog, so each is fed as a synthetic view.
+  const pgDefinition = buildLwqlAccessModelDefinition({
+    names: harness.names,
+    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+    namedCollection: {
+      collection,
+      // The docker host as seen from inside the ClickHouse container; see the
+      // module comment for why this is not a shared docker network.
+      host: "host.docker.internal",
+      port: postgres.container.getPort(),
+      database: PG_DATABASE,
+      user: PG_READER_ROLE,
+      password: PG_READER_PASSWORD,
+    },
+    sourceDatabase: harness.names.database,
+    views: lwqlTables.map(syntheticFactView),
+  });
   await harness.applyAsAdmin([
-    ...postgresNamedCollectionStatements({
-      connection: {
-        collection,
-        // The docker host as seen from inside the ClickHouse container; see the
-        // module comment for why this is not a shared docker network.
-        host: "host.docker.internal",
-        port: postgres.container.getPort(),
-        database: PG_DATABASE,
-        user: PG_READER_ROLE,
-        password: PG_READER_PASSWORD,
-      },
-    }),
+    ...renderLwqlNamedCollectionDdl(pgDefinition),
     ...lwqlTables.map(
       (lwqlTable) =>
         `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
@@ -2659,8 +2828,15 @@ export async function mapPostgresIntoClickHouse({
     // column-scoped one for every source it reads, and ClickHouse grants are
     // additive: a whole-table grant issued here would sit underneath it and
     // quietly widen it back out — the same trap the fixture fact tables carry.
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names: harness.names, lwqlTable }),
+    // So only the per-table row policies are taken from the rendered model.
+    ...renderLwqlAccessModelDdl(pgDefinition).filter(
+      (statement) =>
+        statement.startsWith("CREATE ROW POLICY OR REPLACE") &&
+        lwqlTables.some((lwqlTable) =>
+          statement.includes(
+            `_tenant ON ${harness.names.database}.${lwqlTable.table}`,
+          ),
+        ),
     ),
   ]);
   return lwqlTables;

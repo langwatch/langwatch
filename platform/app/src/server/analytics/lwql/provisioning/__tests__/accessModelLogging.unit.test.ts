@@ -8,7 +8,6 @@
  * @see ../clickhouseStatementRunner.ts — clickHouseErrorSummary
  * @see ../selfProvisioning.ts — probeAppFunctionStore error log
  * @see ../reconvergence.ts — probe / converge error logs
- * @scenario "No provisioning log line or thrown error contains SQL statement text"
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,6 +19,7 @@ const STATEMENT = `CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_
 
 describe("clickHouseErrorSummary", () => {
   describe("when a ClickHouse error embeds the failing statement and its password", () => {
+    /** @scenario "No provisioning log line or thrown error contains SQL statement text" */
     it("summarises to the code and type only, never the statement or the secret", () => {
       const error = Object.assign(
         new Error(

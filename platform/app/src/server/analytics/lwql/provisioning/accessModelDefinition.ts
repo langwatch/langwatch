@@ -36,6 +36,7 @@ import type { LangWatchQLNames } from "./accessModel";
 import {
   lwqlKeyMapPolicyName,
   lwqlKeyMapSelfFilter,
+  lwqlProfileSettings,
   lwqlRowPolicyName,
   lwqlTenantPredicate,
 } from "./accessModelDdl";
@@ -92,73 +93,6 @@ export interface LwqlAccessModelDefinition {
   readonly grants: readonly LwqlGrantTarget[];
   readonly rowPolicies: readonly LwqlRowPolicyTarget[];
   readonly namedCollection: PostgresNamedCollection;
-}
-
-/** The restricted profile's settings, in DDL order, pinned per the limits. */
-function profileSettings({
-  names,
-  limits,
-}: {
-  names: LangWatchQLNames;
-  limits: LangWatchQLResourceLimits;
-}): LwqlProfileSetting[] {
-  return [
-    {
-      name: names.tenantSetting,
-      value: "",
-      quoted: true,
-      constraint: "changeable_in_readonly",
-    },
-    { name: "readonly", value: 1, constraint: "const" },
-    {
-      name: "max_execution_time",
-      value: limits.maxExecutionTimeSeconds,
-      constraint: "const",
-    },
-    {
-      name: "max_memory_usage",
-      value: limits.maxMemoryUsageBytes,
-      constraint: "const",
-    },
-    { name: "max_threads", value: limits.maxThreads, constraint: "const" },
-    {
-      name: "max_concurrent_queries_for_user",
-      value: limits.maxConcurrentQueriesForUser,
-      constraint: "const",
-    },
-    {
-      name: "max_rows_to_read",
-      value: limits.maxRowsToRead,
-      constraint: "const",
-    },
-    {
-      name: "max_bytes_to_read",
-      value: limits.maxBytesToRead,
-      constraint: "const",
-    },
-    {
-      name: "read_overflow_mode",
-      value: "throw",
-      quoted: true,
-      constraint: "const",
-    },
-    {
-      name: "max_result_rows",
-      value: limits.maxResultRows,
-      constraint: "const",
-    },
-    {
-      name: "max_result_bytes",
-      value: limits.maxResultBytes,
-      constraint: "const",
-    },
-    {
-      name: "result_overflow_mode",
-      value: "throw",
-      quoted: true,
-      constraint: "const",
-    },
-  ];
 }
 
 /** The grant set, composed with the same catalog helpers the shipped DDL uses. */
@@ -271,7 +205,7 @@ export function buildLwqlAccessModelDefinition({
     user: { name: names.restrictedUser, passwordSha256Hex },
     profile: {
       name: names.settingsProfile,
-      settings: profileSettings({ names, limits }),
+      settings: lwqlProfileSettings({ names, limits }),
     },
     grants: accessModelGrants({ names, sourceDatabase, views }),
     rowPolicies: accessModelRowPolicies({ names, sourceDatabase, views }),

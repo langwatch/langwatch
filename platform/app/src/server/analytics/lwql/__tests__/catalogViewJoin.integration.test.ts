@@ -20,10 +20,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import {
-  dropLangWatchQLRowPolicyStatement,
-  lwqlRowPolicyStatement,
-} from "../provisioning/accessModel";
+import { dropLangWatchQLRowPolicyStatement } from "../provisioning/accessModel";
 import {
   LWQL_SOURCE_ALIAS,
   lwqlViewSetupStatements,
@@ -31,6 +28,7 @@ import {
 } from "../provisioning/catalogStatements";
 import {
   type LangWatchQLClickHouseHarness,
+  lwqlHarnessRowPolicyStatement,
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
@@ -214,13 +212,10 @@ describe("given a catalog view that joins two tenant-policed tables (#8085)", ()
         leakedTenants = rows.map((row) => row.RightTenant);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          lwqlHarnessRowPolicyStatement({
             names: harness.names,
-            lwqlTable: {
-              table: "join_right",
-              tenantColumn: "TenantId",
-              database: facts,
-            },
+            table: "join_right",
+            tenantColumn: "TenantId",
             sourceDatabase: facts,
           }),
         ]);

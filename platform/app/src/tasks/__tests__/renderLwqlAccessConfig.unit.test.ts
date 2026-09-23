@@ -4,9 +4,6 @@
  * input, and never emits the password, its hash or the file contents (AC5).
  *
  * @see ../renderLwqlAccessConfig.ts
- * @scenario "renderLwqlAccessConfig writes exactly the users.d and config.d files"
- * @scenario "renderLwqlAccessConfig fails with a named error when an input is missing"
- * @scenario "renderLwqlAccessConfig never prints file contents or secrets"
  */
 
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
@@ -43,6 +40,7 @@ describe("renderLwqlAccessConfig", () => {
   });
 
   describe("when the environment is fully configured", () => {
+    /** @scenario "renderLwqlAccessConfig writes exactly the users.d and config.d files" */
     it("writes exactly users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml", async () => {
       await writeLwqlAccessConfig({ outDir, env: FULL_ENV });
 
@@ -65,6 +63,7 @@ describe("renderLwqlAccessConfig", () => {
   });
 
   describe("when a required input is missing", () => {
+    /** @scenario "renderLwqlAccessConfig fails with a named error when an input is missing" */
     it("throws a named error without any file written", async () => {
       const { LWQL_POSTGRES_READER_PASSWORD, ...missingReader } = FULL_ENV;
       void LWQL_POSTGRES_READER_PASSWORD;
@@ -96,6 +95,7 @@ describe("renderLwqlAccessConfig", () => {
   });
 
   describe("when it reports what it wrote", () => {
+    /** @scenario "renderLwqlAccessConfig never prints file contents or secrets" */
     it("returns the relative paths and the secret length, not the secret", async () => {
       const result = await writeLwqlAccessConfig({ outDir, env: FULL_ENV });
 

@@ -18,6 +18,7 @@
  * @see specs/lwql/api.feature
  */
 
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -33,6 +34,11 @@ import {
   lwqlClickHouseSetupStatements,
 } from "../accessModel";
 import {
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
+import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "../catalogStatements";
@@ -40,7 +46,6 @@ import {
   inventoryConfigStoreLwqlEntities,
   runClickHouseStatements,
 } from "../clickhouseStatementRunner";
-import { postgresNamedCollectionStatements } from "../postgresMapping";
 
 // The names the app self-provisions on every distribution; these are the ones a
 // config store would define, so the test targets them deliberately.
@@ -146,42 +151,49 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         ]),
       );
 
-      // The shipped provisioning statements, composed from the same builders
-      // `selfHostedClickHouseProvisioningStatements` uses. Composed directly
-      // rather than through that wrapper because its single-database guard is a
-      // production invariant the test harness deliberately breaks: the shipped
-      // migrations land the fact tables in their own database, so — as in
+      // The shipped provisioning statements, composed from the same pieces
+      // `selfHostedClickHouseProvisioningStatements` uses: structural setup, the
+      // named collection and the whole access model, all rendered from the one
+      // shared definition (#8258). Composed directly rather than through that
+      // wrapper because its single-database guard is a production invariant the
+      // test harness deliberately breaks: the shipped migrations land the fact
+      // tables in their own database, so — as in
       // `catalogStatements.integration.test.ts` — the views read facts from
       // `harness.factDatabase` while the identity, collection and views
       // themselves live in `names.database`. The identity and named collection
       // statements target the config-store-owned names, so the runner must skip
       // them; every other statement (views, grants to the config-store user)
       // still runs or is tolerated by code.
+      const definition = buildLwqlAccessModelDefinition({
+        names,
+        passwordSha256Hex: createHash("sha256")
+          .update(RESTRICTED_PASSWORD)
+          .digest("hex"),
+        namedCollection: {
+          collection: CONFIG_STORE_COLLECTION,
+          host: "host.docker.internal",
+          port: 5432,
+          database: "lwqltest",
+          user: "lwql_ro",
+          password: READER_PASSWORD,
+        },
+        sourceDatabase: harness.factDatabase,
+      });
       const statements = [
         ...lwqlClickHouseSetupStatements({
           names,
-          password: RESTRICTED_PASSWORD,
-          lwqlTables: [],
           sourceDatabase: harness.factDatabase,
           // Kept out so the proof is about config-store tolerance, not the
           // replica-store probe.
           includeAppFunctions: false,
         }),
-        ...postgresNamedCollectionStatements({
-          connection: {
-            collection: CONFIG_STORE_COLLECTION,
-            host: "host.docker.internal",
-            port: 5432,
-            database: "lwqltest",
-            user: "lwql_ro",
-            password: READER_PASSWORD,
-          },
-        }),
+        ...renderLwqlNamedCollectionDdl(definition),
         ...lwqlViewSetupStatements({
           names,
           sourceDatabase: harness.factDatabase,
           dedup: SHIPPED_LWQL_DEDUP,
         }),
+        ...renderLwqlAccessModelDdl(definition),
       ];
 
       // The whole point: no throw, even though several statements target

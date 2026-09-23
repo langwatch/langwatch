@@ -9,19 +9,24 @@
  * ({@link ./accessModelUsersConfig.ts}) — so the BYO DDL path and the
  * chart/SaaS rendered path can never drift.
  *
- * This module is the SQL half. It carries the individual statement builders,
- * relocated here verbatim from `accessModel.ts` (a byte-identical move, proven
- * by `__tests__/accessModelDdl.fixture.unit.test.ts`), and
- * {@link renderLwqlAccessModelDdl}, which renders the whole model straight from
- * the definition so the parity test can compare it structurally against the
- * YAML.
+ * This module is the SQL half. The access model itself is single-sourced from
+ * the definition: {@link renderLwqlAccessModelDdl} renders the settings profile,
+ * the restricted user, every row policy and every grant, and
+ * {@link renderLwqlNamedCollectionDdl} the config.d named collection — the only
+ * access DDL in the codebase (issue #8258). The per-statement builders were
+ * deleted; every harness and integration suite now renders from the definition
+ * too, so the DDL they provision is byte-identical to production's, pinned by
+ * `__tests__/accessModelDdl.fixture.unit.test.ts`.
  *
- * `accessModel.ts` re-exports the builders below so every existing importer is
+ * The module also carries {@link lwqlClickHouseSetupStatements} (the structural
+ * database / app-function / key-map objects the model sits on) and
+ * {@link dropLangWatchQLRowPolicyStatement} (used only to prove the row policy
+ * is load-bearing). `accessModel.ts` re-exports those so their importers are
  * unchanged.
  *
  * AC5 logging rule: nothing here logs. It only returns SQL text. A caller that
  * logs a failure must name the statement kind and the ClickHouse error code
- * only — never the text these builders return.
+ * only — never the text these functions return.
  *
  * @see ./accessModelDefinition.ts — the typed definition both emitters consume
  * @see ./accessModelUsersConfig.ts — the users.d / config.d YAML emitter
@@ -38,7 +43,6 @@ import {
   assertNames,
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
-  type LangWatchQLTable,
   lwqlKeyMapTableStatement,
   qualified,
 } from "./accessModel";
@@ -49,7 +53,6 @@ import type {
   LwqlRowPolicyTarget,
 } from "./accessModelDefinition";
 import { lwqlAppFunctionStatements } from "./appFunctionStatements";
-import { postgresNamedCollectionStatements } from "./postgresMapping";
 
 /**
  * The tenant predicate. This constant is the single source: the app owns the
@@ -159,7 +162,8 @@ export function lwqlKeyMapPolicyName(keyMapTable: string): string {
 }
 
 /**
- * The settings profile.
+ * The restricted profile's settings, in DDL order — the single source both this
+ * emitter and the users.d YAML emitter render from.
  *
  * The tenant capability is the single `CHANGEABLE_IN_READONLY` setting, and its
  * default of `''` is what makes an absent context read zero rows instead of all
@@ -175,126 +179,70 @@ export function lwqlKeyMapPolicyName(keyMapTable: string): string {
  * TOO_MANY_ROWS_OR_BYTES (396) instead, mapped to `lwql_result_too_large` by
  * `isClickHouseResultTooLargeError` in the executor, never surfaced raw.
  */
-export function lwqlSettingsProfileStatement({
+export function lwqlProfileSettings({
   names,
   limits = DEFAULT_LWQL_RESOURCE_LIMITS,
 }: {
   names: LangWatchQLNames;
   limits?: LangWatchQLResourceLimits;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE SETTINGS PROFILE OR REPLACE ${names.settingsProfile}\n` +
-    `  SETTINGS ${names.tenantSetting} = '' CHANGEABLE_IN_READONLY,\n` +
-    `           readonly = 1 CONST,\n` +
-    `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
-    `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
-    `           max_threads = ${limits.maxThreads} CONST,\n` +
-    `           max_concurrent_queries_for_user = ${limits.maxConcurrentQueriesForUser} CONST,\n` +
-    `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
-    `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
-    `           read_overflow_mode = 'throw' CONST,\n` +
-    `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
-    `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
-    `           result_overflow_mode = 'throw' CONST`
-  );
-}
-
-/**
- * The shared restricted identity, carrying the profile and nothing else.
- *
- * `sha256_password` rather than `plaintext_password`, because the two differ
- * only in what ClickHouse keeps at rest: the wire is identical — the client
- * sends the password and the server hashes it to compare — so nothing about the
- * connection changes, while `plaintext_password` would leave the credential
- * recoverable in the access storage and in `SHOW CREATE USER` for anyone who
- * reaches the server as an administrator. This identity is shared by every
- * LangWatchQL query, so a recovered password is a foothold on all of them.
- */
-export function lwqlRestrictedUserStatement({
-  names,
-  password,
-}: {
-  names: LangWatchQLNames;
-  password: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE USER OR REPLACE ${names.restrictedUser} ` +
-    `IDENTIFIED WITH sha256_password BY ${clickHouseLiteral(password)} ` +
-    `SETTINGS PROFILE ${names.settingsProfile}`
-  );
-}
-
-/**
- * `SELECT` on one LangWatchQL object, every column. The identity is granted
- * nothing else.
- *
- * Whole-object rather than column-scoped, because the objects granted this way
- * are the LangWatchQL views themselves and the key map — things whose entire
- * column list is the exposed surface by construction. Source tables are granted
- * column by column instead; see `lwqlSourceColumnGrantStatement`.
- */
-export function lwqlGrantStatement({
-  names,
-  table,
-  database,
-}: {
-  names: LangWatchQLNames;
-  table: string;
-  /** Defaults to {@link LangWatchQLNames.database}. */
-  database?: string;
-}): string {
-  assertNames(names);
-  return `GRANT SELECT ON ${qualified(names, table, database)} TO ${names.restrictedUser}`;
-}
-
-/**
- * The key map polices itself: the restricted identity sees exactly the row its
- * own hash matches, so it can neither enumerate other tenants' hashes nor
- * confirm a guessed one.
- */
-export function lwqlKeyMapRowPolicyStatement({
-  names,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
-  sourceDatabase?: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE ROW POLICY OR REPLACE ${lwqlKeyMapPolicyName(names.keyMapTable)} ` +
-    `ON ${qualified(names, names.keyMapTable, sourceDatabase)}\n` +
-    `  USING ${lwqlKeyMapSelfFilter(names)}\n` +
-    `  TO ${names.restrictedUser}`
-  );
-}
-
-/**
- * One row policy per LangWatchQL object.
- *
- * ClickHouse applies row policies before any user predicate and inside every
- * query shape — CTE, `UNION ALL`, both join sides, subqueries, and `merge()` —
- * so the policy, not the submitted SQL, is what bounds the read.
- */
-export function lwqlRowPolicyStatement({
-  names,
-  lwqlTable,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  lwqlTable: LangWatchQLTable;
-  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
-  sourceDatabase?: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE ROW POLICY OR REPLACE ${lwqlRowPolicyName(lwqlTable.table)} ` +
-    `ON ${qualified(names, lwqlTable.table, lwqlTable.database)}\n` +
-    `  USING ${lwqlTenantPredicate({ names, tenantColumn: lwqlTable.tenantColumn, sourceDatabase })}\n` +
-    `  TO ${names.restrictedUser}`
-  );
+}): LwqlProfileSetting[] {
+  return [
+    {
+      name: names.tenantSetting,
+      value: "",
+      quoted: true,
+      constraint: "changeable_in_readonly",
+    },
+    { name: "readonly", value: 1, constraint: "const" },
+    {
+      name: "max_execution_time",
+      value: limits.maxExecutionTimeSeconds,
+      constraint: "const",
+    },
+    {
+      name: "max_memory_usage",
+      value: limits.maxMemoryUsageBytes,
+      constraint: "const",
+    },
+    { name: "max_threads", value: limits.maxThreads, constraint: "const" },
+    {
+      name: "max_concurrent_queries_for_user",
+      value: limits.maxConcurrentQueriesForUser,
+      constraint: "const",
+    },
+    {
+      name: "max_rows_to_read",
+      value: limits.maxRowsToRead,
+      constraint: "const",
+    },
+    {
+      name: "max_bytes_to_read",
+      value: limits.maxBytesToRead,
+      constraint: "const",
+    },
+    {
+      name: "read_overflow_mode",
+      value: "throw",
+      quoted: true,
+      constraint: "const",
+    },
+    {
+      name: "max_result_rows",
+      value: limits.maxResultRows,
+      constraint: "const",
+    },
+    {
+      name: "max_result_bytes",
+      value: limits.maxResultBytes,
+      constraint: "const",
+    },
+    {
+      name: "result_overflow_mode",
+      value: "throw",
+      quoted: true,
+      constraint: "const",
+    },
+  ];
 }
 
 /** Drops one LangWatchQL object's row policy. Used to prove the policy is load-bearing. */
@@ -313,42 +261,26 @@ export function dropLangWatchQLRowPolicyStatement({
 }
 
 /**
- * Every statement that provisions the LangWatchQL access model, in dependency
- * order.
+ * The structural objects the LangWatchQL access model sits on: the database, the
+ * app-function UDFs, and the key-map table. Never the access model itself.
  *
- * Order is load-bearing, not cosmetic: `CREATE USER OR REPLACE` mints a new
- * access-entity id, so any grant or policy created before it would still point
- * at the replaced user. Grants and policies must always follow the user.
+ * The access model — the settings profile, the restricted user, every grant and
+ * row policy — is single-sourced from the definition ({@link buildLwqlAccessModelDefinition})
+ * and rendered by {@link renderLwqlAccessModelDdl} in `sql` mode, or shipped as
+ * per-pod `users.d` config in `rendered` mode. This function never emits it, so
+ * there is exactly one code path for access DDL (issue #8258).
  *
- * The LangWatchQL objects themselves (fact tables, PostgreSQL-engine tables) are
- * NOT created here — they come from migrations and from the PG mapping. This
- * function provisions only the access model over them.
- *
- * The application provisions this on every distribution (issue #8258): it owns
- * the LangWatchQL access model on both self-hosted and cloud, so there is one
- * definition and no rendered copy to keep in parity.
- *
- * `includeAccessStatements = false` is the `rendered` mode (#8258): the access
- * statements (the profile, the restricted user, the key map's grant and
- * self-policy) are delivered as per-pod `users.d` config instead of DDL, so the
- * converge provisions only the structural objects — the database, the app
- * functions and the key-map table — and skips the access statements. The DDL
- * for the default (`sql` mode, `includeAccessStatements = true`) is unchanged,
- * byte for byte.
+ * The LangWatchQL objects the model governs (fact tables, PostgreSQL-engine
+ * tables, views) are NOT created here either — they come from migrations, the PG
+ * mapping and {@link lwqlViewSetupStatements}. This provisions only the three
+ * structural objects the rest depends on.
  */
 export function lwqlClickHouseSetupStatements({
   names,
-  password,
-  lwqlTables,
-  limits = DEFAULT_LWQL_RESOURCE_LIMITS,
   sourceDatabase,
   includeAppFunctions = true,
-  includeAccessStatements = true,
 }: {
   names: LangWatchQLNames;
-  password: string;
-  lwqlTables: LangWatchQLTable[];
-  limits?: LangWatchQLResourceLimits;
   /**
    * Whether the app functions' UDFs are created. Off only where a create
    * would land on one replica of several; see `canProvisionAppFunctions` in
@@ -356,67 +288,25 @@ export function lwqlClickHouseSetupStatements({
    */
   includeAppFunctions?: boolean;
   /**
-   * Whether the access statements (settings profile, restricted user, the key
-   * map's grant and self-policy, and every table row policy and grant) are
-   * emitted as DDL. `false` is the `rendered` mode: they ship as `users.d`
-   * config and the converge provisions only the structural objects. Default
-   * `true` keeps the `sql` mode output byte-identical.
-   */
-  includeAccessStatements?: boolean;
-  /**
    * Database the key-map table actually lives in. Defaults to
    * {@link LangWatchQLNames.database}, matching the test harness's convention
    * of provisioning its own key map alongside the rest of the suite. A real
    * deploy must pass the app's ClickHouse database here — migration 00084
    * creates the key-map table there, not in `names.database`, and every
-   * statement below that reads or writes the key map (the table itself, its
-   * grant, its self-policy, and every LangWatchQL row policy's tenant lookup)
-   * has to agree on which database that is, or the policies resolve against
-   * an empty table and every governed query returns zero rows.
+   * statement that reads or writes the key map has to agree on which database
+   * that is, or the policies resolve against an empty table and every governed
+   * query returns zero rows.
    */
   sourceDatabase?: string;
 }): string[] {
   assertNames(names);
-  const accessStatements = includeAccessStatements
-    ? [
-        lwqlSettingsProfileStatement({ names, limits }),
-        lwqlRestrictedUserStatement({ names, password }),
-        // Each table's row policy before its grant, and the order is load-bearing.
-        // A table carrying a SELECT grant and no row policy returns every row in
-        // ClickHouse, so granting first opens a window in which the restricted
-        // identity reads across every tenant — and this list is executed statement
-        // by statement, not atomically. A caller that dies partway (a dropped
-        // connection, one refused statement) leaves that window standing, and
-        // `provisionLwql`'s self-provisioning path deliberately swallows the error
-        // and continues booting, so nothing downstream would close it.
-        //
-        // Policy-first inverts the failure: a partial run leaves the identity
-        // policed but not yet granted, which refuses reads rather than widening
-        // them. Safe because every table named already exists by this point — the
-        // key map is created above, and `lwqlTables` are migration-owned.
-        lwqlKeyMapRowPolicyStatement({ names, sourceDatabase }),
-        ...lwqlTables.map((lwqlTable) =>
-          lwqlRowPolicyStatement({ names, lwqlTable, sourceDatabase }),
-        ),
-        lwqlGrantStatement({
-          names,
-          table: names.keyMapTable,
-          database: sourceDatabase,
-        }),
-        ...lwqlTables.map((lwqlTable) =>
-          lwqlGrantStatement({ names, table: lwqlTable.table }),
-        ),
-      ]
-    : [];
   return [
     `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-    // The app functions' projection UDFs. Alongside the other object creation
-    // and before the grants: they depend on nothing, and calling a SQL UDF
-    // needs no grant, so nothing below refers back to them. See
-    // `./appFunctionStatements.ts` for why they are SQL rather than config.
+    // The app functions' projection UDFs. They depend on nothing, and calling a
+    // SQL UDF needs no grant. See `./appFunctionStatements.ts` for why they are
+    // SQL rather than config.
     ...(includeAppFunctions ? lwqlAppFunctionStatements() : []),
     lwqlKeyMapTableStatement({ names, sourceDatabase }),
-    ...accessStatements,
   ];
 }
 
@@ -438,28 +328,34 @@ function settingValueLiteral(setting: LwqlProfileSetting): string {
   return setting.quoted ? `'${setting.value}'` : `${setting.value}`;
 }
 
-/** The settings profile, rendered from the definition rather than from limits. */
-function renderProfileDdl(definition: LwqlAccessModelDefinition): string {
-  const body = definition.profile.settings
+/** The settings profile, rendered from the profile slice of the definition. */
+function renderProfileDdl(
+  profile: LwqlAccessModelDefinition["profile"],
+): string {
+  const body = profile.settings
     .map(
       (setting) =>
         `${setting.name} = ${settingValueLiteral(setting)} ${settingConstraintKeyword(setting)}`,
     )
     .join(",\n           ");
-  return `CREATE SETTINGS PROFILE OR REPLACE ${definition.profile.name}\n  SETTINGS ${body}`;
+  return `CREATE SETTINGS PROFILE OR REPLACE ${profile.name}\n  SETTINGS ${body}`;
 }
 
 /**
- * The restricted user, rendered from the definition. `sha256_hash BY '<hex>'`
- * rather than `sha256_password BY '<plaintext>'`: the definition never carries
- * the plaintext (AC5), and ClickHouse stores the identical digest either way,
- * so the rendered user and the DDL user authenticate the same password.
+ * The restricted user, rendered from the user slice of the definition.
+ * `sha256_hash BY '<hex>'` rather than `sha256_password BY '<plaintext>'`: the
+ * definition never carries the plaintext (AC5), and ClickHouse stores the
+ * identical digest either way, so the rendered user and the DDL user
+ * authenticate the same password.
  */
-function renderUserDdl(definition: LwqlAccessModelDefinition): string {
+function renderUserDdl(
+  user: LwqlAccessModelDefinition["user"],
+  profileName: string,
+): string {
   return (
-    `CREATE USER OR REPLACE ${definition.user.name} ` +
-    `IDENTIFIED WITH sha256_hash BY '${definition.user.passwordSha256Hex}' ` +
-    `SETTINGS PROFILE ${definition.profile.name}`
+    `CREATE USER OR REPLACE ${user.name} ` +
+    `IDENTIFIED WITH sha256_hash BY '${user.passwordSha256Hex}' ` +
+    `SETTINGS PROFILE ${profileName}`
   );
 }
 
@@ -507,8 +403,8 @@ export function renderLwqlAccessModelDdl(
 ): string[] {
   const user = definition.user.name;
   return [
-    renderProfileDdl(definition),
-    renderUserDdl(definition),
+    renderProfileDdl(definition.profile),
+    renderUserDdl(definition.user, definition.profile.name),
     ...definition.rowPolicies.map((policy) => renderRowPolicyDdl(policy, user)),
     ...definition.grants.map((grant) => renderGrantDdl(grant, user)),
   ];
@@ -519,11 +415,31 @@ export function renderLwqlAccessModelDdl(
  * shared definition. Separate from {@link renderLwqlAccessModelDdl} because the
  * postgres-engine tables reference the collection, so the composition emits this
  * before them while the rest of the access model follows them.
+ *
+ * The credentials live in the collection, never in a table definition and never
+ * in a query: the restricted identity is granted neither `NAMED COLLECTION` nor
+ * `SHOW NAMED COLLECTIONS`, so `SHOW CREATE TABLE` on a mapped table reveals the
+ * collection's *name* and nothing more. Dropped first rather than
+ * `IF NOT EXISTS`, so re-provisioning against a host whose address changed
+ * converges instead of silently keeping the old one.
  */
 export function renderLwqlNamedCollectionDdl(
   definition: LwqlAccessModelDefinition,
 ): string[] {
-  return postgresNamedCollectionStatements({
-    connection: definition.namedCollection,
-  });
+  const { namedCollection } = definition;
+  assertIdentifier(namedCollection.collection, "named collection");
+  if (!Number.isInteger(namedCollection.port)) {
+    throw new Error(
+      `lwql provisioning: named collection port must be an integer, got ${namedCollection.port}`,
+    );
+  }
+  return [
+    `DROP NAMED COLLECTION IF EXISTS ${namedCollection.collection}`,
+    `CREATE NAMED COLLECTION ${namedCollection.collection} AS ` +
+      `host=${clickHouseLiteral(namedCollection.host)}, ` +
+      `port=${namedCollection.port}, ` +
+      `database=${clickHouseLiteral(namedCollection.database)}, ` +
+      `user=${clickHouseLiteral(namedCollection.user)}, ` +
+      `password=${clickHouseLiteral(namedCollection.password)}`,
+  ];
 }

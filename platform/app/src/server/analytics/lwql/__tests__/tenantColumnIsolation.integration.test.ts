@@ -20,16 +20,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import {
-  dropLangWatchQLRowPolicyStatement,
-  lwqlRowPolicyStatement,
-} from "../provisioning/accessModel";
+import { dropLangWatchQLRowPolicyStatement } from "../provisioning/accessModel";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "../provisioning/catalogStatements";
 import {
   type LangWatchQLClickHouseHarness,
+  lwqlHarnessRowPolicyStatement,
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
@@ -159,9 +157,10 @@ describe("given a LangWatchQL dataset over a project_id-keyed source table", () 
         expect(unpoliced.length).toBe(2);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          lwqlHarnessRowPolicyStatement({
             names: harness.names,
-            lwqlTable,
+            table: lwqlTable.table,
+            tenantColumn: lwqlTable.tenantColumn,
             sourceDatabase: database,
           }),
         ]);

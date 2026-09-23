@@ -48,41 +48,12 @@ export interface PostgresNamedCollection {
 }
 
 /**
- * Creates the named collection holding the PostgreSQL credentials server-side.
- *
- * Credentials live in the collection, never in a table definition and never in
- * a query: the restricted identity is granted neither `NAMED COLLECTION` nor
- * `SHOW NAMED COLLECTIONS`, so `SHOW CREATE TABLE` on a mapped table reveals
- * the collection's *name* and nothing more.
- *
- * Dropped first rather than `IF NOT EXISTS`, so re-provisioning against a host
- * whose address has changed converges instead of silently keeping the old one.
- *
- * The application provisions this on every distribution (issue #8258): it owns
- * these objects on both self-hosted and cloud, so there is one definition and
- * no rendered copy to keep in parity.
+ * The named collection holding the PostgreSQL credentials is rendered from the
+ * shared access-model definition ({@link renderLwqlNamedCollectionDdl} in
+ * `./accessModelDdl.ts`), the single source both delivery paths read (#8258).
+ * {@link PostgresNamedCollection} above is that definition's `namedCollection`
+ * shape.
  */
-export function postgresNamedCollectionStatements({
-  connection,
-}: {
-  connection: PostgresNamedCollection;
-}): string[] {
-  assertIdentifier(connection.collection, "named collection");
-  if (!Number.isInteger(connection.port)) {
-    throw new Error(
-      `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-    );
-  }
-  return [
-    `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-    `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-      `host=${clickHouseLiteral(connection.host)}, ` +
-      `port=${connection.port}, ` +
-      `database=${clickHouseLiteral(connection.database)}, ` +
-      `user=${clickHouseLiteral(connection.user)}, ` +
-      `password=${clickHouseLiteral(connection.password)}`,
-  ];
-}
 
 /** A column of a PostgreSQL-engine table, in ClickHouse types. */
 export interface LangWatchQLColumn {

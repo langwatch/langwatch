@@ -4,8 +4,7 @@
  * only the structural objects; `sql` provisions the whole model as DDL.
  *
  * @see ../selfProvisioning.ts — lwqlAccessModelMode, selfHostedClickHouseProvisioningStatements
- * @scenario "In rendered mode the converge skips every access statement"
- * @scenario "In sql mode the converge runs the full DDL access path"
+ * @see ../../../../start.ts — armLwqlReconvergenceWatch, gated on this mode
  */
 
 import { describe, expect, it } from "vitest";
@@ -62,6 +61,19 @@ describe("lwqlAccessModelMode", () => {
       );
     });
   });
+
+  describe("when the server decides whether to arm the reconvergence watch", () => {
+    // `start.ts` arms the watch only when `lwqlAccessModelMode() === "sql"`
+    // (see armLwqlReconvergenceWatch): rendered mode ships the model as per-pod
+    // config, so there is no config-store→SQL-store handover to reconverge.
+    /** @scenario "In rendered mode the server does not arm the reconvergence watch" */
+    it("is never sql in rendered mode, the gate that skips arming", () => {
+      expect(lwqlAccessModelMode({})).not.toBe("sql");
+      expect(
+        lwqlAccessModelMode({ LWQL_ACCESS_MODEL_MODE: "rendered" }),
+      ).not.toBe("sql");
+    });
+  });
 });
 
 describe("selfHostedClickHouseProvisioningStatements access-statement gating", () => {
@@ -81,6 +93,7 @@ describe("selfHostedClickHouseProvisioningStatements access-statement gating", (
       );
     });
 
+    /** @scenario "In rendered mode the converge skips every access statement" */
     it("emits no restricted user, profile, grant, row policy or named collection", () => {
       expect(rendered.some((s) => s.includes("CREATE USER"))).toBe(false);
       expect(rendered.some((s) => s.includes("CREATE SETTINGS PROFILE"))).toBe(
@@ -97,6 +110,7 @@ describe("selfHostedClickHouseProvisioningStatements access-statement gating", (
   describe("when sql mode runs the full DDL access path", () => {
     const sql = statements("sql");
 
+    /** @scenario "In sql mode the converge runs the full DDL access path" */
     it("emits the restricted user, profile, grants, row policies and named collection", () => {
       expect(
         sql.some((s) => s.includes("CREATE USER OR REPLACE langwatch_lwql")),

@@ -38,6 +38,7 @@ import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
   LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
+  lwqlHarnessRowPolicyStatement,
   MOVED_PARTITION_FIXTURE,
   mapPostgresIntoClickHouse,
   measureQuery,
@@ -68,7 +69,6 @@ import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
 } from "../accessModel";
 import {
   lwqlApprovedPostgresViewNames,
@@ -497,9 +497,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).map((row) => row.TenantId);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          lwqlHarnessRowPolicyStatement({
             names: harness.names,
-            lwqlTable: sourceTable,
+            table: sourceTable.table,
+            tenantColumn: sourceTable.tenantColumn,
             sourceDatabase: facts,
           }),
         ]);

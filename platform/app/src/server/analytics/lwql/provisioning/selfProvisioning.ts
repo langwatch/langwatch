@@ -249,10 +249,7 @@ export function selfHostedClickHouseProvisioningStatements({
   // (that is single-sourced from the definition below or shipped as config).
   const structural = lwqlClickHouseSetupStatements({
     names,
-    password: restrictedPassword,
-    lwqlTables: [],
     includeAppFunctions,
-    includeAccessStatements: false,
     sourceDatabase,
   });
   const engineTables = [
@@ -265,7 +262,6 @@ export function selfHostedClickHouseProvisioningStatements({
     names,
     sourceDatabase,
     dedup: SHIPPED_LWQL_DEDUP,
-    includeAccessStatements: false,
   });
 
   if (mode === "rendered") {

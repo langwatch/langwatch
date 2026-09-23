@@ -11,10 +11,6 @@
  * @see ../accessModelDefinition.ts
  * @see ../accessModelDdl.ts
  * @see ../accessModelUsersConfig.ts
- * @scenario "The DDL emitter and the users.d emitter name the same user, profile, settings and constraints"
- * @scenario "The DDL emitter and the users.d emitter grant the same objects"
- * @scenario "The DDL emitter and the users.d emitter carry the same row policies and predicates"
- * @scenario "The named collection fields are identical between the two emitters"
  */
 
 import { load } from "js-yaml";
@@ -270,6 +266,7 @@ describe("LangWatchQL access-model emitter parity", () => {
   );
 
   describe("when both emitters render the same definition", () => {
+    /** @scenario "The DDL emitter and the users.d emitter name the same user, profile, settings and constraints" */
     it("the DDL names the same user and password hash the definition holds", () => {
       expect(fromDdl.user).toEqual(expected.user);
       expect(fromYaml.user).toEqual(expected.user);
@@ -280,17 +277,20 @@ describe("LangWatchQL access-model emitter parity", () => {
       expect(fromYaml.profile).toEqual(expected.profile);
     });
 
+    /** @scenario "The DDL emitter and the users.d emitter grant the same objects" */
     it("the granted objects and their columns match on both sides", () => {
       expect(fromDdl.grants).toEqual(expected.grants);
       expect(fromYaml.grants).toEqual(expected.grants);
       expect(fromYaml.grants.length).toBeGreaterThan(1);
     });
 
+    /** @scenario "The DDL emitter and the users.d emitter carry the same row policies and predicates" */
     it("the row policies and predicates match on both sides", () => {
       expect(fromDdl.policies).toEqual(expected.policies);
       expect(fromYaml.policies).toEqual(expected.policies);
     });
 
+    /** @scenario "The named collection fields are identical between the two emitters" */
     it("the named-collection fields match on both sides", () => {
       expect(fromDdl.namedCollection).toEqual(expected.namedCollection);
       expect(fromYaml.namedCollection).toEqual(expected.namedCollection);

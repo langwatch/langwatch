@@ -35,9 +35,9 @@ import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLResourceLimits,
 } from "../limits";
-import { lwqlClickHouseSetupStatements } from "../provisioning/accessModel";
 import {
   type LangWatchQLClickHouseHarness,
+  lwqlHarnessAccessModelStatements,
   recordSeedControl,
   startLangWatchQLClickHouse,
 } from "./lwqlClickHouseHarness";
@@ -87,13 +87,12 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
    * apply and the test would report a working ceiling as broken.
    */
   const provisionWith = async (limits: LangWatchQLResourceLimits) => {
+    // Re-render the access model from the definition with the new limits: the
+    // settings profile carries the ceiling under test, and the ordered
+    // profile→user→policies→grants render converges it without stranding the
+    // user on a replaced profile id.
     await harness.applyAsAdmin(
-      lwqlClickHouseSetupStatements({
-        names: harness.names,
-        password: harness.restrictedConnection().password,
-        lwqlTables: harness.lwqlTables,
-        limits,
-      }),
+      lwqlHarnessAccessModelStatements({ harness, limits }),
     );
   };
 

@@ -4,10 +4,6 @@
  * or the single-node bypass. Driven with a fake query over `system.*`.
  *
  * @see ../sqlModeClusterGuard.ts
- * @scenario "A single-node target passes the sql-mode cluster guard"
- * @scenario "A multi-host cluster without replicated access storage aborts sql-mode provisioning"
- * @scenario "A multi-host cluster with replicated access storage passes the sql-mode cluster guard"
- * @scenario "The sql-mode cluster guard is bypassed by the single-node override"
  */
 
 import { describe, expect, it } from "vitest";
@@ -45,6 +41,7 @@ const THREE_HOST_CLUSTER: Record<string, string>[] = [
 
 describe("assertLwqlSqlModeClusterSafe", () => {
   describe("when the server is a single node", () => {
+    /** @scenario "A single-node target passes the sql-mode cluster guard" */
     it("passes", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
@@ -56,6 +53,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
   });
 
   describe("when the cluster is multi-host without replicated access storage", () => {
+    /** @scenario "A multi-host cluster without replicated access storage aborts sql-mode provisioning" */
     it("aborts with the named error carrying the counts", async () => {
       const promise = assertLwqlSqlModeClusterSafe({
         query: fakeQuery({ clusters: THREE_HOST_CLUSTER }),
@@ -73,6 +71,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
   });
 
   describe("when the cluster is multi-host with replicated access storage", () => {
+    /** @scenario "A multi-host cluster with replicated access storage passes the sql-mode cluster guard" */
     it("passes — the model reaches every host through Keeper", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
@@ -87,6 +86,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
   });
 
   describe("when the single-node bypass is set", () => {
+    /** @scenario "The sql-mode cluster guard is bypassed by the single-node override" */
     it("passes regardless of the cluster topology", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({

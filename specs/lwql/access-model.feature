@@ -43,10 +43,10 @@ Feature: LangWatchQL access model — one typed definition, two emitters, two de
     Then both name the same collection with the same host, port, database, user and password fields
 
   @unit
-  Scenario: The DDL emitter output is byte-identical to the shipped access statements
-    Given the shipped LangWatchQL setup statements for fixed inputs
-    When the access-model builders are moved to consume the definition
-    Then the emitted DDL for those inputs is byte-for-byte the statements shipped before the move
+  Scenario: The DDL emitter renders the whole access model from the shared definition
+    Given the shared access-model definition for fixed inputs
+    When the SQL DDL emitter renders the access model and named collection from it
+    Then it is the single source of the access DDL, identifies the user by sha256 hash never the plaintext, and orders every row policy before every grant
 
   # ---------------------------------------------------------------------------
   # DoD line 4 — the render task
