@@ -179,14 +179,16 @@ describe("given the model-provider editor drawer", () => {
   });
 
   describe("when a credential is typed and saved", () => {
-    /** @scenario "Configure API keys with manual input" */
-    it("sends the key the customer typed to modelProvider.update", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       renderWithModelProviderHost(OPEN_FOR_A_NEW_OPENAI_KEY, new FakeModelProviderHost());
 
       await typeTheKey(user, "sk-test123");
       await user.click(screen.getByRole("button", { name: /save/i }));
+    });
 
+    /** @scenario "Configure API keys with manual input" */
+    it("sends the key the customer typed to modelProvider.update", async () => {
       await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
       expect(mockUpdate.mock.calls[0]?.[0]).toMatchObject({
         provider: "openai",
@@ -202,12 +204,6 @@ describe("given the model-provider editor drawer", () => {
      */
     /** @scenario "Configure API keys with manual input" */
     it("checks the key with the provider before storing it", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      renderWithModelProviderHost(OPEN_FOR_A_NEW_OPENAI_KEY, new FakeModelProviderHost());
-
-      await typeTheKey(user, "sk-test123");
-      await user.click(screen.getByRole("button", { name: /save/i }));
-
       await waitFor(() => expect(mockValidateApiKey).toHaveBeenCalled());
       expect(mockValidateApiKey.mock.calls[0]?.[0]).toMatchObject({
         provider: "openai",

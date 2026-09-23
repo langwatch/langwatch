@@ -27,7 +27,7 @@ import {
   spendSettlementPM,
 } from "@langwatch/gateway-process";
 import { nanoid } from "nanoid";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 const ns = `settle-pm-${nanoid(8)}`;
 const T0 = Date.UTC(2026, 6, 21, 9, 0, 0);
@@ -37,8 +37,8 @@ const PROJECT = `project-${ns}`;
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<SpendSettlementState>;
 let dispatcher: OutboxDispatcherService;
-let sendSettleSpend: ReturnType<typeof vi.fn>;
-let findOpenAdmissions: ReturnType<typeof vi.fn>;
+let sendSettleSpend: Mock<SpendSettlementProcessDeps["sendSettleSpend"]>;
+let findOpenAdmissions: Mock<SpendSettlementProcessDeps["findOpenAdmissions"]>;
 let clock: number;
 
 function buildDefinition(deps: SpendSettlementProcessDeps) {
@@ -118,12 +118,15 @@ async function drainOutbox(passes = 4): Promise<void> {
 
 beforeEach(() => {
   clock = T0;
-  sendSettleSpend = vi.fn().mockResolvedValue(undefined);
-  findOpenAdmissions = vi.fn().mockResolvedValue([]);
+  sendSettleSpend = vi
+    .fn<SpendSettlementProcessDeps["sendSettleSpend"]>()
+    .mockResolvedValue(undefined);
+  findOpenAdmissions = vi
+    .fn<SpendSettlementProcessDeps["findOpenAdmissions"]>()
+    .mockResolvedValue([]);
   const deps: SpendSettlementProcessDeps = {
-    sendSettleSpend: sendSettleSpend as unknown as SpendSettlementProcessDeps["sendSettleSpend"],
-    findOpenAdmissions:
-      findOpenAdmissions as unknown as SpendSettlementProcessDeps["findOpenAdmissions"],
+    sendSettleSpend,
+    findOpenAdmissions,
     graceMs: GRACE_MS,
     now: () => clock,
   };

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The Go data plane's door: HMAC gate, change feed, spend batch, guardrail verdict, real HTTP.
@@ -8,8 +9,8 @@ import type {
   GatewayGuardrailBundleEntry,
   GatewayGuardrailResource,
 } from "@langwatch/gateway-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import { describe, expect, it, vi } from "vitest";
+import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { gatewayServer } from "../../gateway.server.ts";
@@ -34,8 +35,8 @@ import {
 const ORGANIZATION_ID = "organization-1";
 
 /** The revision feed, as the long poll reads it. */
-function testChangeEvents(): GatewayChangeEvents & { since: ReturnType<typeof vi.fn> } {
-  const since = vi.fn(async () => ({
+function testChangeEvents(): GatewayChangeEvents & { since: Mock<GatewayChangeEvents["since"]> } {
+  const since = vi.fn<GatewayChangeEvents["since"]>(async () => ({
     currentRevision: 42n,
     events: [
       {
@@ -53,7 +54,7 @@ function testChangeEvents(): GatewayChangeEvents & { since: ReturnType<typeof vi
     since,
     append: vi.fn(async () => ({ revision: 42n })),
     currentRevision: vi.fn(async () => 42n),
-  } as unknown as GatewayChangeEvents & { since: ReturnType<typeof vi.fn> };
+  };
 }
 
 /** The spend pipeline's senders, as the producer registration publishes them. */
@@ -105,14 +106,14 @@ class TestGuardrailRepository extends GatewayGuardrailRepository {
  */
 function testGuardrails(options?: {
   guardrails?: GatewayGuardrailCheckRow[];
-  monitors?: { id: string; evaluatorId: string; checkType: string; parameters: unknown }[];
+  monitors?: EnabledGuardrailMonitor[];
   runEvaluator?: () => Promise<SingleEvaluationResult>;
 }): GatewayGuardrailEvaluationService {
   return GatewayGuardrailEvaluationService.create({
     repository: new TestGuardrailRepository(options?.guardrails ?? []),
-    monitors: {
+    monitors: createApiFixture<MonitorApi>({
       listEnabledGuardrailMonitors: vi.fn(async () => options?.monitors ?? []),
-    } as unknown as MonitorApi,
+    }),
     runEvaluator:
       options?.runEvaluator ??
       vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true })),

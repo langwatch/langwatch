@@ -82,7 +82,7 @@ describe("the sign-in capability auth publishes", () => {
     });
   });
 
-  describe("spelling a sign-in code", () => {
+  describe("when a sign-in error code is normalized", () => {
     it("folds better-auth's link-account codes onto the one the screens read", () => {
       const { subject } = capability({ data: {} });
 

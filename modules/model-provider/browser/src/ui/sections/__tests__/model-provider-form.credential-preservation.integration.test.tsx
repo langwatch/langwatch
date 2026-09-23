@@ -131,7 +131,7 @@ describe("Feature: edits beside a saved credential leave that credential intact"
       });
 
       describe("when the saved provider is edited and saved", () => {
-        it("leaves the provider's scope selection untouched", async () => {
+        beforeEach(async () => {
           primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
           renderDrawer({ modelProviderId: rowId, providerKey });
           const user = userEvent.setup();
@@ -139,7 +139,9 @@ describe("Feature: edits beside a saved credential leave that credential intact"
           await screen.findByText(apiKey);
           await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
           await user.click(screen.getByRole("button", { name: /^save$/i }));
+        });
 
+        it("leaves the provider's scope selection untouched", async () => {
           await waitFor(() => {
             expect(mockMutateAsync).toHaveBeenCalledTimes(1);
           });
@@ -160,14 +162,6 @@ describe("Feature: edits beside a saved credential leave that credential intact"
          */
         /** @scenario Preserve original API key when saving with masked placeholder */
         it("sends the untouched key back masked so the stored one survives", async () => {
-          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
-          renderDrawer({ modelProviderId: rowId, providerKey });
-          const user = userEvent.setup();
-
-          await screen.findByText(apiKey);
-          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
-          await user.click(screen.getByRole("button", { name: /^save$/i }));
-
           await waitFor(() => {
             expect(mockMutateAsync).toHaveBeenCalledTimes(1);
           });

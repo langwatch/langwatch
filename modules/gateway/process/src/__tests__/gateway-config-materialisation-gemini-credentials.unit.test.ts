@@ -7,6 +7,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
@@ -21,11 +22,34 @@ const assembly = GatewayConfigAssemblyAdapter.create({
   platformProviders: noPlatformProviders,
 });
 
-const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
-  ({
-    provider: "gemini",
-    customKeys,
-  }) as unknown as ModelProvider;
+const AT = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
+
+const geminiRow = (customKeys: Record<string, string>): ModelProvider => ({
+  id: "mp_gemini",
+  name: "gemini",
+  provider: "gemini",
+  routingHandle: null,
+  enabled: true,
+  customKeys,
+  extraHeaders: null,
+  customModels: null,
+  customEmbeddingsModels: null,
+  deploymentMapping: null,
+  rateLimitRpm: null,
+  rateLimitTpm: null,
+  rateLimitRpd: null,
+  rotationPolicy: "MANUAL",
+  providerConfig: null,
+  fallbackPriorityGlobal: null,
+  langySkipPermissionsModels: null,
+  healthStatus: "HEALTHY",
+  circuitOpenedAt: null,
+  lastHealthCheckAt: null,
+  disabledAt: null,
+  createdAt: AT,
+  updatedAt: AT,
+  organizationId: "org_gemini",
+});
 
 const credentialsPort: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,

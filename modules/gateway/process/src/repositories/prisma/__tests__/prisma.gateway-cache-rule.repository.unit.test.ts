@@ -78,13 +78,15 @@ function recordingPorts() {
         changes.push({ kind: input.kind, inTransaction: transaction !== undefined });
         return Promise.resolve({ revision: 1n });
       },
-    } as unknown as GatewayChangeEvents,
+      since: () => Promise.resolve({ currentRevision: 1n, events: [] }),
+      currentRevision: () => Promise.resolve(1n),
+    } satisfies GatewayChangeEvents,
     auditPort: {
       append: (input: { action: string }, transaction?: unknown) => {
         audits.push({ action: input.action, inTransaction: transaction !== undefined });
         return Promise.resolve();
       },
-    } as unknown as GatewayAudit,
+    } satisfies GatewayAudit,
   };
 }
 

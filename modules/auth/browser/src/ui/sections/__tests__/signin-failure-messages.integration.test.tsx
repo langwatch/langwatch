@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // implementation when `~/utils/auth-client` first loads, so a stub installed
 // later in the test body would never be the one it calls.
 const { fetchMock, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => {
-  const fetchMock = vi.fn();
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  const fetchMock = vi.fn<typeof fetch>();
+  globalThis.fetch = fetchMock;
   return {
     fetchMock,
     sessionRef: { current: { data: null as unknown } },

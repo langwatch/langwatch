@@ -91,7 +91,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpend {
         .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
         .slice(0, limit),
     spendByVirtualKey: async () => [],
-  } as unknown as GatewayVirtualKeySpend;
+  };
 }
 
 function service(

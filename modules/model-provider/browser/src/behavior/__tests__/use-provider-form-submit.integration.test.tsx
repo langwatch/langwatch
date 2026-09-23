@@ -166,7 +166,7 @@ describe("useProviderFormSubmit()", () => {
 
   describe("given useAsDefaultProvider is true and provider is azure", () => {
     describe("when projectDefaultModel belongs to a different provider (openai/gpt-5.2)", () => {
-      it("does not call updateProjectDefaultModels mutation", async () => {
+      beforeEach(async () => {
         const snapshot = buildSnapshot({
           projectDefaultModel: "openai/gpt-5.2",
           projectTopicClusteringModel: "azure/gpt-5-mini",
@@ -176,27 +176,19 @@ describe("useProviderFormSubmit()", () => {
         await act(async () => {
           await result.current.submit();
         });
+      });
 
+      it("does not call updateProjectDefaultModels mutation", () => {
         expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
-      it("creates an error toast", async () => {
-        const snapshot = buildSnapshot({
-          projectDefaultModel: "openai/gpt-5.2",
-          projectTopicClusteringModel: "azure/gpt-5-mini",
-        });
-        const { result } = renderSubmitHook({ snapshot });
-
-        await act(async () => {
-          await result.current.submit();
-        });
-
+      it("creates an error toast", () => {
         expect(mockToasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
       });
     });
 
     describe("when projectTopicClusteringModel belongs to a different provider (openai/gpt-5-mini)", () => {
-      it("does not call updateProjectDefaultModels mutation", async () => {
+      beforeEach(async () => {
         const snapshot = buildSnapshot({
           projectDefaultModel: "azure/gpt-5-mini",
           projectTopicClusteringModel: "openai/gpt-5-mini",
@@ -206,21 +198,13 @@ describe("useProviderFormSubmit()", () => {
         await act(async () => {
           await result.current.submit();
         });
+      });
 
+      it("does not call updateProjectDefaultModels mutation", () => {
         expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
-      it("creates an error toast", async () => {
-        const snapshot = buildSnapshot({
-          projectDefaultModel: "azure/gpt-5-mini",
-          projectTopicClusteringModel: "openai/gpt-5-mini",
-        });
-        const { result } = renderSubmitHook({ snapshot });
-
-        await act(async () => {
-          await result.current.submit();
-        });
-
+      it("creates an error toast", () => {
         expect(mockToasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
       });
     });

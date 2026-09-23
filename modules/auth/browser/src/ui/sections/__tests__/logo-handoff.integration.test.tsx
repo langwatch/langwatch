@@ -24,12 +24,16 @@ import { _resetLogoHandoffForTests } from "../logo-handoff.tsx";
 const setReducedMotion = (reduce: boolean) => {
   // A fresh `matchMedia` identity on purpose: `useReducedMotion` caches its
   // MediaQueryList against the function it was created from.
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+  window.matchMedia = vi.fn((query: string): MediaQueryList => ({
     matches: reduce,
     media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: vi.fn(() => true),
+  }));
 };
 
 const renderFrontDoor = () =>

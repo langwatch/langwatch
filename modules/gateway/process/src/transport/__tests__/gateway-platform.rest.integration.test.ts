@@ -236,8 +236,9 @@ function cacheRuleRow(overrides: Partial<GatewayCacheRuleResource> = {}): Gatewa
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
+    createdById: "usr_1",
     ...overrides,
-  } as unknown as GatewayCacheRuleResource;
+  };
 }
 
 /** Mounts the family behind a stateful idempotency ledger, for a project-scoped credential. */
