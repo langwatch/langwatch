@@ -35,7 +35,7 @@ bad()  { echo "FAIL [$1] $2" >&2; failures=$((failures + 1)); }
 # python reads the file, PyYAML turns `on:` into the boolean key True (harmless,
 # we only read `jobs`), and we emit exactly the facts the scenarios assert.
 WF_FACTS="$(python3 - "$WORKFLOW" <<'PY'
-import sys, yaml
+import re, sys, yaml
 
 with open(sys.argv[1]) as f:
     doc = yaml.safe_load(f)
@@ -106,9 +106,21 @@ emit("app_unprovisioned_legs", app_unprovisioned)
 # step count too. An `if:` on it would silently drop a whole leg's suites — the
 # same "optional suite" failure continue-on-error causes. Counted on the e2e
 # job's steps only; the job-level draft gate `if:` is not a step.
+def runs_suite_script(run):
+    # An executable invocation, not a substring: a non-comment line whose
+    # command is the matrix.script expression (optionally a ./path prefix), so a
+    # commented-out `# ${{ matrix.script }}` never counts.
+    for line in run.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if re.match(r'^(\./\S*)?\$\{\{\s*matrix\.script\s*\}\}', stripped):
+            return True
+    return False
+
 suite_steps = [
     s for s in e2e["steps"]
-    if isinstance(s.get("run"), str) and "matrix.script" in s["run"]
+    if isinstance(s.get("run"), str) and runs_suite_script(s["run"])
 ]
 emit("suite_step_count", len(suite_steps))
 suite_step_if = sum(1 for s in suite_steps if "if" in s)
@@ -116,7 +128,6 @@ emit("suite_step_if_count", suite_step_if)
 
 # The suites each leg runs, parsed from `E2E_SUITES="..."` in its script. Legs
 # without it (overlays) contribute none.
-import re
 union = []
 duplicated = False
 seen = set()
