@@ -418,8 +418,9 @@ test_app() {
 # view/backfill provisioning is idempotent. test_lwql_replicas covers the
 # multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
-# The LWQL access model is DELIVERED by the main-phase <release>-lwql-access-render
-# Job (revision-suffixed name). `helm --wait` does not wait for Jobs, and the
+# The LWQL access model is DELIVERED by the <release>-lwql-access-render Job
+# (revision-suffixed name; main-phase on install, pre-upgrade hook on upgrade so
+# the new Secret lands before the pod roll). `helm --wait` does not wait for Jobs, and the
 # ClickHouse mount is required, so a failed render leaves ClickHouse stuck rather
 # than silently accessless — but assert Complete explicitly anyway, and dump the
 # Job/pod events on failure so a broken render is diagnosable without a re-run.

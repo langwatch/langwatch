@@ -2035,25 +2035,22 @@ clickhouse:
   # and `helm install --wait --wait-for-jobs` fails, instead of ClickHouse coming
   # up healthy with NO LWQL access set — the silent-success failure that shipped
   # once and was only caught much later by an in-cluster row-count assertion.
-  # statefulset.yaml renders extraVolumes through `tpl (toYaml .) $`, so `$` is
-  # the parent (root) context and this calls the parent helper directly — the
-  # single source of truth for the Secret name, no hand-copied literal to drift.
-  ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod (LWQL access Secret by default).
-  extraVolumes:
-    - name: lwql-access
-      secret:
-        secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
-        optional: false
-  ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container (LWQL access files by default).
-  extraVolumeMounts:
-    - name: lwql-access
-      mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml
-      subPath: lwql-access.yaml
-      readOnly: true
-    - name: lwql-access
-      mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml
-      subPath: lwql-named-collection.yaml
-      readOnly: true
+  #
+  # The mount is NOT delivered through the operator-facing extraVolumes /
+  # extraVolumeMounts: Helm replaces lists wholesale, so an operator adding one
+  # extra volume there would silently drop the LWQL mount. It rides its own
+  # value instead — clickhouse.lwqlAccess.secretName — which the subchart
+  # StatefulSet renders unconditionally into the pod (see that chart's
+  # statefulset.yaml), leaving extraVolumes free for operators. The value is a
+  # template string rendered through `tpl ... $`, so it calls the parent helper
+  # directly — the single source of truth for the Secret name, no drift.
+  ## @param clickhouse.lwqlAccess.secretName [string] Secret carrying the rendered LWQL access files; mounted unconditionally into every ClickHouse pod. Rendered from the parent helper — leave as-is.
+  lwqlAccess:
+    secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
+  ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod.
+  extraVolumes: []
+  ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container.
+  extraVolumeMounts: []
 
   # Roll every ClickHouse pod when the app catalog (hence the rendered access
   # model) changes, so an upgrade re-mounts the freshly rendered Secret.
@@ -2101,6 +2098,8 @@ clickhouse:
 lwql:
   ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
   enabled: true
+  ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
+  imagePullSecrets: []
 
 # =============================================================================
 # Redis Configuration

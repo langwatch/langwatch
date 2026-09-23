@@ -219,6 +219,15 @@ podAnnotations: {}
 extraVolumes: []
 extraVolumeMounts: []
 
+# LangWatchQL access-model delivery. When secretName is non-empty the StatefulSet
+# mounts that Secret's two rendered files into users.d / config.d on EVERY pod,
+# unconditionally (not through the operator-facing extraVolumes above, which Helm
+# would let an operator's own volume replace). The umbrella chart sets it to a
+# template string that resolves to <release>-lwql-clickhouse-access; empty here so
+# a standalone install of this subchart renders no LWQL mount.
+lwqlAccess:
+  secretName: ""
+
 # Scheduling
 scheduling:
   nodeSelector: {}

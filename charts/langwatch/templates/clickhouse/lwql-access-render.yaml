@@ -27,22 +27,39 @@
   but no kubectl, so the writer is a small node script that PUTs/POSTs the Secret
   with the pod's ServiceAccount token — no extra tooling image.
 
-  Why a MAIN-PHASE Job, not a pre-install hook. The render reads the same LWQL
-  env the app reads — LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD and
-  DATABASE_URL — which live in the app Secret and the PostgreSQL Secret, both
-  created in the release's main phase. A pre-install hook runs BEFORE any main
-  resource exists, so on a first install those Secrets are absent and the hook
-  Job fails (verified: helm aborts with "failed pre-install ... Job Failed").
-  Helm's install order applies Secrets and RBAC before Jobs, and a Job before
-  the StatefulSet is APPLIED but helm --wait then waits for both concurrently:
-  the Job renders and writes the access Secret while the ClickHouse pods sit in
-  ContainerCreating (their required subPath mount has nothing to resolve yet —
-  the kubelet retries a missing required Secret rather than hard-failing it),
-  and once the Secret exists the kubelet re-syncs the volume and the pods start. So a plain main-phase Job both sees its inputs and lands its output
-  before the pods finish coming up, on install and upgrade alike. The Job name
-  carries .Release.Revision because a Job's pod template is immutable — a
-  stable-named Job could not be updated on `helm upgrade`; a fresh name each
-  revision sidesteps that, and helm prunes the previous revision's Job.
+  Phasing: MAIN-PHASE on install, PRE-UPGRADE HOOK on upgrade (keyed on
+  .Release.IsUpgrade). The render reads the same LWQL env the app reads —
+  LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD and DATABASE_URL —
+  which live in the app Secret and the PostgreSQL Secret.
+
+  On a FIRST INSTALL those Secrets do not exist yet, so the render must run in
+  the main phase, AFTER helm has applied them: helm's install order lays down
+  Secrets and RBAC before Jobs, and a Job before the StatefulSet, then --wait
+  waits for both concurrently. The Job renders and writes the access Secret
+  while the ClickHouse pods sit in ContainerCreating (their required subPath
+  mount has nothing to resolve yet — the kubelet retries a missing required
+  Secret rather than hard-failing it), and once the Secret exists the kubelet
+  re-syncs the volume and the pods start. A pre-INSTALL hook cannot do this: it
+  runs before any main resource exists, so those input Secrets are absent and
+  the Job fails (verified: helm aborts with "failed pre-install ... Job Failed").
+
+  On an UPGRADE the input Secrets already exist (from the previous revision), so
+  the render can — and MUST — run BEFORE the StatefulSet is re-applied. The
+  StatefulSet carries the catalog-version annotation (below), so applying it
+  rolls every ClickHouse pod; helm's kind order applies the StatefulSet before a
+  main-phase Job, so a main-phase render would roll the pods against the PREVIOUS
+  release's Secret and freeze the stale model into every subPath mount (subPath
+  mounts do not pick up later Secret updates) until the next upgrade. Running the
+  render as a `pre-upgrade` hook writes the new Secret before the StatefulSet
+  roll, so every pod re-mounts the fresh model. On upgrade the still-present
+  previous-revision RBAC (ServiceAccount, Role, RoleBinding — main-phase
+  resources, not yet reconciled) backs the hook; `before-hook-creation` clears a
+  prior hook Job of the same name first.
+
+  The Job name carries .Release.Revision because a Job's pod template is
+  immutable — a fresh name each revision sidesteps that and keeps install and
+  hook Jobs distinct; helm prunes the previous one (ttlSecondsAfterFinished and,
+  on the hook, before-hook-creation).
 
   Why no `SYSTEM RELOAD CONFIG` hook and no per-secret checksum: ClickHouse 25.10
   hot-reloads users.d and config.d from disk within ~3s of a file change
@@ -53,7 +70,8 @@
   rides the release-version annotation on the ClickHouse pod template
   (`clickhouse.podAnnotations`, bumped in release lockstep with the app image /
   catalog), which rolls the StatefulSet so every pod re-mounts the freshly
-  rendered Secret. Install, scale-up and disk-rebuild pods mount it at boot.
+  rendered Secret — which the pre-upgrade render hook has already written before
+  the roll begins. Install, scale-up and disk-rebuild pods mount it at boot.
 
   Gated on chart-managed ClickHouse. When `lwql.enabled=false` the Job still
   renders — but writes two empty documents — so the pods' unconditional mount is
@@ -124,6 +142,20 @@ metadata:
   name: {{ $jobName }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
+  {{- if .Release.IsUpgrade }}
+  # On upgrade only, run as a pre-upgrade hook so the new access Secret is
+  # written BEFORE the StatefulSet's catalog annotation rolls the ClickHouse
+  # pods against it — otherwise the roll freezes the previous release's model
+  # into every subPath mount. On install this block is absent and the Job runs
+  # in the main phase, which is the only phase where its input Secrets (app +
+  # PostgreSQL) exist on a first install. The RBAC below stays main-phase: on
+  # upgrade the previous revision's ServiceAccount/Role/RoleBinding still back
+  # this hook.
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+  {{- end }}
 spec:
   backoffLimit: 2
   activeDeadlineSeconds: 300
@@ -145,9 +177,31 @@ spec:
       # script (and NODE_EXTRA_CA_CERTS below) already read.
       automountServiceAccountToken: true
       restartPolicy: Never
-      {{- with (.Values.global).imagePullSecrets }}
+      # This Job runs under its OWN ServiceAccount, so pull secrets attached to
+      # the namespace's default ServiceAccount do not reach it; it takes its own
+      # declared, documented value (same rationale as the stored-objects hooks).
+      {{- with .Values.lwql.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Honour the chart-wide scheduling defaults so the render Job lands where
+      # every other pod does (topologySpreadConstraints are deliberately NOT
+      # copied: on a single-run Job a DoNotSchedule spread can only wedge the
+      # release — matching langwatch.storedObjects.upgradeHookPodSpec).
+      {{- with .Values.global.scheduling.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.scheduling.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.scheduling.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.scheduling.priorityClassName }}
+      priorityClassName: {{ . | quote }}
       {{- end }}
       # Reuse the app component's pod security context (uid 1000, fsGroup 1000,
       # runAsNonRoot, seccompProfile). The app image ships no USER directive, so

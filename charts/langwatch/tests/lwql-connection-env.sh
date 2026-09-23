@@ -260,25 +260,40 @@ $(cat "$err")"
   fi
 
   # One render Job (revision-suffixed name) that runs the app image and renders
-  # the access files. It is a MAIN-PHASE Job, not a hook: the render reads the
-  # app + PostgreSQL Secrets, which only exist in the main phase, so a pre-install
-  # hook would fail on a first install.
+  # the access files. It is MAIN-PHASE on install and a PRE-UPGRADE hook on
+  # upgrade (asserted below): the render reads the app + PostgreSQL Secrets, which
+  # exist only in the main phase, so a pre-install hook would fail on a first
+  # install; on upgrade those Secrets already exist and the render must precede
+  # the StatefulSet roll.
   if ! grep -qE "name: lw-lwql-access-render-[0-9]+" "$out"; then
     fail "topology-no-job" "no revision-named lw-lwql-access-render-<n> Job rendered on chart-managed ClickHouse."
   fi
   if ! grep -q "renderLwqlAccessConfig" "$out"; then
     fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."
   fi
-  # Guard the exact regression this design fixes: the render resources must NOT
-  # be helm hooks (a pre-install hook cannot read the main-phase Secrets it
-  # needs). Scope the check to just this template so a sibling hook elsewhere in
-  # the chart cannot trip it.
+  # On INSTALL the render resources must be MAIN-PHASE (no helm hook): a
+  # pre-install hook cannot read the main-phase app/PostgreSQL Secrets it needs.
+  # Scope the check to just this template so a sibling hook elsewhere cannot trip
+  # it. ($out is the default, i.e. install, render.)
   local only="${TMPDIR:-/tmp}/lwql-render-only.yaml"
   if helm template lw . --set autogen.enabled=true \
        --show-only templates/clickhouse/lwql-access-render.yaml >"$only" 2>/dev/null; then
     if grep -q 'helm.sh/hook:' "$only"; then
-      fail "topology-is-hook" "the access-render resources are helm hooks; they must be main-phase so the render sees the app/PostgreSQL Secrets on a first install."
+      fail "topology-install-not-hook" "on install the access-render resources must be main-phase (no helm hook) so the render sees the app/PostgreSQL Secrets on a first install."
     fi
+  fi
+  # On UPGRADE the render Job MUST be a pre-upgrade hook: the new access Secret
+  # has to be written BEFORE the StatefulSet's catalog annotation rolls the pods,
+  # or every subPath mount freezes the previous release's model. The input
+  # Secrets already exist on an upgrade, so the hook has what it needs.
+  local upgrade_only="${TMPDIR:-/tmp}/lwql-render-upgrade-only.yaml"
+  if helm template lw . --is-upgrade --set autogen.enabled=true \
+       --show-only templates/clickhouse/lwql-access-render.yaml >"$upgrade_only" 2>/dev/null; then
+    if ! grep -q 'helm.sh/hook: pre-upgrade' "$upgrade_only"; then
+      fail "topology-upgrade-hook" "on upgrade the access-render Job must be a pre-upgrade hook so the new access Secret lands before the StatefulSet roll."
+    fi
+  else
+    fail "topology-upgrade-render" "the access-render template failed to render with --is-upgrade."
   fi
   # The Role is scoped to the one Secret name for get/update/patch (create cannot
   # be name-scoped in Kubernetes RBAC, so it is a separate namespaced rule).
