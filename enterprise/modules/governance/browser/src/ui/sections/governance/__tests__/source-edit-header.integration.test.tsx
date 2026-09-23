@@ -29,6 +29,34 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
+import type { Source } from "../ingestion-source-forms.ts";
+
+function sourceRow(overrides: Partial<Source>): Source {
+  return {
+    id: "src_test",
+    organizationId: "org_acme",
+    teamId: null,
+    sourceType: "otel_generic",
+    name: "Test source",
+    description: null,
+    parserConfig: {},
+    hasPollerCursor: false,
+    pullSchedule: null,
+    status: "active",
+    traceProjectId: null,
+    traceProjectArchived: false,
+    lastEventAt: null,
+    archivedAt: null,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    createdById: null,
+    errorCount: 0,
+    lastRunCompleteness: null,
+    pullStatus: null,
+    lastSuccessAt: null,
+    ...overrides,
+  };
+}
 
 /**
  * `OttlEditor` sits inside the drawer's body and calls tRPC on render. It is
@@ -78,7 +106,7 @@ type DrawerSource = Parameters<typeof SourceEditDrawer>[0]["source"];
  * which is wrong in both directions.
  */
 const anthropicSource = ({ report, hasPulled }: { report: string; hasPulled: boolean }) =>
-  ({
+  sourceRow({
     id: "src_anthropic",
     name: "Anthropic org",
     description: "",
@@ -91,10 +119,10 @@ const anthropicSource = ({ report, hasPulled }: { report: string; hasPulled: boo
     hasPollerCursor: hasPulled,
     traceProjectId: null,
     traceProjectArchived: false,
-  }) as unknown as DrawerSource;
+  });
 
 /** A row written by a newer deploy than the one serving this page. */
-const sourceOfAnUnknownType = {
+const sourceOfAnUnknownType = sourceRow({
   id: "src_future",
   name: "Something new",
   description: "",
@@ -102,7 +130,7 @@ const sourceOfAnUnknownType = {
   parserConfig: {},
   traceProjectId: null,
   traceProjectArchived: false,
-} as unknown as DrawerSource;
+});
 
 const renderDrawer = (source: DrawerSource) => {
   const host = fakeGovernanceHost();

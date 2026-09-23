@@ -394,7 +394,7 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
         anchorKind: null,
         anchorId: null,
         anchorPath: null,
-      } as unknown as ProjectionAnnotation,
+      },
     ];
     annotations.scores = [{ id: QUALITY_SCORE_ID, name: "quality" } as AnnotationScoreName];
   }, 60_000);

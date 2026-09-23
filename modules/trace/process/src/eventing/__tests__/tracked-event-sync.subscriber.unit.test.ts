@@ -1,17 +1,24 @@
-import type { TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type {
   TraceSummaryData,
   SpanReceivedEvent,
-  TraceProcessingEvent,
+  TopicAssignedEvent,
   OtlpSpan,
 } from "@langwatch/trace-contract";
-import { TRACK_EVENT_SPAN_NAME } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+  TRACK_EVENT_SPAN_NAME,
+} from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   TrackedEventSync,
   type TrackedEventSyncSubscriberDeps,
 } from "../tracked-event-sync.subscriber.ts";
+import { createFoldState } from "./trace-subscriber.fixtures.ts";
 
 type FeedbackEvent = {
   type?: string;
@@ -58,7 +65,7 @@ function makeOtlpSpan(feedbackEvents: FeedbackEvent[]): OtlpSpan {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 /**
@@ -89,17 +96,7 @@ function makeRecordedTrackEventSpan(eventType: string): OtlpSpan {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
-}
-
-function createFoldState(): TraceSummaryData {
-  return {
-    traceId: "trace-1",
-    occurredAt: Date.now(),
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    attributes: {},
-  } as unknown as TraceSummaryData;
+  };
 }
 
 function createSpanReceivedEvent(
@@ -110,11 +107,11 @@ function createSpanReceivedEvent(
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
       span,
       resource: null,
@@ -123,22 +120,28 @@ function createSpanReceivedEvent(
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
     ...overrides,
-  } as unknown as SpanReceivedEvent;
+  };
 }
 
-function createNonSpanEvent(): TraceProcessingEvent {
+function createNonSpanEvent(): TopicAssignedEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
-    tenantId: "tenant-1",
+    tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    type: "lw.obs.trace.topic_assigned",
-    version: 1,
-    data: {},
+    type: TOPIC_ASSIGNED_EVENT_TYPE,
+    version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+    data: {
+      topicId: null,
+      topicName: null,
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
     metadata: {},
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 function createContext(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
@@ -450,7 +453,7 @@ describe("trackedEventSync subscriber", () => {
       const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
       const oldEvent = createSpanReceivedEvent(span, {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
-      } as Partial<SpanReceivedEvent>);
+      });
 
       await subscriber(oldEvent, createContext(createFoldState()));
 

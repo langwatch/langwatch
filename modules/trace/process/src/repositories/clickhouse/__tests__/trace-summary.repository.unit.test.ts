@@ -8,6 +8,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { createFoldState } from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
 const heavyRow = {
@@ -254,8 +255,8 @@ describe("given the trace-summary row carries a storage anchor", () => {
       };
     }
 
-    const stateWith = (over: Partial<TraceSummaryData>) =>
-      ({
+    const stateWith = (over: Partial<TraceSummaryData>): TraceSummaryData =>
+      createFoldState({
         traceId: "t1",
         attributes: {},
         annotationIds: [],
@@ -264,7 +265,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         updatedAt: anchorMs,
         LastEventOccurredAt: anchorMs,
         ...over,
-      }) as unknown as TraceSummaryData;
+      });
 
     it("puts the frozen anchor in OccurredAt and the baseline in its own column", async () => {
       const { repo, insert } = makeInsertRepo();

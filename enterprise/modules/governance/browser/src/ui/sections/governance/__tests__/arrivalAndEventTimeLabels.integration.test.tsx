@@ -47,6 +47,7 @@ vi.mock("~/components/ui/toaster", () => ({
 
 import { IngestionSourcesTable } from "../../../../features/ingestion-sources/ingestion-sources-table.tsx";
 import { SourceHealthCards } from "../governance-ingestion-source.screen.tsx";
+import type { Source } from "../ingestion-source-forms.ts";
 
 /**
  * A source whose last pull landed twenty-three minutes ago and whose newest
@@ -54,15 +55,42 @@ import { SourceHealthCards } from "../governance-ingestion-source.screen.tsx";
  * contradiction. Only the fields these two components touch are set.
  */
 const ARRIVED_MINUTES_AGO = 23;
-const sourceThatJustDelivered = {
+function sourceRow(overrides: Partial<Source>): Source {
+  return {
+    id: "src_test",
+    organizationId: "org_acme",
+    teamId: null,
+    sourceType: "otel_generic",
+    name: "Test source",
+    description: null,
+    parserConfig: {},
+    hasPollerCursor: false,
+    pullSchedule: null,
+    status: "active",
+    traceProjectId: null,
+    traceProjectArchived: false,
+    lastEventAt: null,
+    archivedAt: null,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    createdById: null,
+    errorCount: 0,
+    lastRunCompleteness: null,
+    pullStatus: null,
+    lastSuccessAt: null,
+    ...overrides,
+  };
+}
+
+const sourceThatJustDelivered = sourceRow({
   id: "src_admin_costs",
   name: "Vendor spend",
   description: "",
   sourceType: "openai_admin",
   status: "active",
   errorCount: 0,
-  lastEventAt: new Date(Date.now() - ARRIVED_MINUTES_AGO * 60 * 1000),
-} as unknown as Parameters<typeof IngestionSourcesTable>[0]["sources"][number];
+  lastEventAt: new Date(Date.now() - ARRIVED_MINUTES_AGO * 60 * 1000).toISOString(),
+});
 
 /** Midnight of a day whose report arrived hours later. */
 const newestEventStampedAtMidnight = {
@@ -70,7 +98,7 @@ const newestEventStampedAtMidnight = {
   events7d: 28,
   events30d: 120,
   lastSuccessIso: new Date(new Date().setUTCHours(0, 0, 0, 0) - 11 * 60 * 60 * 1000).toISOString(),
-} as unknown as Parameters<typeof SourceHealthCards>[0]["health"];
+};
 
 function renderRow() {
   return render(
