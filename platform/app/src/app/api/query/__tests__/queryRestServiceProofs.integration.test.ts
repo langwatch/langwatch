@@ -1690,6 +1690,13 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           dedup: SHIPPED_LWQL_DEDUP,
         }),
       );
+      // View creation is structural only (#8258); the reader gets no grant from
+      // it. Re-mint the whole access model over the catalog plus the ad-hoc view
+      // so the permitted caller's read of `transcripts` is granted.
+      await harness.applyAccessModel({
+        views,
+        sourceDatabase: facts,
+      });
       setLangWatchQLService(
         new LangWatchQLService({
           executor: createLangWatchQLExecutor({
@@ -1719,6 +1726,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         await harness.applyAsAdmin([
           `DROP VIEW IF EXISTS ${database}.transcripts`,
         ]);
+        // Re-mint the catalog-only model so the dropped view leaves no lingering
+        // grant for later tests (CREATE USER OR REPLACE re-mints the whole model).
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
     });
 
