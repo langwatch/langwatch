@@ -145,7 +145,8 @@ function headersRecord(rows: HeaderRow[]): Record<string, string> {
 }
 
 function bodyTemplateOf(slice: WebhookSlice): string | null {
-  return slice.template.value.trim().length > 0 ? slice.template.value : null;
+  const template = slice.template.value;
+  return template.trim().length > 0 ? template : null;
 }
 
 /**

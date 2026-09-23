@@ -103,6 +103,7 @@ export function SignUpCredentialForm({
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
+  const registerError = !submitError && !serverErrorIsOnTheForm ? register.error : null;
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
   // Whether the password half of the form has opened. Latched rather than
   // derived from focus, so the confirmation does not vanish the moment
@@ -257,8 +258,9 @@ export function SignUpCredentialForm({
               <Alert.Description>{submitError}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
-        ) : register.error && !serverErrorIsOnTheForm ? (
-          <HandledErrorAlert error={register.error} fallbackTitle="Couldn't create your account" />
+        ) : null}
+        {registerError ? (
+          <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
         ) : null}
         {/* Arrives with the confirmation. Before that the passkey button IS
             the call to action, and a second primary button under an empty

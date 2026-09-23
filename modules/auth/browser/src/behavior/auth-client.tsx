@@ -52,14 +52,26 @@ const adaptSession = (data: unknown): CompatSession | null => {
       pendingSsoSetup: (user.pendingSsoSetup as boolean | undefined) ?? false,
       impersonator: user.impersonator as CompatSession["user"]["impersonator"],
     },
-    expires:
-      expiresAt instanceof Date
-        ? expiresAt.toISOString()
-        : typeof expiresAt === "string"
-          ? expiresAt
-          : nowInstant().toString({ fractionalSecondDigits: 3 }),
+    expires: expiresOf(expiresAt),
   };
 };
+
+function expiresOf(expiresAt: unknown): string {
+  if (expiresAt instanceof Date) return expiresAt.toISOString();
+  if (typeof expiresAt === "string") return expiresAt;
+  return nowInstant().toString({ fractionalSecondDigits: 3 });
+}
+
+function sessionStatusOf({
+  isPending,
+  hasData,
+}: {
+  isPending: boolean;
+  hasData: boolean;
+}): SessionStatus {
+  if (isPending) return "loading";
+  return hasData ? "authenticated" : "unauthenticated";
+}
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -135,7 +147,7 @@ export const useSession = (
     };
   }, []);
 
-  const status: SessionStatus = isPending ? "loading" : data ? "authenticated" : "unauthenticated";
+  const status = sessionStatusOf({ isPending, hasData: Boolean(data) });
 
   const required = options?.required;
   const onUnauthenticated = options?.onUnauthenticated;

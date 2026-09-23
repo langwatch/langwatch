@@ -155,6 +155,7 @@ function SignUpForm() {
   const register = api.user.register.useMutation();
   const [signInLoading, setSignInLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const registerError = submitError ? null : register.error;
   const [showRecoveryLinks, setShowRecoveryLinks] = useState(false);
   const showErrorToast = useShowErrorToast();
 
@@ -292,9 +293,10 @@ function SignUpForm() {
                     <Alert.Description>{submitError}</Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
-              ) : register.error ? (
+              ) : null}
+              {registerError ? (
                 <HandledErrorAlert
-                  error={register.error}
+                  error={registerError}
                   fallbackTitle="Couldn't create your account"
                 />
               ) : null}
