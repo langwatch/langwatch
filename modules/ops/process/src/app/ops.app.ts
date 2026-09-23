@@ -142,11 +142,15 @@ import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
 import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
 import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
+import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
 import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
+import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
+import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
+import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import { buildOpsInfrastructure, type OpsProcessMembers } from "./ops-composition.build.ts";
@@ -530,6 +534,8 @@ type OpsRuntimeDependencies = Readonly<{
   explain: OpsExplainService;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
   checkup: OpsCheckupService | undefined;
+  /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
+  anomalies: AnomalyDetectorService | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
@@ -643,11 +649,21 @@ export class OpsApp implements OpsApi {
       },
     });
 
+    const anomalies = AnomalyDetectorService.create({
+      rateTracker: RedisAnomalyRateTrackerRepository.create({
+        redis: members.redis,
+        featureFlags: dependencies.featureFlags,
+      }),
+      anomalyState: RedisAnomalyStateRepository.create(members.redis),
+      featureFlags: dependencies.featureFlags,
+    });
+
     return OpsApp.fromInfrastructure({
       infrastructure,
       dependencies,
       repositories: setup.repositories,
       checkup,
+      anomalies,
     });
   }
 
@@ -661,6 +677,7 @@ export class OpsApp implements OpsApi {
     dependencies: OpsAppRuntimeDependencies;
     repositories: OpsRepositories;
     checkup?: OpsCheckupService;
+    anomalies?: AnomalyDetectorService;
   }): OpsApp {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -694,6 +711,7 @@ export class OpsApp implements OpsApi {
         }),
       }),
       checkup: setup.checkup,
+      anomalies: setup.anomalies,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
@@ -1738,6 +1756,13 @@ export class OpsApp implements OpsApi {
     return this.#checkup.usageReports.send();
   }
 
+  /** One tick of `ops_anomaly_detection`: surfaces and clears the tenants' rate anomalies. */
+  detectAnomalies(): Promise<AnomalyDetectionTickResult> {
+    const { anomalies } = this.#dependencies;
+    if (!anomalies) throw new OpsCapabilityUnavailableError("anomaly detection");
+    return anomalies.tick();
+  }
+
   get #checkup(): OpsCheckupService {
     const { checkup } = this.#dependencies;
     if (!checkup) throw new OpsCapabilityUnavailableError("the checkup");
@@ -1845,20 +1870,6 @@ export interface OpsSnapshotRedis {
   ): Promise<unknown>;
   tryGet(key: string): Promise<string | null>;
   incr(key: string): Promise<number>;
-}
-
-export interface OpsWorkerHandle {
-  stop(): void | Promise<void>;
-}
-
-/** Process controls for the complete Ops worker graph. */
-export interface OpsWorker {
-  tryStartAnomalyWorker(): OpsWorkerHandle | undefined;
-  /**
-   * The fleet's queue-metrics writer. One process publishes the snapshot every other one reads, so
-   * the handle's `stop` hands the lease back rather than letting the fleet wait out its TTL.
-   */
-  tryStartQueueMetricsWriter(): OpsWorkerHandle | undefined;
 }
 
 /**

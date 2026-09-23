@@ -2,6 +2,7 @@ import { bindRestMiddleware } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { OpsApp } from "#app/ops.app";
+import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { adminRest } from "#transport/admin.rest";
@@ -37,7 +38,8 @@ export const opsServer = defineServerModule("ops")
       apiKeyRequestCredentialOf(context.req.raw),
     ),
   ])
-  .withEventing(usageReportEventing);
+  .withEventing(usageReportEventing)
+  .withEventing(anomalyDetectionEventing);
 
 /** One request's presented project credential, unverified, or none at all. */
 function apiKeyRequestCredentialOf(

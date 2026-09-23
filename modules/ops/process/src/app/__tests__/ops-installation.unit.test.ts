@@ -39,17 +39,26 @@ import { createTestLogger } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { opsServer } from "../../ops.server.ts";
+import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
-function memberWithoutStore<Value extends object>(): Value {
+/** A store that holds nothing: every command is written down, a lease `SET` is granted. */
+function memberWithoutStore<Value extends object>(commands: unknown[][] = []): Value {
   const member: Partial<Value> = {};
-  return new Proxy(member, { get: () => async () => null }) as Value;
+  return new Proxy(member, {
+    get:
+      (_member, command) =>
+      async (...args: unknown[]) => {
+        commands.push([command, ...args]);
+        return command === "set" ? "OK" : null;
+      },
+  }) as Value;
 }
 
-function process(role: "api" | "worker") {
+function process(role: "api" | "worker", redisCommands: unknown[][] = []) {
   const { logger } = createTestLogger();
 
   return createApp({ role })
@@ -76,7 +85,7 @@ function process(role: "api" | "worker") {
     .withMember("processName", "langwatch-test")
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
-    .withKeyvalue(memberWithoutStore<RedisConnection>())
+    .withKeyvalue(memberWithoutStore<RedisConnection>(redisCommands))
     .withEventing(
       new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
     )
@@ -146,5 +155,31 @@ describe("ops app installation", () => {
         await runtime.stop();
       }
     });
+  });
+
+  describe("given the process starts", () => {
+    /** @scenario "The queue-metrics writer contends for the lease in every serving role" */
+    it.each(["api", "worker"] as const)(
+      "the %s role runs the queue-metrics writer and hands its lease back on stop",
+      async (role) => {
+        const redisCommands: unknown[][] = [];
+        const runtime = await process(role, redisCommands).boot();
+        const leaseCommands = () =>
+          redisCommands.filter((command) => command.includes(SNAPSHOT_LEASE_KEY));
+
+        try {
+          expect(leaseCommands()).toEqual([]);
+          await runtime.start();
+
+          await vi.waitFor(() =>
+            expect(leaseCommands()).toContainEqual(expect.arrayContaining(["set"])),
+          );
+        } finally {
+          await runtime.stop();
+        }
+
+        expect(leaseCommands().at(-1)?.[0]).toBe("eval");
+      },
+    );
   });
 });

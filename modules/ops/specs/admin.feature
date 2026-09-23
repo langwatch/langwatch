@@ -59,12 +59,14 @@ Feature: Platform administration package boundary
     Then the service refuses with its stable scheduler error
     And no audit entry is written for the refused control
 
+  # ADR-090: the writer runs in every serving role so dashboard freshness never
+  # depends on worker health; one pod holds the lease and publishes for all.
   @unit
-  Scenario: The anomaly worker preserves its settling delay and retry interval
-    Given a composed tenant-rate anomaly detector
-    When the Ops worker contribution starts
-    Then its first tick runs after five seconds
-    And a failed tick retries after sixty seconds without stopping the worker
+  Scenario: The queue-metrics writer contends for the lease in every serving role
+    Given Ops is installed in an api or a worker process
+    When the process starts
+    Then the queue-metrics writer contends for the snapshot lease
+    And stopping the process hands the lease back before the stores close
 
   @unit
   Scenario: The daily usage report is one report for the whole install

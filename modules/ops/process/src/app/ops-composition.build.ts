@@ -21,13 +21,18 @@ import type {
 } from "../repositories/ops-explain.repository.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
+import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
+import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import type { OrganizationSsoRouting } from "../services/admin-backoffice.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingOpsIntrospectionAdapter } from "../services/eventing.ops-introspection.service.ts";
 import { AdminAuditSink } from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
+import { QueueOpsMetricsSourceAdapter } from "../services/queue.ops-queue-metrics-source.service.ts";
+import { QueueService } from "../services/queue.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 import { OpsOperations } from "./ops-operations.ts";
 import type {
@@ -172,6 +177,27 @@ export function buildOpsInfrastructure(input: {
     members.logger.error({ error }, "failed to start the ops snapshot reader");
   });
   resources.own("api ops snapshot reader", () => snapshots.stop());
+
+  // Every serving role, lease-elected across the fleet (ADR-090); stopped before the
+  // stores close, so the lease is handed back rather than left to lapse.
+  const queueMetricsWriter = OpsMetricsCollectorService.create({
+    metrics: RedisOpsMetricsRepository.create({ redis: members.redis }),
+    ops: QueueOpsMetricsSourceAdapter.create(
+      QueueService.create({ repo: QueueRedisRepository.create({ redis: members.redis }) }),
+    ),
+    snapshots: DefaultOpsSnapshotService.create(
+      RedisOpsSnapshotRepository.create(new MemberOpsSnapshotRedis(members.redis)),
+    ),
+  });
+  resources.ownService({
+    name: "ops queue-metrics writer",
+    start: () => {
+      queueMetricsWriter.start().catch((error: unknown) => {
+        members.logger.error({ error }, "failed to start the ops queue-metrics writer");
+      });
+    },
+    stop: () => queueMetricsWriter.stop(),
+  });
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,

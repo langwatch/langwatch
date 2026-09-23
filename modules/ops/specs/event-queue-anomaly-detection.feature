@@ -67,3 +67,26 @@ Feature: Per-tenant rate anomaly detection
     When the AnomalyDetector tick runs
     Then the tenant is skipped this tick
     And the not-enough-data verdict is cached with a short expiry, well under the baseline's 1h cache TTL
+
+  # Main ticked on every worker replica with no leader; a scheduled process
+  # wakes once across the fleet, so each tick runs on one worker.
+  @unit @anomaly-detection @schedule
+  Scenario: Anomaly detection ticks once a minute as a scheduled process
+    Given Ops's anomaly detection pipeline is installed
+    When the schedule wakes
+    Then one detection is asked for, keyed by that wake
+    And the next wake comes sixty seconds later
+
+  @unit @anomaly-detection @schedule
+  Scenario: A redelivered detection surfaces a runaway tenant once
+    Given tenant "proj_runaway" is running at a hundred times its baseline
+    When the same detection is delivered twice
+    Then one hard-tier anomaly is recorded for "proj_runaway"
+    And the hard-tier alert goes out once
+
+  @unit @anomaly-detection @schedule
+  Scenario: A failed detection tick waits for the next wake
+    Given the detector fails on its first tick
+    When the detection is delivered
+    Then the delivery settles without an error
+    And the next wake runs detection again
