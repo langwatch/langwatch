@@ -576,12 +576,17 @@ export class EventSourcing {
    * lane's recorded accessor) must equal the group-key tenant segment, else
    * the job was misrouted. Refuse non-retryably so the queue dead-letters it.
    */
-  private assertTenantRoutingConsistency(
-    entry: JobRegistryEntry,
-    clean: Record<string, unknown>,
-    payload: Record<string, unknown>,
-    queueName: string,
-  ): void {
+  private assertTenantRoutingConsistency({
+    entry,
+    clean,
+    payload,
+    queueName,
+  }: {
+    entry: JobRegistryEntry;
+    clean: Record<string, unknown>;
+    payload: Record<string, unknown>;
+    queueName: string;
+  }): void {
     const payloadTenant = String(entry.getTenantId(clean));
     const groupTenant = entry.groupKeyFn(clean).split("/")[0] ?? "";
     if (payloadTenant === groupTenant) return;
@@ -675,7 +680,12 @@ export class EventSourcing {
     if (!result) {
       this.rejectUnroutableJob(payload, queueName);
     }
-    this.assertTenantRoutingConsistency(result.entry, result.clean, payload, queueName);
+    this.assertTenantRoutingConsistency({
+      entry: result.entry,
+      clean: result.clean,
+      payload,
+      queueName,
+    });
     // Forward the delivery. Dropping it here silently pinned
     // `deliveryAttempt` at 1 for every registry entry, which disabled the
     // fold store's merge-on-retry applied-id handling in the running
@@ -712,7 +722,12 @@ export class EventSourcing {
     const routed = payloads.map((payload) => {
       const result = this.lookupEntry(payload);
       if (!result) this.rejectUnroutableJob(payload, queueName);
-      this.assertTenantRoutingConsistency(result.entry, result.clean, payload, queueName);
+      this.assertTenantRoutingConsistency({
+        entry: result.entry,
+        clean: result.clean,
+        payload,
+        queueName,
+      });
       return result;
     });
 

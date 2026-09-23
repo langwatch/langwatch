@@ -40,13 +40,20 @@ export class EventingClickHouseEventStore<
   private readonly tracer = getLangWatchTracer("langwatch.trace-processing.event-store.clickhouse");
   private readonly logger = createLogger("langwatch:trace-processing:event-store:clickhouse");
 
-  private constructor(
-    repository: EventRepository,
-    private readonly retention: EventingRetentionConfiguration,
-    private readonly retentionPolicyResolver?: RetentionPolicyResolver,
-    private readonly classifyEventLogRetention?: EventLogRetentionClassifier,
-  ) {
-    super(repository);
+  private readonly retention: EventingRetentionConfiguration;
+  private readonly retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly classifyEventLogRetention?: EventLogRetentionClassifier;
+
+  private constructor(options: {
+    repository: EventRepository;
+    retention: EventingRetentionConfiguration;
+    retentionPolicyResolver?: RetentionPolicyResolver;
+    classifyEventLogRetention?: EventLogRetentionClassifier;
+  }) {
+    super(options.repository);
+    this.retention = options.retention;
+    this.retentionPolicyResolver = options.retentionPolicyResolver;
+    this.classifyEventLogRetention = options.classifyEventLogRetention;
   }
 
   static create(options: {
@@ -55,12 +62,7 @@ export class EventingClickHouseEventStore<
     retentionPolicyResolver?: RetentionPolicyResolver;
     classifyEventLogRetention?: EventLogRetentionClassifier;
   }): EventingClickHouseEventStore {
-    return new EventingClickHouseEventStore(
-      options.repository,
-      options.retention,
-      options.retentionPolicyResolver,
-      options.classifyEventLogRetention,
-    );
+    return new EventingClickHouseEventStore(options);
   }
 
   protected override async instrument<T>(

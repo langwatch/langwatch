@@ -97,13 +97,19 @@ export function validateCommand(command: unknown): z.infer<typeof CommandSchema>
 /**
  * Creates a type-safe command. No runtime validation—pass pre-validated types only.
  */
-export function createCommand<Payload = unknown, Metadata = Record<string, unknown>>(
-  tenantId: TenantId,
-  aggregateId: string,
-  type: CommandType,
-  data: Payload,
-  metadata?: Metadata,
-): Command<Payload, Metadata> {
+export function createCommand<Payload = unknown, Metadata = Record<string, unknown>>({
+  tenantId,
+  aggregateId,
+  type,
+  data,
+  metadata,
+}: {
+  tenantId: TenantId;
+  aggregateId: string;
+  type: CommandType;
+  data: Payload;
+  metadata?: Metadata;
+}): Command<Payload, Metadata> {
   return {
     tenantId,
     aggregateId,

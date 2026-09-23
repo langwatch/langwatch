@@ -79,23 +79,32 @@ export interface GracefulShutdownOptions {
  */
 export class GracefulShutdown {
   static create(options: GracefulShutdownOptions): GracefulShutdown {
-    return new GracefulShutdown(
-      options.logger,
-      options.deadlineMs,
-      options.exit ?? (process.exit.bind(process) as (code: number) => never),
-      options.terminating === true,
-    );
+    return new GracefulShutdown({
+      logger: options.logger,
+      deadlineMs: options.deadlineMs,
+      exit: options.exit ?? (process.exit.bind(process) as (code: number) => never),
+      terminating: options.terminating === true,
+    });
   }
 
   private readonly phases: ShutdownPhase[] = [];
   private shuttingDown = false;
+  private readonly logger: ShutdownLogger;
+  private readonly deadlineMs: number | undefined;
+  private readonly exit: (code: number) => never;
+  private readonly terminating: boolean;
 
-  private constructor(
-    private readonly logger: ShutdownLogger,
-    private readonly deadlineMs: number | undefined,
-    private readonly exit: (code: number) => never,
-    private readonly terminating: boolean,
-  ) {}
+  private constructor(settings: {
+    logger: ShutdownLogger;
+    deadlineMs: number | undefined;
+    exit: (code: number) => never;
+    terminating: boolean;
+  }) {
+    this.logger = settings.logger;
+    this.deadlineMs = settings.deadlineMs;
+    this.exit = settings.exit;
+    this.terminating = settings.terminating;
+  }
 
   /** Appends one phase. Order is the order phases were added. */
   phase(phase: ShutdownPhase): this {

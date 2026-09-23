@@ -161,7 +161,7 @@ export async function processCommand<EventType extends Event>(
     return;
   }
 
-  const command = createCommand(tenantId, aggregateId, commandType, validated);
+  const command = createCommand({ tenantId, aggregateId, type: commandType, data: validated });
 
   const commandStartTime = performance.now();
   try {
@@ -310,7 +310,12 @@ async function handleBatchCommands<EventType extends Event>(args: {
     }
 
     progress.attempted++;
-    const command = createCommand(payloadTenantId, aggregateId, commandType, validated);
+    const command = createCommand({
+      tenantId: payloadTenantId,
+      aggregateId,
+      type: commandType,
+      data: validated,
+    });
     const events = await handler.handle(command);
     validateHandlerEvents(events, commandType);
     // Only a command that contributed events is "handled" for cleanup,

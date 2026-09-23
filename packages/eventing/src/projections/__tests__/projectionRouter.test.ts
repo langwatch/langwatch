@@ -908,8 +908,13 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, {
-          tenantId,
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
+          fold,
+          events,
+          context: {
+            tenantId,
+          },
         });
 
         // The expensive fold load/store happens once — the O(n) win.
@@ -947,8 +952,13 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, {
-          tenantId,
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
+          fold,
+          events,
+          context: {
+            tenantId,
+          },
         });
 
         expect(seen).toEqual(["e1", "e3"]);
@@ -979,8 +989,13 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("second", 2000),
         ];
 
-        await (router as any).processFoldProjectionBatch("my-fold", fold, events, {
-          tenantId,
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
+          fold,
+          events,
+          context: {
+            tenantId,
+          },
         });
 
         expect(seen).toEqual(["first", "second", "third"]);
@@ -1004,12 +1019,12 @@ describe("ProjectionRouter", () => {
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 
-        await (router as any).processFoldProjectionBatch(
-          "my-fold",
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
           fold,
-          [makeBatchEvent("e1", 1000), makeBatchEvent("e2", 2000)],
-          { tenantId },
-        );
+          events: [makeBatchEvent("e1", 1000), makeBatchEvent("e2", 2000)],
+          context: { tenantId },
+        });
 
         expect(store.store).toHaveBeenCalledWith(
           expect.anything(),

@@ -70,7 +70,12 @@ export type ServerComponent = Readonly<{
 export class Server {
   static create(options: ServerOptions): Server {
     const exit = options.exit ?? (process.exit.bind(process) as (code: number) => never);
-    const server = new Server(options.name, options.logger, options.shutdownDeadlineMs, exit);
+    const server = new Server({
+      name: options.name,
+      logger: options.logger,
+      shutdownDeadlineMs: options.shutdownDeadlineMs,
+      exit,
+    });
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
     server.with(server.createHealthComponent(options.healthPort));
@@ -102,12 +107,22 @@ export class Server {
   private closing: Promise<void> | undefined;
   private sealed = false;
 
-  protected constructor(
-    readonly name: string,
-    private readonly logger: ServerLogger,
-    shutdownDeadlineMs: number | undefined,
-    exit: (code: number) => never,
-  ) {
+  readonly name: string;
+  private readonly logger: ServerLogger;
+
+  protected constructor({
+    name,
+    logger,
+    shutdownDeadlineMs,
+    exit,
+  }: {
+    name: string;
+    logger: ServerLogger;
+    shutdownDeadlineMs: number | undefined;
+    exit: (code: number) => never;
+  }) {
+    this.name = name;
+    this.logger = logger;
     this.graceful = GracefulShutdown.create({
       logger,
       ...(shutdownDeadlineMs === undefined ? {} : { deadlineMs: shutdownDeadlineMs }),

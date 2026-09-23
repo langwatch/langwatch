@@ -7,15 +7,23 @@ import { apiSurface, bearerDoor } from "./api-surface.ts";
 import { resolveUiBundle } from "./bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
 
-export async function processSurface(
-  config: ApiHostConfig,
-  production: boolean,
-  executionProxyBaseUrl: string | undefined,
-  members: ProcessMemberSource,
-  secrets: ScopedSecrets,
-  selection: TransportSelection,
-  publicConfig: Readonly<Record<string, unknown>>,
-): Promise<(peers: TransportPeers) => ExposedSurface<unknown, unknown>> {
+export async function processSurface({
+  config,
+  production,
+  executionProxyBaseUrl,
+  members,
+  secrets,
+  selection,
+  publicConfig,
+}: {
+  config: ApiHostConfig;
+  production: boolean;
+  executionProxyBaseUrl: string | undefined;
+  members: ProcessMemberSource;
+  secrets: ScopedSecrets;
+  selection: TransportSelection;
+  publicConfig: Readonly<Record<string, unknown>>;
+}): Promise<(peers: TransportPeers) => ExposedSurface<unknown, unknown>> {
   const bundle = resolveUiBundle({
     directory: config.bundleDirectory,
     assetBase: config.assetBase,

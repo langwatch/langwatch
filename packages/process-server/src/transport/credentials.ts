@@ -50,20 +50,23 @@ export type ApiRestCredentialPeers = Readonly<{
 
 export class ApiRestCredentials {
   static create(peers: ApiRestCredentialPeers): ApiRestCredentials {
-    return new ApiRestCredentials(
-      peers.apiKeys,
-      peers.authz,
-      peers.organizations,
-      peers.logger ?? createLogger("langwatch:api:rest:credential"),
-    );
+    return new ApiRestCredentials({
+      ...peers,
+      logger: peers.logger ?? createLogger("langwatch:api:rest:credential"),
+    });
   }
 
-  private constructor(
-    private readonly apiKeys: ApiRestCredentialPeers["apiKeys"],
-    private readonly authz: ApiRestCredentialPeers["authz"],
-    private readonly organizations: ApiRestCredentialPeers["organizations"],
-    private readonly logger: Pick<Logger, "error">,
-  ) {}
+  private readonly apiKeys: ApiRestCredentialPeers["apiKeys"];
+  private readonly authz: ApiRestCredentialPeers["authz"];
+  private readonly organizations: ApiRestCredentialPeers["organizations"];
+  private readonly logger: Pick<Logger, "error">;
+
+  private constructor(peers: Required<ApiRestCredentialPeers>) {
+    this.apiKeys = peers.apiKeys;
+    this.authz = peers.authz;
+    this.organizations = peers.organizations;
+    this.logger = peers.logger;
+  }
 
   async authenticate(input: {
     request: Request;

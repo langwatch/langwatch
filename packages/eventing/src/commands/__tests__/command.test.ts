@@ -19,7 +19,7 @@ describe("createCommand", () => {
     it("preserves tenantId correctly", () => {
       const payload = { action: "test" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.tenantId).toBe(tenantId);
     });
@@ -27,7 +27,7 @@ describe("createCommand", () => {
     it("preserves aggregateId correctly", () => {
       const payload = { action: "test" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.aggregateId).toBe(aggregateId);
     });
@@ -35,7 +35,7 @@ describe("createCommand", () => {
     it("preserves command type correctly", () => {
       const payload = { action: "test" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.type).toBe(commandType);
     });
@@ -43,7 +43,7 @@ describe("createCommand", () => {
     it("preserves payload data correctly", () => {
       const payload = { action: "test", value: 42 };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toEqual(payload);
     });
@@ -56,7 +56,7 @@ describe("createCommand", () => {
       const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.metadata).toBeUndefined();
     });
@@ -73,7 +73,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { correlationId: "corr-123", traceId: "trace-456" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
+      const command = createCommand({
+        tenantId,
+        aggregateId,
+        type: commandType,
+        data: payload,
+        metadata,
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -90,7 +96,13 @@ describe("createCommand", () => {
         array: [1, 2, 3],
       };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
+      const command = createCommand({
+        tenantId,
+        aggregateId,
+        type: commandType,
+        data: payload,
+        metadata,
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -106,7 +118,7 @@ describe("createCommand", () => {
     it("works with string payload", () => {
       const payload = "string-payload";
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toBe(payload);
     });
@@ -114,7 +126,7 @@ describe("createCommand", () => {
     it("works with number payload", () => {
       const payload = 42;
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toBe(payload);
     });
@@ -122,7 +134,7 @@ describe("createCommand", () => {
     it("works with object payload", () => {
       const payload = { key: "value", number: 123 };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toEqual(payload);
     });
@@ -130,7 +142,7 @@ describe("createCommand", () => {
     it("works with array payload", () => {
       const payload = [1, 2, 3, "four"];
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toEqual(payload);
     });
@@ -138,7 +150,7 @@ describe("createCommand", () => {
     it("works with null payload", () => {
       const payload = null;
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload);
+      const command = createCommand({ tenantId, aggregateId, type: commandType, data: payload });
 
       expect(command.data).toBeNull();
     });
@@ -155,7 +167,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { key: "value" };
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
+      const command = createCommand({
+        tenantId,
+        aggregateId,
+        type: commandType,
+        data: payload,
+        metadata,
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -164,7 +182,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = null;
 
-      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
+      const command = createCommand({
+        tenantId,
+        aggregateId,
+        type: commandType,
+        data: payload,
+        metadata,
+      });
 
       expect(command.metadata).toBeNull();
     });

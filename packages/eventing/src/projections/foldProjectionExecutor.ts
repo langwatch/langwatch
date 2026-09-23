@@ -899,7 +899,7 @@ export class FoldProjectionExecutor {
     // wired, bounding memory for a huge aggregate (100k+ events). Gated on
     // refoldOnOutOfOrder: false since paged results arrive in (timestamp, eventId) order.
     if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
-      return this.streamRefoldUpToDelivered(projection, delivered, context, upToEvent);
+      return this.streamRefoldUpToDelivered({ projection, delivered, context, upToEvent });
     }
 
     const history = await projection.eventLoaderUpTo!({
@@ -940,12 +940,17 @@ export class FoldProjectionExecutor {
    * history, deduping across page boundaries. Bounded working set (one page)
    * vs unbounded array path; applies missing delivered events on top.
    */
-  private async streamRefoldUpToDelivered<State, E extends Event>(
-    projection: FoldProjectionDefinition<State, E>,
-    delivered: E[],
-    context: ProjectionStoreContext,
-    upToEvent: E,
-  ): Promise<State | null> {
+  private async streamRefoldUpToDelivered<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    upToEvent,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: E[];
+    context: ProjectionStoreContext;
+    upToEvent: E;
+  }): Promise<State | null> {
     const PAGE_SIZE = this.refoldPageSize;
     // Safety net only: the paged loader's cursor is expected to strictly
     // advance every call. If that contract is ever violated (e.g. a

@@ -238,7 +238,7 @@ export class PrismaProcessStore implements ProcessStore {
       updatedAt: asDate(commit.now),
     };
 
-    const conflict = await this.upsertInstanceRow(tx, commit, actualRevision, instanceData);
+    const conflict = await this.upsertInstanceRow({ tx, commit, actualRevision, instanceData });
     if (conflict) return conflict;
 
     if (commit.sourceEventId !== null) {
@@ -278,10 +278,15 @@ export class PrismaProcessStore implements ProcessStore {
    * `revisionConflict` result if another commit won the race, or `null` on
    * success.
    */
-  private async upsertInstanceRow<State>(
-    tx: Prisma.TransactionClient,
-    commit: ProcessCommit<State>,
-    actualRevision: number,
+  private async upsertInstanceRow<State>({
+    tx,
+    commit,
+    actualRevision,
+    instanceData,
+  }: {
+    tx: Prisma.TransactionClient;
+    commit: ProcessCommit<State>;
+    actualRevision: number;
     instanceData: {
       tenantId: string;
       userId: string | null;
@@ -289,8 +294,8 @@ export class PrismaProcessStore implements ProcessStore {
       revision: number;
       nextWakeAt: Date | null;
       updatedAt: Date;
-    },
-  ): Promise<CommitResult | null> {
+    };
+  }): Promise<CommitResult | null> {
     if (actualRevision === 0) {
       const inserted = await tx.processManagerInstance.createMany({
         data: [

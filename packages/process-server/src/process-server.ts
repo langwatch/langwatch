@@ -54,15 +54,30 @@ export class ProcessServer implements ProcessBoot {
       healthPort: options.healthPort ?? settings.port,
       shutdownDeadlineMs: settings.shutdownDeadlineMs,
     });
-    return new ProcessServer(server, options.config, options.resolver, settings);
+    return new ProcessServer({
+      server,
+      config: options.config,
+      resolver: options.resolver,
+      settings,
+    });
   }
 
-  private constructor(
-    private readonly server: Server,
-    readonly config: ParsedConfig,
-    private readonly resolver: SecretsResolver,
-    private readonly settings: z.infer<typeof processSettings>,
-  ) {}
+  private readonly server: Server;
+  readonly config: ParsedConfig;
+  private readonly resolver: SecretsResolver;
+  private readonly settings: z.infer<typeof processSettings>;
+
+  private constructor(deps: {
+    server: Server;
+    config: ParsedConfig;
+    resolver: SecretsResolver;
+    settings: z.infer<typeof processSettings>;
+  }) {
+    this.server = deps.server;
+    this.config = deps.config;
+    this.resolver = deps.resolver;
+    this.settings = deps.settings;
+  }
 
   get surfaceDefaults(): SurfaceDefaultsOptions {
     if (!this.config.http)
@@ -103,15 +118,15 @@ export class ProcessServer implements ProcessBoot {
       members = opened;
       let surface: ((peers: TransportPeers) => ExposedSurface<unknown, unknown>) | undefined;
       if (role === "api" && transports) {
-        surface = await processSurface(
-          this.config.http as ApiHostConfig,
-          this.production,
-          this.settings.nlpServiceUrl,
+        surface = await processSurface({
+          config: this.config.http as ApiHostConfig,
+          production: this.production,
+          executionProxyBaseUrl: this.settings.nlpServiceUrl,
           members,
-          this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
-          transports,
-          this.publicConfig(modules),
-        );
+          secrets: this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
+          selection: transports,
+          publicConfig: this.publicConfig(modules),
+        });
       }
       const runtime = await bootInstalledProcess({
         role,

@@ -111,12 +111,12 @@ class ApiSurface {
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface(
+    return new ApiSurface({
       composition,
       peers,
       authz,
       sessions,
-      ApiRestCredentials.create({
+      credentials: ApiRestCredentials.create({
         apiKeys: peers.app(ApiKeyApi),
         authz,
         organizations: peers.app(OrganizationApi),
@@ -124,7 +124,7 @@ class ApiSurface {
       }),
       idempotency,
       rateLimiter,
-    );
+    });
   }
 
   readonly #projectCredentials = new WeakMap<Request, ResolvedApiKeyCredential>();
@@ -136,15 +136,32 @@ class ApiSurface {
   readonly #rest: RestHost | undefined;
   readonly #trpc: TrpcHost | undefined;
 
-  private constructor(
-    private readonly composition: ApiSurfaceComposition,
-    peers: TransportPeers,
-    private readonly authz: AuthzApi,
-    private readonly sessions: SessionReader,
-    private readonly credentials: ApiRestCredentials,
-    idempotency: IdempotentRunner | undefined,
-    rateLimiter: RateLimiter | undefined,
-  ) {
+  private readonly composition: ApiSurfaceComposition;
+  private readonly authz: AuthzApi;
+  private readonly sessions: SessionReader;
+  private readonly credentials: ApiRestCredentials;
+
+  private constructor({
+    composition,
+    peers,
+    authz,
+    sessions,
+    credentials,
+    idempotency,
+    rateLimiter,
+  }: {
+    composition: ApiSurfaceComposition;
+    peers: TransportPeers;
+    authz: AuthzApi;
+    sessions: SessionReader;
+    credentials: ApiRestCredentials;
+    idempotency: IdempotentRunner | undefined;
+    rateLimiter: RateLimiter | undefined;
+  }) {
+    this.composition = composition;
+    this.authz = authz;
+    this.sessions = sessions;
+    this.credentials = credentials;
     if (composition.selection.selected.rest)
       this.#rest = this.#restHost(peers, idempotency, rateLimiter);
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(peers, rateLimiter);

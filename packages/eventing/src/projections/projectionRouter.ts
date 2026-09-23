@@ -462,7 +462,12 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(projectionName, projection, [event], context);
+        await this.processStateProjectionEvents({
+          projectionName,
+          projection,
+          events: [event],
+          context,
+        });
       },
       async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
@@ -473,7 +478,7 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(projectionName, projection, events, context);
+        await this.processStateProjectionEvents({ projectionName, projection, events, context });
       },
     );
   }
@@ -523,11 +528,16 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionEvent(projectionName, fold, triggerEvent, {
-          tenantId: triggerEvent.tenantId,
-          ...(context.deliveryAttempt !== undefined
-            ? { deliveryAttempt: context.deliveryAttempt }
-            : {}),
+        await this.processFoldProjectionEvent({
+          projectionName,
+          fold,
+          event: triggerEvent,
+          context: {
+            tenantId: triggerEvent.tenantId,
+            ...(context.deliveryAttempt !== undefined
+              ? { deliveryAttempt: context.deliveryAttempt }
+              : {}),
+          },
         });
       },
       async (projectionName, events, context) => {
@@ -540,18 +550,23 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionBatch(projectionName, fold, events, {
-          tenantId: events[0]!.tenantId,
-          ...(context.deliveryAttempt !== undefined
-            ? { deliveryAttempt: context.deliveryAttempt }
-            : {}),
-          // A bisected sub-batch after the first commit of its dispatch: the
-          // fold commit must extend the applied-id set, not replace it
-          // (#6578). Dropping this here silently re-enables the double-apply
-          // this chain exists to prevent.
-          ...(context.isDeliveryContinuation !== undefined
-            ? { isDeliveryContinuation: context.isDeliveryContinuation }
-            : {}),
+        await this.processFoldProjectionBatch({
+          projectionName,
+          fold,
+          events,
+          context: {
+            tenantId: events[0]!.tenantId,
+            ...(context.deliveryAttempt !== undefined
+              ? { deliveryAttempt: context.deliveryAttempt }
+              : {}),
+            // A bisected sub-batch after the first commit of its dispatch: the
+            // fold commit must extend the applied-id set, not replace it
+            // (#6578). Dropping this here silently re-enables the double-apply
+            // this chain exists to prevent.
+            ...(context.isDeliveryContinuation !== undefined
+              ? { isDeliveryContinuation: context.isDeliveryContinuation }
+              : {}),
+          },
         });
       },
     );
@@ -869,7 +884,7 @@ export class ProjectionRouter<
             continue;
           }
           try {
-            await this.processFoldProjectionEvent(projectionName, fold, event, context);
+            await this.processFoldProjectionEvent({ projectionName, fold, event, context });
           } catch (error) {
             const category = categorizeError(error);
             handleError(error, category, this.logger, {
@@ -915,7 +930,12 @@ export class ProjectionRouter<
         }
 
         for (const event of matching) {
-          await this.processStateProjectionEvents(name, projection, [event], context);
+          await this.processStateProjectionEvents({
+            projectionName: name,
+            projection,
+            events: [event],
+            context,
+          });
         }
       } catch (error) {
         this.logger.error(
@@ -1351,12 +1371,17 @@ export class ProjectionRouter<
     );
   }
 
-  private async processStateProjectionEvents(
-    projectionName: string,
-    projection: StateProjectionDefinition<any, EventType>,
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processStateProjectionEvents({
+    projectionName,
+    projection,
+    events,
+    context,
+  }: {
+    projectionName: string;
+    projection: StateProjectionDefinition<any, EventType>;
+    events: EventType[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     if (events.length === 0) return;
     const first = events[0]!;
 
@@ -1481,12 +1506,17 @@ export class ProjectionRouter<
    * Processes a single event for a fold projection (incremental).
    * The fold state in the store serves as the checkpoint — no separate checkpoint tracking needed.
    */
-  private async processFoldProjectionEvent(
-    projectionName: string,
-    fold: FoldProjectionDefinition<any, EventType>,
-    event: EventType,
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processFoldProjectionEvent({
+    projectionName,
+    fold,
+    event,
+    context,
+  }: {
+    projectionName: string;
+    fold: FoldProjectionDefinition<any, EventType>;
+    event: EventType;
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     await this.tracer.withActiveSpan(
       "ProjectionRouter.processFoldProjectionEvent",
       {
@@ -1639,12 +1669,17 @@ export class ProjectionRouter<
    * `FoldProjectionExecutor.executeBatch`), used by the GroupQueue's coalescing
    * path. Subscribers fire once with the final folded state.
    */
-  private async processFoldProjectionBatch(
-    projectionName: string,
-    fold: FoldProjectionDefinition<any, EventType>,
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processFoldProjectionBatch({
+    projectionName,
+    fold,
+    events,
+    context,
+  }: {
+    projectionName: string;
+    fold: FoldProjectionDefinition<any, EventType>;
+    events: EventType[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     if (events.length === 0) return;
 
     await this.tracer.withActiveSpan(

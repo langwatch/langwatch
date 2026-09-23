@@ -12,12 +12,17 @@ function counter(name: string, help: string, labelNames: readonly string[]): Cou
   );
 }
 
-function histogram(
-  name: string,
-  help: string,
-  labelNames: readonly string[],
+function histogram({
+  name,
+  help,
+  labelNames,
   buckets = [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000],
-): HistogramMetric {
+}: {
+  name: string;
+  help: string;
+  labelNames: readonly string[];
+  buckets?: number[];
+}): HistogramMetric {
   return (
     (register.getSingleMetric(name) as HistogramMetric | undefined) ??
     new Histogram({ name, help, labelNames, buckets })
@@ -30,40 +35,41 @@ const projectionTotal = counter("es_projection_total", "Eventing projection exec
   "projection_name",
   "status",
 ]);
-const projectionDuration = histogram(
-  "es_projection_duration_milliseconds",
-  "Eventing projection execution duration",
-  ["pipeline_name", "projection_kind", "projection_name"],
-);
+const projectionDuration = histogram({
+  name: "es_projection_duration_milliseconds",
+  help: "Eventing projection execution duration",
+  labelNames: ["pipeline_name", "projection_kind", "projection_name"],
+});
 const commandTotal = counter("es_command_total", "Eventing commands processed", [
   "pipeline_name",
   "command_type",
   "status",
 ]);
-const commandDuration = histogram("es_command_duration_milliseconds", "Eventing command duration", [
-  "pipeline_name",
-  "command_type",
-]);
+const commandDuration = histogram({
+  name: "es_command_duration_milliseconds",
+  help: "Eventing command duration",
+  labelNames: ["pipeline_name", "command_type"],
+});
 const foldTotal = counter("es_fold_projection_total", "Eventing ClickHouse fold executions", [
   "pipeline_name",
   "projection_name",
   "status",
 ]);
-const foldDuration = histogram(
-  "es_fold_projection_duration_milliseconds",
-  "Eventing ClickHouse fold duration",
-  ["pipeline_name", "projection_name"],
-);
+const foldDuration = histogram({
+  name: "es_fold_projection_duration_milliseconds",
+  help: "Eventing ClickHouse fold duration",
+  labelNames: ["pipeline_name", "projection_name"],
+});
 const mapTotal = counter("es_map_projection_total", "Eventing ClickHouse map executions", [
   "pipeline_name",
   "projection_name",
   "status",
 ]);
-const mapDuration = histogram(
-  "es_map_projection_duration_milliseconds",
-  "Eventing ClickHouse map duration",
-  ["pipeline_name", "projection_name"],
-);
+const mapDuration = histogram({
+  name: "es_map_projection_duration_milliseconds",
+  help: "Eventing ClickHouse map duration",
+  labelNames: ["pipeline_name", "projection_name"],
+});
 const mapEnqueueTotal = counter(
   "es_map_projection_enqueue_total",
   "Eventing ClickHouse map routing outcomes",
@@ -74,11 +80,11 @@ const projectionSubscriberTotal = counter(
   "Eventing projection subscriber executions",
   ["pipeline_name", "reactor_name", "status"],
 );
-const projectionSubscriberDuration = histogram(
-  "es_reactor_duration_milliseconds",
-  "Eventing projection subscriber duration",
-  ["pipeline_name", "reactor_name"],
-);
+const projectionSubscriberDuration = histogram({
+  name: "es_reactor_duration_milliseconds",
+  help: "Eventing projection subscriber duration",
+  labelNames: ["pipeline_name", "reactor_name"],
+});
 const projectionSubscriberCollapsed = counter(
   "es_reactor_collapsed_total",
   "Projection subscriber jobs collapsed before enqueue",
@@ -89,11 +95,11 @@ const subscriberTotal = counter("es_subscriber_total", "Eventing subscriber exec
   "subscriber_name",
   "status",
 ]);
-const subscriberDuration = histogram(
-  "es_subscriber_duration_milliseconds",
-  "Eventing subscriber duration",
-  ["pipeline_name", "subscriber_name"],
-);
+const subscriberDuration = histogram({
+  name: "es_subscriber_duration_milliseconds",
+  help: "Eventing subscriber duration",
+  labelNames: ["pipeline_name", "subscriber_name"],
+});
 const subscriberEnqueueTotal = counter(
   "es_subscriber_enqueue_total",
   "Eventing subscriber routing outcomes",
@@ -122,29 +128,29 @@ const foldCacheTotal = counter("es_fold_cache_total", "Fold consistency cache lo
   "projection_name",
   "result",
 ]);
-const foldCacheGetDuration = histogram(
-  "es_fold_cache_get_duration_milliseconds",
-  "Fold consistency cache reads",
-  ["projection_name", "source"],
-  [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
-);
-const foldCacheStoreDuration = histogram(
-  "es_fold_cache_store_duration_milliseconds",
-  "Fold consistency cache writes",
-  ["projection_name"],
-  [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
-);
+const foldCacheGetDuration = histogram({
+  name: "es_fold_cache_get_duration_milliseconds",
+  help: "Fold consistency cache reads",
+  labelNames: ["projection_name", "source"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+const foldCacheStoreDuration = histogram({
+  name: "es_fold_cache_store_duration_milliseconds",
+  help: "Fold consistency cache writes",
+  labelNames: ["projection_name"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
 const foldCacheRedisErrorTotal = counter(
   "es_fold_cache_redis_error_total",
   "Fold consistency cache Redis failures",
   ["projection_name", "operation"],
 );
-const foldCacheEntryBytes = histogram(
-  "es_fold_cache_entry_bytes",
-  "Serialized fold consistency cache entry bytes",
-  ["projection_name"],
-  [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
-);
+const foldCacheEntryBytes = histogram({
+  name: "es_fold_cache_entry_bytes",
+  help: "Serialized fold consistency cache entry bytes",
+  labelNames: ["projection_name"],
+  buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
+});
 const foldDedupUnavailableTotal = counter(
   "es_fold_dedup_unavailable_total",
   "Retried folds without an applied-event set",
@@ -155,12 +161,12 @@ const foldDuplicateEventsSkippedTotal = counter(
   "Redelivered fold events skipped",
   ["projection_name"],
 );
-const foldBlindReapplyEvents = histogram(
-  "es_fold_blind_reapply_events",
-  "Events blindly reapplied by a fold retry",
-  ["projection_name"],
-  [1, 2, 5, 10, 25, 50, 100, 250, 500],
-);
+const foldBlindReapplyEvents = histogram({
+  name: "es_fold_blind_reapply_events",
+  help: "Events blindly reapplied by a fold retry",
+  labelNames: ["projection_name"],
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
 const foldPostStoreFailureTotal = counter(
   "es_fold_post_store_failure_total",
   "Fold failures after durable state storage",
@@ -172,11 +178,11 @@ const processManagerTotal = counter("es_process_manager_total", "Process-manager
   "input_kind",
   "outcome",
 ]);
-const processManagerDuration = histogram(
-  "es_process_manager_duration_milliseconds",
-  "Process-manager evolution duration",
-  ["process_name", "input_kind"],
-);
+const processManagerDuration = histogram({
+  name: "es_process_manager_duration_milliseconds",
+  help: "Process-manager evolution duration",
+  labelNames: ["process_name", "input_kind"],
+});
 const processOutboxTotal = counter("es_process_outbox_total", "Process-manager outbox attempts", [
   "process_name",
   "intent_type",
@@ -187,24 +193,24 @@ const processOutboxStuckDrains = counter(
   "Abandoned process-manager outbox drains",
   ["process_name"],
 );
-const processOutboxDuration = histogram(
-  "es_process_outbox_duration_milliseconds",
-  "Process-manager outbox attempt duration",
-  ["process_name", "intent_type"],
-  [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000],
-);
-const processWakeLag = histogram(
-  "es_process_wake_lag_milliseconds",
-  "Process-manager wake delay",
-  ["process_name"],
-  [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
-);
-const processOutboxDispatchLag = histogram(
-  "es_process_outbox_dispatch_lag_milliseconds",
-  "Process-manager outbox dispatch delay",
-  ["process_name"],
-  [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
-);
+const processOutboxDuration = histogram({
+  name: "es_process_outbox_duration_milliseconds",
+  help: "Process-manager outbox attempt duration",
+  labelNames: ["process_name", "intent_type"],
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000],
+});
+const processWakeLag = histogram({
+  name: "es_process_wake_lag_milliseconds",
+  help: "Process-manager wake delay",
+  labelNames: ["process_name"],
+  buckets: [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
+});
+const processOutboxDispatchLag = histogram({
+  name: "es_process_outbox_dispatch_lag_milliseconds",
+  help: "Process-manager outbox dispatch delay",
+  labelNames: ["process_name"],
+  buckets: [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
+});
 const processIntentsSuppressed = counter(
   "es_process_intents_suppressed_total",
   "Already-dispatched process-manager intents suppressed",
@@ -500,11 +506,11 @@ const eventsStoredTotal = counter(
   ["pipeline_name"],
 );
 
-const storeDurationMs = histogram(
-  "event_sourcing_store_duration_milliseconds",
-  "Duration of storeEvents (store + projection dispatch) in milliseconds",
-  ["pipeline_name"],
-);
+const storeDurationMs = histogram({
+  name: "event_sourcing_store_duration_milliseconds",
+  help: "Duration of storeEvents (store + projection dispatch) in milliseconds",
+  labelNames: ["pipeline_name"],
+});
 
 export type EventSourcingStoreMetrics = {
   eventsStored(pipelineName: string, count: number): void;
