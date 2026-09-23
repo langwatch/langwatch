@@ -418,7 +418,6 @@ test_app() {
 # view/backfill provisioning is idempotent. test_lwql_replicas covers the
 # multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
-# @scenario "A single-replica deployment provisions LangWatchQL unchanged"
 # The LWQL access model is DELIVERED by the main-phase <release>-lwql-access-render
 # Job (revision-suffixed name). `helm --wait` does not wait for Jobs, and the
 # ClickHouse mount is required, so a failed render leaves ClickHouse stuck rather
@@ -448,6 +447,7 @@ assert_render_job_complete() {
   fi
 }
 
+# @scenario "A single-replica deployment provisions LangWatchQL unchanged"
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 

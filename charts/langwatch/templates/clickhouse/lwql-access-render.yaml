@@ -57,7 +57,10 @@
 
   Gated on chart-managed ClickHouse. When `lwql.enabled=false` the Job still
   renders — but writes two empty documents — so the pods' unconditional mount is
-  always satisfiable and disabling the feature never wedges ClickHouse boot;
+  always satisfiable and disabling the feature never wedges ClickHouse boot.
+  (The ClickHouse subchart cannot read the umbrella-scoped `.Values.lwql`, so the
+  mount cannot be gated on the feature flag without promoting it to `global`;
+  the empty-document render keeps a single operator flag correct instead.)
   `lwql.enabled` toggles the CONTENT, not the topology.
 */}}
 {{- if .Values.clickhouse.chartManaged }}
@@ -71,6 +74,9 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
+# The render Job calls the Kubernetes API to write the access Secret, so its
+# ServiceAccount mounts the token (the pod opts in too).
+automountServiceAccountToken: true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -128,11 +134,16 @@ spec:
         {{- include "langwatch.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
-      # No blanket token mount (hardened posture, like the backup Jobs). The Job
-      # DOES need an API token to write the access Secret, so it is projected
-      # explicitly into the standard SA path below with a bounded lifetime,
-      # rather than auto-mounting the long-lived one.
-      automountServiceAccountToken: false
+      # This Job is the one LWQL workload that calls the Kubernetes API: it writes
+      # the access Secret every ClickHouse pod mounts. Like the preflight and
+      # stored-objects hooks, it therefore mounts the ServiceAccount token.
+      # It is auto-mounted the standard way (NOT hand-rolled as a projected
+      # volume): a chart-authored `serviceAccountToken:` source collides with the
+      # projected volume platform admission webhooks inject, which the
+      # helm-azure-identity guard forbids chart-wide. The auto-mounted token,
+      # ca.crt and namespace land at the conventional path the write-secret
+      # script (and NODE_EXTRA_CA_CERTS below) already read.
+      automountServiceAccountToken: true
       restartPolicy: Never
       {{- with (.Values.global).imagePullSecrets }}
       imagePullSecrets:
@@ -181,7 +192,10 @@ spec:
                 pnpm run task renderLwqlAccessConfig --out /render
               else
                 # Feature off: write empty, valid YAML so the pods' mount is
-                # always satisfiable and ClickHouse merges a no-op.
+                # always satisfiable and ClickHouse merges a no-op. The mount
+                # cannot be gated on lwql.enabled (the ClickHouse subchart cannot
+                # read the umbrella-scoped flag), so an empty document keeps a
+                # disabled install from wedging on a missing Secret.
                 printf '{}\n' > /render/users.d/lwql-access.yaml
                 printf '{}\n' > /render/config.d/lwql-named-collection.yaml
               fi
@@ -248,12 +262,6 @@ spec:
               mountPath: /render
             - name: tmp
               mountPath: /tmp
-            # The SA token the write-secret script authenticates with. Mounted at
-            # the conventional path so the script (and NODE_EXTRA_CA_CERTS) find
-            # token, ca.crt and namespace exactly where a default mount puts them.
-            - name: kube-api-access
-              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -268,24 +276,4 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
-        # Reconstruct the standard ServiceAccount mount explicitly (token, ca.crt,
-        # namespace) so pod-level automountServiceAccountToken can stay false
-        # while the write-secret script still has a short-lived API token.
-        - name: kube-api-access
-          projected:
-            defaultMode: 0444
-            sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-              - configMap:
-                  name: kube-root-ca.crt
-                  items:
-                    - key: ca.crt
-                      path: ca.crt
-              - downwardAPI:
-                  items:
-                    - path: namespace
-                      fieldRef:
-                        fieldPath: metadata.namespace
 {{- end }}

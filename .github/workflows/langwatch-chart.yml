@@ -284,7 +284,13 @@ jobs:
           - name: overlays
             script: make test-e2e-overlays
             cluster: lw-overlay
-            build_app: false
+            # The overlays leg installs chart-managed ClickHouse, which now
+            # depends on the app image: the lwql-access-render Job runs it to
+            # write the access Secret every ClickHouse pod mounts (required
+            # mount). Without the image the Job hits ErrImageNeverPull and
+            # ClickHouse never leaves ContainerCreating. Build + load it like
+            # the infra leg (Resolve/Build/Load steps are gated on build_app).
+            build_app: true
     defaults:
       run:
         working-directory: charts/langwatch

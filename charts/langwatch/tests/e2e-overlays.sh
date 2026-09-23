@@ -660,10 +660,25 @@ HARDENED_WORKLOADS=(
   "charts/gateway/templates/deployment.yaml"
   "charts/clickhouse/templates/statefulset.yaml"
   # The LWQL access-render Job runs the app image to write the access Secret.
-  # It reaches the Kubernetes API (like the preflight / stored-objects hooks)
-  # but, unlike them, stays fully hardened: it projects a short-lived token
-  # explicitly instead of auto-mounting one, and runs read-only-root with a
-  # writable /tmp HOME. It renders whenever ClickHouse is chart-managed (default).
+  # It reaches the Kubernetes API (like the preflight / stored-objects hooks), so
+  # it MUST mount the ServiceAccount token — see TOKEN_MOUNTING_WORKLOADS below.
+  # It renders whenever ClickHouse is chart-managed (default), including under
+  # strict-admission, so it is a hardened workload (not an exemption, which the
+  # strict overlay would have to remove and cannot: the flag that would remove it
+  # is the one that keeps the hardened ClickHouse StatefulSet rendering too). On
+  # every other axis it is fully hardened: read-only root, non-root uid 1000, all
+  # capabilities dropped, seccomp RuntimeDefault, size-bounded emptyDirs.
+  "templates/clickhouse/lwql-access-render.yaml"
+)
+
+# Hardened workloads that legitimately MOUNT the ServiceAccount token because they
+# call the Kubernetes API. For these, the sweep inverts the automount assertion:
+# the token must be mounted (automountServiceAccountToken NOT false) rather than
+# withheld. This is an honest positive requirement, not a skipped check — the
+# render Job cannot write the access Secret without its token, and it must not
+# hand-roll a projected token volume (that collides with the platform webhook's
+# own, which the helm-azure-identity guard forbids chart-wide), so it auto-mounts.
+TOKEN_MOUNTING_WORKLOADS=(
   "templates/clickhouse/lwql-access-render.yaml"
 )
 
@@ -751,6 +766,13 @@ assert_every_emptydir_bounded() {
 # one hit anywhere satisfies them for the whole document.
 assert_workload_hardened() {
   local tpl="$1"; shift
+  # Workloads that call the Kubernetes API must mount the token; for them the
+  # automount assertion is inverted (mounted, not withheld). See
+  # TOKEN_MOUNTING_WORKLOADS.
+  local needs_token=0 w
+  for w in "${TOKEN_MOUNTING_WORKLOADS[@]}"; do
+    [[ "$w" == "$tpl" ]] && needs_token=1
+  done
   local out report
   out=$(tmpl_only "$tpl" "$@") || {
     fail "hardening: could not render $tpl"; return
@@ -778,7 +800,13 @@ assert_workload_hardened() {
     (( nonroot == 1 ))    || missing+=" container.runAsNonRoot:true"
     (( podnonroot == 1 )) || missing+=" pod.runAsNonRoot:true"
     (( seccomp == 1 ))    || missing+=" pod.seccompProfile:RuntimeDefault"
-    (( automount == 1 ))  || missing+=" pod.automountServiceAccountToken:false"
+    if (( needs_token == 1 )); then
+      # Inverted: this workload calls the K8s API, so the token MUST be mounted
+      # (automount != false). Withholding it would break the write, not harden it.
+      (( automount == 0 )) || missing+=" pod.automountServiceAccountToken:true (workload calls the K8s API)"
+    else
+      (( automount == 1 )) || missing+=" pod.automountServiceAccountToken:false"
+    fi
     if [[ -n "$missing" ]]; then
       fail "hardening[$tpl]: ${id} container '${cname}' missing:${missing}"
       failures=$((failures + 1))
