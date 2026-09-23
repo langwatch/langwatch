@@ -994,6 +994,12 @@ export const tracePipeline = definePipeline("trace")
   .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
 ```
 
+`.withJobs` takes two kinds (Alex, 2026-09-23): a `cron(...)` schedule, and a long-running job, a
+factory returning `{ start, stop }` that owns its own timers (first tick, delay after each run). The
+worker starts every job after boot and stops it before the stores close; the api never constructs one.
+Work that must run in every role (ADR-090's lease-held writer) is not a job: it stays a service the
+module owns. `withWorkers` is retired.
+
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
 repositories. The process builds, registers and connects them one at a time in
