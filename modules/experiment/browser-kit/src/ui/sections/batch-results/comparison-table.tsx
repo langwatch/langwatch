@@ -96,24 +96,8 @@ type BuildComparisonColumnsOptions = {
   onOpenTrace?: (traceId: string) => void;
 };
 
-/**
- * Build columns for comparison mode
- */
-const buildComparisonColumns = ({
-  comparisonData,
-  hiddenColumns,
-  showOutputs,
-  showEvaluations,
-  showCostAndLatency,
-  rowHeight,
-  describeFailure,
-  renderEvaluatorResult,
-  renderTracePeek,
-  onOpenTrace,
-}: BuildComparisonColumnsOptions) => {
-  const columns = [];
-
-  // Get a merged view of all columns from all runs
+/** A merged view of all dataset and target columns from all runs, first run wins. */
+const mergeRunColumns = (comparisonData: ComparisonRunData[]) => {
   const allDatasetColumns = new Map<string, BatchDatasetColumn>();
   const allTargetColumns = new Map<string, BatchTargetColumn>();
 
@@ -130,6 +114,27 @@ const buildComparisonColumns = ({
       }
     }
   }
+
+  return { allDatasetColumns, allTargetColumns };
+};
+
+/**
+ * Build columns for comparison mode
+ */
+const buildComparisonColumns = ({
+  comparisonData,
+  hiddenColumns,
+  showOutputs,
+  showEvaluations,
+  showCostAndLatency,
+  rowHeight,
+  describeFailure,
+  renderEvaluatorResult,
+  renderTracePeek,
+  onOpenTrace,
+}: BuildComparisonColumnsOptions) => {
+  const columns = [];
+  const { allDatasetColumns, allTargetColumns } = mergeRunColumns(comparisonData);
 
   // Row number column
   columns.push(
