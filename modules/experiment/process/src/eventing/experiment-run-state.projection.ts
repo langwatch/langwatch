@@ -121,7 +121,10 @@ export class ExperimentRunStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    ExperimentRunStateData,
+    "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  > {
     return {
       RunId: "",
       ExperimentId: "",

@@ -199,13 +199,13 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     } else if ("handle" in data) {
       handle = null;
     }
-    this.#assertUniqueHandle(
+    this.#assertUniqueHandle({
       handle,
-      existing.scope,
+      scope: existing.scope,
       projectId,
-      existing.organizationId,
-      existing.id,
-    );
+      organizationId: existing.organizationId,
+      excludeId: existing.id,
+    });
     const updated = {
       ...existing,
       name: "name" in data ? (data.name ?? existing.name) : existing.name,
@@ -285,12 +285,12 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     const handle = configData.handle
       ? storedHandle({ ...configData, handle: configData.handle })
       : null;
-    this.#assertUniqueHandle(
+    this.#assertUniqueHandle({
       handle,
-      configData.scope,
-      configData.projectId,
-      configData.organizationId,
-    );
+      scope: configData.scope,
+      projectId: configData.projectId,
+      organizationId: configData.organizationId,
+    });
     const now = toDate(nowInstant());
     const config: StoredConfig = {
       id: `prompt_${nanoid()}`,
@@ -483,13 +483,19 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     };
   }
 
-  #assertUniqueHandle(
-    handle: string | null,
-    scope: PromptScope,
-    projectId: string,
-    organizationId: string,
-    excludeId?: string,
-  ): void {
+  #assertUniqueHandle({
+    handle,
+    scope,
+    projectId,
+    organizationId,
+    excludeId,
+  }: {
+    handle: string | null;
+    scope: PromptScope;
+    projectId: string;
+    organizationId: string;
+    excludeId?: string;
+  }): void {
     if (!handle) return;
     const duplicate = [...this.#state.configs.values()].some(
       (row) =>

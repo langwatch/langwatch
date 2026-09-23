@@ -161,7 +161,11 @@ describe("given a target result", () => {
     /** @scenario "A cell's duration is the wall clock between the engine's timestamps" */
     it("carries the wall clock between them", () => {
       const result = targetResultOf(
-        mapTargetResult("target-1", 0, { timestamps: { started_at: 1000, finished_at: 2500 } }),
+        mapTargetResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: { timestamps: { started_at: 1000, finished_at: 2500 } },
+        }),
       );
 
       expect(result.duration).toBe(1500);
@@ -170,7 +174,11 @@ describe("given a target result", () => {
     /** @scenario "A cell's duration is the wall clock between the engine's timestamps" */
     it("reports no duration when one end is missing", () => {
       const result = targetResultOf(
-        mapTargetResult("target-1", 0, { timestamps: { started_at: 1000 } }),
+        mapTargetResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: { timestamps: { started_at: 1000 } },
+        }),
       );
 
       expect(result.duration).toBeUndefined();
@@ -181,10 +189,15 @@ describe("given a target result", () => {
     /** @scenario "A coded engine failure reaches the cell on the handled channel" */
     it("sends the code and the trace rather than the engine's own words", () => {
       const result = targetResultOf(
-        mapTargetResult("target-1", 1, {
-          error: 'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
-          error_type: "http_error",
-          trace_id: "trace-9",
+        mapTargetResult({
+          nodeId: "target-1",
+          rowIndex: 1,
+          executionState: {
+            error:
+              'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+            error_type: "http_error",
+            trace_id: "trace-9",
+          },
         }),
       );
 
@@ -196,10 +209,14 @@ describe("given a target result", () => {
     /** @scenario "A coded engine failure reaches the cell on the handled channel" */
     it("carries the upstream status the provider answered with", () => {
       const result = targetResultOf(
-        mapTargetResult("target-1", 0, {
-          error: "httpblock: upstream returned 500",
-          error_type: "upstream_http_error",
-          upstream_status: 500,
+        mapTargetResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: {
+            error: "httpblock: upstream returned 500",
+            error_type: "upstream_http_error",
+            upstream_status: 500,
+          },
         }),
       );
 
@@ -210,7 +227,13 @@ describe("given a target result", () => {
   describe("when the engine sent no code", () => {
     /** @scenario "A coded engine failure reaches the cell on the handled channel" */
     it("leaves the handled channel empty and keeps the raw line as the fallback", () => {
-      const result = targetResultOf(mapTargetResult("target-1", 0, { error: "plain string" }));
+      const result = targetResultOf(
+        mapTargetResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: { error: "plain string" },
+        }),
+      );
 
       expect(result.domainError).toBeUndefined();
       expect(result.error).toBe("plain string");
@@ -225,7 +248,12 @@ describe("given an evaluator verdict", () => {
     /** @scenario "A guardrail evaluator stores its verdict without a meaningless score" */
     it("stores the verdict without the score", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, processed, { stripScore: true }),
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: processed,
+          options: { stripScore: true },
+        }),
       );
 
       expect(event.result).toMatchObject({ status: "processed", passed: true, score: undefined });
@@ -233,7 +261,9 @@ describe("given an evaluator verdict", () => {
 
     /** @scenario "A guardrail evaluator stores its verdict without a meaningless score" */
     it("keeps the score for every other evaluator", () => {
-      const event = evaluatorResultOf(mapEvaluatorResult("target-1.eval-1", 0, processed));
+      const event = evaluatorResultOf(
+        mapEvaluatorResult({ nodeId: "target-1.eval-1", rowIndex: 0, executionState: processed }),
+      );
 
       expect(event.result).toMatchObject({ status: "processed", score: 0.75 });
     });
@@ -243,10 +273,14 @@ describe("given an evaluator verdict", () => {
     /** @scenario "An execution failure outranks the evaluator's own error output" */
     it("reports the execution's failure, not the evaluator's", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "error",
-          error: "Connection timeout",
-          outputs: { status: "error", details: "Evaluator internal error" },
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "error",
+            error: "Connection timeout",
+            outputs: { status: "error", details: "Evaluator internal error" },
+          },
         }),
       );
 
@@ -266,9 +300,13 @@ describe("given an evaluator verdict", () => {
       { name: "real text", details: "Matched exactly", kept: "Matched exactly" },
     ])("keeps details that are $name as $kept", ({ details, kept }) => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { passed: true, details },
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { passed: true, details },
+          },
         }),
       );
 
@@ -280,11 +318,11 @@ describe("given an evaluator verdict", () => {
     /** @scenario "A comparison verdict persists only the candidate ids it judged" */
     it("persists only which candidates were judged, not their text", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult(
-          "target-1.eval-1",
-          0,
-          { status: "success", outputs: { label: "a" } },
-          {
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: { status: "success", outputs: { label: "a" } },
+          options: {
             inputs: {
               candidates: [
                 { id: "a", output: "a long answer", cost: 0.1 },
@@ -294,7 +332,7 @@ describe("given an evaluator verdict", () => {
               input: "the task",
             },
           },
-        ),
+        }),
       );
 
       expect(event.inputs).toEqual({ candidates: [{ id: "a" }, { id: "b" }] });
@@ -303,14 +341,14 @@ describe("given an evaluator verdict", () => {
     /** @scenario "A comparison verdict persists only the candidate ids it judged" */
     it("persists nothing for an evaluator that judged no candidate list", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult(
-          "target-1.eval-1",
-          0,
-          { status: "success", outputs: { score: 1 } },
-          {
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: { status: "success", outputs: { score: 1 } },
+          options: {
             inputs: { output: "hello", expected_output: "hello" },
           },
-        ),
+        }),
       );
 
       expect(event.inputs).toBeUndefined();
@@ -320,9 +358,13 @@ describe("given an evaluator verdict", () => {
   describe("when the node id names no evaluator", () => {
     /** @scenario "A verdict addressed to no evaluator fails loudly" */
     it("refuses to map it rather than storing a verdict against nothing", () => {
-      expect(() => mapEvaluatorResult("target-1", 0, { status: "success" })).toThrow(
-        "Expected evaluator node ID but got: target-1",
-      );
+      expect(() =>
+        mapEvaluatorResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: { status: "success" },
+        }),
+      ).toThrow("Expected evaluator node ID but got: target-1");
     });
   });
 });
@@ -502,9 +544,15 @@ describe("given an evaluator node inside a studio workflow", () => {
     /** @scenario "A workflow evaluator's verdict shows the node's name, not its id" */
     it("shows the name over the raw node id", () => {
       const event = evaluatorResultOf(
-        mapWorkflowEvaluatorResult(0, "target-1", "node-abc", "Answer Relevancy", {
-          status: "success",
-          outputs: { passed: true, score: "0.9" },
+        mapWorkflowEvaluatorResult({
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "node-abc",
+          evaluatorName: "Answer Relevancy",
+          executionState: {
+            status: "success",
+            outputs: { passed: true, score: "0.9" },
+          },
         }),
       );
 
@@ -517,9 +565,14 @@ describe("given an evaluator node inside a studio workflow", () => {
     /** @scenario "A workflow evaluator's verdict shows the node's name, not its id" */
     it("leaves the name unset so storage falls back to the node id", () => {
       const event = evaluatorResultOf(
-        mapWorkflowEvaluatorResult(0, "target-1", "node-abc", undefined, {
-          status: "success",
-          outputs: { passed: true },
+        mapWorkflowEvaluatorResult({
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "node-abc",
+          executionState: {
+            status: "success",
+            outputs: { passed: true },
+          },
         }),
       );
 
@@ -531,11 +584,17 @@ describe("given an evaluator node inside a studio workflow", () => {
     /** @scenario "A coded engine failure reaches the cell on the handled channel" */
     it("sends the code on the handled channel beside the raw details", () => {
       const event = evaluatorResultOf(
-        mapWorkflowEvaluatorResult(0, "target-1", "node-abc", "Judge", {
-          status: "error",
-          error: "llm call failed",
-          nodeErrorCode: "llm_error",
-          trace_id: "trace-3",
+        mapWorkflowEvaluatorResult({
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "node-abc",
+          evaluatorName: "Judge",
+          executionState: {
+            status: "error",
+            error: "llm call failed",
+            nodeErrorCode: "llm_error",
+            trace_id: "trace-3",
+          },
         }),
       );
 
@@ -549,10 +608,14 @@ describe("given an evaluator node inside a studio workflow", () => {
   describe("when a component evaluator reports cost", () => {
     it("keeps a reported zero cost on a processed verdict", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { passed: true, score: 1.0 },
-          cost: 0,
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { passed: true, score: 1.0 },
+            cost: 0,
+          },
         }),
       );
 
@@ -564,13 +627,17 @@ describe("given an evaluator node inside a studio workflow", () => {
   describe("when a component evaluator declined the row", () => {
     /** @scenario "A skipped verdict from a component evaluator is reported as skipped" */
     it("reports the verdict as skipped with its reason and no score", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 3, {
-        status: "success",
-        outputs: {
-          status: "skipped",
-          details: "Total tokens exceed the maximum of 64000: 70000",
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 3,
+        executionState: {
+          status: "success",
+          outputs: {
+            status: "skipped",
+            details: "Total tokens exceed the maximum of 64000: 70000",
+          },
+          timestamps: { started_at: 1000, finished_at: 1200 },
         },
-        timestamps: { started_at: 1000, finished_at: 1200 },
       });
 
       expect(result).toEqual({
@@ -588,10 +655,14 @@ describe("given an evaluator node inside a studio workflow", () => {
 
     it("keeps what the judge spent before declining", () => {
       const event = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { status: "skipped", details: "the two passes disagreed" },
-          cost: 0.002,
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { status: "skipped", details: "the two passes disagreed" },
+            cost: 0.002,
+          },
         }),
       );
 
@@ -604,16 +675,24 @@ describe("given an evaluator node inside a studio workflow", () => {
 
     it("keeps a reported zero cost apart from an unreported one", () => {
       const reportedZero = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { status: "skipped", details: "nothing to evaluate" },
-          cost: 0,
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { status: "skipped", details: "nothing to evaluate" },
+            cost: 0,
+          },
         }),
       );
       const unreported = evaluatorResultOf(
-        mapEvaluatorResult("target-1.eval-1", 1, {
-          status: "success",
-          outputs: { status: "skipped", details: "nothing to evaluate" },
+        mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 1,
+          executionState: {
+            status: "success",
+            outputs: { status: "skipped", details: "nothing to evaluate" },
+          },
         }),
       );
 
@@ -625,9 +704,15 @@ describe("given an evaluator node inside a studio workflow", () => {
   describe("when a workflow evaluator declined the row", () => {
     /** @scenario "A skipped verdict from a workflow evaluator is reported as skipped" */
     it("reports the verdict as skipped with its reason", () => {
-      const result = mapWorkflowEvaluatorResult(2, "target-1", "eval-1", "Faithfulness", {
-        status: "success",
-        outputs: { status: "skipped", details: "No contexts to evaluate" },
+      const result = mapWorkflowEvaluatorResult({
+        rowIndex: 2,
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        evaluatorName: "Faithfulness",
+        executionState: {
+          status: "success",
+          outputs: { status: "skipped", details: "No contexts to evaluate" },
+        },
       });
 
       expect(result).toEqual({

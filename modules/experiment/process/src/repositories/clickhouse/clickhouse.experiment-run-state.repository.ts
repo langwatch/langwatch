@@ -133,14 +133,21 @@ export class ClickHouseExperimentRunStateRepository<
     };
   }
 
-  private mapProjectionDataToClickHouseRecord(
-    data: ExperimentRunStateData,
-    tenantId: string,
-    projectionId: string,
-    projectionVersion: string,
-    lastProcessedEventId: string,
-    runId: string,
-  ): ClickHouseExperimentRunWriteRecord {
+  private mapProjectionDataToClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    projectionVersion,
+    lastProcessedEventId,
+    runId,
+  }: {
+    data: ExperimentRunStateData;
+    tenantId: string;
+    projectionId: string;
+    projectionVersion: string;
+    lastProcessedEventId: string;
+    runId: string;
+  }): ClickHouseExperimentRunWriteRecord {
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -285,14 +292,14 @@ export class ClickHouseExperimentRunStateRepository<
     try {
       const client = await this.clickhouse.resolveClient(context.tenantId);
       const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-        projection.data as ExperimentRunStateData,
-        String(context.tenantId),
-        projection.id,
-        projection.version,
-        projection.id,
+      const projectionRecord = this.mapProjectionDataToClickHouseRecord({
+        data: projection.data as ExperimentRunStateData,
+        tenantId: String(context.tenantId),
+        projectionId: projection.id,
+        projectionVersion: projection.version,
+        lastProcessedEventId: projection.id,
         runId,
-      );
+      });
 
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
@@ -356,14 +363,14 @@ export class ClickHouseExperimentRunStateRepository<
       const retentionDays = retentionPolicy?.experiments ?? this.defaultRetentionDays;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-        const record = this.mapProjectionDataToClickHouseRecord(
-          projection.data as ExperimentRunStateData,
-          String(context.tenantId),
-          projection.id,
-          projection.version,
-          projection.id,
+        const record = this.mapProjectionDataToClickHouseRecord({
+          data: projection.data as ExperimentRunStateData,
+          tenantId: String(context.tenantId),
+          projectionId: projection.id,
+          projectionVersion: projection.version,
+          lastProcessedEventId: projection.id,
           runId,
-        );
+        });
         record._retention_days = retentionDays;
         return record;
       });

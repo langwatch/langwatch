@@ -83,16 +83,15 @@ describe("buildEvaluatorNode", () => {
       max_tokens: 100,
     };
 
-    const node = buildEvaluatorNode(
+    const node = buildEvaluatorNode({
       evaluator,
-      "target-1.eval-1",
-      "target-1",
+      nodeId: "target-1.eval-1",
+      targetId: "target-1",
       cell,
-      0,
+      index: 0,
       settings,
-      undefined, // dbEvaluatorId
-      "Custom LLM Score", // name
-    );
+      name: "Custom LLM Score",
+    });
 
     // Settings should be in parameters array (format expected by langwatch_nlp)
     const parameters = (node.data as Record<string, unknown>).parameters as {
@@ -122,16 +121,15 @@ describe("buildEvaluatorNode", () => {
     const cell = createBasicCell();
 
     // No settings passed (defaults to empty)
-    const node = buildEvaluatorNode(
+    const node = buildEvaluatorNode({
       evaluator,
-      "target-1.eval-1",
-      "target-1",
+      nodeId: "target-1.eval-1",
+      targetId: "target-1",
       cell,
-      0,
-      {}, // settings
-      undefined, // dbEvaluatorId
-      "Exact Match", // name
-    );
+      index: 0,
+      settings: {},
+      name: "Exact Match",
+    });
 
     // Should have empty parameters array when no settings
     const parameters = (node.data as Record<string, unknown>).parameters as {
@@ -151,7 +149,13 @@ describe("buildEvaluatorNode", () => {
     const evaluator = createBasicEvaluatorConfig();
     const cell = createBasicCell();
 
-    const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+    const node = buildEvaluatorNode({
+      evaluator,
+      nodeId: "target-1.eval-1",
+      targetId: "target-1",
+      cell,
+      index: 0,
+    });
 
     expect(node.data.evaluator).toBe("langevals/exact_match");
   });
@@ -160,7 +164,13 @@ describe("buildEvaluatorNode", () => {
     const evaluator = createBasicEvaluatorConfig();
     const cell = createBasicCell();
 
-    const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+    const node = buildEvaluatorNode({
+      evaluator,
+      nodeId: "target-1.eval-1",
+      targetId: "target-1",
+      cell,
+      index: 0,
+    });
 
     expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
   });
@@ -269,7 +279,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildSignatureNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     expect(node.type).toBe("signature");
   });
@@ -279,7 +289,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildSignatureNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // LLM config should be in parameters array
     const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
@@ -296,7 +306,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildSignatureNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // Prompt should be converted to instructions parameter
     const instructionsParam = node.data.parameters?.find(
@@ -311,7 +321,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildSignatureNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // Messages should be in parameters array
     const messagesParam = node.data.parameters?.find(
@@ -326,7 +336,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildSignatureNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // LLM config should still be from parameters array
     const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
@@ -411,7 +421,7 @@ describe("buildHttpNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     expect(node.type).toBe("http");
   });
@@ -421,7 +431,7 @@ describe("buildHttpNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // Should extract {{input}} and {{threadId}} from body template
     const inputIdentifiers = node.data.inputs?.map((i) => i.identifier);
@@ -434,7 +444,7 @@ describe("buildHttpNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // threadId has a value mapping, should have that value
     const threadIdInput = node.data.inputs?.find((i) => i.identifier === "threadId");
@@ -450,7 +460,7 @@ describe("buildHttpNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     // HTTP config is stored in parameters (consistent with other node types)
     const params = node.data.parameters ?? [];
@@ -469,7 +479,7 @@ describe("buildHttpNodeFromAgent", () => {
     const targetConfig = createTargetConfig();
     const cell = createCell();
 
-    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+    const node = buildHttpNodeFromAgent({ nodeId: "target-1", agent, targetConfig, cell });
 
     expect(node.data.outputs).toHaveLength(1);
     expect(node.data.outputs?.[0]?.identifier).toBe("output");
@@ -515,7 +525,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     // Node ID should be the target ID, not a composite ID
     expect(node.id).toBe("target-eval-1");
@@ -526,7 +536,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     expect(node.type).toBe("evaluator");
   });
@@ -535,7 +545,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     expect(node.data.evaluator).toBe("evaluators/eval-abc-123");
   });
@@ -550,7 +560,7 @@ describe("buildEvaluatorTargetNode", () => {
       targetConfig,
     };
 
-    expect(() => buildEvaluatorTargetNode("target-eval-1", targetConfig, cell)).toThrow(
+    expect(() => buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell })).toThrow(
       'Evaluator target "target-eval-1" has no evaluator ID. targetEvaluatorId must be set.',
     );
   });
@@ -559,7 +569,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
     expect(node.data.outputs?.map((o) => o.type)).toEqual(["bool", "float", "str"]);
@@ -569,7 +579,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     // The 'output' input should NOT have a value (it comes from edge/dataset)
     const outputInput = node.data.inputs?.find((i) => i.identifier === "output");
@@ -595,7 +605,7 @@ describe("buildEvaluatorTargetNode", () => {
       targetConfig,
     };
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     const outputInput = node.data.inputs?.find((i) => i.identifier === "output");
     expect(outputInput?.value).toBe("literal value for output");
@@ -623,7 +633,12 @@ describe("buildEvaluatorTargetNode", () => {
       ],
     ]);
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell, loadedEvaluators);
+    const node = buildEvaluatorTargetNode({
+      nodeId: "target-eval-1",
+      targetConfig,
+      cell,
+      loadedEvaluators,
+    });
 
     // Settings should be converted to parameters
     const params = node.data.parameters ?? [];
@@ -640,7 +655,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     expect(node.data.cls).toBe("LangWatchEvaluator");
   });
@@ -661,7 +676,12 @@ describe("buildEvaluatorTargetNode", () => {
       ],
     ]);
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell, loadedEvaluators);
+    const node = buildEvaluatorTargetNode({
+      nodeId: "target-eval-1",
+      targetConfig,
+      cell,
+      loadedEvaluators,
+    });
 
     expect(node.data.name).toBe("Sentiment Evaluator");
   });
@@ -670,7 +690,7 @@ describe("buildEvaluatorTargetNode", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
-    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+    const node = buildEvaluatorTargetNode({ nodeId: "target-eval-1", targetConfig, cell });
 
     expect(node.data.name).toBe("target-eval-1");
   });

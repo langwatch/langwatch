@@ -6,9 +6,13 @@ describe("mapEvaluatorResult", () => {
   describe("given the evaluator failed with provider auth", () => {
     /** @scenario Judge auth failures are serialized as domain errors */
     it("serializes a domain error for raw 403 responses", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "error",
-        error: '403 {\n  "message": "Missing Authentication Token"\n}',
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "error",
+          error: '403 {\n  "message": "Missing Authentication Token"\n}',
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -23,9 +27,13 @@ describe("mapEvaluatorResult", () => {
     });
 
     it("does not reclassify non-auth error strings", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "error",
-        error: "Evaluator timeout",
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "error",
+          error: "Evaluator timeout",
+        },
       });
 
       expect(result.type).toBe("evaluator_result");

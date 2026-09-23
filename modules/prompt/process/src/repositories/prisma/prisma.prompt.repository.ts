@@ -449,7 +449,9 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     data: Partial<CreateLlmConfigParams>,
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<LlmPromptConfig> {
-    return this.#refusingTakenHandle(() => this.#writeConfig(idOrHandle, projectId, data, options));
+    return this.#refusingTakenHandle(() =>
+      this.#writeConfig({ idOrHandle, projectId, data, options }),
+    );
   }
 
   updateConfigAndCreateVersion(
@@ -486,14 +488,17 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   /**
    * Update an LLM config's metadata (name only)
    */
-  async #writeConfig(
-    idOrHandle: string,
-    projectId: string,
-    data: Partial<CreateLlmConfigParams>,
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<LlmPromptConfig> {
+  async #writeConfig({
+    idOrHandle,
+    projectId,
+    data,
+    options,
+  }: {
+    idOrHandle: string;
+    projectId: string;
+    data: Partial<CreateLlmConfigParams>;
+    options?: { tx?: Prisma.TransactionClient };
+  }): Promise<LlmPromptConfig> {
     const { tx } = options ?? {};
     const client = tx ?? this.prisma;
     // Get organizationId first using the proper approach
@@ -569,12 +574,12 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     runtimeParameters?: Record<string, unknown>;
   }): Promise<LlmConfigWithLatestVersion> {
     return this.prisma.$transaction(async (tx) => {
-      const updatedConfig = await this.#writeConfig(
-        params.idOrHandle,
-        params.projectId,
-        params.data,
-        { tx },
-      );
+      const updatedConfig = await this.#writeConfig({
+        idOrHandle: params.idOrHandle,
+        projectId: params.projectId,
+        data: params.data,
+        options: { tx },
+      });
       const latestVersionRaw = await this.versions.findLatestVersion(
         updatedConfig.id,
         params.projectId,

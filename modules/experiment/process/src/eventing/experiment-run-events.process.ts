@@ -25,7 +25,8 @@ export const experimentRunStartedEventDataSchema = z.object({
   targets: z.array(targetSchema),
 });
 
-export const experimentRunStartedEventSchema = EventSchema.extend({
+export const experimentRunStartedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.STARTED),
   data: experimentRunStartedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
@@ -65,7 +66,8 @@ export const targetResultEventDataSchema = z.object({
   carriedOver: z.boolean().optional(),
 });
 
-export const targetResultEventSchema = EventSchema.extend({
+export const targetResultEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT),
   data: targetResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
@@ -99,7 +101,8 @@ export const evaluatorResultEventDataSchema = z.object({
   carriedOver: z.boolean().optional(),
 });
 
-export const evaluatorResultEventSchema = EventSchema.extend({
+export const evaluatorResultEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT),
   data: evaluatorResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
@@ -119,7 +122,8 @@ export const traceMetricsComputedEventDataSchema = z.object({
   totalCost: z.number(),
 });
 
-export const traceMetricsComputedEventSchema = EventSchema.extend({
+export const traceMetricsComputedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED),
   data: traceMetricsComputedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
@@ -138,7 +142,8 @@ export const experimentRunCompletedEventDataSchema = z.object({
   stoppedAt: z.number().nullable().optional(),
 });
 
-export const experimentRunCompletedEventSchema = EventSchema.extend({
+export const experimentRunCompletedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.COMPLETED),
   data: experimentRunCompletedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),

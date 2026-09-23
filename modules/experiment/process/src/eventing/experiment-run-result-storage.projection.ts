@@ -81,7 +81,7 @@ export class ExperimentRunResultStorageMapProjection
   protected readonly events = resultEvents;
 
   override options = {
-    groupKeyFn: (event: { data: { experimentId: string; runId: string; index: number } }) =>
+    groupKeyFn: (event: { data: { experimentId: string; runId: string; index: number } }): string =>
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
   };
 

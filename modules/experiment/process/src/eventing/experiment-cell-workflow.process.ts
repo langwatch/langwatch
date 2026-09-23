@@ -76,31 +76,31 @@ export const buildCellWorkflow = (
   const entryNode = buildEntryNode(datasetColumns, datasetEntry);
 
   // Build target node
-  const { targetNode, targetNodeId } = buildTargetNode(
+  const { targetNode, targetNodeId } = buildTargetNode({
     targetConfig,
     loadedData,
     cell,
-    loadedData.evaluators, // Pass evaluators for evaluator-as-target case
-  );
+    loadedEvaluators: loadedData.evaluators,
+  });
 
   // Build evaluator nodes
-  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes(
+  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes({
     evaluatorConfigs,
-    targetConfig.id,
+    targetId: targetConfig.id,
     cell,
-    loadedData.evaluators,
-  );
+    loadedEvaluators: loadedData.evaluators,
+  });
 
   // Build edges
-  const edges = buildEdges(
-    entryNode.id,
+  const edges = buildEdges({
+    entryNodeId: entryNode.id,
     targetNodeId,
     targetConfig,
     evaluatorConfigs,
     evaluatorNodeIds,
     cell,
     datasetColumns,
-  );
+  });
 
   const workflow: StudioWorkflow = {
     spec_version: LATEST_SPEC_VERSION,
@@ -163,12 +163,12 @@ export const buildEvaluatorCellWorkflow = ({
   const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
 
   const entryNode = buildEntryNode(datasetColumns, datasetEntry);
-  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes(
+  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes({
     evaluatorConfigs,
-    targetConfig.id,
+    targetId: targetConfig.id,
     cell,
     loadedEvaluators,
-  );
+  });
 
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   const edges: StudioEdge[] = evaluatorConfigs.flatMap((evaluator) => {
@@ -268,12 +268,17 @@ type LoadedTargetData = {
 /**
  * Builds the target node based on whether it's a prompt, agent, or evaluator.
  */
-const buildTargetNode = (
-  targetConfig: TargetConfig,
-  loadedData: LoadedTargetData,
-  cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
-): {
+const buildTargetNode = ({
+  targetConfig,
+  loadedData,
+  cell,
+  loadedEvaluators,
+}: {
+  targetConfig: TargetConfig;
+  loadedData: LoadedTargetData;
+  cell: ExecutionCell;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+}): {
   targetNode: StudioNode<Signature | Code | HttpNodeData | Evaluator>;
   targetNodeId: string;
 } => {
@@ -312,7 +317,12 @@ const buildTargetNode = (
   } else if (targetConfig.type === "evaluator") {
     // Evaluator target - build evaluator node with target ID
     return {
-      targetNode: buildEvaluatorTargetNode(targetNodeId, targetConfig, cell, loadedEvaluators),
+      targetNode: buildEvaluatorTargetNode({
+        nodeId: targetNodeId,
+        targetConfig,
+        cell,
+        loadedEvaluators,
+      }),
       targetNodeId,
     };
   } else {
@@ -321,22 +331,32 @@ const buildTargetNode = (
       switch (loadedData.agent.type) {
         case "http":
           return {
-            targetNode: buildHttpNodeFromAgent(targetNodeId, loadedData.agent, targetConfig, cell),
+            targetNode: buildHttpNodeFromAgent({
+              nodeId: targetNodeId,
+              agent: loadedData.agent,
+              targetConfig,
+              cell,
+            }),
             targetNodeId,
           };
         case "signature":
           return {
-            targetNode: buildSignatureNodeFromAgent(
-              targetNodeId,
-              loadedData.agent,
+            targetNode: buildSignatureNodeFromAgent({
+              nodeId: targetNodeId,
+              agent: loadedData.agent,
               targetConfig,
               cell,
-            ),
+            }),
             targetNodeId,
           };
         case "code":
           return {
-            targetNode: buildCodeNodeFromAgent(targetNodeId, loadedData.agent, targetConfig, cell),
+            targetNode: buildCodeNodeFromAgent({
+              nodeId: targetNodeId,
+              agent: loadedData.agent,
+              targetConfig,
+              cell,
+            }),
             targetNodeId,
           };
         case "workflow":
@@ -379,12 +399,17 @@ const buildTargetNode = (
  * Builds an evaluator node when an evaluator is used as a target.
  * The node ID is the target ID (not a composite ID like regular evaluators).
  */
-export const buildEvaluatorTargetNode = (
-  nodeId: string,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
-): StudioNode<Evaluator> => {
+export const buildEvaluatorTargetNode = ({
+  nodeId,
+  targetConfig,
+  cell,
+  loadedEvaluators,
+}: {
+  nodeId: string;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+}): StudioNode<Evaluator> => {
   // Get settings: prefer local config if available, otherwise use DB settings
   const dbEvaluator = targetConfig.targetEvaluatorId
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
@@ -678,12 +703,17 @@ export const buildSignatureNodeFromLocalConfig = ({
 /**
  * Builds a signature node from a TypedAgent with type "signature".
  */
-export const buildSignatureNodeFromAgent = (
-  nodeId: string,
-  agent: TypedAgent,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): StudioNode<Signature> => {
+export const buildSignatureNodeFromAgent = ({
+  nodeId,
+  agent,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  agent: TypedAgent;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): StudioNode<Signature> => {
   const config = agent.config;
 
   // Get inputs with value mappings applied. The `in` guards keep the union
@@ -775,12 +805,17 @@ const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => 
 /**
  * Builds a code node from a TypedAgent with type "code" or "workflow".
  */
-export const buildCodeNodeFromAgent = (
-  nodeId: string,
-  agent: TypedAgent,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): StudioNode<Code> => {
+export const buildCodeNodeFromAgent = ({
+  nodeId,
+  agent,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  agent: TypedAgent;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): StudioNode<Code> => {
   const config = agent.config;
 
   // Get inputs with value mappings applied. The `in` guards keep the union
@@ -825,12 +860,17 @@ const HTTP_AGENT_FIXED_INPUTS = ["threadId", "messages", "input"] as const;
  * Builds an HTTP node from a TypedAgent with type "http". The HTTP config is
  * read directly from the agent, not duplicated on the target.
  */
-export const buildHttpNodeFromAgent = (
-  nodeId: string,
-  agent: TypedAgent,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): StudioNode<HttpNodeData> => {
+export const buildHttpNodeFromAgent = ({
+  nodeId,
+  agent,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  agent: TypedAgent;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): StudioNode<HttpNodeData> => {
   // The agent.type === "http" check is done before calling this function,
   // so we can safely cast the config to HttpComponentConfig
   const config = agent.config as HttpComponentConfig;
@@ -886,12 +926,17 @@ export const buildHttpNodeFromAgent = (
 /**
  * Builds evaluator nodes for all evaluators in the cell.
  */
-const buildEvaluatorNodes = (
-  evaluatorConfigs: EvaluatorConfig[],
-  targetId: string,
-  cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
-): {
+const buildEvaluatorNodes = ({
+  evaluatorConfigs,
+  targetId,
+  cell,
+  loadedEvaluators,
+}: {
+  evaluatorConfigs: EvaluatorConfig[];
+  targetId: string;
+  cell: ExecutionCell;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+}): {
   evaluatorNodes: StudioNode<Evaluator>[];
   evaluatorNodeIds: Record<string, string>;
 } => {
@@ -913,16 +958,16 @@ const buildEvaluatorNodes = (
     // Get name from loaded evaluator, fall back to evaluator ID
     const evaluatorName = dbEvaluator?.name ?? evaluator.id;
 
-    const node = buildEvaluatorNode(
+    const node = buildEvaluatorNode({
       evaluator,
       nodeId,
       targetId,
       cell,
       index,
       settings,
-      evaluator.dbEvaluatorId, // Pass dbEvaluatorId to use evaluators/{id} path
-      evaluatorName,
-    );
+      dbEvaluatorId: evaluator.dbEvaluatorId,
+      name: evaluatorName,
+    });
     evaluatorNodes.push(node);
   });
 
@@ -934,16 +979,25 @@ const buildEvaluatorNodes = (
  * @param dbEvaluatorId - Database evaluator ID for using evaluators/{id} path
  * @param name - Display name for the evaluator (from loaded DB evaluator)
  */
-export const buildEvaluatorNode = (
-  evaluator: EvaluatorConfig,
-  nodeId: string,
-  targetId: string,
-  cell: ExecutionCell,
-  index: number,
-  settings: Record<string, unknown> = {},
-  dbEvaluatorId?: string,
-  name?: string,
-): StudioNode<Evaluator> => {
+export const buildEvaluatorNode = ({
+  evaluator,
+  nodeId,
+  targetId,
+  cell,
+  index,
+  settings = {},
+  dbEvaluatorId,
+  name,
+}: {
+  evaluator: EvaluatorConfig;
+  nodeId: string;
+  targetId: string;
+  cell: ExecutionCell;
+  index: number;
+  settings?: Record<string, unknown>;
+  dbEvaluatorId?: string;
+  name?: string;
+}): StudioNode<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
@@ -951,7 +1005,7 @@ export const buildEvaluatorNode = (
   const inputs: Field[] = evaluator.inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
-    value: getEvaluatorInputValue(input.identifier, evaluator, targetId, cell),
+    value: getEvaluatorInputValue({ inputIdentifier: input.identifier, evaluator, targetId, cell }),
   }));
 
   // Convert evaluator settings to parameters format expected by langwatch_nlp
@@ -996,15 +1050,23 @@ export const buildEvaluatorNode = (
 /**
  * Builds edges connecting entry -> target and target/entry -> evaluators.
  */
-const buildEdges = (
-  entryNodeId: string,
-  targetNodeId: string,
-  targetConfig: TargetConfig,
-  evaluatorConfigs: EvaluatorConfig[],
-  evaluatorNodeIds: Record<string, string>,
-  cell: ExecutionCell,
-  datasetColumns: { id: string; name: string; type: string }[],
-): StudioEdge[] => {
+const buildEdges = ({
+  entryNodeId,
+  targetNodeId,
+  targetConfig,
+  evaluatorConfigs,
+  evaluatorNodeIds,
+  cell,
+  datasetColumns,
+}: {
+  entryNodeId: string;
+  targetNodeId: string;
+  targetConfig: TargetConfig;
+  evaluatorConfigs: EvaluatorConfig[];
+  evaluatorNodeIds: Record<string, string>;
+  cell: ExecutionCell;
+  datasetColumns: { id: string; name: string; type: string }[];
+}): StudioEdge[] => {
   const edges: StudioEdge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
@@ -1114,12 +1176,17 @@ const getInputValue = (
 /**
  * Gets the input value for an evaluator, applying value mappings if present.
  */
-const getEvaluatorInputValue = (
-  inputIdentifier: string,
-  evaluator: EvaluatorConfig,
-  targetId: string,
-  cell: ExecutionCell,
-): unknown => {
+const getEvaluatorInputValue = ({
+  inputIdentifier,
+  evaluator,
+  targetId,
+  cell,
+}: {
+  inputIdentifier: string;
+  evaluator: EvaluatorConfig;
+  targetId: string;
+  cell: ExecutionCell;
+}): unknown => {
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return undefined;
 

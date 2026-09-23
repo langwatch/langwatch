@@ -8,7 +8,7 @@ export { ExperimentDspyRetentionRepository } from "./repositories/experiment-dsp
 export type { ExperimentDatabase } from "./repositories/prisma/prisma.experiment.repository.ts";
 export type { ExperimentWorkflowVersionDatabase } from "./repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 export {
-  RedisExperimentRunProcessingRepository as ClickHouseExperimentRunProcessingAdapter,
+  RedisExperimentRunProcessingRepository,
   type ClickHouseExperimentRunProcessingAdapterOptions,
 } from "./repositories/redis/redis.experiment-run-processing.repository.ts";
 export {
@@ -18,7 +18,7 @@ export {
   type ExperimentRunEventingResultRecord,
   type ExperimentRunEventingState,
   type ExperimentRunEventingStateRepository,
-  type ClickhouseExperimentRunProcessingRepository as ExperimentRunProcessingPipelineDeps,
+  type ClickhouseExperimentRunProcessingRepository,
 } from "./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 export type {
   ExperimentAppDependencies,

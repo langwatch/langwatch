@@ -156,9 +156,14 @@ const durationOf = (
 /**
  * Maps a target completion event to a target_result SSE event.
  */
-export const mapTargetResult = (
-  nodeId: string,
-  rowIndex: number,
+export const mapTargetResult = ({
+  nodeId,
+  rowIndex,
+  executionState,
+  options,
+}: {
+  nodeId: string;
+  rowIndex: number;
   executionState: {
     outputs?: Record<string, unknown>;
     cost?: number;
@@ -167,9 +172,9 @@ export const mapTargetResult = (
     error?: string;
     error_type?: string;
     upstream_status?: number;
-  },
-  options?: { isEvaluatorAsTarget?: boolean },
-): EvaluationV3Event => {
+  };
+  options?: { isEvaluatorAsTarget?: boolean };
+}): EvaluationV3Event => {
   const { targetId } = parseNodeId(nodeId);
 
   const duration = durationOf(executionState.timestamps);
@@ -293,16 +298,21 @@ const processedResult = (
  *
  * @param options.stripScore - If true, the score will be omitted from the result
  */
-export const mapEvaluatorResult = (
-  nodeId: string,
-  rowIndex: number,
+export const mapEvaluatorResult = ({
+  nodeId,
+  rowIndex,
+  executionState,
+  options,
+}: {
+  nodeId: string;
+  rowIndex: number;
   executionState: {
     status: string;
     outputs?: Record<string, unknown>;
     cost?: number;
     timestamps?: { started_at?: number; finished_at?: number };
     error?: string;
-  },
+  };
   options?: {
     stripScore?: boolean;
     /**
@@ -311,8 +321,8 @@ export const mapEvaluatorResult = (
      * which variants were compared — the response alone only names the winner.
      */
     inputs?: Record<string, unknown>;
-  },
-): EvaluationV3Event => {
+  };
+}): EvaluationV3Event => {
   const { targetId, evaluatorId } = parseNodeId(nodeId);
 
   if (!evaluatorId) {
@@ -388,10 +398,10 @@ export const mapNlpEvent = ({
   if (targetNodes.has(component_id)) {
     // Target node
     const isEvaluatorAsTarget = config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
-    return mapTargetResult(
-      component_id,
+    return mapTargetResult({
+      nodeId: component_id,
       rowIndex,
-      {
+      executionState: {
         outputs: execution_state.outputs,
         cost: execution_state.cost,
         timestamps: execution_state.timestamps,
@@ -400,25 +410,25 @@ export const mapNlpEvent = ({
         error_type: isError ? execution_state.error_type : undefined,
         upstream_status: isError ? execution_state.upstream_status : undefined,
       },
-      { isEvaluatorAsTarget },
-    );
+      options: { isEvaluatorAsTarget },
+    });
   } else if (isEvaluatorNode(component_id)) {
     // Evaluator node - check if score should be stripped
     const { evaluatorId } = parseNodeId(component_id);
     const stripScore = evaluatorId ? config?.stripScoreEvaluatorIds?.has(evaluatorId) : false;
 
-    return mapEvaluatorResult(
-      component_id,
+    return mapEvaluatorResult({
+      nodeId: component_id,
       rowIndex,
-      {
+      executionState: {
         status: execution_state.status,
         outputs: execution_state.outputs,
         cost: execution_state.cost,
         timestamps: execution_state.timestamps,
         error: isError ? execution_state.error : undefined,
       },
-      { stripScore, inputs: evaluatorInputs },
-    );
+      options: { stripScore, inputs: evaluatorInputs },
+    });
   }
 
   // Unknown node type
@@ -502,11 +512,17 @@ const workflowErrorResult = (executionState: {
  * Maps a studio workflow evaluator node's execution state to an evaluator_result event.
  * Unlike mapEvaluatorResult, this handles stringy score/passed values through coercion.
  */
-export const mapWorkflowEvaluatorResult = (
-  rowIndex: number,
-  targetId: string,
-  evaluatorId: string,
-  evaluatorName: string | undefined,
+export const mapWorkflowEvaluatorResult = ({
+  rowIndex,
+  targetId,
+  evaluatorId,
+  evaluatorName,
+  executionState,
+}: {
+  rowIndex: number;
+  targetId: string;
+  evaluatorId: string;
+  evaluatorName?: string;
   executionState: {
     status: string;
     outputs?: Record<string, unknown>;
@@ -520,8 +536,8 @@ export const mapWorkflowEvaluatorResult = (
     nodeErrorCode?: string;
     upstream_status?: number;
     trace_id?: string;
-  },
-): EvaluationV3Event => {
+  };
+}): EvaluationV3Event => {
   const hasEvaluatorError =
     !!executionState.error ||
     executionState.status === "error" ||

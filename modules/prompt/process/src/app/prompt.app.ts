@@ -25,6 +25,7 @@ import {
   type PromptCopySource,
   type PromptCopySummary,
   type PromptDeleteResult,
+  type PromptSyncResult,
   type PromptModifyPermission,
   type PromptReference,
   type PromptTag,
@@ -260,27 +261,35 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.getAllPrompts(input);
   }
 
-  getAllPrompts(input: { projectId: string; organizationId?: string; version?: "latest" | "all" }) {
+  getAllPrompts(input: {
+    projectId: string;
+    organizationId?: string;
+    version?: "latest" | "all";
+  }): Promise<VersionedPrompt[]> {
     return this.#dependencies.prompts.getAllPrompts(input);
   }
 
-  getAllVersions(input: { idOrHandle: string; projectId: string; organizationId?: string }) {
+  getAllVersions(input: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<VersionedPrompt[]> {
     return this.#dependencies.prompts.getAllVersions(input);
   }
 
-  createPrompt(input: CreatePromptCommand) {
+  createPrompt(input: CreatePromptCommand): Promise<VersionedPrompt> {
     return this.#dependencies.prompts.createPrompt(input);
   }
 
-  updatePrompt(input: UpdatePromptCommand) {
+  updatePrompt(input: UpdatePromptCommand): Promise<VersionedPrompt> {
     return this.#dependencies.prompts.updatePrompt(input);
   }
 
-  syncPrompt(input: Parameters<PromptService["syncPrompt"]>[0]) {
+  syncPrompt(input: Parameters<PromptService["syncPrompt"]>[0]): Promise<PromptSyncResult> {
     return this.#dependencies.prompts.syncPrompt(input);
   }
 
-  listTags(input: { organizationId: string }) {
+  listTags(input: { organizationId: string }): Promise<PromptTag[]> {
     return this.#dependencies.prompts.listTags(input);
   }
 
@@ -293,11 +302,19 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.seedTagsForOrganization(input);
   }
 
-  createTag(input: { organizationId: string; name: string; createdById?: string }) {
+  createTag(input: {
+    organizationId: string;
+    name: string;
+    createdById?: string;
+  }): Promise<PromptTag> {
     return this.#dependencies.prompts.createTag(input);
   }
 
-  renameTag(input: { organizationId: string; oldName: string; newName: string }) {
+  renameTag(input: {
+    organizationId: string;
+    oldName: string;
+    newName: string;
+  }): Promise<PromptTag> {
     return this.#dependencies.prompts.renameTag(input);
   }
 
@@ -408,7 +425,11 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.deletePrompt(input);
   }
 
-  deletePrompt(input: { idOrHandle: string; projectId: string; organizationId?: string }) {
+  deletePrompt(input: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<PromptDeleteResult> {
     return this.delete(input);
   }
 
@@ -426,11 +447,19 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.getCopySource(input);
   }
 
-  getNamesByIds(input: { ids: string[]; projectId: string; organizationId: string }) {
+  getNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ id: string; name: string }[]> {
     return this.#dependencies.prompts.getNamesByIds(input);
   }
 
-  getExistingIds(input: { ids: string[]; projectId: string; organizationId: string }) {
+  getExistingIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<string[]> {
     return this.#dependencies.prompts.getExistingIds(input);
   }
 

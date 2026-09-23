@@ -196,23 +196,22 @@ export class ExperimentWorkflowCellService {
     }
 
     state.evaluatorEvents.push(
-      mapWorkflowEvaluatorResult(
-        cell.rowIndex,
-        cell.targetId,
-        componentId,
-        evaluatorNodeNames.get(componentId),
-        {
+      mapWorkflowEvaluatorResult({
+        rowIndex: cell.rowIndex,
+        targetId: cell.targetId,
+        evaluatorId: componentId,
+        evaluatorName: evaluatorNodeNames.get(componentId),
+        executionState: {
           status: execution.status,
           outputs: execution.outputs,
           cost: execution.cost,
           error: execution.error,
-          // The coded half of the failure: without it the evaluator cell renders the engine's raw
-          // message verbatim.
+
           nodeErrorCode: execution.error_type,
           upstream_status: execution.upstream_status,
           trace_id: execution.trace_id ?? state.finalTraceId,
         },
-      ),
+      }),
     );
   }
 
