@@ -230,6 +230,124 @@ describe("given a handler that takes more than the framework hands it", () => {
   });
 });
 
+const REST_ROUTES = "modules/widget/process/src/transport/widget.rest.ts";
+const ROUTER_HEAD = [
+  'import { defineRestRouter } from "@langwatch/api/rest";',
+  "export const widgetRest = defineRestRouter(WidgetApi)",
+];
+
+/** Each finding as messageId, line and column, the column read off the reported node. */
+function located(...routeLines) {
+  const columns = [];
+  const probe = {
+    meta: transportDeclaresRule.meta,
+    create(context) {
+      const report = (descriptor) => {
+        columns.push(descriptor.node.loc.start.column);
+        context.report(descriptor);
+      };
+
+      return transportDeclaresRule.create(Object.create(context, { report: { value: report } }));
+    },
+  };
+  const code = [...ROUTER_HEAD, ...routeLines, "  .build();"].join("\n");
+
+  return runRule(probe, { code, cwd: workspace.cwd, filename: REST_ROUTES }).map(
+    ({ data, line, messageId }, index) => [messageId, data.field, line, columns[index]],
+  );
+}
+
+describe("given a route whose own chain declares a producer", () => {
+  /** @scenario "A handler takes the producer its own route declared" */
+  it("accepts response, request and raw from a protocol route that reads a raw body", () => {
+    expect(
+      located(
+        '  .post("/widgets/grant", "grantWidget")',
+        '  .withRawBody("text", { mediaType: "application/json" })',
+        '  .withResponse("protocol", { produces: "application/json", because: "RFC" })',
+        "  .handle(async ({ app, raw, request, response }) =>",
+        "    answer(response, await app.grantWidget({ raw, request })),",
+        "  )",
+      ),
+    ).toEqual([]);
+  });
+
+  it("accepts response from a bytes route, request from a forwarded one and files from a multipart one", () => {
+    expect(
+      located(
+        '  .post("/widgets/export", "exportWidgets")',
+        "  .withInput(exportSchema)",
+        '  .withResponse("bytes", { produces: "text/csv" })',
+        "  .handle(async ({ app, input, response }) => response.stream(await app.exportWidgets(input)))",
+        '  .get("/widgets/proxy", "proxyWidgets")',
+        '  .withResponse("forwarded", { because: "upstream owns the wire" })',
+        "  .handle(async (context) => context.response.pass(await context.app.proxyWidgets(context.request)))",
+        '  .post("/widgets/upload", "uploadWidget")',
+        "  .withMultipart({ fields: uploadSchema, files: { sheet: { required: true } } })",
+        "  .handle(async ({ app, input, files }) => app.uploadWidget({ input, sheet: files.sheet }))",
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("given a handler taking a producer its route did not declare", () => {
+  /** @scenario "A handler taking a producer its own route did not declare is reported at the field" */
+  it("reports raw without withRawBody, request on a bytes route and files without withMultipart", () => {
+    expect(
+      located(
+        '  .post("/widgets/grant", "grantWidget")',
+        "  .withInput(grantSchema)",
+        '  .withResponse("bytes", { produces: "text/csv" })',
+        "  .handle(async ({ app, raw, request, files, response }) =>",
+        "    response.stream(await app.grantWidget({ raw, request, files })),",
+        "  )",
+      ),
+    ).toEqual([
+      ["rawContextField", "raw", 6, 24],
+      ["rawContextField", "request", 6, 29],
+      ["rawContextField", "files", 6, 38],
+    ]);
+  });
+
+  it("reports response and raw when only an earlier route in the same chain declared them", () => {
+    expect(
+      located(
+        '  .post("/widgets/grant", "grantWidget")',
+        '  .withRawBody("text")',
+        '  .withResponse("protocol", { produces: "application/json", because: "RFC" })',
+        "  .handle(async ({ app, raw, response }) => answer(response, await app.grantWidget(raw)))",
+        '  .post("/widgets/revoke", "revokeWidget")',
+        "  .withInput(revokeSchema)",
+        "  .withOutput(revokeSchema)",
+        "  .handle(async ({ app, input, raw, response }) => answer(response, await app.revokeWidget(input, raw)))",
+      ),
+    ).toEqual([
+      ["rawContextField", "raw", 10, 31],
+      ["rawContextField", "response", 10, 36],
+    ]);
+  });
+
+  it("reports request when the declared kind is not written as a literal", () => {
+    expect(
+      located(
+        '  .get("/widgets/proxy", "proxyWidgets")',
+        '  .withResponse(FORWARDED, { because: "upstream owns the wire" })',
+        "  .handle(async ({ app, request, response }) => response.pass(await app.proxyWidgets(request)))",
+      ),
+    ).toEqual([["rawContextField", "request", 5, 24]]);
+  });
+
+  it("reports the context's response member on a route that declared no producer", () => {
+    expect(
+      located(
+        '  .get("/widgets", "listWidgets")',
+        "  .withOutput(widgetsSchema)",
+        "  .handle(async (context) => context.response.write(await context.app.listWidgets()))",
+      ),
+    ).toEqual([["rawContextAccess", undefined, 5, 29]]);
+  });
+});
+
 describe("given fluent route handlers in a transport", () => {
   /** @scenario "A handler that shapes the response itself is refused" */
   it("reports response methods, raw responses, raw access, sentinels, detached handlers and mutations", () => {

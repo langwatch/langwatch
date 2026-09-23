@@ -18,6 +18,11 @@ const FLUENT_ENDPOINT_METHODS = new Set([
   "withoutResourceLimit",
 ]);
 const ROUTE_VERBS = new Set(["delete", "get", "patch", "post", "put", "register"]);
+const PRODUCED_BY_DECLARATION = new Map([
+  ["withRawBody", ["raw"]],
+  ["withMultipart", ["files"]],
+]);
+const REQUEST_READING_KINDS = new Set(["protocol", "forwarded"]);
 const HANDLER_ARGUMENT = new Map([
   ["handle", 0],
   ["register", 2],
@@ -199,6 +204,30 @@ function isInsideRouteCallback(call) {
 /** `.handle(...)` closing a fluent endpoint chain, or inside a route verb's callback. */
 function isFluentEndpointHandle(call) {
   return hasFluentReceiver(call) || isInsideRouteCallback(call);
+}
+
+/** What one link of a route chain hands its handler, as `@langwatch/api/rest` declares it. */
+function fieldsProducedBy(link) {
+  const name = propertyName(link.callee);
+  if (name !== "withResponse") return PRODUCED_BY_DECLARATION.get(name) ?? [];
+  const [kind] = link.arguments;
+  const readsRequest = kind?.type === "Literal" && REQUEST_READING_KINDS.has(kind.value);
+
+  return readsRequest ? ["response", "request"] : ["response"];
+}
+
+/** The context fields a `.handle(h)` call's own route declared, read back to its verb. */
+export function declaredProducerFields(call) {
+  const fields = new Set();
+  let link = call.callee.object;
+  while (link?.type === "CallExpression") {
+    for (const field of fieldsProducedBy(link)) fields.add(field);
+    const name = propertyName(link.callee);
+    if (name === undefined || ROUTE_VERBS.has(name)) break;
+    link = link.callee.object;
+  }
+
+  return fields;
 }
 
 /** How a call registers a handler: fluent `.handle(h)`, legacy `.registerRoute(...)`, or not. */

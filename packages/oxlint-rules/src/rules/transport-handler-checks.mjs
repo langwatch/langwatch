@@ -1,6 +1,7 @@
 import { childNodes, walk } from "../ast.mjs";
 import {
   bindingElement,
+  declaredProducerFields,
   isFunctionExpression,
   parameterPattern,
   propertyName,
@@ -11,7 +12,8 @@ import {
 
 // What `transport-declares` reads inside one route handler. Each check takes
 // the handler and a `tools` pair: `report(node, messageId, data)` and
-// `text(node)`, the node's source as written.
+// `text(node)`, the node's source as written. `produced` holds the fields the
+// handler's own route chain declared a producer for (`declaredProducerFields`).
 
 const ALLOWED_HANDLER_FIELDS = new Set(["input", "app", "actor", "scope", "signal"]);
 const RAW_CONTEXT_FIELDS = new Set([
@@ -49,15 +51,21 @@ const SERVICE_OR_REPOSITORY = /(?:App|Service|Repository)$/;
 const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:App|Service|Repository)$/;
 const HANDLER_STATEMENT_LIMIT = 6;
 
-/** A destructured context field outside `{ input, app, actor, scope, signal }`. */
-function reportContextBinding(element, tools) {
+const NOTHING_PRODUCED = new Set();
+
+function isHandedOver(field, produced) {
+  return ALLOWED_HANDLER_FIELDS.has(field) || produced.has(field);
+}
+
+/** A destructured context field the framework does not hand this route's handler. */
+function reportContextBinding({ element, produced, tools }) {
   const binding = bindingElement(element);
   if (binding.rest) {
     tools.report(element, "rawContextSpread", { name: binding.name });
 
     return binding;
   }
-  if (binding.name !== undefined && !ALLOWED_HANDLER_FIELDS.has(binding.name)) {
+  if (binding.name !== undefined && !isHandedOver(binding.name, produced)) {
     tools.report(element, "rawContextField", { field: binding.name });
 
     return binding;
@@ -66,25 +74,26 @@ function reportContextBinding(element, tools) {
   return undefined;
 }
 
-function reportRawAccess(body, name, tools) {
+function reportRawAccess({ body, name, produced, tools }) {
   walk(body, (node) => {
     if (node.type !== "MemberExpression" || node.object.type !== "Identifier") return;
     const field = propertyName(node) ?? stringKey(node);
-    if (node.object.name === name && RAW_CONTEXT_FIELDS.has(field)) {
+    const raw = RAW_CONTEXT_FIELDS.has(field) && !produced.has(field);
+    if (node.object.name === name && raw) {
       tools.report(node, "rawContextAccess", { text: tools.text(node) });
     }
   });
 }
 
 /** `const c = ctx` and `const { req } = ctx`: names the handler's context also goes by. */
-function contextAliases(body, root, tools) {
+function contextAliases({ body, produced, root, tools }) {
   const names = new Set([root]);
   walk(body, (node) => {
     const aliased = node.type === "VariableDeclarator" && names.has(node.init?.name);
     if (!aliased || node.init.type !== "Identifier") return;
     if (node.id.type === "Identifier") names.add(node.id.name);
     for (const element of node.id.properties ?? []) {
-      const raw = reportContextBinding(element, tools);
+      const raw = reportContextBinding({ element, produced, tools });
       if (raw?.local) names.add(raw.local);
     }
   });
@@ -113,16 +122,21 @@ function declaredHandler(call, program) {
 /** `.handle(h)` in any source that declares transports: `h` takes only the framework's fields. */
 export function inspectDeclaredHandler({ call, program, tools }) {
   const handler = declaredHandler(call, program);
+  const produced = declaredProducerFields(call);
   const pattern = parameterPattern(handler?.params[0]);
   if (pattern?.type === "ObjectPattern") {
-    const raw = pattern.properties.map((element) => reportContextBinding(element, tools));
+    const raw = pattern.properties.map((element) =>
+      reportContextBinding({ element, produced, tools }),
+    );
     for (const binding of raw) {
-      if (binding?.local && !binding.rest) reportRawAccess(handler.body, binding.local, tools);
+      if (!binding?.local || binding.rest) continue;
+      reportRawAccess({ body: handler.body, name: binding.local, produced, tools });
     }
   }
   if (pattern?.type !== "Identifier") return;
-  for (const name of contextAliases(handler.body, pattern.name, tools)) {
-    reportRawAccess(handler.body, name, tools);
+  const { body } = handler;
+  for (const name of contextAliases({ body, produced, root: pattern.name, tools })) {
+    reportRawAccess({ body, name, produced, tools });
   }
 }
 
@@ -143,7 +157,7 @@ function boundaryReaders(aliases) {
   return { directMember, startsAtContext };
 }
 
-function inspectMemberAccess(node, readers, tools) {
+function inspectMemberAccess({ node, produced, readers, tools }) {
   const own = propertyName(node) ?? stringKey(node);
   if (own === "headers") {
     tools.report(node, "transportHeaders", { text: tools.text(node) });
@@ -151,7 +165,8 @@ function inspectMemberAccess(node, readers, tools) {
     return;
   }
   const member = readers.directMember(node);
-  if (member !== "session" && RAW_CONTEXT_FIELDS.has(member)) {
+  const raw = RAW_CONTEXT_FIELDS.has(member) && !produced.has(member);
+  if (member !== "session" && raw) {
     tools.report(node, "rawContextAccess", { text: tools.text(node) });
   }
 }
@@ -175,18 +190,18 @@ function inspectResponseShaping(node, readers, tools) {
   }
 }
 
-/** A fluent route's handler: framework fields in, a plain value out, nothing of the response. */
-export function inspectHandlerBoundary(handler, tools) {
+/** A route's handler: the fields its route hands over in, a value or a producer's answer out. */
+export function inspectHandlerBoundary({ handler, produced = NOTHING_PRODUCED, tools }) {
   const pattern = parameterPattern(handler.params[0]);
   const aliases = new Set(pattern?.type === "Identifier" ? [pattern.name] : []);
   for (const element of pattern?.type === "ObjectPattern" ? pattern.properties : []) {
-    reportContextBinding(element, tools);
+    reportContextBinding({ element, produced, tools });
   }
   const readers = boundaryReaders(aliases);
   walk(handler.body, (node) => {
     const aliasing = node.type === "VariableDeclarator" && node.id.type === "Identifier";
     if (aliasing && readers.startsAtContext(node.init)) aliases.add(node.id.name);
-    if (node.type === "MemberExpression") inspectMemberAccess(node, readers, tools);
+    if (node.type === "MemberExpression") inspectMemberAccess({ node, produced, readers, tools });
     inspectResponseShaping(node, readers, tools);
   });
 }

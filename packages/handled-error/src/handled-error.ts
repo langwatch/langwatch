@@ -44,13 +44,15 @@ export function setTraceUrlProvider(provider: TraceUrlProvider): void {
 /** One runtime constructor shared by every copy of this package in a realm. */
 const HANDLED_ERROR_RUNTIME = Symbol.for("@langwatch/handled-error/runtime/v1");
 
+/** Every error the realm-wide runtime constructor issued: the provenance brand. */
+const ISSUED_BY_HANDLED_ERROR = new WeakSet<object>();
+
 /**
  * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not `instanceof`,
  * across process boundaries.
  */
 abstract class HandledErrorRuntime extends Error {
   static #traceUrlProvider: TraceUrlProvider = () => undefined;
-  readonly #issuedByHandledError = true;
   readonly isHandled = true as const;
   readonly meta: Record<string, unknown>;
   readonly traceId: string | undefined;
@@ -93,6 +95,7 @@ abstract class HandledErrorRuntime extends Error {
     this.tips = options.tips ?? [];
     this.docsUrl = options.docsUrl;
     this.reasons = options.reasons ?? [];
+    ISSUED_BY_HANDLED_ERROR.add(this);
   }
 
   /** Produce the full user-facing serialised shape. */
@@ -171,7 +174,7 @@ abstract class HandledErrorRuntime extends Error {
   }
 
   private static hasProvenance(error: unknown): error is HandledErrorRuntime {
-    return typeof error === "object" && error !== null && #issuedByHandledError in error;
+    return typeof error === "object" && error !== null && ISSUED_BY_HANDLED_ERROR.has(error);
   }
 }
 

@@ -100,3 +100,15 @@ describe("given a .integration.test.tsx file", () => {
     expect(found).toEqual([]);
   });
 });
+
+describe("given a .browser.test.tsx file", () => {
+  /** @scenario "A real-browser test importing testing-library is left alone" */
+  it("reports nothing, since the browser lane collects it and jsdom excludes it", () => {
+    const found = report(
+      'import { render } from "@testing-library/react";\ntest("x", () => {});',
+      "modules/agent/browser/src/ui/blocks/__tests__/agent-card.browser.test.tsx",
+    );
+
+    expect(found).toEqual([]);
+  });
+});

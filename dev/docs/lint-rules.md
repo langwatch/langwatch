@@ -1159,13 +1159,13 @@ Messages:
   - fix: Declare the route with `defineRestRouter` or the procedure with `defineTrpcRouter`; the process builds and mounts the application.
 - `rawContextAccess`
   - what: The handler reaches the raw request through `{{text}}`.
-  - fix: Take only `{ input, app, actor, scope, signal }`; the framework resolves the request, the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
 - `rawContextField`
   - what: The handler takes `{{field}}` from its context.
-  - fix: Take only `{ input, app, actor, scope, signal }`; the framework resolves the request, the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
 - `rawContextSpread`
   - what: The handler collects the rest of its context into `{{name}}`.
-  - fix: Take only `{ input, app, actor, scope, signal }`; the framework resolves the request, the session and the headers before the handler runs.
+  - fix: Take only `{ input, app, actor, scope, signal }` and the producer this route's own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.
 - `rawHonoRoute`
   - what: This transport registers the raw Hono route `{{method}}()`.
   - fix: Declare the route with `defineRestRouter` or the procedure with `defineTrpcRouter`; the process builds and mounts the application.

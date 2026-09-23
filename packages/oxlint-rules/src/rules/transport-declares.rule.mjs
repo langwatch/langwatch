@@ -7,6 +7,7 @@ import {
   inspectHandlerShape,
 } from "./transport-handler-checks.mjs";
 import {
+  declaredProducerFields,
   endpointHandlerArgument,
   handlerRegistration,
   isFunctionExpression,
@@ -81,7 +82,7 @@ const PROPERTY_NODES = new Set([
 ]);
 
 const HANDLER_FIELDS_FIX =
-  "Take only `{ input, app, actor, scope, signal }`; the framework resolves the request, the session and the headers before the handler runs.";
+  'Take only `{ input, app, actor, scope, signal }` and the producer this route\'s own chain declares: `response` from `.withResponse(...)`, `request` from `.withResponse("protocol" | "forwarded", ...)`, `raw` from `.withRawBody(...)`, `files` from `.withMultipart(...)`; the framework resolves the session and the headers before the handler runs.';
 const PLAIN_RESULT_FIX =
   "Return the plain value `.withOutput()` declares, or nothing for an empty response, and throw a `HandledError` to refuse; the framework serialises both.";
 const DECLARE_ROUTE_FIX =
@@ -386,7 +387,8 @@ function inspectRouteCall(node, state, tools) {
   const handler = resolveHandler(registration.candidate, state.functions);
   if (handler && !state.bounded.has(handler)) {
     state.bounded.add(handler);
-    inspectHandlerBoundary(handler, tools);
+    const produced = registration.fluent ? declaredProducerFields(node) : undefined;
+    inspectHandlerBoundary({ handler, produced, tools });
   }
 }
 

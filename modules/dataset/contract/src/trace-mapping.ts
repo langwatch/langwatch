@@ -712,7 +712,7 @@ export const TRACE_MAPPINGS = {
       data: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
-      } = {},
+      },
     ) => filterThreadTraces(trace, data),
   },
   threads_until_current: {
@@ -723,7 +723,7 @@ export const TRACE_MAPPINGS = {
       data: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
-      } = {},
+      },
     ) =>
       filterThreadTraces(trace, data, (t) => {
         return t.timestamps.started_at <= trace.timestamps.started_at;
@@ -756,7 +756,11 @@ export const TRACE_MAPPINGS = {
           trace: TraceWithAnnotations,
           key: string,
           subkey: string,
-          data: { annotationScoreOptions?: AnnotationScore[] },
+          data: {
+            annotationScoreOptions?: AnnotationScore[];
+            allTraces?: TraceWithAnnotations[];
+            selectedFields?: string[];
+          },
         ) => string | number | object | undefined | unknown[]);
     expandable_by?: keyof typeof TRACE_EXPANSIONS;
   }

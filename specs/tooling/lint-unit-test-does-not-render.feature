@@ -35,3 +35,10 @@ Feature: The unit-test-does-not-render lint rule
     Given a .e2e.test.tsx file that imports from @testing-library/react
     When the unit-test-does-not-render rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A real-browser test importing testing-library is left alone
+    Given a .browser.test.tsx file, which the browser vitest lane collects and the jsdom lane excludes
+    And it imports from @testing-library/react
+    When the unit-test-does-not-render rule runs over it
+    Then it reports nothing

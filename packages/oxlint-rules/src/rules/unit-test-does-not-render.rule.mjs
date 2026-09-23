@@ -2,11 +2,12 @@ import { defineRule } from "../define-rule.mjs";
 
 // A test that renders a component is an integration test (TESTING_PHILOSOPHY.md);
 // importing `@testing-library/*` means it renders, so a `.unit.test` or unlevelled
-// `.test.tsx` doing so is misnamed. Known miss: `render` re-exported via test-utils.
+// `.test.tsx` doing so is misnamed. `.browser.test.tsx` is vitest's real-browser
+// lane (`BROWSER_TEST_GLOB`). Known miss: `render` re-exported via test-utils.
 
 const UNIT_TEST_FILE = /\.unit\.test\.tsx?$/;
 const COMPONENT_TEST_FILE = /\.test\.tsx$/;
-const RENDERING_LEVEL = /\.(?:integration|e2e)\.test\.tsx$/;
+const RENDERING_LEVEL = /\.(?:integration|e2e|browser)\.test\.tsx$/;
 const TESTING_LIBRARY_SPECIFIER = /^@testing-library\//;
 const TEST_SUFFIX = /(?:\.unit)?\.test\.(tsx?)$/;
 
