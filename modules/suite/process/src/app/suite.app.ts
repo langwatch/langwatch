@@ -59,7 +59,10 @@ import {
   type SuiteRunProcessingPipeline,
 } from "../services/suite-run-processing.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
-import { buildSuiteInfrastructure } from "./suite-composition.build.ts";
+import {
+  buildSuiteInfrastructure,
+  type SuiteAppInfrastructure,
+} from "./suite-composition.build.ts";
 
 /**
  * What a lookup by id found. A test suite IS a suite of kind "test_suite", but the two
@@ -180,7 +183,7 @@ export class SuiteApp implements SuiteApi {
     repositories: SuiteRepositories;
     dependencies: SuiteAppDependencies;
     runRepository?: SuiteRunReadRepository;
-    infrastructure?: Partial<ReturnType<typeof buildSuiteInfrastructure>>;
+    infrastructure?: Partial<SuiteAppInfrastructure>;
     /** Deterministic ids and a fixed clock are the service's own seams, not infrastructure. */
     generateId?: () => string;
     now?: () => Instant;

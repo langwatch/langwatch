@@ -217,22 +217,27 @@ function RegistryRowComponent<TRow>({
             // strings (trace IDs, model slugs, error messages) will otherwise visually
             // bleed across the right border and overlap the next cell's content.
             overflow="hidden"
-            {...cellPropsFor(cell, style.borderColor, i)}
+            {...cellPropsFor({ cell, leftBorderColor: style.borderColor, index: i })}
           >
             {isLoading && isSelectCell && <SkeletonSelectCell />}
             {isLoading && !isSelectCell && (
               <SkeletonCellContent meta={meta} rowIdx={skeletonRowIdx} colIdx={i} />
             )}
             {!isLoading &&
-              pickCell(registry, cell.column.id, densityMode, {
-                row: tanstackRow.original,
-                density: tokens,
-                densityMode,
-                isExpanded,
-                isSelected,
-                isFocused,
-                actions,
-                enabledAddonIds: addons,
+              pickCell({
+                registry,
+                id: cell.column.id,
+                density: densityMode,
+                ctx: {
+                  row: tanstackRow.original,
+                  density: tokens,
+                  densityMode,
+                  isExpanded,
+                  isSelected,
+                  isFocused,
+                  actions,
+                  enabledAddonIds: addons,
+                },
               })}
           </Td>
         );

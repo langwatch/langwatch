@@ -143,12 +143,17 @@ export function parseTracePromptIds(
  * Parses prompt reference data from flat span attributes.
  */
 /** A reference from a handle plus an optional raw version number, defaulting to no version. */
-function withHandleAndVersion(
-  handle: string,
-  versionRaw: unknown,
-  variables: Record<string, string> | null,
-  draft: boolean,
-): PromptReference {
+function withHandleAndVersion({
+  handle,
+  versionRaw,
+  variables,
+  draft,
+}: {
+  handle: string;
+  versionRaw: unknown;
+  variables: Record<string, string> | null;
+  draft: boolean;
+}): PromptReference {
   if (versionRaw != null) {
     const version = Number(versionRaw);
     if (Number.isInteger(version) && version > 0) {
@@ -205,7 +210,7 @@ export function extractPromptReference(
   const versionRaw = readAttribute(params, "langwatch.prompt.version.number");
 
   if (typeof handle === "string" && handle.length > 0) {
-    return withHandleAndVersion(handle, versionRaw, variables, draft);
+    return withHandleAndVersion({ handle, versionRaw, variables, draft });
   }
 
   // Bare-slug `prompt.id` (no colon, no separate handle attribute) — the
@@ -213,7 +218,7 @@ export function extractPromptReference(
   // the v2 accordion lights up on llm spans that the server enriched
   // via ancestor lookup (which writes nested `langwatch.prompt.id` only).
   if (typeof promptId === "string" && promptId.length > 0) {
-    return withHandleAndVersion(promptId, versionRaw, variables, draft);
+    return withHandleAndVersion({ handle: promptId, versionRaw, variables, draft });
   }
 
   return null;

@@ -6,7 +6,7 @@ import { inferAllEvaluatorMappings, inferAllTargetMappings } from "../../mapping
 import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas.ts";
 import { type Transform, TransformError, type WorkbenchState } from "./types.ts";
 
-export const newTargetId = () => `target-${nanoid(8)}`;
+export const newTargetId = (): string => `target-${nanoid(8)}`;
 
 /**
  * Append a target and wire it up.

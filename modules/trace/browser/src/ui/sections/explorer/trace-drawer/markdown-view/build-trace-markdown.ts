@@ -818,13 +818,19 @@ function metadataLines(trace: TraceHeader): string[] {
   return ["# metadata", ...flat, ""];
 }
 
-export function buildTraceMarkdown(
-  trace: TraceHeader,
-  spans: SpanTreeNode[],
-  opts: MarkdownConfig,
-  fullSpans?: FullSpan[],
-  events: DerivedTraceEvent[] = [],
-): string {
+export function buildTraceMarkdown({
+  trace,
+  spans,
+  opts,
+  fullSpans,
+  events = [],
+}: {
+  trace: TraceHeader;
+  spans: SpanTreeNode[];
+  opts: MarkdownConfig;
+  fullSpans?: FullSpan[];
+  events?: DerivedTraceEvent[];
+}): string {
   const lines: string[] = [...headerLines(trace), ...systemLines(trace, fullSpans)];
 
   if (trace.status === "error" && trace.error) {

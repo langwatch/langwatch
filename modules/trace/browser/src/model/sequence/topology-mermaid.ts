@@ -105,12 +105,17 @@ const DARK_PALETTE = {
   other: { bg: "#1E293B", fg: "#CBD5E1", stroke: "#64748B" },
 } as const;
 
-function addNode(
-  node: NodeInfo,
-  spanId: string,
-  nodeMap: Map<string, NodeInfo>,
-  nodeFirstSpan: Map<string, string>,
-): void {
+function addNode({
+  node,
+  spanId,
+  nodeMap,
+  nodeFirstSpan,
+}: {
+  node: NodeInfo;
+  spanId: string;
+  nodeMap: Map<string, NodeInfo>;
+  nodeFirstSpan: Map<string, string>;
+}): void {
   if (nodeMap.has(node.id)) return;
   nodeMap.set(node.id, node);
   nodeFirstSpan.set(node.id, spanId);
@@ -138,11 +143,11 @@ function addSpanToTopology({
   if (!child) return;
   const childNode = getNode(span);
   if (!childNode) return;
-  addNode(childNode, span.spanId, nodeMap, nodeFirstSpan);
+  addNode({ node: childNode, spanId: span.spanId, nodeMap, nodeFirstSpan });
 
   const parentNode = nearestParentNode(child, byId, typesToInclude);
   if (!parentNode || parentNode.id === childNode.id) return;
-  addNode(parentNode, child.parentSpanId ?? span.spanId, nodeMap, nodeFirstSpan);
+  addNode({ node: parentNode, spanId: child.parentSpanId ?? span.spanId, nodeMap, nodeFirstSpan });
 
   const key = `${parentNode.id}->${childNode.id}`;
   const duration = Math.max(0, span.endTimeMs - span.startTimeMs);

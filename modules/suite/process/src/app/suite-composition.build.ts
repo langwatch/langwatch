@@ -1,13 +1,13 @@
 // Build SuiteApp collaborators; `execution` field is deliberately refused.
 import type { AgentApi } from "@langwatch/agent-contract";
-import { SuiteExecutionUnavailableError } from "@langwatch/suite-contract";
+import { SuiteExecutionUnavailableError, type SuiteRunResult } from "@langwatch/suite-contract";
 
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
 import type { SuiteExecution } from "./suite.app.ts";
 
 /** Refuses every run by name, rather than crashing on an absent collaborator. */
 class UnavailableSuiteExecution implements SuiteExecution {
-  execute(): ReturnType<SuiteExecution["execute"]> {
+  execute(): Promise<SuiteRunResult> {
     return Promise.reject(new SuiteExecutionUnavailableError());
   }
 }

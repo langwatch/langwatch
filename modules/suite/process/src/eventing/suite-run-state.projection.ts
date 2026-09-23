@@ -82,7 +82,10 @@ export class SuiteRunStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    SuiteRunStateData,
+    "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  > {
     return {
       SuiteRunId: "",
       BatchRunId: "",

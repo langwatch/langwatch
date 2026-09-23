@@ -13,7 +13,7 @@ import { type Transform, TransformError, type WorkbenchState } from "./types.ts"
 /** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
 const EVALUATOR_KSUID_RESOURCE = "evaluator";
 
-export const newEvaluatorId = () => generate(EVALUATOR_KSUID_RESOURCE).toString();
+export const newEvaluatorId = (): string => generate(EVALUATOR_KSUID_RESOURCE).toString();
 
 /**
  * Refuses an evaluator that carries a `comparison` config it cannot own.

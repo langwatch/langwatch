@@ -8,21 +8,21 @@ export interface TranscriptRenderMembers {
   renderTerminalOutput?: (text: string, isError: boolean) => ReactNode;
 }
 
-const TranscriptRenderPortsContext = createContext<TranscriptRenderMembers>({});
+const TranscriptRenderContext = createContext<TranscriptRenderMembers>({});
 
 export function TranscriptRenderProvider({
   children,
-  ...ports
+  ...members
 }: TranscriptRenderMembers & { children: ReactNode }) {
-  const parentPorts = useContext(TranscriptRenderPortsContext);
-  const mergedPorts = { ...parentPorts, ...ports };
+  const parentMembers = useContext(TranscriptRenderContext);
+  const mergedMembers = { ...parentMembers, ...members };
   return (
-    <TranscriptRenderPortsContext.Provider value={mergedPorts}>
+    <TranscriptRenderContext.Provider value={mergedMembers}>
       {children}
-    </TranscriptRenderPortsContext.Provider>
+    </TranscriptRenderContext.Provider>
   );
 }
 
 export function useTranscriptRenderPorts(): TranscriptRenderMembers {
-  return useContext(TranscriptRenderPortsContext);
+  return useContext(TranscriptRenderContext);
 }

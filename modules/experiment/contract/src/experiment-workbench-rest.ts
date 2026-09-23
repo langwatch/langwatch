@@ -73,7 +73,7 @@ export const handledErrorEnvelopeSchema = z
  * `StaleWorkbenchStateError`'s `currentVersion` arrives as a sibling of
  * `error` (the REST boundary spreads `meta` flat) — reloading is the remedy.
  */
-export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.extend({
+export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.safeExtend({
   currentVersion: z
     .number()
     .int()
@@ -458,7 +458,7 @@ export const experimentInitBadRequestSchema = z.union([
  * What a refused create call sends. Two 403 refusals: API key permission denied or plan
  * experiment limit. `error` code distinguishes them; limit case carries counts.
  */
-export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.extend({
+export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.safeExtend({
   limitType: z
     .string()
     .optional()

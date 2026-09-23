@@ -89,7 +89,12 @@ export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactE
       const parked =
         next !== null && isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
       if (
-        isAnchorSettled(next, previous, window.innerWidth, window.scrollX) ||
+        isAnchorSettled({
+          next,
+          previous,
+          viewportWidth: window.innerWidth,
+          scrollX: window.scrollX,
+        }) ||
         frames >= MAX_FRAMES
       ) {
         setAnchorRect(next);

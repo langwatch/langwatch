@@ -67,7 +67,17 @@ interface BuildContext {
   processed: Set<string>;
 }
 
-function registerParticipant(ctx: BuildContext, span: SpanTreeNode, id: string, display: string) {
+function registerParticipant({
+  ctx,
+  span,
+  id,
+  display,
+}: {
+  ctx: BuildContext;
+  span: SpanTreeNode;
+  id: string;
+  display: string;
+}) {
   if (!ctx.participants.has(id)) {
     ctx.participants.add(id);
     ctx.participantDisplay.set(id, display);
@@ -222,7 +232,7 @@ function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipan
   const display = getParticipantDisplay(span);
   const currentParticipant = id && display ? id : null;
   if (currentParticipant && display) {
-    registerParticipant(ctx, span, currentParticipant, display);
+    registerParticipant({ ctx, span, id: currentParticipant, display });
   }
 
   const isInteraction =
@@ -305,7 +315,7 @@ export function generateMermaidSyntax(
   for (const span of ordered) {
     const id = getParticipantId(span);
     const display = getParticipantDisplay(span);
-    if (id && display) registerParticipant(ctx, span, id, display);
+    if (id && display) registerParticipant({ ctx, span, id, display });
   }
 
   const spanById = new Map(spans.map((s) => [s.spanId, s]));

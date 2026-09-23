@@ -107,12 +107,17 @@ export function isAnchorParkedOffscreen(
 // Spotlight ring placement requires settled anchor: on-screen and rect
 // unchanged from previous frame.
 // Spec: specs/langy/langy-panel-layout.feature
-export function isAnchorSettled(
-  next: AnchorRect | null,
-  previous: AnchorRect | null,
-  viewportWidth: number,
-  scrollX: number,
-): boolean {
+export function isAnchorSettled({
+  next,
+  previous,
+  viewportWidth,
+  scrollX,
+}: {
+  next: AnchorRect | null;
+  previous: AnchorRect | null;
+  viewportWidth: number;
+  scrollX: number;
+}): boolean {
   if (next === null || previous === null) return false;
   if (isAnchorParkedOffscreen(next, viewportWidth, scrollX)) return false;
   return (

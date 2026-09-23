@@ -25,12 +25,17 @@ export function itemBlockKey(item: StackItem): string {
  * `useIdx`: an id match when both sides carry one, otherwise the next
  * unconsumed result. Returns -1 when nothing pairs.
  */
-function findMatchingResultIndex(
-  blocks: KeyedContentBlock[],
-  useIdx: number,
-  use: KeyedBlock<"tool_use">,
-  consumed: Set<number>,
-): number {
+function findMatchingResultIndex({
+  blocks,
+  useIdx,
+  use,
+  consumed,
+}: {
+  blocks: KeyedContentBlock[];
+  useIdx: number;
+  use: KeyedBlock<"tool_use">;
+  consumed: Set<number>;
+}): number {
   for (let j = useIdx + 1; j < blocks.length; j++) {
     if (consumed.has(j)) continue;
     const cand = blocks[j]!;
@@ -51,7 +56,7 @@ export function pairToolBlocks(blocks: KeyedContentBlock[]): StackItem[] {
     if (consumed.has(i)) continue;
     const b = blocks[i]!;
     if (b.kind === "tool_use") {
-      const resultIdx = findMatchingResultIndex(blocks, i, b, consumed);
+      const resultIdx = findMatchingResultIndex({ blocks, useIdx: i, use: b, consumed });
       const result = resultIdx >= 0 ? blocks[resultIdx] : undefined;
       if (result?.kind === "tool_result") {
         consumed.add(resultIdx);

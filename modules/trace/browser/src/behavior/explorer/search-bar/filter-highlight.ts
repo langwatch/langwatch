@@ -169,12 +169,17 @@ function isPositionCoveredBySlot(slots: DecorationSlot[], from: number, to: numb
   return false;
 }
 
-function decorateTag(
-  tag: TagToken,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
+function decorateTag({
+  tag,
+  negated,
+  baseOffset,
+  plan,
+}: {
+  tag: TagToken;
+  negated: boolean;
+  baseOffset: number;
+  plan: DecorationPlan;
+}): void {
   const start = baseOffset + tag.location.start;
   const end = baseOffset + tag.location.end;
   const isImplicit = tag.field.type === "ImplicitField";
@@ -205,15 +210,20 @@ function decorateTag(
   });
 }
 
-function walkAst(
-  node: LiqeQuery,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
+function walkAst({
+  node,
+  negated,
+  baseOffset,
+  plan,
+}: {
+  node: LiqeQuery;
+  negated: boolean;
+  baseOffset: number;
+  plan: DecorationPlan;
+}): void {
   switch (node.type) {
     case "Tag": {
-      decorateTag(node as TagToken, negated, baseOffset, plan);
+      decorateTag({ tag: node as TagToken, negated, baseOffset, plan });
       return;
     }
     case "UnaryOperator": {
@@ -225,12 +235,12 @@ function walkAst(
         to: baseOffset + unary.location.start + kwLen,
         className: "filter-keyword filter-keyword-not",
       });
-      walkAst(unary.operand, negated !== isNeg, baseOffset, plan);
+      walkAst({ node: unary.operand, negated: negated !== isNeg, baseOffset, plan });
       return;
     }
     case "LogicalExpression": {
       const logic = node as LogicalExpressionToken;
-      walkAst(logic.left, negated, baseOffset, plan);
+      walkAst({ node: logic.left, negated, baseOffset, plan });
       if (logic.operator.type === "BooleanOperator") {
         const op = logic.operator;
         plan.slots.push({
@@ -243,7 +253,7 @@ function walkAst(
           opLoc: { start: op.location.start, end: op.location.end },
         });
       }
-      walkAst(logic.right, negated, baseOffset, plan);
+      walkAst({ node: logic.right, negated, baseOffset, plan });
       return;
     }
     case "ParenthesizedExpression": {
@@ -258,7 +268,7 @@ function walkAst(
         to: baseOffset + paren.location.end,
         className: "filter-paren",
       });
-      walkAst(paren.expression, negated, baseOffset, plan);
+      walkAst({ node: paren.expression, negated, baseOffset, plan });
       return;
     }
   }
@@ -312,7 +322,7 @@ export function buildDecorationPlan(text: string, baseOffset = 0): DecorationPla
   try {
     const ast = cachedParse(trimmed);
     const plan: DecorationPlan = { slots: [], tokens: [], leadingWs };
-    walkAst(ast, false, baseOffset + leadingWs, plan);
+    walkAst({ node: ast, negated: false, baseOffset: baseOffset + leadingWs, plan });
     flagOperatorShapedTypos(normalized, baseOffset, plan);
     return plan;
   } catch {
