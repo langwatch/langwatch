@@ -164,6 +164,9 @@ function TeamSpendPanel({
   );
 
   const teams = teamsQuery.data ?? [];
+  const isLoading = teamsQuery.isLoading;
+  const isEmpty = !isLoading && teams.length === 0;
+  const hasRows = !isLoading && teams.length > 0;
 
   return (
     <>
@@ -185,19 +188,19 @@ function TeamSpendPanel({
         overflow="hidden"
       >
         <Header />
-        {teamsQuery.isLoading ? (
+        {isLoading && (
           <Box padding={6}>
             <Spinner />
           </Box>
-        ) : teams.length === 0 ? (
+        )}
+        {isEmpty && (
           <Box padding={6} color="fg.muted" fontSize="sm">
             {teamsQuery.error
               ? "Team activity could not be read."
               : "No team activity this window."}
           </Box>
-        ) : (
-          teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)
         )}
+        {hasRows && teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)}
       </VStack>
       <Text fontSize="xs" color="fg.muted">
         {teams.length} team{teams.length === 1 ? "" : "s"} shown.
@@ -258,17 +261,33 @@ function Header() {
   );
 }
 
+function trendArrow(pct: number): string {
+  if (pct > 0) return "↑";
+  if (pct < 0) return "↓";
+  return "·";
+}
+
+function trendColorFor({
+  hasPriorBaseline,
+  pct,
+}: {
+  hasPriorBaseline: boolean;
+  pct: number;
+}): string {
+  if (!hasPriorBaseline) return "fg.muted";
+  if (pct > 25) return "orange.500";
+  if (pct < -25) return "blue.500";
+  return "fg.muted";
+}
+
 function Row({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
   const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
-  const arrow = team.deltaPctVsPriorWindow > 0 ? "↑" : team.deltaPctVsPriorWindow < 0 ? "↓" : "·";
-  const trendColor = !team.hasPriorBaseline
-    ? "fg.muted"
-    : team.deltaPctVsPriorWindow > 25
-      ? "orange.500"
-      : team.deltaPctVsPriorWindow < -25
-        ? "blue.500"
-        : "fg.muted";
+  const arrow = trendArrow(team.deltaPctVsPriorWindow);
+  const trendColor = trendColorFor({
+    hasPriorBaseline: team.hasPriorBaseline,
+    pct: team.deltaPctVsPriorWindow,
+  });
   const inner = (
     <HStack
       paddingY={2}

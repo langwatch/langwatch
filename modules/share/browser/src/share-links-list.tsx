@@ -19,6 +19,10 @@ export function ShareLinksList({
   onCopy: (url: string) => void;
   onRevoke: (id: string) => void;
 }) {
+  const showError = !isLoading && isError;
+  const isEmpty = !isLoading && !isError && links.length === 0;
+  const hasRows = !isLoading && !isError && links.length > 0;
+
   return (
     <VStack gap={0} align="stretch">
       <Text
@@ -32,20 +36,23 @@ export function ShareLinksList({
         Links
       </Text>
 
-      {isLoading ? (
+      {isLoading && (
         <HStack color="fg.muted" fontSize="sm" gap={2} paddingY={3}>
           <Spinner size="sm" />
           <Text>Loading…</Text>
         </HStack>
-      ) : isError ? (
+      )}
+      {showError && (
         <Text color="fg.error" fontSize="sm" paddingY={3}>
           Couldn&apos;t load share links. Please try again.
         </Text>
-      ) : links.length === 0 ? (
+      )}
+      {isEmpty && (
         <Text color="fg.muted" fontSize="sm" paddingY={3}>
           No links yet.
         </Text>
-      ) : (
+      )}
+      {hasRows &&
         links.map((link, index) => (
           <ShareLinkRow
             key={link.id}
@@ -55,8 +62,7 @@ export function ShareLinksList({
             onCopy={onCopy}
             onRevoke={() => onRevoke(link.id)}
           />
-        ))
-      )}
+        ))}
     </VStack>
   );
 }

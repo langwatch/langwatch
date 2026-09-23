@@ -52,6 +52,11 @@ function GovernanceUserDetailPage() {
   const pageTitle = user
     ? `${user.actor} · AI Governance · LangWatch`
     : "User · AI Governance · LangWatch";
+  const showNotice = !canReadActivity;
+  const showError = canReadActivity && !!usersQuery.error;
+  const showSpinner = canReadActivity && !usersQuery.error && usersQuery.isLoading;
+  const isSettled = canReadActivity && !usersQuery.error && !usersQuery.isLoading;
+  const showNoData = isSettled && !user;
 
   return (
     <GovernanceLayout pageTitle={pageTitle}>
@@ -82,25 +87,27 @@ function GovernanceUserDetailPage() {
           </HStack>
         </VStack>
 
-        {!canReadActivity ? (
+        {showNotice && (
           <PermissionRequiredNotice
             permission="activityMonitor:view"
             detail="This member's spend and activity stay hidden until then."
           />
-        ) : usersQuery.error ? (
+        )}
+        {showError && (
           <HandledErrorAlert
             error={usersQuery.error}
             fallbackTitle="Couldn't load this member's activity"
           />
-        ) : usersQuery.isLoading ? (
-          <Spinner />
-        ) : !user ? (
+        )}
+        {showSpinner && <Spinner />}
+        {showNoData && (
           <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <Text fontSize="sm" color="fg.muted">
               No spend data for this user in the last 30 days.
             </Text>
           </Box>
-        ) : (
+        )}
+        {isSettled && user && (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
               <Stat label="Spend, last 30 days" value={fmtUsd(user.spendUsd)} />
