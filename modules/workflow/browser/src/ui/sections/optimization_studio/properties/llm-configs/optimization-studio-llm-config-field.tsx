@@ -1,7 +1,5 @@
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { LLMConfigField } from "@langwatch/prompt-browser/llm-config-field";
 import type { Output } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";

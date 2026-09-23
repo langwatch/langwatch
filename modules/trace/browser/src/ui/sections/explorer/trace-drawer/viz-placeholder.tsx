@@ -1,12 +1,6 @@
 import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-// PeerCursorOverlay used to wrap just the viz pane (scoped to the
-// active viz tab). It was lifted to the drawer level (TraceDrawerShell)
-// so cursors render anywhere a peer's cursor lands in the drawer — the
-// previous scope hid peers as soon as they hovered out of the
-// viz pane.
-import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-browser";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -26,9 +20,19 @@ import { useShallow } from "zustand/react/shallow";
 import type { VizTab } from "../../../../behavior/drawer.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+// PeerCursorOverlay used to wrap just the viz pane (scoped to the
+// active viz tab). It was lifted to the drawer level (TraceDrawerShell)
+// so cursors render anywhere a peer's cursor lands in the drawer — the
+// previous scope hid peers as soon as they hovered out of the
+// viz pane.
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "../../../../behavior/presence/presence-store.ts";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { FlameView } from "../../flame/flame-view.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";
 import { WaterfallView } from "./waterfall-view/index.ts";

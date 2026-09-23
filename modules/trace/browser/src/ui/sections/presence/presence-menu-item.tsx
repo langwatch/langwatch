@@ -5,11 +5,10 @@
 
 import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  resolvePresenceAvailability,
-  usePresencePreferencesStore,
-} from "@langwatch/presence-browser";
 import { Eye, EyeOff } from "lucide-react";
+
+import { usePresencePreferencesStore } from "../../../behavior/presence/presence-preferences-store.ts";
+import { resolvePresenceAvailability } from "../../../model/presence/presence-availability.ts";
 
 /**
  * The two switches the row reads, in the shape the application's own workspace

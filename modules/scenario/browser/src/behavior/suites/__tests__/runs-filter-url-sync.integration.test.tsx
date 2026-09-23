@@ -4,21 +4,14 @@
  * @see https://github.com/langwatch/langwatch/pull/3205
  */
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-// The empty states carry the Setup via Agent menu, whose langy hooks need
-// app context these tests do not build; the control has its own tests.
-vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
-  SetupWithAgentButton: () => null,
-}));
-
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { createRunHistoryStore } from "@langwatch/suite-browser-kit";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ScenarioHostApi, ScenarioHostProvider } from "../../../model/scenario-host.ts";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../use-suite-routing.ts";

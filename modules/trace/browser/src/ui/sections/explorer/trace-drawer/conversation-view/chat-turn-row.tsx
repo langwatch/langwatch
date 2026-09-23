@@ -1,5 +1,6 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
+  type BubbleTone,
   useConversationExpand,
   formatCost,
   formatDuration,
@@ -27,7 +28,6 @@ import {
 import {
   Bubble,
   type BubbleSide,
-  type BubbleTone,
   truncateMarkdown,
 } from "../../trace-table/registry/addons/conversation/bubble.tsx";
 import type { TraceListItem } from "../../types/trace.ts";

@@ -2,11 +2,8 @@ import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { AISparklesLoader } from "@langwatch/model-provider-browser-kit";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { AISparklesLoader, allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";

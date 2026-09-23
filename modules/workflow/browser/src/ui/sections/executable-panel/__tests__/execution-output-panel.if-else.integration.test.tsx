@@ -10,6 +10,12 @@ vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
+vi.mock("../../../../behavior/lent-trace.tsx", () => ({
+  RenderInputOutput: ({ value }: { value: unknown }) => (
+    <span>{typeof value === "string" ? value : JSON.stringify(value)}</span>
+  ),
+}));
+
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));

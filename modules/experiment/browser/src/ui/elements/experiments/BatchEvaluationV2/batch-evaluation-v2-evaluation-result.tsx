@@ -9,7 +9,6 @@ import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-im
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import {
   ExpandedTextDialog,
   HoverableBigText,
@@ -18,6 +17,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { TraceIdPeek } from "../../../../behavior/lent-trace.tsx";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 
 type EvaluationRowData = {

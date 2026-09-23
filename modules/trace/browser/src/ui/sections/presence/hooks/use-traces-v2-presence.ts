@@ -1,8 +1,11 @@
-import { selectMostVisibleSection, useSectionTrackerStore } from "@langwatch/presence-browser";
 import type { PresenceLocation } from "@langwatch/presence-contract";
 import { useMemo } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import {
+  selectMostVisibleSection,
+  useSectionTrackerStore,
+} from "../../../../behavior/presence/section-tracker-store.ts";
 import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-presence-feature-enabled.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePresence } from "./use-presence.ts";

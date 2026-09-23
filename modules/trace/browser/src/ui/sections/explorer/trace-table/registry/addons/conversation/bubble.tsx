@@ -1,5 +1,5 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { useConversationExpand } from "@langwatch/trace-browser-kit";
+import { BUBBLE_TONES, type BubbleTone, useConversationExpand } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -14,52 +14,7 @@ import {
 import { ReasoningBlock } from "../../../../trace-drawer/transcript/index.ts";
 
 export type BubbleSide = "left" | "right";
-export type BubbleTone = "user" | "assistant" | "error" | "system";
 export type BubbleSize = "compact" | "regular";
-
-export interface BubblePalette {
-  bg: string;
-  fg: string;
-  accent: string;
-  avatarBg: string;
-  avatarFg: string;
-  selectedBg: string;
-}
-
-export const BUBBLE_TONES: Record<BubbleTone, BubblePalette> = {
-  user: {
-    bg: "blue.subtle",
-    fg: "fg",
-    accent: "blue.fg",
-    avatarBg: "blue.muted",
-    avatarFg: "blue.fg",
-    selectedBg: "blue.subtle",
-  },
-  assistant: {
-    bg: "bg.muted",
-    fg: "fg",
-    accent: "purple.fg",
-    avatarBg: "purple.subtle",
-    avatarFg: "purple.fg",
-    selectedBg: "bg.muted",
-  },
-  error: {
-    bg: "red.subtle",
-    fg: "red.fg",
-    accent: "red.fg",
-    avatarBg: "red.muted",
-    avatarFg: "red.fg",
-    selectedBg: "red.subtle",
-  },
-  system: {
-    bg: "bg.panel",
-    fg: "fg.muted",
-    accent: "fg.muted",
-    avatarBg: "bg.muted",
-    avatarFg: "fg.muted",
-    selectedBg: "bg.panel",
-  },
-};
 
 interface BubbleProps {
   side: BubbleSide;

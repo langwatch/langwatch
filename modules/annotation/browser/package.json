@@ -20,11 +20,6 @@
       "types": "./dist/annotation-form.d.ts",
       "default": "./src/annotation-form.ts"
     },
-    "./annotation-chips": {
-      "langwatch-declaration-source": "./src/annotation-chips.ts",
-      "types": "./dist/annotation-chips.d.ts",
-      "default": "./src/annotation-chips.ts"
-    },
     "./annotation-card": {
       "langwatch-declaration-source": "./src/annotation-card.ts",
       "types": "./dist/annotation-card.d.ts",

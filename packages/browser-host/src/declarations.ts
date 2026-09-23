@@ -41,6 +41,54 @@ export type UiLicenseBillingSectionProps = {
   commitUsdCents: number;
 };
 
+/** What a screen hands model-provider's model picker. */
+export type UiModelSelectorProps = {
+  model: string;
+  options: string[];
+  onChange: (model: string) => void;
+  size?: "sm" | "md" | "full";
+  mode?: "chat" | "embedding";
+  /** A "Configure available models" link at the bottom of the dropdown. */
+  showConfigureAction?: boolean;
+  /** Names the feature in the callout shown when no model is available. */
+  forFeatureLabel?: string;
+};
+
+/** What a screen hands model-provider's display of one chosen model. */
+export type UiModelDisplayProps = {
+  model: string;
+  fontSize?: string;
+};
+
+/** What a screen hands trace's eye-icon peek at one trace. */
+export type UiTraceIdPeekProps = {
+  traceId: string;
+};
+
+/** What a screen hands trace's hover peek around a trigger of its own. */
+export type UiTracePreviewHoverCardProps = {
+  traceId: string;
+  children: ReactNode;
+};
+
+/** What a screen hands trace's input/output viewer. */
+export type UiRenderInputOutputProps = {
+  value: unknown;
+  showTools?: boolean | "copy-only";
+  collapsed?: boolean;
+  collapseStringsAfterLength?: number;
+  /** Per-node collapse decision, e.g. "start every array collapsed". */
+  shouldCollapse?: (field: { type: string }) => boolean;
+  /** Show the entry count beside each object and array. */
+  displayObjectSize?: boolean;
+};
+
+/** What an empty state hands trace's "Setup via Agent" menu. */
+export type UiSetupWithAgentButtonProps = {
+  surface: "simulations" | "simulationRuns";
+  size?: "sm" | "md";
+};
+
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
@@ -52,6 +100,12 @@ export type UiDeclaredCapabilities = {
   };
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
+  modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
+  modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
+  renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
+  setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
+  traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
+  tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
 };
 
 export type UiDeclaredName = keyof UiDeclaredCapabilities;

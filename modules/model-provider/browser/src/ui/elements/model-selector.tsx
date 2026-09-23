@@ -17,6 +17,7 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   modelProviderIcons,
+  type ModelOption,
   NoModelsConfiguredCallout,
   ProviderIconGlyph,
 } from "@langwatch/model-provider-browser-kit";
@@ -35,27 +36,6 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-
-export type ModelOption = {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  isDisabled: boolean;
-  mode?: "chat" | "embedding" | undefined;
-  isCustom?: boolean;
-};
-
-export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
-  ([key, value]) => ({
-    label: key,
-    value: key,
-    icon: modelProviderIcons[key.split("/")[0] as keyof typeof modelProviderIcons],
-    isDisabled: false,
-    mode: value.mode as "chat" | "embedding",
-  }),
-);
-
-export const allModelOptions = modelSelectorOptions.map((option) => option.value);
 
 export type ModelOptionGroup = {
   provider: string;

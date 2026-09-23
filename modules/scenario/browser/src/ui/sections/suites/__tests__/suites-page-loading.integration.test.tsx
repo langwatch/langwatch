@@ -7,14 +7,8 @@ import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The empty states carry the Setup via Agent menu, whose langy hooks need
-// app context these tests do not build; the control has its own tests.
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
-}));
-
-vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
-  SetupWithAgentButton: () => null,
 }));
 
 const mockSuitesQuery = vi.fn();

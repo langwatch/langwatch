@@ -3,9 +3,9 @@ import { Markdown } from "@langwatch/browser-host/markdown";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
 import { useEffect, useRef, useState } from "react";
 
+import { RenderInputOutput } from "../../behavior/lent-trace.tsx";
 import { isJson } from "../../model/is-json.ts";
 
 /** The expanded text: rendered JSON, rendered markdown, or the raw string. */

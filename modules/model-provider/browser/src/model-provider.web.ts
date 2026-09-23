@@ -29,6 +29,19 @@ export const modelProviderWeb = defineWebModule("model-provider")
       load: () => import("./ui/sections/model-costs-screen.tsx"),
     },
   })
+  /** Lent, not kitted: both read this module's providers (§3.4 rule 7). */
+  .withCapabilities({
+    modelDisplay: {
+      load: async () => ({
+        default: (await import("./ui/elements/llm-model-display.tsx")).LLMModelDisplay,
+      }),
+    },
+    modelSelector: {
+      load: async () => ({
+        default: (await import("./ui/elements/model-selector.tsx")).ModelSelector,
+      }),
+    },
+  })
   /**
    * What another module may mount. langy edits providers inline; evaluator
    * and trace pick a model or read its cost/error surface.

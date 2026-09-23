@@ -1,12 +1,10 @@
 import { HStack, Skeleton, Text } from "@chakra-ui/react";
-import {
-  AnnotationCommentsChip,
-  AnnotationScoresChip,
-  AnnotationSuggestionsChip,
-} from "@langwatch/annotation-browser/annotation-chips";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type React from "react";
 
+import { AnnotationCommentsChip } from "../../../../../../elements/annotation/annotation-comments-chip.tsx";
+import { AnnotationScoresChip } from "../../../../../../elements/annotation/annotation-scores-chip.tsx";
+import { AnnotationSuggestionsChip } from "../../../../../../elements/annotation/annotation-suggestions-chip.tsx";
 import { useScoreNamesById } from "../../../../../use-score-names-by-id.ts";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";

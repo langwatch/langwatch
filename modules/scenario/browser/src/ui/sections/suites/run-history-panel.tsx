@@ -32,11 +32,11 @@ import {
   useScrollToBatch,
 } from "@langwatch/suite-browser-kit";
 import { isSuiteSetId } from "@langwatch/suite-contract";
-import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import { api } from "../../../behavior/scenario-api.ts";
 import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs.ts";

@@ -1,12 +1,10 @@
-import {
-  usePresencePreferencesStore,
-  usePresenceStore,
-  useTabSessionId,
-} from "@langwatch/presence-browser";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef } from "react";
 
+import { usePresencePreferencesStore } from "../../../../behavior/presence/presence-preferences-store.ts";
+import { usePresenceStore } from "../../../../behavior/presence/presence-store.ts";
+import { useTabSessionId } from "../../../../behavior/presence/use-tab-session-id.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;

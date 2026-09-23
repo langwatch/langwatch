@@ -63,7 +63,6 @@
     "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",

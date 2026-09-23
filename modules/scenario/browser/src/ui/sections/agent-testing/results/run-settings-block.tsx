@@ -5,9 +5,9 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import type { ReactNode } from "react";
 
+import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
 import type { RunSettingParameter, RunSettings } from "./run-settings.ts";

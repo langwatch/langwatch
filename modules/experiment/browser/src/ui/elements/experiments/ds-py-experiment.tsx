@@ -67,8 +67,8 @@ type DSPyStepQuery = UseTRPCQueryResult<
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
-import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
 
+import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
 import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
 import { MetadataTag } from "../metadata-tag.tsx";

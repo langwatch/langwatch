@@ -48,10 +48,8 @@ import {
   renderLangyChoiceSelectionText,
   type LangyResourceContext,
 } from "@langwatch/langy-contract";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { nowInstant } from "@langwatch/time";
 import type { UIMessage } from "ai";
 import {

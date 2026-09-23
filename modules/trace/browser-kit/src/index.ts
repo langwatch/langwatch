@@ -1,4 +1,5 @@
 export * from "./expand-context.ts";
+export * from "./model/bubble-tones.ts";
 export * from "./explorer-link-lens.ts";
 export * from "./explorer.store.ts";
 export * from "./export-types.ts";

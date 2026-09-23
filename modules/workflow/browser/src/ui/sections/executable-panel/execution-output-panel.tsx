@@ -9,12 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
-import { SpanDuration } from "@langwatch/trace-browser/surfaces/span-details";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
 
+import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
+import { SpanDuration } from "../../elements/span-duration.tsx";
 import { RedactedField } from "../redacted-field.tsx";
 
 interface OutputPanelProps {

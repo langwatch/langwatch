@@ -1,11 +1,15 @@
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-browser";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import type { DrawerViewMode } from "../../../../behavior/drawer.store.ts";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "../../../../behavior/presence/presence-store.ts";
+import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 
 interface ModeSwitchProps {
   viewMode: DrawerViewMode;

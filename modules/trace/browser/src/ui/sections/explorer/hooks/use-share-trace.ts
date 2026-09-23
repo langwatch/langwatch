@@ -1,12 +1,10 @@
-import {
-  type CreateShareLinkDraft,
-  type ShareLinkView,
-} from "@langwatch/share-browser/share-link-views";
-import { expiryToInstant } from "@langwatch/share-browser/share-links";
 import { toDate } from "@langwatch/time";
 import { useCallback } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";
+import { expiryToInstant } from "../../../../model/share/share-expiry.ts";
+import { type ShareLinkView } from "../../../../model/share/share-link-status.ts";
+import { type CreateShareLinkDraft } from "../../../blocks/share/create-share-link-form.tsx";
 import { showErrorToast } from "../../errors/index.ts";
 
 /**

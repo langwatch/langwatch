@@ -92,9 +92,6 @@
       "path": "../../onboarding/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../presence/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../presence/contract/tsconfig.build.json"
     },
     {
@@ -105,9 +102,6 @@
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../share/browser/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"

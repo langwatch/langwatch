@@ -16,10 +16,6 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
-  SetupWithAgentButton: () => null,
-}));
-
 vi.mock("@langwatch/trace-browser-kit", async () => {
   const actual = await vi.importActual<typeof traceBrowserKitModule>(
     "@langwatch/trace-browser-kit",

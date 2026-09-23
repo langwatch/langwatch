@@ -38,7 +38,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
     "@langwatch/langy-browser-kit": "workspace:*",
-    "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",

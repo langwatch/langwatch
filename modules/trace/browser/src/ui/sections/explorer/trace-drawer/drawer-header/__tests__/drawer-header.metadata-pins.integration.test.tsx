@@ -44,11 +44,13 @@ vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/presence-browser", () => ({
+vi.mock("../../../../../elements/presence/trace-presence-avatars.tsx", () => ({
   TracePresenceAvatars: () => null,
-  // `ModeSwitch` and `VizPlaceholder` read the peer store to decide whose
-  // cursors to show. The header renders both, so the mock has to answer for
-  // the store as well or the module throws before anything is asserted.
+}));
+// `ModeSwitch` and `VizPlaceholder` read the peer store to decide whose
+// cursors to show. The header renders both, so the mock has to answer for
+// the store as well or the module throws before anything is asserted.
+vi.mock("../../../../../../behavior/presence/presence-store.ts", () => ({
   usePresenceStore: () => [],
   selectPeersMatching: () => () => [],
 }));

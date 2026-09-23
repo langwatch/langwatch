@@ -6,7 +6,6 @@ import { Box, Button, Center, EmptyState, HStack, Separator, Text, VStack } from
 import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
-import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
 import {
   BarChart3,
   CheckCircle,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import { useNow } from "../../../behavior/use-now.ts";
 import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel.tsx";

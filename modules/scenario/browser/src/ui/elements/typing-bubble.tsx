@@ -5,8 +5,7 @@
 
 import { Box, Circle, Flex, HStack, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
-import { BUBBLE_TONES } from "@langwatch/trace-browser/surfaces/conversation-bubble";
+import { BUBBLE_TONES, getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 
 /** One dot rises and fades, the next follows it. */
 const typingDot = keyframes`

@@ -14,7 +14,6 @@ import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { TracePresenceAvatars } from "@langwatch/presence-browser";
 import {
   Chip,
   useFilterStore,
@@ -53,6 +52,7 @@ import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared
 import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
+import { TracePresenceAvatars } from "../../../../elements/presence/trace-presence-avatars.tsx";
 import { EditableTraceName } from "../../../editable-trace-name.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";

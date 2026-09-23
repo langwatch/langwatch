@@ -96,7 +96,6 @@
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",

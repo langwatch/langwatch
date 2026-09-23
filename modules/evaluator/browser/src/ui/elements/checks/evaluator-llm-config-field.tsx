@@ -1,16 +1,15 @@
 import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { LLMModelDisplay, toInternalKey } from "@langwatch/prompt-browser-kit";
+import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
+import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { toInternalKey } from "@langwatch/prompt-browser-kit";
 import { LLMConfigPopover } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
+
+import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 
 /**
  * LLM config parameter keys that the popover can read/write.

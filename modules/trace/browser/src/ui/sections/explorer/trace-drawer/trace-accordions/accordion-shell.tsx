@@ -1,10 +1,11 @@
 import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
-import { PresenceSection, SectionPresenceDot } from "@langwatch/presence-browser";
 import { type ReactNode, useRef } from "react";
 import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
 
 import { getDrawerDensityTokens, useDensityStore } from "../../../../../behavior/density.store.ts";
 import { useSectionPresenceStore } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import { PresenceSection } from "../../../../elements/presence/presence-section.tsx";
+import { SectionPresenceDot } from "../../../../elements/presence/section-presence-dot.tsx";
 
 export function AccordionShell({
   children,

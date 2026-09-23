@@ -14,10 +14,6 @@
       "langwatch-declaration-source": "./src/presence.web.ts",
       "types": "./dist/presence.web.d.ts",
       "default": "./src/presence.web.ts"
-    },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     }
   },
   "scripts": {

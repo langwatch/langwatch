@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { TracePeekSummary } from "../trace-peek-summary.tsx";
 
-interface TracePreviewHoverCardProps {
+export interface TracePreviewHoverCardProps {
   traceId: string;
   children: ReactNode;
   /**
@@ -73,7 +73,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   );
 };
 
-interface TraceIdPeekProps {
+export interface TraceIdPeekProps {
   traceId: string;
   /**
    * Approximate trace timestamp (ms epoch) forwarded as a partition-

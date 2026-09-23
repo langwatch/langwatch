@@ -1,17 +1,16 @@
 import { VStack } from "@chakra-ui/react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { ShareTraceDialogBody } from "@langwatch/share-browser/share-link-views";
-import { copyShareLink } from "@langwatch/share-browser/share-links";
 import { useRef } from "react";
 
+import { copyShareLink } from "../../../../../behavior/share/share-links.ts";
+import { ShareTraceDialogBody } from "../../../../blocks/share/share-trace-dialog-body.tsx";
 import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
 import { useShareTrace } from "../../hooks/use-share-trace.ts";
 
 /**
- * The share dialog's frame. The body — the mint form and the link list — is
- * `@langwatch/share-browser`; this file owns the application's dialog chrome, the
- * tRPC transport behind it, and how a copy is reported.
+ * The share dialog's frame around the mint form and the link list (`ui/blocks/share`):
+ * the dialog chrome, the tRPC transport behind it, and how a copy is reported.
  */
 export function ShareTraceDialog({
   open,

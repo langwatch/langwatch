@@ -18,16 +18,6 @@
       "types": "./dist/ui/sections/setup-with-agent-button.d.ts",
       "default": "./src/ui/sections/setup-with-agent-button.tsx"
     },
-    "./surfaces/render-input-output": {
-      "langwatch-declaration-source": "./src/ui/sections/traces/render-input-output.tsx",
-      "types": "./dist/ui/sections/traces/render-input-output.d.ts",
-      "default": "./src/ui/sections/traces/render-input-output.tsx"
-    },
-    "./surfaces/span-details": {
-      "langwatch-declaration-source": "./src/ui/sections/traces/span-details.tsx",
-      "types": "./dist/ui/sections/traces/span-details.d.ts",
-      "default": "./src/ui/sections/traces/span-details.tsx"
-    },
     "./surfaces/traces-mapping": {
       "langwatch-declaration-source": "./src/ui/sections/traces/traces-mapping.tsx",
       "types": "./dist/ui/sections/traces/traces-mapping.d.ts",
@@ -37,16 +27,6 @@
       "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
       "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",
       "default": "./src/ui/sections/presence/presence-menu-item.tsx"
-    },
-    "./surfaces/trace-id-peek": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-id-peek.tsx",
-      "types": "./dist/ui/sections/explorer/trace-id-peek.d.ts",
-      "default": "./src/ui/sections/explorer/trace-id-peek.tsx"
-    },
-    "./surfaces/conversation-bubble": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
-      "types": "./dist/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.d.ts",
-      "default": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx"
     },
     "./surfaces/project-span-names": {
       "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",
@@ -95,13 +75,11 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
     "@langwatch/onboarding-browser-kit": "workspace:*",
-    "@langwatch/presence-browser": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/share-browser": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/suite-browser": "workspace:*",
     "@langwatch/suite-browser-kit": "workspace:*",

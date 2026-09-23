@@ -9,7 +9,11 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { INHERIT_SENTINEL, ProviderModelSelector } from "@langwatch/model-provider-browser-kit";
+import {
+  INHERIT_SENTINEL,
+  modelSelectorOptions,
+  ProviderModelSelector,
+} from "@langwatch/model-provider-browser-kit";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -23,7 +27,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
-import { modelSelectorOptions } from "../elements/model-selector.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;

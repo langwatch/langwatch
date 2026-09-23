@@ -1,5 +1,6 @@
 export * from "./model/clamp-max-tokens.ts";
 export * from "./model/model-error.ts";
+export * from "./model/model-options.ts";
 export * from "./provider-icons.ts";
 export * from "./ui/elements/icons/ai-sparkles-loader.tsx";
 export * from "./ui/elements/icons/history.tsx";

@@ -26,4 +26,27 @@ export const traceWeb = defineWebModule("trace")
           .AddDatasetRecordDrawer,
       }),
     },
+  })
+  /** Trace UI that reads trace's own data, lent to the modules that show it (§3.4 rule 7). */
+  .withCapabilities({
+    renderInputOutput: {
+      load: async () => ({
+        default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,
+      }),
+    },
+    setupWithAgentButton: {
+      load: async () => ({
+        default: (await import("./ui/sections/setup-with-agent-button.tsx")).SetupWithAgentButton,
+      }),
+    },
+    traceIdPeek: {
+      load: async () => ({
+        default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TraceIdPeek,
+      }),
+    },
+    tracePreviewHoverCard: {
+      load: async () => ({
+        default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
+      }),
+    },
   });

@@ -19,21 +19,17 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import {
-  allModelOptions,
-  ModelSelector,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { allModelOptions } from "@langwatch/model-provider-browser-kit";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
-import { AddModelProviderKey } from "../../elements/checks/add-model-provider-key.tsx";
+import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
+import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
-// Simple component to handle model disabled check
-const ModelSelectorWithWarning = ({
+const EvaluatorModelSelector = ({
   selectorOptions,
   field,
   fieldName,
@@ -43,34 +39,15 @@ const ModelSelectorWithWarning = ({
   field: any;
   fieldName: string;
   variant: string;
-}) => {
-  const { modelOption } = useModelSelectionOptions(
-    selectorOptions,
-    field.value,
-    fieldName === "model" ? "chat" : "embedding",
-  );
-  const isModelDisabled = modelOption?.isDisabled ?? false;
-
-  return (
-    <VStack align="start" width="full">
-      <ModelSelector
-        options={selectorOptions}
-        model={field.value}
-        onChange={(model) => field.onChange(model)}
-        mode={fieldName === "model" ? "chat" : "embedding"}
-        size={variant === "studio" ? "sm" : "md"}
-      />
-      {isModelDisabled && (
-        <AddModelProviderKey
-          runWhat="run this evaluation"
-          nodeProvidersWithoutCustomKeys={[field.value.split("/")[0] ?? "unknown"]}
-        />
-      )}
-    </VStack>
-  );
-};
-
-import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
+}) => (
+  <ModelSelector
+    options={selectorOptions}
+    model={field.value}
+    onChange={(model) => field.onChange(model)}
+    mode={fieldName === "model" ? "chat" : "embedding"}
+    size={variant === "studio" ? "sm" : "md"}
+  />
+);
 
 // Toggle-button field for array-of-literal-union fields (e.g. include_metrics),
 // replacing the generic dropdown + "Add" array UI where the option set is
@@ -419,7 +396,7 @@ const DynamicZodForm = ({
             control={control}
             render={({ field }) => {
               return (
-                <ModelSelectorWithWarning
+                <EvaluatorModelSelector
                   selectorOptions={selectorOptions}
                   field={field}
                   fieldName={fieldName}

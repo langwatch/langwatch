@@ -184,26 +184,14 @@ vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", ()
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-selector", async (importOriginal) => {
-  const mod = await importOriginal<object>();
-  return {
-    ...mod,
-    useModelSelectionOptions: (_options: string[], model: string) => ({
-      modelOption: model
-        ? {
-            label: model.split("/")[1] ?? model,
-            value: model,
-            icon: <svg data-testid="model-provider-icon" />,
-            isDisabled: false,
-            mode: "chat" as const,
-            isCustom: false,
-          }
-        : undefined,
-      groupedByProvider: model ? [{ provider: model.split("/")[0] ?? "", models: [] }] : [],
-      isLoading: false,
-    }),
-  };
-});
+vi.mock("../../../../../behavior/lent-model-provider.tsx", () => ({
+  LLMModelDisplay: ({ model }: { model: string }) => (
+    <span>
+      <svg data-testid="model-provider-icon" />
+      {model.split("/")[1] ?? model}
+    </span>
+  ),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

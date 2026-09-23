@@ -39,7 +39,6 @@ import {
 } from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import type { Project } from "@langwatch/workflow-contract";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -50,6 +49,7 @@ import {
   useMultiRunData,
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
+import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";

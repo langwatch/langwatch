@@ -4,10 +4,10 @@
  * Spec: specs/traces-v2/presence-toggle-placement.feature
  */
 import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
-import { usePresencePreferencesStore } from "@langwatch/presence-browser";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { usePresencePreferencesStore } from "../../../../behavior/presence/presence-preferences-store.ts";
 import { PresenceMenuItem, type PresenceMenuItemProps } from "../presence-menu-item.tsx";
 
 function renderInOpenMenu(switches: PresenceMenuItemProps) {

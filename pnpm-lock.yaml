@@ -2339,9 +2339,6 @@ importers:
       '@langwatch/langy-browser-kit':
         specifier: workspace:*
         version: link:../../../../modules/langy/browser-kit
-      '@langwatch/model-provider-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/model-provider/browser
       '@langwatch/model-provider-browser-kit':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/browser-kit
@@ -6777,9 +6774,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-browser-kit':
         specifier: workspace:*
         version: link:../../trace/browser-kit
@@ -10881,9 +10875,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/model-provider-browser':
-        specifier: workspace:*
-        version: link:../../model-provider/browser
       '@langwatch/model-provider-browser-kit':
         specifier: workspace:*
         version: link:../../model-provider/browser-kit
@@ -12458,9 +12449,6 @@ importers:
       '@langwatch/onboarding-browser-kit':
         specifier: workspace:*
         version: link:../../onboarding/browser-kit
-      '@langwatch/presence-browser':
-        specifier: workspace:*
-        version: link:../../presence/browser
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../../presence/contract
@@ -12476,9 +12464,6 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
-      '@langwatch/share-browser':
-        specifier: workspace:*
-        version: link:../../share/browser
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
@@ -13406,9 +13391,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract

@@ -15,7 +15,6 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import {
   ComponentIcon,
   assertCrispChatHidden,
@@ -49,6 +48,7 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
+import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow.ts";
