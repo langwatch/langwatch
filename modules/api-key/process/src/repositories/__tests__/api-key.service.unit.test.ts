@@ -319,7 +319,7 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
     getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     findWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     findIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
-    getById: vi.fn().mockResolvedValue(null),
+    findById: vi.fn().mockResolvedValue(null),
     listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
     listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
     findIdByLegacyApiKey: () => memory.findIdByLegacyApiKey(),

@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { EnsuredPersonalWorkspace, OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +8,12 @@ import { ZodError } from "zod";
 import type { UserAvatarStorage } from "../../app/user.members.ts";
 import type { UserRepository } from "../../repositories/user.repository.ts";
 import { UserService } from "../user.service.ts";
+
+const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
+  team: { id: "team-1", name: "Personal", slug: "personal", createdAtMs: 0 },
+  project: { id: "project-1", name: "Personal", slug: "personal", apiKey: "key-1", createdAtMs: 0 },
+  created: true,
+};
 
 const user: UserFullProfile = {
   id: "user-1",
@@ -81,9 +87,7 @@ function createService() {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
   const organizations = createApiFixture<OrganizationApi>({
-    ensurePersonalWorkspace: vi.fn(async () => ({
-      project: { id: "project-1" },
-    })),
+    ensurePersonalWorkspace: async () => ENSURED_WORKSPACE,
   });
   return {
     service: UserService.create({
@@ -331,9 +335,7 @@ describe("given a user whose photo came from their identity provider", () => {
     }
     const repository = new StatefulRepository();
     const organizations = createApiFixture<OrganizationApi>({
-      ensurePersonalWorkspace: vi.fn<() => Promise<{ project: { id: string } }>>(async () => ({
-        project: { id: "project-1" },
-      })),
+      ensurePersonalWorkspace: async () => ENSURED_WORKSPACE,
     });
     return {
       service: UserService.create({
