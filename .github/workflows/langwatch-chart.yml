@@ -63,6 +63,9 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
 
+  workflow_dispatch:
+    # Allow running kind e2e legs on demand against draft branches.
+    # Skipped on draft PRs by the if: conditions at ~line 226 and ~270.
 # The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
 # 697s and `e2e: overlays` to 348s — and without a group every push to a chart
 # PR left its predecessors running to completion alongside it. Same rule as
