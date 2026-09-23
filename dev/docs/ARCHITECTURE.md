@@ -509,6 +509,10 @@ setup breaks on upgrade; LangWatch production sets `otlp` (a push is
 cheaper than a scrape at our cardinality). Under `otlp` the scrape endpoint
 is NOT mounted, and composing `prometheusMetrics` refuses by name — an
 unmounted endpoint is honest, a mounted-but-empty one lies to a prober.
+**Telemetry is recorded, never passed** (Alex, 2026-09-23): any package or module records counters,
+histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
+channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an
+anomaly, a limit) reads owned state, never exported metrics.
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
 `hostedMembers(stores)` from process-stores, `hostedRuntime({ name, runtime,
