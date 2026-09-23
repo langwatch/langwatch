@@ -1673,20 +1673,16 @@ export function createTrpcErrorFormatter(
     shape: TRPCDefaultErrorShape;
     error: { cause?: unknown; message?: string; code?: string };
   }) {
-    const handled = HandledError.isHandled(error.cause)
-      ? error.cause
-      : isZodLikeError(error.cause)
-        ? ValidationError.fromZodError(error.cause)
-        : null;
+    let handled: HandledError | null = null;
+    if (HandledError.isHandled(error.cause)) handled = error.cause;
+    else if (isZodLikeError(error.cause)) handled = ValidationError.fromZodError(error.cause);
 
     const isInternalServerError =
       error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
 
-    const message = handled
-      ? handled.code
-      : isInternalServerError
-        ? HandledError.toUserMessage(error.cause)
-        : shape.message;
+    let message = shape.message;
+    if (handled) message = handled.code;
+    else if (isInternalServerError) message = HandledError.toUserMessage(error.cause);
 
     const isAuthoredMessage =
       !handled &&

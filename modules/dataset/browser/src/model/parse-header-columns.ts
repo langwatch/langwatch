@@ -102,36 +102,39 @@ export async function parseHeaderColumns(file: File): Promise<DatasetConfirmColu
     return columns.length > 0 ? columns : null;
   }
 
-  if (format === "jsonl") {
-    const line = firstNonEmptyLine(text);
-    if (!line) return null;
-    try {
-      const keys = keysOf(JSON.parse(line));
-      if (!keys || keys.length === 0) return null;
-      const columns = toColumns(keys, format);
-      return columns.length > 0 ? columns : null;
-    } catch {
-      return null; // first object didn't fit the slice / not an object
-    }
-  }
-
-  // format === "json": a single array. The slice usually truncates it, so parse
-  // the whole slice first (small files), else brace-match the first object.
-  let keys: string[] | null = null;
-  try {
-    const whole = JSON.parse(text);
-    if (Array.isArray(whole)) keys = keysOf(whole[0]);
-  } catch {
-    const objText = firstJsonObject(text);
-    if (objText) {
-      try {
-        keys = keysOf(JSON.parse(objText));
-      } catch {
-        keys = null;
-      }
-    }
-  }
-  if (!keys || keys.length === 0) return null;
+  const keys = format === "jsonl" ? jsonlHeaderKeys(text) : jsonHeaderKeys(text);
+  if (keys.length === 0) return null;
   const columns = toColumns(keys, format);
   return columns.length > 0 ? columns : null;
 }
+
+const jsonlHeaderKeys = (text: string): string[] => {
+  const line = firstNonEmptyLine(text);
+  if (!line) return [];
+  try {
+    return keysOf(JSON.parse(line)) ?? [];
+  } catch {
+    return []; // first object didn't fit the slice / not an object
+  }
+};
+
+// A single array. The slice usually truncates it, so parse the whole slice
+// first (small files), else brace-match the first object.
+const jsonHeaderKeys = (text: string): string[] => {
+  try {
+    const whole = JSON.parse(text);
+    return Array.isArray(whole) ? (keysOf(whole[0]) ?? []) : [];
+  } catch {
+    return firstJsonObjectKeys(text);
+  }
+};
+
+const firstJsonObjectKeys = (text: string): string[] => {
+  const objText = firstJsonObject(text);
+  if (!objText) return [];
+  try {
+    return keysOf(JSON.parse(objText)) ?? [];
+  } catch {
+    return [];
+  }
+};

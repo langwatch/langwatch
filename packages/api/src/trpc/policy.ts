@@ -1185,35 +1185,32 @@ export function createTrpcRuntimePolicy<
     const result = await next();
     const actor = ports.identity.actor(ctx);
 
-    if (
-      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated logs for mutations
-      !result.ok &&
-      result.error instanceof TRPCError &&
-      result.error.code !== "INTERNAL_SERVER_ERROR" &&
-      actor?.id
-    ) {
-      const auditedInput = input ?? (await getRawInput());
-      const scopeIds = auditScopeIds(auditedInput);
-
-      await ports.audit.record({
-        userId: actor.id,
-        organizationId: scopeIds.organizationId,
-        projectId: scopeIds.projectId,
-        action: path,
-        // Through the same redaction as the success path. This middleware sits
-        // ahead of the input parser, so tRPC hands it no parsed `input`;
-        // reading the raw input is what puts the arguments, project and
-        // organization on a failed call's row instead of leaving them blank.
-        args: redactAuditArgs({ input: auditedInput, action: path }),
-        error: result.error,
-        req: ctx.req,
-        // When an admin is impersonating, the actor id reflects the
-        // impersonated user (correct for RBAC attribution). We stamp the
-        // real admin's identity in metadata so security forensics can
-        // filter on `metadata.impersonatorId`.
-        metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
-      });
+    const auditedAsMutation = type === "mutation" && ctx.permissionChecked; // avoid duplicated logs
+    if (auditedAsMutation || result.ok || !actor?.id) return result;
+    if (!(result.error instanceof TRPCError) || result.error.code === "INTERNAL_SERVER_ERROR") {
+      return result;
     }
+    const auditedInput = input ?? (await getRawInput());
+    const scopeIds = auditScopeIds(auditedInput);
+
+    await ports.audit.record({
+      userId: actor.id,
+      organizationId: scopeIds.organizationId,
+      projectId: scopeIds.projectId,
+      action: path,
+      // Through the same redaction as the success path. This middleware sits
+      // ahead of the input parser, so tRPC hands it no parsed `input`;
+      // reading the raw input is what puts the arguments, project and
+      // organization on a failed call's row instead of leaving them blank.
+      args: redactAuditArgs({ input: auditedInput, action: path }),
+      error: result.error,
+      req: ctx.req,
+      // When an admin is impersonating, the actor id reflects the
+      // impersonated user (correct for RBAC attribution). We stamp the
+      // real admin's identity in metadata so security forensics can
+      // filter on `metadata.impersonatorId`.
+      metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
+    });
 
     return result;
   };
