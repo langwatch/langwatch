@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluatorConfig,
   EvaluationV3Event,
@@ -41,10 +42,10 @@ const ports = {
   },
 } as unknown as ExperimentRunCollaborators;
 
-const workflows = {
-  enrichStudioEvent: async ({ event }: { event: unknown }) => event,
-  prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowApi;
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
 
 const workflowDsl = {
   nodes: [
@@ -56,22 +57,21 @@ const workflowDsl = {
   edges: [],
 } as unknown as StudioWorkflow;
 
-const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell =>
-  ({
-    rowIndex: 0,
-    targetId: "wf-target",
-    targetConfig: {
-      id: "wf-target",
-      type: "workflow",
-      workflowId: "wf_1",
-      inputs: [],
-      outputs: [],
-      mappings: {},
-    },
-    evaluatorConfigs: [],
-    datasetEntry: { _datasetId: "dataset-1", question: "is a dog an animal?" },
-    ...overrides,
-  }) as unknown as ExecutionCell;
+const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
+  rowIndex: 0,
+  targetId: "wf-target",
+  targetConfig: {
+    id: "wf-target",
+    type: "workflow",
+    workflowId: "wf_1",
+    inputs: [],
+    outputs: [],
+    mappings: {},
+  },
+  evaluatorConfigs: [],
+  datasetEntry: { _datasetId: "dataset-1", question: "is a dog an animal?" },
+  ...overrides,
+});
 
 /**
  * A grading evaluator attached to the target column in the workbench, reading
@@ -147,7 +147,7 @@ const succeedingRun: StudioServerEvent[] = [
     },
   },
   { type: "done" },
-] as unknown as StudioServerEvent[];
+];
 
 /** Two results on the end node, the shape that exposed the bug. */
 const twoResultRun: StudioServerEvent[] = [
@@ -163,7 +163,7 @@ const twoResultRun: StudioServerEvent[] = [
     },
   },
   { type: "done" },
-] as unknown as StudioServerEvent[];
+];
 
 const failingRun: StudioServerEvent[] = [
   {
@@ -177,7 +177,7 @@ const failingRun: StudioServerEvent[] = [
     },
   },
   { type: "done" },
-] as unknown as StudioServerEvent[];
+];
 
 const gradingSuccess: StudioServerEvent[] = [
   {
@@ -190,7 +190,7 @@ const gradingSuccess: StudioServerEvent[] = [
       },
     },
   },
-] as unknown as StudioServerEvent[];
+];
 
 beforeEach(() => {
   scripted.flow = [];

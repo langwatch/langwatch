@@ -8,10 +8,13 @@ import { describe, expect, it } from "vitest";
 import { resolvePromptInputs } from "../prompt-execution-event.rules.ts";
 
 function formWithTemplate(
-  templateMessages: { role: string; content: string }[],
+  templateMessages: PromptConfigFormValues["version"]["configData"]["messages"],
 ): PromptConfigFormValues {
   return {
+    handle: null,
+    scope: "PROJECT",
     version: {
+      parameters: {},
       configData: {
         llm: { model: "openai/gpt-5-mini" },
         messages: templateMessages,
@@ -19,7 +22,7 @@ function formWithTemplate(
         outputs: [{ identifier: "output", type: "str" }],
       },
     },
-  } as unknown as PromptConfigFormValues;
+  };
 }
 
 const INPUT_SLOT = "{{input}}";

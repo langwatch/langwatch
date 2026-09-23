@@ -9,8 +9,11 @@ import { describe, expect, it } from "vitest";
 
 import { buildPromptExecutionEvent } from "../prompt-execution-event.rules.ts";
 
-const formValues = {
+const formValues: PromptConfigFormValues = {
+  handle: null,
+  scope: "PROJECT",
   version: {
+    parameters: {},
     configData: {
       llm: { model: "openai/gpt-5-mini" },
       messages: [
@@ -21,7 +24,7 @@ const formValues = {
       outputs: [{ identifier: "output", type: "str" }],
     },
   },
-} as unknown as PromptConfigFormValues;
+};
 
 const buildEvent = () =>
   buildPromptExecutionEvent({

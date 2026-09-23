@@ -13,7 +13,19 @@ import { experimentInitCaller, experimentInitRest } from "../experiment-init.res
 const PROJECT_ID = "project-1";
 const PROJECT_SLUG = "project-one";
 
-const experiment = { id: "experiment-1", slug: "nightly-regression" } as unknown as Experiment;
+const experiment: Experiment = {
+  id: "experiment-1",
+  projectId: PROJECT_ID,
+  slug: "nightly-regression",
+  name: null,
+  type: "EVALUATIONS_V3",
+  workflowId: null,
+  createdAt: new Date("2026-08-24T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-24T00:00:00.000Z"),
+  archivedAt: null,
+  workbenchState: null,
+  workbenchVersion: 0,
+};
 
 /**
  * The plan refusal as the licensing layer raises it. Declared here rather than
