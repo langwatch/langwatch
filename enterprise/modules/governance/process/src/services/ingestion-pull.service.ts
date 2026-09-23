@@ -41,12 +41,17 @@ export class IngestionPullService {
     this.clock = options.clock ?? Date.now;
   }
 
-  static create(
-    runPort: IngestionPullRunner,
-    outcomePort: IngestionPullOutcomeChannel,
-    metrics: IngestionPullMetricsSink,
-    options: { maxAttempts?: number; clock?: () => number } = {},
-  ): IngestionPullService {
+  static create({
+    runPort,
+    outcomePort,
+    metrics,
+    options = {},
+  }: {
+    runPort: IngestionPullRunner;
+    outcomePort: IngestionPullOutcomeChannel;
+    metrics: IngestionPullMetricsSink;
+    options?: { maxAttempts?: number; clock?: () => number };
+  }): IngestionPullService {
     return new IngestionPullService({ runPort, outcomePort, metrics, options });
   }
 

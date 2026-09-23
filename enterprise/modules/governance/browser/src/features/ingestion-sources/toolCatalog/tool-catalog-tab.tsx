@@ -7,14 +7,14 @@ import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-stat
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
-import { asRegisteredTools, buildRegisteredToolCards } from "./registeredTools";
-import { SAMPLE_TOOL_CARDS } from "./sampleToolCards";
+import { asRegisteredTools, buildRegisteredToolCards } from "./registered-tools";
+import { SAMPLE_TOOL_CARDS } from "./sample-tool-cards";
+import type { ToolCard } from "./tool-cards";
 import {
   type ToolCardActions,
   ToolCatalogCards,
   type ToolCatalogLayout,
 } from "./tool-catalog-cards";
-import type { ToolCard } from "./toolCards";
 
 /**
  * The Catalog pane: every AI tool the organization has registered.

@@ -41,12 +41,17 @@ export class DefaultGovernanceService implements GovernanceApi {
     this.lifecycle = lifecycle;
   }
 
-  static create(
-    rules: GovernanceRulesOperationsService,
-    ingestion: GovernanceIngestionOperationsService,
-    activity: GovernanceActivityOperationsService,
-    lifecycle: GovernanceLifecycleOperationsService,
-  ): DefaultGovernanceService {
+  static create({
+    rules,
+    ingestion,
+    activity,
+    lifecycle,
+  }: {
+    rules: GovernanceRulesOperationsService;
+    ingestion: GovernanceIngestionOperationsService;
+    activity: GovernanceActivityOperationsService;
+    lifecycle: GovernanceLifecycleOperationsService;
+  }): DefaultGovernanceService {
     return new DefaultGovernanceService({ rules, ingestion, activity, lifecycle });
   }
 

@@ -48,15 +48,23 @@ export class GovernanceIngestionOperationsService {
     this.ottl = ottl;
   }
 
-  static create(
-    canonicalCost: CanonicalCostExtractorService,
-    eventing: GovernanceEventingChannel,
-    ingestionKeys: IngestionKeyService,
-    ingestionSources: IngestionSourceService,
-    templates: IngestionTemplateService,
-    ocsf: DefaultGovernanceOcsfExportService,
-    ottl: GovernanceOttlGateway,
-  ): GovernanceIngestionOperationsService {
+  static create({
+    canonicalCost,
+    eventing,
+    ingestionKeys,
+    ingestionSources,
+    templates,
+    ocsf,
+    ottl,
+  }: {
+    canonicalCost: CanonicalCostExtractorService;
+    eventing: GovernanceEventingChannel;
+    ingestionKeys: IngestionKeyService;
+    ingestionSources: IngestionSourceService;
+    templates: IngestionTemplateService;
+    ocsf: DefaultGovernanceOcsfExportService;
+    ottl: GovernanceOttlGateway;
+  }): GovernanceIngestionOperationsService {
     return new GovernanceIngestionOperationsService({
       canonicalCost,
       eventing,

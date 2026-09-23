@@ -32,8 +32,8 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
 
     while (!placed) {
       for (let col = 0; col <= 2 - colSpan; col++) {
-        if (isAreaFree(occupied, col, row, colSpan, rowSpan)) {
-          occupyArea(occupied, col, row, colSpan, rowSpan);
+        if (isAreaFree(occupied, { col, row, colSpan, rowSpan })) {
+          occupyArea(occupied, { col, row, colSpan, rowSpan });
           layouts.push({
             graphId: item.id,
             gridColumn: col,
@@ -58,10 +58,7 @@ const cellKey = (col: number, row: number) => `${col},${row}`;
 
 const isAreaFree = (
   occupied: Set<string>,
-  col: number,
-  row: number,
-  colSpan: number,
-  rowSpan: number,
+  { col, row, colSpan, rowSpan }: { col: number; row: number; colSpan: number; rowSpan: number },
 ) => {
   for (let c = col; c < col + colSpan; c++) {
     for (let r = row; r < row + rowSpan; r++) {
@@ -74,10 +71,7 @@ const isAreaFree = (
 
 const occupyArea = (
   occupied: Set<string>,
-  col: number,
-  row: number,
-  colSpan: number,
-  rowSpan: number,
+  { col, row, colSpan, rowSpan }: { col: number; row: number; colSpan: number; rowSpan: number },
 ) => {
   for (let c = col; c < col + colSpan; c++) {
     for (let r = row; r < row + rowSpan; r++) {

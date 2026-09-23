@@ -71,8 +71,8 @@ import {
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
 import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
+import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/tool-cards.ts";
 import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/tool-catalog-tab.tsx";
-import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/toolCards.ts";
 import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
 import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
 import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";

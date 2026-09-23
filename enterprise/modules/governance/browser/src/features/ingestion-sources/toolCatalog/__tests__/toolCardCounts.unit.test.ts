@@ -11,8 +11,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SAMPLE_TOOL_CARDS } from "../sampleToolCards";
-import { exactCardCount, formatCardCount } from "../toolCards";
+import { SAMPLE_TOOL_CARDS } from "../sample-tool-cards";
+import { exactCardCount, formatCardCount } from "../tool-cards";
 
 describe("given a count on a catalog card", () => {
   describe("when it runs to nine digits", () => {

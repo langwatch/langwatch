@@ -53,12 +53,12 @@ export class ScimCostCenterService {
   }
 
   findFromRequest(request: ScimCreateUserRequest): string | null | undefined {
-    const extension = Reflect.get(request, SCIM_ENTERPRISE_USER_SCHEMA);
+    const extension = request[SCIM_ENTERPRISE_USER_SCHEMA];
     if (extension === null || typeof extension !== "object" || !("costCenter" in extension)) {
       return undefined;
     }
 
-    const costCenter = Reflect.get(extension, "costCenter");
+    const costCenter = extension.costCenter;
 
     return typeof costCenter === "string" ? costCenter : null;
   }
@@ -79,10 +79,11 @@ export class ScimCostCenterService {
       };
     }
 
-    if (operation.value != null && typeof operation.value === "object") {
-      const extension = Reflect.get(operation.value, SCIM_ENTERPRISE_USER_SCHEMA);
+    const value = operation.value;
+    if (value != null && typeof value === "object" && SCIM_ENTERPRISE_USER_SCHEMA in value) {
+      const extension = value[SCIM_ENTERPRISE_USER_SCHEMA];
       if (extension && typeof extension === "object" && "costCenter" in extension) {
-        const costCenter = Reflect.get(extension, "costCenter");
+        const costCenter = extension.costCenter;
 
         return {
           present: true,

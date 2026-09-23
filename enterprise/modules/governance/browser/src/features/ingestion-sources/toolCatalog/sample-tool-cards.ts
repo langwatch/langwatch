@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ToolCard } from "./toolCards";
+import type { ToolCard } from "./tool-cards";
 
 /**
  * The invented catalog, kept away from the real one.

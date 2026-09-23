@@ -10,7 +10,7 @@ import {
   type ToolCard,
   type ToolCardRow,
   toolCardMissingReason,
-} from "./toolCards";
+} from "./tool-cards";
 
 /**
  * The catalog as a table: one row per tool, one column per figure.

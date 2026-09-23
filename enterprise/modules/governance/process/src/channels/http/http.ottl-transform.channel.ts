@@ -119,13 +119,27 @@ function normaliseErrors(raw: RawValidateResponse | RawTransformResponse): OttlV
  * process composition root and injected here.
  */
 export class HttpOttlTransformChannel extends GovernanceOttlGateway {
-  private constructor(
-    private readonly baseUrl: string | null,
-    private readonly secret: string | null,
-    private readonly request: typeof fetch,
-    private readonly now: () => number,
-  ) {
+  private readonly baseUrl: string | null;
+  private readonly secret: string | null;
+  private readonly request: typeof fetch;
+  private readonly now: () => number;
+
+  private constructor({
+    baseUrl,
+    secret,
+    request,
+    now,
+  }: {
+    baseUrl: string | null;
+    secret: string | null;
+    request: typeof fetch;
+    now: () => number;
+  }) {
     super();
+    this.baseUrl = baseUrl;
+    this.secret = secret;
+    this.request = request;
+    this.now = now;
   }
 
   static create(options: {
@@ -134,12 +148,12 @@ export class HttpOttlTransformChannel extends GovernanceOttlGateway {
     request?: typeof fetch;
     now?: () => number;
   }): HttpOttlTransformChannel {
-    return new HttpOttlTransformChannel(
-      options.baseUrl ?? null,
-      options.secret ?? null,
-      options.request ?? fetch,
-      options.now ?? Date.now,
-    );
+    return new HttpOttlTransformChannel({
+      baseUrl: options.baseUrl ?? null,
+      secret: options.secret ?? null,
+      request: options.request ?? fetch,
+      now: options.now ?? Date.now,
+    });
   }
 
   async validate(statements: string[]): Promise<OttlValidationResult> {

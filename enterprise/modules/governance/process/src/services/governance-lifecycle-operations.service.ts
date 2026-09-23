@@ -51,16 +51,25 @@ export class GovernanceLifecycleOperationsService {
     this.setupState = setupState;
   }
 
-  static create(
-    routingPolicies: DefaultGovernanceRoutingPolicyService,
-    personalVirtualKeys: DefaultGovernancePersonalVirtualKeyService,
-    cliBootstrap: DefaultGovernanceCliBootstrapService,
-    cliSessions: DefaultGovernanceCliSessionInventoryService,
-    cliTokenRevocation: DefaultGovernanceCliTokenRevocationService,
-    adminWorkspaceViewAudit: DefaultGovernanceAdminWorkspaceViewAuditService,
-    quarantineFill: QuarantineFillEvaluatorService,
-    setupState: DefaultGovernanceSetupStateService,
-  ): GovernanceLifecycleOperationsService {
+  static create({
+    routingPolicies,
+    personalVirtualKeys,
+    cliBootstrap,
+    cliSessions,
+    cliTokenRevocation,
+    adminWorkspaceViewAudit,
+    quarantineFill,
+    setupState,
+  }: {
+    routingPolicies: DefaultGovernanceRoutingPolicyService;
+    personalVirtualKeys: DefaultGovernancePersonalVirtualKeyService;
+    cliBootstrap: DefaultGovernanceCliBootstrapService;
+    cliSessions: DefaultGovernanceCliSessionInventoryService;
+    cliTokenRevocation: DefaultGovernanceCliTokenRevocationService;
+    adminWorkspaceViewAudit: DefaultGovernanceAdminWorkspaceViewAuditService;
+    quarantineFill: QuarantineFillEvaluatorService;
+    setupState: DefaultGovernanceSetupStateService;
+  }): GovernanceLifecycleOperationsService {
     return new GovernanceLifecycleOperationsService({
       routingPolicies,
       personalVirtualKeys,

@@ -515,7 +515,7 @@ const CustomGraph_ = React.memo(
     // Calculate pie/donut data using shapeDataForSummary (same logic as summary charts)
     const pieData = useMemo(() => {
       if (input.graphType === "pie" || input.graphType === "donnut") {
-        const summaryData = shapeDataForSummary(input, seriesByKey, timeseries, nameForSeries);
+        const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
         return summaryData.current.filter((item) => item.value > 0);
       }
       return [];
@@ -702,7 +702,7 @@ const CustomGraph_ = React.memo(
     };
 
     if (input.graphType === "summary") {
-      const summaryData = shapeDataForSummary(input, seriesByKey, timeseries, nameForSeries);
+      const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
 
       // Create a map for key-based lookup to match current with previous values correctly
       const previousByKey = Object.fromEntries(summaryData.previous.map((p) => [p.key, p]));
@@ -811,7 +811,7 @@ const CustomGraph_ = React.memo(
     ) as [typeof XAxis, typeof YAxis];
 
     if (["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full") {
-      const summaryData = shapeDataForSummary(input, seriesByKey, timeseries, nameForSeries);
+      const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
       const sortedCurrentData = [...(summaryData.current ?? [])].toSorted(
         (a, b) => b.value - a.value,
       );
@@ -1202,12 +1202,17 @@ const shapeDataForGraph = (input: CustomGraphInput, timeseries: TimeseriesQuery)
   return currentAndPreviousData as ({ date: string } & Record<string, number>)[] | undefined;
 };
 
-const shapeDataForSummary = (
-  input: CustomGraphInput,
-  seriesByKey: Record<string, Series>,
-  timeseries: TimeseriesQuery,
-  nameForSeries: (aggKey: string) => string,
-) => {
+const shapeDataForSummary = ({
+  input,
+  seriesByKey,
+  timeseries,
+  nameForSeries,
+}: {
+  input: CustomGraphInput;
+  seriesByKey: Record<string, Series>;
+  timeseries: TimeseriesQuery;
+  nameForSeries: (aggKey: string) => string;
+}) => {
   const flattenCurrentPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
   const flattenPreviousPeriod =

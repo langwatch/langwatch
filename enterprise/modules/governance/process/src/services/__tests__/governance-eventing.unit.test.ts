@@ -358,11 +358,11 @@ describe("governance signal eventing", () => {
 describe("ingestion pull process and projection", () => {
   const process = IngestionPullProcess.create({
     schedule: new FixedSchedule(),
-    execution: IngestionPullService.create(
-      new UnusedPull(),
-      new UnusedOutcome(),
-      new UnusedMetrics(),
-    ),
+    execution: IngestionPullService.create({
+      runPort: new UnusedPull(),
+      outcomePort: new UnusedOutcome(),
+      metrics: new UnusedMetrics(),
+    }),
   });
   const definition = buildProcessDefinition(
     buildProcessManager<IngestionPullProcessingEvent & Event>({
@@ -494,12 +494,12 @@ describe("ingestion pull retry outcomes", () => {
   it("redelivers a failed window, then records one terminal durable failure", async () => {
     const outcome = new RecordingPullOutcome();
     const metrics = new RecordingPullMetrics();
-    const service = IngestionPullService.create(
-      new FailingPull(new Error("provider unavailable")),
-      outcome,
+    const service = IngestionPullService.create({
+      runPort: new FailingPull(new Error("provider unavailable")),
+      outcomePort: outcome,
       metrics,
-      { clock: () => 2_000 },
-    );
+      options: { clock: () => 2_000 },
+    });
     const pull = {
       sourceId: "source-1",
       runId: "run-1",

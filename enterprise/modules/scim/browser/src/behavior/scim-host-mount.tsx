@@ -21,13 +21,27 @@ import {
 } from "../model/scim-host.ts";
 
 class CapabilityScimHost extends ScimHostApi {
-  constructor(
-    private readonly orgId: string | undefined,
-    private readonly appBaseUrl: string,
-    private readonly feedback: UiFeedback,
-    private readonly uiRoute: UiRoute,
-  ) {
+  private readonly orgId: string | undefined;
+  private readonly appBaseUrl: string;
+  private readonly feedback: UiFeedback;
+  private readonly uiRoute: UiRoute;
+
+  constructor({
+    orgId,
+    appBaseUrl,
+    feedback,
+    uiRoute,
+  }: {
+    orgId: string | undefined;
+    appBaseUrl: string;
+    feedback: UiFeedback;
+    uiRoute: UiRoute;
+  }) {
     super();
+    this.orgId = orgId;
+    this.appBaseUrl = appBaseUrl;
+    this.feedback = feedback;
+    this.uiRoute = uiRoute;
   }
 
   organizationId(): string | undefined {
@@ -67,7 +81,13 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
   const { appBaseUrl } = useUiDeployment();
 
   const host = useMemo(
-    () => new CapabilityScimHost(organizationId ?? void 0, appBaseUrl, feedback, route),
+    () =>
+      new CapabilityScimHost({
+        orgId: organizationId ?? void 0,
+        appBaseUrl,
+        feedback,
+        uiRoute: route,
+      }),
     [organizationId, appBaseUrl, feedback, route],
   );
 

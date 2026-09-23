@@ -19,7 +19,7 @@ import {
   buildRegisteredToolCards,
   type RegisteredTool,
   vendorForTool,
-} from "../registeredTools";
+} from "../registered-tools";
 
 function assistant(assistantKind: string): RegisteredTool {
   return {

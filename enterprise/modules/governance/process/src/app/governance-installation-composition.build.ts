@@ -212,27 +212,27 @@ export class GovernanceInstallationComposition {
       activity: this.options.setupActivity,
     });
 
-    const rules = GovernanceRulesOperationsService.create(
+    const rules = GovernanceRulesOperationsService.create({
       anomalyRules,
       departments,
       policy,
       aiTools,
-    );
-    const ingestion = GovernanceIngestionOperationsService.create(
+    });
+    const ingestion = GovernanceIngestionOperationsService.create({
       canonicalCost,
-      this.options.eventing,
+      eventing: this.options.eventing,
       ingestionKeys,
       ingestionSources,
       templates,
       ocsf,
-      this.options.ottl,
-    );
+      ottl: this.options.ottl,
+    });
     const activityOperations = GovernanceActivityOperationsService.create(
       activity,
       personalUsage,
       this.options.budgetOverview,
     );
-    const lifecycle = GovernanceLifecycleOperationsService.create(
+    const lifecycle = GovernanceLifecycleOperationsService.create({
       routingPolicies,
       personalVirtualKeys,
       cliBootstrap,
@@ -241,8 +241,13 @@ export class GovernanceInstallationComposition {
       adminWorkspaceViewAudit,
       quarantineFill,
       setupState,
-    );
+    });
 
-    return DefaultGovernanceService.create(rules, ingestion, activityOperations, lifecycle);
+    return DefaultGovernanceService.create({
+      rules,
+      ingestion,
+      activity: activityOperations,
+      lifecycle,
+    });
   }
 }

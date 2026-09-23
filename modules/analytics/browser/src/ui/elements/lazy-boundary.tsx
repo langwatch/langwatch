@@ -4,13 +4,18 @@
  * INSIDE on purpose: outside, a pending import blanks the whole page.
  */
 
-import { createElement, lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import {
+  createElement,
+  Suspense,
+  type ComponentType,
+  type LazyExoticComponent,
+  type ReactNode,
+} from "react";
 
 export function lazyBoundary<P extends object>(
-  load: () => Promise<{ default: ComponentType<P> }>,
+  Loaded: LazyExoticComponent<ComponentType<P>>,
   loading: () => ReactNode,
 ): ComponentType<P> {
-  const Loaded = lazy(load);
   const Boundary = (props: P) =>
     createElement(Suspense, { fallback: createElement(loading) }, createElement(Loaded, props));
   Boundary.displayName = "LazyBoundary";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { GovernanceSummaryBarItem } from "../../../ui/elements/governance-summary-bar.tsx";
-import type { ToolCard } from "../toolCatalog/toolCards.ts";
+import type { ToolCard } from "../toolCatalog/tool-cards.ts";
 
 /**
  * The Inventory's resume strip: one figure per tab, above the tabs.

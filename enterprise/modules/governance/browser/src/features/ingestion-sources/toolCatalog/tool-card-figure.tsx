@@ -5,7 +5,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { TileIcon } from "../../ai-tools/ui/elements/tile-icon.tsx";
 import { SourceTypeIconGlyph } from "../ui/elements/source-type-icon-glyph.tsx";
-import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./toolCards";
+import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./tool-cards";
 
 /**
  * The two pieces the grid card and the list table both draw: one figure, and

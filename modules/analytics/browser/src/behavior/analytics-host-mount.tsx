@@ -23,15 +23,35 @@ import {
 } from "../model/analytics-host.ts";
 
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
-  constructor(
-    private readonly project_: AnalyticsHostProject | undefined,
-    private readonly organizationId_: string | undefined,
-    private readonly hasPermissionOf: (permission: string) => boolean,
-    private readonly routeCapability: UiRoute,
-    private readonly navigationCapability: UiNavigation,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly project_: AnalyticsHostProject | undefined;
+  private readonly organizationId_: string | undefined;
+  private readonly hasPermissionOf: (permission: string) => boolean;
+  private readonly routeCapability: UiRoute;
+  private readonly navigationCapability: UiNavigation;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    project_,
+    organizationId_,
+    hasPermissionOf,
+    routeCapability,
+    navigationCapability,
+    feedback,
+  }: {
+    project_: AnalyticsHostProject | undefined;
+    organizationId_: string | undefined;
+    hasPermissionOf: (permission: string) => boolean;
+    routeCapability: UiRoute;
+    navigationCapability: UiNavigation;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.project_ = project_;
+    this.organizationId_ = organizationId_;
+    this.hasPermissionOf = hasPermissionOf;
+    this.routeCapability = routeCapability;
+    this.navigationCapability = navigationCapability;
+    this.feedback = feedback;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -91,21 +111,22 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   // direction to be wrong in.
   const host = useMemo(
     () =>
-      new CapabilityAnalyticsHost(
-        scopeProjectId !== void 0 && scopeProjectId === projectId
-          ? {
-              id: scopeProjectId,
-              slug: scopeProjectSlug ?? "",
-              name: scopeProjectName ?? "",
-              hasFirstMessage: false,
-            }
-          : void 0,
-        organizationId ?? void 0,
-        (permission) => session.hasPermission(permission),
-        route,
-        navigation,
+      new CapabilityAnalyticsHost({
+        project_:
+          scopeProjectId !== void 0 && scopeProjectId === projectId
+            ? {
+                id: scopeProjectId,
+                slug: scopeProjectSlug ?? "",
+                name: scopeProjectName ?? "",
+                hasFirstMessage: false,
+              }
+            : void 0,
+        organizationId_: organizationId ?? void 0,
+        hasPermissionOf: (permission) => session.hasPermission(permission),
+        routeCapability: route,
+        navigationCapability: navigation,
         feedback,
-      ),
+      }),
     [
       scopeProjectId,
       scopeProjectSlug,

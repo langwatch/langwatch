@@ -6,6 +6,7 @@
  */
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";
+import { lazy } from "react";
 
 import { lazyBoundary } from "../elements/lazy-boundary.tsx";
 import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
@@ -13,7 +14,7 @@ import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.ts
 export type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
 
 export const LazyLangWatchQLWidgetChart = lazyBoundary<LangWatchQLWidgetChartProps>(
-  () => import("./langwatch-ql-widget-chart.tsx"),
+  lazy(() => import("./langwatch-ql-widget-chart.tsx")),
   () => (
     <HStack gap={2} color="fg.muted" padding={4}>
       <Spinner size="sm" />

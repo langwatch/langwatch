@@ -351,12 +351,17 @@ function FieldsFilter({
   );
 }
 
-function updateNestedSelection(
-  current: FilterParam,
-  keysAhead: FilterField[],
-  keysBefore: string[],
-  values: string[],
-): FilterParam {
+function updateNestedSelection({
+  current,
+  keysAhead,
+  keysBefore,
+  values,
+}: {
+  current: FilterParam;
+  keysAhead: FilterField[];
+  keysBefore: string[];
+  values: string[];
+}): FilterParam {
   if (keysAhead.length === 1 && keysBefore.length === 0) {
     return values;
   }
@@ -454,7 +459,7 @@ function NestedListSelection({
       keys={keysBefore}
       onChange={(values) => {
         const topLevelFilterId = keysAhead[keysAhead.length - 1]!;
-        const filterParam = updateNestedSelection(current, keysAhead, keysBefore, values);
+        const filterParam = updateNestedSelection({ current, keysAhead, keysBefore, values });
         setFilter(topLevelFilterId, filterParam);
       }}
       {...(keysAhead.length > 1
@@ -962,12 +967,17 @@ function RangeFilter({
   );
 }
 
-function toggleVoteRange(
-  field: number,
-  min: number | undefined,
-  max: number | undefined,
-  isChecked: boolean,
-): string[] {
+function toggleVoteRange({
+  field,
+  min,
+  max,
+  isChecked,
+}: {
+  field: number;
+  min: number | undefined;
+  max: number | undefined;
+  isChecked: boolean;
+}): string[] {
   if (!isChecked) {
     return [
       (min && min < field ? min : field).toString(),
@@ -1019,7 +1029,7 @@ function ThumbsUpDownVoteFilter({
               checked={isChecked}
               onClick={(e) => {
                 e.stopPropagation();
-                onChange(toggleVoteRange(field, min, max, isChecked));
+                onChange(toggleVoteRange({ field, min, max, isChecked }));
               }}
             >
               <Text fontSize="sm">{label}</Text>

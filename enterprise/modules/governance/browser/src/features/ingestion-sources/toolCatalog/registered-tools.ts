@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { AiToolEntry, AiToolTileType } from "../../ai-tools/model/ai-tool-tile.ts";
-import { TOOL_CARD_ROWS, type ToolCard, type ToolCardBadge, type ToolCardRow } from "./toolCards";
+import { TOOL_CARD_ROWS, type ToolCard, type ToolCardBadge, type ToolCardRow } from "./tool-cards";
 
 /**
  * Turning the organization's tool registry into catalog cards.

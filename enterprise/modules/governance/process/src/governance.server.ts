@@ -228,7 +228,11 @@ export function createIngestionPullExecution(options: {
   outcome: IngestionPullOutcomeChannel;
   metrics: IngestionPullMetricsSink;
 }): IngestionPullService {
-  return IngestionPullService.create(options.run, options.outcome, options.metrics);
+  return IngestionPullService.create({
+    runPort: options.run,
+    outcomePort: options.outcome,
+    metrics: options.metrics,
+  });
 }
 
 /**

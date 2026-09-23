@@ -4,13 +4,13 @@ import { Badge, Box, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { ToolCardFigure, ToolCardMark } from "./tool-card-figure";
-import { ToolCatalogTable } from "./tool-catalog-table";
 import {
   TOOL_CARD_BADGE_LABEL,
   TOOL_CARD_ROW_META,
   type ToolCard,
   toolCardMissingReason,
-} from "./toolCards";
+} from "./tool-cards";
+import { ToolCatalogTable } from "./tool-catalog-table";
 
 /**
  * The registered-tools catalog, drawn.

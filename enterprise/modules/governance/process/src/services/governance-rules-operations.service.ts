@@ -34,12 +34,17 @@ export class GovernanceRulesOperationsService {
     this.aiTools = aiTools;
   }
 
-  static create(
-    anomalyRules: AnomalyRuleService,
-    departments: DepartmentService,
-    policy: PostgresGovernancePolicyService,
-    aiTools: DefaultGovernanceAiToolCatalogService,
-  ): GovernanceRulesOperationsService {
+  static create({
+    anomalyRules,
+    departments,
+    policy,
+    aiTools,
+  }: {
+    anomalyRules: AnomalyRuleService;
+    departments: DepartmentService;
+    policy: PostgresGovernancePolicyService;
+    aiTools: DefaultGovernanceAiToolCatalogService;
+  }): GovernanceRulesOperationsService {
     return new GovernanceRulesOperationsService({ anomalyRules, departments, policy, aiTools });
   }
 

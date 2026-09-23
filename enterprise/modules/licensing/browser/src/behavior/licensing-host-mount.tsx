@@ -22,15 +22,35 @@ import {
 import { licensingApi } from "./licensing-api.ts";
 
 class CapabilityLicensingHost extends LicensingHostApi {
-  constructor(
-    private readonly orgId: string | undefined,
-    private readonly deploymentIsSaaS: boolean,
-    private readonly purchaseUrl: string | undefined,
-    private readonly invalidate: () => void,
-    private readonly feedback: UiFeedback,
-    private readonly mayManageOrganization: boolean,
-  ) {
+  private readonly orgId: string | undefined;
+  private readonly deploymentIsSaaS: boolean;
+  private readonly purchaseUrl: string | undefined;
+  private readonly invalidate: () => void;
+  private readonly feedback: UiFeedback;
+  private readonly mayManageOrganization: boolean;
+
+  constructor({
+    orgId,
+    deploymentIsSaaS,
+    purchaseUrl,
+    invalidate,
+    feedback,
+    mayManageOrganization,
+  }: {
+    orgId: string | undefined;
+    deploymentIsSaaS: boolean;
+    purchaseUrl: string | undefined;
+    invalidate: () => void;
+    feedback: UiFeedback;
+    mayManageOrganization: boolean;
+  }) {
     super();
+    this.orgId = orgId;
+    this.deploymentIsSaaS = deploymentIsSaaS;
+    this.purchaseUrl = purchaseUrl;
+    this.invalidate = invalidate;
+    this.feedback = feedback;
+    this.mayManageOrganization = mayManageOrganization;
   }
 
   organizationId(): string | undefined {
@@ -85,14 +105,14 @@ export default function LicensingHostMount({ children }: { children?: ReactNode 
 
   const host = useMemo(
     () =>
-      new CapabilityLicensingHost(
-        organizationId ?? void 0,
-        deployment.isSaaS,
-        void 0,
-        () => void utils.invalidate(),
+      new CapabilityLicensingHost({
+        orgId: organizationId ?? void 0,
+        deploymentIsSaaS: deployment.isSaaS,
+        purchaseUrl: void 0,
+        invalidate: () => void utils.invalidate(),
         feedback,
         mayManageOrganization,
-      ),
+      }),
     [organizationId, deployment.isSaaS, utils, feedback, mayManageOrganization],
   );
 

@@ -8,11 +8,11 @@ import {
   EMPTY_INSIGHTS_COUNTS,
   type InsightsFolder,
   InsightsRail,
-} from "../../../features/insights/InsightsRail.tsx";
+} from "../../../features/insights/insights-rail.tsx";
 import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
-} from "../../../features/insights/InsightsSetupDrawer.tsx";
+} from "../../../features/insights/insights-setup-drawer.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
 /**
