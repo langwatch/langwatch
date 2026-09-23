@@ -70,7 +70,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [110](./110-grant-aggregates-are-grants.md)                       | A grant aggregate is a grant, not an organization                                           | Proposed (supersedes ADR-092 §13's aggregate choice) |
 | [131](./131-better-auth-is-a-boundary-over-identity-services.md) | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma | Accepted |
 | [136](./136-lwql-postgres-catalog-derived-opt-out.md) | The PostgreSQL half of the LangWatchQL catalog is derived from the Prisma manifest, opt-out | Accepted |
-| [141](./141-the-app-owns-the-lwql-access-model.md) | The app owns the LangWatchQL access model — no rendered copy | Accepted |
+| [141](./141-the-app-owns-the-lwql-access-model.md) | The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod | Accepted |
 
 ## When to Write an ADR
 
