@@ -288,38 +288,42 @@ $(cat "$err")"
     if job_doc "$only" | grep -q 'helm.sh/hook:'; then
       fail "topology-install-job-not-hook" "on install the render Job must be main-phase (no helm hook) so it reads DATABASE_URL from the main-phase PostgreSQL Secret on a first install."
     fi
-    # The RBAC (ServiceAccount/Role/RoleBinding) MUST be pre-install,pre-upgrade
-    # hooks at a lower weight than the Job: both they and the LWQL passwords are
-    # new in this version, so on a first upgrade from a pre-LWQL release neither
-    # exists in the main phase yet when the pre-upgrade hook Job runs.
-    if [[ "$(grep -c 'helm.sh/hook: pre-install,pre-upgrade' "$only")" -lt 3 ]]; then
-      fail "topology-rbac-hooks" "the render ServiceAccount/Role/RoleBinding must each be pre-install,pre-upgrade hooks so they back the pre-upgrade hook Job on a first upgrade."
+    # The RBAC (ServiceAccount/Role/RoleBinding) MUST be
+    # pre-install,pre-upgrade,pre-rollback hooks at a lower weight than the Job:
+    # both they and the LWQL passwords are new in this version, so on a first
+    # upgrade from a pre-LWQL release neither exists in the main phase yet when the
+    # pre-upgrade hook Job runs; pre-rollback so `helm rollback`/`--atomic` also
+    # has them before the pods roll.
+    if [[ "$(grep -c 'helm.sh/hook: pre-install,pre-upgrade,pre-rollback' "$only")" -lt 3 ]]; then
+      fail "topology-rbac-hooks" "the render ServiceAccount/Role/RoleBinding must each be pre-install,pre-upgrade,pre-rollback hooks so they back the pre-upgrade/pre-rollback hook Job."
     fi
     if ! grep -q 'helm.sh/hook-weight: "-10"' "$only"; then
       fail "topology-rbac-weight" "the render RBAC hooks must sit at a lower hook-weight (-10) than the Job so they are created first."
     fi
   fi
-  # On UPGRADE the render Job MUST be a pre-upgrade hook: the new access Secret
-  # has to be written BEFORE the StatefulSet's catalog annotation rolls the pods,
-  # or every subPath mount freezes the previous release's model. The input
-  # Secrets already exist on an upgrade, so the hook has what it needs.
+  # On UPGRADE (and ROLLBACK — both set .Release.IsUpgrade) the render Job MUST be
+  # a pre-upgrade,pre-rollback hook: the new access Secret has to be written
+  # BEFORE the StatefulSet's catalog annotation rolls the pods, or every subPath
+  # mount freezes the previous release's model. Rollback reverts the annotation
+  # and rolls the pods too, so it needs the same pre-hook render. The input
+  # Secrets already exist on an upgrade/rollback, so the hook has what it needs.
   local upgrade_only="${TMPDIR:-/tmp}/lwql-render-upgrade-only.yaml"
   if helm template lw . --is-upgrade --set autogen.enabled=true \
        --show-only templates/clickhouse/lwql-access-render.yaml >"$upgrade_only" 2>/dev/null; then
-    if ! job_doc "$upgrade_only" | grep -q 'helm.sh/hook: pre-upgrade'; then
-      fail "topology-upgrade-hook" "on upgrade the render Job must be a pre-upgrade hook so the new access Secret lands before the StatefulSet roll."
+    if ! job_doc "$upgrade_only" | grep -q 'helm.sh/hook: pre-upgrade,pre-rollback'; then
+      fail "topology-upgrade-hook" "on upgrade/rollback the render Job must be a pre-upgrade,pre-rollback hook so the new access Secret lands before the StatefulSet roll."
     fi
   else
     fail "topology-upgrade-render" "the access-render template failed to render with --is-upgrade."
   fi
-  # The LWQL password Secret must ALSO be a pre-install,pre-upgrade hook carrying
-  # both keys, so the render Job finds the passwords on a first upgrade before the
-  # main phase would heal the app Secret with them.
+  # The LWQL password Secret must ALSO be a pre-install,pre-upgrade,pre-rollback
+  # hook carrying both keys, so the render Job finds the passwords on a first
+  # upgrade (and on rollback) before the main phase would heal the app Secret.
   local pw_only="${TMPDIR:-/tmp}/lwql-passwords-only.yaml"
   if helm template lw . --set autogen.enabled=true \
        --show-only templates/lwql-passwords-secret.yaml >"$pw_only" 2>/dev/null; then
-    if ! grep -q 'helm.sh/hook: pre-install,pre-upgrade' "$pw_only"; then
-      fail "topology-passwords-hook" "the LWQL password Secret must be a pre-install,pre-upgrade hook."
+    if ! grep -q 'helm.sh/hook: pre-install,pre-upgrade,pre-rollback' "$pw_only"; then
+      fail "topology-passwords-hook" "the LWQL password Secret must be a pre-install,pre-upgrade,pre-rollback hook."
     fi
     if ! grep -q 'LWQL_CLICKHOUSE_PASSWORD:' "$pw_only" || ! grep -q 'LWQL_POSTGRES_READER_PASSWORD:' "$pw_only"; then
       fail "topology-passwords-keys" "the LWQL password Secret must carry both LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD."
@@ -366,4 +370,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one render Job (main-phase on install, pre-upgrade hook on upgrade) with its RBAC and the LWQL password Secret as pre-install,pre-upgrade hooks at a lower weight, a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"
+echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one render Job (main-phase on install, pre-upgrade,pre-rollback hook on upgrade/rollback) with its RBAC and the LWQL password Secret as pre-install,pre-upgrade,pre-rollback hooks at a lower weight, a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"

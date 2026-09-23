@@ -933,7 +933,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      Where the passwords live: an operator-supplied `secrets.existingSecret`
      carries them; otherwise, when the chart generates them (autogen), they are
      in the chart-owned `langwatch.lwql.passwordSecretName` Secret — a
-     pre-install,pre-upgrade hook, so the render Job finds them on a first upgrade
+     pre-install,pre-upgrade,pre-rollback hook, so the render Job finds them on a first upgrade
      before the app Secret is healed (see templates/lwql-passwords-secret.yaml);
      with autogen off and no existingSecret the operator hand-creates the app
      Secret, so they come from there. All three pre-exist before the render hook.
@@ -1282,9 +1282,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   Name of the Secret the LangWatchQL access-render Job writes and every
   chart-managed ClickHouse pod mounts (issue #8258). Holds the two rendered
   files `lwql-access.yaml` (users.d) and `lwql-named-collection.yaml` (config.d).
-  The subchart mount in values.yaml calls this helper directly: statefulset.yaml
-  renders extraVolumes through `tpl (toYaml .) $`, so `$` is the parent context
-  and the helper resolves there — one source of truth, no literal to keep in sync.
+  The subchart mount reads this through `clickhouse.lwqlAccess.secretName`, which
+  values.yaml sets to `{{ include "langwatch.lwql.accessSecretName" $ }}`; the
+  ClickHouse subchart's `templates/statefulset.yaml` resolves it with
+  `tpl .Values.lwqlAccess.secretName $`, so `$` is the parent context and the
+  helper resolves there — one source of truth, no literal to keep in sync.
 */}}
 {{- define "langwatch.lwql.accessSecretName" -}}
   {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
@@ -1293,7 +1295,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/*
   Name of the chart-owned Secret holding the two LWQL passwords
   (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) when the chart
-  generates them (autogen, no existingSecret). It is a pre-install,pre-upgrade
+  generates them (autogen, no existingSecret). It is a pre-install,pre-upgrade,pre-rollback
   hook (templates/lwql-passwords-secret.yaml) so the passwords exist before the
   render Job on a first upgrade, when the app Secret has not yet been healed with
   the keys. sharedEnv resolves the LWQL passwords to this Secret on the autogen

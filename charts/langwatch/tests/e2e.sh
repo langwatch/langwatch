@@ -480,7 +480,7 @@ test_lwql() {
   # Job read from the chart-owned LWQL password Secret and wrote into the mounted
   # user file as its password_sha256_hex.
   local lwql_pw
-  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   local p
@@ -724,7 +724,7 @@ test_lwql_replicas() {
   app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
     -o jsonpath='{.items[0].metadata.name}')
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
-  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   local pod_count
@@ -881,16 +881,26 @@ test_lwql_upgrade_from_main() {
 
   # Strip the release back to a pre-LWQL state: delete the render RBAC and the
   # chart-owned LWQL password Secret. (The app Secret already carries no LWQL keys
-  # in this version — they live only in langwatch-lwql-passwords — so there is
+  # in this version — they live only in the ${RELEASE}-lwql-passwords Secret — so there is
   # nothing to strip there.) The next `helm upgrade` now hits the same
   # missing-inputs state a real customer's first upgrade does.
   info "Reproducing the pre-LWQL state: deleting render RBAC and the LWQL password Secret"
   kc delete serviceaccount "${RELEASE}-lwql-access-render" --ignore-not-found
   kc delete role "${RELEASE}-lwql-access-render" --ignore-not-found
   kc delete rolebinding "${RELEASE}-lwql-access-render" --ignore-not-found
-  kc delete secret "langwatch-lwql-passwords" --ignore-not-found
+  kc delete secret "${RELEASE}-lwql-passwords" --ignore-not-found
+  # Assert the strip actually removed the objects BEFORE upgrading. If a name here
+  # drifts from the chart, `kc delete --ignore-not-found` is a no-op and the
+  # objects survive — then the upgrade is not testing the pre-LWQL path at all.
+  # These assertions fail loudly in that case instead of passing silently.
   assert_eq "pre-LWQL state: no LWQL password Secret before upgrade" \
-    "$(kc get secret langwatch-lwql-passwords -o name 2>/dev/null || echo missing)" "missing"
+    "$(kc get secret ${RELEASE}-lwql-passwords -o name 2>/dev/null || echo missing)" "missing"
+  assert_eq "pre-LWQL state: no render ServiceAccount before upgrade" \
+    "$(kc get serviceaccount ${RELEASE}-lwql-access-render -o name 2>/dev/null || echo missing)" "missing"
+  assert_eq "pre-LWQL state: no render Role before upgrade" \
+    "$(kc get role ${RELEASE}-lwql-access-render -o name 2>/dev/null || echo missing)" "missing"
+  assert_eq "pre-LWQL state: no render RoleBinding before upgrade" \
+    "$(kc get rolebinding ${RELEASE}-lwql-access-render -o name 2>/dev/null || echo missing)" "missing"
 
   # The first upgrade. --wait-for-jobs so a failed pre-upgrade hook Job fails the
   # upgrade (helm awaits hook Jobs; without the RBAC/password-secret hooks this
@@ -911,8 +921,8 @@ test_lwql_upgrade_from_main() {
   # completed.
   assert_render_job_complete
   assert_eq "pre-upgrade hook recreated the LWQL password Secret" \
-    "$(kc get secret langwatch-lwql-passwords -o name 2>/dev/null || echo missing)" \
-    "secret/langwatch-lwql-passwords"
+    "$(kc get secret ${RELEASE}-lwql-passwords -o name 2>/dev/null || echo missing)" \
+    "secret/${RELEASE}-lwql-passwords"
 
   # Every ClickHouse pod serves the tenant-filtered query with the FRESHLY
   # rendered identity — its password comes from the recreated password Secret, so
@@ -923,7 +933,7 @@ test_lwql_upgrade_from_main() {
   app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
     -o jsonpath='{.items[0].metadata.name}')
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
-  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   for p in $pods; do

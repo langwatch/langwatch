@@ -31,12 +31,13 @@
   Phasing. The render reads LWQL_CLICKHOUSE_PASSWORD,
   LWQL_POSTGRES_READER_PASSWORD (the chart-owned LWQL password Secret
   `<release>-lwql-passwords`) and DATABASE_URL (the PostgreSQL Secret). The Job
-  runs MAIN-PHASE on install and as a PRE-UPGRADE HOOK on upgrade (keyed on
-  .Release.IsUpgrade); every input it needs is in place before it runs on both
-  paths:
+  runs MAIN-PHASE on install and as a PRE-UPGRADE/PRE-ROLLBACK HOOK on upgrade or
+  rollback (keyed on .Release.IsUpgrade, which Helm sets for both); every input
+  it needs is in place before it runs on both paths:
 
   - RBAC (ServiceAccount, Role, RoleBinding) and the LWQL password Secret are
-    `pre-install,pre-upgrade` hooks at a lower hook-weight (-10) than the Job (5),
+    `pre-install,pre-upgrade,pre-rollback` hooks at a lower hook-weight (-10) than
+    the Job (5),
     with `before-hook-creation` and NOT `hook-succeeded`, so they PERSIST into the
     main phase — backing the main-phase install Job (and, for the passwords, the
     app Deployment and workers) as well as the pre-upgrade hook Job. The password
@@ -114,7 +115,7 @@ metadata:
   # version, so on a first upgrade from a pre-LWQL release it does not exist in
   # the main phase yet when the pre-upgrade hook runs.
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook: pre-install,pre-upgrade,pre-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation
 # The render Job calls the Kubernetes API to write the access Secret, so its
@@ -130,7 +131,7 @@ metadata:
   # Same hook treatment as the ServiceAccount above, so the Role exists before
   # the Job on install and on the first upgrade alike.
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook: pre-install,pre-upgrade,pre-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation
 rules:
@@ -157,7 +158,7 @@ metadata:
     {{- include "langwatch.labels" . | nindent 4 }}
   # Same hook treatment as the ServiceAccount and Role above.
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook: pre-install,pre-upgrade,pre-rollback
     helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation
 subjects:
@@ -179,16 +180,18 @@ metadata:
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
   {{- if .Release.IsUpgrade }}
-  # On upgrade only, run as a pre-upgrade hook so the new access Secret is
-  # written BEFORE the StatefulSet's catalog annotation rolls the ClickHouse
-  # pods against it — otherwise the roll freezes the previous release's model
-  # into every subPath mount. On install this block is absent and the Job runs
-  # in the main phase, the only phase where DATABASE_URL (the PostgreSQL Secret)
-  # exists on a first install. The RBAC above and the chart-owned LWQL password
-  # Secret are pre-install,pre-upgrade hooks at a lower weight, so they back both
-  # the main-phase install Job and this pre-upgrade hook.
+  # On upgrade and rollback (both set .Release.IsUpgrade), run as a
+  # pre-upgrade/pre-rollback hook so the new access Secret is written BEFORE the
+  # StatefulSet's catalog annotation rolls the ClickHouse pods against it —
+  # otherwise the roll freezes the previous release's model into every subPath
+  # mount. Rollback reverts the annotation and rolls pods too, so it needs the
+  # same pre-hook render. On install this block is absent and the Job runs in the
+  # main phase, the only phase where DATABASE_URL (the PostgreSQL Secret) exists
+  # on a first install. The RBAC above and the chart-owned LWQL password Secret
+  # are pre-install,pre-upgrade,pre-rollback hooks at a lower weight, so they back
+  # the main-phase install Job and this pre-upgrade/pre-rollback hook alike.
   annotations:
-    helm.sh/hook: pre-upgrade
+    helm.sh/hook: pre-upgrade,pre-rollback
     helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation
   {{- end }}
