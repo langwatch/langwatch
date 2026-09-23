@@ -42,20 +42,20 @@ export async function runMigrations(
   // resolve to the same binary — the inner one finds it via PATH, which
   // the env block above already prepends with ctx.paths.bin.
   const pnpm = await resolvePnpm(ctx.paths);
-  await execAndPipe(
+  await execAndPipe({
     bus,
-    "migrate:prisma",
-    pnpm.command,
-    [...pnpm.args, "run", "task", "prisma-migrate"],
-    { cwd: tasksDir, env },
-  );
-  await execAndPipe(
+    service: "migrate:prisma",
+    bin: pnpm.command,
+    args: [...pnpm.args, "run", "task", "prisma-migrate"],
+    options: { cwd: tasksDir, env },
+  });
+  await execAndPipe({
     bus,
-    "migrate:clickhouse",
-    pnpm.command,
-    [...pnpm.args, "run", "task", "clickhouse-migrate"],
-    { cwd: tasksDir, env },
-  );
+    service: "migrate:clickhouse",
+    bin: pnpm.command,
+    args: [...pnpm.args, "run", "task", "clickhouse-migrate"],
+    options: { cwd: tasksDir, env },
+  });
 
   bus.emit({
     type: "healthy",

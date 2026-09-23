@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 
 import { execa } from "execa";
+import * as tar from "tar";
 
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
@@ -88,9 +89,8 @@ export function makePostgresPredep(development: LocalOrchestratorDevelopmentConf
       const target = join(paths.bin, "postgres");
       mkdirSync(target, { recursive: true });
       const url = downloadUrl(platform);
-      const tar = await import("tar");
       const tmp = join(paths.bin, `.postgres-${PG_VERSION}-${platform}.tar.gz`);
-      await downloadWithProgress(url, tmp, task, `downloading postgres ${PG_VERSION}`);
+      await downloadWithProgress({ url, tmp, task, prefix: `downloading postgres ${PG_VERSION}` });
 
       task.output = "verifying sha256";
       const expectedRes = await fetch(`${url}.sha256`);

@@ -228,13 +228,19 @@ export class PrismaGatewayBudgetScopeTargetRepository {
    * kind costs at most one findMany. VK, GROUP and PRINCIPAL lookups pin
    * organizationId so a stray scopeId can't surface another tenant's data.
    */
-  async resolveScopeTargetsBatch(
-    prisma: GatewayBudgetScopeTargetDatabase,
-    budgets: { scopeType: string; scopeId: string }[],
-    organizationId: string | null,
-    projects: ProjectIdentity[],
-    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
-  ): Promise<Map<string, BudgetScopeTargetInfo>> {
+  async resolveScopeTargetsBatch({
+    prisma,
+    budgets,
+    organizationId,
+    projects,
+    virtualKeyProjectScopes,
+  }: {
+    prisma: GatewayBudgetScopeTargetDatabase;
+    budgets: { scopeType: string; scopeId: string }[];
+    organizationId: string | null;
+    projects: ProjectIdentity[];
+    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[];
+  }): Promise<Map<string, BudgetScopeTargetInfo>> {
     const ids: Record<string, Set<string>> = {
       ORGANIZATION: new Set(),
       TEAM: new Set(),

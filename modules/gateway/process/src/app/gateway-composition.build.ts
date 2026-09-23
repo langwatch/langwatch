@@ -1,4 +1,4 @@
-import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzPermission, ApiKeyPermissionScope } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
@@ -102,7 +102,7 @@ class GatewayAuthzScopePermissions implements GatewayScopePermissions {
 
   sessionHolds(input: {
     userId: string;
-    permission: Parameters<AuthzApi["hasPermission"]>[0]["permission"];
+    permission: AuthzPermission;
     scope: GatewayPermissionScope;
   }): Promise<boolean> {
     const scope = authzScopeOf(input.scope);
@@ -111,14 +111,14 @@ class GatewayAuthzScopePermissions implements GatewayScopePermissions {
       userId: input.userId,
       permission: input.permission,
       ...scope,
-    } as Parameters<AuthzApi["hasPermission"]>[0]);
+    });
   }
 
   apiKeyHolds(input: {
     apiKeyId: string;
     userId: string | null;
     organizationId: string;
-    permission: Parameters<AuthzApi["hasPermission"]>[0]["permission"];
+    permission: AuthzPermission;
     scope: GatewayPermissionScope;
   }): Promise<boolean> {
     return this.authz.hasApiKeyPermission({

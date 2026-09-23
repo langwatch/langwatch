@@ -66,7 +66,12 @@ export const goosePredep: Predep = {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
     const target = join(paths.bin, "goose");
-    await downloadWithProgress(url, target, task, `downloading goose ${GOOSE_VERSION}`);
+    await downloadWithProgress({
+      url,
+      tmp: target,
+      task,
+      prefix: `downloading goose ${GOOSE_VERSION}`,
+    });
     chmodSync(target, 0o755);
     const version = (await resolveVersion(target)) ?? "unknown";
     return { version, resolvedPath: target };

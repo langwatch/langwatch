@@ -7,12 +7,17 @@ import { nowInstant } from "@langwatch/time";
 import type { PredepTask } from "./types.ts";
 
 // Download URL to disk with progress reporting. Throttled for spinner updates.
-export async function downloadWithProgress(
-  url: string,
-  tmp: string,
-  task: PredepTask,
-  prefix: string,
-): Promise<void> {
+export async function downloadWithProgress({
+  url,
+  tmp,
+  task,
+  prefix,
+}: {
+  url: string;
+  tmp: string;
+  task: PredepTask;
+  prefix: string;
+}): Promise<void> {
   const res = await fetch(url);
   if (!res.ok || !res.body) {
     throw new Error(`${prefix} download failed (${url}): HTTP ${res.status}`);

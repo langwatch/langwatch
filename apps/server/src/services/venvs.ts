@@ -47,18 +47,18 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
 
       mkdirSync(venvDir, { recursive: true });
       const extraArgs = (spec.extras ?? []).flatMap((e) => ["--extra", e]);
-      await execAndPipe(
+      await execAndPipe({
         bus,
-        `prepare:${spec.name}`,
-        uvBin,
-        ["sync", "--project", spec.projectDir, ...extraArgs],
-        {
+        service: `prepare:${spec.name}`,
+        bin: uvBin,
+        args: ["sync", "--project", spec.projectDir, ...extraArgs],
+        options: {
           env: {
             ...process.env,
             UV_PROJECT_ENVIRONMENT: venvDir,
           },
         },
-      );
+      });
       writeFileSync(hashFile, expected);
       bus.emit({
         type: "healthy",

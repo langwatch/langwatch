@@ -116,7 +116,12 @@ export function makeAigatewayPredep({
 
       const url = downloadUrl(version, platform);
       try {
-        await downloadWithProgress(url, out, task, `downloading langwatch ai-gateway ${version}`);
+        await downloadWithProgress({
+          url,
+          tmp: out,
+          task,
+          prefix: `downloading langwatch ai-gateway ${version}`,
+        });
         chmodSync(out, 0o755);
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };

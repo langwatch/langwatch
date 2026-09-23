@@ -78,7 +78,7 @@ export const pnpmPredep: Predep = {
   async install({ platform, paths, task }: InstallContext) {
     const url = downloadUrl(platform);
     const bin = join(paths.bin, "pnpm");
-    await downloadWithProgress(url, bin, task, `downloading pnpm ${PNPM_VERSION}`);
+    await downloadWithProgress({ url, tmp: bin, task, prefix: `downloading pnpm ${PNPM_VERSION}` });
     chmodSync(bin, 0o755);
     const version = (await resolveVersion(bin)) ?? "unknown";
     if (version !== PNPM_VERSION) {

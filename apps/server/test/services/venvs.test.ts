@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const execCalls: { bin: string; args: string[] }[] = [];
 
 vi.mock("../../src/services/_pipe-to-bus.ts", () => ({
-  execAndPipe: vi.fn(async (_bus: unknown, _name: string, bin: string, args: string[]) => {
+  execAndPipe: vi.fn(async ({ bin, args }: { bin: string; args: string[] }) => {
     execCalls.push({ bin, args });
   }),
 }));

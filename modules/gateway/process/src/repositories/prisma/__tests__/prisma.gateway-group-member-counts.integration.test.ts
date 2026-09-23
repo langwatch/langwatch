@@ -92,16 +92,16 @@ describe.skipIf(!DB_URL)("gateway group member counts", () => {
   describe("when budget scope targets are resolved for group budgets", () => {
     it("carries each group's member count", async () => {
       const targets =
-        await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch(
+        await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch({
           prisma,
-          [
+          budgets: [
             { scopeType: "GROUP", scopeId: busyGroupId },
             { scopeType: "GROUP", scopeId: emptyGroupId },
           ],
           organizationId,
-          [],
-          [],
-        );
+          projects: [],
+          virtualKeyProjectScopes: [],
+        });
 
       expect([...targets.values()].map(({ id, memberCount }) => ({ id, memberCount }))).toEqual(
         expect.arrayContaining([

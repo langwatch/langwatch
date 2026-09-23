@@ -58,7 +58,7 @@ export const redisPredep: Predep = {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
     const tmp = join(paths.bin, `.redis-${REDIS_VERSION}-${platform}.tar.gz`);
-    await downloadWithProgress(url, tmp, task, `downloading redis ${REDIS_VERSION}`);
+    await downloadWithProgress({ url, tmp, task, prefix: `downloading redis ${REDIS_VERSION}` });
 
     task.output = "verifying sha256";
     const expectedRes = await fetch(`${url}.sha256`);

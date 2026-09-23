@@ -115,10 +115,12 @@ export async function ensureLangwatchDeps(
   if (!installFresh) {
     // Install dev deps first (prisma and vite need them), then prune in the second pass.
     // --filter keeps install to app + dependencies only, excluding SDK/compiler/tests.
-    await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
-      ...pnpm.args,
-      ...workspaceInstallArgs(rootDir, { prod: false }),
-    ]);
+    await execAndPipe({
+      bus,
+      service: "prepare:langwatch",
+      bin: pnpm.command,
+      args: [...pnpm.args, ...workspaceInstallArgs(rootDir, { prod: false })],
+    });
   }
 
   // Published npm tarballs ship dist/ pre-built (see
@@ -131,38 +133,37 @@ export async function ensureLangwatchDeps(
     // below reaches), then the browser bundle — without dist/client every
     // browser route 404s. Neither Node process is built; both run from source.
     for (const script of ["start:prepare:files", "ensure:built"]) {
-      await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
-        ...pnpm.args,
-        "-C",
-        rootDir,
-        "run",
-        script,
-      ]);
+      await execAndPipe({
+        bus,
+        service: "prepare:langwatch",
+        bin: pnpm.command,
+        args: [...pnpm.args, "-C", rootDir, "run", script],
+      });
     }
-    await execAndPipe(
+    await execAndPipe({
       bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, "-C", rootDir, "--filter", "@langwatch/ui...", "run", "build"],
-      {
+      service: "prepare:langwatch",
+      bin: pnpm.command,
+      args: [...pnpm.args, "-C", rootDir, "--filter", "@langwatch/ui...", "run", "build"],
+      options: {
         env: {
           ...process.env,
           NODE_ENV: "production",
         },
       },
-    );
+    });
   }
 
   // Prune dev dependencies (vite, vitest, playwright); keep prisma for migrations.
   // Only on relocated copy; dev checkout keeps its own build tooling intact.
   if (shouldPruneToProd(apiDir, ctx.paths)) {
-    await execAndPipe(
+    await execAndPipe({
       bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, ...workspaceInstallArgs(rootDir, { prod: true })],
-      { env: { ...process.env, CI: "true" } },
-    );
+      service: "prepare:langwatch",
+      bin: pnpm.command,
+      args: [...pnpm.args, ...workspaceInstallArgs(rootDir, { prod: true })],
+      options: { env: { ...process.env, CI: "true" } },
+    });
   }
 
   // pnpm install does not auto-generate the prisma client, and prune removes
@@ -170,16 +171,21 @@ export async function ensureLangwatchDeps(
   // extraneous — the Dockerfile regenerates after pruning for the same
   // reason). One post-prune generate covers every path that needs it.
   if (!prismaClientGenerated(rootNodeModules, nodeModulesPath)) {
-    await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
-      ...pnpm.args,
-      "-C",
-      apiDir,
-      "exec",
-      "prisma",
-      "generate",
-      "--config",
-      "./prisma.config.ts",
-    ]);
+    await execAndPipe({
+      bus,
+      service: "prepare:langwatch",
+      bin: pnpm.command,
+      args: [
+        ...pnpm.args,
+        "-C",
+        apiDir,
+        "exec",
+        "prisma",
+        "generate",
+        "--config",
+        "./prisma.config.ts",
+      ],
+    });
   }
 
   // Link external members' peers to app-resolved instances; only on relocated copy.

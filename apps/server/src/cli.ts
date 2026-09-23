@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 
 import chalk from "chalk";
 import { Command } from "commander";
@@ -13,6 +13,7 @@ import {
 import { streamEventsToTTY } from "./animation/log-tee.ts";
 import { openBrowser } from "./animation/open-browser.ts";
 import { resolveLocalOrchestratorConfig } from "./platform/config/local-orchestrator.config.ts";
+import { detectConflicts } from "./port-conflict/detect.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
@@ -218,7 +219,6 @@ program
     printDoctorTable(rows);
     const base = Number.parseInt(opts.portBase, 10);
     const ports = allocatePorts(base);
-    const { detectConflicts } = await import("./port-conflict/detect.ts");
     const conflicts = await detectConflicts(base);
     console.log(chalk.bold(`Ports (port-base=${base})`));
     for (const [k, v] of Object.entries(ports)) {
@@ -283,7 +283,6 @@ program
       console.log(chalk.yellow("Aborted."));
       process.exit(0);
     }
-    const { rmSync } = await import("node:fs");
     rmSync(paths.root, { recursive: true, force: true });
     console.log(chalk.green(`✓ removed ${paths.root}`));
   });

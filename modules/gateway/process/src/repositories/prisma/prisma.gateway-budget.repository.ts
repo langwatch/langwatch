@@ -325,13 +325,13 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
     const targets =
-      await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch(
-        this.prisma,
+      await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch({
+        prisma: this.prisma,
         budgets,
         organizationId,
         projects,
         virtualKeyProjectScopes,
-      );
+      });
 
     return new Map(targets);
   }

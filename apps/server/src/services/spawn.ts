@@ -162,21 +162,26 @@ function spawnAttempt(state: SupervisionState): void {
   // chunk still flushing through readline (spawn.integration.test's
   // flaky 'row-2' assertion).
   const pipesDrained: Promise<void>[] = [
-    pipeLines(child, "stdout", state.spec.name, logStream, state.bus),
-    pipeLines(child, "stderr", state.spec.name, logStream, state.bus),
+    pipeLines({ child, streamName: "stdout", service: state.spec.name, logStream, bus: state.bus }),
+    pipeLines({ child, streamName: "stderr", service: state.spec.name, logStream, bus: state.bus }),
   ];
 
   restartSteadyTimer(state);
-  wireChildTermination(state, child, logStream, pipesDrained);
+  wireChildTermination({ state, child, logStream, pipesDrained });
 }
 
 // Wire child termination. Both exit and spawn error funnel to handleExit.
-function wireChildTermination(
-  state: SupervisionState,
-  child: ChildProcess,
-  logStream: WriteStream,
-  pipesDrained: Promise<void>[],
-): void {
+function wireChildTermination({
+  state,
+  child,
+  logStream,
+  pipesDrained,
+}: {
+  state: SupervisionState;
+  child: ChildProcess;
+  logStream: WriteStream;
+  pipesDrained: Promise<void>[];
+}): void {
   let settled = false;
   const settleOnce = (code: number | null, signal: NodeJS.Signals | null): void => {
     if (settled) return;
@@ -295,13 +300,19 @@ async function killWithEscalation(child: ChildProcess): Promise<void> {
   await waitForExit(child, 5_000);
 }
 
-function pipeLines(
-  child: ChildProcess,
-  streamName: "stdout" | "stderr",
-  service: ServiceName,
-  logStream: WriteStream,
-  bus: EventBus,
-): Promise<void> {
+function pipeLines({
+  child,
+  streamName,
+  service,
+  logStream,
+  bus,
+}: {
+  child: ChildProcess;
+  streamName: "stdout" | "stderr";
+  service: ServiceName;
+  logStream: WriteStream;
+  bus: EventBus;
+}): Promise<void> {
   const stream = child[streamName];
   if (!stream) return Promise.resolve();
   const rl = createInterface({ input: stream });

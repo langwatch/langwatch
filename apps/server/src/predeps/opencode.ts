@@ -70,14 +70,19 @@ async function detectOpencode(
   return { installed: true, version: v ?? "unknown", resolvedPath: bundled };
 }
 
-async function installFromTarball(
-  url: string,
-  binDir: string,
-  task: PredepTask,
-  label: string,
-): Promise<void> {
+async function installFromTarball({
+  url,
+  binDir,
+  task,
+  label,
+}: {
+  url: string;
+  binDir: string;
+  task: PredepTask;
+  label: string;
+}): Promise<void> {
   const tmp = join(binDir, `.opencode-${OPENCODE_VERSION}.tgz`);
-  await downloadWithProgress(url, tmp, task, label);
+  await downloadWithProgress({ url, tmp, task, prefix: label });
   task.output = "extracting";
   // The archive holds a single `opencode` binary at its root; the exact-match
   // filter is what keeps anything else from landing in bin/.
@@ -85,15 +90,20 @@ async function installFromTarball(
   rmSync(tmp, { force: true });
 }
 
-async function installFromZip(
-  url: string,
-  binDir: string,
-  task: PredepTask,
-  label: string,
-): Promise<void> {
+async function installFromZip({
+  url,
+  binDir,
+  task,
+  label,
+}: {
+  url: string;
+  binDir: string;
+  task: PredepTask;
+  label: string;
+}): Promise<void> {
   const out = join(binDir, "opencode");
   const tmp = join(binDir, `.opencode-${OPENCODE_VERSION}.zip`);
-  await downloadWithProgress(url, tmp, task, label);
+  await downloadWithProgress({ url, tmp, task, prefix: label });
   task.output = "extracting";
   // Node ships no zip reader; `unzip` is present on macOS by default.
   // Extract to a staging dir so a multi-entry archive cannot scatter
@@ -140,9 +150,9 @@ export function makeOpencodePredep({ isEnabled }: { isEnabled: boolean }): Prede
       const label = `downloading langy assistant runtime ${OPENCODE_VERSION}`;
 
       if (src.kind === "tarball") {
-        await installFromTarball(src.url, paths.bin, task, label);
+        await installFromTarball({ url: src.url, binDir: paths.bin, task, label });
       } else {
-        await installFromZip(src.url, paths.bin, task, label);
+        await installFromZip({ url: src.url, binDir: paths.bin, task, label });
       }
 
       if (!existsSync(out)) {
