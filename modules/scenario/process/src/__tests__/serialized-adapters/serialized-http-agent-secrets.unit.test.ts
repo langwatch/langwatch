@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,
-} from "../support/test-scenario-http.port.ts";
+} from "../support/test-scenario-http.fixture.ts";
 
 vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({

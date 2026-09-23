@@ -15,7 +15,7 @@ import { NullSimulationRepository } from "../repositories/simulation.repository.
 import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
-import { RecordEvaluationsCommand } from "./recordEvaluations.command.ts";
+import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
 import {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDefinition,

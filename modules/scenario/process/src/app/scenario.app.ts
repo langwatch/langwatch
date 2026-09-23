@@ -1,6 +1,10 @@
 import { on, type EventEmitter } from "node:events";
 
-import { AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentApi,
+  type AgentTestRunResult,
+  type AgentTestTurnResult,
+} from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -21,6 +25,8 @@ import {
   type CodeScenario,
   type ResolveScenarioRunParametersInput,
   type ResolvedScenarioRunParameters,
+  type ResolvedScenarioRunParametersForScenario,
+  type ScenarioReferenceState,
   type ResultAtom,
   type ResultsFilter,
   type ResultsGroupBy,
@@ -319,7 +325,7 @@ export class ScenarioApp implements ScenarioApi {
     this.#dependencies = rest;
   }
 
-  testAgentTurn(input: TestAgentTurnInput) {
+  testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
     return this.#dependencies.agentTesting.sendTurn(input);
   }
 
@@ -364,7 +370,7 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.events.archive(input);
   }
 
-  testAgentRun(input: TestAgentRunInput) {
+  testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
     return this.#dependencies.agentTesting.scheduleRun(input);
   }
 
@@ -391,11 +397,14 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.scenarios.listTestSuites(input);
   }
 
-  getReferenceStates(input: { ids: string[]; projectId: string }) {
+  getReferenceStates(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<ScenarioReferenceState[]> {
     return this.#dependencies.scenarios.getReferenceStates(input);
   }
 
-  getRunConfigs(input: { ids: string[]; projectId: string }) {
+  getRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]> {
     return this.#dependencies.scenarios.getRunConfigs(input);
   }
 
@@ -406,7 +415,7 @@ export class ScenarioApp implements ScenarioApi {
   resolveRunParametersForScenarios(input: {
     scenarios: ScenarioRunConfig[];
     values?: RunParameterValues;
-  }) {
+  }): Promise<ResolvedScenarioRunParametersForScenario[]> {
     return this.#dependencies.scenarios.resolveRunParametersForScenarios(input);
   }
 

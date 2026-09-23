@@ -378,7 +378,10 @@ export class SimulationRunStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    SimulationRunStateData,
+    "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  > {
     return {
       ScenarioRunId: "",
       ScenarioId: "",

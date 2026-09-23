@@ -154,13 +154,19 @@ export class ClickHouseSimulationRunStateRepository<
     };
   }
 
-  private mapProjectionDataToClickHouseRecord(
-    data: SimulationRunStateData,
-    tenantId: string,
-    projectionId: string,
-    projectionVersion: string,
-    scenarioRunId: string,
-  ): ClickHouseSimulationRunWriteRecord {
+  private mapProjectionDataToClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    projectionVersion,
+    scenarioRunId,
+  }: {
+    data: SimulationRunStateData;
+    tenantId: string;
+    projectionId: string;
+    projectionVersion: string;
+    scenarioRunId: string;
+  }): ClickHouseSimulationRunWriteRecord {
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -324,13 +330,13 @@ export class ClickHouseSimulationRunStateRepository<
 
     try {
       const scenarioRunId = String(projection.aggregateId);
-      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-        projection.data as SimulationRunStateData,
-        String(context.tenantId),
-        projection.id,
-        projection.version,
+      const projectionRecord = this.mapProjectionDataToClickHouseRecord({
+        data: projection.data as SimulationRunStateData,
+        tenantId: String(context.tenantId),
+        projectionId: projection.id,
+        projectionVersion: projection.version,
         scenarioRunId,
-      );
+      });
 
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { scenarios?: number | null }
@@ -406,13 +412,13 @@ export class ClickHouseSimulationRunStateRepository<
       const retentionDays = retentionPolicy?.scenarios ?? this.options.defaultRetentionDays;
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
-        const record = this.mapProjectionDataToClickHouseRecord(
-          projection.data as SimulationRunStateData,
-          String(context.tenantId),
-          projection.id,
-          projection.version,
+        const record = this.mapProjectionDataToClickHouseRecord({
+          data: projection.data as SimulationRunStateData,
+          tenantId: String(context.tenantId),
+          projectionId: projection.id,
+          projectionVersion: projection.version,
           scenarioRunId,
-        );
+        });
         record._retention_days = retentionDays;
         return record;
       });

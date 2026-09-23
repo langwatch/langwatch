@@ -11,7 +11,7 @@ import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createOtelEchoServer } from "./support/otel-echo-server.ts";
-import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.port.ts";
+import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.fixture.ts";
 
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
 

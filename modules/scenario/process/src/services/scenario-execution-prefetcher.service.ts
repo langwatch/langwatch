@@ -93,22 +93,34 @@ export class ScenarioExecutionPrefetcherService {
     });
     const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
 
-    return new ScenarioExecutionPrefetcherService(
+    return new ScenarioExecutionPrefetcherService({
       options,
       runSecrets,
       lookups,
       targets,
       completion,
-    );
+    });
   }
 
-  private constructor(
-    private readonly options: ScenarioExecutionPrefetcherServiceOptions,
-    private readonly runSecrets: ScenarioRunSecretsService,
-    private readonly lookups: ScenarioExecutionLookupService,
-    private readonly targets: ScenarioTargetPrefetchService,
-    private readonly completion: ScenarioPrefetchCompletionService,
-  ) {}
+  private readonly options: ScenarioExecutionPrefetcherServiceOptions;
+  private readonly runSecrets: ScenarioRunSecretsService;
+  private readonly lookups: ScenarioExecutionLookupService;
+  private readonly targets: ScenarioTargetPrefetchService;
+  private readonly completion: ScenarioPrefetchCompletionService;
+
+  private constructor(collaborators: {
+    options: ScenarioExecutionPrefetcherServiceOptions;
+    runSecrets: ScenarioRunSecretsService;
+    lookups: ScenarioExecutionLookupService;
+    targets: ScenarioTargetPrefetchService;
+    completion: ScenarioPrefetchCompletionService;
+  }) {
+    this.options = collaborators.options;
+    this.runSecrets = collaborators.runSecrets;
+    this.lookups = collaborators.lookups;
+    this.targets = collaborators.targets;
+    this.completion = collaborators.completion;
+  }
 
   // Arrow instance properties, not prototype methods: tests hold a bare
   // Object.create(prototype) instance and monkey-patch these directly to

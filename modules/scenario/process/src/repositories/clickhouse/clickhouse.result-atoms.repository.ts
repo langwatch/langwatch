@@ -349,7 +349,7 @@ type RawAtomQueryRow = Omit<RawAtomRow, "Status"> & { Status: string };
 /**
  * Narrow duck-typed slice of `ClickHouseClient` this repository reads
  * through, so the composition root can hand it the same routed-tenant
- * client v1's `SimulationReadClient` already composes, with no cast.
+ * client v1's `SimulationClickHouseClient` already composes, with no cast.
  */
 export type ResultAtomsClickHouseClient = {
   query(input: {

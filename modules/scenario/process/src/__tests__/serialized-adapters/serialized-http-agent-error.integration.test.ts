@@ -10,7 +10,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.port.ts";
+import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.fixture.ts";
 
 // ---------------------------------------------------------------------------
 // Shared constants

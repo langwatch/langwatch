@@ -14,7 +14,7 @@ export {
   RecordEvaluationsCommand,
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
-} from "./eventing/recordEvaluations.command.ts";
+} from "./eventing/record-evaluations.commands.ts";
 export * from "./services/litellm-model.service.ts";
 export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.service.ts";
 export * from "./services/node-scenario-child-process.service.ts";
@@ -39,7 +39,7 @@ export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
 } from "./eventing/simulation-processing.pipeline.ts";
-export { SimulationProcessingProducerPipeline as SimulationProcessingProducerAdapter } from "./eventing/simulation-processing-producer.pipeline.ts";
+export { SimulationProcessingProducerPipeline } from "./eventing/simulation-processing-producer.pipeline.ts";
 export {
   ScenarioApp,
   scenarioAppDependencyTokens,
@@ -89,7 +89,7 @@ export { RunConfigurationsClickHouseRepository } from "./repositories/clickhouse
 export { type RawRunConfigurationRow } from "./repositories/run-configurations.repository.ts";
 export {
   SimulationClickHouseRepository,
-  type SimulationClickHouseClient as SimulationReadClient,
+  type SimulationClickHouseClient,
 } from "./repositories/clickhouse/simulation-clickhouse.repository.ts";
 export { SimulationExecutionRepository } from "./repositories/simulation-execution.repository.ts";
 export { MemoryResultAtomsRepository } from "./repositories/memory/memory.result-atoms.repository.ts";

@@ -140,12 +140,17 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
  * verdict, plus — for a column-target comparison — the target's own row
  * keyed by its own id, since the target IS the evaluator for this shape.
  */
-export const buildTargetEvaluatorsForRow = (
-  target: TargetConfig,
-  evaluators: EvaluatorConfig[],
-  results: EvaluationResults,
-  rowIndex: number,
-): Record<string, unknown> =>
+export const buildTargetEvaluatorsForRow = ({
+  target,
+  evaluators,
+  results,
+  rowIndex,
+}: {
+  target: TargetConfig;
+  evaluators: EvaluatorConfig[];
+  results: EvaluationResults;
+  rowIndex: number;
+}): Record<string, unknown> =>
   Object.fromEntries([
     ...evaluators.map(
       (evaluator) =>
@@ -1223,7 +1228,12 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: buildTargetEvaluatorsForRow(target, evaluators, results, index),
+              evaluators: buildTargetEvaluatorsForRow({
+                target,
+                evaluators,
+                results,
+                rowIndex: index,
+              }),
               // Error for this target/row: the engine's raw string, plus the
               // code the cell reads its customer-facing copy from.
               error: results.errors[target.id]?.[index] ?? null,

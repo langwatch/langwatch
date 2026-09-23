@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
-import { RecordEvaluationsCommand } from "../recordEvaluations.command.ts";
+import { RecordEvaluationsCommand } from "../record-evaluations.commands.ts";
 import { SimulationProcessingPipelineAdapter } from "../simulation-processing.pipeline.ts";
 import {
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,

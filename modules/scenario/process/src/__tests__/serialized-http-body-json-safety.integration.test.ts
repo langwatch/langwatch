@@ -8,7 +8,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.port.ts";
+import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.fixture.ts";
 
 interface N8nLikeServer {
   url: string;

@@ -1,6 +1,9 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import type { scenarioGenerateRequestSchema } from "@langwatch/scenario-contract";
+import type {
+  ScenarioGenerateResponse,
+  scenarioGenerateRequestSchema,
+} from "@langwatch/scenario-contract";
 import {
   scenarioGenerateResultSchema,
   ScenarioGenerationFailedError,
@@ -63,7 +66,9 @@ export class ScenarioGenerationService {
     return new ScenarioGenerationService(dependencies);
   }
 
-  async generate(input: z.infer<typeof scenarioGenerateRequestSchema>) {
+  async generate(
+    input: z.infer<typeof scenarioGenerateRequestSchema>,
+  ): Promise<ScenarioGenerateResponse> {
     const { projectId, prompt, currentScenario } = input;
     await this.#dependencies.bounds.assertGenerateWithinBounds({ projectId });
 

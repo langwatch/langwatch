@@ -13,7 +13,7 @@ import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract"
 
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
-import { RecordEvaluationsCommand } from "./recordEvaluations.command.ts";
+import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
 import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
 import {
   SimulationRunMetricsMapProjection,
