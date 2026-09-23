@@ -98,13 +98,19 @@ function relativeGap(a: number, b: number): number {
  * sides price are compared for value — a field one side carries alone is a
  * coverage difference, not a wrong number.
  */
-function compareEntry(
-  modelId: string,
-  origin: "overlay" | "generated",
-  catalog: LLMModelPricing,
-  upstream: LLMModelPricing,
-  source: string,
-): { mismatch: UnitMismatch | null; disagreements: PriceDisagreement[] } {
+function compareEntry({
+  modelId,
+  origin,
+  catalog,
+  upstream,
+  source,
+}: {
+  modelId: string;
+  origin: "overlay" | "generated";
+  catalog: LLMModelPricing;
+  upstream: LLMModelPricing;
+  source: string;
+}): { mismatch: UnitMismatch | null; disagreements: PriceDisagreement[] } {
   const catalogUnits = pricedUnits(catalog);
   const upstreamUnits = pricedUnits(upstream);
 
@@ -164,7 +170,13 @@ export function auditCatalog({
       for (const [source, byId] of Object.entries(upstream)) {
         const upstreamPricing = byId[modelId];
         if (!upstreamPricing) continue;
-        const result = compareEntry(modelId, origin, entry.pricing, upstreamPricing, source);
+        const result = compareEntry({
+          modelId,
+          origin,
+          catalog: entry.pricing,
+          upstream: upstreamPricing,
+          source,
+        });
         if (result.mismatch) unitMismatch.push(result.mismatch);
         into.push(...result.disagreements);
       }

@@ -23,15 +23,39 @@ import {
 } from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyRotationService {
-  private constructor(
-    private readonly transactions: GatewayTransaction,
-    private readonly repository: GatewayVirtualKeyRepository,
-    private readonly changeEvents: GatewayChangeEvents,
-    private readonly auditLog: GatewayAudit,
-    private readonly crypto: GatewayVirtualKeyCrypto,
-    private readonly validation: VirtualKeyValidationService,
-    private readonly governanceSignals?: GatewayGovernanceSignals,
-  ) {}
+  private readonly transactions: GatewayTransaction;
+  private readonly repository: GatewayVirtualKeyRepository;
+  private readonly changeEvents: GatewayChangeEvents;
+  private readonly auditLog: GatewayAudit;
+  private readonly crypto: GatewayVirtualKeyCrypto;
+  private readonly validation: VirtualKeyValidationService;
+  private readonly governanceSignals?: GatewayGovernanceSignals;
+
+  private constructor({
+    transactions,
+    repository,
+    changeEvents,
+    auditLog,
+    crypto,
+    validation,
+    governanceSignals,
+  }: {
+    transactions: GatewayTransaction;
+    repository: GatewayVirtualKeyRepository;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
+    crypto: GatewayVirtualKeyCrypto;
+    validation: VirtualKeyValidationService;
+    governanceSignals?: GatewayGovernanceSignals;
+  }) {
+    this.transactions = transactions;
+    this.repository = repository;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+    this.crypto = crypto;
+    this.validation = validation;
+    this.governanceSignals = governanceSignals;
+  }
 
   static create(input: {
     transactions: GatewayTransaction;
@@ -42,15 +66,15 @@ export class VirtualKeyRotationService {
     validation: VirtualKeyValidationService;
     governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyRotationService {
-    return new VirtualKeyRotationService(
-      input.transactions,
-      input.repository,
-      input.changeEvents,
-      input.auditLog,
-      input.crypto,
-      input.validation,
-      input.governanceSignals,
-    );
+    return new VirtualKeyRotationService({
+      transactions: input.transactions,
+      repository: input.repository,
+      changeEvents: input.changeEvents,
+      auditLog: input.auditLog,
+      crypto: input.crypto,
+      validation: input.validation,
+      governanceSignals: input.governanceSignals,
+    });
   }
 
   async rotate(input: RotateVirtualKeyInput): Promise<CreatedVirtualKey> {

@@ -29,8 +29,9 @@ export class MemorySessionMetricSeriesRepository extends SessionMetricSeriesRepo
       const existing = this.memory.metricSeries.findIndex(
         (held) => held.tenantId === record.tenantId && held.seriesId === record.seriesId,
       );
+      const heldAsOfUnixMs = this.memory.metricSeries[existing]?.asOfUnixMs ?? 0;
       if (existing === -1) this.memory.metricSeries.push(record);
-      else if ((this.memory.metricSeries[existing]?.asOfUnixMs ?? 0) <= record.asOfUnixMs) {
+      else if (heldAsOfUnixMs <= record.asOfUnixMs) {
         this.memory.metricSeries[existing] = record;
       }
     }

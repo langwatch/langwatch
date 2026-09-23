@@ -275,13 +275,13 @@ export class ModelProviderDefaultsService {
     expandModel = true,
   ): ModelDefaultEffective | null {
     for (const tier of DEFAULT_TIERS) {
-      const configured = this.findConfigured(configs, chain, key, tier, expandModel);
+      const configured = this.findConfigured({ configs, chain, key, tier, expandModel });
       if (configured) {
         return configured;
       }
 
       if (role !== key) {
-        const fallback = this.findConfigured(configs, chain, role, tier, expandModel);
+        const fallback = this.findConfigured({ configs, chain, key: role, tier, expandModel });
         if (fallback) {
           return fallback;
         }
@@ -291,13 +291,19 @@ export class ModelProviderDefaultsService {
     return null;
   }
 
-  private findConfigured(
-    configs: ModelDefaultConfig[],
-    chain: ModelDefaultScope[],
-    key: string,
-    tier: (typeof DEFAULT_TIERS)[number],
-    expandModel: boolean,
-  ): ModelDefaultEffective | null {
+  private findConfigured({
+    configs,
+    chain,
+    key,
+    tier,
+    expandModel,
+  }: {
+    configs: ModelDefaultConfig[];
+    chain: ModelDefaultScope[];
+    key: string;
+    tier: (typeof DEFAULT_TIERS)[number];
+    expandModel: boolean;
+  }): ModelDefaultEffective | null {
     const scopeIds = new Set(
       chain.filter((scope) => scope.scopeType === tier.type).map((scope) => scope.scopeId),
     );

@@ -25,6 +25,7 @@ import {
 import type {
   WebhookEndpointRuntime,
   WebhookEndpointServiceOptions,
+  WebhookEndpointStatusSnapshot,
 } from "../webhook-endpoint.repository.ts";
 import {
   type MemoryWebhookDatabase,
@@ -592,7 +593,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return secrets;
   }
 
-  async findStatusSnapshot(params: { organizationId: string; endpointId: string }) {
+  async findStatusSnapshot(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot | null> {
     const endpoint = this.#database.findEndpoint(params.endpointId);
     if (
       !endpoint ||
@@ -750,7 +754,20 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     endpointId: string;
     limit?: number;
     cursor?: { firedAt: Instant; id: string };
-  }) {
+  }): Promise<{
+    deliveries: {
+      id: string;
+      dispatchId: string;
+      attempt: number;
+      eventCount: number;
+      outcome: WebhookDeliveryOutcome;
+      responseStatus: number | null;
+      latencyMs: number | null;
+      error: string | null;
+      firedAt: Instant;
+    }[];
+    nextCursor: { firedAt: Instant; id: string } | null;
+  }> {
     this.#live(params);
     const limit = Math.min(params.limit ?? 25, 200);
     const cursorFiredAtMs = params.cursor ? toDate(params.cursor.firedAt).getTime() : null;
@@ -790,7 +807,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     };
   }
 
-  async health(params: { organizationId: string; endpointId: string }) {
+  async health(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot> {
     return statusSnapshotOf(this.#live(params));
   }
 

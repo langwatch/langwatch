@@ -53,12 +53,27 @@ export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 export class GatewayService {
   private readonly reachPolicy = GatewayBudgetScopeReachService.create();
 
-  private constructor(
-    private readonly repository: GatewayBudgetRepository,
-    private readonly projects: ProjectApi,
-    private readonly cacheRules: GatewayCacheRuleService,
-    private readonly guardrails: GatewayGuardrailService,
-  ) {}
+  private readonly repository: GatewayBudgetRepository;
+  private readonly projects: ProjectApi;
+  private readonly cacheRules: GatewayCacheRuleService;
+  private readonly guardrails: GatewayGuardrailService;
+
+  private constructor({
+    repository,
+    projects,
+    cacheRules,
+    guardrails,
+  }: {
+    repository: GatewayBudgetRepository;
+    projects: ProjectApi;
+    cacheRules: GatewayCacheRuleService;
+    guardrails: GatewayGuardrailService;
+  }) {
+    this.repository = repository;
+    this.projects = projects;
+    this.cacheRules = cacheRules;
+    this.guardrails = guardrails;
+  }
 
   static create(input: {
     repository: GatewayBudgetRepository;
@@ -66,7 +81,12 @@ export class GatewayService {
     cacheRules: GatewayCacheRuleService;
     guardrails: GatewayGuardrailService;
   }): GatewayService {
-    return new GatewayService(input.repository, input.projects, input.cacheRules, input.guardrails);
+    return new GatewayService({
+      repository: input.repository,
+      projects: input.projects,
+      cacheRules: input.cacheRules,
+      guardrails: input.guardrails,
+    });
   }
 
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
@@ -377,7 +397,7 @@ export class GatewayService {
       return;
     }
 
-    const scopeType = kind === "TEAM" ? "team" : kind === "PROJECT" ? "project" : "group";
+    const scopeType = unreachableScopeTypeOf(kind);
 
     throw new GatewayBudgetScopeUnreachableError({
       scopeType,
@@ -431,3 +451,8 @@ export type {
   GatewayBudgetWithSeats,
   UpdateBudgetInput,
 };
+
+function unreachableScopeTypeOf(kind: "TEAM" | "PROJECT" | "GROUP") {
+  if (kind === "TEAM") return "team";
+  return kind === "PROJECT" ? "project" : "group";
+}

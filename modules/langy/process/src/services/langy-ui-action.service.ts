@@ -39,9 +39,9 @@ const BACKEND_CLAIMANT = "langy:backend";
 const logger = createLogger("langwatch:langy:ui-actions");
 
 export const uiActionKeys = {
-  pending: (actionId: string) => `langy:ui:pending:${actionId}`,
-  claim: (actionId: string) => `langy:ui:claim:${actionId}`,
-  result: (actionId: string) => `langy:ui:result:${actionId}`,
+  pending: (actionId: string): string => `langy:ui:pending:${actionId}`,
+  claim: (actionId: string): string => `langy:ui:claim:${actionId}`,
+  result: (actionId: string): string => `langy:ui:result:${actionId}`,
 };
 
 /** What the pending record pins: where the action belongs. */

@@ -18,12 +18,27 @@ type AiToolCliCatalogReader = {
 };
 
 export class DefaultGovernanceCliBootstrapService {
-  private constructor(
-    private readonly catalog: AiToolCliCatalogReader,
-    private readonly budgets: CliBudgetOverviewReader,
-    private readonly contacts: CliAdminContactReader,
-    private readonly gatewayUrl: string,
-  ) {}
+  private readonly catalog: AiToolCliCatalogReader;
+  private readonly budgets: CliBudgetOverviewReader;
+  private readonly contacts: CliAdminContactReader;
+  private readonly gatewayUrl: string;
+
+  private constructor({
+    catalog,
+    budgets,
+    contacts,
+    gatewayUrl,
+  }: {
+    catalog: AiToolCliCatalogReader;
+    budgets: CliBudgetOverviewReader;
+    contacts: CliAdminContactReader;
+    gatewayUrl: string;
+  }) {
+    this.catalog = catalog;
+    this.budgets = budgets;
+    this.contacts = contacts;
+    this.gatewayUrl = gatewayUrl;
+  }
 
   static create(options: {
     catalog: AiToolCliCatalogReader;
@@ -31,12 +46,12 @@ export class DefaultGovernanceCliBootstrapService {
     contacts: CliAdminContactReader;
     gatewayUrl: string;
   }): DefaultGovernanceCliBootstrapService {
-    return new DefaultGovernanceCliBootstrapService(
-      options.catalog,
-      options.budgets,
-      options.contacts,
-      options.gatewayUrl,
-    );
+    return new DefaultGovernanceCliBootstrapService({
+      catalog: options.catalog,
+      budgets: options.budgets,
+      contacts: options.contacts,
+      gatewayUrl: options.gatewayUrl,
+    });
   }
 
   async resolve(input: CliBootstrapInput): Promise<CliBootstrapResult> {

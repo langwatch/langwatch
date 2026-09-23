@@ -17,12 +17,27 @@ export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: stri
 export type LangyNavigateOrganizationUrl = (input: { path: string }) => string;
 
 export class LangyNavigateFallbackService {
-  private constructor(
-    private readonly projects: LangyNavigateProject,
-    private readonly platformUrl: LangyNavigatePlatformUrl,
-    private readonly organizationUrl: LangyNavigateOrganizationUrl,
-    private readonly resources: LangyNavigateResourceLocator | undefined,
-  ) {}
+  private readonly projects: LangyNavigateProject;
+  private readonly platformUrl: LangyNavigatePlatformUrl;
+  private readonly organizationUrl: LangyNavigateOrganizationUrl;
+  private readonly resources: LangyNavigateResourceLocator | undefined;
+
+  private constructor({
+    projects,
+    platformUrl,
+    organizationUrl,
+    resources,
+  }: {
+    projects: LangyNavigateProject;
+    platformUrl: LangyNavigatePlatformUrl;
+    organizationUrl: LangyNavigateOrganizationUrl;
+    resources: LangyNavigateResourceLocator | undefined;
+  }) {
+    this.projects = projects;
+    this.platformUrl = platformUrl;
+    this.organizationUrl = organizationUrl;
+    this.resources = resources;
+  }
 
   static create(deps: {
     projects: LangyNavigateProject;
@@ -34,12 +49,12 @@ export class LangyNavigateFallbackService {
      */
     resources?: LangyNavigateResourceLocator;
   }): LangyNavigateFallbackService {
-    return new LangyNavigateFallbackService(
-      deps.projects,
-      deps.platformUrl,
-      deps.organizationUrl,
-      deps.resources,
-    );
+    return new LangyNavigateFallbackService({
+      projects: deps.projects,
+      platformUrl: deps.platformUrl,
+      organizationUrl: deps.organizationUrl,
+      resources: deps.resources,
+    });
   }
 
   /**

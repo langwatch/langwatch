@@ -56,14 +56,35 @@ export { ADOPTABLE_CONVERSATION_ID };
  * ADR-133 (the flagged "contract-service" shape); now the sole definition.
  */
 export class LangyService {
-  private constructor(
-    private readonly feedbackPrompt: LangyFeedbackPromptPolicy,
-    private readonly conversations: LangyConversationService,
-    private readonly turns: LangyTurnService,
-    private readonly messages: LangyMessageService,
-    private readonly credentials: LangyCredentialService,
-    private readonly openRelay: OpenLangyRelay | null = null,
-  ) {}
+  private readonly feedbackPrompt: LangyFeedbackPromptPolicy;
+  private readonly conversations: LangyConversationService;
+  private readonly turns: LangyTurnService;
+  private readonly messages: LangyMessageService;
+  private readonly credentials: LangyCredentialService;
+  private readonly openRelay: OpenLangyRelay | null;
+
+  private constructor({
+    feedbackPrompt,
+    conversations,
+    turns,
+    messages,
+    credentials,
+    openRelay = null,
+  }: {
+    feedbackPrompt: LangyFeedbackPromptPolicy;
+    conversations: LangyConversationService;
+    turns: LangyTurnService;
+    messages: LangyMessageService;
+    credentials: LangyCredentialService;
+    openRelay?: OpenLangyRelay | null;
+  }) {
+    this.feedbackPrompt = feedbackPrompt;
+    this.conversations = conversations;
+    this.turns = turns;
+    this.messages = messages;
+    this.credentials = credentials;
+    this.openRelay = openRelay;
+  }
 
   /** Builds the process-owned capability from the complete Langy services. */
   static create(options: {
@@ -74,14 +95,14 @@ export class LangyService {
     feedbackPrompt: LangyFeedbackPromptPolicy;
     openRelay?: OpenLangyRelay;
   }): LangyService {
-    return new LangyService(
-      options.feedbackPrompt,
-      options.conversations,
-      options.turns,
-      options.messages,
-      options.credentials,
-      options.openRelay ?? null,
-    );
+    return new LangyService({
+      feedbackPrompt: options.feedbackPrompt,
+      conversations: options.conversations,
+      turns: options.turns,
+      messages: options.messages,
+      credentials: options.credentials,
+      openRelay: options.openRelay ?? null,
+    });
   }
 
   openRelayConnection(): LangyRelayConnection {

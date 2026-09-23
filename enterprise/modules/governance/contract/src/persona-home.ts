@@ -137,11 +137,8 @@ export class PersonaHomeResolverService {
   }
 
   private mapPersonaToDestination(persona: Persona, input: PersonaResolverInput): string {
-    const projectHome = input.firstProjectSlug
-      ? `/${input.firstProjectSlug}`
-      : input.hasGovernanceUi
-        ? "/me"
-        : "/onboarding/welcome";
+    const noProjectHome = input.hasGovernanceUi ? "/me" : "/onboarding/welcome";
+    const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : noProjectHome;
 
     if (!input.hasGovernanceUi) return projectHome;
     switch (persona) {

@@ -55,8 +55,8 @@ export const endpointDtoSchema = z.discriminatedUnion("destination_kind", [
 ]);
 
 export const endpointWithSecretDtoSchema = z.discriminatedUnion("destination_kind", [
-  httpEndpointDtoSchema.extend({ secret: z.string() }),
-  sqsEndpointDtoSchema.extend({ secret: z.string() }),
+  z.object({ ...httpEndpointDtoSchema.shape, secret: z.string() }),
+  z.object({ ...sqsEndpointDtoSchema.shape, secret: z.string() }),
 ]);
 
 export const deliveryDtoSchema = z.object({

@@ -38,20 +38,35 @@ export class GithubPullRequestMappingService {
     demand: GithubBranchDemandService;
     maintenance: GithubBranchMaintenanceService;
   }): GithubPullRequestMappingService {
-    return new GithubPullRequestMappingService(
-      deps.repository,
-      deps.branches,
-      deps.demand,
-      deps.maintenance,
-    );
+    return new GithubPullRequestMappingService({
+      repository: deps.repository,
+      branches: deps.branches,
+      demand: deps.demand,
+      maintenance: deps.maintenance,
+    });
   }
 
-  private constructor(
-    private readonly repository: GithubPullRequestsRepository,
-    private readonly branches: GithubBranchMappingService,
-    private readonly demand: GithubBranchDemandService,
-    private readonly maintenance: GithubBranchMaintenanceService,
-  ) {}
+  private readonly repository: GithubPullRequestsRepository;
+  private readonly branches: GithubBranchMappingService;
+  private readonly demand: GithubBranchDemandService;
+  private readonly maintenance: GithubBranchMaintenanceService;
+
+  private constructor({
+    repository,
+    branches,
+    demand,
+    maintenance,
+  }: {
+    repository: GithubPullRequestsRepository;
+    branches: GithubBranchMappingService;
+    demand: GithubBranchDemandService;
+    maintenance: GithubBranchMaintenanceService;
+  }) {
+    this.repository = repository;
+    this.branches = branches;
+    this.demand = demand;
+    this.maintenance = maintenance;
+  }
 
   async findForBranches(input: {
     organizationId: string;

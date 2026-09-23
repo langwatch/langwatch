@@ -80,19 +80,55 @@ export class IngestionPullWorkerService {
     return CONVERSATION_ROUTING.get(sourceType)?.profile;
   }
 
-  private constructor(
-    private readonly sources: IngestionPullSourceReader,
-    private readonly registry: PullerRegistryService,
-    private readonly credentials: IngestionCredentialsService,
-    private readonly projects: GovernanceProjectDirectory,
-    private readonly sink: GovernanceOcsfEventSink,
-    private readonly usageEntitlement: PulledUsageEntitlements,
-    private readonly usageRecords: PulledUsageRecordService,
-    private readonly diagnostics: IngestionPullDiagnosticsSink,
-    private readonly traceIngestion: GovernanceTraceIngestionClient | undefined,
-    private readonly configuration: IngestionPullWorkerConfiguration,
-    private readonly now: () => number,
-  ) {}
+  private readonly sources: IngestionPullSourceReader;
+  private readonly registry: PullerRegistryService;
+  private readonly credentials: IngestionCredentialsService;
+  private readonly projects: GovernanceProjectDirectory;
+  private readonly sink: GovernanceOcsfEventSink;
+  private readonly usageEntitlement: PulledUsageEntitlements;
+  private readonly usageRecords: PulledUsageRecordService;
+  private readonly diagnostics: IngestionPullDiagnosticsSink;
+  private readonly traceIngestion: GovernanceTraceIngestionClient | undefined;
+  private readonly configuration: IngestionPullWorkerConfiguration;
+  private readonly now: () => number;
+
+  private constructor({
+    sources,
+    registry,
+    credentials,
+    projects,
+    sink,
+    usageEntitlement,
+    usageRecords,
+    diagnostics,
+    traceIngestion,
+    configuration,
+    now,
+  }: {
+    sources: IngestionPullSourceReader;
+    registry: PullerRegistryService;
+    credentials: IngestionCredentialsService;
+    projects: GovernanceProjectDirectory;
+    sink: GovernanceOcsfEventSink;
+    usageEntitlement: PulledUsageEntitlements;
+    usageRecords: PulledUsageRecordService;
+    diagnostics: IngestionPullDiagnosticsSink;
+    traceIngestion: GovernanceTraceIngestionClient | undefined;
+    configuration: IngestionPullWorkerConfiguration;
+    now: () => number;
+  }) {
+    this.sources = sources;
+    this.registry = registry;
+    this.credentials = credentials;
+    this.projects = projects;
+    this.sink = sink;
+    this.usageEntitlement = usageEntitlement;
+    this.usageRecords = usageRecords;
+    this.diagnostics = diagnostics;
+    this.traceIngestion = traceIngestion;
+    this.configuration = configuration;
+    this.now = now;
+  }
 
   static create(options: {
     sources: IngestionPullSourceReader;
@@ -107,19 +143,19 @@ export class IngestionPullWorkerService {
     configuration?: IngestionPullWorkerConfiguration;
     now?: () => number;
   }): IngestionPullWorkerService {
-    return new IngestionPullWorkerService(
-      options.sources,
-      options.registry,
-      options.credentials,
-      options.projects,
-      options.sink,
-      options.usageEntitlement,
-      options.usageRecords,
-      options.diagnostics,
-      options.traceIngestion,
-      options.configuration ?? IngestionPullWorkerConfiguration.create(),
-      options.now ?? Date.now,
-    );
+    return new IngestionPullWorkerService({
+      sources: options.sources,
+      registry: options.registry,
+      credentials: options.credentials,
+      projects: options.projects,
+      sink: options.sink,
+      usageEntitlement: options.usageEntitlement,
+      usageRecords: options.usageRecords,
+      diagnostics: options.diagnostics,
+      traceIngestion: options.traceIngestion,
+      configuration: options.configuration ?? IngestionPullWorkerConfiguration.create(),
+      now: options.now ?? Date.now,
+    });
   }
 
   async run(input: {

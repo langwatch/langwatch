@@ -63,7 +63,7 @@ export const modelMetadataForFrontendSchema = modelCatalogEntrySchema
     pricing: true,
     reasoningConfig: true,
   })
-  .extend({ parameterConstraints: parameterConstraintsSchema.optional() })
+  .safeExtend({ parameterConstraints: parameterConstraintsSchema.optional() })
   .strict();
 export type ModelMetadataForFrontend = z.infer<typeof modelMetadataForFrontendSchema>;
 

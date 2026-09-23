@@ -79,6 +79,8 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const isString = (value: unknown): value is string => typeof value === "string";
+
 /** The reason chain, defensively: anything without a code is not a reason. */
 const asReasons = (value: unknown): CliHandledErrorReason[] | undefined => {
   if (!Array.isArray(value)) return undefined;
@@ -157,30 +159,15 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     const telemetry = asRecord(serialized.telemetry);
     return {
       code: typeof serialized.code === "string" ? serialized.code : (serialized.kind as string),
-      message:
-        typeof record.error === "string"
-          ? record.error
-          : typeof record.message === "string"
-            ? record.message
-            : undefined,
+      message: [record.error, record.message].find(isString),
       meta: asRecord(serialized.meta) ?? {},
       retryable: serialized.retryable === true,
-      traceId:
-        typeof serialized.traceId === "string"
-          ? serialized.traceId
-          : typeof telemetry?.traceId === "string"
-            ? telemetry.traceId
-            : undefined,
+      traceId: [serialized.traceId, telemetry?.traceId].find(isString),
       traceUrl: typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
       logsUrl: typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
       reasons: asReasons(serialized.reasons),
       suggestions: asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
-      docUrl:
-        typeof serialized.docsUrl === "string"
-          ? serialized.docsUrl
-          : typeof serialized.docUrl === "string"
-            ? serialized.docUrl
-            : undefined,
+      docUrl: [serialized.docsUrl, serialized.docUrl].find(isString),
     };
   }
 
@@ -214,23 +201,12 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // failure; without any, this is not the platform's shape at all. The ordering guards a
   // hijack: dialect 1 spreads meta FLAT, so a meta bag holding a literal `code` (or `type`) key
   // would shadow the real discriminant on `error` if it were read first.
-  const named =
-    typeof record.kind === "string"
-      ? typeof record.code === "string"
-        ? record.code
-        : typeof record.type === "string"
-          ? record.type
-          : record.kind
-      : typeof record.error === "string"
-        ? record.error
-        : looksLikeErrorEnvelope(record)
-          ? typeof record.code === "string"
-            ? record.code
-            : typeof record.type === "string"
-              ? record.type
-              : null
-          : null;
-  if (named === null) return null;
+  const envelopeCode = [record.code, record.type].find(isString);
+  let named: string | undefined;
+  if (typeof record.kind === "string") named = envelopeCode ?? record.kind;
+  else if (typeof record.error === "string") named = record.error;
+  else if (looksLikeErrorEnvelope(record)) named = envelopeCode;
+  if (named === undefined) return null;
 
   // Everything the platform did NOT put in meta gets lifted out, so the flat
   // spread does not smuggle the envelope's own fields back in as domain context.
@@ -269,14 +245,11 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // usually just the code echoed back — server copy never crosses
   // the boundary (ADR-045) — so prose the server deliberately authored under
   const authored = nestedMeta?.message;
+  const authoredSentence =
+    typeof authored === "string" && authored.length > 0 ? authored : undefined;
   const sentence =
-    typeof authored === "string" && authored.length > 0
-      ? authored
-      : typeof message === "string" && message !== named
-        ? message
-        : typeof error === "string" && error !== named
-          ? error
-          : undefined;
+    authoredSentence ??
+    [message, error].find((text): text is string => typeof text === "string" && text !== named);
 
   const telemetryRecord = asRecord(telemetry);
   const traceRecord = asRecord(trace);
@@ -287,29 +260,12 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     // Dialect 3 carries meta as its own key; dialect 1 spreads it flat.
     meta: nestedMeta ?? rest,
     retryable: retryable === true,
-    traceId:
-      typeof traceRecord?.traceId === "string"
-        ? traceRecord.traceId
-        : typeof telemetryRecord?.traceId === "string"
-          ? telemetryRecord.traceId
-          : typeof traceId === "string"
-            ? traceId
-            : undefined,
-    traceUrl:
-      typeof traceUrl === "string"
-        ? traceUrl
-        : typeof traceRecord?.traceUrl === "string"
-          ? traceRecord.traceUrl
-          : undefined,
-    logsUrl:
-      typeof logsUrl === "string"
-        ? logsUrl
-        : typeof traceRecord?.logsUrl === "string"
-          ? traceRecord.logsUrl
-          : undefined,
+    traceId: [traceRecord?.traceId, telemetryRecord?.traceId, traceId].find(isString),
+    traceUrl: [traceUrl, traceRecord?.traceUrl].find(isString),
+    logsUrl: [logsUrl, traceRecord?.logsUrl].find(isString),
     reasons: asReasons(reasons),
     suggestions: asSuggestions(tips) ?? asSuggestions(suggestions),
-    docUrl: typeof docsUrl === "string" ? docsUrl : typeof docUrl === "string" ? docUrl : undefined,
+    docUrl: [docsUrl, docUrl].find(isString),
   };
 };
 
@@ -487,12 +443,7 @@ export const readCliErrorDocument = (output: unknown): CliHandledError | null =>
   if (!record || record.ok !== false) return null;
 
   const error = asRecord(record.error);
-  const code =
-    typeof error?.code === "string"
-      ? error.code
-      : typeof error?.kind === "string"
-        ? error.kind
-        : null;
+  const code = [error?.code, error?.kind].find(isString) ?? null;
   if (!error || code === null) return null;
 
   return {
@@ -532,12 +483,7 @@ const asAlreadyReadHandledError = (
   outer: Record<string, unknown> | null,
 ): CliHandledError | null => {
   if (!outer || outer.isLangWatchHandledError !== true) return null;
-  const code =
-    typeof outer.code === "string"
-      ? outer.code
-      : typeof outer.kind === "string"
-        ? outer.kind
-        : null;
+  const code = [outer.code, outer.kind].find(isString) ?? null;
   if (code === null) return null;
 
   return {

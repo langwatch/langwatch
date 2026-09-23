@@ -119,12 +119,8 @@ export function getReasoningConfig(modelId: string): ReasoningConfig | undefined
     }
   }
 
-  if (
-    lowerModelId.includes("anthropic/") &&
-    (lowerModelId.includes("claude-opus-4") ||
-      lowerModelId.includes("claude-4") ||
-      lowerModelId.includes("claude-5"))
-  ) {
+  const isLongThinkingClaude = includesAny(lowerModelId, ["claude-opus-4", "claude-4", "claude-5"]);
+  if (lowerModelId.includes("anthropic/") && isLongThinkingClaude) {
     return ANTHROPIC_CLAUDE_OPUS_45;
   }
 
@@ -140,17 +136,13 @@ export function getReasoningConfig(modelId: string): ReasoningConfig | undefined
     }
   }
 
-  if (
-    (lowerModelId.includes("xai/") || lowerModelId.includes("x-ai/")) &&
-    lowerModelId.includes("grok-3-mini")
-  ) {
+  const isXai = includesAny(lowerModelId, ["xai/", "x-ai/"]);
+  if (isXai && lowerModelId.includes("grok-3-mini")) {
     return XAI_GROK3_MINI;
   }
 
-  if (
-    lowerModelId.includes("deepseek/") &&
-    (lowerModelId.includes("-r1") || lowerModelId.includes("reasoner"))
-  ) {
+  const isDeepseekReasoner = includesAny(lowerModelId, ["-r1", "reasoner"]);
+  if (lowerModelId.includes("deepseek/") && isDeepseekReasoner) {
     return DEEPSEEK_R1;
   }
 
@@ -170,4 +162,8 @@ export function getAllowedReasoningValues(modelId: string): readonly ReasoningEf
 /** Default reasoning effort for a model, or undefined if it takes none. */
 export function getDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
   return getReasoningConfig(modelId)?.defaultValue;
+}
+
+function includesAny(text: string, needles: readonly string[]): boolean {
+  return needles.some((needle) => text.includes(needle));
 }

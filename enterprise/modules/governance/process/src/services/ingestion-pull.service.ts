@@ -19,12 +19,24 @@ export class IngestionPullService {
   private readonly maxAttempts: number;
   private readonly clock: () => number;
 
-  private constructor(
-    private readonly runPort: IngestionPullRunner,
-    private readonly outcomePort: IngestionPullOutcomeChannel,
-    private readonly metrics: IngestionPullMetricsSink,
-    options: { maxAttempts?: number; clock?: () => number } = {},
-  ) {
+  private readonly runPort: IngestionPullRunner;
+  private readonly outcomePort: IngestionPullOutcomeChannel;
+  private readonly metrics: IngestionPullMetricsSink;
+
+  private constructor({
+    runPort,
+    outcomePort,
+    metrics,
+    options = {},
+  }: {
+    runPort: IngestionPullRunner;
+    outcomePort: IngestionPullOutcomeChannel;
+    metrics: IngestionPullMetricsSink;
+    options?: { maxAttempts?: number; clock?: () => number };
+  }) {
+    this.runPort = runPort;
+    this.outcomePort = outcomePort;
+    this.metrics = metrics;
     this.maxAttempts = options.maxAttempts ?? INGESTION_PULL_MAX_ATTEMPTS;
     this.clock = options.clock ?? Date.now;
   }
@@ -35,7 +47,7 @@ export class IngestionPullService {
     metrics: IngestionPullMetricsSink,
     options: { maxAttempts?: number; clock?: () => number } = {},
   ): IngestionPullService {
-    return new IngestionPullService(runPort, outcomePort, metrics, options);
+    return new IngestionPullService({ runPort, outcomePort, metrics, options });
   }
 
   async execute(input: IngestionPullExecution): Promise<void> {

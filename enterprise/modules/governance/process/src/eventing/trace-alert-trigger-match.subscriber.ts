@@ -8,12 +8,27 @@ import {
 } from "../app/governance.members.ts";
 
 export class TraceAlertTriggerMatchSubscriber {
-  private constructor(
-    private readonly triggers: TraceAlertTriggerReader,
-    private readonly matches: TraceAlertTriggerMatchChannel,
-    private readonly originGuard: TraceAlertOriginGuard,
-    private readonly metrics: TraceAlertMetricsSink,
-  ) {}
+  private readonly triggers: TraceAlertTriggerReader;
+  private readonly matches: TraceAlertTriggerMatchChannel;
+  private readonly originGuard: TraceAlertOriginGuard;
+  private readonly metrics: TraceAlertMetricsSink;
+
+  private constructor({
+    triggers,
+    matches,
+    originGuard,
+    metrics,
+  }: {
+    triggers: TraceAlertTriggerReader;
+    matches: TraceAlertTriggerMatchChannel;
+    originGuard: TraceAlertOriginGuard;
+    metrics: TraceAlertMetricsSink;
+  }) {
+    this.triggers = triggers;
+    this.matches = matches;
+    this.originGuard = originGuard;
+    this.metrics = metrics;
+  }
 
   static create(options: {
     triggers: TraceAlertTriggerReader;
@@ -21,12 +36,12 @@ export class TraceAlertTriggerMatchSubscriber {
     originGuard: TraceAlertOriginGuard;
     metrics: TraceAlertMetricsSink;
   }): TraceAlertTriggerMatchSubscriber {
-    return new TraceAlertTriggerMatchSubscriber(
-      options.triggers,
-      options.matches,
-      options.originGuard,
-      options.metrics,
-    );
+    return new TraceAlertTriggerMatchSubscriber({
+      triggers: options.triggers,
+      matches: options.matches,
+      originGuard: options.originGuard,
+      metrics: options.metrics,
+    });
   }
 
   async handle(event: GovernanceTraceEvent, context: GovernanceTraceContext): Promise<void> {

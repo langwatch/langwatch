@@ -27,51 +27,8 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
         ttlMs: 60_000,
       },
     },
-    handle: async (event) => {
-      const point = event.data;
-      if (!isCodingAgentMetricName(point.metricName)) return;
-      // Histograms and summaries carry no scalar total; nothing the session
-      // vocabulary maps arrives as one today.
-      if (point.valueType === "none") return;
-
-      const attributes = parsePointAttributes(point.pointAttributesJson);
-      if (attributes === null) return;
-      const sessionKey = resolveConversationKey(attributes);
-      if (sessionKey === null) return;
-
-      const value =
-        point.valueType === "double"
-          ? point.valueDouble
-          : point.valueInt !== null
-            ? Number(point.valueInt)
-            : null;
-      if (value === null || !Number.isFinite(value)) return;
-
-      const isDelta = point.aggregationTemporality === "delta";
-
-      await deps.contributeMetricFacts({
-        tenantId: point.tenantId,
-        sessionId: sessionKey,
-        sessionKeySource: "provider",
-        agent: detectCodingAgent({
-          recordName: point.metricName,
-          scopeName: point.scopeName,
-          // Resource service.name is the only signal that separates Cowork
-          // from the Claude Code runtime it reuses; without it a session's
-          // metric contribution could first-writer-win the fold's agent to
-          // claude_code while its log contributions say claude_cowork.
-          serviceName: serviceNameFromResource(point.resourceAttributesJson),
-        }),
-        occurredAt: point.timeUnixMs,
-        seriesId: isDelta ? point.pointId : point.seriesId,
-        metricName: point.metricName,
-        unit: point.metricUnit || null,
-        attributes: liftScalarAttributes(attributes),
-        value,
-        dataPointCount: 1,
-        asOfUnixMs: point.timeUnixMs,
-      });
-    },
+    handle: (event) =>
+      dispatchMetricPoint({ event, contributeMetricFacts: deps.contributeMetricFacts }),
   };
 }
 
@@ -110,4 +67,52 @@ function serviceNameFromResource(json: string): string | null {
   const resource = parsePointAttributes(json);
   const serviceName = resource?.["service.name"];
   return typeof serviceName === "string" && serviceName.length > 0 ? serviceName : null;
+}
+
+async function dispatchMetricPoint({
+  event,
+  contributeMetricFacts,
+}: {
+  event: MetricProcessingEvent;
+  contributeMetricFacts: (data: ContributeMetricFactsCommandData) => Promise<void>;
+}): Promise<void> {
+  const point = event.data;
+  if (!isCodingAgentMetricName(point.metricName)) return;
+  // Histograms and summaries carry no scalar total; nothing the session
+  // vocabulary maps arrives as one today.
+  if (point.valueType === "none") return;
+
+  const attributes = parsePointAttributes(point.pointAttributesJson);
+  if (attributes === null) return;
+  const sessionKey = resolveConversationKey(attributes);
+  if (sessionKey === null) return;
+
+  const intValue = point.valueInt !== null ? Number(point.valueInt) : null;
+  const value = point.valueType === "double" ? point.valueDouble : intValue;
+  if (value === null || !Number.isFinite(value)) return;
+
+  const isDelta = point.aggregationTemporality === "delta";
+
+  await contributeMetricFacts({
+    tenantId: point.tenantId,
+    sessionId: sessionKey,
+    sessionKeySource: "provider",
+    agent: detectCodingAgent({
+      recordName: point.metricName,
+      scopeName: point.scopeName,
+      // Resource service.name is the only signal that separates Cowork
+      // from the Claude Code runtime it reuses; without it a session's
+      // metric contribution could first-writer-win the fold's agent to
+      // claude_code while its log contributions say claude_cowork.
+      serviceName: serviceNameFromResource(point.resourceAttributesJson),
+    }),
+    occurredAt: point.timeUnixMs,
+    seriesId: isDelta ? point.pointId : point.seriesId,
+    metricName: point.metricName,
+    unit: point.metricUnit || null,
+    attributes: liftScalarAttributes(attributes),
+    value,
+    dataPointCount: 1,
+    asOfUnixMs: point.timeUnixMs,
+  });
 }

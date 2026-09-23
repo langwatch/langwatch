@@ -255,12 +255,9 @@ export function mergePolicyDim(raw: unknown): {
   const deny = Array.isArray(r.deny)
     ? r.deny.filter((x): x is string => typeof x === "string")
     : [];
-  const allow =
-    r.allow === null || r.allow === undefined
-      ? null
-      : Array.isArray(r.allow)
-        ? r.allow.filter((x): x is string => typeof x === "string")
-        : null;
+  const allow = Array.isArray(r.allow)
+    ? r.allow.filter((x): x is string => typeof x === "string")
+    : null;
 
   return { deny, allow };
 }

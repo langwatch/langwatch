@@ -80,12 +80,27 @@ export type VirtualKeyUsageSummary = {
 const RECENT_DEBITS_LIMIT = 20;
 
 export class GatewayUsageService {
-  private constructor(
-    private readonly projects: GatewayUsageProjects,
-    private readonly virtualKeys: GatewayUsageVirtualKeys,
-    private readonly chRepo?: GatewayBudgetSpend,
-    private readonly spendRepo?: GatewayVirtualKeySpend,
-  ) {}
+  private readonly projects: GatewayUsageProjects;
+  private readonly virtualKeys: GatewayUsageVirtualKeys;
+  private readonly chRepo?: GatewayBudgetSpend;
+  private readonly spendRepo?: GatewayVirtualKeySpend;
+
+  private constructor({
+    projects,
+    virtualKeys,
+    chRepo,
+    spendRepo,
+  }: {
+    projects: GatewayUsageProjects;
+    virtualKeys: GatewayUsageVirtualKeys;
+    chRepo?: GatewayBudgetSpend;
+    spendRepo?: GatewayVirtualKeySpend;
+  }) {
+    this.projects = projects;
+    this.virtualKeys = virtualKeys;
+    this.chRepo = chRepo;
+    this.spendRepo = spendRepo;
+  }
 
   /**
    * Both repositories are required keys with optional values: a ClickHouse-less deploy passes
@@ -98,7 +113,12 @@ export class GatewayUsageService {
     chRepo: GatewayBudgetSpend | undefined;
     spendRepo: GatewayVirtualKeySpend | undefined;
   }): GatewayUsageService {
-    return new GatewayUsageService(args.projects, args.virtualKeys, args.chRepo, args.spendRepo);
+    return new GatewayUsageService({
+      projects: args.projects,
+      virtualKeys: args.virtualKeys,
+      chRepo: args.chRepo,
+      spendRepo: args.spendRepo,
+    });
   }
 
   /**
@@ -175,9 +195,24 @@ export class GatewayUsageService {
       totalUsd += usdToNanoUsd(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
-      this.bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
-      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+      this.bumpBucket({
+        map: byVk,
+        key: bucket.virtualKeyId,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
+      this.bumpBucket({
+        map: byModel,
+        key: bucket.model,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
+      this.bumpBucket({
+        map: byDay,
+        key: bucket.day,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
     }
 
     const vkMeta = await this.loadVirtualKeyMeta(args.organizationId, [...byVk.keys()]);
@@ -257,8 +292,18 @@ export class GatewayUsageService {
       totalUsd += usdToNanoUsd(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
-      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+      this.bumpBucket({
+        map: byModel,
+        key: bucket.model,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
+      this.bumpBucket({
+        map: byDay,
+        key: bucket.day,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
     }
 
     return {
@@ -281,11 +326,7 @@ export class GatewayUsageService {
         tokensInput: trace.promptTokens,
         tokensOutput: trace.completionTokens,
         durationMs: trace.durationMs || null,
-        status: trace.blockedByGuardrail
-          ? "BLOCKED_BY_GUARDRAIL"
-          : trace.hasError
-            ? "PROVIDER_ERROR"
-            : "SUCCESS",
+        status: traceStatusOf(trace),
       })),
     };
   }
@@ -331,12 +372,17 @@ export class GatewayUsageService {
       }));
   }
 
-  private bumpBucket(
-    map: Map<string, { totalUsd: bigint; requests: number }>,
-    key: string,
-    amount: string,
-    requests: number,
-  ) {
+  private bumpBucket({
+    map,
+    key,
+    amount,
+    requests,
+  }: {
+    map: Map<string, { totalUsd: bigint; requests: number }>;
+    key: string;
+    amount: string;
+    requests: number;
+  }) {
     const existing = map.get(key);
     if (existing) {
       existing.totalUsd += usdToNanoUsd(amount);
@@ -401,4 +447,9 @@ function microUsdToFixed6(micro: bigint): string {
 /** A nano-USD integer as a six-decimal money string. */
 function nanoUsdToFixed6(nano: bigint): string {
   return microUsdToFixed6(roundedQuotient(nano, 1000n));
+}
+
+function traceStatusOf(trace: { blockedByGuardrail: boolean; hasError: boolean }) {
+  if (trace.blockedByGuardrail) return "BLOCKED_BY_GUARDRAIL";
+  return trace.hasError ? "PROVIDER_ERROR" : "SUCCESS";
 }

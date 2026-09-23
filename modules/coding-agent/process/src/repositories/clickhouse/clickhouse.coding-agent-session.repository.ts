@@ -375,12 +375,27 @@ function toRecord({
 }
 
 export class CodingAgentSessionClickHouseRepository implements SessionRepository {
-  private constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
-    private readonly defaultTraceRetentionDays: number,
-    private readonly metrics: CodingAgentReadMetrics,
-    private readonly clock: CodingAgentClock,
-  ) {}
+  private readonly clickhouse: ClickHouseQueryClient;
+  private readonly defaultTraceRetentionDays: number;
+  private readonly metrics: CodingAgentReadMetrics;
+  private readonly clock: CodingAgentClock;
+
+  private constructor({
+    clickhouse,
+    defaultTraceRetentionDays,
+    metrics,
+    clock,
+  }: {
+    clickhouse: ClickHouseQueryClient;
+    defaultTraceRetentionDays: number;
+    metrics: CodingAgentReadMetrics;
+    clock: CodingAgentClock;
+  }) {
+    this.clickhouse = clickhouse;
+    this.defaultTraceRetentionDays = defaultTraceRetentionDays;
+    this.metrics = metrics;
+    this.clock = clock;
+  }
 
   static create(deps: {
     clickhouse: ClickHouseQueryClient;
@@ -388,12 +403,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     metrics: CodingAgentReadMetrics;
     clock: CodingAgentClock;
   }): CodingAgentSessionClickHouseRepository {
-    return new CodingAgentSessionClickHouseRepository(
-      deps.clickhouse,
-      deps.defaultTraceRetentionDays,
-      deps.metrics,
-      deps.clock,
-    );
+    return new CodingAgentSessionClickHouseRepository({
+      clickhouse: deps.clickhouse,
+      defaultTraceRetentionDays: deps.defaultTraceRetentionDays,
+      metrics: deps.metrics,
+      clock: deps.clock,
+    });
   }
 
   /**
@@ -966,6 +981,24 @@ function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<str
   return [...bySession.values()];
 }
 
+// A column absent from the record ranks as "no progress" rather than NaN,
+// which would make every comparison against it false and the winner depend on
+// argument order.
+function progressMsOf(value: unknown): number {
+  const ms = parseClickHouseDateTimeMs(asString(value));
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function progressOf(record: Record<string, unknown>) {
+  return {
+    watermark: progressMsOf(record.LastEventOccurredAt),
+    signals: asNumber(record.ModelCalls) + asNumber(record.ToolCalls) + asNumber(record.Prompts),
+    units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
+    applied: Array.isArray(record.AppliedEventIds) ? record.AppliedEventIds.length : 0,
+    startedAt: progressMsOf(record.StartedAt),
+  };
+}
+
 /**
  * `findLatestRecord`'s ranking, key for key, applied in TypeScript.
  */
@@ -973,20 +1006,6 @@ function preferredOf(
   incumbent: Record<string, unknown>,
   challenger: Record<string, unknown>,
 ): Record<string, unknown> {
-  // A column absent from the record ranks as "no progress" rather than NaN,
-  // which would make every comparison against it false and the winner depend on
-  // argument order.
-  const msOf = (value: unknown) => {
-    const ms = parseClickHouseDateTimeMs(asString(value));
-    return Number.isFinite(ms) ? ms : 0;
-  };
-  const progressOf = (record: Record<string, unknown>) => ({
-    watermark: msOf(record.LastEventOccurredAt),
-    signals: asNumber(record.ModelCalls) + asNumber(record.ToolCalls) + asNumber(record.Prompts),
-    units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
-    applied: Array.isArray(record.AppliedEventIds) ? record.AppliedEventIds.length : 0,
-    startedAt: msOf(record.StartedAt),
-  });
   const held = progressOf(incumbent);
   const next = progressOf(challenger);
 

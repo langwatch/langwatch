@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { LangyTurnAccessRedisRepository } from "../repositories/redis/redis.langy-turn-access.repository.ts";
 
@@ -39,19 +39,18 @@ describe("LangyTurnAccessRedisRepository", () => {
   });
 
   describe("given a different user", () => {
-    it("does not confirm them — access is per-actor", async () => {
-      const redis = fakeRedis();
-      const store = LangyTurnAccessRedisRepository.create({ redis });
-      await store.grant(ACCESS);
+    let store: LangyTurnAccessRedisRepository;
 
+    beforeEach(async () => {
+      store = LangyTurnAccessRedisRepository.create({ redis: fakeRedis() });
+      await store.grant(ACCESS);
+    });
+
+    it("does not confirm them — access is per-actor", async () => {
       expect(await store.isTurnActor({ ...ACCESS, userId: "mallory" })).toBe(false);
     });
 
     it("does not confirm across projects, even for the same user", async () => {
-      const redis = fakeRedis();
-      const store = LangyTurnAccessRedisRepository.create({ redis });
-      await store.grant(ACCESS);
-
       expect(await store.isTurnActor({ ...ACCESS, projectId: "p2" })).toBe(false);
     });
   });

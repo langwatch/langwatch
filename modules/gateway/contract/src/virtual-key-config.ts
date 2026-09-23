@@ -33,7 +33,7 @@ export function normalizeVkTags(tags: readonly unknown[]): string[] {
     if (typeof raw !== "string") continue;
     // Slice by code point so truncation can never split a surrogate pair
     // into lone halves, which serialise as invalid UTF-8 downstream.
-    const tag = [...raw.trim()].slice(0, VK_TAG_MAX_LENGTH).join("").trim();
+    const tag = Array.from(raw.trim()).slice(0, VK_TAG_MAX_LENGTH).join("").trim();
     if (tag === "") continue;
     normalized.add(tag);
     if (normalized.size === VK_TAGS_MAX_COUNT) break;

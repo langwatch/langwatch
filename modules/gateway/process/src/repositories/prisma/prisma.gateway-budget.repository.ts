@@ -881,7 +881,8 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       }
       const vkAnchor = input.scope.anchorVirtualKeyId;
       const projectAnchor = input.scope.anchorProjectId;
-      if ((vkAnchor ? 1 : 0) + (projectAnchor ? 1 : 0) !== 1) {
+      const anchorCount = Number(Boolean(vkAnchor)) + Number(Boolean(projectAnchor));
+      if (anchorCount !== 1) {
         throw new GatewayScopeOrgMismatchError("attributed-user anchor");
       }
       // Cross-org guard on the anchor, mirroring VIRTUAL_KEY / PROJECT.
@@ -1261,11 +1262,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         fromDate(budget.resetsAt),
         now,
       );
+      const storedSpent = periodHasRolled ? new Prisma.Decimal(0) : budget.spentUsd;
       const effectiveSpent = chSpendByBudgetId
         ? new Prisma.Decimal(chSpendByBudgetId.get(budget.id) ?? "0")
-        : periodHasRolled
-          ? new Prisma.Decimal(0)
-          : budget.spentUsd;
+        : storedSpent;
 
       scopes.push({
         scope: budget.scopeType.toLowerCase(),
@@ -1302,7 +1302,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     }
 
     const decision: BudgetCheckDecision =
-      blockedBy.length > 0 ? "hard_block" : warnings.length > 0 ? "soft_warn" : "allow";
+      blockedBy.length > 0 ? "hard_block" : warningDecisionOf(warnings);
 
     return { decision, warnings, blockReason, blockedBy, scopes };
   }
@@ -1413,4 +1413,8 @@ function lineFor(
 function percentUsed(spent: Prisma.Decimal, limit: Prisma.Decimal): number {
   if (limit.isZero()) return 100;
   return Number(spent.div(limit).times(100).toDecimalPlaces(2));
+}
+
+function warningDecisionOf(warnings: BudgetCheckResult["warnings"]): BudgetCheckDecision {
+  return warnings.length > 0 ? "soft_warn" : "allow";
 }

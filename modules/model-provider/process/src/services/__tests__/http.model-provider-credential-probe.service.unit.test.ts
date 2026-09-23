@@ -45,7 +45,7 @@ describe("validateProviderApiKey", () => {
     vi.restoreAllMocks();
   });
 
-  describe("Skip validation scenarios", () => {
+  describe("given validation is skipped", () => {
     it("returns valid for unknown provider", async () => {
       const result = await validateProviderApiKey("unknown_provider", {
         SOME_API_KEY: "test-key",
@@ -105,7 +105,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("ElevenLabs validation", () => {
+  describe("when validating an ElevenLabs key", () => {
     /** @scenario "ElevenLabs keys validate with the xi-api-key header" */
     it("uses xi-api-key header against the ElevenLabs models endpoint", async () => {
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
@@ -150,7 +150,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("Providers without a validation endpoint", () => {
+  describe("given a provider without a validation endpoint", () => {
     /** @scenario "Providers with no known validation endpoint skip validation" */
     it("skips validation instead of fetching a relative URL", async () => {
       const result = await validateProviderApiKey("voyage", {
@@ -165,7 +165,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("Bearer token validation (OpenAI)", () => {
+  describe("when validating a bearer token (OpenAI)", () => {
     it("returns valid when API key is accepted", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -274,7 +274,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("Anthropic validation", () => {
+  describe("when validating an Anthropic key", () => {
     it("uses x-api-key header for Anthropic", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -330,7 +330,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("Gemini validation", () => {
+  describe("when validating a Gemini key", () => {
     it("uses query parameter for Gemini", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -885,7 +885,7 @@ describe("validateProviderApiKey", () => {
     });
   });
 
-  describe("Custom provider validation", () => {
+  describe("when validating a custom provider", () => {
     it("skips validation when no API key and no base URL", async () => {
       const result = await validateProviderApiKey("custom", {
         CUSTOM_API_KEY: "",

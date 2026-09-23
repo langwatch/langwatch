@@ -122,7 +122,7 @@ const cliSuccessSchema = z.union([
   z.object({ ok: z.literal(true) }),
   cliBootstrapResultSchema,
   governanceBudgetOverviewForUserSchema,
-  z.object({ project: cliProjectSchema.extend({ api_key: z.string() }) }),
+  z.object({ project: z.object({ ...cliProjectSchema.shape, api_key: z.string() }) }),
   z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
   z.object({ api_key: z.string(), project: cliProjectSchema }),
   z.object({

@@ -82,7 +82,7 @@ export class LangyTurnPreparationService {
     const permit = await this.reservePermit(args);
     await this.ensureWorkerAccess(args, earlyWorkerProbe);
     const prepared = this.buildPreparedTurn(args, results, permit.capReachedNote);
-    await this.stashPreparedTurn(args, prepared, runToken, permit.reserved);
+    await this.stashPreparedTurn({ args, prepared, runToken, permitReserved: permit.reserved });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
     await this.dispatchPreparedTurn(args, prepared, runToken);
     this.deps.metrics.count({ outcome: "accepted" });
@@ -320,12 +320,17 @@ export class LangyTurnPreparationService {
     };
   }
 
-  private async stashPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
-    runToken: string,
-    permitReserved: boolean,
-  ) {
+  private async stashPreparedTurn({
+    args,
+    prepared,
+    runToken,
+    permitReserved,
+  }: {
+    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
+    runToken: string;
+    permitReserved: boolean;
+  }) {
     try {
       await Promise.all([
         args.accessStore.grant({
@@ -430,11 +435,10 @@ export class LangyTurnPreparationService {
 
     void args.worker
       .dispatch({
-        intent: prepared.pendingHandoff
-          ? "revive"
-          : args.credentials.langwatchApiKey
-            ? "create"
-            : "continue",
+        intent: dispatchIntentOf({
+          resumable: Boolean(prepared.pendingHandoff),
+          hasApiKey: Boolean(args.credentials.langwatchApiKey),
+        }),
         projectId: args.projectId,
         userId: args.userId,
         runToken,
@@ -462,4 +466,15 @@ export class LangyTurnPreparationService {
         );
       });
   }
+}
+
+function dispatchIntentOf({
+  resumable,
+  hasApiKey,
+}: {
+  resumable: boolean;
+  hasApiKey: boolean;
+}): "create" | "revive" | "continue" {
+  if (resumable) return "revive";
+  return hasApiKey ? "create" : "continue";
 }

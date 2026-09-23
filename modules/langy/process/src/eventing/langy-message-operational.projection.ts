@@ -33,7 +33,7 @@ export class LangyMessageOperationalMapProjection
   protected readonly events = messageEvents;
 
   override options = {
-    groupKeyFn: (event: { data: { conversationId: string; messageId: string } }) =>
+    groupKeyFn: (event: { data: { conversationId: string; messageId: string } }): string =>
       `langy:${event.data.conversationId}:message:${event.data.messageId}`,
   };
 

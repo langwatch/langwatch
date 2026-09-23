@@ -55,11 +55,11 @@ function unwrap(raw: string): string {
   out = out.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
   out = out.replace(/^(?:title|chat|conversation)\s*[:=]\s*/i, "");
   out = out.trim();
-  if (
-    (out.startsWith('"') && out.endsWith('"')) ||
-    (out.startsWith("'") && out.endsWith("'")) ||
-    (out.startsWith("“") && out.endsWith("”"))
-  ) {
+  const trimmed = out;
+  const quoted = TITLE_QUOTE_PAIRS.some(
+    ([open, close]) => trimmed.startsWith(open) && trimmed.endsWith(close),
+  );
+  if (quoted) {
     out = out.slice(1, -1);
   }
   return stripTrailingPunctuation(out.trim());
@@ -107,3 +107,9 @@ function capitaliseFirst(word: string): string {
   if (at === -1) return word;
   return word.slice(0, at) + word.charAt(at).toUpperCase() + word.slice(at + 1);
 }
+
+const TITLE_QUOTE_PAIRS = [
+  ['"', '"'],
+  ["'", "'"],
+  ["“", "”"],
+] as const;

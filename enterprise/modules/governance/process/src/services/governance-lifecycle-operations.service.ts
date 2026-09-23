@@ -13,16 +13,43 @@ import type { QuarantineFillEvaluatorService } from "./quarantine-fill.service.t
 
 /** Private cohesive collaborator for the lifecycle operation set. */
 export class GovernanceLifecycleOperationsService {
-  private constructor(
-    private readonly routingPolicies: DefaultGovernanceRoutingPolicyService,
-    private readonly personalVirtualKeys: DefaultGovernancePersonalVirtualKeyService,
-    private readonly cliBootstrap: DefaultGovernanceCliBootstrapService,
-    private readonly cliSessions: DefaultGovernanceCliSessionInventoryService,
-    private readonly cliTokenRevocation: DefaultGovernanceCliTokenRevocationService,
-    private readonly adminWorkspaceViewAudit: DefaultGovernanceAdminWorkspaceViewAuditService,
-    private readonly quarantineFill: QuarantineFillEvaluatorService,
-    private readonly setupState: DefaultGovernanceSetupStateService,
-  ) {}
+  private readonly routingPolicies: DefaultGovernanceRoutingPolicyService;
+  private readonly personalVirtualKeys: DefaultGovernancePersonalVirtualKeyService;
+  private readonly cliBootstrap: DefaultGovernanceCliBootstrapService;
+  private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
+  private readonly cliTokenRevocation: DefaultGovernanceCliTokenRevocationService;
+  private readonly adminWorkspaceViewAudit: DefaultGovernanceAdminWorkspaceViewAuditService;
+  private readonly quarantineFill: QuarantineFillEvaluatorService;
+  private readonly setupState: DefaultGovernanceSetupStateService;
+
+  private constructor({
+    routingPolicies,
+    personalVirtualKeys,
+    cliBootstrap,
+    cliSessions,
+    cliTokenRevocation,
+    adminWorkspaceViewAudit,
+    quarantineFill,
+    setupState,
+  }: {
+    routingPolicies: DefaultGovernanceRoutingPolicyService;
+    personalVirtualKeys: DefaultGovernancePersonalVirtualKeyService;
+    cliBootstrap: DefaultGovernanceCliBootstrapService;
+    cliSessions: DefaultGovernanceCliSessionInventoryService;
+    cliTokenRevocation: DefaultGovernanceCliTokenRevocationService;
+    adminWorkspaceViewAudit: DefaultGovernanceAdminWorkspaceViewAuditService;
+    quarantineFill: QuarantineFillEvaluatorService;
+    setupState: DefaultGovernanceSetupStateService;
+  }) {
+    this.routingPolicies = routingPolicies;
+    this.personalVirtualKeys = personalVirtualKeys;
+    this.cliBootstrap = cliBootstrap;
+    this.cliSessions = cliSessions;
+    this.cliTokenRevocation = cliTokenRevocation;
+    this.adminWorkspaceViewAudit = adminWorkspaceViewAudit;
+    this.quarantineFill = quarantineFill;
+    this.setupState = setupState;
+  }
 
   static create(
     routingPolicies: DefaultGovernanceRoutingPolicyService,
@@ -34,7 +61,7 @@ export class GovernanceLifecycleOperationsService {
     quarantineFill: QuarantineFillEvaluatorService,
     setupState: DefaultGovernanceSetupStateService,
   ): GovernanceLifecycleOperationsService {
-    return new GovernanceLifecycleOperationsService(
+    return new GovernanceLifecycleOperationsService({
       routingPolicies,
       personalVirtualKeys,
       cliBootstrap,
@@ -43,7 +70,7 @@ export class GovernanceLifecycleOperationsService {
       adminWorkspaceViewAudit,
       quarantineFill,
       setupState,
-    );
+    });
   }
 
   readonly routingPolicyList: GovernanceApi["routingPolicyList"] = (...args) =>

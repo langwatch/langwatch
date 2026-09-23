@@ -76,18 +76,16 @@ export function createPullRequestMappingHandler(
 ) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
-    if (
-      !shouldMapPullRequests(
-        {
-          repositoryHost: foldState.repositoryHost ?? "",
-          repositoryOwner: foldState.repositoryOwner ?? "",
-          repositoryName: foldState.repositoryName ?? "",
-          gitBranch: foldState.gitBranch ?? "",
-        },
-        github,
-      )
-    )
-      return;
+    const mapsPullRequests = shouldMapPullRequests(
+      {
+        repositoryHost: foldState.repositoryHost ?? "",
+        repositoryOwner: foldState.repositoryOwner ?? "",
+        repositoryName: foldState.repositoryName ?? "",
+        gitBranch: foldState.gitBranch ?? "",
+      },
+      github,
+    );
+    if (!mapsPullRequests) return;
 
     try {
       await github.requestBranchMapping({

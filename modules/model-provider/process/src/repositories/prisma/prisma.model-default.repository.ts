@@ -198,7 +198,8 @@ function isModelDefaultDatabase(database: object): database is RootDatabase {
 function scopeSort(left: ModelDefaultScope, right: ModelDefaultScope): number {
   const leftKey = `${left.scopeType}:${left.scopeId}`;
   const rightKey = `${right.scopeType}:${right.scopeId}`;
-  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  if (leftKey < rightKey) return -1;
+  return leftKey > rightKey ? 1 : 0;
 }
 
 function toConfig(

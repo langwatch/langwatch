@@ -121,8 +121,8 @@ export class CodingAgentPullRequestUsageService {
           cacheCreationTokens: session.cacheCreationTokens,
           totalTokens: this.tokenTotal(session),
           costUsd: priced ? session.costUsd : null,
-          billedCostUsd: priced ? (nonBilled ? 0 : session.costUsd) : null,
-          nonBilledCostUsd: priced ? (nonBilled ? session.costUsd : 0) : null,
+          billedCostUsd: priced ? billedShareOf(session.costUsd, !nonBilled) : null,
+          nonBilledCostUsd: priced ? billedShareOf(session.costUsd, nonBilled) : null,
         });
         continue;
       }
@@ -279,4 +279,8 @@ export class CodingAgentPullRequestUsageService {
       tokensKnown: false,
     }));
   }
+}
+
+function billedShareOf(costUsd: number, applies: boolean): number {
+  return applies ? costUsd : 0;
 }

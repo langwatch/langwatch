@@ -14,6 +14,9 @@ import {
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
   type SpendUsage,
+  type GatewayInternalSpendSubmission,
+  type VirtualKeyWithScopes,
+  type GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -107,7 +110,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return new GatewayInternalProtocolService(members);
   }
 
-  findVirtualKeyBySecret(secret: string) {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
     return this.#members.virtualKeys.findBySecretInternal(secret);
   }
 
@@ -146,11 +149,17 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     };
   }
 
-  findTraceDestination(projectId: string) {
+  findTraceDestination(projectId: string): Promise<{
+    id: string;
+    teamId: string;
+  } | null> {
     return this.#members.projects.findTraceDestination(projectId);
   }
 
-  signJwt(input: Parameters<GatewayJwtService["sign"]>[0]) {
+  signJwt(input: Parameters<GatewayJwtService["sign"]>[0]): {
+    jwt: string;
+    expiresAt: number;
+  } {
     const jwt = this.#members.jwt;
     if (!jwt) throw new Error("gateway JWT signing is unavailable in this deployment");
 
@@ -165,11 +174,13 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.refreshCodex?.(input) ?? null;
   }
 
-  findVirtualKeyForConfig(id: string) {
+  findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
     return this.#members.store.findVirtualKeyForConfig(id);
   }
 
-  async configVersionToken(input: Parameters<GatewayConfigMaterialiserService["versionToken"]>[0]) {
+  async configVersionToken(
+    input: Parameters<GatewayConfigMaterialiserService["versionToken"]>[0],
+  ): Promise<string> {
     const config = this.#members.config;
     if (!config)
       throw new Error("gateway config materialisation is unavailable in this deployment");
@@ -177,7 +188,9 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return config.versionToken(input);
   }
 
-  async materialiseConfig(input: Parameters<GatewayConfigMaterialiserService["materialise"]>[0]) {
+  async materialiseConfig(
+    input: Parameters<GatewayConfigMaterialiserService["materialise"]>[0],
+  ): Promise<unknown> {
     const config = this.#members.config;
     if (!config)
       throw new Error("gateway config materialisation is unavailable in this deployment");
@@ -185,11 +198,25 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return config.materialise(input);
   }
 
-  listChanges(organizationId: string, since: bigint, limit: number) {
+  listChanges(
+    organizationId: string,
+    since: bigint,
+    limit: number,
+  ): Promise<{
+    currentRevision: bigint;
+    events: {
+      kind: string;
+      virtualKeyId: string | null;
+      budgetId: string | null;
+      modelProviderId: string | null;
+      projectId: string | null;
+      revision: bigint;
+    }[];
+  }> {
     return this.#members.changes.since(organizationId, since, limit);
   }
 
-  currentRevision(organizationId: string) {
+  currentRevision(organizationId: string): Promise<bigint> {
     return this.#members.changes.currentRevision(organizationId);
   }
 
@@ -197,7 +224,16 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.guardrails?.check(input) ?? null;
   }
 
-  async budgetBucketSpend(input: { budgetId: string; endUserId: string }) {
+  async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<
+    | {
+        status: "not_found";
+      }
+    | {
+        status: "available";
+        spentMicroUsd: number;
+        bucketScopeId: string | null;
+      }
+  > {
     const budget = await this.#members.store.findBudget(input.budgetId);
     if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
       return { status: "not_found" } as const;
@@ -223,7 +259,9 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return { status: "available", spentMicroUsd, bucketScopeId } as const;
   }
 
-  async submitSpendCommands(records: GatewayInternalSpendCommandRecord[]) {
+  async submitSpendCommands(
+    records: GatewayInternalSpendCommandRecord[],
+  ): Promise<GatewayInternalSpendSubmission> {
     const pipeline = this.#members.spend;
     if (!pipeline) return { status: "unavailable" } as const;
     const { perCommand, rejected } = groupSpendCommands(records, pipeline.rating);

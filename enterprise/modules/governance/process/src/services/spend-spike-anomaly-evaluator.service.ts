@@ -24,12 +24,27 @@ export type SpendSpikeEvaluationSummary = {
 };
 
 export class SpendSpikeAnomalyEvaluatorService {
-  private constructor(
-    private readonly repository: SpendSpikeAnomalyRepository,
-    private readonly spend: AnomalySpendReader | undefined,
-    private readonly dispatcher: AnomalyAlertDispatcherService,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-  ) {}
+  private readonly repository: SpendSpikeAnomalyRepository;
+  private readonly spend: AnomalySpendReader | undefined;
+  private readonly dispatcher: AnomalyAlertDispatcherService;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+
+  private constructor({
+    repository,
+    spend,
+    dispatcher,
+    diagnostics,
+  }: {
+    repository: SpendSpikeAnomalyRepository;
+    spend: AnomalySpendReader | undefined;
+    dispatcher: AnomalyAlertDispatcherService;
+    diagnostics: GovernanceDiagnosticsSink;
+  }) {
+    this.repository = repository;
+    this.spend = spend;
+    this.dispatcher = dispatcher;
+    this.diagnostics = diagnostics;
+  }
 
   static create(options: {
     repository: SpendSpikeAnomalyRepository;
@@ -37,12 +52,12 @@ export class SpendSpikeAnomalyEvaluatorService {
     dispatcher: AnomalyAlertDispatcherService;
     diagnostics?: GovernanceDiagnosticsSink;
   }): SpendSpikeAnomalyEvaluatorService {
-    return new SpendSpikeAnomalyEvaluatorService(
-      options.repository,
-      options.spend,
-      options.dispatcher,
-      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
-    );
+    return new SpendSpikeAnomalyEvaluatorService({
+      repository: options.repository,
+      spend: options.spend,
+      dispatcher: options.dispatcher,
+      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+    });
   }
 
   async evaluateAll(input: { now?: Instant } = {}): Promise<SpendSpikeEvaluationSummary> {
@@ -84,12 +99,12 @@ export class SpendSpikeAnomalyEvaluatorService {
         })),
       });
 
-      return SpendSpikeAnomalyEvaluatorService.noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult({
         rule,
-        now,
-        "skip_invalid_config",
-        "thresholdConfig failed strict validation — rule is quarantined until repaired",
-      );
+        windowEnd: now,
+        decision: "skip_invalid_config",
+        reason: "thresholdConfig failed strict validation — rule is quarantined until repaired",
+      });
     }
 
     const windowMs = parsed.data.windowSec * 1_000;
@@ -98,23 +113,23 @@ export class SpendSpikeAnomalyEvaluatorService {
     const baselineStart = windowStart.subtract({ milliseconds: BASELINE_WINDOWS * windowMs });
     const tenantId = await this.repository.findGovernanceTenantId(rule.organizationId);
     if (!tenantId) {
-      return SpendSpikeAnomalyEvaluatorService.noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult({
         rule,
-        now,
-        "skip_no_data",
-        "Organization has no governance tenant",
+        windowEnd: now,
+        decision: "skip_no_data",
+        reason: "Organization has no governance tenant",
         windowStart,
-      );
+      });
     }
 
     if (!this.spend) {
-      return SpendSpikeAnomalyEvaluatorService.noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult({
         rule,
-        now,
-        "skip_no_data",
-        "Spend storage is not configured",
+        windowEnd: now,
+        decision: "skip_no_data",
+        reason: "Spend storage is not configured",
         windowStart,
-      );
+      });
     }
 
     const totals = await this.spend.findSpendTotals({
@@ -193,13 +208,19 @@ export class SpendSpikeAnomalyEvaluatorService {
     return { type: "all" };
   }
 
-  private static noDataResult(
-    rule: AnomalyRule,
-    windowEnd: Instant,
-    decision: "skip_no_data" | "skip_invalid_config",
-    reason: string,
-    windowStart: Instant = windowEnd,
-  ): SpendSpikeEvaluationResult {
+  private static noDataResult({
+    rule,
+    windowEnd,
+    decision,
+    reason,
+    windowStart = windowEnd,
+  }: {
+    rule: AnomalyRule;
+    windowEnd: Instant;
+    decision: "skip_no_data" | "skip_invalid_config";
+    reason: string;
+    windowStart?: Instant;
+  }): SpendSpikeEvaluationResult {
     return {
       ruleId: rule.id,
       organizationId: rule.organizationId,

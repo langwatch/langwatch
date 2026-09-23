@@ -49,7 +49,7 @@ export class ModelProviderResolutionService {
     const configs = await this.configs(parsed.projectId, context.organizationId);
     const chain = this.chain(parsed.projectId, context.teamId, context.organizationId);
     const restrictedModels = new Set<string>();
-    const resolution = this.findResolution(configs, chain, feature, restrictedModels);
+    const resolution = this.findResolution({ configs, chain, feature, restrictedModels });
 
     if (resolution) {
       return modelProviderResolutionSchema.parse({ ...resolution, feature });
@@ -173,12 +173,17 @@ export class ModelProviderResolutionService {
     ];
   }
 
-  private findResolution(
-    configs: ModelDefaultConfig[],
-    chain: ModelDefaultScope[],
-    feature: ModelDefaultFeature,
-    restrictedModels: Set<string>,
-  ): Omit<ModelProviderResolution, "feature"> | null {
+  private findResolution({
+    configs,
+    chain,
+    feature,
+    restrictedModels,
+  }: {
+    configs: ModelDefaultConfig[];
+    chain: ModelDefaultScope[];
+    feature: ModelDefaultFeature;
+    restrictedModels: Set<string>;
+  }): Omit<ModelProviderResolution, "feature"> | null {
     for (const tier of TIERS) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
 

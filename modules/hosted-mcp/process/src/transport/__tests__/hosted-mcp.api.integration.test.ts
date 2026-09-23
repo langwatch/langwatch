@@ -143,13 +143,16 @@ const DOCS_PAGE_FIXTURE = [
  * Replace global `fetch` for the duration of a docs-tool test so the tool resolves a fixed page
  * instead of reaching langwatch.ai / GitHub. Returns the spy so the caller can restore it.
  */
+function urlOf(input: URL | Request): string {
+  return input instanceof URL ? input.href : input.url;
+}
+
 function stubDocsFetch(): MockInstance {
   const realFetch = globalThis.fetch;
   return vi
     .spyOn(globalThis, "fetch")
     .mockImplementation((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-      const requestUrl =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const requestUrl = typeof input === "string" ? input : urlOf(input);
       if (requestUrl.includes("langwatch.ai")) {
         return Promise.resolve(
           new Response(DOCS_PAGE_FIXTURE, {

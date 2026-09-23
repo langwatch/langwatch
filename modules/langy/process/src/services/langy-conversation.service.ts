@@ -62,15 +62,38 @@ export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
  * lifecycle collaborators below each own one of those jobs.
  */
 export class LangyConversationService {
-  private constructor(
-    private readonly repository: LangyConversationRepository,
-    private readonly commands: LangyConversationCommands,
-    private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
-    private readonly events: LangyConversationEventsReader | null = null,
-    private readonly finalParts: LangyFinalPartsService = LangyFinalPartsService.create(),
-    private readonly runtime: LangyConversationRuntime = defaultRuntime,
-    private readonly turnOrder: LangyTurnOrderReader | null = null,
-  ) {
+  private readonly repository: LangyConversationRepository;
+  private readonly commands: LangyConversationCommands;
+  private readonly messages: LangyMessageRepository;
+  private readonly events: LangyConversationEventsReader | null;
+  private readonly finalParts: LangyFinalPartsService;
+  private readonly runtime: LangyConversationRuntime;
+  private readonly turnOrder: LangyTurnOrderReader | null;
+
+  private constructor({
+    repository,
+    commands,
+    messages = new NullLangyMessageRepository(),
+    events = null,
+    finalParts = LangyFinalPartsService.create(),
+    runtime = defaultRuntime,
+    turnOrder = null,
+  }: {
+    repository: LangyConversationRepository;
+    commands: LangyConversationCommands;
+    messages?: LangyMessageRepository;
+    events?: LangyConversationEventsReader | null;
+    finalParts?: LangyFinalPartsService;
+    runtime?: LangyConversationRuntime;
+    turnOrder?: LangyTurnOrderReader | null;
+  }) {
+    this.repository = repository;
+    this.commands = commands;
+    this.messages = messages;
+    this.events = events;
+    this.finalParts = finalParts;
+    this.runtime = runtime;
+    this.turnOrder = turnOrder;
     this.reads = LangyConversationReadService.create({ repository, events });
     this.turns = LangyConversationTurnService.create({
       repository,
@@ -258,7 +281,7 @@ export class LangyConversationService {
     runtime?: LangyConversationRuntime,
     turnOrder?: LangyTurnOrderReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(
+    return new LangyConversationService({
       repository,
       commands,
       messages,
@@ -266,6 +289,6 @@ export class LangyConversationService {
       finalParts,
       runtime,
       turnOrder,
-    );
+    });
   }
 }

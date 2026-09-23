@@ -82,10 +82,10 @@ export class GatewayApplicableBudgetsService {
     // pointer the materialiser follows — deciding it again here would empty
     // the list for a key whose destination was deleted while its team/
     // project budgets kept enforcing. A draft previews the decision the save is about to make.
+    const storedTraceProject = async () =>
+      draft.traceProjectId ? projects.findTraceDestination(draft.traceProjectId) : null;
     const traceProject = draft.virtualKeyId
-      ? draft.traceProjectId
-        ? await projects.findTraceDestination(draft.traceProjectId)
-        : null
+      ? await storedTraceProject()
       : await findTraceDestinationForDraft({ projects, draft });
 
     return this.resolveApplicableBudgetsForTarget(
@@ -122,7 +122,12 @@ export class GatewayApplicableBudgetsService {
 
     // Independent lookups on an interactive path: run them together.
     const [spentByBudgetId, targets, providerLabels] = await Promise.all([
-      loadSpend(this.budgetDecisions, target.organizationId, resolved, chRepo),
+      loadSpend({
+        budgetDecisions: this.budgetDecisions,
+        organizationId: target.organizationId,
+        resolved,
+        chRepo,
+      }),
       this.budgetDecisions.resolveScopeTargets(
         resolved.map((r) => r.budget),
         target.organizationId,
@@ -177,12 +182,17 @@ async function findTraceDestinationForDraft({
   return decision.outcome === "resolved" ? decision.project : null;
 }
 
-async function loadSpend(
-  budgetDecisions: GatewayService,
-  organizationId: string,
-  resolved: GatewayResolvedBudget[],
-  chRepo?: GatewayBudgetSpend,
-): Promise<Map<string, string>> {
+async function loadSpend({
+  budgetDecisions,
+  organizationId,
+  resolved,
+  chRepo,
+}: {
+  budgetDecisions: GatewayService;
+  organizationId: string;
+  resolved: GatewayResolvedBudget[];
+  chRepo?: GatewayBudgetSpend;
+}): Promise<Map<string, string>> {
   if (!chRepo) {
     return new Map();
   }

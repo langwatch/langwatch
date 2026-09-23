@@ -68,7 +68,7 @@ describe("CodexAccountService", () => {
     });
   });
 
-  describe("while the user has not approved yet", () => {
+  describe("given the user has not approved yet", () => {
     it.each([403, 404])("reports HTTP %i as pending", async (status) => {
       const { impl } = scriptedFetch({
         "/api/accounts/deviceauth/token": () => ({
@@ -186,7 +186,7 @@ describe("CodexAccountService", () => {
     });
   });
 
-  describe("CodexAccountService.decodeCodexClaims", () => {
+  describe("when decoding the Codex account claims", () => {
     it("reads account id, plan and email from the OpenAI auth claim", () => {
       expect(CodexAccountService.decodeCodexClaims(ID_TOKEN)).toEqual({
         accountId: "acct-123",

@@ -517,12 +517,11 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
       // is the ran-but-failed answer; the no-answer stall is
       // agent_response_failed, handled above.
       const outcome = event.data.outcome;
-      const status =
-        outcome === "failed"
-          ? LANGY_CONVERSATION_TURN_STATUS.FAILED
-          : outcome === "stopped"
-            ? LANGY_CONVERSATION_TURN_STATUS.STOPPED
-            : LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
+      const settled =
+        outcome === "stopped"
+          ? LANGY_CONVERSATION_TURN_STATUS.STOPPED
+          : LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
+      const status = outcome === "failed" ? LANGY_CONVERSATION_TURN_STATUS.FAILED : settled;
       return {
         ...withIdentity(event, state),
         AnswerParts: event.data.parts ?? [],

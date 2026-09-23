@@ -19,12 +19,27 @@ import type { GovernanceRulesOperationsService } from "./governance-rules-operat
  * implements `GovernanceApi` directly rather than extending an abstract class.
  */
 export class DefaultGovernanceService implements GovernanceApi {
-  private constructor(
-    private readonly rules: GovernanceRulesOperationsService,
-    private readonly ingestion: GovernanceIngestionOperationsService,
-    private readonly activity: GovernanceActivityOperationsService,
-    private readonly lifecycle: GovernanceLifecycleOperationsService,
-  ) {}
+  private readonly rules: GovernanceRulesOperationsService;
+  private readonly ingestion: GovernanceIngestionOperationsService;
+  private readonly activity: GovernanceActivityOperationsService;
+  private readonly lifecycle: GovernanceLifecycleOperationsService;
+
+  private constructor({
+    rules,
+    ingestion,
+    activity,
+    lifecycle,
+  }: {
+    rules: GovernanceRulesOperationsService;
+    ingestion: GovernanceIngestionOperationsService;
+    activity: GovernanceActivityOperationsService;
+    lifecycle: GovernanceLifecycleOperationsService;
+  }) {
+    this.rules = rules;
+    this.ingestion = ingestion;
+    this.activity = activity;
+    this.lifecycle = lifecycle;
+  }
 
   static create(
     rules: GovernanceRulesOperationsService,
@@ -32,7 +47,7 @@ export class DefaultGovernanceService implements GovernanceApi {
     activity: GovernanceActivityOperationsService,
     lifecycle: GovernanceLifecycleOperationsService,
   ): DefaultGovernanceService {
-    return new DefaultGovernanceService(rules, ingestion, activity, lifecycle);
+    return new DefaultGovernanceService({ rules, ingestion, activity, lifecycle });
   }
 
   readonly anomalyRuleList: GovernanceApi["anomalyRuleList"] = (...args) =>

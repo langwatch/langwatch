@@ -36,19 +36,22 @@ const eventSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const spanFactsContributedEventSchema = eventSchema.extend({
+export const spanFactsContributedEventSchema = z.object({
+  ...eventSchema.shape,
   type: z.literal(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: spanFactsContributionSchema,
 });
 export type SpanFactsContributedEvent = z.infer<typeof spanFactsContributedEventSchema>;
 
-export const logFactsContributedEventSchema = eventSchema.extend({
+export const logFactsContributedEventSchema = z.object({
+  ...eventSchema.shape,
   type: z.literal(LOG_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: logFactsContributionSchema,
 });
 export type LogFactsContributedEvent = z.infer<typeof logFactsContributedEventSchema>;
 
-export const metricFactsContributedEventSchema = eventSchema.extend({
+export const metricFactsContributedEventSchema = z.object({
+  ...eventSchema.shape,
   type: z.literal(METRIC_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: metricFactsContributionSchema,
 });

@@ -84,12 +84,7 @@ export class CodexAccountService {
     if (typeof deviceAuthId !== "string" || typeof userCode !== "string") {
       throw new CodexAuthError("malformed", "device code fields missing");
     }
-    const interval =
-      typeof json.interval === "number"
-        ? json.interval
-        : typeof json.interval === "string"
-          ? Number(json.interval)
-          : 5;
+    const interval = pollIntervalOf(json.interval);
     return {
       userCode,
       deviceAuthId,
@@ -293,4 +288,9 @@ export class CodexOAuthModelProviderTokenRefresherAdapter extends CodexTokenRefr
       throw error;
     }
   }
+}
+
+function pollIntervalOf(interval: unknown): number {
+  if (typeof interval === "number") return interval;
+  return typeof interval === "string" ? Number(interval) : 5;
 }

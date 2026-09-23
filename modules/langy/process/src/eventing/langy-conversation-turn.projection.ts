@@ -10,6 +10,7 @@ import {
   LANGY_CONVERSATION_PROJECTION_VERSIONS,
   type LangyConversationTurnData,
   makeConversationTurnKey,
+  type LangyConversationTurnFoldState,
 } from "@langwatch/langy-contract";
 
 import type {
@@ -90,7 +91,7 @@ export class LangyConversationTurnFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): LangyConversationTurnFoldState {
     return initLangyConversationTurnState();
   }
 

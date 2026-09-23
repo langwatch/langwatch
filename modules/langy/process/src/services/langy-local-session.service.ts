@@ -186,13 +186,11 @@ export class LocalControlSessionCoreService {
     authorization?: string;
     projectId?: string;
   }): Promise<AuthenticateOutcome> {
-    const credentials = this.readCredential((name) =>
-      name.toLowerCase() === "authorization"
-        ? authorization
-        : name.toLowerCase() === "x-project-id"
-          ? projectId
-          : undefined,
-    );
+    const credentials = this.readCredential((name) => {
+      const header = name.toLowerCase();
+      if (header === "authorization") return authorization;
+      return header === "x-project-id" ? projectId : undefined;
+    });
     if (!credentials) {
       return {
         ok: false,

@@ -135,91 +135,135 @@ export class LangyAnalyticsEventMapProjection
     this.store = deps.store;
   }
 
-  mapLangyConversationConversationStarted(event: LangyConversationStartedEvent) {
+  mapLangyConversationConversationStarted(
+    event: LangyConversationStartedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationMessageRecorded(event: LangyMessageRecordedEvent) {
+  mapLangyConversationMessageRecorded(
+    event: LangyMessageRecordedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationForked(event: LangyConversationForkedEvent) {
+  mapLangyConversationConversationForked(
+    event: LangyConversationForkedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationMessageImported(event: LangyMessageImportedEvent) {
+  mapLangyConversationMessageImported(
+    event: LangyMessageImportedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationAgentTurnAccepted(event: LangyAgentTurnAcceptedEvent) {
+  mapLangyConversationAgentTurnAccepted(
+    event: LangyAgentTurnAcceptedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationToolCallInitiated(event: LangyToolCallInitiatedEvent) {
+  mapLangyConversationToolCallInitiated(
+    event: LangyToolCallInitiatedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationToolCallSucceeded(event: LangyToolCallSucceededEvent) {
+  mapLangyConversationToolCallSucceeded(
+    event: LangyToolCallSucceededEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationToolCallFailed(event: LangyToolCallFailedEvent) {
+  mapLangyConversationToolCallFailed(
+    event: LangyToolCallFailedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationPlanUpdated(event: LangyPlanUpdatedEvent) {
+  mapLangyConversationPlanUpdated(
+    event: LangyPlanUpdatedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationAgentResponseFailed(event: LangyAgentResponseFailedEvent) {
+  mapLangyConversationAgentResponseFailed(
+    event: LangyAgentResponseFailedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationAgentResponded(event: LangyAgentRespondedEvent) {
+  mapLangyConversationAgentResponded(
+    event: LangyAgentRespondedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationArchived(event: LangyConversationArchivedEvent) {
+  mapLangyConversationConversationArchived(
+    event: LangyConversationArchivedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationMetadataUpdated(event: LangyConversationMetadataUpdatedEvent) {
+  mapLangyConversationConversationMetadataUpdated(
+    event: LangyConversationMetadataUpdatedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationHandoffPending(event: LangyConversationHandoffPendingEvent) {
+  mapLangyConversationConversationHandoffPending(
+    event: LangyConversationHandoffPendingEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationHandoffConsumed(event: LangyConversationHandoffConsumedEvent) {
+  mapLangyConversationConversationHandoffConsumed(
+    event: LangyConversationHandoffConsumedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationConversationTitleGenerated(event: LangyConversationTitleGeneratedEvent) {
+  mapLangyConversationConversationTitleGenerated(
+    event: LangyConversationTitleGeneratedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationLocalControlRequested(event: LangyLocalControlRequestedEvent) {
+  mapLangyConversationLocalControlRequested(
+    event: LangyLocalControlRequestedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationLocalWorkspaceConnected(event: LangyLocalWorkspaceConnectedEvent) {
+  mapLangyConversationLocalWorkspaceConnected(
+    event: LangyLocalWorkspaceConnectedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationLocalWorkspaceDisconnected(event: LangyLocalWorkspaceDisconnectedEvent) {
+  mapLangyConversationLocalWorkspaceDisconnected(
+    event: LangyLocalWorkspaceDisconnectedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationLocalPolicyChanged(event: LangyLocalPolicyChangedEvent) {
+  mapLangyConversationLocalPolicyChanged(
+    event: LangyLocalPolicyChangedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationUserWaitStarted(event: LangyUserWaitStartedEvent) {
+  mapLangyConversationUserWaitStarted(
+    event: LangyUserWaitStartedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 
-  mapLangyConversationUserWaitEnded(event: LangyUserWaitEndedEvent) {
+  mapLangyConversationUserWaitEnded(
+    event: LangyUserWaitEndedEvent,
+  ): LangyAnalyticsEventProjectionRecord {
     return this.record(event);
   }
 

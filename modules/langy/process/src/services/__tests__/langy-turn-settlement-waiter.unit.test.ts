@@ -101,6 +101,7 @@ describe("tryAwaitTurnSettlement", () => {
       await new Promise((resolve) =>
         input.signal.addEventListener("abort", resolve, { once: true }),
       );
+      yield* [];
     });
 
     const settlement = await tryAwaitTurnSettlement({

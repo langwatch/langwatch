@@ -9,8 +9,8 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
@@ -152,7 +152,7 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   });
 
-  describe("create with PRINCIPAL kind", () => {
+  describe("when creating a PRINCIPAL budget", () => {
     it("persists scopeType=PRINCIPAL with the named user as scopeId", async () => {
       const created = await service.create({
         organizationId: ORG_ID,
@@ -203,7 +203,7 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
     });
   });
 
-  describe("cascade strictest-wins with PRINCIPAL the tightest", () => {
+  describe("given PRINCIPAL is the tightest scope in a strictest-wins cascade", () => {
     let principalBudgetId: string;
     let projectBudgetId: string;
 

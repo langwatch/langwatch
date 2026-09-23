@@ -72,7 +72,10 @@ export class IngestionPullRunStatusEventingProjection
     return new IngestionPullRunStatusEventingProjection(store);
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    IngestionPullRunStatusData,
+    "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  > {
     return {
       SourceId: "",
       Enabled: false,

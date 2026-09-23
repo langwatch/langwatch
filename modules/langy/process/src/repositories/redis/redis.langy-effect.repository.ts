@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:langy:process-effects");
  * transactional commit that retires the message.
  */
 
-export interface CreateLangyEffectPortsOptions {
+export interface CreateLangyEffectRepositoryOptions {
   handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped">;
   worker: LangyWorker;
   mintSessionKey: (args: {
@@ -72,7 +72,7 @@ function assertHandoffIdentity(params: {
  * downstream spans.
  */
 export class RedisLangyEffectRepository {
-  static create(deps: CreateLangyEffectPortsOptions): LangyEffectMembers {
+  static create(deps: CreateLangyEffectRepositoryOptions): LangyEffectMembers {
     return {
       workerDispatch: {
         async dispatchTurn({ projectId, conversationId, turnId }): Promise<void> {
@@ -112,11 +112,10 @@ export class RedisLangyEffectRepository {
           }
 
           let dispatchHandoff = handoff;
-          let intent: "create" | "revive" | "continue" = handoff.resumeToken
-            ? "revive"
-            : handoff.credentials.langwatchApiKey
-              ? "create"
-              : "continue";
+          let intent: "create" | "revive" | "continue" = dispatchIntentOf({
+            resumable: Boolean(handoff.resumeToken),
+            hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
+          });
           const dispatch = (candidate: LangyTurnHandoff) =>
             deps.worker.dispatch({
               intent,
@@ -220,4 +219,15 @@ export class RedisLangyEffectRepository {
       },
     };
   }
+}
+
+function dispatchIntentOf({
+  resumable,
+  hasApiKey,
+}: {
+  resumable: boolean;
+  hasApiKey: boolean;
+}): "create" | "revive" | "continue" {
+  if (resumable) return "revive";
+  return hasApiKey ? "create" : "continue";
 }

@@ -102,13 +102,12 @@ function nameOf(document: unknown, omit?: string): string | undefined {
  * because the reduction's marker is the only record of the rows it removed.
  */
 function rawCollectionOf(document: unknown): unknown[] | null {
-  return Array.isArray(document)
-    ? document
-    : document && typeof document === "object"
-      ? (COLLECTION_KEYS.map((key) => (document as Record<string, unknown>)[key]).find(
-          Array.isArray,
-        ) ?? null)
-      : null;
+  if (Array.isArray(document)) return document;
+  return document && typeof document === "object"
+    ? (COLLECTION_KEYS.map((key) => (document as Record<string, unknown>)[key]).find(
+        Array.isArray,
+      ) ?? null)
+    : null;
 }
 
 /** Only the rows that are results. `returned` counts these. */

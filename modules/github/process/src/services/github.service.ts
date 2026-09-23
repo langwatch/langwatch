@@ -68,28 +68,54 @@ export class GithubFeatureService implements GithubApi {
   private readonly connection: GithubConnectionService;
 
   static create(dependencies: GithubServiceDependencies): GithubFeatureService {
-    return new GithubFeatureService(
-      dependencies.installations,
-      dependencies.mapping,
-      dependencies.status,
-      dependencies.config,
-      dependencies.host,
-      dependencies.installState,
-      dependencies.installResponse,
-      dependencies.pullRequestEvents,
-    );
+    return new GithubFeatureService({
+      installations: dependencies.installations,
+      mapping: dependencies.mapping,
+      status: dependencies.status,
+      config: dependencies.config,
+      host: dependencies.host,
+      installState: dependencies.installState,
+      installResponse: dependencies.installResponse,
+      pullRequestEvents: dependencies.pullRequestEvents,
+    });
   }
 
-  private constructor(
-    private readonly installations: GithubInstallationsService,
-    private readonly mapping: GithubPullRequestMappingService,
-    private readonly status: GithubPullRequestStatusService,
-    private readonly config: GithubServiceDependencies["config"],
-    private readonly host: GithubHost,
-    private readonly installState: GithubInstallState,
-    private readonly installResponse: GithubInstallResponse,
-    private readonly pullRequestEvents: GithubPullRequestEventParser,
-  ) {
+  private readonly installations: GithubInstallationsService;
+  private readonly mapping: GithubPullRequestMappingService;
+  private readonly status: GithubPullRequestStatusService;
+  private readonly config: GithubServiceDependencies["config"];
+  private readonly host: GithubHost;
+  private readonly installState: GithubInstallState;
+  private readonly installResponse: GithubInstallResponse;
+  private readonly pullRequestEvents: GithubPullRequestEventParser;
+
+  private constructor({
+    installations,
+    mapping,
+    status,
+    config,
+    host,
+    installState,
+    installResponse,
+    pullRequestEvents,
+  }: {
+    installations: GithubInstallationsService;
+    mapping: GithubPullRequestMappingService;
+    status: GithubPullRequestStatusService;
+    config: GithubServiceDependencies["config"];
+    host: GithubHost;
+    installState: GithubInstallState;
+    installResponse: GithubInstallResponse;
+    pullRequestEvents: GithubPullRequestEventParser;
+  }) {
+    this.installations = installations;
+    this.mapping = mapping;
+    this.status = status;
+    this.config = config;
+    this.host = host;
+    this.installState = installState;
+    this.installResponse = installResponse;
+    this.pullRequestEvents = pullRequestEvents;
     this.connection = GithubConnectionService.create({
       installations,
       getAppConfig: () => this.getAppConfig(),

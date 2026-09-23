@@ -34,15 +34,30 @@ export class GithubInstallationsService {
     organization: OrganizationApi,
     access: GithubInstallationAccessService,
   ): GithubInstallationsService {
-    return new GithubInstallationsService(repository, appTokens, organization, access);
+    return new GithubInstallationsService({ repository, appTokens, organization, access });
   }
 
-  private constructor(
-    private readonly repository: GithubInstallationsRepository,
-    private readonly appTokens: GithubAppTokenCache,
-    private readonly organization: OrganizationApi,
-    private readonly access: GithubInstallationAccessService,
-  ) {}
+  private readonly repository: GithubInstallationsRepository;
+  private readonly appTokens: GithubAppTokenCache;
+  private readonly organization: OrganizationApi;
+  private readonly access: GithubInstallationAccessService;
+
+  private constructor({
+    repository,
+    appTokens,
+    organization,
+    access,
+  }: {
+    repository: GithubInstallationsRepository;
+    appTokens: GithubAppTokenCache;
+    organization: OrganizationApi;
+    access: GithubInstallationAccessService;
+  }) {
+    this.repository = repository;
+    this.appTokens = appTokens;
+    this.organization = organization;
+    this.access = access;
+  }
 
   get configured(): boolean {
     return this.appTokens.configured;

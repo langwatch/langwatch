@@ -157,7 +157,7 @@ const gatewayBudgetScopeTargetSchema = z
   .strict();
 
 /** One budget row, enriched with what the list and detail screens render around it. */
-const gatewayBudgetEnrichedSchema = gatewayBudgetDtoSchema.extend({
+const gatewayBudgetEnrichedSchema = gatewayBudgetDtoSchema.safeExtend({
   spendAvailable: z.boolean(),
   unreachableByAnyKey: z.boolean(),
   scopeTarget: gatewayBudgetScopeTargetSchema.nullable(),
@@ -175,7 +175,7 @@ export type GatewayBudgetList = z.infer<typeof gatewayBudgetListSchema>;
 
 /** One budget in full, with its recent ledger entries. */
 export const gatewayBudgetDetailSchema = gatewayBudgetEnrichedSchema
-  .extend({
+  .safeExtend({
     recentLedger: z.array(
       z
         .object({

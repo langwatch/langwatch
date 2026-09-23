@@ -44,7 +44,7 @@ export class LangyInternalService {
     return new LangyInternalService(langy, metrics, hasLiveBuffer);
   }
 
-  async ingestTurnResult(input: LangyTurnResultInput) {
+  async ingestTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }> {
     const { turnId, projectId, conversationId } = input;
     if (!(await this.#langy.turnExists({ turnId, projectId, conversationId }))) {
       throw new NotFoundError("turn not found");
@@ -59,7 +59,10 @@ export class LangyInternalService {
     return { status: "accepted" as const };
   }
 
-  async revokeCredentials(input: { apiKeyId: string; projectId: string }) {
+  async revokeCredentials(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<{ outcome: "revoked" | "already_revoked" }> {
     const outcome = await this.#langy.revokeWorkerSessionKey(input);
     if (outcome === "not_found") throw new NotFoundError("Session key not found");
     if (outcome === "refused") {

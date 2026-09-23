@@ -40,6 +40,24 @@ import {
   type AgentCallContext,
   type DispatchAgent,
   type DispatchCall,
+  type AgentWorkflowConfig,
+  type AgentTestRunResult,
+  type HttpProxyResult,
+  type AgentConnectRegisterAnswer,
+  type AgentConnectPollAnswer,
+  type CallOutcome,
+  type AgentCopyCreated,
+  type AgentPushToCopies,
+  type AgentConnectRegisterOutput,
+  type AgentCallResult,
+  type AgentTestTurnResult,
+  type AgentHistoryEntry,
+  type AgentCopy,
+  type RelatedAgentEntities,
+  type AgentReferenceState,
+  type AgentOverviewPage,
+  type AgentPage,
+  type AgentOverview,
 } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -167,67 +185,76 @@ export class AgentApp implements AgentApi {
     return this.#relayMaxPayloadMb;
   }
 
-  async getAll(input: AgentProjectInput & { viewerUserId?: string | null }) {
+  async getAll(
+    input: AgentProjectInput & { viewerUserId?: string | null },
+  ): Promise<AgentOverview[]> {
     return this.#enrich(await this.#agents.getAll(input), input);
   }
 
-  async getById(input: GetAgentInput & { viewerUserId?: string | null }) {
+  async getById(input: GetAgentInput & { viewerUserId?: string | null }): Promise<AgentOverview> {
     const agent = await this.#agents.getById(input);
     const [enriched] = await this.#enrich([agent], input);
     return enriched!;
   }
 
-  list(input: ListAgentsInput) {
+  list(input: ListAgentsInput): Promise<AgentPage> {
     return this.#agents.list(input);
   }
 
-  async listWithPresence(input: ListAgentsInput & { viewerUserId?: string | null }) {
+  async listWithPresence(
+    input: ListAgentsInput & { viewerUserId?: string | null },
+  ): Promise<AgentOverviewPage> {
     const page = await this.#agents.list(input);
     return { ...page, data: await this.#enrich(page.data, input) };
   }
 
-  async create(input: CreateAgentCommand) {
+  async create(input: CreateAgentCommand): Promise<AgentWithFields> {
     return this.#withFields(await this.#agents.create(input));
   }
 
-  async update(input: UpdateAgentCommand) {
+  async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
     return this.#withFields(await this.#agents.update(input));
   }
 
-  archive(input: GetAgentInput) {
+  archive(input: GetAgentInput): Promise<Agent> {
     return this.#agents.archive(input);
   }
-  exists(input: GetAgentInput) {
+  exists(input: GetAgentInput): Promise<boolean> {
     return this.#agents.exists(input);
   }
-  getNamesByIds(input: AgentIdsInput) {
+  getNamesByIds(input: AgentIdsInput): Promise<
+    {
+      id: string;
+      name: string;
+    }[]
+  > {
     return this.#agents.getNamesByIds(input);
   }
-  getReferenceStates(input: AgentIdsInput) {
+  getReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]> {
     return this.#agents.getReferenceStates(input);
   }
 
-  listWorkflowConfigs(input: AgentWorkflowInput) {
+  listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
     return this.#agents.listWorkflowConfigs(input);
   }
 
   updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
     return this.#agents.updateWorkflowConfig(input);
   }
-  registerConnected(input: RegisterConnectedAgentInput) {
+  registerConnected(input: RegisterConnectedAgentInput): Promise<Agent> {
     return this.#agents.registerConnected(input);
   }
-  touchLastSeenAt(input: GetAgentInput & { at: Instant }) {
+  touchLastSeenAt(input: GetAgentInput & { at: Instant }): Promise<void> {
     return this.#agents.touchLastSeenAt(input);
   }
-  getConnectedByName(input: ConnectedAgentsInput) {
+  getConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]> {
     return this.#agents.getConnectedByName(input);
   }
-  getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput) {
+  getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]> {
     return this.#agents.getConnectedByNameAndEnvironment(input);
   }
 
-  async relatedEntities(input: GetAgentInput) {
+  async relatedEntities(input: GetAgentInput): Promise<RelatedAgentEntities> {
     const agent = await this.#agents.getById(input);
     const workflowId = linkedWorkflowId(agent);
     const workflows = workflowId
@@ -239,7 +266,12 @@ export class AgentApp implements AgentApi {
     return { workflow: workflows[0] ?? null };
   }
 
-  async cascadeArchive(input: GetAgentInput) {
+  async cascadeArchive(input: GetAgentInput): Promise<{
+    agent: Agent;
+    archivedWorkflow: {
+      id: string;
+    } | null;
+  }> {
     const agent = await this.#agents.getById(input);
     const workflowId = linkedWorkflowId(agent);
     const archivedWorkflow = workflowId
@@ -248,7 +280,7 @@ export class AgentApp implements AgentApi {
     return { agent: await this.#agents.archive(input), archivedWorkflow };
   }
 
-  async getCopies(input: AgentCopiesInput) {
+  async getCopies(input: AgentCopiesInput): Promise<AgentCopy[]> {
     const copies = await this.#copies.getCopies(input);
     const paths = await this.#projects.listPaths({
       projectIds: [...new Set(copies.map((copy) => copy.projectId))],
@@ -266,32 +298,44 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  copy(input: CopyAgentCommand) {
+  copy(input: CopyAgentCommand): Promise<{
+    id: string;
+    projectId: string;
+    name: string;
+    copiedFromAgentId: string;
+  }> {
     return this.#copies.copy(input);
   }
-  pushToCopies(input: PushAgentCopiesInput) {
+  pushToCopies(input: PushAgentCopiesInput): Promise<{
+    pushedTo: number;
+    selectedCopies: number;
+  }> {
     return this.#copies.pushToCopies(input);
   }
-  getSourceOfCopy(input: AgentReferenceInput) {
+  getSourceOfCopy(input: AgentReferenceInput): Promise<Agent> {
     return this.#copies.getSourceOfCopy(input);
   }
-  syncFromSource(input: AgentReferenceInput) {
+  syncFromSource(input: AgentReferenceInput): Promise<{
+    ok: true;
+  }> {
     return this.#copies.syncFromSource(input);
   }
 
-  async getCopiesForActor(input: AgentReferenceInput & { actorId: string }) {
+  async getCopiesForActor(input: AgentReferenceInput & { actorId: string }): Promise<AgentCopy[]> {
     await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
     const copies = await this.getCopies({ sourceAgentId: input.agentId });
     const allowed = await this.#permittedCopies(copies, input.actorId, "evaluations:view");
     return copies.filter((copy) => allowed.has(copy.id));
   }
 
-  async copyForActor(input: CopyAgentCommand & { actorId: string }) {
+  async copyForActor(input: CopyAgentCommand & { actorId: string }): Promise<AgentCopyCreated> {
     await this.#assertSourcePermission(input.actorId, input.sourceProjectId);
     return this.copy(input);
   }
 
-  async pushToCopiesForActor(input: AgentReferenceInput & { actorId: string; copyIds?: string[] }) {
+  async pushToCopiesForActor(
+    input: AgentReferenceInput & { actorId: string; copyIds?: string[] },
+  ): Promise<AgentPushToCopies> {
     const copies = await this.#copies.getCopies({ sourceAgentId: input.agentId });
     const allowed = await this.#permittedCopies(copies, input.actorId, "evaluations:manage");
     const copyIds = input.copyIds ? input.copyIds.filter((id) => allowed.has(id)) : [...allowed];
@@ -302,13 +346,15 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  async syncFromSourceForActor(input: AgentReferenceInput & { actorId: string }) {
+  async syncFromSourceForActor(input: AgentReferenceInput & { actorId: string }): Promise<{
+    ok: true;
+  }> {
     const source = await this.getSourceOfCopy(input);
     await this.#assertSourcePermission(input.actorId, source.projectId);
     return this.syncFromSource(input);
   }
 
-  async getHistory(input: AgentReferenceInput) {
+  async getHistory(input: AgentReferenceInput): Promise<AgentHistoryEntry[]> {
     await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
     const entries = await this.#auditLog.listEntityHistory({
       projectId: input.projectId,
@@ -328,7 +374,15 @@ export class AgentApp implements AgentApi {
     }));
   }
 
-  async ownersOf(agents: readonly { ownerUserId: string | null }[]) {
+  async ownersOf(agents: readonly { ownerUserId: string | null }[]): Promise<
+    Map<
+      string,
+      {
+        userId: string;
+        name: string | null;
+      }
+    >
+  > {
     const userIds = [
       ...new Set(agents.flatMap((agent) => (agent.ownerUserId ? [agent.ownerUserId] : []))),
     ];
@@ -343,7 +397,7 @@ export class AgentApp implements AgentApi {
       message: string;
       params?: Record<string, string | number | boolean>;
     },
-  ) {
+  ): Promise<AgentTestTurnResult> {
     const agent = await this.#withFields(await this.#agents.getById(input));
     return this.#scenarios.testAgentTurn({
       projectId: input.projectId,
@@ -354,7 +408,7 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  async testRun(input: AgentReferenceInput & { actorId: string }) {
+  async testRun(input: AgentReferenceInput & { actorId: string }): Promise<AgentTestRunResult> {
     const agent = await this.#withFields(
       await this.#agents.getById({ id: input.agentId, projectId: input.projectId }),
     );
@@ -365,15 +419,18 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  executeHttpTest(input: HttpAgentTestInput & { actorId: string }) {
+  executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
     if (!this.#httpTesting) throw new AgentHttpTestingUnavailableError();
     return this.#httpTesting.execute(input);
   }
 
-  acceptConnection(connection: AgentConnection, credentials: AgentConnectCredentials) {
+  acceptConnection(
+    connection: AgentConnection,
+    credentials: AgentConnectCredentials,
+  ): Promise<void> {
     return this.#connections().acceptConnection(connection, credentials);
   }
-  async call(input: AgentCallInput, context: AgentCallContext) {
+  async call(input: AgentCallInput, context: AgentCallContext): Promise<AgentCallResult> {
     const agent = await this.#agents.getById({ id: input.id, projectId: input.projectId });
     if (agent.type !== "connected") throw new AgentNotFoundError(input.id, input.projectId);
     const ownerUserId = agent.ownerUserId;
@@ -418,13 +475,16 @@ export class AgentApp implements AgentApi {
       durationMs: outcome.durationMs,
     };
   }
-  connectRegister(body: unknown, credentials: AgentConnectCredentials) {
+  connectRegister(
+    body: unknown,
+    credentials: AgentConnectCredentials,
+  ): Promise<AgentConnectRegisterAnswer> {
     return this.#connections().connectRegister(body, credentials);
   }
   async registerConnectedAgentInstance(
     input: AgentConnectRegisterInput,
     credentials: AgentConnectCredentials,
-  ) {
+  ): Promise<AgentConnectRegisterOutput> {
     const answer = await this.#connections().connectRegister(input, credentials);
 
     if (answer.frame.type === "refused") {
@@ -437,7 +497,10 @@ export class AgentApp implements AgentApi {
 
     return { frame: answer.frame, instanceToken: answer.instanceToken };
   }
-  connectPoll(input: AgentConnectPollInput, credentials: AgentConnectCredentials) {
+  connectPoll(
+    input: AgentConnectPollInput,
+    credentials: AgentConnectCredentials,
+  ): Promise<AgentConnectPollAnswer> {
     return this.#connections().connectPoll(input, credentials);
   }
   callConnected(input: {
@@ -445,13 +508,21 @@ export class AgentApp implements AgentApi {
     agent: DispatchAgent;
     call: DispatchCall;
     signal?: AgentCallSignal;
-  }) {
+  }): Promise<CallOutcome> {
     return this.#connections().dispatch(input);
   }
-  getPresence(input: { projectId: string; agents: readonly { id: string; type: string }[] }) {
+  getPresence(input: {
+    projectId: string;
+    agents: readonly { id: string; type: string }[];
+  }): Promise<Map<string, AgentPresence>> {
     return this.#connections().listPresence(input);
   }
-  connectFrames(input: AgentConnectFramesInput, credentials: AgentConnectCredentials) {
+  connectFrames(
+    input: AgentConnectFramesInput,
+    credentials: AgentConnectCredentials,
+  ): Promise<{
+    accepted: number;
+  }> {
     return this.#connections().connectFrames(input, credentials);
   }
 

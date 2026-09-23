@@ -68,7 +68,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     );
     const rows = perOrganization.flat();
     return {
-      providers: [...new Set(rows.map((row) => row.provider))].sort(),
+      providers: [...new Set(rows.map((row) => row.provider))].toSorted(),
       ...(rows.length === 0
         ? {}
         : { firstModelProviderAt: Math.min(...rows.map((row) => row.createdAt.getTime())) }),

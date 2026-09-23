@@ -67,7 +67,7 @@ export const modelProviderSchema = z
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
 export const modelProviderSummarySchema = modelProviderSchema
-  .extend({
+  .safeExtend({
     models: z.array(z.string()).nullable().optional(),
     embeddingsModels: z.array(z.string()).nullable().optional(),
     deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
@@ -81,7 +81,7 @@ export type ModelProviderSummary = z.infer<typeof modelProviderSummarySchema>;
 
 /** Server-only provider value used to build model execution parameters. */
 export const modelProviderExecutionSchema = modelProviderSchema
-  .extend({
+  .safeExtend({
     models: z.array(z.string()).nullable(),
     embeddingsModels: z.array(z.string()).nullable(),
     disabledByDefault: z.boolean().optional(),
@@ -131,7 +131,7 @@ export const modelProviderTenantInputSchema = z
 export type ModelProviderTenantInput = z.infer<typeof modelProviderTenantInputSchema>;
 
 export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
-  .extend({
+  .safeExtend({
     id: z.string().min(1).optional(),
     actorId: z.string().min(1).optional(),
     provider: z.string().min(1),
@@ -158,7 +158,7 @@ export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
 export type ModelProviderWriteInput = z.infer<typeof modelProviderWriteInputSchema>;
 
 export const modelProviderDeleteInputSchema = modelProviderTenantInputSchema
-  .extend({
+  .safeExtend({
     id: z.string().min(1).optional(),
     actorId: z.string().min(1).optional(),
     provider: z.string().min(1),
@@ -182,7 +182,7 @@ export type ModelProviderListOrganizationInput = z.infer<
 >;
 
 export const modelProviderTestConnectionInputSchema = modelProviderTenantInputSchema
-  .extend({
+  .safeExtend({
     actorId: z.string().min(1).optional(),
     modelProviderId: z.string().min(1),
   })
@@ -277,7 +277,7 @@ export type ModelProviderCodexGatewayRefresh = z.infer<
 >;
 
 export const modelProviderApiKeyValidationInputSchema = modelProviderTenantInputSchema
-  .extend({
+  .safeExtend({
     provider: z.string().min(1),
     customKeys: providerCredentialSchema,
   })

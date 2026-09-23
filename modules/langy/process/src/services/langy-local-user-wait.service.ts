@@ -17,7 +17,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
 
 import { turnWaitsKey, waitKey } from "../rules/langy-local-control-keys.rules.ts";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";

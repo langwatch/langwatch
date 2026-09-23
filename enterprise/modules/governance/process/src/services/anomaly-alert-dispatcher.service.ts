@@ -20,13 +20,31 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_BACKOFF_MS = 250;
 
 export class AnomalyAlertDispatcherService {
-  private constructor(
-    private readonly http: AnomalyAlertHttpClient,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-    private readonly timeoutMs: number,
-    private readonly maxRetries: number,
-    private readonly retryBackoffMs: number,
-  ) {}
+  private readonly http: AnomalyAlertHttpClient;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+  private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryBackoffMs: number;
+
+  private constructor({
+    http,
+    diagnostics,
+    timeoutMs,
+    maxRetries,
+    retryBackoffMs,
+  }: {
+    http: AnomalyAlertHttpClient;
+    diagnostics: GovernanceDiagnosticsSink;
+    timeoutMs: number;
+    maxRetries: number;
+    retryBackoffMs: number;
+  }) {
+    this.http = http;
+    this.diagnostics = diagnostics;
+    this.timeoutMs = timeoutMs;
+    this.maxRetries = maxRetries;
+    this.retryBackoffMs = retryBackoffMs;
+  }
 
   static create(options: {
     http: AnomalyAlertHttpClient;
@@ -35,13 +53,13 @@ export class AnomalyAlertDispatcherService {
     maxRetries?: number;
     retryBackoffMs?: number;
   }): AnomalyAlertDispatcherService {
-    return new AnomalyAlertDispatcherService(
-      options.http,
-      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
-      options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      options.maxRetries ?? DEFAULT_MAX_RETRIES,
-      options.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS,
-    );
+    return new AnomalyAlertDispatcherService({
+      http: options.http,
+      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      maxRetries: options.maxRetries ?? DEFAULT_MAX_RETRIES,
+      retryBackoffMs: options.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS,
+    });
   }
 
   async dispatchAlert(input: AnomalyAlertDispatchInput): Promise<AnomalyAlertDispatchResult> {

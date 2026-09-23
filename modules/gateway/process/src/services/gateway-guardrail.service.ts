@@ -28,22 +28,40 @@ export class GatewayGuardrailService {
     projects: ProjectApi;
     audit: GatewayAudit;
   }): GatewayGuardrailService {
-    return new GatewayGuardrailService(
-      input.repository,
-      input.evaluators,
-      input.monitors,
-      input.projects,
-      input.audit,
-    );
+    return new GatewayGuardrailService({
+      repository: input.repository,
+      evaluators: input.evaluators,
+      monitors: input.monitors,
+      projects: input.projects,
+      audit: input.audit,
+    });
   }
 
-  private constructor(
-    private readonly repository: GatewayGuardrailRepository,
-    private readonly evaluators: EvaluatorApi,
-    private readonly monitors: MonitorApi,
-    private readonly projects: ProjectApi,
-    private readonly audit: GatewayAudit,
-  ) {}
+  private readonly repository: GatewayGuardrailRepository;
+  private readonly evaluators: EvaluatorApi;
+  private readonly monitors: MonitorApi;
+  private readonly projects: ProjectApi;
+  private readonly audit: GatewayAudit;
+
+  private constructor({
+    repository,
+    evaluators,
+    monitors,
+    projects,
+    audit,
+  }: {
+    repository: GatewayGuardrailRepository;
+    evaluators: EvaluatorApi;
+    monitors: MonitorApi;
+    projects: ProjectApi;
+    audit: GatewayAudit;
+  }) {
+    this.repository = repository;
+    this.evaluators = evaluators;
+    this.monitors = monitors;
+    this.projects = projects;
+    this.audit = audit;
+  }
 
   list(projectId: string): Promise<GatewayGuardrailResource[]> {
     return this.repository.findAll(projectId);

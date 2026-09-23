@@ -229,12 +229,7 @@ export class LangyTurnStartService {
       });
     } catch (error) {
       this.deps.metrics.count({
-        outcome:
-          error instanceof LangyTurnInProgressError
-            ? "busy"
-            : error instanceof LangyAgentUnavailableError
-              ? "rejected"
-              : "failed",
+        outcome: turnStartFailureOutcomeOf(error),
       });
       await attempt.abort();
       if (error instanceof LangySessionKeyScopeError) {
@@ -244,4 +239,9 @@ export class LangyTurnStartService {
       throw error;
     }
   }
+}
+
+function turnStartFailureOutcomeOf(error: unknown) {
+  if (error instanceof LangyTurnInProgressError) return "busy";
+  return error instanceof LangyAgentUnavailableError ? "rejected" : "failed";
 }

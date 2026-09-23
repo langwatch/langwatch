@@ -267,13 +267,13 @@ export class ModelProviderApp implements ModelProviderApi {
       config: buildConfig,
       dependencies,
     });
-    return new ModelProviderApp(
+    return new ModelProviderApp({
       repositories,
       dependencies,
-      infrastructure,
+      members: infrastructure,
       executionProxyBaseUrl,
       platformChain,
-    );
+    });
   }
 
   /**
@@ -288,13 +288,14 @@ export class ModelProviderApp implements ModelProviderApi {
     executionProxyBaseUrl?: string;
     platformChain?: PlatformProviderChainService;
   }): ModelProviderApp {
-    return new ModelProviderApp(
-      setup.repositories,
-      setup.dependencies,
-      setup.members,
-      setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
-      setup.platformChain ?? PlatformProviderChainService.create(),
-    );
+    return new ModelProviderApp({
+      repositories: setup.repositories,
+      dependencies: setup.dependencies,
+      members: setup.members,
+      executionProxyBaseUrl:
+        setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
+      platformChain: setup.platformChain ?? PlatformProviderChainService.create(),
+    });
   }
 
   /** The registry's ceilings, read from the catalogue this package ships. */
@@ -325,13 +326,22 @@ export class ModelProviderApp implements ModelProviderApi {
   readonly #playground: ModelProviderPlaygroundService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
 
-  private constructor(
-    repositories: ModelProviderRepositories,
-    dependencies: ModelProviderSetup["dependencies"],
-    members: ModelProviderInfrastructure,
-    executionProxyBaseUrl: string,
-    private readonly platformChain: PlatformProviderChainService,
-  ) {
+  private readonly platformChain: PlatformProviderChainService;
+
+  private constructor({
+    repositories,
+    dependencies,
+    members,
+    executionProxyBaseUrl,
+    platformChain,
+  }: {
+    repositories: ModelProviderRepositories;
+    dependencies: ModelProviderSetup["dependencies"];
+    members: ModelProviderInfrastructure;
+    executionProxyBaseUrl: string;
+    platformChain: PlatformProviderChainService;
+  }) {
+    this.platformChain = platformChain;
     this.#dataPrivacy = dependencies.dataPrivacy;
     this.#modelProviders = ModelProviderGateway.create({
       repository: repositories.providers,

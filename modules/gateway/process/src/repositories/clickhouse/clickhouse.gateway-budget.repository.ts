@@ -1047,12 +1047,17 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
    * or every bucket under the anchor carrying its provider suffix. An unfiltered target matches
    * only buckets with no suffix, so it never absorbs a filtered sibling's spend.
    */
-  private static bucketMatchSql(
-    target: BudgetSpendTarget,
-    budgetIdParam: string,
-    scopeIdParam: string,
-    suffixParam: string,
-  ): string {
+  private static bucketMatchSql({
+    target,
+    budgetIdParam,
+    scopeIdParam,
+    suffixParam,
+  }: {
+    target: BudgetSpendTarget;
+    budgetIdParam: string;
+    scopeIdParam: string;
+    suffixParam: string;
+  }): string {
     const budget = `BudgetId = {${budgetIdParam}:String}`;
     if (target.match !== "prefix") {
       return `${budget} AND ScopeId = {${scopeIdParam}:String}`;
@@ -1084,12 +1089,12 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
       if (t.match === "prefix" && t.bucketSuffix) {
         params[`fsuffix${i}`] = t.bucketSuffix;
       }
-      const bucket = GatewayBudgetClickHouseRepository.bucketMatchSql(
-        t,
-        `fbudgetId${i}`,
-        `fscopeId${i}`,
-        `fsuffix${i}`,
-      );
+      const bucket = GatewayBudgetClickHouseRepository.bucketMatchSql({
+        target: t,
+        budgetIdParam: `fbudgetId${i}`,
+        scopeIdParam: `fscopeId${i}`,
+        suffixParam: `fsuffix${i}`,
+      });
       return `toString(sumIf(AmountNanoUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
     });
     return { sql: sums.join(",\n              "), params };
@@ -1112,12 +1117,12 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
       params[`scope${i}`] = GatewayBudgetClickHouseRepository.scopeToClickHouse(t.scope);
       params[`scopeId${i}`] = t.scopeId;
       if (t.bucketSuffix) params[`suffix${i}`] = t.bucketSuffix;
-      const bucket = GatewayBudgetClickHouseRepository.bucketMatchSql(
-        t,
-        `budgetId${i}`,
-        `scopeId${i}`,
-        `suffix${i}`,
-      );
+      const bucket = GatewayBudgetClickHouseRepository.bucketMatchSql({
+        target: t,
+        budgetIdParam: `budgetId${i}`,
+        scopeIdParam: `scopeId${i}`,
+        suffixParam: `suffix${i}`,
+      });
       return `(Scope = {scope${i}:String} AND ${bucket})`;
     });
     return { sql: terms.join(" OR "), params };

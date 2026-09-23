@@ -10,13 +10,31 @@ import type {
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class IngestionPullLifecycleService {
-  private constructor(
-    private readonly repository: IngestionPullLifecycleRepository,
-    private readonly tenant: IngestionPullTenantResolver,
-    private readonly commands: IngestionPullLifecycleChannel,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-    private readonly now: () => number,
-  ) {}
+  private readonly repository: IngestionPullLifecycleRepository;
+  private readonly tenant: IngestionPullTenantResolver;
+  private readonly commands: IngestionPullLifecycleChannel;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+  private readonly now: () => number;
+
+  private constructor({
+    repository,
+    tenant,
+    commands,
+    diagnostics,
+    now,
+  }: {
+    repository: IngestionPullLifecycleRepository;
+    tenant: IngestionPullTenantResolver;
+    commands: IngestionPullLifecycleChannel;
+    diagnostics: GovernanceDiagnosticsSink;
+    now: () => number;
+  }) {
+    this.repository = repository;
+    this.tenant = tenant;
+    this.commands = commands;
+    this.diagnostics = diagnostics;
+    this.now = now;
+  }
 
   static create(options: {
     repository: IngestionPullLifecycleRepository;
@@ -25,13 +43,13 @@ export class IngestionPullLifecycleService {
     diagnostics?: GovernanceDiagnosticsSink;
     now?: () => number;
   }): IngestionPullLifecycleService {
-    return new IngestionPullLifecycleService(
-      options.repository,
-      options.tenant,
-      options.commands,
-      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
-      options.now ?? Date.now,
-    );
+    return new IngestionPullLifecycleService({
+      repository: options.repository,
+      tenant: options.tenant,
+      commands: options.commands,
+      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      now: options.now ?? Date.now,
+    });
   }
 
   async sync(source: IngestionPullLifecycleSource): Promise<void> {

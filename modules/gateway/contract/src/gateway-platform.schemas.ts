@@ -176,11 +176,13 @@ export const gatewayExternalIdFilterSchema = z
   .optional()
   .describe("Exact match on the resource's external_id.");
 
-export const gatewayVirtualKeyListQuerySchema = gatewayPageQuerySchema.extend({
+export const gatewayVirtualKeyListQuerySchema = z.object({
+  ...gatewayPageQuerySchema.shape,
   external_id: gatewayExternalIdFilterSchema,
 });
 
-export const gatewayBudgetListQuerySchema = gatewayPageQuerySchema.extend({
+export const gatewayBudgetListQuerySchema = z.object({
+  ...gatewayPageQuerySchema.shape,
   scope_type: z
     .string()
     .optional()

@@ -108,14 +108,16 @@ export class ModelProviderCommandService {
     const projectScopes = parsed.projectId
       ? await this.options.scopes.tryGetProjectScopes(parsed.projectId)
       : null;
-    const existing = parsed.id
-      ? await this.options.repository.tryFindById({ id: parsed.id, organizationId })
-      : projectScopes
-        ? await this.options.repository.tryFindByProviderForProject({
+    const existingByProvider = async () =>
+      projectScopes
+        ? this.options.repository.tryFindByProviderForProject({
             provider: parsed.provider,
             projectScopes,
           })
         : null;
+    const existing = parsed.id
+      ? await this.options.repository.tryFindById({ id: parsed.id, organizationId })
+      : await existingByProvider();
     if (!existing) {
       throw new ModelProviderNotFoundError();
     }

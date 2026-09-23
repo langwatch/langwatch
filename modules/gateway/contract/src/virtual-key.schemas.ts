@@ -29,7 +29,8 @@ export const virtualKeyApiKeyInputSchema = z.object({
 });
 
 /** Disabling a key, with the optional operator note recorded against it. */
-export const virtualKeyApiDisableInputSchema = virtualKeyApiKeyInputSchema.extend({
+export const virtualKeyApiDisableInputSchema = z.object({
+  ...virtualKeyApiKeyInputSchema.shape,
   reason: z.string().max(500).optional(),
 });
 

@@ -112,16 +112,43 @@ type PersonalUsageReader = {
 };
 
 export class BudgetOverviewService {
-  private constructor(
-    private readonly repository: GatewayBudgetOverviewRepository,
-    private readonly organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">,
-    private readonly featureFlags: FeatureFlagApi,
-    private readonly personalVirtualKeys: PersonalVirtualKeyReader,
-    private readonly personalUsage: PersonalUsageReader | undefined,
-    private readonly budgetDecisions: GatewayService,
-    private readonly providerLabels: GatewayProviderLabelRepository,
-    private readonly chRepo?: GatewayBudgetSpend,
-  ) {}
+  private readonly repository: GatewayBudgetOverviewRepository;
+  private readonly organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
+  private readonly featureFlags: FeatureFlagApi;
+  private readonly personalVirtualKeys: PersonalVirtualKeyReader;
+  private readonly personalUsage: PersonalUsageReader | undefined;
+  private readonly budgetDecisions: GatewayService;
+  private readonly providerLabels: GatewayProviderLabelRepository;
+  private readonly chRepo?: GatewayBudgetSpend;
+
+  private constructor({
+    repository,
+    organizations,
+    featureFlags,
+    personalVirtualKeys,
+    personalUsage,
+    budgetDecisions,
+    providerLabels,
+    chRepo,
+  }: {
+    repository: GatewayBudgetOverviewRepository;
+    organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
+    featureFlags: FeatureFlagApi;
+    personalVirtualKeys: PersonalVirtualKeyReader;
+    personalUsage: PersonalUsageReader | undefined;
+    budgetDecisions: GatewayService;
+    providerLabels: GatewayProviderLabelRepository;
+    chRepo?: GatewayBudgetSpend;
+  }) {
+    this.repository = repository;
+    this.organizations = organizations;
+    this.featureFlags = featureFlags;
+    this.personalVirtualKeys = personalVirtualKeys;
+    this.personalUsage = personalUsage;
+    this.budgetDecisions = budgetDecisions;
+    this.providerLabels = providerLabels;
+    this.chRepo = chRepo;
+  }
 
   private get applicableBudgets(): GatewayApplicableBudgetsService {
     return GatewayApplicableBudgetsService.create({
@@ -140,16 +167,16 @@ export class BudgetOverviewService {
     personalUsage?: PersonalUsageReader;
     budgetRepository?: GatewayBudgetSpend;
   }): BudgetOverviewService {
-    return new BudgetOverviewService(
-      options.repository,
-      options.organizations,
-      options.featureFlags,
-      options.personalVirtualKeys,
-      options.personalUsage,
-      options.budgetDecisions,
-      options.providerLabels,
-      options.budgetRepository,
-    );
+    return new BudgetOverviewService({
+      repository: options.repository,
+      organizations: options.organizations,
+      featureFlags: options.featureFlags,
+      personalVirtualKeys: options.personalVirtualKeys,
+      personalUsage: options.personalUsage,
+      budgetDecisions: options.budgetDecisions,
+      providerLabels: options.providerLabels,
+      chRepo: options.budgetRepository,
+    });
   }
 
   /**
@@ -351,7 +378,8 @@ function byMostBindingFirst(a: BudgetOverviewItem, b: BudgetOverviewItem): numbe
     return rank;
   }
 
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  if (a.id < b.id) return -1;
+  return a.id > b.id ? 1 : 0;
 }
 
 function scopeClassForUser(

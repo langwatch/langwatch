@@ -38,6 +38,24 @@ import {
   type GatewayConnectUpstream,
   type GatewayLicenseTokenResolution,
   type GatewayServerConfig,
+  type GatewayResolvedBudget,
+  type VirtualKeyBudgetInput,
+  type GatewayMintedVirtualKey,
+  type GatewayVirtualKeyUsageSummary,
+  type GatewayUsageSummary,
+  type GatewayGuardrailResource,
+  type GatewayBudgetResource,
+  type GatewayBudgetDetail,
+  type GatewayBudgetScopeTarget,
+  type GatewayCacheRuleResource,
+  type GatewayBudgetScopeReachResult,
+  type GatewayBudgetHealth,
+  type GatewayBudgetListWithHealth,
+  type GatewayPricedSpend,
+  type GatewayPricedSpendResult,
+  type GatewayInternalSpendCommandRecord,
+  type GatewayInternalSpendSubmission,
+  type GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -690,16 +708,16 @@ export class GatewayApp implements GatewayApi {
         internalCollaborators.realtimeSessions ?? setup.members.elevenLabsWebhook?.sessions,
     });
 
-    return new GatewayApp(
-      {
+    return new GatewayApp({
+      members: {
         ...controlPlane,
         ...(setup.members.elevenLabsWebhook
           ? { elevenLabsWebhook: setup.members.elevenLabsWebhook }
           : {}),
       },
       internalProtocol,
-      GatewayInternalIdentity.create(secrets.internalSecret),
-      {
+      internalDoor: GatewayInternalIdentity.create(secrets.internalSecret),
+      spend: {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
         // `settlementGraceMs` owns the parse, the bound and the warning on the
@@ -709,17 +727,17 @@ export class GatewayApp implements GatewayApi {
         // config; a real boot always states one through the process parse.
         settlementGraceMs: settlementGraceMs(setup.config?.spendSettlementGraceMs),
       },
-      {
+      budgetOverviewDeps: {
         organizations: setup.dependencies.organizations,
         featureFlags: setup.dependencies.featureFlags,
       },
-      {
+      addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
         publicUrl: setup.config?.publicUrl ?? setup.config?.baseUrl,
         expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.members.publicBaseUrl,
       },
       connectUpstream,
-    );
+    });
   }
 
   #coreDependencies: GatewayAppDependencies | undefined;
@@ -736,19 +754,27 @@ export class GatewayApp implements GatewayApi {
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
 
-  private constructor(
-    members: GatewayInfrastructure,
-    internalProtocol: GatewayInternalProtocolService,
-    internalDoor: RestIdentity,
-    spend?: GatewaySpendCollaborators,
-    budgetOverviewDeps?: GatewayBudgetOverviewDeps,
-    addresses: GatewayDeploymentAddresses = {
+  private constructor({
+    members,
+    internalProtocol,
+    internalDoor,
+    spend,
+    budgetOverviewDeps,
+    addresses = {
       baseUrl: void 0,
       publicUrl: void 0,
       expectedControlPlaneUrl: void 0,
     },
-    connectUpstream?: GatewayConnectUpstreamService,
-  ) {
+    connectUpstream,
+  }: {
+    members: GatewayInfrastructure;
+    internalProtocol: GatewayInternalProtocolService;
+    internalDoor: RestIdentity;
+    spend?: GatewaySpendCollaborators;
+    budgetOverviewDeps?: GatewayBudgetOverviewDeps;
+    addresses?: GatewayDeploymentAddresses;
+    connectUpstream?: GatewayConnectUpstreamService;
+  }) {
     this.#addresses = addresses;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
@@ -771,10 +797,8 @@ export class GatewayApp implements GatewayApi {
     return this.#internalDoor;
   }
 
-  findVirtualKeyBySecret(
-    ...args: Parameters<GatewayInternalProtocolService["findVirtualKeyBySecret"]>
-  ) {
-    return this.#internalProtocol.findVirtualKeyBySecret(...args);
+  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+    return this.#internalProtocol.findVirtualKeyBySecret(secret);
   }
 
   resolveLicenseToken(input: {
@@ -784,62 +808,89 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.resolveLicenseToken(input);
   }
 
-  findTraceDestination(
-    ...args: Parameters<GatewayInternalProtocolService["findTraceDestination"]>
-  ) {
-    return this.#internalProtocol.findTraceDestination(...args);
+  findTraceDestination(projectId: string): Promise<{
+    id: string;
+    teamId: string;
+  } | null> {
+    return this.#internalProtocol.findTraceDestination(projectId);
   }
 
-  signJwt(...args: Parameters<GatewayInternalProtocolService["signJwt"]>) {
+  signJwt(...args: Parameters<GatewayInternalProtocolService["signJwt"]>): {
+    jwt: string;
+    expiresAt: number;
+  } {
     return this.#internalProtocol.signJwt(...args);
   }
 
-  touchVirtualKeyUsage(
-    ...args: Parameters<GatewayInternalProtocolService["touchVirtualKeyUsage"]>
-  ) {
-    return this.#internalProtocol.touchVirtualKeyUsage(...args);
+  touchVirtualKeyUsage(id: string): Promise<void> {
+    return this.#internalProtocol.touchVirtualKeyUsage(id);
   }
 
   refreshCodex(...args: Parameters<GatewayInternalProtocolService["refreshCodex"]>) {
     return this.#internalProtocol.refreshCodex(...args);
   }
 
-  findVirtualKeyForConfig(
-    ...args: Parameters<GatewayInternalProtocolService["findVirtualKeyForConfig"]>
-  ) {
-    return this.#internalProtocol.findVirtualKeyForConfig(...args);
+  findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
+    return this.#internalProtocol.findVirtualKeyForConfig(id);
   }
 
-  configVersionToken(...args: Parameters<GatewayInternalProtocolService["configVersionToken"]>) {
-    return this.#internalProtocol.configVersionToken(...args);
+  configVersionToken(input: VirtualKeyWithScopes): Promise<string> {
+    return this.#internalProtocol.configVersionToken(input);
   }
 
-  materialiseConfig(...args: Parameters<GatewayInternalProtocolService["materialiseConfig"]>) {
-    return this.#internalProtocol.materialiseConfig(...args);
+  materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown> {
+    return this.#internalProtocol.materialiseConfig(input);
   }
 
-  listChanges(...args: Parameters<GatewayInternalProtocolService["listChanges"]>) {
-    return this.#internalProtocol.listChanges(...args);
+  listChanges(
+    organizationId: string,
+    since: bigint,
+    limit: number,
+  ): Promise<{
+    currentRevision: bigint;
+    events: {
+      kind: string;
+      virtualKeyId: string | null;
+      budgetId: string | null;
+      modelProviderId: string | null;
+      projectId: string | null;
+      revision: bigint;
+    }[];
+  }> {
+    return this.#internalProtocol.listChanges(organizationId, since, limit);
   }
 
-  currentRevision(...args: Parameters<GatewayInternalProtocolService["currentRevision"]>) {
-    return this.#internalProtocol.currentRevision(...args);
+  currentRevision(organizationId: string): Promise<bigint> {
+    return this.#internalProtocol.currentRevision(organizationId);
   }
 
   checkGuardrails(...args: Parameters<GatewayInternalProtocolService["checkGuardrails"]>) {
     return this.#internalProtocol.checkGuardrails(...args);
   }
 
-  budgetBucketSpend(...args: Parameters<GatewayInternalProtocolService["budgetBucketSpend"]>) {
+  budgetBucketSpend(
+    ...args: Parameters<GatewayInternalProtocolService["budgetBucketSpend"]>
+  ): Promise<
+    | {
+        status: "not_found";
+      }
+    | {
+        status: "available";
+        spentMicroUsd: number;
+        bucketScopeId: string | null;
+      }
+  > {
     return this.#internalProtocol.budgetBucketSpend(...args);
   }
 
-  submitSpendCommands(...args: Parameters<GatewayInternalProtocolService["submitSpendCommands"]>) {
-    return this.#internalProtocol.submitSpendCommands(...args);
+  submitSpendCommands(
+    records: GatewayInternalSpendCommandRecord[],
+  ): Promise<GatewayInternalSpendSubmission> {
+    return this.#internalProtocol.submitSpendCommands(records);
   }
 
-  recordPricedSpend(...args: Parameters<GatewayInternalProtocolService["recordPricedSpend"]>) {
-    return this.#internalProtocol.recordPricedSpend(...args);
+  recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
+    return this.#internalProtocol.recordPricedSpend(input);
   }
 
   reserveRealtimeSession(
@@ -866,19 +917,29 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.reportRealtimeSessionUsage(...args);
   }
 
-  getAgentCacheEntry(input: { projectId: string; name: string }) {
+  getAgentCacheEntry(input: { projectId: string; name: string }): Promise<{
+    name: string;
+    value: string;
+  }> {
     return this.#agentCacheService().get(input);
   }
 
-  putAgentCacheEntry(input: GatewayAgentCacheWriteInput) {
+  putAgentCacheEntry(input: GatewayAgentCacheWriteInput): Promise<{
+    name: string;
+    ttl_seconds: number;
+  }> {
     return this.#agentCacheService().put(input);
   }
 
-  claimAgentCacheEntry(input: GatewayAgentCacheWriteInput) {
+  claimAgentCacheEntry(input: GatewayAgentCacheWriteInput): Promise<{
+    name: string;
+    claimed: boolean;
+    ttl_seconds: number;
+  }> {
     return this.#agentCacheService().claim(input);
   }
 
-  deleteAgentCacheEntry(input: { projectId: string; name: string }) {
+  deleteAgentCacheEntry(input: { projectId: string; name: string }): Promise<void> {
     return this.#agentCacheService().delete(input);
   }
 
@@ -1057,94 +1118,106 @@ export class GatewayApp implements GatewayApi {
     return dependencies;
   }
 
-  listBudgetsWithHealth(organizationId: string) {
+  listBudgetsWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth> {
     return this.#dependencies.budgetDecisions.listWithHealth(organizationId);
   }
 
-  listBudgetPageWithHealth(input: GatewayBudgetPageInput) {
+  listBudgetPageWithHealth(input: GatewayBudgetPageInput): Promise<GatewayBudgetListWithHealth> {
     return this.#dependencies.budgetDecisions.listPageWithHealth(input);
   }
 
-  tryGetBudgetWithHealth(input: { id: string; organizationId: string }) {
+  tryGetBudgetWithHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetHealth | null> {
     return this.#dependencies.budgetDecisions.findHealthById(input);
   }
 
-  budgetScopeReach(input: GatewayBudgetScopeReachInput) {
+  budgetScopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
     return this.#dependencies.budgetDecisions.scopeReach(input);
   }
 
-  listCacheRulePage(input: GatewayCacheRulePageInput) {
+  listCacheRulePage(input: GatewayCacheRulePageInput): Promise<GatewayCacheRuleResource[]> {
     return this.#dependencies.budgetDecisions.cacheRuleListPage(input);
   }
 
-  listProjectBudgetsWithHealth(projectId: string) {
+  listProjectBudgetsWithHealth(projectId: string): Promise<GatewayBudgetListWithHealth> {
     return this.#dependencies.budgetDecisions.listForProjectWithHealth(projectId);
   }
 
   listBudgetScopeTargets(
     budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
-  ) {
+  ): Promise<Map<string, GatewayBudgetScopeTarget>> {
     return this.#dependencies.budgetDecisions.resolveScopeTargets(budgets, organizationId);
   }
 
-  findBudgetDetail(input: { id: string; organizationId: string }) {
+  findBudgetDetail(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail | null> {
     return this.#dependencies.budgetDecisions.findDetailById(input);
   }
 
-  createBudget(input: CreateGatewayBudgetInput) {
+  createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {
     return this.#dependencies.budgetDecisions.create(input);
   }
 
-  updateBudget(input: UpdateGatewayBudgetInput) {
+  updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource> {
     return this.#dependencies.budgetDecisions.update(input);
   }
 
-  archiveBudget(input: ArchiveGatewayBudgetInput) {
+  archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource> {
     return this.#dependencies.budgetDecisions.archive(input);
   }
 
-  resetBudget(input: ResetGatewayBudgetInput) {
+  resetBudget(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource> {
     return this.#dependencies.budgetDecisions.reset(input);
   }
 
-  listGuardrails(projectId: string) {
+  listGuardrails(projectId: string): Promise<GatewayGuardrailResource[]> {
     return this.#dependencies.budgetDecisions.guardrailList(projectId);
   }
 
-  findGuardrail(input: { id: string; projectId: string }) {
+  findGuardrail(input: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayGuardrailResource | null> {
     return this.#dependencies.budgetDecisions.findGuardrail(input);
   }
 
-  createGuardrail(input: CreateGatewayGuardrailInput) {
+  createGuardrail(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
     return this.#dependencies.budgetDecisions.guardrailCreate(input);
   }
 
-  updateGuardrail(input: UpdateGatewayGuardrailInput) {
+  updateGuardrail(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
     return this.#dependencies.budgetDecisions.guardrailUpdate(input);
   }
 
-  archiveGuardrail(input: ArchiveGatewayGuardrailInput) {
+  archiveGuardrail(input: ArchiveGatewayGuardrailInput): Promise<void> {
     return this.#dependencies.budgetDecisions.guardrailArchive(input);
   }
 
-  listCacheRules(organizationId: string) {
+  listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]> {
     return this.#dependencies.budgetDecisions.cacheRuleList(organizationId);
   }
 
-  findCacheRule(input: { id: string; organizationId: string }) {
+  findCacheRule(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
     return this.#dependencies.budgetDecisions.findCacheRule(input);
   }
 
-  createCacheRule(input: CreateGatewayCacheRuleInput) {
+  createCacheRule(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleCreate(input);
   }
 
-  updateCacheRule(input: UpdateGatewayCacheRuleInput) {
+  updateCacheRule(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleUpdate(input);
   }
 
-  archiveCacheRule(input: ArchiveGatewayCacheRuleInput) {
+  archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
   }
 
@@ -1154,7 +1227,11 @@ export class GatewayApp implements GatewayApi {
     return (await this.#dependencies.projects.findOrganizationId(projectId)) ?? null;
   }
 
-  usageSummary(input: { organizationId: string; virtualKeyIds: string[]; window: UsageWindow }) {
+  usageSummary(input: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    window: UsageWindow;
+  }): Promise<GatewayUsageSummary> {
     return this.#dependencies.usage.summary(input);
   }
 
@@ -1163,7 +1240,7 @@ export class GatewayApp implements GatewayApi {
     virtualKeyId: string;
     window: UsageWindow;
     model?: string;
-  }) {
+  }): Promise<GatewayVirtualKeyUsageSummary> {
     return this.#dependencies.usage.summaryForVirtualKey(input);
   }
 
@@ -1216,23 +1293,23 @@ export class GatewayApp implements GatewayApi {
     };
   }
 
-  findVirtualKeyById(id: string, organizationId: string) {
+  findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null> {
     return this.#dependencies.virtualKeys.findById(id, organizationId);
   }
 
-  createVirtualKey(input: GatewayVirtualKeyCreateInput) {
+  createVirtualKey(input: GatewayVirtualKeyCreateInput): Promise<GatewayMintedVirtualKey> {
     return this.#dependencies.virtualKeys.create(input);
   }
 
-  updateVirtualKey(input: GatewayVirtualKeyUpdateInput) {
+  updateVirtualKey(input: GatewayVirtualKeyUpdateInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.update(input);
   }
 
-  rotateVirtualKey(input: GatewayVirtualKeyRotateInput) {
+  rotateVirtualKey(input: GatewayVirtualKeyRotateInput): Promise<GatewayMintedVirtualKey> {
     return this.#dependencies.virtualKeys.rotate(input);
   }
 
-  revokeVirtualKey(input: GatewayVirtualKeyRevokeInput) {
+  revokeVirtualKey(input: GatewayVirtualKeyRevokeInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.revoke(input);
   }
 
@@ -1302,11 +1379,11 @@ export class GatewayApp implements GatewayApi {
     return this.#connectManagedKeys;
   }
 
-  disableVirtualKey(input: GatewayVirtualKeyDisableInput) {
+  disableVirtualKey(input: GatewayVirtualKeyDisableInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.disable(input);
   }
 
-  enableVirtualKey(input: GatewayVirtualKeyEnableInput) {
+  enableVirtualKey(input: GatewayVirtualKeyEnableInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.enable(input);
   }
 
@@ -1322,7 +1399,17 @@ export class GatewayApp implements GatewayApi {
     return this.#addresses;
   }
 
-  parseVirtualKeyBudget(input: unknown) {
+  parseVirtualKeyBudget(input: unknown):
+    | {
+        success: true;
+        data: VirtualKeyBudgetInput;
+      }
+    | {
+        success: false;
+        error: {
+          message: string;
+        };
+      } {
     return this.#dependencies.schemas.virtualKeyBudgetInput.safeParse(input);
   }
 
@@ -1332,7 +1419,7 @@ export class GatewayApp implements GatewayApi {
     }
       ? Input
       : never,
-  ) {
+  ): Promise<GatewayVirtualKeyRecord[]> {
     return this.#dependencies.virtualKeys.getPage(input);
   }
 
@@ -1467,7 +1554,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.listApplicableBudgets(input);
   }
 
-  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget) {
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.#dependencies.budgetDecisions.resolveApplicableBudgets(input);
   }
 

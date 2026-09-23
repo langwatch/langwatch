@@ -13,12 +13,27 @@ import type {
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class QuarantineFillEvaluatorService {
-  private constructor(
-    private readonly tenant: QuarantineTenantResolver,
-    private readonly traceActivity: QuarantineTraceActivityReader | undefined,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-    private readonly now: () => number,
-  ) {}
+  private readonly tenant: QuarantineTenantResolver;
+  private readonly traceActivity: QuarantineTraceActivityReader | undefined;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+  private readonly now: () => number;
+
+  private constructor({
+    tenant,
+    traceActivity,
+    diagnostics,
+    now,
+  }: {
+    tenant: QuarantineTenantResolver;
+    traceActivity: QuarantineTraceActivityReader | undefined;
+    diagnostics: GovernanceDiagnosticsSink;
+    now: () => number;
+  }) {
+    this.tenant = tenant;
+    this.traceActivity = traceActivity;
+    this.diagnostics = diagnostics;
+    this.now = now;
+  }
 
   static create(options: {
     tenant: QuarantineTenantResolver;
@@ -26,12 +41,12 @@ export class QuarantineFillEvaluatorService {
     diagnostics?: GovernanceDiagnosticsSink;
     now?: () => number;
   }): QuarantineFillEvaluatorService {
-    return new QuarantineFillEvaluatorService(
-      options.tenant,
-      options.traceActivity,
-      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
-      options.now ?? Date.now,
-    );
+    return new QuarantineFillEvaluatorService({
+      tenant: options.tenant,
+      traceActivity: options.traceActivity,
+      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      now: options.now ?? Date.now,
+    });
   }
 
   async evaluate(input: QuarantineFillInput): Promise<QuarantineFillStats> {

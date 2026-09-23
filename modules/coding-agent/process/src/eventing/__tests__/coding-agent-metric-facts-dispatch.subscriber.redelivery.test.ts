@@ -24,17 +24,18 @@ const POINT_ID = "b".repeat(64);
  * Sorting pins the same order the producer persists without importing its
  * private rules into this module.
  */
+function encodedValueOf(value: unknown) {
+  if (typeof value === "boolean") return { type: "bool", value };
+  if (typeof value === "number") return { type: "double", value };
+  return { type: "string", value: String(value) };
+}
+
 function encodeAttributes(attributes: Record<string, unknown>): string {
   return JSON.stringify(
     Object.entries(attributes)
       .map(([key, value]) => ({
         key,
-        value:
-          typeof value === "boolean"
-            ? { type: "bool", value }
-            : typeof value === "number"
-              ? { type: "double", value }
-              : { type: "string", value: String(value) },
+        value: encodedValueOf(value),
       }))
       .toSorted((left, right) => left.key.localeCompare(right.key)),
   );
@@ -75,7 +76,7 @@ function dataPointEvent({
       pointAttributesJson: encodeAttributes(attributes),
       resourceAttributesJson: encodeAttributes(resourceAttributes),
       timeUnixMs: 1_500,
-      valueType: valueDouble !== null ? "double" : valueInt !== null ? "int" : "none",
+      valueType: valueTypeOf(valueDouble, valueInt),
       valueDouble,
       valueInt,
     },
@@ -225,3 +226,8 @@ describe("codingAgentMetricFactsDispatch", () => {
     });
   });
 });
+
+function valueTypeOf(valueDouble: number | null, valueInt: string | null) {
+  if (valueDouble !== null) return "double";
+  return valueInt !== null ? "int" : "none";
+}

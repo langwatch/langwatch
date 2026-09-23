@@ -27,7 +27,9 @@ export class ConnectedAgentCredentialService implements ConnectedAgentCredential
   readonly #authz: AuthzApi;
   readonly #projects: ProjectApi;
 
-  static create(dependencies: ConnectedAgentCredentialDependencies) {
+  static create(
+    dependencies: ConnectedAgentCredentialDependencies,
+  ): ConnectedAgentCredentialService {
     return new ConnectedAgentCredentialService(dependencies);
   }
 

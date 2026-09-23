@@ -27,6 +27,11 @@ function precedence(row: ModelProviderEditorValue): readonly [0 | 1, number, 0 |
   return [row.enabled ? 0 : 1, scopeRank(row), row.id ? 0 : 1, row.id ?? ""] as const;
 }
 
+function compareIds(id: string, theirId: string): number {
+  if (id === theirId) return 0;
+  return id < theirId ? -1 : 1;
+}
+
 function compareRows(left: ModelProviderEditorValue, right: ModelProviderEditorValue): number {
   const [enabled, scope, persisted, id] = precedence(left);
   const [theirEnabled, theirScope, theirPersisted, theirId] = precedence(right);
@@ -34,7 +39,7 @@ function compareRows(left: ModelProviderEditorValue, right: ModelProviderEditorV
     enabled - theirEnabled ||
     scope - theirScope ||
     persisted - theirPersisted ||
-    (id === theirId ? 0 : id < theirId ? -1 : 1)
+    compareIds(id, theirId)
   );
 }
 

@@ -81,7 +81,17 @@ interface RawTransformResponse {
  * pulls in Hono context types we don't want in this lightweight EE
  * service module.
  */
-function canonical(method: string, path: string, timestamp: string, body: string): string {
+function canonical({
+  method,
+  path,
+  timestamp,
+  body,
+}: {
+  method: string;
+  path: string;
+  timestamp: string;
+  body: string;
+}): string {
   const bodyHash = createHash("sha256").update(body).digest("hex");
   return `${method}\n${path}\n${timestamp}\n${bodyHash}`;
 }
@@ -189,7 +199,10 @@ export class HttpOttlTransformChannel extends GovernanceOttlGateway {
     }
     const timestamp = Math.floor(this.now() / 1_000).toString();
     const bodyJson = JSON.stringify(body);
-    const signature = sign(this.secret, canonical("POST", path, timestamp, bodyJson));
+    const signature = sign(
+      this.secret,
+      canonical({ method: "POST", path, timestamp, body: bodyJson }),
+    );
     return this.request(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {

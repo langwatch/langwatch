@@ -53,13 +53,12 @@ export const createGatewayCacheRuleInputSchema = z.object({
   actorUserId: z.string(),
 });
 
-export const updateGatewayCacheRuleInputSchema = createGatewayCacheRuleInputSchema
-  .partial()
-  .extend({
-    id: z.string(),
-    organizationId: z.string(),
-    actorUserId: z.string(),
-  });
+export const updateGatewayCacheRuleInputSchema = z.object({
+  ...createGatewayCacheRuleInputSchema.partial().shape,
+  id: z.string(),
+  organizationId: z.string(),
+  actorUserId: z.string(),
+});
 
 export const archiveGatewayCacheRuleInputSchema = z.object({
   id: z.string(),

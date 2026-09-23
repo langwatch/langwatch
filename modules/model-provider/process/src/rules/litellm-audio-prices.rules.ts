@@ -98,18 +98,11 @@ function toPricing(price: LitellmPriceEntry): LLMModelPricing | null {
 }
 
 function describe(mode: string, pricing: LLMModelPricing): string {
-  const unit =
-    pricing.inputCostPerCharacter !== undefined
-      ? "per input character"
-      : pricing.inputCostPerSecond !== undefined
-        ? "per second of audio"
-        : "per token";
-  const kind =
-    mode === "audio_speech"
-      ? "Speech synthesis"
-      : mode === "realtime"
-        ? "Realtime audio"
-        : "Speech-to-text";
+  const durationUnit =
+    pricing.inputCostPerSecond !== undefined ? "per second of audio" : "per token";
+  const unit = pricing.inputCostPerCharacter !== undefined ? "per input character" : durationUnit;
+  const listeningKind = mode === "realtime" ? "Realtime audio" : "Speech-to-text";
+  const kind = mode === "audio_speech" ? "Speech synthesis" : listeningKind;
   return `${kind}, priced ${unit}. Synced from litellm's price registry.`;
 }
 
@@ -126,12 +119,9 @@ export function mapLitellmAudioModels(
   const unrepresentable: UnrepresentableModel[] = [];
 
   for (const [rawId, price] of Object.entries(prices)) {
+    if (!isCurrentAudioPrice(rawId, price)) continue;
     const mode = price.mode ?? "";
-    if (!AUDIO_MODES.includes(mode)) continue;
-
     const provider = price.litellm_provider ?? "";
-    if (!AUDIO_PROVIDERS.includes(provider)) continue;
-    if (DATED_VARIANT.test(rawId)) continue;
 
     const id = rawId.includes("/") ? rawId : `${provider}/${rawId}`;
     if (excludeIds.has(id)) continue;
@@ -158,7 +148,7 @@ export function mapLitellmAudioModels(
       maxCompletionTokens: null,
       supportedParameters: [],
       defaultParameters: null,
-      modality: isRealtime ? "audio->audio" : isSpeech ? "text->audio" : "audio->text",
+      modality: audioModalityOf({ isRealtime, isSpeech }),
       mode: "audio",
       description: describe(mode, pricing),
       supportsImageInput: false,
@@ -201,4 +191,15 @@ export async function fetchLitellmPrices(): Promise<Record<string, LitellmPriceE
   } catch {
     return null;
   }
+}
+
+function audioModalityOf({ isRealtime, isSpeech }: { isRealtime: boolean; isSpeech: boolean }) {
+  if (isRealtime) return "audio->audio";
+  return isSpeech ? "text->audio" : "audio->text";
+}
+
+function isCurrentAudioPrice(rawId: string, price: LitellmPriceEntry): boolean {
+  if (!AUDIO_MODES.includes(price.mode ?? "")) return false;
+  if (!AUDIO_PROVIDERS.includes(price.litellm_provider ?? "")) return false;
+  return !DATED_VARIANT.test(rawId);
 }

@@ -31,18 +31,51 @@ import type { PullDestinationService } from "./pull-destination.service.ts";
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export class IngestionSourceService {
-  private constructor(
-    private readonly repository: IngestionSourceRepository,
-    private readonly projects: ProjectApi,
-    private readonly entitlements: IngestionSourceEntitlements,
-    private readonly lifecycle: IngestionSourceLifecycleChannel,
-    private readonly credentials: IngestionCredentialsService,
-    private readonly secrets: IngestionSecretService,
-    private readonly destinations: PullDestinationService,
-    private readonly diagnostics: GovernanceDiagnosticsSink,
-    private readonly now: () => number,
-    private readonly validation: IngestionSourceValidationService,
-  ) {}
+  private readonly repository: IngestionSourceRepository;
+  private readonly projects: ProjectApi;
+  private readonly entitlements: IngestionSourceEntitlements;
+  private readonly lifecycle: IngestionSourceLifecycleChannel;
+  private readonly credentials: IngestionCredentialsService;
+  private readonly secrets: IngestionSecretService;
+  private readonly destinations: PullDestinationService;
+  private readonly diagnostics: GovernanceDiagnosticsSink;
+  private readonly now: () => number;
+  private readonly validation: IngestionSourceValidationService;
+
+  private constructor({
+    repository,
+    projects,
+    entitlements,
+    lifecycle,
+    credentials,
+    secrets,
+    destinations,
+    diagnostics,
+    now,
+    validation,
+  }: {
+    repository: IngestionSourceRepository;
+    projects: ProjectApi;
+    entitlements: IngestionSourceEntitlements;
+    lifecycle: IngestionSourceLifecycleChannel;
+    credentials: IngestionCredentialsService;
+    secrets: IngestionSecretService;
+    destinations: PullDestinationService;
+    diagnostics: GovernanceDiagnosticsSink;
+    now: () => number;
+    validation: IngestionSourceValidationService;
+  }) {
+    this.repository = repository;
+    this.projects = projects;
+    this.entitlements = entitlements;
+    this.lifecycle = lifecycle;
+    this.credentials = credentials;
+    this.secrets = secrets;
+    this.destinations = destinations;
+    this.diagnostics = diagnostics;
+    this.now = now;
+    this.validation = validation;
+  }
 
   static create(options: {
     repository: IngestionSourceRepository;
@@ -55,18 +88,18 @@ export class IngestionSourceService {
     diagnostics: GovernanceDiagnosticsSink;
     now?: () => number;
   }): IngestionSourceService {
-    return new IngestionSourceService(
-      options.repository,
-      options.projects,
-      options.entitlements,
-      options.lifecycle,
-      options.credentials,
-      options.secrets,
-      options.destinations,
-      options.diagnostics,
-      options.now ?? Date.now,
-      IngestionSourceValidationService.create({ projects: options.projects }),
-    );
+    return new IngestionSourceService({
+      repository: options.repository,
+      projects: options.projects,
+      entitlements: options.entitlements,
+      lifecycle: options.lifecycle,
+      credentials: options.credentials,
+      secrets: options.secrets,
+      destinations: options.destinations,
+      diagnostics: options.diagnostics,
+      now: options.now ?? Date.now,
+      validation: IngestionSourceValidationService.create({ projects: options.projects }),
+    });
   }
 
   /** Whether a source's stored `pollerCursor` holds a real cursor. */

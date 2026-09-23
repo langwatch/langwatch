@@ -258,10 +258,10 @@ describe("GovernanceApp as the module a process installs", () => {
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");
       expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
-      expect(app.ingestOtlpTraces).toBeTypeOf("function");
-      expect(app.ingestWebhook).toBeTypeOf("function");
-      expect(app.ingestOtlpLogs).toBeTypeOf("function");
-      expect(app.ingestOtlpMetrics).toBeTypeOf("function");
+      expect(typeof app.ingestOtlpTraces).toBe("function");
+      expect(typeof app.ingestWebhook).toBe("function");
+      expect(typeof app.ingestOtlpLogs).toBe("function");
+      expect(typeof app.ingestOtlpMetrics).toBe("function");
     });
 
     it("resolves the CLI caller and Enterprise plan through the named peers", async () => {

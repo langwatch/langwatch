@@ -2,7 +2,8 @@ import type { WebhookSpendEventRow } from "../../services/webhook-envelope.servi
 import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository.ts";
 
 function idSuffixFor(status: WebhookSpendEventRow["status"]): string {
-  return status === "settled" ? "settled" : status === "admitted" ? "admitted" : "completed";
+  if (status === "settled") return "settled";
+  return status === "admitted" ? "admitted" : "completed";
 }
 
 /** The emitted-envelope log the memory twin runs, so the events reads can be

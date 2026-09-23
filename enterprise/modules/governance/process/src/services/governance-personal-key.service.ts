@@ -46,13 +46,31 @@ type RoutingPolicy = {
 };
 
 export class DefaultGovernancePersonalVirtualKeyService {
-  private constructor(
-    private readonly repository: PersonalVirtualKeyRepository,
-    private readonly issuer: PersonalVirtualKeyIssuer,
-    private readonly organizations: OrganizationService,
-    private readonly policies: RoutingPolicyReader,
-    private readonly gatewayBaseUrl: string,
-  ) {}
+  private readonly repository: PersonalVirtualKeyRepository;
+  private readonly issuer: PersonalVirtualKeyIssuer;
+  private readonly organizations: OrganizationService;
+  private readonly policies: RoutingPolicyReader;
+  private readonly gatewayBaseUrl: string;
+
+  private constructor({
+    repository,
+    issuer,
+    organizations,
+    policies,
+    gatewayBaseUrl,
+  }: {
+    repository: PersonalVirtualKeyRepository;
+    issuer: PersonalVirtualKeyIssuer;
+    organizations: OrganizationService;
+    policies: RoutingPolicyReader;
+    gatewayBaseUrl: string;
+  }) {
+    this.repository = repository;
+    this.issuer = issuer;
+    this.organizations = organizations;
+    this.policies = policies;
+    this.gatewayBaseUrl = gatewayBaseUrl;
+  }
 
   static create(options: {
     repository: PersonalVirtualKeyRepository;
@@ -61,13 +79,13 @@ export class DefaultGovernancePersonalVirtualKeyService {
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }): DefaultGovernancePersonalVirtualKeyService {
-    return new DefaultGovernancePersonalVirtualKeyService(
-      options.repository,
-      options.issuer,
-      options.organizations,
-      options.policies,
-      options.gatewayBaseUrl,
-    );
+    return new DefaultGovernancePersonalVirtualKeyService({
+      repository: options.repository,
+      issuer: options.issuer,
+      organizations: options.organizations,
+      policies: options.policies,
+      gatewayBaseUrl: options.gatewayBaseUrl,
+    });
   }
 
   private resolvePolicy(parsed: IssuePersonalVirtualKeyInput): Promise<RoutingPolicy | null> {

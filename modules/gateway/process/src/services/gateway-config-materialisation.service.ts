@@ -38,38 +38,46 @@ import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.s
 import type { GatewayService } from "./gateway.service.ts";
 
 export class GatewayConfigMaterialiserService {
+  private readonly scopeResolution: GatewayScopeResolutionService;
+  private readonly projects: ProjectApi;
+  private readonly chRepo: GatewayBudgetSpend | null;
+  private readonly budgetDecisions: GatewayService;
+  private readonly credentials: GatewayModelProviderCredentials;
+  private readonly assembly: GatewayConfigAssembly;
+  private readonly langyMirrorProjectId: string | undefined;
+  private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
+
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
-    private readonly scopeResolution: GatewayScopeResolutionService,
-    private readonly projects: ProjectApi,
-    private readonly chRepo: GatewayBudgetSpend | null,
-    /**
-     * The process's own gateway service. Required rather than defaulted: building one here meant
-     * composing a second service per request over the same tables, and the default could not be
-     * completed once that service grew its guardrail and cache-rule collaborators.
-     */
-    private readonly budgetDecisions: GatewayService,
-    /**
-     * Reads a provider row's stored keys. A port because the cipher belongs to
-     * the Model Provider feature and a gateway package may not depend on
-     * another feature's server package.
-     */
-    private readonly credentials: GatewayModelProviderCredentials,
-    /**
-     * The version token, the reserved tier vocabulary and the shipped model
-     * catalog: the three reads the bundle needs that are not this service's
-     * own logic.
-     */
-    private readonly assembly: GatewayConfigAssembly,
-    /**
-     * The mirror project this deployment names, if any. Stated by the
-     * composition root rather than read here: a package receives its
-     * deployment facts as configuration.
-     */
-    private readonly langyMirrorProjectId: string | undefined,
-    /** The hosted provider a connected install adds; absent where nothing composes one. */
-    private readonly connectUpstream: GatewayConnectUpstreamService | undefined,
-  ) {}
+    {
+      scopeResolution,
+      projects,
+      chRepo,
+      budgetDecisions,
+      credentials,
+      assembly,
+      langyMirrorProjectId,
+      connectUpstream,
+    }: {
+      scopeResolution: GatewayScopeResolutionService;
+      projects: ProjectApi;
+      chRepo: GatewayBudgetSpend | null;
+      budgetDecisions: GatewayService;
+      credentials: GatewayModelProviderCredentials;
+      assembly: GatewayConfigAssembly;
+      langyMirrorProjectId: string | undefined;
+      connectUpstream: GatewayConnectUpstreamService | undefined;
+    },
+  ) {
+    this.scopeResolution = scopeResolution;
+    this.projects = projects;
+    this.chRepo = chRepo;
+    this.budgetDecisions = budgetDecisions;
+    this.credentials = credentials;
+    this.assembly = assembly;
+    this.langyMirrorProjectId = langyMirrorProjectId;
+    this.connectUpstream = connectUpstream;
+  }
 
   static create(input: {
     scopeResolution: GatewayScopeResolutionService;
@@ -82,16 +90,16 @@ export class GatewayConfigMaterialiserService {
     langyMirrorProjectId?: string | undefined;
     connectUpstream?: GatewayConnectUpstreamService | undefined;
   }): GatewayConfigMaterialiserService {
-    return new GatewayConfigMaterialiserService(
-      input.scopeResolution,
-      input.projects,
-      input.chRepo,
-      input.budgetDecisions,
-      input.credentials,
-      input.assembly,
-      input.langyMirrorProjectId,
-      input.connectUpstream,
-    );
+    return new GatewayConfigMaterialiserService({
+      scopeResolution: input.scopeResolution,
+      projects: input.projects,
+      chRepo: input.chRepo,
+      budgetDecisions: input.budgetDecisions,
+      credentials: input.credentials,
+      assembly: input.assembly,
+      langyMirrorProjectId: input.langyMirrorProjectId,
+      connectUpstream: input.connectUpstream,
+    });
   }
 
   /**

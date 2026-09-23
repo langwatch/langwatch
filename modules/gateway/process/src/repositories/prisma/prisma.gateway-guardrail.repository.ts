@@ -66,8 +66,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
         name: row.name,
         evaluatorId: row.evaluatorId,
         evaluatorSlug: row.evaluator?.slug ?? null,
-        direction:
-          row.direction === "PRE" ? "pre" : row.direction === "POST" ? "post" : "stream_chunk",
+        direction: guardrailDirectionOf(row.direction),
         failureMode: row.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
       }),
     );
@@ -140,4 +139,9 @@ function toResource(row: GatewayGuardrail): GatewayGuardrailResource {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
+}
+
+function guardrailDirectionOf(direction: string) {
+  if (direction === "PRE") return "pre";
+  return direction === "POST" ? "post" : "stream_chunk";
 }

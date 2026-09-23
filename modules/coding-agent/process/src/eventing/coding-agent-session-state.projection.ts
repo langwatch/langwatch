@@ -392,12 +392,8 @@ export class CodingAgentSessionStateProjection {
     const title = value?.trim() || null;
     if (title === null) return state;
     if (source === "prompt" && state.title !== null) return state;
-    const current =
-      state.titleSource !== null
-        ? TITLE_RANK[state.titleSource]
-        : state.title !== null
-          ? TITLE_RANK.generated
-          : 0;
+    const untitledRank = state.title !== null ? TITLE_RANK.generated : 0;
+    const current = state.titleSource !== null ? TITLE_RANK[state.titleSource] : untitledRank;
     if (TITLE_RANK[source] < current) return state;
     return { ...state, title, titleSource: source };
   }

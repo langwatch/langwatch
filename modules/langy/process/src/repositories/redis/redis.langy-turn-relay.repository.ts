@@ -360,24 +360,10 @@ export class RedisLangyTurnRelayRepository {
       reserveFrameNonce,
       ...(options.readHandoffRunToken
         ? { readHandoffRunToken: options.readHandoffRunToken }
-        : handoff
-          ? {
-              readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
-                const row = await handoff.read({ conversationId, turnId });
-                if (!row || row.projectId !== projectId) return null;
-                return row.runToken || null;
-              },
-            }
-          : {}),
+        : handoffRunTokenReader(handoff)),
       ...(options.refreshHandoffTtl
         ? { refreshHandoffTtl: options.refreshHandoffTtl }
-        : handoff
-          ? {
-              refreshHandoffTtl: async ({ conversationId, turnId }) => {
-                await handoff.refresh({ conversationId, turnId });
-              },
-            }
-          : {}),
+        : handoffTtlRefresher(handoff)),
       resourceLinks,
       ...(options.resolveResourceUrl ? { resolveResourceUrl: options.resolveResourceUrl } : {}),
       ...(options.logger ? { logger: options.logger } : {}),
@@ -602,7 +588,7 @@ export class RedisLangyTurnRelayRepository {
         // see `resourceLinks`); everything else goes through the normal path.
         const invocation = this.soleNavigateInvocationOf(frame);
         if (invocation) {
-          return this.applyNavigateTool(projectId, at, frame, invocation);
+          return this.applyNavigateTool({ projectId, at, frame, invocation });
         }
 
         // The model sometimes CHAINS the navigate onto its lookup (`…get X --format json &&
@@ -612,7 +598,7 @@ export class RedisLangyTurnRelayRepository {
         // stdout changes nothing here.
         if (frame.phase === "end" && !frame.isError) {
           for (const chained of this.chainedNavigateInvocationsOf(frame)) {
-            await this.applyNavigateTool(projectId, at, frame, chained);
+            await this.applyNavigateTool({ projectId, at, frame, invocation: chained });
           }
         }
         return this.applyTool(projectId, at, frame);
@@ -848,12 +834,17 @@ export class RedisLangyTurnRelayRepository {
    * Resolve a navigate instruction and push it to the live edge — NEVER to the durable log (see
    * `LangyStreamEntry`'s `navigate` variant).
    */
-  private async applyNavigateTool(
-    projectId: string,
-    at: { conversationId: string; turnId: string },
-    frame: Extract<LangyRelayFrame, { type: "tool" }>,
-    invocation: { resourceId: string },
-  ): Promise<LangyRelayOutcome> {
+  private async applyNavigateTool({
+    projectId,
+    at,
+    frame,
+    invocation,
+  }: {
+    projectId: string;
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    invocation: { resourceId: string };
+  }): Promise<LangyRelayOutcome> {
     if (frame.phase === "start" || frame.isError) return { status: "applied" };
 
     // The conversation's remembered link first; on a miss, the platform's own
@@ -917,4 +908,28 @@ function safeJson(s: string): unknown {
   } catch {
     return null;
   }
+}
+
+function handoffRunTokenReader(
+  handoff: LangyTurnHandoffRedisRepository | null,
+): Pick<LangyTurnRelayDeps, "readHandoffRunToken"> {
+  if (!handoff) return {};
+  return {
+    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
+      const row = await handoff.read({ conversationId, turnId });
+      if (!row || row.projectId !== projectId) return null;
+      return row.runToken || null;
+    },
+  };
+}
+
+function handoffTtlRefresher(
+  handoff: LangyTurnHandoffRedisRepository | null,
+): Pick<LangyTurnRelayDeps, "refreshHandoffTtl"> {
+  if (!handoff) return {};
+  return {
+    refreshHandoffTtl: async ({ conversationId, turnId }) => {
+      await handoff.refresh({ conversationId, turnId });
+    },
+  };
 }

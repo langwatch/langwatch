@@ -38,16 +38,17 @@ function validCronField(field: string, min: number, max: number): boolean {
 }
 
 function isRunnableCron(cron: string): boolean {
-  const [minute, hour, day, month, weekday] = cron.trim().split(/\s+/);
-  if (!minute || !hour || !day || !month || !weekday) return false;
-  if (
-    !validCronField(minute, 0, 59) ||
-    !validCronField(hour, 0, 23) ||
-    !validCronField(day, 1, 31) ||
-    !validCronField(month, 1, 12) ||
-    !validCronField(weekday, 0, 7)
-  )
-    return false;
+  const [minute = "", hour = "", day = "", month = "", weekday = ""] = cron.trim().split(/\s+/);
+  const fieldsPresent = [minute, hour, day, month, weekday].every(Boolean);
+  if (!fieldsPresent) return false;
+  const fieldsInRange = [
+    validCronField(minute, 0, 59),
+    validCronField(hour, 0, 23),
+    validCronField(day, 1, 31),
+    validCronField(month, 1, 12),
+    validCronField(weekday, 0, 7),
+  ].every(Boolean);
+  if (!fieldsInRange) return false;
   if (/^\d+$/.test(day) && /^\d+$/.test(month)) {
     const maximum = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][Number(month) - 1];
     if (maximum === undefined || Number(day) > maximum) return false;

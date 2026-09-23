@@ -39,7 +39,8 @@ export const githubPullRequestRefSchema = z.object({
   prNumber: z.number().int().positive(),
 });
 
-export const githubPullRequestLiveStatusSchema = githubPullRequestRefSchema.extend({
+export const githubPullRequestLiveStatusSchema = z.object({
+  ...githubPullRequestRefSchema.shape,
   status: z.enum(["open", "draft", "merged", "closed"]),
   source: z.enum(["live", "snapshot"]),
   mappedAt: z.date().nullable(),

@@ -86,14 +86,35 @@ export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationC
 
 /** A process-owned worker contribution. Creating it does not start a timer. */
 export class GatewayRealtimeSessionReconciliationService {
-  private constructor(
-    private readonly repository: RealtimeSessionReconciliationRepository,
-    private readonly credentials: ElevenLabsCredentialReader,
-    private readonly conversations: ElevenLabsConversationReader,
-    private readonly logger: RealtimeSessionReconciliationLogger,
-    private readonly config: RealtimeSessionReconciliationConfig,
-    private readonly clock: RealtimeSessionReconciliationClock,
-  ) {}
+  private readonly repository: RealtimeSessionReconciliationRepository;
+  private readonly credentials: ElevenLabsCredentialReader;
+  private readonly conversations: ElevenLabsConversationReader;
+  private readonly logger: RealtimeSessionReconciliationLogger;
+  private readonly config: RealtimeSessionReconciliationConfig;
+  private readonly clock: RealtimeSessionReconciliationClock;
+
+  private constructor({
+    repository,
+    credentials,
+    conversations,
+    logger,
+    config,
+    clock,
+  }: {
+    repository: RealtimeSessionReconciliationRepository;
+    credentials: ElevenLabsCredentialReader;
+    conversations: ElevenLabsConversationReader;
+    logger: RealtimeSessionReconciliationLogger;
+    config: RealtimeSessionReconciliationConfig;
+    clock: RealtimeSessionReconciliationClock;
+  }) {
+    this.repository = repository;
+    this.credentials = credentials;
+    this.conversations = conversations;
+    this.logger = logger;
+    this.config = config;
+    this.clock = clock;
+  }
 
   static create(options: {
     repository: RealtimeSessionReconciliationRepository;
@@ -103,14 +124,14 @@ export class GatewayRealtimeSessionReconciliationService {
     config: RealtimeSessionReconciliationConfig;
     clock: RealtimeSessionReconciliationClock;
   }): GatewayRealtimeSessionReconciliationService {
-    return new GatewayRealtimeSessionReconciliationService(
-      options.repository,
-      options.credentials,
-      options.conversations,
-      options.logger,
-      options.config,
-      options.clock,
-    );
+    return new GatewayRealtimeSessionReconciliationService({
+      repository: options.repository,
+      credentials: options.credentials,
+      conversations: options.conversations,
+      logger: options.logger,
+      config: options.config,
+      clock: options.clock,
+    });
   }
 
   async poll(now = this.clock.now()): Promise<{

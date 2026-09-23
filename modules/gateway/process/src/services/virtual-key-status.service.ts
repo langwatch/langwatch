@@ -22,15 +22,39 @@ import {
 } from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyStatusService {
-  private constructor(
-    private readonly transactions: GatewayTransaction,
-    private readonly repository: GatewayVirtualKeyRepository,
-    private readonly changeEvents: GatewayChangeEvents,
-    private readonly auditLog: GatewayAudit,
-    private readonly validation: VirtualKeyValidationService,
-    private readonly budgets: VirtualKeyBudgetService,
-    private readonly governanceSignals?: GatewayGovernanceSignals,
-  ) {}
+  private readonly transactions: GatewayTransaction;
+  private readonly repository: GatewayVirtualKeyRepository;
+  private readonly changeEvents: GatewayChangeEvents;
+  private readonly auditLog: GatewayAudit;
+  private readonly validation: VirtualKeyValidationService;
+  private readonly budgets: VirtualKeyBudgetService;
+  private readonly governanceSignals?: GatewayGovernanceSignals;
+
+  private constructor({
+    transactions,
+    repository,
+    changeEvents,
+    auditLog,
+    validation,
+    budgets,
+    governanceSignals,
+  }: {
+    transactions: GatewayTransaction;
+    repository: GatewayVirtualKeyRepository;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
+    validation: VirtualKeyValidationService;
+    budgets: VirtualKeyBudgetService;
+    governanceSignals?: GatewayGovernanceSignals;
+  }) {
+    this.transactions = transactions;
+    this.repository = repository;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+    this.validation = validation;
+    this.budgets = budgets;
+    this.governanceSignals = governanceSignals;
+  }
 
   static create(input: {
     transactions: GatewayTransaction;
@@ -41,15 +65,15 @@ export class VirtualKeyStatusService {
     budgets: VirtualKeyBudgetService;
     governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyStatusService {
-    return new VirtualKeyStatusService(
-      input.transactions,
-      input.repository,
-      input.changeEvents,
-      input.auditLog,
-      input.validation,
-      input.budgets,
-      input.governanceSignals,
-    );
+    return new VirtualKeyStatusService({
+      transactions: input.transactions,
+      repository: input.repository,
+      changeEvents: input.changeEvents,
+      auditLog: input.auditLog,
+      validation: input.validation,
+      budgets: input.budgets,
+      governanceSignals: input.governanceSignals,
+    });
   }
 
   async revoke(input: RevokeVirtualKeyInput): Promise<VirtualKeyWithScopes> {

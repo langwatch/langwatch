@@ -13,6 +13,9 @@ import {
   type ConnectedAgentsInput,
   type GetAgentInput,
   type ListAgentsInput,
+  type AgentWorkflowConfig,
+  type AgentName,
+  type AgentReferenceState,
 } from "@langwatch/agent-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -23,6 +26,7 @@ import type {
   RegisterPersistedAgentInput,
   UpdateAgentCopyInput,
   UpdatePersistedAgentInput,
+  AgentCopyRecord,
 } from "../agent.repository.ts";
 
 export class MemoryAgentRepository implements AgentRepository {
@@ -66,7 +70,7 @@ export class MemoryAgentRepository implements AgentRepository {
     }));
   }
 
-  async findReferenceStates(input: AgentIdsInput) {
+  async findReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]> {
     return [...this.#agents.values()]
       .filter((agent) => agent.projectId === input.projectId && input.ids.includes(agent.id))
       .map(({ id, archivedAt, type, name, ownerUserId, lastSeenAt }) =>
@@ -74,7 +78,7 @@ export class MemoryAgentRepository implements AgentRepository {
       );
   }
 
-  async findNamesByIds(input: AgentIdsInput) {
+  async findNamesByIds(input: AgentIdsInput): Promise<AgentName[]> {
     return [...this.#agents.values()]
       .filter((agent) => agent.projectId === input.projectId && input.ids.includes(agent.id))
       .map(({ id, name }) => ({ id, name }));
@@ -86,7 +90,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return agent?.projectId === input.projectId && agent.archivedAt === null;
   }
 
-  async findPage(input: ListAgentsInput) {
+  async findPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
     const rows = this.#visible(input.projectId);
     const offset = (input.page - 1) * input.limit;
 
@@ -143,7 +147,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return this.#save({ ...agent, archivedAt: toDate(nowInstant()) });
   }
 
-  async listWorkflowConfigs(input: AgentWorkflowInput) {
+  async listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
     return [...this.#agents.values()]
       .filter(
         (agent) =>
@@ -166,7 +170,7 @@ export class MemoryAgentRepository implements AgentRepository {
     this.#agents.set(agent.id, updated);
   }
 
-  async findCopies(sourceAgentId: string) {
+  async findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
     return [...this.#agents.values()]
       .filter((agent) => agent.copiedFromAgentId === sourceAgentId && agent.archivedAt === null)
       .map(({ id, name, projectId }) => ({ id, name, projectId }));

@@ -58,13 +58,12 @@ export const createGatewayGuardrailInputSchema = z.object({
   actorUserId: z.string(),
 });
 
-export const updateGatewayGuardrailInputSchema = createGatewayGuardrailInputSchema
-  .partial()
-  .extend({
-    id: z.string(),
-    projectId: z.string(),
-    actorUserId: z.string(),
-  });
+export const updateGatewayGuardrailInputSchema = z.object({
+  ...createGatewayGuardrailInputSchema.partial().shape,
+  id: z.string(),
+  projectId: z.string(),
+  actorUserId: z.string(),
+});
 
 export const archiveGatewayGuardrailInputSchema = z.object({
   id: z.string(),

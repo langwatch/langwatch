@@ -384,12 +384,10 @@ export function liftCodingAgentLogFacts({
   attributes: Record<string, unknown>;
 }): Record<string, string | number | boolean> | null {
   const eventName = attributes["event.name"];
+  const recordName = typeof eventName === "string" ? eventName : null;
   if (
     eventName !== SESSION_CONTEXT_EVENT_NAME &&
-    detectCodingAgent({
-      scopeName,
-      recordName: typeof eventName === "string" ? eventName : null,
-    }) === "unknown"
+    detectCodingAgent({ scopeName, recordName }) === "unknown"
   ) {
     return null;
   }

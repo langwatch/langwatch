@@ -155,7 +155,7 @@ export {
   LangyTitleGeneratorService,
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
-export type { CreateLangyEffectPortsOptions } from "./repositories/redis/redis.langy-effect.repository.ts";
+export type { CreateLangyEffectRepositoryOptions } from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,

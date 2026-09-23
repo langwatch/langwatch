@@ -12,6 +12,10 @@ import {
   type ListAgentsInput,
   type ConnectedAgentsInput,
   type ConnectedAgentsEnvironmentInput,
+  type AgentName,
+  type AgentReferenceState,
+  type Agent,
+  type AgentWorkflowConfig,
 } from "@langwatch/agent-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import {
@@ -30,6 +34,7 @@ import type {
   UpdateAgentCopyInput,
   RegisterPersistedAgentInput,
   AgentPresenceInput,
+  AgentCopyRecord,
 } from "../agent.repository.ts";
 import { mapAgentRow } from "./prisma.agent.mapper.ts";
 
@@ -61,7 +66,7 @@ export class PrismaAgentRepository
 {
   static readonly create = this.factory((prisma) => new PrismaAgentRepository(prisma));
 
-  async listWorkflowConfigs(input: AgentWorkflowInput) {
+  async listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
     const agents = await this.prisma.agent.findMany({
       where: { projectId: input.projectId, workflowId: input.workflowId, archivedAt: null },
       select: { id: true, config: true },
@@ -85,7 +90,7 @@ export class PrismaAgentRepository
       });
   }
 
-  async getById(input: GetAgentInput) {
+  async getById(input: GetAgentInput): Promise<Agent> {
     const row = await this.prisma.agent.findFirst({
       where: { id: input.id, projectId: input.projectId, archivedAt: null },
     });
@@ -94,14 +99,14 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
-  async getByIdOnly(id: string) {
+  async getByIdOnly(id: string): Promise<Agent> {
     const row = await this.prisma.agent.findFirst({ where: { id, archivedAt: null } });
     if (!row) throw new AgentSourceNotFoundError(id);
 
     return mapAgentRow(row);
   }
 
-  async getByIdIncludingArchived(input: GetAgentInput) {
+  async getByIdIncludingArchived(input: GetAgentInput): Promise<Agent> {
     const row = await this.prisma.agent.findFirst({
       where: { id: input.id, projectId: input.projectId },
     });
@@ -110,7 +115,7 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
-  async findAll(input: AgentProjectInput) {
+  async findAll(input: AgentProjectInput): Promise<Agent[]> {
     const rows = await this.prisma.agent.findMany({
       where: { projectId: input.projectId, archivedAt: null, AND: [connectedAgentVisibleWhere()] },
       orderBy: { updatedAt: "desc" },
@@ -132,7 +137,7 @@ export class PrismaAgentRepository
     );
   }
 
-  async findReferenceStates(input: AgentIdsInput) {
+  async findReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]> {
     const rows = await this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: {
@@ -148,14 +153,14 @@ export class PrismaAgentRepository
     return agentReferenceStateSchema.array().parse(rows);
   }
 
-  findNamesByIds(input: AgentIdsInput) {
+  findNamesByIds(input: AgentIdsInput): Promise<AgentName[]> {
     return this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true },
     });
   }
 
-  async exists(input: GetAgentInput) {
+  async exists(input: GetAgentInput): Promise<boolean> {
     return (
       (await this.prisma.agent.count({
         where: { id: input.id, projectId: input.projectId, archivedAt: null },
@@ -163,7 +168,7 @@ export class PrismaAgentRepository
     );
   }
 
-  async findPage(input: ListAgentsInput) {
+  async findPage(input: ListAgentsInput): Promise<{ data: Agent[]; total: number }> {
     const where = {
       projectId: input.projectId,
       archivedAt: null,
@@ -182,7 +187,7 @@ export class PrismaAgentRepository
     return { data: rows.map(mapAgentRow), total };
   }
 
-  async create(input: PersistAgentInput) {
+  async create(input: PersistAgentInput): Promise<Agent> {
     const row = await this.prisma.agent
       .create({
         data: {
@@ -205,7 +210,7 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
-  async update(input: UpdatePersistedAgentInput) {
+  async update(input: UpdatePersistedAgentInput): Promise<Agent> {
     const row = await this.prisma.agent
       .update({
         where: { id: input.id, projectId: input.projectId },
@@ -221,7 +226,7 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
-  async archive(input: GetAgentInput) {
+  async archive(input: GetAgentInput): Promise<Agent> {
     const row = await this.prisma.agent
       .update({
         where: { id: input.id, projectId: input.projectId, archivedAt: null },
@@ -232,7 +237,7 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
-  findCopies(sourceAgentId: string) {
+  findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
     return this.prisma.agent.findMany({
       where: { copiedFromAgentId: sourceAgentId, archivedAt: null },
       select: { id: true, name: true, projectId: true },
@@ -246,7 +251,9 @@ export class PrismaAgentRepository
     });
   }
 
-  async findConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput) {
+  async findConnectedByNameAndEnvironment(
+    input: ConnectedAgentsEnvironmentInput,
+  ): Promise<Agent[]> {
     const rows = await this.prisma.agent.findMany({
       where: {
         projectId: input.projectId,
@@ -261,7 +268,7 @@ export class PrismaAgentRepository
     return rows.map(mapAgentRow);
   }
 
-  async findConnectedByName(input: ConnectedAgentsInput) {
+  async findConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]> {
     const rows = await this.prisma.agent.findMany({
       where: {
         projectId: input.projectId,
@@ -275,7 +282,7 @@ export class PrismaAgentRepository
     return rows.map(mapAgentRow);
   }
 
-  async registerConnected(input: RegisterPersistedAgentInput) {
+  async registerConnected(input: RegisterPersistedAgentInput): Promise<Agent> {
     const config = configSchema.parse(input.config);
     const lastSeenAt = new Date();
     const identity = { projectId: input.projectId, identityKey: input.identity.identityKey };

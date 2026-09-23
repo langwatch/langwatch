@@ -203,7 +203,7 @@ export const codingAgentSessionEventSchema = z
 
 /** One durable row in the ordered coding-agent session-event read model. */
 export const codingAgentSessionEventRecordSchema = codingAgentSessionEventSchema
-  .extend({ tenantId: z.string() })
+  .safeExtend({ tenantId: z.string() })
   .strict();
 
 /** One durable trace-to-session mapping written by the projection. */
@@ -667,6 +667,6 @@ export type CodingAgentGithubConnection = z.infer<typeof codingAgentGithubConnec
  * decide what to render.
  */
 export const codingAgentPersonalPullRequestUsageWithConnectionSchema =
-  codingAgentPersonalPullRequestUsageSchema.extend({
+  codingAgentPersonalPullRequestUsageSchema.safeExtend({
     connection: codingAgentGithubConnectionSchema,
   });

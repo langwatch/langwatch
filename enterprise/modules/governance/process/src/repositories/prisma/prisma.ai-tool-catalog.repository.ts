@@ -231,7 +231,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
         if (lockedCount > 0) return { hasSeeded: false, created: 0 };
         await transaction.aiToolEntry.createMany({
           data: input.tiles.map((tile, order) =>
-            starterData(input.organizationId, tile, order, null),
+            starterData({ organizationId: input.organizationId, tile, order, actorUserId: null }),
           ),
         });
         return { hasSeeded: true, created: input.tiles.length };
@@ -284,12 +284,12 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     for (const [index, tile] of create.entries()) {
       operations.push(
         this.database.aiToolEntry.create({
-          data: starterData(
-            input.values.organizationId,
+          data: starterData({
+            organizationId: input.values.organizationId,
             tile,
-            existing.length + index,
-            input.values.actorUserId,
-          ),
+            order: existing.length + index,
+            actorUserId: input.values.actorUserId,
+          }),
         }),
       );
     }
@@ -384,12 +384,17 @@ function legacyScope(
   return { scope: "department", scopeId: departmentIds[0]! };
 }
 
-function starterData(
-  organizationId: string,
-  tile: AiToolStarterTile,
-  order: number,
-  actorUserId?: string | null,
-): Prisma.AiToolEntryCreateManyInput {
+function starterData({
+  organizationId,
+  tile,
+  order,
+  actorUserId,
+}: {
+  organizationId: string;
+  tile: AiToolStarterTile;
+  order: number;
+  actorUserId?: string | null;
+}): Prisma.AiToolEntryCreateManyInput {
   return {
     organizationId,
     scope: "organization",

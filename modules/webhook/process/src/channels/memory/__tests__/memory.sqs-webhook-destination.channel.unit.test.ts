@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MemorySqsWebhookDestinationChannel } from "../memory.sqs.webhook-destination.channel.ts";
+import { MemorySqsWebhookDestinationChannel } from "../memory.sqs-webhook-destination.channel.ts";
 
 const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/webhooks";
 

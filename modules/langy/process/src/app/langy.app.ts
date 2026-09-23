@@ -1,5 +1,6 @@
 import { BearerIdentity, type RestIdentity } from "@langwatch/api/rest";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
@@ -28,6 +29,8 @@ import {
   langySecrets,
   type LangyServerConfig,
   type LangyUsageCount,
+  type LangyRelayConnection,
+  type RelayTally,
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
 import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
@@ -202,7 +205,9 @@ export class LangyApp implements LangyApiContract {
    * deleted `LangyMaintenanceWorkerFeatureInstaller`. `deleteDispatchedBefore`
    * is the installing process's own outbox prune, handed in by the seam.
    */
-  maintenanceEventingPipeline(deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">) {
+  maintenanceEventingPipeline(
+    deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
+  ): StaticPipelineDefinition<Event> {
     return EventingLangyMaintenanceAdapter.create({
       sessionKeyReap: {
         reap: () => this.dependencies.sessionKeyReap.reap(),
@@ -225,15 +230,19 @@ export class LangyApp implements LangyApiContract {
     );
   }
 
-  ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput) {
+  ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput): Promise<{
+    status: "accepted";
+  }> {
     return this.#internal.ingestTurnResult(input);
   }
 
-  revokeInternalCredentials(input: { apiKeyId: string; projectId: string }) {
+  revokeInternalCredentials(input: { apiKeyId: string; projectId: string }): Promise<{
+    outcome: "revoked" | "already_revoked";
+  }> {
     return this.#internal.revokeCredentials(input);
   }
 
-  receiveInternalFrames(body: ReadableStream<Uint8Array> | null) {
+  receiveInternalFrames(body: ReadableStream<Uint8Array> | null): Promise<RelayTally> {
     return this.#internal.receiveFrames(body);
   }
 
@@ -261,19 +270,23 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.trySetEgressAllowlist(input);
   }
 
-  openRelayConnection() {
+  openRelayConnection(): LangyRelayConnection {
     return this.dependencies.langy.openRelayConnection();
   }
 
-  getPage(input: Parameters<LangyApiContract["getPage"]>[0]) {
+  getPage(input: Parameters<LangyApiContract["getPage"]>[0]): Promise<LangyConversationListPage> {
     return this.dependencies.langy.getPage(input);
   }
 
-  getEventsAfter(input: Parameters<LangyApiContract["getEventsAfter"]>[0]) {
+  getEventsAfter(
+    input: Parameters<LangyApiContract["getEventsAfter"]>[0],
+  ): Promise<LangyConversationEventPage> {
     return this.dependencies.langy.getEventsAfter(input);
   }
 
-  findByIdVisible(input: Parameters<LangyApiContract["findByIdVisible"]>[0]) {
+  findByIdVisible(
+    input: Parameters<LangyApiContract["findByIdVisible"]>[0],
+  ): Promise<LangyConversationDetail | null> {
     return this.dependencies.langy.findByIdVisible(input);
   }
 
@@ -281,19 +294,25 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.countUsage(input);
   }
 
-  getAllByConversation(input: Parameters<LangyApiContract["getAllByConversation"]>[0]) {
+  getAllByConversation(
+    input: Parameters<LangyApiContract["getAllByConversation"]>[0],
+  ): Promise<LangyMessageRow[]> {
     return this.dependencies.langy.getAllByConversation(input);
   }
 
-  deleteById(input: Parameters<LangyApiContract["deleteById"]>[0]) {
+  deleteById(input: Parameters<LangyApiContract["deleteById"]>[0]): Promise<boolean> {
     return this.dependencies.langy.deleteById(input);
   }
 
-  updateById(input: Parameters<LangyApiContract["updateById"]>[0]) {
+  updateById(
+    input: Parameters<LangyApiContract["updateById"]>[0],
+  ): Promise<LangyConversationDetail> {
     return this.dependencies.langy.updateById(input);
   }
 
-  forkById(input: Parameters<LangyApiContract["forkById"]>[0]) {
+  forkById(input: Parameters<LangyApiContract["forkById"]>[0]): Promise<{
+    conversation: LangyConversationDetail;
+  }> {
     return this.dependencies.langy.forkById(input);
   }
 
@@ -302,49 +321,67 @@ export class LangyApp implements LangyApiContract {
    * pays for, so the project's window is spent here and an over-limit caller
    * never reaches the engine.
    */
-  async startConversationTurn(input: Parameters<LangyApiContract["startConversationTurn"]>[0]) {
+  async startConversationTurn(
+    input: Parameters<LangyApiContract["startConversationTurn"]>[0],
+  ): Promise<{
+    conversationId: string;
+    turnId: string;
+  }> {
     await this.dependencies.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
 
     return this.dependencies.langy.startConversationTurn(input);
   }
 
-  warmConversationWorker(input: Parameters<LangyApiContract["warmConversationWorker"]>[0]) {
+  warmConversationWorker(
+    input: Parameters<LangyApiContract["warmConversationWorker"]>[0],
+  ): Promise<{
+    conversationId: string | null;
+    warmed: boolean;
+  }> {
     return this.dependencies.langy.warmConversationWorker(input);
   }
 
-  findModelsAllowedForProject(projectId: string) {
+  findModelsAllowedForProject(projectId: string): Promise<string[] | null> {
     return this.dependencies.langy.findModelsAllowedForProject(projectId);
   }
 
-  revokeWorkerSessionKey(input: Parameters<LangyApiContract["revokeWorkerSessionKey"]>[0]) {
+  revokeWorkerSessionKey(
+    input: Parameters<LangyApiContract["revokeWorkerSessionKey"]>[0],
+  ): Promise<"revoked" | "already_revoked" | "not_found" | "refused"> {
     return this.dependencies.langy.revokeWorkerSessionKey(input);
   }
 
-  turnExists(input: Parameters<LangyApiContract["turnExists"]>[0]) {
+  turnExists(input: Parameters<LangyApiContract["turnExists"]>[0]): Promise<boolean> {
     return this.dependencies.langy.turnExists(input);
   }
 
-  ingestAgentTurnResult(input: Parameters<LangyApiContract["ingestAgentTurnResult"]>[0]) {
+  ingestAgentTurnResult(
+    input: Parameters<LangyApiContract["ingestAgentTurnResult"]>[0],
+  ): Promise<void> {
     return this.dependencies.langy.ingestAgentTurnResult(input);
   }
 
-  findRunToken(input: Parameters<LangyApiContract["findRunToken"]>[0]) {
+  findRunToken(input: Parameters<LangyApiContract["findRunToken"]>[0]): Promise<string | null> {
     return this.dependencies.langy.findRunToken(input);
   }
 
-  recordToolCallStarted(input: Parameters<LangyApiContract["recordToolCallStarted"]>[0]) {
+  recordToolCallStarted(
+    input: Parameters<LangyApiContract["recordToolCallStarted"]>[0],
+  ): Promise<void> {
     return this.dependencies.langy.recordToolCallStarted(input);
   }
 
-  recordToolCallCompleted(input: Parameters<LangyApiContract["recordToolCallCompleted"]>[0]) {
+  recordToolCallCompleted(
+    input: Parameters<LangyApiContract["recordToolCallCompleted"]>[0],
+  ): Promise<void> {
     return this.dependencies.langy.recordToolCallCompleted(input);
   }
 
-  recordTurnHandoff(input: Parameters<LangyApiContract["recordTurnHandoff"]>[0]) {
+  recordTurnHandoff(input: Parameters<LangyApiContract["recordTurnHandoff"]>[0]): Promise<void> {
     return this.dependencies.langy.recordTurnHandoff(input);
   }
 
-  recordPlanUpdated(input: Parameters<LangyApiContract["recordPlanUpdated"]>[0]) {
+  recordPlanUpdated(input: Parameters<LangyApiContract["recordPlanUpdated"]>[0]): Promise<void> {
     return this.dependencies.langy.recordPlanUpdated(input);
   }
 

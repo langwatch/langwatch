@@ -14,15 +14,39 @@ import type { DefaultGovernanceOcsfExportService } from "./ocsf-export.service.t
 
 /** Private cohesive collaborator for the ingestion operation set. */
 export class GovernanceIngestionOperationsService {
-  private constructor(
-    private readonly canonicalCost: CanonicalCostExtractorService,
-    private readonly eventing: GovernanceEventingChannel,
-    private readonly ingestionKeys: IngestionKeyService,
-    private readonly ingestionSources: IngestionSourceService,
-    private readonly templates: IngestionTemplateService,
-    private readonly ocsf: DefaultGovernanceOcsfExportService,
-    private readonly ottl: GovernanceOttlGateway,
-  ) {}
+  private readonly canonicalCost: CanonicalCostExtractorService;
+  private readonly eventing: GovernanceEventingChannel;
+  private readonly ingestionKeys: IngestionKeyService;
+  private readonly ingestionSources: IngestionSourceService;
+  private readonly templates: IngestionTemplateService;
+  private readonly ocsf: DefaultGovernanceOcsfExportService;
+  private readonly ottl: GovernanceOttlGateway;
+
+  private constructor({
+    canonicalCost,
+    eventing,
+    ingestionKeys,
+    ingestionSources,
+    templates,
+    ocsf,
+    ottl,
+  }: {
+    canonicalCost: CanonicalCostExtractorService;
+    eventing: GovernanceEventingChannel;
+    ingestionKeys: IngestionKeyService;
+    ingestionSources: IngestionSourceService;
+    templates: IngestionTemplateService;
+    ocsf: DefaultGovernanceOcsfExportService;
+    ottl: GovernanceOttlGateway;
+  }) {
+    this.canonicalCost = canonicalCost;
+    this.eventing = eventing;
+    this.ingestionKeys = ingestionKeys;
+    this.ingestionSources = ingestionSources;
+    this.templates = templates;
+    this.ocsf = ocsf;
+    this.ottl = ottl;
+  }
 
   static create(
     canonicalCost: CanonicalCostExtractorService,
@@ -33,7 +57,7 @@ export class GovernanceIngestionOperationsService {
     ocsf: DefaultGovernanceOcsfExportService,
     ottl: GovernanceOttlGateway,
   ): GovernanceIngestionOperationsService {
-    return new GovernanceIngestionOperationsService(
+    return new GovernanceIngestionOperationsService({
       canonicalCost,
       eventing,
       ingestionKeys,
@@ -41,7 +65,7 @@ export class GovernanceIngestionOperationsService {
       templates,
       ocsf,
       ottl,
-    );
+    });
   }
 
   readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (...args) =>

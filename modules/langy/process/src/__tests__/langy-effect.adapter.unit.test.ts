@@ -99,7 +99,7 @@ describe("RedisLangyEffectRepository", () => {
       stored: handoff({ resumeToken: "resume-token" }),
       expectedIntent: "revive",
     },
-  ])("worker $label dispatch", ({ stored, expectedIntent }) => {
+  ])("when the worker dispatches $label", ({ stored, expectedIntent }) => {
     it("reads and validates the handoff before mapping the worker request", async () => {
       const deps = makeDeps(stored);
       const ports = RedisLangyEffectRepository.create(deps);

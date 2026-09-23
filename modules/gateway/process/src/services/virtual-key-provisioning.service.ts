@@ -49,16 +49,43 @@ interface UpdatePlan {
 }
 
 export class VirtualKeyProvisioningService {
-  private constructor(
-    private readonly transactions: GatewayTransaction,
-    private readonly repository: GatewayVirtualKeyRepository,
-    private readonly changeEvents: GatewayChangeEvents,
-    private readonly auditLog: GatewayAudit,
-    private readonly crypto: GatewayVirtualKeyCrypto,
-    private readonly validation: VirtualKeyValidationService,
-    private readonly budgets: VirtualKeyBudgetService,
-    private readonly governanceSignals?: GatewayGovernanceSignals,
-  ) {}
+  private readonly transactions: GatewayTransaction;
+  private readonly repository: GatewayVirtualKeyRepository;
+  private readonly changeEvents: GatewayChangeEvents;
+  private readonly auditLog: GatewayAudit;
+  private readonly crypto: GatewayVirtualKeyCrypto;
+  private readonly validation: VirtualKeyValidationService;
+  private readonly budgets: VirtualKeyBudgetService;
+  private readonly governanceSignals?: GatewayGovernanceSignals;
+
+  private constructor({
+    transactions,
+    repository,
+    changeEvents,
+    auditLog,
+    crypto,
+    validation,
+    budgets,
+    governanceSignals,
+  }: {
+    transactions: GatewayTransaction;
+    repository: GatewayVirtualKeyRepository;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
+    crypto: GatewayVirtualKeyCrypto;
+    validation: VirtualKeyValidationService;
+    budgets: VirtualKeyBudgetService;
+    governanceSignals?: GatewayGovernanceSignals;
+  }) {
+    this.transactions = transactions;
+    this.repository = repository;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+    this.crypto = crypto;
+    this.validation = validation;
+    this.budgets = budgets;
+    this.governanceSignals = governanceSignals;
+  }
 
   static create(input: {
     transactions: GatewayTransaction;
@@ -70,16 +97,16 @@ export class VirtualKeyProvisioningService {
     budgets: VirtualKeyBudgetService;
     governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyProvisioningService {
-    return new VirtualKeyProvisioningService(
-      input.transactions,
-      input.repository,
-      input.changeEvents,
-      input.auditLog,
-      input.crypto,
-      input.validation,
-      input.budgets,
-      input.governanceSignals,
-    );
+    return new VirtualKeyProvisioningService({
+      transactions: input.transactions,
+      repository: input.repository,
+      changeEvents: input.changeEvents,
+      auditLog: input.auditLog,
+      crypto: input.crypto,
+      validation: input.validation,
+      budgets: input.budgets,
+      governanceSignals: input.governanceSignals,
+    });
   }
 
   async create(input: CreateVirtualKeyInput): Promise<CreatedVirtualKey> {
@@ -266,16 +293,14 @@ export class VirtualKeyProvisioningService {
       );
     }
 
+    // An explicit switch away from POLICY retires the stored reference rather than tripping the
+    // pairing check below: the caller stated the whole routing decision, and keeping the old id
+    // would reject an update that is not contradictory.
+    const switchesAwayFromPolicy =
+      input.routingMode !== undefined && input.routingMode !== "POLICY";
+    const carriedRoutingPolicyId = switchesAwayFromPolicy ? null : existing.routingPolicyId;
     const nextRoutingPolicyId =
-      input.routingPolicyId !== undefined
-        ? input.routingPolicyId
-        : input.routingMode !== undefined && input.routingMode !== "POLICY"
-          ? // An explicit switch away from POLICY retires the stored
-            // reference rather than tripping the pairing check below: the
-            // caller stated the whole routing decision, and keeping the
-            // old id would reject an update that is not contradictory.
-            null
-          : existing.routingPolicyId;
+      input.routingPolicyId !== undefined ? input.routingPolicyId : carriedRoutingPolicyId;
     const routingMode =
       input.routingMode !== undefined || input.routingPolicyId !== undefined
         ? VirtualKeyValidationService.resolveRoutingMode(

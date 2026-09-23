@@ -138,7 +138,8 @@ export const ImportMessageCommand = defineCommand({
  * AcceptAgentTurn atomically stores the accepted turn and, when resuming, the prior handoff
  * consumption. The token itself stays out of the event log; only the producing turn id is recorded.
  */
-const acceptAgentTurnDataSchema = langyAgentTurnAcceptedEventDataSchema.extend({
+const acceptAgentTurnDataSchema = z.object({
+  ...langyAgentTurnAcceptedEventDataSchema.shape,
   conversationStart: langyConversationStartedEventDataSchema
     .omit({ conversationId: true })
     .optional(),
@@ -161,7 +162,9 @@ export class AcceptAgentTurnCommand implements CommandHandler<
     return data.conversationId;
   }
 
-  static getSpanAttributes(data: LangyAcceptAgentTurnCommandData) {
+  static getSpanAttributes(
+    data: LangyAcceptAgentTurnCommandData,
+  ): Record<string, string | number | boolean> {
     return {
       "payload.conversation.id": data.conversationId,
       "payload.turn.id": data.turnId,

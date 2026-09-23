@@ -12,12 +12,27 @@ import type { PostgresGovernancePolicyService } from "./governance-policy.servic
 
 /** Private cohesive collaborator for the rules operation set. */
 export class GovernanceRulesOperationsService {
-  private constructor(
-    private readonly anomalyRules: AnomalyRuleService,
-    private readonly departments: DepartmentService,
-    private readonly policy: PostgresGovernancePolicyService,
-    private readonly aiTools: DefaultGovernanceAiToolCatalogService,
-  ) {}
+  private readonly anomalyRules: AnomalyRuleService;
+  private readonly departments: DepartmentService;
+  private readonly policy: PostgresGovernancePolicyService;
+  private readonly aiTools: DefaultGovernanceAiToolCatalogService;
+
+  private constructor({
+    anomalyRules,
+    departments,
+    policy,
+    aiTools,
+  }: {
+    anomalyRules: AnomalyRuleService;
+    departments: DepartmentService;
+    policy: PostgresGovernancePolicyService;
+    aiTools: DefaultGovernanceAiToolCatalogService;
+  }) {
+    this.anomalyRules = anomalyRules;
+    this.departments = departments;
+    this.policy = policy;
+    this.aiTools = aiTools;
+  }
 
   static create(
     anomalyRules: AnomalyRuleService,
@@ -25,7 +40,7 @@ export class GovernanceRulesOperationsService {
     policy: PostgresGovernancePolicyService,
     aiTools: DefaultGovernanceAiToolCatalogService,
   ): GovernanceRulesOperationsService {
-    return new GovernanceRulesOperationsService(anomalyRules, departments, policy, aiTools);
+    return new GovernanceRulesOperationsService({ anomalyRules, departments, policy, aiTools });
   }
 
   readonly anomalyRuleList: GovernanceApi["anomalyRuleList"] = (...args) =>

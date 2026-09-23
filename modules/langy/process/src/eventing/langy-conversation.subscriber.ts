@@ -222,11 +222,10 @@ export function createAgentTurnLivenessSubscriber(
         .appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" })
         .catch(() => undefined);
       await deps.worker.dispatch({
-        intent: handoff.resumeToken
-          ? "revive"
-          : handoff.credentials.langwatchApiKey
-            ? "create"
-            : "continue",
+        intent: dispatchIntentOf({
+          resumable: Boolean(handoff.resumeToken),
+          hasApiKey: Boolean(handoff.credentials.langwatchApiKey),
+        }),
         conversationId,
         turnId,
         projectId,
@@ -326,4 +325,15 @@ export function createLangyTurnAdmissionLifecycleSubscriber(deps: {
       });
     },
   };
+}
+
+function dispatchIntentOf({
+  resumable,
+  hasApiKey,
+}: {
+  resumable: boolean;
+  hasApiKey: boolean;
+}): "create" | "revive" | "continue" {
+  if (resumable) return "revive";
+  return hasApiKey ? "create" : "continue";
 }

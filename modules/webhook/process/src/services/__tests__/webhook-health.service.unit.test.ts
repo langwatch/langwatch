@@ -43,7 +43,7 @@ const health = (stats: { attempted: number; delivered: number; latencies: number
   serviceReporting(stats).health({ organizationId: "organization-1", endpointId: "endpoint-1" });
 
 describe("WebhookHealthService.health", () => {
-  describe("the success rate", () => {
+  describe("when computing the success rate", () => {
     it("is the delivered share of what was attempted", async () => {
       await expect(health({ attempted: 4, delivered: 3, latencies: [] })).resolves.toMatchObject({
         successRate: 0.75,
@@ -59,7 +59,7 @@ describe("WebhookHealthService.health", () => {
     });
   });
 
-  describe("the p95 latency", () => {
+  describe("when computing the p95 latency", () => {
     it("sorts the samples before picking, whatever order they arrived in", async () => {
       // The samples come back in delivery order. Reading the 95th slot of an
       // unsorted list reports whichever request happened to land there.

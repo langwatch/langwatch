@@ -39,73 +39,84 @@ import {
   langyToolCallSucceededEventDataSchema,
   langyUserWaitEndedEventDataSchema,
   langyUserWaitStartedEventDataSchema,
+  type LangyConversationStateFoldState,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-export const LangyConversationStartedEventSchema = EventSchema.extend({
+export const LangyConversationStartedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED),
   data: langyConversationStartedEventDataSchema,
 });
 export type LangyConversationStartedEvent = z.infer<typeof LangyConversationStartedEventSchema>;
 
-export const LangyConversationForkedEventSchema = EventSchema.extend({
+export const LangyConversationForkedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_FORKED),
   data: langyConversationForkedEventDataSchema,
 });
 export type LangyConversationForkedEvent = z.infer<typeof LangyConversationForkedEventSchema>;
 
-export const LangyMessageRecordedEventSchema = EventSchema.extend({
+export const LangyMessageRecordedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_RECORDED),
   data: langyMessageRecordedEventDataSchema,
 });
 export type LangyMessageRecordedEvent = z.infer<typeof LangyMessageRecordedEventSchema>;
 
-export const LangyMessageImportedEventSchema = EventSchema.extend({
+export const LangyMessageImportedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_IMPORTED),
   data: langyMessageImportedEventDataSchema,
 });
 export type LangyMessageImportedEvent = z.infer<typeof LangyMessageImportedEventSchema>;
 
-export const LangyAgentTurnAcceptedEventSchema = EventSchema.extend({
+export const LangyAgentTurnAcceptedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED),
   data: langyAgentTurnAcceptedEventDataSchema,
 });
 export type LangyAgentTurnAcceptedEvent = z.infer<typeof LangyAgentTurnAcceptedEventSchema>;
 
-export const LangyToolCallInitiatedEventSchema = EventSchema.extend({
+export const LangyToolCallInitiatedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED),
   data: langyToolCallInitiatedEventDataSchema,
 });
 export type LangyToolCallInitiatedEvent = z.infer<typeof LangyToolCallInitiatedEventSchema>;
 
-export const LangyToolCallSucceededEventSchema = EventSchema.extend({
+export const LangyToolCallSucceededEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED),
   data: langyToolCallSucceededEventDataSchema,
 });
 export type LangyToolCallSucceededEvent = z.infer<typeof LangyToolCallSucceededEventSchema>;
 
-export const LangyToolCallFailedEventSchema = EventSchema.extend({
+export const LangyToolCallFailedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED),
   data: langyToolCallFailedEventDataSchema,
 });
 export type LangyToolCallFailedEvent = z.infer<typeof LangyToolCallFailedEventSchema>;
 
-export const LangyPlanUpdatedEventSchema = EventSchema.extend({
+export const LangyPlanUpdatedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED),
   data: langyPlanUpdatedEventDataSchema,
 });
 export type LangyPlanUpdatedEvent = z.infer<typeof LangyPlanUpdatedEventSchema>;
 
-export const LangyAgentResponseFailedEventSchema = EventSchema.extend({
+export const LangyAgentResponseFailedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED),
   data: langyAgentResponseFailedEventDataSchema,
@@ -118,21 +129,24 @@ export type LangyAgentResponseFailedEvent = z.infer<typeof LangyAgentResponseFai
 // Redis transport implements), not here, because these schemas are for durable
 // event-sourcing events.
 
-export const LangyAgentRespondedEventSchema = EventSchema.extend({
+export const LangyAgentRespondedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED),
   data: langyAgentRespondedEventDataSchema,
 });
 export type LangyAgentRespondedEvent = z.infer<typeof LangyAgentRespondedEventSchema>;
 
-export const LangyConversationArchivedEventSchema = EventSchema.extend({
+export const LangyConversationArchivedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED),
   data: langyConversationArchivedEventDataSchema,
 });
 export type LangyConversationArchivedEvent = z.infer<typeof LangyConversationArchivedEventSchema>;
 
-export const LangyConversationMetadataUpdatedEventSchema = EventSchema.extend({
+export const LangyConversationMetadataUpdatedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED),
   data: langyConversationMetadataUpdatedEventDataSchema,
@@ -141,7 +155,8 @@ export type LangyConversationMetadataUpdatedEvent = z.infer<
   typeof LangyConversationMetadataUpdatedEventSchema
 >;
 
-export const LangyConversationHandoffPendingEventSchema = EventSchema.extend({
+export const LangyConversationHandoffPendingEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING),
   data: langyConversationHandoffPendingEventDataSchema,
@@ -150,7 +165,8 @@ export type LangyConversationHandoffPendingEvent = z.infer<
   typeof LangyConversationHandoffPendingEventSchema
 >;
 
-export const LangyConversationHandoffConsumedEventSchema = EventSchema.extend({
+export const LangyConversationHandoffConsumedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED),
   data: langyConversationHandoffConsumedEventDataSchema,
@@ -159,7 +175,8 @@ export type LangyConversationHandoffConsumedEvent = z.infer<
   typeof LangyConversationHandoffConsumedEventSchema
 >;
 
-export const LangyConversationTitleGeneratedEventSchema = EventSchema.extend({
+export const LangyConversationTitleGeneratedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED),
   data: langyConversationTitleGeneratedEventDataSchema,
@@ -168,14 +185,16 @@ export type LangyConversationTitleGeneratedEvent = z.infer<
   typeof LangyConversationTitleGeneratedEventSchema
 >;
 
-export const LangyLocalControlRequestedEventSchema = EventSchema.extend({
+export const LangyLocalControlRequestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_CONTROL_REQUESTED),
   data: langyLocalControlRequestedEventDataSchema,
 });
 export type LangyLocalControlRequestedEvent = z.infer<typeof LangyLocalControlRequestedEventSchema>;
 
-export const LangyLocalWorkspaceConnectedEventSchema = EventSchema.extend({
+export const LangyLocalWorkspaceConnectedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_CONNECTED),
   data: langyLocalWorkspaceConnectedEventDataSchema,
@@ -184,7 +203,8 @@ export type LangyLocalWorkspaceConnectedEvent = z.infer<
   typeof LangyLocalWorkspaceConnectedEventSchema
 >;
 
-export const LangyLocalWorkspaceDisconnectedEventSchema = EventSchema.extend({
+export const LangyLocalWorkspaceDisconnectedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_DISCONNECTED),
   data: langyLocalWorkspaceDisconnectedEventDataSchema,
@@ -193,21 +213,24 @@ export type LangyLocalWorkspaceDisconnectedEvent = z.infer<
   typeof LangyLocalWorkspaceDisconnectedEventSchema
 >;
 
-export const LangyLocalPolicyChangedEventSchema = EventSchema.extend({
+export const LangyLocalPolicyChangedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_POLICY_CHANGED),
   data: langyLocalPolicyChangedEventDataSchema,
 });
 export type LangyLocalPolicyChangedEvent = z.infer<typeof LangyLocalPolicyChangedEventSchema>;
 
-export const LangyUserWaitStartedEventSchema = EventSchema.extend({
+export const LangyUserWaitStartedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_STARTED),
   data: langyUserWaitStartedEventDataSchema,
 });
 export type LangyUserWaitStartedEvent = z.infer<typeof LangyUserWaitStartedEventSchema>;
 
-export const LangyUserWaitEndedEventSchema = EventSchema.extend({
+export const LangyUserWaitEndedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED),
   version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_ENDED),
   data: langyUserWaitEndedEventDataSchema,
@@ -308,7 +331,7 @@ export class LangyConversationStateFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): LangyConversationStateFoldState {
     return initLangyConversationState();
   }
 

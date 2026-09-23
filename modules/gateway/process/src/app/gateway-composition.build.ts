@@ -105,12 +105,7 @@ class GatewayAuthzScopePermissions implements GatewayScopePermissions {
     permission: Parameters<AuthzApi["hasPermission"]>[0]["permission"];
     scope: GatewayPermissionScope;
   }): Promise<boolean> {
-    const scope =
-      input.scope.type === "org"
-        ? { organizationId: input.scope.id }
-        : input.scope.type === "team"
-          ? { teamId: input.scope.id }
-          : { projectId: input.scope.id };
+    const scope = authzScopeOf(input.scope);
 
     return this.authz.hasPermission({
       userId: input.userId,
@@ -479,4 +474,9 @@ function membershipForProjectCredential(project: ProjectIdentity): MembershipSet
     teamIds: new Set([project.teamId]),
     projectIds: new Set([project.id]),
   };
+}
+
+function authzScopeOf(scope: GatewayPermissionScope) {
+  if (scope.type === "org") return { organizationId: scope.id };
+  return scope.type === "team" ? { teamId: scope.id } : { projectId: scope.id };
 }

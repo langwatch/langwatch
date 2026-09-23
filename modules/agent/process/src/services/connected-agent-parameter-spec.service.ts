@@ -39,11 +39,10 @@ function scalarTypeOf(property: Record<string, unknown>): {
   isDowngraded: boolean;
 } {
   const declared = property.type;
+  const declaredNames = typeof declared === "string" ? [declared] : [];
   const names = Array.isArray(declared)
     ? declared.filter((name): name is string => typeof name === "string")
-    : typeof declared === "string"
-      ? [declared]
-      : [];
+    : declaredNames;
   // `Optional[int]` arrives as `["integer", "null"]`; null adds nothing.
   const concrete = names.filter((name) => name !== "null");
   if (concrete.length === 1) {

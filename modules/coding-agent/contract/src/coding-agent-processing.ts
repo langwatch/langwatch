@@ -55,7 +55,8 @@ const workingContextStampSchema = {
  * Facts off one coding-agent SPAN: structure, timing, tokens, finish reason.
  * The span itself stays in span storage — `traceId`/`spanId` reach it.
  */
-export const spanFactsContributionSchema = contributionBaseSchema.extend({
+export const spanFactsContributionSchema = z.object({
+  ...contributionBaseSchema.shape,
   traceId: z.string().min(1),
   spanId: z.string().min(1),
   /** The wire span name (`claude_code.tool`, `opencode.tool.bash`, …). */
@@ -79,7 +80,8 @@ export type SpanFactsContribution = z.infer<typeof spanFactsContributionSchema>;
  * Facts off one coding-agent LOG record: the facts with no span — the denied
  * tool, the failed-and-retried call, the authoritative cost, the compaction.
  */
-export const logFactsContributionSchema = contributionBaseSchema.extend({
+export const logFactsContributionSchema = z.object({
+  ...contributionBaseSchema.shape,
   /** The canonical record's content hash — reaches the stored row. */
   recordId: z.string().min(1),
   /** CorrelationTraceId (wire or synthesized); null when none resolved. */
@@ -100,7 +102,8 @@ export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
  * is the series' total as of `asOfUnixMs`, never a delta; re-delivery
  * replaces (last-write-wins), never adds — the rule that makes replay safe.
  */
-export const metricFactsContributionSchema = contributionBaseSchema.extend({
+export const metricFactsContributionSchema = z.object({
+  ...contributionBaseSchema.shape,
   /** The canonical metric pipeline's series identity hash. */
   seriesId: z.string().min(1),
   /** The wire metric name (`claude_code.lines_of_code.count`, …). */

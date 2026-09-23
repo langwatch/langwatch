@@ -27,6 +27,8 @@ import {
   type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
+  type CodingAgentTracePullRequestLink,
+  type CodingAgentTranscript,
 } from "@langwatch/coding-agent-contract";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -179,7 +181,12 @@ export class CodingAgentApp implements CodingAgentApi {
       },
       resolveCallerProjectScope: (input) => scopeService.resolve(input),
     };
-    return new CodingAgentApp(service, dependencies.github, scope, members);
+    return new CodingAgentApp({
+      codingAgents: service,
+      github: dependencies.github,
+      scope,
+      members,
+    });
   }
 
   /**
@@ -200,12 +207,17 @@ export class CodingAgentApp implements CodingAgentApi {
   readonly #visibility: CodingAgentViewerVisibilityReader;
   readonly #audit: CodingAgentAuditSink;
 
-  private constructor(
-    codingAgents: CodingAgentSessionService,
-    github: GithubApi,
-    scope: CodingAgentScopeMembers,
-    members: CodingAgentInfrastructure,
-  ) {
+  private constructor({
+    codingAgents,
+    github,
+    scope,
+    members,
+  }: {
+    codingAgents: CodingAgentSessionService;
+    github: GithubApi;
+    scope: CodingAgentScopeMembers;
+    members: CodingAgentInfrastructure;
+  }) {
     this.#codingAgents = codingAgents;
     this.#github = github;
     this.#scope = scope;
@@ -229,21 +241,27 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 
   /** Pure derivation, no session store read: folds spans and logs into a transcript. */
-  buildTranscript(input: { spans: SpanDetail[]; logs: TranscriptLogRecord[] }) {
+  buildTranscript(input: {
+    spans: SpanDetail[];
+    logs: TranscriptLogRecord[];
+  }): CodingAgentTranscript {
     return buildCodingAgentTranscript(input);
   }
 
-  findBySessionId(input: CodingAgentSessionLookupInput) {
+  findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {
     return this.#codingAgents.findBySessionId(input);
   }
 
-  findSessionForTrace(input: { projectId: string; traceId: string }) {
+  findSessionForTrace(input: {
+    projectId: string;
+    traceId: string;
+  }): Promise<CodingAgentSession | null> {
     return this.#codingAgents.findSessionForTrace(input);
   }
 
   linkTraceSessionsToPullRequests(
     input: Parameters<CodingAgentSessionService["linkTraceSessionsToPullRequests"]>[0],
-  ) {
+  ): Promise<CodingAgentTracePullRequestLink[]> {
     return this.#codingAgents.linkTraceSessionsToPullRequests(input);
   }
 

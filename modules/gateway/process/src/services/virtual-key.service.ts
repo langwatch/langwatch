@@ -35,13 +35,31 @@ import {
 } from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyService {
-  private constructor(
-    private readonly repository: GatewayVirtualKeyRepository,
-    private readonly crypto: GatewayVirtualKeyCrypto,
-    private readonly provisioning: VirtualKeyProvisioningService,
-    private readonly rotation: VirtualKeyRotationService,
-    private readonly status: VirtualKeyStatusService,
-  ) {}
+  private readonly repository: GatewayVirtualKeyRepository;
+  private readonly crypto: GatewayVirtualKeyCrypto;
+  private readonly provisioning: VirtualKeyProvisioningService;
+  private readonly rotation: VirtualKeyRotationService;
+  private readonly status: VirtualKeyStatusService;
+
+  private constructor({
+    repository,
+    crypto,
+    provisioning,
+    rotation,
+    status,
+  }: {
+    repository: GatewayVirtualKeyRepository;
+    crypto: GatewayVirtualKeyCrypto;
+    provisioning: VirtualKeyProvisioningService;
+    rotation: VirtualKeyRotationService;
+    status: VirtualKeyStatusService;
+  }) {
+    this.repository = repository;
+    this.crypto = crypto;
+    this.provisioning = provisioning;
+    this.rotation = rotation;
+    this.status = status;
+  }
 
   static create(input: {
     transactions: GatewayTransaction;
@@ -74,11 +92,11 @@ export class VirtualKeyService {
       governanceSignals: input.governanceSignals,
     };
 
-    return new VirtualKeyService(
-      input.repository,
-      input.crypto,
-      VirtualKeyProvisioningService.create({ ...shared, crypto: input.crypto }),
-      VirtualKeyRotationService.create({
+    return new VirtualKeyService({
+      repository: input.repository,
+      crypto: input.crypto,
+      provisioning: VirtualKeyProvisioningService.create({ ...shared, crypto: input.crypto }),
+      rotation: VirtualKeyRotationService.create({
         transactions: input.transactions,
         repository: input.repository,
         changeEvents: input.changeEvents,
@@ -87,8 +105,8 @@ export class VirtualKeyService {
         validation,
         governanceSignals: input.governanceSignals,
       }),
-      VirtualKeyStatusService.create(shared),
-    );
+      status: VirtualKeyStatusService.create(shared),
+    });
   }
 
   async getAll(organizationId: string): Promise<VirtualKeyWithScopes[]> {
