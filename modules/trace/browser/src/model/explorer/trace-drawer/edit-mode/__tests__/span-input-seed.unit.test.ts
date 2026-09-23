@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { capturedInputForEditing } from "../span-input-seed.ts";
 
-const MESSAGES = [
+const MESSAGES: { role: "user" | "assistant"; content: string }[] = [
   { role: "user", content: "what is the weather" },
   { role: "assistant", content: "mild" },
 ];
@@ -57,11 +57,10 @@ describe("given a span whose messages carry their own system message", () => {
 });
 
 describe("given a span whose system prompt is recorded as content blocks", () => {
-  const spanWith = (params: Record<string, unknown>) =>
-    ({
-      input: { type: "chat_messages", value: MESSAGES },
-      params,
-    }) as unknown as Pick<Span, "input" | "params">;
+  const spanWith = (params: Record<string, unknown>): Pick<Span, "input" | "params"> => ({
+    input: { type: "chat_messages", value: MESSAGES },
+    params,
+  });
 
   const cases: [string, Record<string, unknown>][] = [
     [
@@ -108,7 +107,7 @@ describe("given a span whose system prompt is several content blocks", () => {
   describe("when its input is read", () => {
     /** @scenario "A system prompt recorded as content blocks reads as one prompt" */
     it("reads them as one prompt, a line each", () => {
-      const span = {
+      const span: Pick<Span, "input" | "params"> = {
         input: { type: "chat_messages", value: MESSAGES },
         params: {
           "gen_ai.system_instructions": [
@@ -116,7 +115,7 @@ describe("given a span whose system prompt is several content blocks", () => {
             { type: "text", text: "Answer in one word." },
           ],
         },
-      } as unknown as Pick<Span, "input" | "params">;
+      };
 
       expect(buildDisplayInput(span)).toBe(
         JSON.stringify([

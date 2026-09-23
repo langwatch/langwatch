@@ -594,8 +594,7 @@ describe("traceEditStore", () => {
     };
 
     describe("when one key is changed and another removed", () => {
-      /** @scenario "Corrected metadata is saved as one map of the keys that changed" */
-      it("names both keys and nothing else", () => {
+      beforeEach(() => {
         state().startEditing({ traceId: "trace-1" });
         state().setTraceMetadata({
           key: "environment",
@@ -607,7 +606,10 @@ describe("traceEditStore", () => {
           value: null,
           baselineMetadata: CAPTURED_METADATA,
         });
+      });
 
+      /** @scenario "Corrected metadata is saved as one map of the keys that changed" */
+      it("names both keys and nothing else", () => {
         expect(buildTraceEditPatch(draftState()).trace).toEqual({
           metadata: { environment: "production", reviewer: null },
         });
@@ -615,18 +617,6 @@ describe("traceEditStore", () => {
 
       /** @scenario "Corrected metadata is saved as one map of the keys that changed" */
       it("counts the metadata as one changed field", () => {
-        state().startEditing({ traceId: "trace-1" });
-        state().setTraceMetadata({
-          key: "environment",
-          value: "production",
-          baselineMetadata: CAPTURED_METADATA,
-        });
-        state().setTraceMetadata({
-          key: "reviewer",
-          value: null,
-          baselineMetadata: CAPTURED_METADATA,
-        });
-
         expect(summarizeTraceEdit(draftState())).toEqual({
           changedFields: 1,
           deletedSpans: 0,
@@ -806,12 +796,15 @@ describe("traceEditStore", () => {
     });
 
     describe("when the trace recorded a JSON document as text", () => {
+      const recorded = '{"tools":["search"],"retries":0}';
+      const baselineParams = { "langwatch.params": recorded };
+
+      beforeEach(() => {
+        state().startEditing({ traceId: "trace-1" });
+      });
+
       /** @scenario "Retyping the captured text into an attribute recorded as text is not a change" */
       it("treats the same document read as a structure as unchanged", () => {
-        const recorded = '{"tools":["search"],"retries":0}';
-        const baselineParams = { "langwatch.params": recorded };
-        state().startEditing({ traceId: "trace-1" });
-
         state().setSpanParam({
           spanId: "span-1",
           key: "langwatch.params",
@@ -825,10 +818,6 @@ describe("traceEditStore", () => {
 
       /** @scenario "Retyping the captured text into an attribute recorded as text is not a change" */
       it("still records a document that says something different", () => {
-        const recorded = '{"tools":["search"],"retries":0}';
-        const baselineParams = { "langwatch.params": recorded };
-        state().startEditing({ traceId: "trace-1" });
-
         state().setSpanParam({
           spanId: "span-1",
           key: "langwatch.params",

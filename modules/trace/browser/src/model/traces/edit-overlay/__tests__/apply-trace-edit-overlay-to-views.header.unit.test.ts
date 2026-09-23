@@ -1,4 +1,4 @@
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import type { TraceEditOverlayPatch, TraceHeader } from "@langwatch/trace-contract";
 /**
  * Applying a correction to the drawer header: span count, and metadata
  * attributes read from the header row the way they were ingested.
@@ -15,6 +15,39 @@ const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPat
   spans: [],
   deletedSpanIds: [],
   ...overrides,
+});
+
+const headerWith = (attributes: TraceHeader["attributes"]): TraceHeader => ({
+  traceId: "trace-1",
+  name: "trace",
+  conversationId: null,
+  input: null,
+  output: null,
+  timestamp: 1_000,
+  serviceName: "svc",
+  origin: "application",
+  userId: null,
+  durationMs: 1,
+  models: [],
+  totalCost: null,
+  nonBilledCost: 0,
+  totalTokens: 0,
+  inputTokens: null,
+  outputTokens: null,
+  tokensEstimated: false,
+  traceName: "trace",
+  rootSpanType: null,
+  scenarioRunId: null,
+  containsPrompt: false,
+  selectedPromptId: null,
+  selectedPromptSpanId: null,
+  lastUsedPromptId: null,
+  lastUsedPromptVersionNumber: null,
+  lastUsedPromptVersionId: null,
+  lastUsedPromptSpanId: null,
+  status: "ok",
+  spanCount: 1,
+  attributes,
 });
 
 describe("applying a correction to the drawer header", () => {
@@ -57,14 +90,11 @@ describe("applying a correction to the drawer header", () => {
     /** @scenario "Corrected metadata reads on the drawer header" */
     it("reads on the header row the metadata was ingested on", () => {
       const corrected = applyOverlayToTraceHeader({
-        header: {
-          traceId: "trace-1",
-          attributes: {
-            "metadata.environment": "staging",
-            "metadata.reviewer": "unassigned",
-            "langwatch.labels": '["nightly"]',
-          },
-        } as unknown as Parameters<typeof applyOverlayToTraceHeader>[0]["header"],
+        header: headerWith({
+          "metadata.environment": "staging",
+          "metadata.reviewer": "unassigned",
+          "langwatch.labels": '["nightly"]',
+        }),
         patch: patchOf({
           trace: {
             metadata: {

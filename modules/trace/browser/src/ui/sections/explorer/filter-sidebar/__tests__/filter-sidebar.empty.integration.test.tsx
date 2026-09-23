@@ -237,11 +237,13 @@ describe("<FilterSidebar />", () => {
     });
 
     describe("when descriptors are empty but traces exist", () => {
-      it("renders the sidebar (the no-data case is not the no-traces case)", () => {
+      beforeEach(() => {
         mockHasAnyTraces = true;
         mockFacetsLoading = false;
         mockDescriptors = [];
+      });
 
+      it("renders the sidebar (the no-data case is not the no-traces case)", () => {
         const { container } = renderSidebar();
 
         // hasAnyTraces=true → sidebar should be visible even with 0 descriptors
@@ -249,10 +251,6 @@ describe("<FilterSidebar />", () => {
       });
 
       it("falls back to the default minimal facet set (not a blank rail)", () => {
-        mockHasAnyTraces = true;
-        mockFacetsLoading = false;
-        mockDescriptors = [];
-
         renderSidebar();
 
         // The container always has the header bar, so a non-empty DOM is a

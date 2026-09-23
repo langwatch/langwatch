@@ -4,12 +4,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { setUiFeedbackHost, type UiFeedbackSink } from "@langwatch/browser-host/toaster";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceFailureNotice, TraceHostApi } from "../../../behavior/trace-host.ts";
+import type { TraceFailureNotice } from "../../../behavior/trace-host.ts";
 import {
   SETUP_SURFACES,
   type SetupSurface,
@@ -253,9 +253,13 @@ describe("SetupWithAgentButton", () => {
       // asserted here is that the refusal was HANDED OVER, not what it was
       // made to say, mirroring use-export-traces.integration.test.ts.
       const failures: TraceFailureNotice[] = [];
-      setUiFeedbackHost({
-        failed: (failure: TraceFailureNotice) => failures.push(failure),
-      } as unknown as TraceHostApi);
+      const host: UiFeedbackSink = {
+        succeeded: () => void 0,
+        failed: (failure) => {
+          failures.push(failure);
+        },
+      };
+      setUiFeedbackHost(host);
 
       const user = userEvent.setup();
       Object.defineProperty(navigator, "clipboard", {

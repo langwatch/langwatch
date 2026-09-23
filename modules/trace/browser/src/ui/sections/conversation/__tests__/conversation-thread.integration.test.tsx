@@ -61,7 +61,7 @@ describe("<ConversationThread />", () => {
     Element.prototype.scrollIntoView = scrollIntoView;
     // The thread scrolls its own box as content arrives; jsdom implements
     // neither method, and one test below replaces this stub to observe it.
-    Element.prototype.scrollTo = vi.fn() as unknown as Element["scrollTo"];
+    Element.prototype.scrollTo = vi.fn<(options?: ScrollToOptions | number, y?: number) => void>();
   });
 
   beforeEach(() => {
@@ -274,9 +274,9 @@ describe("<ConversationThread />", () => {
 
   describe("given the thread is rendered beside other scrolling content", () => {
     it("scrolls its own box rather than every ancestor", () => {
-      const scrollTo = vi.fn();
+      const scrollTo = vi.fn<(options?: ScrollToOptions | number, y?: number) => void>();
       // jsdom implements neither, so both are observed rather than measured.
-      Element.prototype.scrollTo = scrollTo as unknown as Element["scrollTo"];
+      Element.prototype.scrollTo = scrollTo;
 
       renderConversation({
         messages: [{ id: "m1", role: "user", content: "hello" }],

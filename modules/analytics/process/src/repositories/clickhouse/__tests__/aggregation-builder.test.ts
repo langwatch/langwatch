@@ -428,9 +428,7 @@ describe("aggregation-builder", () => {
         "TraceId", // -> uniqExact(trace_id)
         "OccurredAt", // used only in period/date boundaries, not in outer aggregations
       ]);
-      const { dedupSubstitutions } = __testOnly__ as unknown as {
-        dedupSubstitutions: () => { source: string }[];
-      };
+      const { dedupSubstitutions } = __testOnly__;
       const registered = new Set(
         dedupSubstitutions().flatMap(({ source: substitutionSource }) =>
           Array.from(substitutionSource.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map((m) => m[1]!),
@@ -1726,18 +1724,18 @@ describe("aggregation-builder", () => {
     // Minimal MetricTranslation-shaped fixtures — the helper only inspects
     // `requiredJoins`, so other fields are intentionally stub values.
     type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
-    const evalMetric = {
+    const evalMetric: MetricStub = {
       selectExpression: "avgIf(es.Passed, 1)",
       alias: "e",
       requiredJoins: ["evaluation_runs"],
       params: {},
-    } as unknown as MetricStub;
-    const traceMetric = {
+    };
+    const traceMetric: MetricStub = {
       selectExpression: "sum(ts.TotalCost)",
       alias: "t",
       requiredJoins: [],
       params: {},
-    } as unknown as MetricStub;
+    };
 
     it("returns true when both eval and trace metrics are present", () => {
       expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(true);
@@ -1762,9 +1760,7 @@ describe("aggregation-builder", () => {
   // only, grouped cost_billed returned the un-subtracted total. Every term
   // must survive the rewrite.
   describe("when transforming composite metrics for dedup", () => {
-    const { transformMetricForDedup } = __testOnly__ as unknown as {
-      transformMetricForDedup: (expr: string, alias: string) => string;
-    };
+    const { transformMetricForDedup } = __testOnly__;
 
     it("keeps BOTH terms of total_tokens (prompt + completion)", () => {
       const result = transformMetricForDedup(

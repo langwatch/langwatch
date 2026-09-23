@@ -106,7 +106,7 @@ const focusedFrames = () => document.querySelectorAll('[data-focused-turn="true"
 const blinkingTurns = () =>
   document.querySelectorAll('[data-focused-turn="true"][data-blinking="true"]');
 
-const scrollTo = vi.fn();
+const scrollTo = vi.fn<(options?: ScrollToOptions | number, y?: number) => void>();
 
 /** Fake clocks the delayed carry, the blink, and the settle loop all run on. */
 function useFakeClocks() {
@@ -135,7 +135,7 @@ beforeEach(() => {
   scrollTo.mockClear();
   mocks.turns = mocks.thread;
   // jsdom has no scrolling of its own, so the container reports the call.
-  Element.prototype.scrollTo = scrollTo as unknown as Element["scrollTo"];
+  Element.prototype.scrollTo = scrollTo;
 });
 
 afterEach(cleanup);

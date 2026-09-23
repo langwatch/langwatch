@@ -749,7 +749,10 @@ describe("PromptTextAreaWithVariables", () => {
         observe() {}
         unobserve() {}
         disconnect() {}
-      } as unknown as typeof ResizeObserver;
+        takeRecords(): ResizeObserverEntry[] {
+          return [];
+        }
+      };
 
       try {
         renderComponent({

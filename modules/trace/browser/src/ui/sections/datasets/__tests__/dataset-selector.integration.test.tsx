@@ -11,30 +11,29 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DatasetSelector } from "../dataset-selector.tsx";
 
-const buildDataset = ({ name, id }: { name: string; id: string }): DatasetSummary =>
-  ({
-    id,
-    name,
-    slug: id,
-    projectId: "test-project-id",
-    columnTypes: [],
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-01-01T00:00:00Z"),
-    archivedAt: null,
-    mapping: null,
-    useS3: false,
-    s3RecordCount: null,
-    contentLayout: "s3_jsonl",
-    status: "ready",
-    statusError: null,
-    stagingKey: null,
-    uploadFilename: null,
-    rowCount: 10,
-    sizeBytes: null,
-    chunkCount: 1,
-    chunkOffsets: null,
-    recordCount: 10,
-  }) as unknown as DatasetSummary;
+const buildDataset = ({ name, id }: { name: string; id: string }): DatasetSummary => ({
+  id,
+  name,
+  slug: id,
+  projectId: "test-project-id",
+  columnTypes: [],
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
+  archivedAt: null,
+  mapping: null,
+  useS3: false,
+  s3RecordCount: null,
+  contentLayout: "s3_jsonl",
+  status: "ready",
+  statusError: null,
+  stagingKey: null,
+  uploadFilename: null,
+  rowCount: 10,
+  sizeBytes: null,
+  chunkCount: 1,
+  chunkOffsets: null,
+  recordCount: 10,
+});
 
 type SelectorProps = Parameters<typeof DatasetSelector>[0];
 

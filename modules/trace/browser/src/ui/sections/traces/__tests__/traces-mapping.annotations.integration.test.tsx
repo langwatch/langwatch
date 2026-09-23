@@ -83,13 +83,21 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 
 const { TracesMapping } = await import("../traces-mapping.tsx");
 
-const REVIEWED_TRACE = {
+const REVIEWED_TRACE: Trace = {
   trace_id: TRACE_ID,
   project_id: "project-1",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
-  spans: [{ span_id: SPAN_ID, name: "web_search", type: "span" }],
-} as unknown as Trace;
+  spans: [
+    {
+      span_id: SPAN_ID,
+      trace_id: TRACE_ID,
+      name: "web_search",
+      type: "span",
+      timestamps: { started_at: 1, finished_at: 1 },
+    },
+  ],
+};
 
 function renderMapping({
   targetFields,

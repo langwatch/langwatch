@@ -81,7 +81,7 @@ describe("HoverableBigText overflow measurement", () => {
 
   beforeEach(() => {
     watches = [];
-    globalThis.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;
+    globalThis.ResizeObserver = TestResizeObserver;
   });
 
   afterEach(() => {

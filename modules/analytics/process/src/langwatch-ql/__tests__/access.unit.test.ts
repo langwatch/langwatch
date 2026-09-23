@@ -13,9 +13,10 @@ import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";
  * was wrapped for tracing, since `spyOn` cannot replace a method reached through a proxy.
  */
 function projectsIn(organizationId: string): ProjectApi {
-  return {
-    getOrganizationId: vi.fn(async () => organizationId),
-  } as unknown as ProjectApi;
+  return createApiFixture<ProjectApi>(
+    { getOrganizationId: async () => organizationId },
+    "lwql projects",
+  );
 }
 
 /** One flag, answered; every other operation refuses by name. */

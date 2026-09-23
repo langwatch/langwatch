@@ -48,13 +48,13 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 
 const { DatasetMappingPreview } = await import("../dataset-mapping-preview.tsx");
 
-const TRACE = {
+const TRACE: Trace = {
   trace_id: "trace-1",
   project_id: "project-1",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
   spans: [],
-} as unknown as Trace;
+};
 
 const COLUMN_TYPES: DatasetColumns = [
   { name: "spans_column", type: "json" },
@@ -62,10 +62,26 @@ const COLUMN_TYPES: DatasetColumns = [
 ];
 
 /** A dataset whose stored mapping offers both the span and the annotation expansion. */
-const DATASET = {
+const DATASET: Dataset = {
   id: "dataset-1",
+  projectId: "project-1",
   name: "runbook quality",
+  slug: "runbook-quality",
   columnTypes: COLUMN_TYPES,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
+  archivedAt: null,
+  useS3: false,
+  s3RecordCount: null,
+  contentLayout: "s3_jsonl",
+  status: "ready",
+  statusError: null,
+  stagingKey: null,
+  uploadFilename: null,
+  rowCount: 0,
+  sizeBytes: null,
+  chunkCount: null,
+  chunkOffsets: null,
   mapping: {
     traceMapping: {
       mapping: {
@@ -75,7 +91,7 @@ const DATASET = {
       expansions: [],
     },
   },
-} as unknown as Dataset;
+};
 
 /**
  * One switch, by the name it announces. Chakra's Switch is a label wrapping a hidden
@@ -105,23 +121,20 @@ beforeEach(() => {
 
 describe("given the drawer's mapping and preview side by side", () => {
   describe("when I click the words beside an expansion switch", () => {
-    /** @scenario "An expansion switch answers to its own label in the drawer" */
-    it("turns that expansion on", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderPreview();
 
       await user.click(screen.getByText("One row per span"));
+    });
 
+    /** @scenario "An expansion switch answers to its own label in the drawer" */
+    it("turns that expansion on", () => {
       expect(switchNamed("One row per span")).toBeChecked();
     });
 
     /** @scenario "An expansion switch answers to its own label in the drawer" */
-    it("leaves every other switch and the preview's own checkboxes alone", async () => {
-      const user = userEvent.setup();
-      renderPreview();
-
-      await user.click(screen.getByText("One row per span"));
-
+    it("leaves every other switch and the preview's own checkboxes alone", () => {
       expect(switchNamed("One row per annotation")).not.toBeChecked();
       expect(switchNamed("Select all rows")).toBeChecked();
     });

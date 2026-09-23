@@ -9,14 +9,12 @@ import { describe, expect, it } from "vitest";
 import { buildFacetItems, orderValues } from "../hooks/use-filter-sidebar-data.ts";
 
 /** A verdict facet as discover hands it over: counts, no order, no colour. */
-const verdictSection = (topValues: { value: string; count: number }[]): CategoricalSection =>
-  ({
-    kind: "categorical",
-    key: "evaluatorVerdict",
-    label: "Evaluator Verdict",
-    topValues: topValues.map((v) => ({ ...v, label: v.value })),
-    totalDistinct: topValues.length,
-  }) as unknown as CategoricalSection;
+const verdictSection = (topValues: { value: string; count: number }[]): CategoricalSection => ({
+  kind: "cat",
+  key: "evaluatorVerdict",
+  label: "Evaluator Verdict",
+  topValues: topValues.map((v) => ({ ...v, label: v.value })),
+});
 
 // Two independent code paths (facet colors vs drilldown) need test to
 // prevent rendering disagreement.

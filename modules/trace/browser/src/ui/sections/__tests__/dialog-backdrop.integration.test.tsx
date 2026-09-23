@@ -123,7 +123,7 @@ describe("Dialog backdrop", () => {
   describe("when consumers reach for the Dialog namespace", () => {
     /** @scenario Dialog.Backdrop is not exposed as a public sub-component */
     it("does not expose a Backdrop sub-component", () => {
-      expect((Dialog as unknown as Record<string, unknown>).Backdrop).toBe(undefined);
+      expect("Backdrop" in Dialog).toBe(false);
     });
   });
 });
