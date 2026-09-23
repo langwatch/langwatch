@@ -4,6 +4,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const TEST_PIPELINE_NAME = "gateway_spend_processing";
@@ -33,7 +34,6 @@ vi.mock("@langwatch/observability", () => {
  */
 async function createEventSourcingWithMockedLogger() {
   vi.resetModules();
-  // oxlint-disable-next-line langwatch/no-inline-dynamic-import
   const { EventSourcing } = await import("../../eventSourcing.ts");
   return new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
 }

@@ -246,7 +246,6 @@ export function RunNameField({
   return (
     <Box data-testid="run-dialog-name-block">
       <FieldLabel>Run name</FieldLabel>
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <Box position="relative" onKeyDown={listKeyHandler(list)}>
         <Input
           {...DIALOG_FIELD_STYLE}

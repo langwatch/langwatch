@@ -104,7 +104,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
         setSelectedProjections(relevant);
       }
     });
-  }, [canDiscover, allTenants, tenantIds, since]); // eslint-disable-next-line
+  }, [canDiscover, allTenants, tenantIds, since]);
   // react-hooks/exhaustive-deps
 
   const projectionMetaByName = useMemo(

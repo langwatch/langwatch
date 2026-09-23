@@ -308,7 +308,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"

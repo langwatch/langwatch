@@ -16,7 +16,6 @@ const mockSchema = vi.fn();
 const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, QueryApiService: vi.fn() };
 });
@@ -45,6 +44,7 @@ class ProcessExitError extends Error {
 }
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
+
 import { queryExamplesCommand } from "../examples";
 import { queryReferenceCommand } from "../reference";
 import { queryLwqlSchemaCommand } from "../schema";
@@ -116,9 +116,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockSchema.mockResolvedValue({ database: "analytics", views: [] });
@@ -175,10 +173,9 @@ describe("queryLwqlSchemaCommand", () => {
       ],
     });
     const result = await queryLwqlSchemaCommand({});
-    expect(
-      (result as { data: { views: { name: string }[] } }).data.views[0]
-        ?.name,
-    ).toBe("analytics.traces");
+    expect((result as { data: { views: { name: string }[] } }).data.views[0]?.name).toBe(
+      "analytics.traces",
+    );
   });
 });
 
@@ -187,23 +184,19 @@ describe("queryReferenceCommand", () => {
   it("returns the whole document by default", async () => {
     const result = await queryReferenceCommand({});
     expect((result as { data: typeof REFERENCE }).data.version).toBe("1");
-    expect((result as { data: typeof REFERENCE }).data.decisionTable).toHaveLength(
-      1,
-    );
+    expect((result as { data: typeof REFERENCE }).data.decisionTable).toHaveLength(1);
   });
 
   /** @scenario "The reference subcommand can print one section" */
   it("returns only the section the caller named", async () => {
     const result = await queryReferenceCommand({ section: "trace-filter" });
-    expect(
-      (result as { data: { fields: { name: string }[] } }).data.fields[0]?.name,
-    ).toBe("status");
+    expect((result as { data: { fields: { name: string }[] } }).data.fields[0]?.name).toBe(
+      "status",
+    );
   });
 
   it("refuses a section it does not have", async () => {
-    await expect(queryReferenceCommand({ section: "sql" })).rejects.toThrow(
-      ProcessExitError,
-    );
+    await expect(queryReferenceCommand({ section: "sql" })).rejects.toThrow(ProcessExitError);
     expect(mockReference).not.toHaveBeenCalled();
   });
 });
@@ -212,8 +205,7 @@ describe("queryExamplesCommand", () => {
   /** @scenario "The examples subcommand prints the example library" */
   it("returns every example with its identifier and statement", async () => {
     const result = await queryExamplesCommand({});
-    const examples = (result as { data: { examples: { id: string }[] } }).data
-      .examples;
+    const examples = (result as { data: { examples: { id: string }[] } }).data.examples;
     expect(examples.map((example) => example.id)).toEqual([
       "lwql.cost-by-model",
       "filter.failures",
@@ -243,8 +235,6 @@ describe("queryExamplesCommand", () => {
   });
 
   it("refuses a language it does not have", async () => {
-    await expect(queryExamplesCommand({ language: "sql" })).rejects.toThrow(
-      ProcessExitError,
-    );
+    await expect(queryExamplesCommand({ language: "sql" })).rejects.toThrow(ProcessExitError);
   });
 });

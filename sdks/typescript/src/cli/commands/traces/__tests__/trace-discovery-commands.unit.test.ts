@@ -18,13 +18,11 @@ const mockSearch = vi.fn();
 const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, TracesApiService: vi.fn() };
 });
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, QueryApiService: vi.fn() };
 });
@@ -54,6 +52,7 @@ class ProcessExitError extends Error {
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { traceFacetsCommand } from "../facets";
 import { traceFieldsCommand } from "../fields";
 
@@ -132,9 +131,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockReference.mockResolvedValue(REFERENCE);
@@ -144,9 +141,7 @@ beforeEach(async () => {
     >;
   } as unknown as typeof TracesApiService);
   vi.mocked(QueryApiService).mockImplementation(function () {
-    return { reference: mockReference } as unknown as InstanceType<
-      typeof QueryApiService
-    >;
+    return { reference: mockReference } as unknown as InstanceType<typeof QueryApiService>;
   } as unknown as typeof QueryApiService);
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -175,8 +170,7 @@ describe("traceFacetsCommand", () => {
       });
       const result = await traceFacetsCommand("model", {});
       expect(
-        (result as { data: { values: { value: string; count: number }[] } }).data
-          .values,
+        (result as { data: { values: { value: string; count: number }[] } }).data.values,
       ).toEqual([{ value: "gpt-5-mini", count: 7 }]);
     });
 
@@ -191,9 +185,9 @@ describe("traceFacetsCommand", () => {
     });
 
     it("refuses a limit that is not a whole number", async () => {
-      await expect(
-        traceFacetsCommand("model", { limit: "many" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(traceFacetsCommand("model", { limit: "many" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockFacets).not.toHaveBeenCalled();
     });
   });
@@ -213,9 +207,7 @@ describe("traceFacetsCommand", () => {
         pending: false,
       });
       const result = await traceFacetsCommand(undefined, {});
-      expect(
-        (result as { data: { facets: { key: string }[] } }).data.facets[0]?.key,
-      ).toBe("model");
+      expect((result as { data: { facets: { key: string }[] } }).data.facets[0]?.key).toBe("model");
       expect(mockFacets).toHaveBeenCalledWith({});
     });
   });
@@ -238,9 +230,7 @@ describe("traceFieldsCommand", () => {
   /** @scenario "The CLI prints the filter fields and the syntax" */
   it("returns the syntax document when asked for it", async () => {
     const result = await traceFieldsCommand({ syntax: true });
-    expect((result as { data: { syntax: string } }).data.syntax).toContain(
-      "trace.attribute.",
-    );
+    expect((result as { data: { syntax: string } }).data.syntax).toContain("trace.attribute.");
   });
 
   /** @scenario "The CLI prints the filter fields and the syntax" */
