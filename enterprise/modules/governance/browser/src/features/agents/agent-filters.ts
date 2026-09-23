@@ -12,7 +12,7 @@ import {
   AGENT_SOURCES,
   type AgentSource,
   type GovernanceAgentRow,
-} from "./agentRows";
+} from "./agent-rows";
 
 /** The source chip's "no filter" value, and the value left out of the URL. */
 export const ALL_SOURCES = "all";

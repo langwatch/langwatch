@@ -2,7 +2,7 @@ import type { AgentsListingRefusalCause } from "@langwatch/enterprise-governance
 import { Bot, SearchX, TriangleAlert } from "lucide-react";
 import type { ComponentType } from "react";
 
-import { spokenList } from "./agentSummary";
+import { spokenList } from "./agent-summary";
 
 /**
  * The page's empty-state words, apart from the renderer: five states, each with its own sentences

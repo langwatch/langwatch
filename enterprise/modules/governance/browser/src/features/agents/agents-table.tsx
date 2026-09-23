@@ -9,13 +9,13 @@ import {
   formatAgentCost,
   formatAgentLastActive,
   formatAgentRequests,
-} from "./AgentFigure";
+} from "./agent-figure";
 import {
   AGENT_HEALTH_LABELS,
   AGENT_SOURCE_LABELS,
   formatRegistered,
   type GovernanceAgentRow,
-} from "./agentRows";
+} from "./agent-rows";
 
 /**
  * The fleet as a list, the page's default: comparing agents is the question. All ten attributes,

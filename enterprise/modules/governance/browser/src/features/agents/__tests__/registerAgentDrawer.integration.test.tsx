@@ -29,7 +29,7 @@ vi.mock("@langwatch/browser-host/markdown", () => ({
   RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
 }));
 
-import { RegisterAgentDrawer } from "../RegisterAgentDrawer";
+import { RegisterAgentDrawer } from "../register-agent-drawer";
 
 function renderDrawer() {
   return render(

@@ -2,9 +2,9 @@ import { HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { LayoutGrid, List as ListIcon } from "lucide-react";
 
-import { AgentCard } from "./AgentCard";
-import type { GovernanceAgentRow } from "./agentRows";
-import { AgentsTable } from "./AgentsTable";
+import { AgentCard } from "./agent-card";
+import type { GovernanceAgentRow } from "./agent-rows";
+import { AgentsTable } from "./agents-table";
 
 /**
  * The fleet's two layouts, the switch and the branch. The list is the default because the page

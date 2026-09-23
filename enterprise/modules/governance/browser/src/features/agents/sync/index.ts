@@ -3,9 +3,9 @@
  * the file, so the module path stays stable if the component grows siblings: import {
  * GovernanceSyncButton } from "../../../features/agents/sync/index.ts";
  */
-export { GovernanceSyncButton, type GovernanceSyncState } from "./GovernanceSyncButton";
+export { GovernanceSyncButton, type GovernanceSyncState } from "./governance-sync-button";
 export {
   type GovernanceSyncStatus,
   type GovernanceSyncUnavailable,
   governanceSyncStatus,
-} from "./syncControlState";
+} from "./sync-control-state";

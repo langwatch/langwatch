@@ -10,8 +10,8 @@ import {
   OWNERSHIP_FILTERS,
   OWNERSHIP_LABELS,
   sourceLabel,
-} from "./agentFilters";
-import { AGENT_SOURCE_LABELS, type AgentSource } from "./agentRows";
+} from "./agent-filters";
+import { AGENT_SOURCE_LABELS, type AgentSource } from "./agent-rows";
 
 /**
  * The Agents filter row: source, ownership, sort, on the section's `FilterChip`. `sources` lists

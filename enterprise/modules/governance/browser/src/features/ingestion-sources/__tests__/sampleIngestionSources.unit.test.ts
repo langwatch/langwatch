@@ -27,7 +27,7 @@ import {
   sampleSourceTypeOptions,
 } from "../model/ingestion-source-catalog.ts";
 import { sourceBadge } from "../model/source-health-display.ts";
-import { SAMPLE_INGESTION_SOURCES } from "../sampleIngestionSources";
+import { SAMPLE_INGESTION_SOURCES } from "../sample-ingestion-sources";
 
 describe("given the Sources tab in sample mode", () => {
   describe("when the sample rows are worked out", () => {

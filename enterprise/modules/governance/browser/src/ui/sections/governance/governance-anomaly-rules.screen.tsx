@@ -2,7 +2,7 @@
 
 import { Heading, VStack } from "@chakra-ui/react";
 
-import { AnomalyRulesTab } from "../../../features/ingestion-sources/AnomalyRulesTab";
+import { AnomalyRulesTab } from "../../../features/ingestion-sources/anomaly-rules-tab";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 
 /**

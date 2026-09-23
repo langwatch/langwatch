@@ -45,7 +45,7 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { IngestionSourcesTable } from "../../../../features/ingestion-sources/IngestionSourcesTable.tsx";
+import { IngestionSourcesTable } from "../../../../features/ingestion-sources/ingestion-sources-table.tsx";
 import { SourceHealthCards } from "../governance-ingestion-source.screen.tsx";
 
 /**

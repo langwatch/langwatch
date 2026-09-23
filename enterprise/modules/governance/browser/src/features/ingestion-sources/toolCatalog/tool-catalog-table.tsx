@@ -4,7 +4,7 @@ import { Badge, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
 import type { ReactNode } from "react";
 
-import { ToolCardFigure, ToolCardMark } from "./ToolCardFigure";
+import { ToolCardFigure, ToolCardMark } from "./tool-card-figure";
 import {
   TOOL_CARD_ROW_META,
   type ToolCard,

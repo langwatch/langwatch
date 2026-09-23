@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { formatLastActive, formatRegistered } from "../agentRows";
+import { formatLastActive, formatRegistered } from "../agent-rows";
 
 describe("formatRegistered", () => {
   it("gives back nothing when the platform has no registration date", () => {

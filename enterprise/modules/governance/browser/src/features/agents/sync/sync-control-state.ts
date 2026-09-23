@@ -3,7 +3,7 @@
  * returns the CAUSE and each page maps it to its own sentence, like `GovernanceEmptyStateCopy`.
  */
 
-import type { GovernanceSyncState } from "./GovernanceSyncButton";
+import type { GovernanceSyncState } from "./governance-sync-button";
 
 /**
  * Why a control cannot be pressed: `no_grant` — the reader lacks the grant that lets them ask.

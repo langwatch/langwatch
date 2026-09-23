@@ -29,7 +29,7 @@ import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-sur
 import { Link } from "../../ui/elements/governance-link.tsx";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
-import { DashboardSelect } from "./DashboardSelect.tsx";
+import { DashboardSelect } from "./dashboard-select.tsx";
 
 /**
  * The Anomaly rules pane of the inventory page, wired to api.anomalyRules.*

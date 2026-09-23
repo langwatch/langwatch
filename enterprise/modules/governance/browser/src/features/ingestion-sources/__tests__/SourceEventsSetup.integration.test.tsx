@@ -27,7 +27,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { EmptyEventsState, EventsSetupPopover, ingestEndpointFor } from "../SourceEventsSetup";
+import { EmptyEventsState, EventsSetupPopover, ingestEndpointFor } from "../source-events-setup";
 
 function renderUi(ui: ReactNode) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

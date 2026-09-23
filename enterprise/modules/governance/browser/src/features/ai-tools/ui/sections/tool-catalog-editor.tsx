@@ -40,7 +40,7 @@ import type {
   ExternalToolConfig,
 } from "../../model/ai-tool-tile.ts";
 import { TileIcon } from "../elements/tile-icon.tsx";
-import { useAiToolCatalog } from "./useAiToolCatalog.ts";
+import { useAiToolCatalog } from "./use-ai-tool-catalog.ts";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",

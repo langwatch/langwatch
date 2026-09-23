@@ -15,7 +15,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fmtRelative } from "../IngestionSourcesTable";
+import { fmtRelative } from "../ingestion-sources-table";
 
 const NOW = new Date("2026-03-01T12:00:00.000Z");
 

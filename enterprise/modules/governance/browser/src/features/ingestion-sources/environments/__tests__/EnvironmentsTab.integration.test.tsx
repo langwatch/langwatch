@@ -17,8 +17,8 @@ import { render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 
-import type { EnvironmentSource } from "../discoveredEnvironments";
-import { EnvironmentsTab } from "../EnvironmentsTab";
+import type { EnvironmentSource } from "../discovered-environments";
+import { EnvironmentsTab } from "../environments-tab";
 
 function source(overrides: Partial<EnvironmentSource>): EnvironmentSource {
   return {

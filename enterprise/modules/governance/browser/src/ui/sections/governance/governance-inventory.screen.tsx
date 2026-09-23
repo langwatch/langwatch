@@ -43,15 +43,15 @@ import {
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
-import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/useAiToolCatalog.ts";
-import { DashboardSelect } from "../../../features/ingestion-sources/DashboardSelect.tsx";
-import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discoveredEnvironments.ts";
+import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/use-ai-tool-catalog.ts";
+import { DashboardSelect } from "../../../features/ingestion-sources/dashboard-select.tsx";
+import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discovered-environments.ts";
 import {
   AddEnvironmentDialog,
   EnvironmentsTab,
   environmentRows,
-} from "../../../features/ingestion-sources/environments/EnvironmentsTab.tsx";
-import { IngestionSourcesTable } from "../../../features/ingestion-sources/IngestionSourcesTable.tsx";
+} from "../../../features/ingestion-sources/environments/environments-tab.tsx";
+import { IngestionSourcesTable } from "../../../features/ingestion-sources/ingestion-sources-table.tsx";
 import {
   gatedSourceTypeOptions,
   isOttlEnabledSourceType,
@@ -70,9 +70,9 @@ import {
   recommendedPullSchedule,
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
 import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
-import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sampleIngestionSources.ts";
+import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
+import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/tool-catalog-tab.tsx";
 import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/toolCards.ts";
-import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/ToolCatalogTab.tsx";
 import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
 import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
 import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";

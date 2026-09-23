@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type GovernanceAgentRow, SAMPLE_AGENT_ROWS } from "../agentRows";
-import { summarizeAgentFleet } from "../agentSummary";
+import { type GovernanceAgentRow, SAMPLE_AGENT_ROWS } from "../agent-rows";
+import { summarizeAgentFleet } from "../agent-summary";
 
 /** One row, with everything the caller does not care about held still. */
 function agentRow(

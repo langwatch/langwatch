@@ -7,7 +7,7 @@ import {
   GovernanceSummaryStatusRow,
 } from "../../ui/elements/governance-summary-cards.tsx";
 import { GovernanceSummarySparkline } from "../../ui/elements/governance-summary-sparkline.tsx";
-import type { AgentFleetSummary, AgentStatusLine } from "./agentSummary";
+import type { AgentFleetSummary, AgentStatusLine } from "./agent-summary";
 
 /**
  * A card that lists counted states, shared by Health and Ownership: they differ only in heading and

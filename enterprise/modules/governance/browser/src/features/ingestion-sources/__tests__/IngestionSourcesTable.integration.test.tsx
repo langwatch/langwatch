@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import type { Source } from "../../../ui/sections/governance/ingestion-source-forms.ts";
-import { IngestionSourcesTable, sortSourcesForTable } from "../IngestionSourcesTable";
+import { IngestionSourcesTable, sortSourcesForTable } from "../ingestion-sources-table";
 
 function makeSource(overrides: Partial<Source> & { id: string }): Source {
   return {

@@ -4,14 +4,14 @@
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import type { GovernanceSummaryTone } from "../../ui/elements/governance-summary-cards.tsx";
-import { sourcesPresentIn } from "./agentFilters";
+import { sourcesPresentIn } from "./agent-filters";
 import {
   AGENT_HEALTH_LABELS,
   AGENT_HEALTH_STATES,
   AGENT_SOURCE_LABELS,
   type AgentHealth,
   type GovernanceAgentRow,
-} from "./agentRows";
+} from "./agent-rows";
 
 /**
  * The registration line's reach: twelve points a month apart. Fewer implies false precision, more

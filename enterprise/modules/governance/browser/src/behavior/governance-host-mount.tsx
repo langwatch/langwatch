@@ -32,74 +32,76 @@ const NO_ORGANIZATIONS: readonly GovernanceOrganization[] = [];
 
 class CapabilityGovernanceHost extends GovernanceHostApi {
   constructor(
-    private readonly organizationId: string | null,
-    private readonly projectId: string | null,
-    private readonly orgs: readonly GovernanceOrganization[],
-    private readonly org: GovernanceOrganization | undefined,
-    private readonly plan_: { isEnterprise: boolean; isLoading: boolean },
-    private readonly deployment_: GovernanceDeployment,
-    private readonly routeReading: GovernanceRouteReading,
-    private readonly session: UiSession,
-    private readonly routeCapability: UiRoute,
-    private readonly navigation: UiNavigation,
-    private readonly feedback: UiFeedback,
+    private readonly inputs: {
+      organizationId: string | null;
+      projectId: string | null;
+      orgs: readonly GovernanceOrganization[];
+      org: GovernanceOrganization | undefined;
+      plan: { isEnterprise: boolean; isLoading: boolean };
+      deployment: GovernanceDeployment;
+      routeReading: GovernanceRouteReading;
+      session: UiSession;
+      routeCapability: UiRoute;
+      navigation: UiNavigation;
+      feedback: UiFeedback;
+    },
   ) {
     super();
   }
 
   scope(): GovernanceScope {
-    return { organizationId: this.organizationId, projectId: this.projectId };
+    return { organizationId: this.inputs.organizationId, projectId: this.inputs.projectId };
   }
 
   organizations(): readonly GovernanceOrganization[] {
-    return this.orgs;
+    return this.inputs.orgs;
   }
 
   organization(): GovernanceOrganization | undefined {
-    return this.org;
+    return this.inputs.org;
   }
 
   currentUser() {
-    return this.session.currentUser();
+    return this.inputs.session.currentUser();
   }
 
   hasPermission(permission: string): boolean {
-    return this.session.hasPermission(permission);
+    return this.inputs.session.hasPermission(permission);
   }
 
   isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
+    return this.inputs.session.isFeatureEnabled(flag);
   }
 
   plan() {
-    return this.plan_;
+    return this.inputs.plan;
   }
 
   deployment(): GovernanceDeployment {
-    return this.deployment_;
+    return this.inputs.deployment;
   }
 
   route(): GovernanceRouteReading {
-    return this.routeReading;
+    return this.inputs.routeReading;
   }
 
   setQuery(
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
   ): void {
-    this.routeCapability.setQuery(next, options);
+    this.inputs.routeCapability.setQuery(next, options);
   }
 
   navigate(to: string): void {
-    this.navigation.navigate(to);
+    this.inputs.navigation.navigate(to);
   }
 
   succeeded(notice: GovernanceSuccessNotice): void {
-    this.feedback.succeeded(notice);
+    this.inputs.feedback.succeeded(notice);
   }
 
   failed(failure: GovernanceFailureNotice): void {
-    this.feedback.failed(failure);
+    this.inputs.feedback.failed(failure);
   }
 }
 
@@ -141,7 +143,7 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityGovernanceHost(
+      new CapabilityGovernanceHost({
         organizationId,
         projectId,
         orgs,
@@ -150,10 +152,10 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
         deployment,
         routeReading,
         session,
-        route,
+        routeCapability: route,
         navigation,
         feedback,
-      ),
+      }),
     [
       organizationId,
       projectId,

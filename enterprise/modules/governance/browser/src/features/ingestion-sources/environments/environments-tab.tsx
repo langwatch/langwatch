@@ -33,7 +33,7 @@ import {
   type EnvironmentRow,
   type EnvironmentSource,
   SAMPLE_ENVIRONMENTS,
-} from "./discoveredEnvironments";
+} from "./discovered-environments";
 
 /**
  * The Environments pane: where an organization's agents run.

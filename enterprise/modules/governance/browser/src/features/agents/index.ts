@@ -6,17 +6,17 @@
 
 // `AgentFigure` is deliberately absent: it is the card's and table's shared plumbing, imported
 // directly.
-export { AgentCard } from "./AgentCard";
-export { AgentFilterBar } from "./AgentFilterBar";
-export { AgentFleetSummaryStrip } from "./AgentFleetSummaryStrip";
+export { AgentCard } from "./agent-card";
+export { AgentFilterBar } from "./agent-filter-bar";
+export { AgentFleetSummaryStrip } from "./agent-fleet-summary-strip";
 export {
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
   DEFAULT_AGENTS_LAYOUT,
   isAgentsLayout,
-} from "./AgentsList";
-export { AGENT_TABLE_COLUMNS, AgentsTable } from "./AgentsTable";
+} from "./agents-list";
+export { AGENT_TABLE_COLUMNS, AgentsTable } from "./agents-table";
 export {
   AGENT_SORT_LABELS,
   AGENT_SORTS,
@@ -35,7 +35,7 @@ export {
   sourceLabel,
   sourcesPresentIn,
   useAgentFilters,
-} from "./agentFilters";
+} from "./agent-filters";
 export {
   AGENT_HEALTH_LABELS,
   AGENT_HEALTH_STATES,
@@ -47,14 +47,14 @@ export {
   formatRegistered,
   type GovernanceAgentRow,
   SAMPLE_AGENT_ROWS,
-} from "./agentRows";
+} from "./agent-rows";
 export {
   type AgentFleetCount,
   type AgentFleetSummary,
   type AgentSpendLine,
   type AgentStatusLine,
   summarizeAgentFleet,
-} from "./agentSummary";
+} from "./agent-summary";
 export {
   AGENTS_EMPTY_COPY,
   agentsListedEmptyCopy,
@@ -62,7 +62,7 @@ export {
   agentsUnlistedCopy,
   type GovernanceEmptyStateCopy,
   NO_MATCHING_AGENTS_COPY,
-} from "./emptyStates";
+} from "./empty-states";
 // `RegisterAgentDrawer` is deliberately absent. It is a registry drawer, and
 // `drawerRegistry` imports it lazily by path so its chunk stays out of the
 // initial bundle; re-exporting it here would pull it back in for every

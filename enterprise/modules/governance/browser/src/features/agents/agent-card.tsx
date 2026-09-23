@@ -8,8 +8,8 @@ import {
   formatAgentCost,
   formatAgentLastActive,
   formatAgentRequests,
-} from "./AgentFigure";
-import { AGENT_SOURCE_LABELS, type GovernanceAgentRow } from "./agentRows";
+} from "./agent-figure";
+import { AGENT_SOURCE_LABELS, type GovernanceAgentRow } from "./agent-rows";
 
 /**
  * One agent as a card, the page's optional layout. Figures go through `AgentFigure` like the list;

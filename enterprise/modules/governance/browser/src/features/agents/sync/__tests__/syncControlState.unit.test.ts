@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { governanceSyncStatus } from "../syncControlState";
+import { governanceSyncStatus } from "../sync-control-state";
 
 const inputs = (over: Partial<Parameters<typeof governanceSyncStatus>[0]>) => ({
   canManage: true,

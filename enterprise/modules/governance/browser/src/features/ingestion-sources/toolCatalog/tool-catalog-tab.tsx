@@ -9,8 +9,12 @@ import { PermissionRequiredNotice } from "../../../ui/elements/permission-requir
 import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
 import { asRegisteredTools, buildRegisteredToolCards } from "./registeredTools";
 import { SAMPLE_TOOL_CARDS } from "./sampleToolCards";
+import {
+  type ToolCardActions,
+  ToolCatalogCards,
+  type ToolCatalogLayout,
+} from "./tool-catalog-cards";
 import type { ToolCard } from "./toolCards";
-import { type ToolCardActions, ToolCatalogCards, type ToolCatalogLayout } from "./ToolCatalogCards";
 
 /**
  * The Catalog pane: every AI tool the organization has registered.

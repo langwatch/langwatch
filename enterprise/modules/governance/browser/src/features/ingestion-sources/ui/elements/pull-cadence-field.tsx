@@ -6,7 +6,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import type { GovernanceSourceType } from "@langwatch/enterprise-governance-contract";
 import { useMemo, useState } from "react";
 
-import { DashboardSelect } from "../../DashboardSelect.tsx";
+import { DashboardSelect } from "../../dashboard-select.tsx";
 import {
   cronFromPullParts,
   type PullCadenceParts,

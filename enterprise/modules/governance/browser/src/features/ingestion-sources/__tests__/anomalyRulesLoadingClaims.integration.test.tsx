@@ -68,7 +68,7 @@ vi.mock("../../../behavior/governance-api.ts", () => {
   return { api, governanceApi: api };
 });
 
-import { AnomalyRulesTab } from "../AnomalyRulesTab";
+import { AnomalyRulesTab } from "../anomaly-rules-tab";
 
 function mount() {
   return renderWithGovernanceHost(<AnomalyRulesTab />, {
