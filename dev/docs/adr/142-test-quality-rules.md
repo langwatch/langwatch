@@ -48,6 +48,7 @@ before the user has done anything wrong.
 | `langwatch/no-logger-spy` | plugin | No `vi.spyOn` on a real logger; assert through `createTestLogger()`. |
 | `langwatch/no-prototype-stub` | plugin | No test double built by `Object.create(Class.prototype)`. |
 | `vitest/valid-expect` | oxlint built-in | `expect` takes at most two arguments; the second labels which iteration failed. |
+| `vitest/expect-expect` | oxlint built-in | A test calls `expect` or a named `expect*`/`assert*` helper; a test that asserts nothing cannot fail. |
 | `vitest/valid-title` | oxlint built-in | A test title is a string and does not start with "should". |
 | `vitest/require-mock-type-parameters` | oxlint built-in | Off (amendment below). |
 
@@ -61,8 +62,8 @@ either way - the built-in flags 17 files beyond the three the two ast-grep
 rules together found (all of which it also finds), so nothing that used to
 fail now passes silently, but nothing newly fails either, since the severity
 and enablement are unchanged from before this migration. `vitest/expect-expect`
-carries no row here because it is advisory-only under `--quiet` and was never
-made a required rule of record. The trade recorded in ADR-135 still applies
+has since become a rule of record: the correctness category runs it at error, and
+its row above names the helpers it trusts (Alex, 2026-09-23). The trade recorded in ADR-135 still applies
 going forward: the review bot no longer quotes these two shapes back on the
 diff, only oxlint's own flat message.
 

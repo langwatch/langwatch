@@ -939,6 +939,8 @@ never thinks about resolution at all. The per-module resolver adapters
 - Every wire schema imports from the module's own contract. The one
   sanctioned exception: the `moduleApi<X>()` app-port interface a door
   declares for its own implementation.
+- A path parameter is named for what it identifies (`:virtualKeyId`, never `:id`). A route main already
+  publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23).
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.

@@ -1,19 +1,36 @@
 import { afterAll, describe, expect, it } from "vitest";
 
+import { PUBLISHED_WIRE } from "../../src/rules/rest-route-published.mjs";
 import { restRouteRule } from "../../src/rules/rest-route.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { contract: {}, process: {} } } },
-});
+const FEATURES = { agent: { layoutVersion: 0, roles: { contract: {}, process: {} } } };
+const PUBLISHED = {
+  paths: {
+    "/api/agents/{id}": { get: {}, parameters: [] },
+    "/api/v1/agents/{id}/runs": { get: {} },
+    "/api/agents/{agentId}/traces": { get: {} },
+    "/api/scim/v2/Users/{id}": { get: {} },
+    "/api/agents/{id}/share": { post: {} },
+  },
+};
 
-afterAll(() => workspace.cleanup());
+const workspace = createFixtureWorkspace({
+  features: FEATURES,
+  files: { [PUBLISHED_WIRE]: JSON.stringify(PUBLISHED) },
+});
+const unpublished = createFixtureWorkspace({ features: FEATURES });
+
+afterAll(() => {
+  workspace.cleanup();
+  unpublished.cleanup();
+});
 
 const TRANSPORT = "modules/agent/process/src/transport/agent.rest.ts";
 const HEAD = 'export const agentRest = defineRestRouter(AgentApi)\n  .withNamespace("agents")\n';
 
 /** Runs the rule and keeps each finding's column beside its line. */
-function report(code, filename = TRANSPORT) {
+function report(code, filename = TRANSPORT, cwd = workspace.cwd) {
   const columns = [];
   const located = {
     meta: restRouteRule.meta,
@@ -27,7 +44,7 @@ function report(code, filename = TRANSPORT) {
     },
   };
 
-  return runRule(located, { code, cwd: workspace.cwd, filename }).map((finding, index) => ({
+  return runRule(located, { code, cwd, filename }).map((finding, index) => ({
     ...finding,
     column: columns[index],
   }));
@@ -276,6 +293,67 @@ describe("given a route path parameter", () => {
 
     expect(where(found)).toEqual([{ messageId: "pathParam", line: 3, column: 7 }]);
     expect(found[0].data.suggestion).toBe("virtualKeyId");
+  });
+});
+
+describe("given a bare path parameter on a route main already publishes", () => {
+  const read = (path, method = "get") =>
+    route(
+      `.${method}("${path}", "readAgent")`,
+      ".withParams(agentParamsSchema)",
+      '.withPermission("agents:view")',
+      ".withOutput(agentSchema)",
+      ".handle(({ app, input }) => app.getAgent(input));",
+    );
+
+  /** @scenario "A route main already publishes keeps its parameter names" */
+  it("reports nothing for the route itself or through its /api/v1 twin", () => {
+    expect(report(read("/:id"))).toEqual([]);
+    expect(report(read("/:id/runs"))).toEqual([]);
+  });
+
+  /** @scenario "A route main already publishes keeps its parameter names" */
+  it("resolves the family's addressing and generation before matching", () => {
+    const scim =
+      'export const scimRest = defineRestRouter(ScimApi)\n  .withNamespace("scim")\n' +
+      '  .withVersion(V)\n  .withAddressing("v1-in-path", { generation: "v2" })\n' +
+      '  .get("/Users/:id", "getUser").withOutput(userSchema).handle(({ app }) => app.get());\n';
+    const literal =
+      'export const legacyRest = defineRestRouter(AgentApi)\n  .withNamespace("legacy")\n' +
+      '  .withVersion(V)\n  .withAddressing("literal", { v1Twin: false })\n' +
+      '  .post("/api/agents/:id/share", "share").withInput(s).withOutput(s).handle(({ app }) => app.share());\n';
+
+    expect(report(scim)).toEqual([]);
+    expect(report(literal)).toEqual([]);
+  });
+
+  /** @scenario "A new route with a bare parameter is still reported" */
+  it("reports a path, a method or a parameter name main does not publish", () => {
+    const found = [
+      ...report(read("/:id/photo")),
+      ...report(read("/:id", "delete")),
+      ...report(read("/:id/traces")),
+    ];
+
+    expect(where(found)).toEqual([
+      { messageId: "pathParam", line: 3, column: 7 },
+      { messageId: "pathParam", line: 3, column: 7 },
+      { messageId: "pathParam", line: 3, column: 10 },
+    ]);
+  });
+
+  /** @scenario "Every other rest-route check still fires on a published route" */
+  it("reports the missing answer on a published route", () => {
+    const found = report(route('.get("/:id", "readAgent")', ".handle(({ app }) => app.get());"));
+
+    expect(where(found)).toEqual([{ messageId: "missingOutput", line: 3, column: 3 }]);
+  });
+
+  /** @scenario "A missing published wire document fails the run by name" */
+  it("throws naming the document instead of passing every route", () => {
+    expect(() => report(read("/:id"), TRANSPORT, unpublished.cwd)).toThrow(
+      "docs/api-reference/openapiLangWatch.json",
+    );
   });
 });
 

@@ -75,6 +75,8 @@
     "vitest/require-mock-type-parameters": "off",
     // `expect(actual, message)` labels which loop iteration failed.
     "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+    // A named `expect*`/`assert*` helper that calls `expect` or throws counts as the test's assertion.
+    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expect*", "assert*"] }],
     // A title states what the test does, not a prediction ("should ...").
     "vitest/valid-title": [
       "error",

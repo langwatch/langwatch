@@ -1,7 +1,8 @@
 Feature: The rest-route lint rule
   One rule for a REST route (dev/docs/ARCHITECTURE.md §8): every route declares
   its input and its answer, answers by returning a plain value or throwing,
-  names its path parameters for what they identify and takes its wire schemas
+  names its path parameters for what they identify (a route main already
+  publishes keeps the names it published) and takes its wire schemas
   from its own module's contract. Each defect is reported once, where it is
   written - the route's method, the offending call or node - and names the
   route by method and path.
@@ -88,6 +89,31 @@ Feature: The rest-route lint rule
     Given a route at `/virtual-keys/:id`
     When the rest-route rule runs over it
     Then it reports pathParam on the path literal, suggesting `virtualKeyId`
+
+  @unit
+  Scenario: A route main already publishes keeps its parameter names
+    Given main's published wire `docs/api-reference/openapiLangWatch.json` lists `GET /api/agents/{id}`
+    And a route at `/:id` in the `agents` family, or one whose addressing and generation resolve to a listed address or its /api/v1 twin
+    When the rest-route rule runs over it
+    Then it reports no pathParam
+
+  @unit
+  Scenario: A new route with a bare parameter is still reported
+    Given a route whose method, path or parameter name main's published wire does not list
+    When the rest-route rule runs over it
+    Then it reports pathParam on the path literal
+
+  @unit
+  Scenario: Every other rest-route check still fires on a published route
+    Given a route main already publishes that declares no answer
+    When the rest-route rule runs over it
+    Then it reports missingOutput on the route's method
+
+  @unit
+  Scenario: A missing published wire document fails the run by name
+    Given a workspace without `docs/api-reference/openapiLangWatch.json`
+    When the rest-route rule meets a bare path parameter
+    Then the run fails naming the document, and never passes the route silently
 
   @unit
   Scenario: A wire schema from another module's contract is reported where it is used

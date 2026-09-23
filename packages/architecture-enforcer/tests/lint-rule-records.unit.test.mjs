@@ -242,9 +242,11 @@ describe("given the workspace-wide oxlint rules", () => {
       expect(workspaceRules).not.toMatch(/"typescript\/no-explicit-any":/);
     });
 
-    /** @scenario "The assertion-coverage rule carries no explicit config line" */
-    it("does not add an explicit vitest/expect-expect line", () => {
-      expect(workspaceRules).not.toMatch(/"vitest\/expect-expect":/);
+    /** @scenario "The assertion-coverage rule trusts expect and assert helpers" */
+    it("configures vitest/expect-expect at error with the expect and assert helpers", () => {
+      expect(workspaceRules).toMatch(
+        /"vitest\/expect-expect":\s*\["error",\s*\{\s*"assertFunctionNames":\s*\["expect",\s*"expect\*",\s*"assert\*"\]\s*\}\]/,
+      );
     });
   });
 

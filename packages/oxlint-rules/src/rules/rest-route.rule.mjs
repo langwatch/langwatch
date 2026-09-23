@@ -1,6 +1,7 @@
 import { walk } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 import { routeChainOf } from "./rest-route-chain.mjs";
+import { familyOf, isPublishedRoute } from "./rest-route-published.mjs";
 import { memberName, unwrap } from "./zod-schema-origin.mjs";
 
 // dev/docs/ARCHITECTURE.md §8: one complete endpoint per route, withInput/withOutput
@@ -163,17 +164,6 @@ function entityOf(segment) {
   return lower;
 }
 
-function namespaceOf(opener) {
-  let current = opener.callee.object;
-
-  while (current?.type === "CallExpression" && current.callee.type === "MemberExpression") {
-    if (memberName(current.callee) === "withNamespace") return stringLiteral(current.arguments[0]);
-    current = current.callee.object;
-  }
-
-  return void 0;
-}
-
 function bareParamsOf(path, namespace) {
   const found = [];
   let owner = namespace;
@@ -247,14 +237,21 @@ function declarationDefects(context, chain) {
   return defects;
 }
 
+/** A bare parameter main already publishes keeps its name; a new route names it. */
+function pathParamFindings(context, chain) {
+  const node = chain.opener.arguments[0];
+  const path = stringLiteral(node) ?? "";
+  const family = familyOf(chain.opener);
+  const bare = bareParamsOf(path, family.namespace);
+  if (bare.length === 0) return [];
+  if (isPublishedRoute({ cwd: context.cwd, method: chain.opens, path, family })) return [];
+
+  return bare.map((data) => ({ node, messageId: "pathParam", data }));
+}
+
 /** What the route's path and schemas get wrong, each on the node that writes it. */
 function wireFindings(context, file, chain) {
-  const path = chain.opener.arguments[0];
-  const params = bareParamsOf(stringLiteral(path) ?? "", namespaceOf(chain.opener)).map((data) => ({
-    node: path,
-    messageId: "pathParam",
-    data,
-  }));
+  const params = pathParamFindings(context, chain);
   const schemas = foreignSchemasOf(context, file, chain).map(({ node, source }) => ({
     node,
     messageId: "foreignContract",
