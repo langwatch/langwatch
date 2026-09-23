@@ -75,6 +75,18 @@ type RunHistoryPanelProps = {
   highlightBatchId?: string | null;
 };
 
+function emptyRunsDescription({
+  hasFiltersApplied,
+  isSingleSuiteView,
+}: {
+  hasFiltersApplied: boolean;
+  isSingleSuiteView: boolean;
+}): string {
+  if (hasFiltersApplied) return "No runs match the selected filters.";
+  if (isSingleSuiteView) return "Run this suite to see results here.";
+  return "Execute a suite to see results here.";
+}
+
 export function RunHistoryPanel({
   scenarioSetId,
   period,
@@ -349,6 +361,8 @@ export function RunHistoryPanel({
   const isSingleSuiteView = !!scenarioSetId;
   const itemCount = groupBy === "none" ? batchRuns.length : groups.length;
   const hasFiltersApplied = !!(filters.scenarioId || filters.passFailStatus);
+  const showEmptyState = !isLoading && itemCount === 0 && !showInitPlaceholder;
+  const showRunList = !isLoading && !showEmptyState;
 
   return (
     <VStack align="stretch" gap={0} height="100%">
@@ -439,9 +453,8 @@ export function RunHistoryPanel({
           Skeleton renders in the list slot only while nothing has been fetched
           yet (the hook's isLoading is gated on zero fetched pages), keeping
           the header and filter bar in place so nothing shifts when data lands. */}
-      {isLoading ? (
-        <RunHistorySkeleton />
-      ) : itemCount === 0 && !showInitPlaceholder ? (
+      {isLoading && <RunHistorySkeleton />}
+      {showEmptyState && (
         <EmptyState.Root paddingY={12}>
           <EmptyState.Content>
             <EmptyState.Indicator>
@@ -451,18 +464,15 @@ export function RunHistoryPanel({
               {hasFiltersApplied ? "No matching runs" : "No runs yet"}
             </EmptyState.Title>
             <EmptyState.Description>
-              {hasFiltersApplied
-                ? "No runs match the selected filters."
-                : isSingleSuiteView
-                  ? "Run this suite to see results here."
-                  : "Execute a suite to see results here."}
+              {emptyRunsDescription({ hasFiltersApplied, isSingleSuiteView })}
             </EmptyState.Description>
             {/* Only when the project truly has nothing to run yet — a
                 filtered-empty list is a search miss, not a setup gap. */}
             {!hasFiltersApplied ? <SetupWithAgentButton surface="simulationRuns" /> : null}
           </EmptyState.Content>
         </EmptyState.Root>
-      ) : (
+      )}
+      {showRunList && (
         <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && <RunRow loading />}
           {groupBy === "none"

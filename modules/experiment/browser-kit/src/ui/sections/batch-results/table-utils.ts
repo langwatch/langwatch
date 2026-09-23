@@ -76,30 +76,24 @@ export const inferColumnType = (value: unknown): string => {
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";
   if (typeof value === "object") {
-    // Must verify first element is actually an object before using 'in' operator
-    if (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      typeof value[0] === "object" &&
-      value[0] !== null &&
-      "role" in value[0]
-    ) {
-      return "chat_messages";
-    }
-    return "json";
+    return isChatMessageList(value) ? "chat_messages" : "json";
   }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return "string";
+  if (typeof value === "string") return inferStringColumnType(value.trim());
+  return "string";
+};
 
-    // Check for image URLs
-    if (getImageUrl(trimmed)) return "image";
+const isChatMessageList = (value: object): boolean => {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const first: unknown = value[0];
+  // Must verify first element is actually an object before using 'in' operator
+  if (typeof first !== "object" || first === null) return false;
+  return "role" in first;
+};
 
-    // Check for boolean strings
-    if (trimmed === "true" || trimmed === "false") return "boolean";
-
-    // Check for number strings
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return "number";
-  }
+const inferStringColumnType = (trimmed: string): string => {
+  if (trimmed === "") return "string";
+  if (getImageUrl(trimmed)) return "image";
+  if (trimmed === "true" || trimmed === "false") return "boolean";
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return "number";
   return "string";
 };

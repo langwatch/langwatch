@@ -15,6 +15,12 @@ const truncate = (value: string, maxLength: number): string => {
   return value.substring(0, maxLength - 3) + "...";
 };
 
+const formatEntryCell = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+};
+
 /**
  * Lists records in a dataset with pagination.
  */
@@ -65,16 +71,7 @@ export const recordsListCommand = async (
         const tableData = records.map((record) => {
           const row: Record<string, string> = { ID: record.id };
           entryKeys.forEach((key) => {
-            const value = record.entry[key];
-            let str: string;
-            if (value === null || value === undefined) {
-              str = "";
-            } else if (typeof value === "string") {
-              str = value;
-            } else {
-              str = JSON.stringify(value);
-            }
-            row[key] = truncate(str, 40);
+            row[key] = truncate(formatEntryCell(record.entry[key]), 40);
           });
           return row;
         });
