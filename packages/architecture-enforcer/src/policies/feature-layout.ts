@@ -179,6 +179,32 @@ function isRulesFrameworkFree({
   );
 }
 
+function relativeRulesImportViolations({
+  pkg,
+  file,
+  specifier,
+  allowed,
+}: {
+  pkg: ClassifiedPackage;
+  file: string;
+  specifier: string;
+  allowed: string;
+}): ArchitectureViolation[] {
+  const target = resolveRelativeModule({ file, specifier });
+  const relativeTarget = target ? workspacePath(`${pkg.root}/src`, target) : void 0;
+  if (relativeTarget?.startsWith("rules/")) return [];
+
+  const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
+
+  return [
+    violation(
+      file,
+      `Rules module cannot import ${JSON.stringify(specifier)}${kind ? `, ${withArticle(kind)}` : ""}.`,
+      allowed,
+    ),
+  ];
+}
+
 function lintRulesImports(
   pkg: ClassifiedPackage,
   file: string,
@@ -193,19 +219,7 @@ function lintRulesImports(
     if (specifier.startsWith("node:")) continue;
 
     if (specifier.startsWith(".")) {
-      const target = resolveRelativeModule({ file, specifier });
-      const relativeTarget = target ? workspacePath(`${pkg.root}/src`, target) : void 0;
-      if (relativeTarget?.startsWith("rules/")) continue;
-
-      const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
-
-      violations.push(
-        violation(
-          file,
-          `Rules module cannot import ${JSON.stringify(specifier)}${kind ? `, ${withArticle(kind)}` : ""}.`,
-          allowed,
-        ),
-      );
+      violations.push(...relativeRulesImportViolations({ pkg, file, specifier, allowed }));
 
       continue;
     }

@@ -52,46 +52,76 @@ export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): Architect
   const owners = new Map<string, string>();
 
   for (const feature of catalogue) {
-    for (const file of featureConfigModules(root, feature)) {
-      const expected = join(root, feature.root, "contract", "src", `${feature.id}.config.ts`);
-      if (file !== expected) continue;
+    violations.push(...lintFeatureConfigModules({ root, feature, owners }));
+  }
 
-      const source = readFileSync(file, "utf8");
-      const name = camelCase(feature.id);
+  violations.push(...lintApplicationConfigReads({ root, owners }));
 
-      const declaresSchema =
-        source.includes(`export const ${name}ServerConfigSchema`) ||
-        source.includes(`export const ${name}WebConfigSchema`);
+  return violations;
+}
 
-      if (!declaresSchema) {
+function lintFeatureConfigModules({
+  root,
+  feature,
+  owners,
+}: {
+  root: string;
+  feature: FeatureCatalogueEntry;
+  owners: Map<string, string>;
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+
+  for (const file of featureConfigModules(root, feature)) {
+    const expected = join(root, feature.root, "contract", "src", `${feature.id}.config.ts`);
+    if (file !== expected) continue;
+
+    const source = readFileSync(file, "utf8");
+    const name = camelCase(feature.id);
+
+    const declaresSchema =
+      source.includes(`export const ${name}ServerConfigSchema`) ||
+      source.includes(`export const ${name}WebConfigSchema`);
+
+    if (!declaresSchema) {
+      violations.push(
+        issue(
+          file,
+          "A feature configuration module must export the schema its half is validated by.",
+          `Export ${name}ServerConfigSchema, ${name}WebConfigSchema, or both.`,
+        ),
+      );
+    }
+
+    for (const binding of bindingsIn(file)) {
+      const owner = owners.get(binding);
+
+      if (owner !== undefined && owner !== file) {
         violations.push(
           issue(
             file,
-            "A feature configuration module must export the schema its half is validated by.",
-            `Export ${name}ServerConfigSchema, ${name}WebConfigSchema, or both.`,
+            `${binding} is already declared by ${relative(root, owner)}.`,
+            "One environment variable has one owning feature. Read the owner's leaf instead of binding it a second time.",
           ),
         );
+
+        continue;
       }
 
-      for (const binding of bindingsIn(file)) {
-        const owner = owners.get(binding);
-
-        if (owner !== undefined && owner !== file) {
-          violations.push(
-            issue(
-              file,
-              `${binding} is already declared by ${relative(root, owner)}.`,
-              "One environment variable has one owning feature. Read the owner's leaf instead of binding it a second time.",
-            ),
-          );
-
-          continue;
-        }
-
-        owners.set(binding, file);
-      }
+      owners.set(binding, file);
     }
   }
+
+  return violations;
+}
+
+function lintApplicationConfigReads({
+  root,
+  owners,
+}: {
+  root: string;
+  owners: ReadonlyMap<string, string>;
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
 
   for (const directory of APPLICATION_CONFIG_DIRECTORIES) {
     const absolute = join(root, directory);
