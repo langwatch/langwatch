@@ -328,10 +328,9 @@ export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTab
   if (!input.series || input.series.length === 0) return "trace_summaries";
 
   // Determine the source. All series must agree.
-  const sources = new Set<AnalyticsMetricSource | undefined>();
-  for (const s of input.series) {
-    sources.add(getMetricSource(s.metric));
-  }
+  const sources = new Set<AnalyticsMetricSource | undefined>(
+    input.series.map((s) => getMetricSource(s.metric)),
+  );
   // Mixed source or unknown → conservative fallback to the legacy trace
   // table; the legacy builder is the only path that can mix trace + eval
   // reads (and unknown-source metrics route through it today).

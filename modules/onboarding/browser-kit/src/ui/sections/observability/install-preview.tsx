@@ -9,7 +9,7 @@ import {
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import type React from "react";
 import { useMemo } from "react";
-import { createHighlighter, type HighlighterGeneric } from "shiki";
+import { createHighlighter } from "shiki";
 
 import type { InstallMatrix } from "./codegen/registry.tsx";
 
@@ -32,7 +32,7 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
   const tabs = useTabs({ defaultValue: tabItems[0]?.key });
 
   const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<HighlighterGeneric<any, any>>({
+    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
       async load() {
         return createHighlighter({
           langs: ["bash"],

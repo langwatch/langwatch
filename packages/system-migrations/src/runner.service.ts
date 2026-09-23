@@ -4,7 +4,11 @@ import type { MigrationLeaseRepository } from "./lease.repository.ts";
 import type { SystemMigrationStateRepository } from "./state.repository.ts";
 import type { SystemMigration } from "./system-migration.ts";
 import type { TenantSource } from "./tenant-source.ts";
-import { isTerminalTenantStatus, type MigrationPassSummary } from "./types.ts";
+import {
+  isTerminalTenantStatus,
+  type MigrationPassSummary,
+  type TenantMigrationRecord,
+} from "./types.ts";
 
 const logger = createLogger("langwatch:system-migrations");
 
@@ -299,42 +303,60 @@ export class SystemMigrationRunnerService {
       // unchanged) and the next pass tries again. One broken tenant must
       // not stop the fleet.
       summary.parked += 1;
-      try {
-        // The same compare-and-set as the outcome write: a `parked` row that
-        // replaced an operator's `rolled_back` pin would be retried on the
-        // next pass and re-finalized, undoing the rollback. A refused park
-        // costs nothing - the pin already keeps the tenant off every later
-        // pass.
-        const parkWritten = await state.upsertRecordUnlessRolledBack({
-          migrationName: migration.name,
-          tenantId,
-          status: "parked",
-          report: {
-            kind: "error",
-            message: error instanceof Error ? error.message : String(error),
-          },
-        });
-        // Newly parked is a transition; a tenant parked again for the same
-        // reason is not, or a permanently broken tenant would keep a
-        // convergence loop running forever.
-        if (parkWritten && existing?.status !== "parked") {
-          summary.advanced += 1;
-        }
-      } catch (parkError) {
-        // Recording the park is itself a write, so the very failure most
-        // likely to park a tenant - the state store being unreachable - is
-        // the one that would throw here and take the rest of the fleet down
-        // with it. An unrecorded park costs nothing the next pass cannot
-        // rebuild: the tenant is still pending, and it is tried again.
-        logger.error(
-          { error: parkError, migration: migration.name, tenantId },
-          "could not record a parked tenant; continuing the pass",
-        );
-      }
+      await recordParkedTenant({ state, migration, tenantId, existing, error, summary });
       logger.error(
         { error, migration: migration.name, tenantId },
         "tenant migration parked on error",
       );
     }
+  }
+}
+
+async function recordParkedTenant({
+  state,
+  migration,
+  tenantId,
+  existing,
+  error,
+  summary,
+}: {
+  state: SystemMigrationStateRepository;
+  migration: SystemMigration;
+  tenantId: string;
+  existing: TenantMigrationRecord | null;
+  error: unknown;
+  summary: MigrationPassSummary;
+}): Promise<void> {
+  try {
+    // The same compare-and-set as the outcome write: a `parked` row that
+    // replaced an operator's `rolled_back` pin would be retried on the
+    // next pass and re-finalized, undoing the rollback. A refused park
+    // costs nothing - the pin already keeps the tenant off every later
+    // pass.
+    const parkWritten = await state.upsertRecordUnlessRolledBack({
+      migrationName: migration.name,
+      tenantId,
+      status: "parked",
+      report: {
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
+    // Newly parked is a transition; a tenant parked again for the same
+    // reason is not, or a permanently broken tenant would keep a
+    // convergence loop running forever.
+    if (parkWritten && existing?.status !== "parked") {
+      summary.advanced += 1;
+    }
+  } catch (parkError) {
+    // Recording the park is itself a write, so the very failure most
+    // likely to park a tenant - the state store being unreachable - is
+    // the one that would throw here and take the rest of the fleet down
+    // with it. An unrecorded park costs nothing the next pass cannot
+    // rebuild: the tenant is still pending, and it is tried again.
+    logger.error(
+      { error: parkError, migration: migration.name, tenantId },
+      "could not record a parked tenant; continuing the pass",
+    );
   }
 }
