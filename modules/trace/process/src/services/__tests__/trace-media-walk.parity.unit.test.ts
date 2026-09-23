@@ -30,7 +30,7 @@ function makeFakeService(): TraceMediaStore {
       count += 1;
       return { id: `so-${count}`, mediaType, isDuplicate: false };
     },
-  } as unknown as TraceMediaStore;
+  };
 }
 
 const PARAMS = {

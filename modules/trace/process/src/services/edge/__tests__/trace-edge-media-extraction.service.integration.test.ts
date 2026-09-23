@@ -387,7 +387,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
         storeFromBytes: async () => {
           throw new Error("store unavailable");
         },
-      } as unknown as TraceMediaStore;
+      };
       const messages = [
         {
           role: "user",

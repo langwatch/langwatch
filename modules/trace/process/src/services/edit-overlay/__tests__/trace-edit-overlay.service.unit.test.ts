@@ -7,10 +7,7 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  TraceEditOverlayRepository,
-  TraceEditOverlayRow,
-} from "../../../repositories/trace-edit-overlay.repository.ts";
+import type { TraceEditOverlayRow } from "../../../repositories/trace-edit-overlay.repository.ts";
 import { TraceEditOverlayService } from "../../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
@@ -35,7 +32,7 @@ const buildService = (stored: unknown) => {
     findAllByProjectAndTraces: vi.fn(async () => (stored ? [row(stored)] : [])),
     upsert,
     delete: deleteRow,
-  } as unknown as TraceEditOverlayRepository;
+  };
 
   return {
     service: TraceEditOverlayService.create(repository),
@@ -724,9 +721,10 @@ describe("TraceEditOverlayService", () => {
       );
       const repository = {
         findByProjectAndTrace: vi.fn(async () => null),
+        findAllByProjectAndTraces: vi.fn(async () => []),
         upsert,
-        delete: vi.fn(),
-      } as unknown as TraceEditOverlayRepository;
+        delete: vi.fn(async () => undefined),
+      };
       const service = TraceEditOverlayService.create(repository);
 
       await service.upsert({
@@ -800,7 +798,9 @@ describe("TraceEditOverlayService", () => {
       const repository = {
         findAllByProjectAndTraces,
         findByProjectAndTrace: vi.fn(async () => null),
-      } as unknown as TraceEditOverlayRepository;
+        upsert: vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch)),
+        delete: vi.fn(async () => undefined),
+      };
       const service = TraceEditOverlayService.create(repository);
 
       const patches = await service.getPatchesByTraceIds({

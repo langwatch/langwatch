@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import { SpanNormalizationPipelineService } from "#services/span-normalization.service";
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import { createTestSpan } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
+
 const CANONICAL = "langwatch.rag.contexts";
 const LEGACY = "langwatch.rag_contexts";
 
@@ -20,9 +22,7 @@ const service = SpanNormalizationPipelineService.create(TraceCanonicalisationSer
 
 /** A span carrying nothing but the RAG attribute under test. */
 function spanWith(attributes: Record<string, unknown>) {
-  const span = { spanAttributes: attributes } as never as Parameters<
-    typeof service.enrichRagContextIds
-  >[0];
+  const span = createTestSpan({ spanAttributes: attributes });
   service.enrichRagContextIds(span);
   return span.spanAttributes as Record<string, unknown>;
 }

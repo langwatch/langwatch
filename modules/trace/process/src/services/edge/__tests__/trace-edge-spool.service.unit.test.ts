@@ -34,7 +34,7 @@ function commandCarrying({ outputBytes }: { outputBytes: number }): RecordSpanCo
     },
     resource: null,
     instrumentationScope: null,
-  } as unknown as RecordSpanCommandData;
+  };
 }
 
 function edge({ putSpool }: { putSpool: ReturnType<typeof vi.fn> }) {

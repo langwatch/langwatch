@@ -50,7 +50,7 @@ describe("Postgres migration safety", () => {
     expect(findings, `\n${formatFindings(findings)}\n`).toEqual([]);
   });
 
-  describe("the rules", () => {
+  describe("when the rules scan a migration", () => {
     /** @scenario "Dropping a column without a retirement note is refused by name" */
     it("refuses a drop with no retirement note, naming the column", () => {
       const findings = scan('ALTER TABLE "Project" DROP COLUMN "legacyKey";');
@@ -113,7 +113,7 @@ describe("Postgres migration safety", () => {
     });
   });
 
-  describe("the baseline", () => {
+  describe("given the baseline of shipped migrations", () => {
     /** @scenario "Migrations already shipped are not scanned" */
     it("exempts history that the rules would otherwise report", () => {
       const exempted = migrations.filter(

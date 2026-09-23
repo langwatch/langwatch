@@ -24,7 +24,6 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
@@ -60,7 +59,7 @@ function trace(traceId: string, output = "captured output"): Trace {
     },
     output: { value: output },
     spans: [],
-  } as unknown as Trace;
+  };
 }
 
 function traceOutputPatch(value: string) {
@@ -74,7 +73,13 @@ function makeService(): TraceLegacyReadService {
       findTracesWithSpans: mockGetTracesWithSpans,
       findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-    } as unknown as TraceLegacyReadRepository,
+      findAllTracesForProject: vi.fn(),
+      findTracesByThreadId: vi.fn(),
+      findCustomersAndLabels: vi.fn(),
+      findDistinctFieldNames: vi.fn(),
+      findTopicCounts: vi.fn(),
+      findSpanForPromptStudio: vi.fn(),
+    },
     editOverlay: {
       getPatchesByTraceIds: mockGetPatchesByTraceIds,
     } as unknown as TraceEditOverlayService,

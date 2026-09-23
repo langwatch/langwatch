@@ -1,5 +1,4 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
@@ -22,7 +21,7 @@ describe("TraceSpanCostMatchingService.computeSpanCost cache pricing", () => {
       const cachedCost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cachedTokens,
-        } as unknown as NormalizedAttributes,
+        },
         model,
         promptTokens: 510,
         completionTokens: 12,
@@ -30,7 +29,7 @@ describe("TraceSpanCostMatchingService.computeSpanCost cache pricing", () => {
 
       // The same token volume billed entirely as fresh input (no cache).
       const fullInputCost = TraceSpanCostMatchingService.computeSpanCost({
-        attrs: {} as unknown as NormalizedAttributes,
+        attrs: {},
         model,
         promptTokens: 510 + cachedTokens,
         completionTokens: 12,

@@ -36,7 +36,6 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
@@ -157,9 +156,13 @@ function makeService(
       findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       findAllTracesForProject: mockGetAllTracesForProject,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-    } as unknown as TraceLegacyReadRepository,
+      findCustomersAndLabels: vi.fn(),
+      findDistinctFieldNames: vi.fn(),
+      findTopicCounts: vi.fn(),
+      findSpanForPromptStudio: vi.fn(),
+    },
     editOverlay: {} as TraceEditOverlayService,
-    logRecordStorage: { getLogsByTraceId } as unknown as TraceLogRecordReader,
+    logRecordStorage: { getLogsByTraceId },
     // The enrichment join reads no evaluation; a refusing double proves it.
     evaluationService: refusingEvaluations(),
   });

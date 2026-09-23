@@ -34,7 +34,7 @@ function makeFakeService(): { service: TraceMediaStore; calls: StoredCall[] } {
       calls.push({ mediaType, bytes });
       return { id: `so-${calls.length}`, mediaType, isDuplicate: false };
     },
-  } as unknown as TraceMediaStore;
+  };
   return { service, calls };
 }
 
