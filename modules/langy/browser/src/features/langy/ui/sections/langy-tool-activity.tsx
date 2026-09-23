@@ -592,7 +592,7 @@ export function LangyActivityParts({
       key: `running:${group.key}`,
       order: group.order,
       node: (
-        <VStack align="stretch" gap={2} role="list">
+        <VStack align="stretch" gap={2} as="ul">
           <RunningActivityCard group={group} devMode={devMode} interrupted={!live} />
         </VStack>
       ),
@@ -620,7 +620,7 @@ export function LangyActivityParts({
             key: `held:${heldGroup.key}`,
             order: heldGroup.lastOrder,
             node: (
-              <VStack align="stretch" gap={2} role="list">
+              <VStack align="stretch" gap={2} as="ul">
                 <LatestSettledActivityCard group={heldGroup} devMode={devMode} />
               </VStack>
             ),
@@ -741,7 +741,7 @@ function CompletedActivityBatch({
           marginLeft={3}
           borderLeftWidth="1px"
           borderColor="border.muted"
-          role="list"
+          as="ul"
         >
           {groups.map((group) => (
             <CompletedActivityRow key={group.key} group={group} devMode={devMode} />
@@ -752,7 +752,7 @@ function CompletedActivityBatch({
           {reasoningTitles.map((title, index) => (
             <Text
               key={`thought-${index}`}
-              role="listitem"
+              as="li"
               textStyle="xs"
               color="fg.subtle"
               fontStyle="italic"
@@ -816,7 +816,7 @@ function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMod
   ) : null;
 
   return (
-    <VStack align="stretch" gap={1} role="listitem">
+    <VStack align="stretch" gap={1} as="li">
       <HStack gap={2} paddingY={1.5}>
         {canOpenResult ? (
           <ResultDisclosureButton
@@ -1321,7 +1321,7 @@ function LatestSettledActivityCard({ group, devMode }: { group: ActivityGroup; d
     <VStack
       align="stretch"
       gap={2}
-      role="listitem"
+      as="li"
       borderWidth="1px"
       borderStyle="solid"
       borderColor="border.muted"
@@ -1445,7 +1445,7 @@ function RunningActivityCard({
     <VStack
       align="stretch"
       gap={2}
-      role="listitem"
+      as="li"
       borderWidth="1px"
       borderStyle="solid"
       borderColor="border.muted"

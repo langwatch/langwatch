@@ -157,7 +157,7 @@ export function LangyDevDrawer({
             backdropFilter: "blur(16px) saturate(1.1)",
             boxShadow: "0 12px 28px rgba(0,0,0,0.5)",
           }}
-          role="complementary"
+          as="aside"
           aria-label="Langy developer inspector"
           initial={reduceMotion ? false : { opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}

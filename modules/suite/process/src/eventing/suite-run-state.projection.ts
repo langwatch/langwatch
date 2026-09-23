@@ -58,6 +58,10 @@ function passRateBpsOf({ passed, graded }: { passed: number; graded: number }): 
   return graded > 0 ? Math.round((passed / graded) * 10000) : null;
 }
 
+function terminalStatusOf(failedCount: number): "FAILURE" | "SUCCESS" {
+  return failedCount > 0 ? "FAILURE" : "SUCCESS";
+}
+
 /**
  * Type-safe fold projection for suite run state.
  */
@@ -161,7 +165,7 @@ export class SuiteRunStateFoldProjection
     let finishedAt = state.FinishedAt;
     if (allDone) {
       finishedAt = event.occurredAt;
-      status = failedCount > 0 ? "FAILURE" : "SUCCESS";
+      status = terminalStatusOf(failedCount);
     }
 
     return {
@@ -207,7 +211,7 @@ export class SuiteRunStateFoldProjection
       GradedCount: gradedCount,
       PassedCount: passedCount,
       PassRateBps: passRateBpsOf({ passed: passedCount, graded: gradedCount }),
-      Status: finished ? (failedCount > 0 ? "FAILURE" : "SUCCESS") : state.Status,
+      Status: finished ? terminalStatusOf(failedCount) : state.Status,
     };
   }
 }

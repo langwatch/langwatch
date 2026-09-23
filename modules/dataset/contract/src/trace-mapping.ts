@@ -841,7 +841,7 @@ export const extractTracesFields = (
     for (const field of fields) {
       const traceMapping = TRACE_MAPPINGS[field];
       if (traceMapping) {
-        result[field] = traceMapping.mapping(trace as any, "", "", {});
+        result[field] = traceMapping.mapping(trace, "", "", {});
       }
     }
     return result;
