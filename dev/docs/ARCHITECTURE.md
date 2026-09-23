@@ -861,6 +861,11 @@ directly.
 
 ---
 
+**Mail off is a state, not a boot failure** (Alex, 2026-09-23). With no mail provider configured the
+process boots; the mail member answers every send by skipping it with one log line naming what was
+not sent, and the browser learns it from public config's `capabilities.email`, so a self-hosted
+install shows that email is not configured instead of silently dropping it.
+
 ## 7. Stores, the tier, and migrations
 
 ```bash
