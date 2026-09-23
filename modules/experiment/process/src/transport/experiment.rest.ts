@@ -9,6 +9,8 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
+  createExperimentBodySchema,
+  createExperimentResponseSchema,
   ExperimentApi,
   experimentsListResponseSchema,
   experimentSummarySchema,
@@ -20,11 +22,6 @@ import {
 } from "@langwatch/experiment-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
-
-import {
-  createExperimentBodySchema,
-  createExperimentResponseSchema,
-} from "../rules/experiment-schemas.rules.ts";
 
 /** Every operation in this family is filed under one tag. */
 const EXPERIMENT_TAGS = ["Experiments"] as const;
@@ -111,7 +108,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   // Read one experiment, by the slug the list route just handed the caller.
   // The id is accepted too rather than refused, since the same list row
   // carries both and a caller reaching for `id` is not making a mistake.
-  .get("/:experimentSlug", "getApiExperimentsBySlug")
+  .get("/:slug", "getApiExperimentsBySlug")
   .withParams(slugParamsSchema)
   .withPermission("experiments:view")
   .withOutput(experimentSummarySchema)
@@ -125,7 +122,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .handle(async ({ app, input, scope }) => {
     const experiment = await app.getBySlugOrId({
       projectId: scope.id,
-      slugOrId: input.experimentSlug,
+      slugOrId: input.slug,
     });
     const [withRuns] = await app.withRunAggregates({
       projectId: scope.id,

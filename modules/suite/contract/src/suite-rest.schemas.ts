@@ -252,4 +252,7 @@ export const suiteRunResultSchema = z.object({
 });
 
 export const suiteAliasIdParamsSchema = z.object({ suiteId: z.string().min(1) });
+
+/** A duplicate takes no body: the source suite travels in the path. */
+export const duplicateSuiteBodySchema = z.object({});
 export const archivedSuiteSchema = z.object({ id: z.string(), archived: z.boolean() });

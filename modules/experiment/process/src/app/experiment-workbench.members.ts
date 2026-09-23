@@ -1,6 +1,6 @@
 // Types the workbench composes beyond the experiment application: its run loop
 // and two best-effort sinks. Live here so app can answer them.
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
@@ -24,10 +24,10 @@ export type ExperimentV3RunLoop = Readonly<{
   ports: ExperimentRunCollaborators | null;
   progress: ExperimentRunProgressRepository | null;
   services: ExecutionDataServices;
-  // The same `WorkflowService` the orchestrator's own collaborators are typed
+  // The same `WorkflowApi` the orchestrator's own collaborators are typed
   // against (see `rules/experiment-run-input.rules.ts`): a transport only
   // forwards it, but it forwards the real dependency, not an opaque one.
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   defaultConcurrency: number;
   startRun(
     input: ExperimentV3StartRunInput,

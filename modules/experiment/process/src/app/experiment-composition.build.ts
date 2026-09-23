@@ -19,7 +19,6 @@ import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
 
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
@@ -304,7 +303,7 @@ export function buildExperimentInfrastructure(input: {
     // The orchestrator's own collaborator, server-private to the workflow
     // module. This process composes no run loop, so nothing behind it is
     // ever called; see `services.workflows` above for the same refusal.
-    workflows: refusing<WorkflowService>("workflow-backed experiment execution"),
+    workflows: refusing<WorkflowApi>("workflow-backed experiment execution"),
     defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
     startRun: () => Promise.reject(new ExperimentCapabilityUnavailableError("experiment run loop")),
   };

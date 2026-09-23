@@ -24,7 +24,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
@@ -88,7 +88,7 @@ export class ExperimentConnectedCellService {
     now,
   }: {
     ports: ExperimentRunCollaborators;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
     cells: ExperimentCellExecutionService;
     dispatch?: ConnectedDispatch;
     sleep?: (ms: number) => Promise<void>;

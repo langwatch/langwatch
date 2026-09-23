@@ -7,9 +7,8 @@ import {
   type WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-  type NlpLambdaInvoke,
-  type NlpPayloadStaging,
 } from "../../app/workflow.app.ts";
+import { type NlpLambdaInvoke, type NlpPayloadStaging } from "../nlp-lambda.channel.ts";
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,

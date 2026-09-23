@@ -9,6 +9,7 @@ export * from "./experiment-workbench-version.ts";
 export * from "./experiment-run.ts";
 export * from "./experiment.responses.ts";
 export * from "./experiment.rest.ts";
+export * from "./experiment-workbench-rest.ts";
 export * from "./experiment.trpc.ts";
 export * from "./experiment-run-eventing.commands.ts";
 export * from "./experiment-run-eventing.events.ts";

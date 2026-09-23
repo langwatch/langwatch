@@ -41,12 +41,12 @@ export type {
   NlpPayloadStaging,
   NlpLambdaInvokeResult,
   StagedNlpPayload,
-} from "./app/workflow.app.ts";
+} from "./channels/nlp-lambda.channel.ts";
 export type {
   NlpLambdaArnResolver,
   NlpLambdaFunctionReader,
   NlpLambdaArnEntry,
-} from "./app/workflow.app.ts";
+} from "./channels/nlp-lambda.channel.ts";
 export { ModelProviderWorkflowStudioDslService } from "./services/workflow-studio-dsl.service.ts";
 export {
   HttpWorkflowStudioStreamAdapter,
@@ -89,13 +89,13 @@ export type {
   WorkflowExecution,
   WorkflowId,
   WorkflowNlpRuntime,
-  WorkflowStudioStream,
   WorkflowStudioDsl,
   WorkflowExecutionInput,
   WorkflowLlmParameterResolution,
   WorkflowNlpDispatchInput,
   WorkflowNlpDispatchResponse,
 } from "./app/workflow.app.ts";
+export type { WorkflowStudioStream } from "./channels/nlp-lambda.channel.ts";
 export type {
   WorkflowAiCall,
   WorkflowCommitMessageModel,
@@ -120,7 +120,7 @@ export type {
   StudioLambdaConfig,
   StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
-export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./app/workflow.app.ts";
+export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./channels/nlp-lambda.channel.ts";
 export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws/aws.nlp-lambda-stream-invoke.channel.ts";
 export { AwsNlpLambdaArnResolverChannel } from "./channels/aws/aws.nlp-lambda-arn-resolver.channel.ts";
 export {

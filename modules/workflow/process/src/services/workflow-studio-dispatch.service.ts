@@ -15,7 +15,7 @@ import {
   type ExecutionState,
 } from "@langwatch/workflow-contract";
 
-import type { WorkflowStudioStream } from "../app/workflow.app.ts";
+import type { WorkflowStudioStream } from "../channels/nlp-lambda.channel.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");

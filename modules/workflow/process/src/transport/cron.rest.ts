@@ -5,6 +5,7 @@ import {
   WorkflowApi,
   workflowCronRestSweepFailedSchema,
   workflowCronRestSweptSchema,
+  workflowCronSweepBodySchema,
 } from "@langwatch/workflow-contract";
 import type { z } from "zod";
 
@@ -18,6 +19,7 @@ export const cronRest = defineRestRouter(WorkflowApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/cron/old_lambdas_cleanup", "runOldLambdasCleanup")
+  .withInput(workflowCronSweepBodySchema)
   .withCredential("internalSecret")
   .withAccess(anyAuthenticated({ reason: CRON_BEARER_IS_THE_GATE }))
   .responds({ 200: workflowCronRestSweptSchema, 500: workflowCronRestSweepFailedSchema })

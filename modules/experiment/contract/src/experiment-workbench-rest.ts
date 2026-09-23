@@ -1,9 +1,42 @@
 /**
- * OpenAPI schemas for the API-key half of the experiments REST surface.
- * Describe responses the handlers already send; handlers keep their own parsing.
+ * What the API-key half of `/api/experiments` takes and answers, as main
+ * published it.
  */
 
 import { z } from "zod";
+
+export const runIdParamsSchema = z.object({ runId: z.string().min(1) });
+
+export const slugVersionParamsSchema = z.object({
+  slug: z.string().min(1),
+  version: z.string().min(1),
+});
+
+/** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
+export const listRunsQuerySchema = z.object({
+  experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
+  page: z.string().optional().describe("1-based page number"),
+  pageSize: z.string().optional().describe("Runs per page, capped at 200"),
+});
+
+export const runResultsQuerySchema = z.object({
+  experimentSlug: z
+    .string()
+    .optional()
+    .describe("Owning experiment. Required once the run has aged out of the status cache."),
+});
+
+export const workbenchStateQuerySchema = z.object({
+  fields: z
+    .string()
+    .optional()
+    .describe("Set to `version` to answer with the version and timestamp only"),
+});
+
+export const listVersionsQuerySchema = z.object({
+  limit: z.string().optional().describe("Versions per page, capped at 100"),
+  cursor: z.string().optional().describe("The `nextCursor` of the previous page"),
+});
 
 /** Run lifecycle as the poll endpoint reports it. */
 export const runStatusSchema = z.enum(["pending", "running", "completed", "failed", "stopped"]);
@@ -59,8 +92,12 @@ const handledErrorSchema = z.object({
     .optional()
     .describe("Who the failure is attributable to: customer, platform, provider"),
   traceId: z.string().optional(),
-  tips: z.array(z.string()).optional(),
+  spanId: z.string().optional(),
+  traceUrl: z.string().optional(),
+  retryable: z.boolean().optional(),
+  tips: z.array(z.string()).readonly().optional(),
   docsUrl: z.string().optional(),
+  reasons: z.array(z.unknown()).optional(),
 });
 
 export const startRunResponseSchema = z.object({
@@ -317,6 +354,12 @@ export const workbenchVersionProbeResponseSchema = z.object({
   updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
 });
 
+/** The read's one answer: `?fields=version` leaves out the name and the setup. */
+export const workbenchStateAnswerSchema = workbenchStateResponseSchema.partial({
+  name: true,
+  state: true,
+});
+
 export const saveWorkbenchStateBodySchema = z.object({
   state: workbenchStateSchema.describe("The full setup to save"),
   expectedVersion: z
@@ -368,6 +411,9 @@ export const listWorkbenchVersionsResponseSchema = z.object({
     .nullable()
     .describe("Pass as `cursor` to read the next page, null on the last one"),
 });
+
+/** A restore takes no body: the version travels in the path. */
+export const restoreWorkbenchVersionBodySchema = z.object({});
 
 export const restoreWorkbenchVersionResponseSchema = z.object({
   version: z

@@ -5,7 +5,7 @@ import {
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
-} from "../app/workflow.app.ts";
+} from "./nlp-lambda.channel.ts";
 
 const logger = createLogger("langwatch:workflow:nlp-lambda");
 

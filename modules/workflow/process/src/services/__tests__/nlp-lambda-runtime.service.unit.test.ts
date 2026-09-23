@@ -4,7 +4,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { NlpLambdaArnResolver, NlpLambdaArnCache } from "../../app/workflow.app.ts";
+import type { NlpLambdaArnCache } from "../../app/workflow.app.ts";
+import type { NlpLambdaArnResolver } from "../../channels/nlp-lambda.channel.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,

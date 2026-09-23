@@ -208,6 +208,9 @@ export const instantEvalRunInputSchema = z.object({
 
 export type InstantEvalRunInputBody = z.infer<typeof instantEvalRunInputSchema>;
 
+/** A cancel takes no body: the run travels in the path. */
+export const cancelInstantEvalRunBodySchema = z.object({});
+
 export const instantEvalIdParamsSchema = z.object({
   id: z.string().min(1).describe("The run id."),
 });

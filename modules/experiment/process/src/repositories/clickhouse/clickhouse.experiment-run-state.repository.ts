@@ -14,14 +14,14 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
-import {
-  makeExperimentRunKey,
-  parseExperimentRunKey,
-} from "../../eventing/experiment-run-key.process.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
 } from "../../eventing/experiment-run-state.projection.ts";
+import {
+  makeExperimentRunKey,
+  parseExperimentRunKey,
+} from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
 

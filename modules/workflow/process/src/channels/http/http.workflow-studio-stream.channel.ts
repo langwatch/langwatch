@@ -4,7 +4,7 @@
 import {
   type WorkflowStudioStream,
   type WorkflowStudioStreamInput,
-} from "../../app/workflow.app.ts";
+} from "../nlp-lambda.channel.ts";
 
 /** The engine's streaming studio route at a single configured address. */
 export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {

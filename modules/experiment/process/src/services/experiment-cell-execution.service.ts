@@ -15,8 +15,8 @@ import type {
   StudioServerEvent,
   StudioWorkflow,
   WorkflowRunOrigin,
+  WorkflowApi,
 } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
 
 import {
   evaluatorErrorResult,
@@ -80,14 +80,14 @@ export class ExperimentCellExecutionService {
     workflows,
   }: {
     ports: ExperimentRunCollaborators;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
   }): ExperimentCellExecutionService {
     return new ExperimentCellExecutionService(ports, workflows);
   }
 
   private constructor(
     private readonly ports: ExperimentRunCollaborators,
-    private readonly workflows: WorkflowService,
+    private readonly workflows: WorkflowApi,
   ) {}
 
   /** Prices an LLM node's token usage at the project's canonical model rate. */

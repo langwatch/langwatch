@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { LambdaWorkflowStudioStreamChannel } from "../aws/aws.lambda-workflow-studio-stream.channel.ts";
 import {
   type NlpLambdaFunctionReader,
   type NlpLambdaStreamInvoke,
@@ -14,8 +15,7 @@ import {
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
   type WorkflowStudioStreamInput,
-} from "../../app/workflow.app.ts";
-import { LambdaWorkflowStudioStreamChannel } from "../aws/aws.lambda-workflow-studio-stream.channel.ts";
+} from "../nlp-lambda.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 

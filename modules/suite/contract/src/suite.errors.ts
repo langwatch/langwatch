@@ -128,3 +128,31 @@ export class SuiteExecutionUnavailableError extends HandledError {
     this.name = "SuiteExecutionUnavailableError";
   }
 }
+
+/**
+ * The project exists but no organization can be resolved behind it.
+ */
+export class OrganizationNotFoundForProjectError extends HandledError {
+  declare readonly code: "organization_not_found_for_project";
+
+  constructor(projectId: string) {
+    super("organization_not_found_for_project", "Organization not found for project", {
+      httpStatus: 404,
+      meta: { projectId },
+    });
+    this.name = "OrganizationNotFoundForProjectError";
+  }
+}
+
+/** A refused run, at the status this family publishes one with. */
+export class SuiteAliasRunRefusedError extends HandledError {
+  constructor(refusal: SuiteExecutionError) {
+    super(refusal.code, refusal.message, {
+      httpStatus: 400,
+      fault: refusal.fault,
+      meta: refusal.meta,
+      tips: refusal.tips,
+    });
+    this.name = "SuiteAliasRunRefusedError";
+  }
+}

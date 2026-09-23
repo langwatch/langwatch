@@ -8,6 +8,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { dSPyStepRESTParamsSchema, ExperimentApi } from "@langwatch/experiment-contract";
@@ -42,11 +43,18 @@ export const dspyStepsCaller = defineRestMiddleware(
 );
 
 /** A JSON answer this door writes itself, in the shape an optimizer parses. */
-const answer = (status: 200 | 400 | 500, body: object) => ({
+const LEGACY_WIRE =
+  "The DSPy SDK reads this family's own flat bodies: `{ message }` for a body that is not JSON or an accepted batch, and `{ error }` with the validation sentence.";
+
+const answer = ({
+  response,
   status,
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body),
-});
+  body,
+}: {
+  response: RestProtocolProducer<"application/json">;
+  status: 200 | 400 | 500;
+  body: object;
+}) => response.write({ status, mediaType: "application/json", body: JSON.stringify(body) });
 
 export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withNamespace("dspy")
@@ -58,7 +66,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   // the schema's own failure - on a bad batch.
   .withRawBody("text", { mediaType: "application/json" })
   .withAccess(publicRoute({ reason: DOOR_REASON }))
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: "application/json", because: LEGACY_WIRE })
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
   .withDocs({
     tags: ["Experiments"],
@@ -80,7 +88,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
     ],
   })
   .withMiddleware(dspyStepsCaller)
-  .handle(async ({ app, raw }, caller) => {
+  .handle(async ({ app, raw, response }, caller) => {
     const { projectId } = caller;
 
     // The size comes from the wire characters rather than a re-serialisation
@@ -91,7 +99,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
     try {
       body = JSON.parse(raw);
     } catch {
-      return answer(400, { message: "Bad request" });
+      return answer({ response, status: 400, body: { message: "Bad request" } });
     }
 
     logger.info(
@@ -106,7 +114,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
         "invalid log_steps data received",
       );
 
-      return answer(400, { error: zodErrorMessage(parsed.error) });
+      return answer({ response, status: 400, body: { error: zodErrorMessage(parsed.error) } });
     }
 
     for (const param of parsed.data) {
@@ -116,8 +124,13 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
           "timestamps not in milliseconds for step",
         );
 
-        return answer(400, {
-          error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        return answer({
+          response,
+          status: 400,
+          body: {
+            error:
+              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+          },
         });
       }
     }
@@ -153,16 +166,16 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
         const context = { projectId, stepId: param.index, runId: param.run_id };
         logger.error({ error, ...context }, "failed to process DSPy step");
         if (error instanceof z.ZodError) {
-          return answer(400, { error: zodErrorMessage(error) });
+          return answer({ response, status: 400, body: { error: zodErrorMessage(error) } });
         }
 
         // Generic on purpose (ADR-045): the detail is on the log line above,
         // and a driver's own message names host, port and database.
-        return answer(500, { error: "Internal server error" });
+        return answer({ response, status: 500, body: { error: "Internal server error" } });
       }
     }
 
-    return answer(200, { message: "ok" });
+    return answer({ response, status: 200, body: { message: "ok" } });
   })
 
   .build();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { makeExperimentRunKey, parseExperimentRunKey } from "../experiment-run-key.process.ts";
+import { makeExperimentRunKey, parseExperimentRunKey } from "../experiment-run-key.rules.ts";
 
 describe("makeExperimentRunKey", () => {
   it("joins experimentId and runId with a colon", () => {

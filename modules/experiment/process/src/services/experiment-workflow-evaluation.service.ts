@@ -7,8 +7,12 @@ import {
   type FindOrCreateWorkflowExperimentInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type {
+  Entry,
+  Field,
+  StudioWorkflow as WorkflowDSL,
+  WorkflowApi,
+} from "@langwatch/workflow-contract";
 
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
@@ -75,7 +79,7 @@ export type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** Everything the run loop reaches outside itself. */
   ports: ExperimentRunCollaborators;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
   /** Where the run's progress is written so a poll on another process finds it. */

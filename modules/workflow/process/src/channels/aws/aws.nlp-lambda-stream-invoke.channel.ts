@@ -5,7 +5,7 @@
  */
 import { InvokeWithResponseStreamCommand, type LambdaClient } from "@aws-sdk/client-lambda";
 
-import { type NlpLambdaStreamInvoke, type NlpLambdaStreamChunk } from "../../app/workflow.app.ts";
+import { type NlpLambdaStreamInvoke, type NlpLambdaStreamChunk } from "../nlp-lambda.channel.ts";
 
 export class AwsNlpLambdaStreamInvokeChannel implements NlpLambdaStreamInvoke {
   static create(options: { lambda: LambdaClient }): AwsNlpLambdaStreamInvokeChannel {

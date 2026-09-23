@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 export const promptProblemSchema = z
@@ -291,3 +291,13 @@ export {
   PromptSystemPromptConflictError as SystemPromptConflictError,
   PromptSystemPromptRequiredError as SystemPromptRequiredError,
 };
+
+/** No such tag in the organization's catalog. */
+export class PromptTagMissingError extends NotFoundError {
+  declare readonly code: "prompt_tag_not_found";
+
+  constructor(name: string) {
+    super("prompt_tag_not_found", "Tag", name, { meta: { name } });
+    this.name = "PromptTagMissingError";
+  }
+}

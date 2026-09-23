@@ -15,7 +15,6 @@ import {
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
 
-import { type NlpLambdaArnResolver } from "../../app/workflow.app.ts";
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   NLP_LAMBDA_MEMORY_SIZE_MB,
@@ -23,6 +22,7 @@ import {
   buildStudioLambdaEnvironment,
   type StudioLambdaConfig,
 } from "../../rules/nlp-lambda-config.rules.ts";
+import { type NlpLambdaArnResolver } from "../nlp-lambda.channel.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 const LOG_RETENTION_DAYS = 365;

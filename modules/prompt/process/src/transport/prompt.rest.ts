@@ -30,6 +30,7 @@ import {
   idParamsSchema,
   idTagParamsSchema,
   idVersionParamsSchema,
+  restorePromptVersionBodySchema,
   promptWindowQuerySchema,
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -330,6 +331,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .delete("/api/prompts/tags/:tag", "deleteApiPromptsTagsByTag")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
+  .withOutput(z.void())
   .withMiddleware(promptRestFacts, promptRestCredential)
   .withDocs({
     description: "Delete a prompt tag definition and cascade to assignments",
@@ -397,6 +399,7 @@ export const promptRest = defineRestRouter(PromptApi)
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
   .withParams(idVersionParamsSchema)
+  .withInput(restorePromptVersionBodySchema)
   .withPermission("prompts:update")
   .withOutput(promptWireSchema)
   .withMiddleware(promptRestFacts)

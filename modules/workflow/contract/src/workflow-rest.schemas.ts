@@ -162,6 +162,9 @@ export const workflowStudioRestEventSchema = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** What a completed sweep answers. */
+/** The sweep takes no body: the scheduler only knocks. */
+export const workflowCronSweepBodySchema = z.object({});
+
 export const workflowCronRestSweptSchema = z.object({ message: z.string() });
 
 /** What a failed sweep answers, in the sentence the scheduler alerts on. */

@@ -39,7 +39,7 @@ export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
 } from "./eventing/simulation-processing.pipeline.ts";
-export { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "./repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts";
+export { SimulationProcessingProducerPipeline as SimulationProcessingProducerAdapter } from "./eventing/simulation-processing-producer.pipeline.ts";
 export {
   ScenarioApp,
   scenarioAppDependencyTokens,

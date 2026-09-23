@@ -6,13 +6,12 @@ import type {
   ExecutionCell,
 } from "@langwatch/experiment-contract";
 import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
+import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a
  * connected agent as a workbench column.
  * @see specs/experiments-v3/connected-agent-target.feature
  */
-import type { WorkflowService } from "@langwatch/workflow-process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scripted = vi.hoisted(() => ({
@@ -52,7 +51,7 @@ const ports = {
 const workflows = {
   enrichStudioEvent: async ({ event }: { event: unknown }) => event,
   prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowService;
+} as unknown as WorkflowApi;
 
 const agent = {
   id: "agent_1",

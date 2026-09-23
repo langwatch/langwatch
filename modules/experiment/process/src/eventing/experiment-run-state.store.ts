@@ -2,7 +2,7 @@ import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eve
 
 import type { ExperimentRunStateRepository } from "../repositories/experiment-run-state.repository.ts";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
-import { parseExperimentRunKey } from "./experiment-run-key.process.ts";
+import { parseExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,

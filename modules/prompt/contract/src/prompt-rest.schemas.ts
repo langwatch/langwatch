@@ -142,6 +142,9 @@ export const idParamsSchema = z.object({ promptId: z.string() });
 export const idTagParamsSchema = z.object({ promptId: z.string(), tag: z.string() });
 export const tagParamsSchema = z.object({ tag: z.string() });
 export const idVersionParamsSchema = z.object({ promptId: z.string(), versionId: z.string() });
+
+/** A restore takes no body: the prompt and version travel in the path. */
+export const restorePromptVersionBodySchema = z.object({});
 export const promptWindowQuerySchema = z.object({
   version: z.coerce.number().int().nonnegative().optional(),
   tag: z.string().optional(),

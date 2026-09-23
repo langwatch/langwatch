@@ -13,7 +13,7 @@ import {
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   ScenarioTestSuiteNotFoundError,
@@ -33,11 +33,13 @@ import {
   createSuiteInputSchema,
   listSuitesQuerySchema,
   runSuiteInputSchema,
+  duplicateSuiteBodySchema,
   suiteAliasIdParamsSchema,
   suiteResponseWithPlatformUrlSchema,
   suiteRunResultSchema,
   updateSuiteInputSchema,
   type WireScope,
+  SuiteAliasRunRefusedError,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
@@ -50,19 +52,6 @@ const DEPRECATION = {
   successor: "/api/v1/run-plans",
   notice: "Deprecated: use /api/v1/run-plans and /api/v1/test-suites.",
 } as const;
-
-/** A refused run, at the status this family publishes one with. */
-class SuiteAliasRunRefusedError extends HandledError {
-  constructor(refusal: SuiteExecutionError) {
-    super(refusal.code, refusal.message, {
-      httpStatus: 400,
-      fault: refusal.fault,
-      meta: refusal.meta,
-      tips: refusal.tips,
-    });
-    this.name = "SuiteAliasRunRefusedError";
-  }
-}
 
 /** The refusal for a body that names targets the addressed row does not take. */
 function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
@@ -485,6 +474,7 @@ export function createSuitesAliasRest(): Readonly<{
       // it leaves the source suite untouched and produces a new one.
       .post("/:suiteId/duplicate", "postApiSuitesByIdDuplicate")
       .withParams(suiteAliasIdParamsSchema)
+      .withInput(duplicateSuiteBodySchema)
       .withPermission("scenarios:create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withStatus(201)

@@ -13,6 +13,7 @@ import {
 import {
   InstantEvalApi,
   instantEvalEstimateSchema,
+  cancelInstantEvalRunBodySchema,
   instantEvalIdParamsSchema,
   instantEvalListQuerySchema,
   instantEvalResultsQuerySchema,
@@ -137,6 +138,7 @@ export const instantEvalRest: Readonly<{
   .post("/:id/cancel", "cancelInstantEvalRun")
   .withPermission("analytics:manage")
   .withParams(instantEvalIdParamsSchema)
+  .withInput(cancelInstantEvalRunBodySchema)
   .withOutput(instantEvalRunSchema)
   .withDocs({
     summary: "Cancel a run",

@@ -10,22 +10,22 @@ import type {
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
-import { ComputeRunMetricsCommand } from "../../eventing/compute-run-metrics.commands.ts";
-import { FinishRunCommand } from "../../eventing/finish-run.commands.ts";
-import { RecordEvaluationsCommand } from "../../eventing/recordEvaluations.command.ts";
+import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
+import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
+import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
+import { FinishRunCommand } from "./finish-run.commands.ts";
+import { RecordEvaluationsCommand } from "./recordEvaluations.command.ts";
 import {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDefinition,
-} from "../../eventing/simulation-processing.pipeline.ts";
+} from "./simulation-processing.pipeline.ts";
 import {
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   simulationRunExecutionPM,
-} from "../../eventing/simulation-run-execution.process.ts";
-import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
-import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
-import { SimulationService as SimulationServiceClass } from "../../services/simulation.service.ts";
-import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
-import { NullSimulationRepository } from "../simulation.repository.ts";
+} from "./simulation-run-execution.process.ts";
+import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metrics.projection.ts";
+import type { SimulationRunStateData } from "./simulation-run-state.projection.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -206,11 +206,9 @@ function buildSimulationProcessingProducerPipeline(input: {
 }
 
 /** The simulation-processing definition as a command-only producer sees it. */
-export class ClickhouseSimulationProcessingProducerRepository {
-  static create(options: {
-    processName: string;
-  }): ClickhouseSimulationProcessingProducerRepository {
-    return new ClickhouseSimulationProcessingProducerRepository(options);
+export class SimulationProcessingProducerPipeline {
+  static create(options: { processName: string }): SimulationProcessingProducerPipeline {
+    return new SimulationProcessingProducerPipeline(options);
   }
 
   private constructor(private readonly options: { processName: string }) {}

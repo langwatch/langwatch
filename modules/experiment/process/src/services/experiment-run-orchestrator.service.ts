@@ -14,8 +14,7 @@ import {
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { ExecutionState, StudioWorkflow, WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
@@ -78,10 +77,10 @@ const comparisonPlan = ({
 /** Re-exported so it moved with its owner without duplicating the type. */
 export type { ComparisonSkipReason } from "../eventing/experiment-comparison-skip.process.ts";
 
-const cellExecution = (ports: ExperimentRunCollaborators, workflows: WorkflowService) =>
+const cellExecution = (ports: ExperimentRunCollaborators, workflows: WorkflowApi) =>
   ExperimentCellExecutionService.create({ ports, workflows });
 
-const workflowCell = (ports: ExperimentRunCollaborators, workflows: WorkflowService) =>
+const workflowCell = (ports: ExperimentRunCollaborators, workflows: WorkflowApi) =>
   ExperimentWorkflowCellService.create({
     ports,
     workflows,
@@ -250,7 +249,7 @@ export class ExperimentRunOrchestratorService {
     ports: ExperimentRunCollaborators,
     datasetColumns: { id: string; name: string; type: string }[],
     loadedData: LoadedCellData,
-    workflows: WorkflowService,
+    workflows: WorkflowApi,
     resultMapperConfig?: ResultMapperConfig,
     isAborted?: () => Promise<boolean>,
   ): AsyncGenerator<EvaluationV3Event> {
@@ -285,7 +284,7 @@ export class ExperimentRunOrchestratorService {
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;
     ports: ExperimentRunCollaborators;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
     /** The run's agent cache credential, when it minted one. */
     sandboxApiKey?: string;
   }): AsyncGenerator<EvaluationV3Event> {

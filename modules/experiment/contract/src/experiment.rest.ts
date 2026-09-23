@@ -68,7 +68,7 @@ export const listExperimentsQuerySchema = z.object({
 });
 
 export const slugParamsSchema = z.object({
-  experimentSlug: z.string().min(1).describe("The experiment's slug, or its id"),
+  slug: z.string().min(1).describe("The experiment's slug, or its id"),
 });
 
 /**

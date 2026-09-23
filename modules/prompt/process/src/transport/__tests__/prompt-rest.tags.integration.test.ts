@@ -4,10 +4,13 @@
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
 import type { PromptTag } from "@langwatch/prisma-client/generated";
-import { PromptTagNotFoundError, type PromptApi } from "@langwatch/prompt-contract";
+import {
+  PromptTagMissingError,
+  PromptTagNotFoundError,
+  type PromptApi,
+} from "@langwatch/prompt-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { PromptTagMissingError } from "../../app/prompt.app.ts";
 import { PrismaPromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import type { PromptTagDatabase } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import { PromptTagService } from "../../services/prompt-tag.service.ts";

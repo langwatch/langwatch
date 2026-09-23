@@ -13,7 +13,6 @@ import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experime
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
@@ -144,7 +143,7 @@ function harness({
     archive: archiveWorkflow,
     ...workflows,
   });
-  const workflowExecutionService = createApiFixture<WorkflowService>();
+  const workflowExecutionService = createApiFixture<WorkflowApi>();
 
   const monitors = {
     deleteForExperiment: vi.fn(async () => undefined),

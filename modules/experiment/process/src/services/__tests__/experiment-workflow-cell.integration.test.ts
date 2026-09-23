@@ -3,13 +3,12 @@ import type {
   EvaluationV3Event,
   ExecutionCell,
 } from "@langwatch/experiment-contract";
-import type { StudioServerEvent, StudioWorkflow } from "@langwatch/workflow-contract";
+import type { StudioServerEvent, StudioWorkflow, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * Tests ExperimentRunOrchestratorService.executeWorkflowCell with a fake studio
  * boundary port fed scripted events instead of live NLP services.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
-import type { WorkflowService } from "@langwatch/workflow-process";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
@@ -45,7 +44,7 @@ const ports = {
 const workflows = {
   enrichStudioEvent: async ({ event }: { event: unknown }) => event,
   prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowService;
+} as unknown as WorkflowApi;
 
 const workflowDsl = {
   nodes: [

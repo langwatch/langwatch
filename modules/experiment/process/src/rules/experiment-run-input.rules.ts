@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
@@ -68,7 +68,7 @@ export type OrchestratorInput = {
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   ports: ExperimentRunCollaborators;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   /** Studio workflows loaded for workflow targets (committed DSL run per row) */
@@ -122,5 +122,5 @@ export interface ConnectedCellInput {
   /** The clock the retry budget reads, replaceable in tests. */
   now?: () => number;
   ports: ExperimentRunCollaborators;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
 }

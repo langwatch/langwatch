@@ -4,6 +4,8 @@
 import { createLogger } from "@langwatch/observability";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
 
+import { STUDIO_STAGING_PREFIX } from "../../rules/nlp-lambda-config.rules.ts";
+import { LambdaWebAdapterStreamService } from "../../services/lambda-web-adapter-stream.service.ts";
 import {
   type NlpLambdaFunctionReader,
   type NlpLambdaStreamInvoke,
@@ -13,9 +15,7 @@ import {
   type StagedNlpPayload,
   type WorkflowStudioStream,
   type WorkflowStudioStreamInput,
-} from "../../app/workflow.app.ts";
-import { STUDIO_STAGING_PREFIX } from "../../rules/nlp-lambda-config.rules.ts";
-import { LambdaWebAdapterStreamService } from "../../services/lambda-web-adapter-stream.service.ts";
+} from "../nlp-lambda.channel.ts";
 
 const logger = createLogger("langwatch:workflow:studio-lambda-stream");
 

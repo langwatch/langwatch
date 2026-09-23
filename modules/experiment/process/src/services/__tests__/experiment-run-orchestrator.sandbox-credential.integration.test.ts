@@ -1,10 +1,9 @@
 import type { ExecutionCell } from "@langwatch/experiment-contract";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
+import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * Pins the previously disconnected sandbox credential paths: `findRunSandboxApiKey`
  * reaches `withSandboxApiKey`, and the dispatched event carries `sandbox_api_key`.
  */
-import type { WorkflowService } from "@langwatch/workflow-process";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
@@ -37,7 +36,7 @@ const ports = {
 const workflows = {
   enrichStudioEvent: async ({ event }: { event: unknown }) => event,
   prepareStudioEvent: async ({ event }: { event: unknown }) => event,
-} as unknown as WorkflowService;
+} as unknown as WorkflowApi;
 
 const makeCell = (): ExecutionCell => ({
   rowIndex: 0,

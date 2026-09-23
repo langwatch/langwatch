@@ -3,7 +3,6 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 /**
  * The prompt library's application: what its doors call.
  */
-import { NotFoundError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -11,6 +10,7 @@ import {
   PromptApi,
   hoistSystemMessage,
   PromptNotFoundError,
+  PromptTagMissingError,
   PromptHasNoCopiesError,
   PromptNoCopiesSelectedError,
   PromptTagInvalidError,
@@ -109,16 +109,6 @@ type PromptRepositorySetup = FeatureSetup<
   undefined,
   PromptRepositories
 >;
-
-/** No such tag in the organization's catalog. */
-export class PromptTagMissingError extends NotFoundError {
-  declare readonly code: "prompt_tag_not_found";
-
-  constructor(name: string) {
-    super("prompt_tag_not_found", "Tag", name, { meta: { name } });
-    this.name = "PromptTagMissingError";
-  }
-}
 
 /**
  * Re-raises the tag service's plain domain errors on the handled channel.

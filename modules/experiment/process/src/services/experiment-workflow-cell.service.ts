@@ -15,8 +15,8 @@ import {
   nodeErrorToDomainError,
   type StudioServerEvent,
   type StudioWorkflow,
+  type WorkflowApi,
 } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
 
 import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
@@ -64,7 +64,7 @@ export class ExperimentWorkflowCellService {
     cells,
   }: {
     ports: ExperimentRunCollaborators;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
     cells: ExperimentCellExecutionService;
   }): ExperimentWorkflowCellService {
     return new ExperimentWorkflowCellService(ports, workflows, cells);
@@ -72,7 +72,7 @@ export class ExperimentWorkflowCellService {
 
   private constructor(
     private readonly ports: ExperimentRunCollaborators,
-    private readonly workflows: WorkflowService,
+    private readonly workflows: WorkflowApi,
     private readonly cells: ExperimentCellExecutionService,
   ) {}
 

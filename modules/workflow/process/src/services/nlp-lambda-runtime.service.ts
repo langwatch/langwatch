@@ -5,11 +5,11 @@
  */
 import type { Logger } from "@langwatch/observability";
 
+import { type NlpLambdaArnCache } from "../app/workflow.app.ts";
 import {
   type NlpLambdaArnResolver,
   type NlpLambdaArnEntry,
-  type NlpLambdaArnCache,
-} from "../app/workflow.app.ts";
+} from "../channels/nlp-lambda.channel.ts";
 
 /** The shared key one project's ARN is filed under. */
 export const NLP_LAMBDA_ARN_CACHE_PREFIX = "lambda_arn:";

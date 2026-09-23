@@ -17,9 +17,24 @@ import {
   ExperimentRunLoopUnavailableError,
   ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
+  listRunsQuerySchema,
+  listVersionsQuerySchema,
+  listWorkbenchVersionsResponseSchema,
   persistedEvaluationsV3StateSchema,
+  restoreWorkbenchVersionBodySchema,
+  restoreWorkbenchVersionResponseSchema,
+  runIdParamsSchema,
   runInputsBodySchema,
+  runResultsQuerySchema,
+  runResultsResponseSchema,
+  runStatusResponseSchema,
   runsSavedDataset,
+  saveWorkbenchStateBodySchema,
+  saveWorkbenchStateResponseSchema,
+  slugParamsSchema,
+  slugVersionParamsSchema,
+  workbenchStateQuerySchema,
+  workbenchStateAnswerSchema,
   type CarriedOverCell,
   type EvaluationsV3State,
   type ExecutionScope,
@@ -123,45 +138,6 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
-const slugParamsSchema = z.object({ experimentSlug: z.string().min(1) });
-const runIdParamsSchema = z.object({ runId: z.string().min(1) });
-const slugVersionParamsSchema = z.object({
-  experimentSlug: z.string().min(1),
-  version: z.string().min(1),
-});
-
-/** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
-const listRunsQuerySchema = z.object({
-  experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
-  page: z.string().optional().describe("1-based page number"),
-  pageSize: z.string().optional().describe("Runs per page, capped at 200"),
-});
-
-const runResultsQuerySchema = z.object({
-  experimentSlug: z
-    .string()
-    .optional()
-    .describe("Owning experiment. Required once the run has aged out of the status cache."),
-});
-
-const workbenchStateQuerySchema = z.object({
-  fields: z
-    .string()
-    .optional()
-    .describe("Set to `version` to answer with the version and timestamp only"),
-});
-
-const listVersionsQuerySchema = z.object({
-  limit: z.string().optional().describe("Versions per page, capped at 100"),
-  cursor: z.string().optional().describe("The `nextCursor` of the previous page"),
-});
-
-const saveWorkbenchStateBodySchema = z.object({
-  state: z.record(z.string(), z.unknown()),
-  expectedVersion: z.number().int().optional(),
-  commitMessage: z.string().optional(),
-});
-
 /** The run loop, or the refusal a process without one owes. Starting a run needs both halves. */
 export function runLoopOf(run: ExperimentV3RunLoop): {
   ports: ExperimentRunCollaborators;
@@ -189,7 +165,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
-  .post("/:experimentSlug/run", "postApiExperimentsBySlugRun")
+  .post("/:slug/run", "postApiExperimentsBySlugRun")
   .withParams(slugParamsSchema)
   // The body is read unparsed: an empty one is a full run, malformed JSON is
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
@@ -215,7 +191,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(
     async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> => {
-      const { experimentSlug: slug } = input;
+      const { slug } = input;
 
       const experiments = app.experiments();
 
@@ -419,7 +395,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId", "getApiExperimentsRunsByRunId")
   .withParams(runIdParamsSchema)
   .withPermission("evaluations:view")
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(runStatusResponseSchema)
   .withDocs({
     summary: "Poll a run",
     description:
@@ -455,63 +431,51 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     logger.debug({ runId, status: runState.status }, "Run status queried");
 
     if (runState.status === "running" || runState.status === "pending") {
-      return jsonAnswer(
-        {
-          runId: runState.runId,
-          status: runState.status,
-          progress: runState.progress,
-          total: runState.total,
-          startedAt: runState.startedAt,
-        },
-        200,
-      );
+      return {
+        runId: runState.runId,
+        status: runState.status,
+        progress: runState.progress,
+        total: runState.total,
+        startedAt: runState.startedAt,
+      };
     }
 
     if (runState.status === "completed") {
-      return jsonAnswer(
-        {
-          runId: runState.runId,
-          status: runState.status,
-          progress: runState.progress,
-          total: runState.total,
-          startedAt: runState.startedAt,
-          finishedAt: runState.finishedAt,
-          summary: runState.summary,
-        },
-        200,
-      );
-    }
-
-    if (runState.status === "failed") {
-      return jsonAnswer(
-        {
-          runId: runState.runId,
-          status: runState.status,
-          progress: runState.progress,
-          total: runState.total,
-          startedAt: runState.startedAt,
-          finishedAt: runState.finishedAt,
-          // The code, never the thrown message (ADR-045).
-          error: runState.error,
-          ...(runState.domainError ? { domainError: runState.domainError } : {}),
-          ...(runState.traceId ? { traceId: runState.traceId } : {}),
-        },
-        200,
-      );
-    }
-
-    // stopped
-    return jsonAnswer(
-      {
+      return {
         runId: runState.runId,
         status: runState.status,
         progress: runState.progress,
         total: runState.total,
         startedAt: runState.startedAt,
         finishedAt: runState.finishedAt,
-      },
-      200,
-    );
+        summary: runState.summary,
+      };
+    }
+
+    if (runState.status === "failed") {
+      return {
+        runId: runState.runId,
+        status: runState.status,
+        progress: runState.progress,
+        total: runState.total,
+        startedAt: runState.startedAt,
+        finishedAt: runState.finishedAt,
+        // The code, never the thrown message (ADR-045).
+        error: runState.error,
+        ...(runState.domainError ? { domainError: runState.domainError } : {}),
+        ...(runState.traceId ? { traceId: runState.traceId } : {}),
+      };
+    }
+
+    // stopped
+    return {
+      runId: runState.runId,
+      status: runState.status,
+      progress: runState.progress,
+      total: runState.total,
+      startedAt: runState.startedAt,
+      finishedAt: runState.finishedAt,
+    };
   })
 
   // ── GET /runs/:runId/results (full per-row results) ─────────────────────
@@ -519,7 +483,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
   .withPermission("evaluations:view")
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(runResultsResponseSchema)
   .withDocs({
     summary: "Read run results",
     description:
@@ -564,7 +528,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       const run = await experiments.findRun({ projectId: scope.id, experimentId, runId });
       if (!run) throw new RunNotFoundError(runId);
 
-      return jsonAnswer(run, 200);
+      return run;
     } catch (error) {
       // Only a genuine miss is a 404 (ADR-045).
       if (HandledError.isHandled(error)) throw error;
@@ -574,11 +538,11 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /:slug/workbench-state ───────────────────────────────────────
-  .get("/:experimentSlug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
+  .get("/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
   .withPermission("experiments:view")
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(workbenchStateAnswerSchema)
   .withDocs({
     summary: "Read an experiment's setup",
     description:
@@ -593,7 +557,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const { experimentSlug: slug } = input;
+    const { slug } = input;
 
     const workbench = await app.experiments().getWorkbenchState({ projectId: scope.id, slug });
 
@@ -604,17 +568,17 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       updatedAt: workbench.updatedAt.toISOString(),
     };
 
-    if (input.fields === "version") return jsonAnswer(identity, 200);
+    if (input.fields === "version") return identity;
 
-    return jsonAnswer({ ...identity, name: workbench.name, state: workbench.state }, 200);
+    return { ...identity, name: workbench.name, state: workbench.state };
   })
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
-  .put("/:experimentSlug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
+  .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs({
     summary: "Save an experiment's setup",
     description:
@@ -635,7 +599,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
-    const { experimentSlug: slug } = input;
+    const { slug } = input;
 
     const saved = await app.experiments().saveWorkbenchState(
       {
@@ -648,15 +612,15 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       { kind: "credential", credential },
     );
 
-    return jsonAnswer({ version: saved.version }, 200);
+    return { version: saved.version };
   })
 
   // ── GET /:slug/versions ─────────────────────────────────────────────
-  .get("/:experimentSlug/versions", "getApiExperimentsBySlugVersions")
+  .get("/:slug/versions", "getApiExperimentsBySlugVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
   .withPermission("experiments:view")
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(listWorkbenchVersionsResponseSchema)
   .withDocs({
     summary: "List an experiment's versions",
     description:
@@ -671,7 +635,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const { experimentSlug: slug } = input;
+    const { slug } = input;
 
     const experiments = app.experiments();
     const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
@@ -689,32 +653,27 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       })(),
     });
 
-    return jsonAnswer(
-      {
-        versions: versions.map((version) => ({
-          version: version.version,
-          counterVersion: version.counterVersion,
-          autoSaved: version.autoSaved,
-          commitMessage: version.commitMessage,
-          authorLabel: version.authorLabel,
-          authorId: version.authorId,
-          createdAt: version.createdAt.toISOString(),
-          updatedAt: version.updatedAt.toISOString(),
-        })),
-        nextCursor,
-      },
-      200,
-    );
+    return {
+      versions: versions.map((version) => ({
+        version: version.version,
+        counterVersion: version.counterVersion,
+        autoSaved: version.autoSaved,
+        commitMessage: version.commitMessage,
+        authorLabel: version.authorLabel,
+        authorId: version.authorId,
+        createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
+      })),
+      nextCursor,
+    };
   })
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
-  .post(
-    "/:experimentSlug/versions/:version/restore",
-    "postApiExperimentsBySlugVersionsByVersionRestore",
-  )
+  .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
-  .withRawResponse({ produces: "application/json" })
+  .withInput(restoreWorkbenchVersionBodySchema)
+  .withOutput(restoreWorkbenchVersionResponseSchema)
   .withDocs({
     summary: "Restore an experiment version",
     description:
@@ -731,7 +690,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
-    const { experimentSlug: slug, version } = input;
+    const { slug, version } = input;
 
     const experiments = app.experiments();
     const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
@@ -757,7 +716,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       "Experiment version restored over REST",
     );
 
-    return jsonAnswer({ version: restored.version }, 200);
+    return { version: restored.version };
   })
 
   .build();

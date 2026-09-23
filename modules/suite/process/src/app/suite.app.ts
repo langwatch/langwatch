@@ -4,7 +4,7 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { RepositoryFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
@@ -41,6 +41,7 @@ import {
   type SuiteRunPlanInput,
   type SuiteRunPlanResult,
   type UpdateSuiteCommand,
+  OrganizationNotFoundForProjectError,
 } from "@langwatch/suite-contract";
 import type { Instant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
@@ -58,21 +59,6 @@ import {
 } from "../services/suite-run-processing.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import { buildSuiteInfrastructure } from "./suite-composition.build.ts";
-
-/**
- * The project exists but no organization can be resolved behind it.
- */
-export class OrganizationNotFoundForProjectError extends HandledError {
-  declare readonly code: "organization_not_found_for_project";
-
-  constructor(projectId: string) {
-    super("organization_not_found_for_project", "Organization not found for project", {
-      httpStatus: 404,
-      meta: { projectId },
-    });
-    this.name = "OrganizationNotFoundForProjectError";
-  }
-}
 
 /**
  * What a lookup by id found. A test suite IS a suite of kind "test_suite", but the two

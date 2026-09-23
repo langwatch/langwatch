@@ -40,10 +40,6 @@
       "types": "./dist/repositories/simulation-execution.repository.d.ts",
       "default": "./src/repositories/simulation-execution.repository.ts"
     },
-    "./composition/simulation-processing-producer": {
-      "types": "./dist/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.d.ts",
-      "default": "./src/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts"
-    },
     "./composition/stalled-runs-backfill": {
       "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",
       "default": "./src/tasks/stalled-runs-backfill.task.ts"

@@ -23,7 +23,6 @@ import {
   traceMetricsComputedEventDataSchema,
 } from "../../eventing/experiment-run-events.process.ts";
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
-import { makeExperimentRunKey } from "../../eventing/experiment-run-key.process.ts";
 import {
   type ClickHouseExperimentRunResultRecord,
   ExperimentRunResultStorageMapProjection,
@@ -33,6 +32,7 @@ import {
   ExperimentRunStateFoldProjection,
 } from "../../eventing/experiment-run-state.projection.ts";
 import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
+import { makeExperimentRunKey } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";

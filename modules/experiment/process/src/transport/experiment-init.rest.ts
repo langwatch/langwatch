@@ -7,6 +7,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestProtocolProducer,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { ExperimentApi, experimentInitBodySchema } from "@langwatch/experiment-contract";
@@ -42,24 +43,41 @@ export const experimentInitCaller = defineRestMiddleware(
 );
 
 /** A JSON answer this door writes itself, in the shape an SDK parses. */
-const answer = (status: 200 | 400 | 403, body: object) => ({
+const LEGACY_WIRE =
+  "The SDKs read this family's own flat bodies: `{ message }` for a body that is not JSON, `{ error }` with the validation sentence, and the flat plan-limit refusal at 403.";
+
+const answer = ({
+  response,
   status,
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body),
-});
+  body,
+}: {
+  response: RestProtocolProducer<"application/json">;
+  status: 200 | 400 | 403;
+  body: object;
+}) => response.write({ status, mediaType: "application/json", body: JSON.stringify(body) });
 
 /**
  * The plan refusal, flattened. Matched on the CODE, not the licence layer's
  * own class: that class lives in an enterprise package this one may not
  * reach, and a code comparison is what a crossed serialisation boundary asks for.
  */
-const limitRefusal = (error: HandledError) =>
-  answer(403, {
-    error: error.code,
-    message: error.message,
-    limitType: error.meta.limitType,
-    current: error.meta.current,
-    max: error.meta.max,
+const limitRefusal = ({
+  response,
+  error,
+}: {
+  response: RestProtocolProducer<"application/json">;
+  error: HandledError;
+}) =>
+  answer({
+    response,
+    status: 403,
+    body: {
+      error: error.code,
+      message: error.message,
+      limitType: error.meta.limitType,
+      current: error.meta.current,
+      max: error.meta.max,
+    },
   });
 
 export const experimentInitRest = defineRestRouter(ExperimentApi)
@@ -73,7 +91,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: DOOR_REASON }))
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: "application/json", because: LEGACY_WIRE })
   .withDocs({
     tags: ["Experiments"],
     summary: "Create an experiment",
@@ -94,12 +112,12 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
     ],
   })
   .withMiddleware(experimentInitCaller)
-  .handle(async ({ app, raw }, caller) => {
+  .handle(async ({ app, raw, response }, caller) => {
     let rawBody: unknown;
     try {
       rawBody = JSON.parse(raw);
     } catch {
-      return answer(400, { message: "Bad request" });
+      return answer({ response, status: 400, body: { message: "Bad request" } });
     }
 
     const parsed = experimentInitBodySchema.safeParse(rawBody);
@@ -109,7 +127,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
         "invalid init data received",
       );
 
-      return answer(400, { error: zodErrorMessage(parsed.error) });
+      return answer({ response, status: 400, body: { error: zodErrorMessage(parsed.error) } });
     }
     const params = parsed.data;
 
@@ -126,13 +144,17 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
         workflowId: params.workflowId,
       });
 
-      return answer(200, {
-        path: `/${caller.projectSlug}/experiments/${experiment.slug}`,
-        slug: experiment.slug,
+      return answer({
+        response,
+        status: 200,
+        body: {
+          path: `/${caller.projectSlug}/experiments/${experiment.slug}`,
+          slug: experiment.slug,
+        },
       });
     } catch (error) {
       if (error instanceof HandledError && error.code === "resource_limit_exceeded") {
-        return limitRefusal(error);
+        return limitRefusal({ response, error });
       }
       throw error;
     }
