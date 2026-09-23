@@ -991,15 +991,14 @@ export const tracePipeline = definePipeline("trace")
   .withCommands({ ingestSpan }) // validate → append
   .withProjections({ traceSummary }) // fold → read model      (worker-only)
   .withSubscribers({ onSpanIngested }) // reactions, idempotent  (worker-only)
-  .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
+  .withProcessManager("retentionSweep", (pm) => pm.schedule({ everyMs }).onWake(…)); // (worker-only)
 ```
 
-Jobs are declared on the pipeline and installed with it through `.withEventing` — there is no
-module-level `.withJobs`. `.withJobs` takes two kinds (Alex, 2026-09-23): a `cron(...)` schedule, and a long-running job, a
-factory returning `{ start, stop }` that owns its own timers (first tick, delay after each run). The
-worker starts every job after boot and stops it before the stores close; the api never constructs one.
-Work that must run in every role (ADR-090's lease-held writer) is not a job: it stays a service the
-module owns. `withWorkers` is retired.
+Background work is a scheduled process manager on the module's pipeline, installed with it through
+`.withEventing` (Alex, 2026-09-23): `.schedule({ everyMs })` arms a wake on the instance row, the worker
+hosts it, it ticks once across the fleet, and `onWake` sends the module's own intent through the outbox.
+There is no `.withJobs` and no module-level timer loop. Work that must run in every role (ADR-090's
+lease-held writer) is not background work: it stays a service the module owns. `withWorkers` is retired.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -1535,8 +1534,8 @@ Until then a process composes `serverModules` directly.
 Also open, each a worklist: the config-defined dependency state migration
 (§6 — deletes the remaining bespoke member tail); eventing member composition for both roles; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
-only); the ClickHouse resolver ruling (§7); worker job declarations designed,
-not landed.
+only); the ClickHouse resolver ruling (§7); background loops main runs that this
+branch never starts, each to become a scheduled process manager.
 
 ---
 
