@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Seat correction caps scopes and reports back teams that lost their only admin.
@@ -33,19 +34,18 @@ type RoleChange = { bindingId: string; role: string; customRoleId: string | null
 
 function recordingGrantsWriter() {
   const changes: RoleChange[] = [];
-  const writer = {
+  const writer = createApiFixture<AuthzGrantsService>({
     attachBindings: async () => ({ attached: [], duplicates: [] }),
-    revokeBindings: async () => ({ revoked: 0 }),
+    revokeBindings: async () => undefined,
     revokeBindingsWhere: async () => 0,
-    changeBindingRole: async (input: RoleChange) => {
+    changeBindingRole: async (input) => {
       changes.push({
         bindingId: input.bindingId,
         role: input.role,
         customRoleId: input.customRoleId ?? null,
       });
-      return { changed: true };
     },
-  } as unknown as AuthzGrantsService;
+  });
   return { writer, changes };
 }
 

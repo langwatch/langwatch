@@ -1,5 +1,6 @@
 /** Tenant purge must clean all rows keyed to it, including non-cascading authorization tables. */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
@@ -47,7 +48,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
-        grants: {} as unknown as AuthzGrantsService,
+        grants: createApiFixture<AuthzGrantsService>(),
       });
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);
@@ -74,7 +75,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
-        grants: {} as unknown as AuthzGrantsService,
+        grants: createApiFixture<AuthzGrantsService>(),
       });
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);
@@ -91,7 +92,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, transaction, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
-        grants: {} as unknown as AuthzGrantsService,
+        grants: createApiFixture<AuthzGrantsService>(),
       });
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);

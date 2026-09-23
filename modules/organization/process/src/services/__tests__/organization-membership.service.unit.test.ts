@@ -60,20 +60,20 @@ describe("OrganizationMembershipService", () => {
     getAuditLogs: vi.fn(),
   };
 
-  const mockPrompts = {
+  const mockPrompts: OrganizationPromptSeed = {
     seedTagsForOrganization: vi.fn(),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeed;
-  const seats = {
+  };
+  const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
-  } as unknown as OrganizationSeatLicense;
-  const sessions = {
+  };
+  const sessions: OrganizationSessionRevocation = {
     revokeAllBrowserSessions: mockRevokeAllBrowserSessions,
-  } as unknown as OrganizationSessionRevocation;
-  const grantCache = {
+  };
+  const grantCache: OrganizationGrantCache = {
     invalidateOrganization: mockInvalidateOrganization,
-  } as unknown as OrganizationGrantCache;
+  };
   /** Nobody here is mid-way through proving a connection; the one test that
    *  is says so itself. */
   const testArrivals = { standingFor: mockStandingFor };
@@ -491,7 +491,7 @@ describe("OrganizationMembershipService", () => {
               Promise.reject(
                 new Error("this process composes no session owner, so it cannot revoke sessions"),
               ),
-          } as unknown as OrganizationSessionRevocation,
+          },
           grantCache,
           testArrivals,
           admissions,

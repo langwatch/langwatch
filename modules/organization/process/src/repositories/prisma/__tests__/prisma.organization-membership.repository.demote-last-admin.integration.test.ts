@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Repository invariant: demoting the last ADMIN is refused before plan checks.
@@ -19,10 +20,10 @@ import { PrismaOrganizationMembershipRepository } from "../prisma.organization-m
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
 describe.skipIf(!DB_URL)(
   "PrismaOrganizationMembershipRepository.updateMemberRole — last admin guard",

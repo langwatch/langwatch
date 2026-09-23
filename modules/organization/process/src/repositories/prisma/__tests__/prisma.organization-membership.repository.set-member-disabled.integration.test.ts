@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Disable/re-enable flips disabledAt without touching role or department,
@@ -19,10 +20,10 @@ import { PrismaOrganizationMembershipRepository } from "../prisma.organization-m
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
 describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository.setMemberDisabled", () => {
   const testNamespace = `set-member-disabled-${nanoid(8)}`;

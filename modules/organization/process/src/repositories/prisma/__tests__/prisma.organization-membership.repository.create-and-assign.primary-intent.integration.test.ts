@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * createAndAssign persists the declared primary intent atomically with the
@@ -20,10 +21,10 @@ import { PrismaOrganizationRepository } from "../prisma.organization.repository.
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
 /** No secret ever passes through this suite; the identity is enough. */
 

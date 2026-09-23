@@ -36,7 +36,7 @@ function harness(
     ensureDefaultAiToolCatalog: vi.fn(async () => undefined),
     createProject: vi.fn(async () => ({ success: true, projectSlug: "acme-project" })),
     ...overrides,
-  } as unknown as OrganizationCeremony;
+  };
 
   const signals = {
     trackServerEvent: vi.fn(),
@@ -48,7 +48,7 @@ function harness(
     recordIntegrationMethod: vi.fn(),
     reportError: vi.fn(),
     ...overrides,
-  } as unknown as OrganizationSignals;
+  };
 
   const ensurePersonalWorkspace = vi.fn(async () => undefined);
 

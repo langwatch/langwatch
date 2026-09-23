@@ -165,7 +165,7 @@ describe("resolveDispatchEvaluatorType", () => {
 
 describe("normalizeEvaluators", () => {
   describe("given an evaluator saved with the legacy shape", () => {
-    const evaluators = [
+    const evaluators: EvaluatorConfig[] = [
       {
         id: "eval-1",
         evaluatorType: "langevals/pairwise_compare",
@@ -173,7 +173,7 @@ describe("normalizeEvaluators", () => {
         mappings: {},
         pairwise: legacyPairwise,
       },
-    ] as unknown as EvaluatorConfig[];
+    ];
 
     it("rewrites it to the canonical shape", () => {
       const [normalized] = normalizeEvaluators(evaluators);
@@ -190,14 +190,14 @@ describe("normalizeEvaluators", () => {
 
   describe("given a plain per-row evaluator", () => {
     it("leaves it alone", () => {
-      const evaluators = [
+      const evaluators: EvaluatorConfig[] = [
         {
           id: "eval-1",
           evaluatorType: "custom/exact_match",
           inputs: [],
           mappings: {},
         },
-      ] as unknown as EvaluatorConfig[];
+      ];
 
       const [normalized] = normalizeEvaluators(evaluators);
 
@@ -211,39 +211,40 @@ describe("normalizeEvaluators", () => {
    * comparison column instead of as a score on every target column.
    */
   describe("given a plain evaluator saved with a comparison config", () => {
-    const stored = () =>
-      [
-        {
-          id: "evaluator_q5RPFdOD",
-          evaluatorType: "langevals/exact_match",
-          inputs: [],
-          comparison: {
-            variants: ["target-1", "target-2"],
-            goldenField: "l3",
-            hasGoldenAnswer: true,
-            variantOutputPaths: { "target-1": ["output"] },
-          },
-          mappings: {
-            "ds-1": {
-              "target-1": {
-                output: {
-                  type: "source",
-                  source: "target",
-                  sourceId: "target-1",
-                  sourceField: "output",
-                },
-                expected_output: {
-                  type: "source",
-                  source: "dataset",
-                  sourceId: "ds-1",
-                  sourceField: "l3",
-                },
+    const stored = (): EvaluatorConfig[] => [
+      {
+        id: "evaluator_q5RPFdOD",
+        evaluatorType: "langevals/exact_match",
+        inputs: [],
+        comparison: {
+          variants: ["target-1", "target-2"],
+          goldenField: "l3",
+          hasGoldenAnswer: true,
+          variantOutputPaths: { "target-1": ["output"] },
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+        mappings: {
+          "ds-1": {
+            "target-1": {
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "ds-1",
+                sourceField: "l3",
               },
             },
           },
-          localEvaluatorConfig: { name: "L3 category exact match" },
         },
-      ] as unknown as EvaluatorConfig[];
+        localEvaluatorConfig: { name: "L3 category exact match" },
+      },
+    ];
 
     /** @scenario "A stored comparison config on a plain evaluator is repaired" */
     it("reads back as an evaluator attached to every target column", () => {
@@ -277,7 +278,7 @@ describe("normalizeEvaluators", () => {
         includeMetrics: [] as ("cost" | "duration")[],
         randomizeOrder: true,
       };
-      const evaluators = [
+      const evaluators: EvaluatorConfig[] = [
         {
           id: "evaluator_compare",
           evaluatorType: COMPARISON_EVALUATOR_TYPE,
@@ -285,7 +286,7 @@ describe("normalizeEvaluators", () => {
           mappings: {},
           comparison,
         },
-      ] as unknown as EvaluatorConfig[];
+      ];
 
       const [normalized] = normalizeEvaluators(evaluators);
 
@@ -297,14 +298,16 @@ describe("normalizeEvaluators", () => {
 describe("normalizeTargets", () => {
   describe("given a legacy pairwise column-target", () => {
     it("rewrites it to the canonical shape", () => {
-      const targets = [
+      const targets: TargetConfig[] = [
         {
           id: "pairwise-target",
           type: "evaluator",
+          inputs: [],
+          outputs: [],
           mappings: {},
           pairwise: legacyPairwise,
         },
-      ] as unknown as TargetConfig[];
+      ];
 
       const [normalized] = normalizeTargets(targets);
 
@@ -315,11 +318,13 @@ describe("normalizeTargets", () => {
 
   describe("given a prompt target saved with a comparison config", () => {
     it("drops the config the target cannot own", () => {
-      const targets = [
+      const targets: TargetConfig[] = [
         {
           id: "prompt-target",
           type: "prompt",
           promptId: "prompt_1",
+          inputs: [],
+          outputs: [],
           mappings: {},
           comparison: {
             variants: ["target-a", "target-b"],
@@ -328,7 +333,7 @@ describe("normalizeTargets", () => {
             randomizeOrder: true,
           },
         },
-      ] as unknown as TargetConfig[];
+      ];
 
       const [normalized] = normalizeTargets(targets);
 
@@ -342,11 +347,13 @@ describe("normalizeTargets", () => {
 
   describe("given an evaluator target with a comparison config", () => {
     it("keeps it, because that is the target kind a comparison column has", () => {
-      const targets = [
+      const targets: TargetConfig[] = [
         {
           id: "comparison-target",
           type: "evaluator",
           targetEvaluatorId: "db_evaluator_1",
+          inputs: [],
+          outputs: [],
           mappings: {},
           comparison: {
             variants: ["target-a", "target-b"],
@@ -355,7 +362,7 @@ describe("normalizeTargets", () => {
             randomizeOrder: true,
           },
         },
-      ] as unknown as TargetConfig[];
+      ];
 
       const [normalized] = normalizeTargets(targets);
 

@@ -39,7 +39,7 @@ describe("ClickHouse migration safety", () => {
     expect(findings, `\n${formatFindings(findings)}\n`).toEqual([]);
   });
 
-  describe("the rules", () => {
+  describe("given each rule scanned on its own", () => {
     /** @scenario "Dropping a ClickHouse column or table without a note is refused by name" */
     it("refuses a drop with no retirement note, naming the object", () => {
       const findings = scan("-- +goose Up\nALTER TABLE ${D}.spans DROP COLUMN `Legacy`;\n");
@@ -116,7 +116,7 @@ describe("ClickHouse migration safety", () => {
     });
   });
 
-  describe("the baseline", () => {
+  describe("given the baseline of shipped migrations", () => {
     it("exempts history that the rules would otherwise report", () => {
       const exempted = migrations.filter(
         (migration) =>

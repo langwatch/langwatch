@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * When a personal workspace goes, and what happens if its owner comes back.
@@ -21,10 +22,10 @@ import { PrismaOrganizationRepository } from "../prisma.organization.repository.
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
 describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
   const identities = PersonalWorkspaceIdentityAdapter.create();

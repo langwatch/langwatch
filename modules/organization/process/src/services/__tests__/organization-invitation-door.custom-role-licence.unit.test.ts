@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 /**
  * @vitest-environment node
@@ -38,12 +39,12 @@ function door(options: { customRolesAllowed: boolean }) {
     if (!options.customRolesAllowed) throw new CustomRolesUnavailableError();
   });
 
-  const invitations = { create } as unknown as OrganizationInvitations;
-  const plans = { assertCustomRolesAllowed } as unknown as OrganizationPlanGate;
-  const signals = {
+  const invitations = createApiFixture<OrganizationInvitations>({ create });
+  const plans = createApiFixture<OrganizationPlanGate>({ assertCustomRolesAllowed });
+  const signals = createApiFixture<OrganizationSignals>({
     trackServerEvent: vi.fn(),
     fireTeamMemberInvitedNurturing: vi.fn(),
-  } as unknown as OrganizationSignals;
+  });
 
   return {
     create,

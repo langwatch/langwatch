@@ -319,9 +319,9 @@ function createService(
   return OrganizationService.create({
     repository,
     teams,
-    groups: {
+    groups: createApiFixture<groupRepositoryModule.GroupRepository>({
       listMembersForGroups: () => Promise.resolve(new Map()),
-    } as unknown as groupRepositoryModule.GroupRepository,
+    }),
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
     groupIdentities: {} as GroupIdentity,

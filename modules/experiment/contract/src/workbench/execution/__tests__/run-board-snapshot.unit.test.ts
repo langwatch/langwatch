@@ -8,10 +8,10 @@ import type { BoardResults } from "../build-execution-request.ts";
 import { planBoardCarryOver } from "../build-execution-request.ts";
 import type { CarriedOverCell, ExecutionScope } from "../types.ts";
 
-const TARGETS = [
-  { id: "target-A", type: "prompt" },
-  { id: "target-B", type: "prompt" },
-] as unknown as TargetConfig[];
+const TARGETS: TargetConfig[] = [
+  { id: "target-A", type: "prompt", inputs: [], outputs: [], mappings: {} },
+  { id: "target-B", type: "prompt", inputs: [], outputs: [], mappings: {} },
+];
 
 const ROWS = [{ question: "one" }, { question: "two" }];
 

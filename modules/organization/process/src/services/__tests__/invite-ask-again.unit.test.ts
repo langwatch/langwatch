@@ -174,7 +174,7 @@ describe("given an expired invitation", () => {
     mail = {
       sendInvite: vi.fn(),
       sendInviteReRequest: sendInviteReRequestEmail,
-    } as unknown as OrganizationInviteMail;
+    };
   });
 
   describe("when its holder asks for a fresh one", () => {
