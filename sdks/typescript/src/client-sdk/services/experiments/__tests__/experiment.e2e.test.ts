@@ -167,7 +167,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       console.log = (...args: unknown[]) => {
         captured.push(args.map(String).join(" "));
       };
-      const origExit = process.exit;
+      const origExit = process.exit.bind(process);
       let exitedWith: number | string | null | undefined = null;
       (process as unknown as { exit: (c?: number) => void }).exit = ((c?: number) => {
         exitedWith = c;

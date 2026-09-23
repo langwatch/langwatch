@@ -206,7 +206,7 @@ describe("startAuthProxy()", () => {
       expect(response.status).toBe(200);
       // The body the client was parsing is cut off, not extended with a JSON
       // error blob it would misparse as agent output.
-      await expect(response.text()).rejects.toThrow();
+      await expect(response.text()).rejects.toThrow(TypeError);
 
       await proxy.close();
       await new Promise<void>((resolve) => flaky.close(() => resolve()));

@@ -6,6 +6,7 @@
 
 import * as fs from "node:fs";
 import * as net from "node:net";
+import { clearTimeout, setTimeout } from "node:timers";
 
 import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import {

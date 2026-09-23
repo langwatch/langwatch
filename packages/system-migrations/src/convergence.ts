@@ -287,7 +287,7 @@ function sleep({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<voi
   if (signal.aborted) return Promise.resolve();
   return new Promise<void>((resolve) => {
     const done = (): void => {
-      clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       signal.removeEventListener("abort", done);
       resolve();
     };

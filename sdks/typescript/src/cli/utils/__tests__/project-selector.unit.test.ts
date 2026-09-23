@@ -106,7 +106,9 @@ describe("given a user-scoped key", () => {
       ),
     );
 
-    await expect(inOneRequest(() => resolveCredentials({ project: "nope" }))).rejects.toThrow();
+    await expect(inOneRequest(() => resolveCredentials({ project: "nope" }))).rejects.toThrow(
+      ProcessExitError,
+    );
 
     expect(whatWasSaid()).toContain("nope");
   });

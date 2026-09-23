@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import * as fs from "fs";
 import http from "http";
 import type { AddressInfo } from "net";
+import { clearTimeout, setTimeout } from "node:timers";
 import * as os from "os";
 import * as path from "path";
 

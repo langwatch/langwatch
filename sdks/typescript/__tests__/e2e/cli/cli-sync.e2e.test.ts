@@ -357,7 +357,9 @@ describe("CLI E2E", () => {
 
       // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
       it.skip("leaves the prompt out of the prompts directory", () => {
-        expect(() => localPromptFileManagement.getPromptFileContent(promptHandle)).toThrow();
+        expect(fs.existsSync(localPromptFileManagement.getPromptFilePath(promptHandle))).toBe(
+          false,
+        );
       });
 
       describe("when remote is updated", () => {

@@ -134,7 +134,7 @@ describe("given the mail gateway this deployment named", () => {
     ] as const)("builds a %s gateway that sends from the declared address", (_name, config) => {
       const mail = buildMail(config);
 
-      expect(mail.value.send).toBeTypeOf("function");
+      expect(mail.value).toHaveProperty("send", expect.any(Function));
       expect(mail.close).toBeTypeOf("function");
     });
 

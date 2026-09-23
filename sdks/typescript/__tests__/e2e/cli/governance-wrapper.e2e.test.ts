@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
+import { clearTimeout, setTimeout } from "node:timers";
 
 /**
  * CLI wrapper e2e suite: pure-Node harness (no Docker, no live LLM), a fake
@@ -523,14 +524,13 @@ describe("governance CLI wrappers — e2e", () => {
         const res = await runCli([tool]);
         expect(res.status).toBe(0);
         const env = envFromStub(res.stdout ?? "");
+        const valueFor = (want: ExpectedValue): string => {
+          if (want === "url") return gwUrl;
+          if (want === "url+v1") return `${gwUrl}/v1`;
+          return want;
+        };
         for (const [k, want] of Object.entries(expected)) {
-          if (want === "url") {
-            expect(env[k]).toBe(gwUrl);
-          } else if (want === "url+v1") {
-            expect(env[k]).toBe(`${gwUrl}/v1`);
-          } else {
-            expect(env[k]).toBe(want);
-          }
+          expect(env[k]).toBe(valueFor(want));
         }
         for (const k of mustNotInject) {
           expect(env[k] ?? "").toBe("");
@@ -735,13 +735,9 @@ describe("governance CLI wrappers — e2e", () => {
           // langwatch-gateway` prepend so codex 0.134+ honors the
           // [model_providers.langwatch] block we wrote to
           // ~/.codex/config.toml. Other tools forward args verbatim.
-          if (tool === "codex") {
-            expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
-            expect(parsed.argv).toContain("--profile");
-            expect(parsed.argv).toContain("langwatch-gateway");
-          } else {
-            expect(parsed.argv).toEqual(["--foo", "bar baz"]);
-          }
+          const expectedPrefix = tool === "codex" ? ["--profile", "langwatch-gateway"] : [];
+          expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
+          expect(parsed.argv.slice(0, -2)).toEqual(expectedPrefix);
         });
       },
     );

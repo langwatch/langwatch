@@ -4,6 +4,7 @@
  */
 
 import * as net from "node:net";
+import { clearTimeout, setTimeout } from "node:timers";
 
 import { inspectSocketTrust } from "./identity";
 import {

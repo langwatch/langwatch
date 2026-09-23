@@ -1,5 +1,6 @@
 import { execSync, spawn } from "child_process";
 import * as fs from "fs";
+import { setTimeout } from "node:timers";
 import * as path from "path";
 
 const CLI_PATH = path.join(__dirname, "../../../../dist/cli/index.js");

@@ -48,11 +48,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
-const mockProcessExit = () => {
+const mockProcessExit = () =>
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
-};
 
 const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorResponse => ({
   id: "evaluator_abc123",
@@ -73,6 +72,7 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
 
 describe("listEvaluatorsCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
+  let exitSpy: ReturnType<typeof mockProcessExit>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,7 +87,7 @@ describe("listEvaluatorsCommand()", () => {
     });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
+    exitSpy = mockProcessExit();
   });
 
   describe("when evaluators exist", () => {
@@ -106,7 +106,7 @@ describe("listEvaluatorsCommand()", () => {
 
       await listEvaluatorsCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

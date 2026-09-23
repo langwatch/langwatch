@@ -45,11 +45,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
-const mockProcessExit = () => {
+const mockProcessExit = () =>
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
-};
 
 const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioResponse => ({
   id: "scenario_abc123",
@@ -69,6 +68,7 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
 
 describe("listScenariosCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
+  let exitSpy: ReturnType<typeof mockProcessExit>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,7 +84,7 @@ describe("listScenariosCommand()", () => {
     });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
+    exitSpy = mockProcessExit();
   });
 
   describe("when scenarios exist", () => {
@@ -103,7 +103,7 @@ describe("listScenariosCommand()", () => {
 
       await listScenariosCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 
