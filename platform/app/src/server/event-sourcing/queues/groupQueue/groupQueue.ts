@@ -664,14 +664,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
     if (this.stagingClosed) {
-      // `reason: "staging_closed"` is a stable discriminator: this is the
-      // queue shutting down, not a real send fault. Best-effort producers key
-      // graceful degradation off it (see PersonalWorkspaceService).
       throw new QueueError(
         this.queueName,
         "send",
         "Cannot send to queue after its drain has finished",
-        { reason: "staging_closed" },
       );
     }
     assertNoReservedKeys(
