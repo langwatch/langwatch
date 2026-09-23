@@ -116,6 +116,11 @@ const attributeDispositionCollection = createListCollection({
   ],
 });
 
+function ruleIcon(rule: DataPrivacyRule) {
+  if (rule.personalOnly) return UserLock;
+  return SCOPE_ICON[rule.scopeType] ?? Folder;
+}
+
 export function PrivacyRuleDrawer({
   open,
   editingRule,
@@ -257,11 +262,7 @@ export function PrivacyRuleDrawer({
     : !isEmptyRuleConfig(config);
   const canSave = scopes.length > 0 && hasChange && !hasInvalidPatterns && !isSaving;
 
-  const editIcon = editingRule
-    ? editingRule.personalOnly
-      ? UserLock
-      : (SCOPE_ICON[editingRule.scopeType] ?? Folder)
-    : null;
+  const editIcon = editingRule ? ruleIcon(editingRule) : null;
   const EditIcon = editIcon;
 
   return (

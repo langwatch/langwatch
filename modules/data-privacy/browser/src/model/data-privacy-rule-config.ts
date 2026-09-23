@@ -145,20 +145,7 @@ export function buildRuleConfig({
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
 }): DataPrivacyConfig {
-  const categories: NonNullable<DataPrivacyConfig["categories"]> = {};
-  for (const category of CONTENT_CATEGORIES) {
-    const choice = dispositions[category];
-    if (choice === "inherit") continue;
-    if (choice === "restrict") {
-      categories[category] = {
-        disposition: "restrict",
-        audience: audienceConfig(audience),
-      };
-    } else {
-      categories[category] = { disposition: choice };
-    }
-  }
-
+  const categories = categoriesConfig({ dispositions, audience });
   const config: DataPrivacyConfig = {};
   if (Object.keys(categories).length > 0) config.categories = categories;
   if (piiChoice !== "inherit") {
@@ -179,17 +166,48 @@ export function buildRuleConfig({
   }
   const attributeRows = validCustomAttributeRows(customAttributes);
   if (attributeRows.length > 0) {
-    config.customAttributes = attributeRows.map((row) =>
-      row.disposition === "restrict"
-        ? {
-            pattern: row.pattern,
-            disposition: "restrict" as const,
-            audience: audienceConfig(audience),
-          }
-        : { pattern: row.pattern, disposition: "drop" as const },
-    );
+    config.customAttributes = attributeRows.map((row) => customAttributeRule({ row, audience }));
   }
   return config;
+}
+
+function categoriesConfig({
+  dispositions,
+  audience,
+}: {
+  dispositions: Record<ContentCategory, CategoryChoice>;
+  audience: AudienceFormState;
+}): NonNullable<DataPrivacyConfig["categories"]> {
+  const categories: NonNullable<DataPrivacyConfig["categories"]> = {};
+  for (const category of CONTENT_CATEGORIES) {
+    const choice = dispositions[category];
+    if (choice === "inherit") continue;
+    if (choice === "restrict") {
+      categories[category] = {
+        disposition: "restrict",
+        audience: audienceConfig(audience),
+      };
+    } else {
+      categories[category] = { disposition: choice };
+    }
+  }
+  return categories;
+}
+
+function customAttributeRule({
+  row,
+  audience,
+}: {
+  row: CustomAttributeFormRow;
+  audience: AudienceFormState;
+}): NonNullable<DataPrivacyConfig["customAttributes"]>[number] {
+  return row.disposition === "restrict"
+    ? {
+        pattern: row.pattern,
+        disposition: "restrict" as const,
+        audience: audienceConfig(audience),
+      }
+    : { pattern: row.pattern, disposition: "drop" as const };
 }
 
 /** The drawer's editable form state. Every control can resolve to "inherit". */
@@ -286,13 +304,18 @@ export function configToFormState(config: DataPrivacyConfig): RuleFormState {
     piiChoice: config.pii?.level ?? "inherit",
     piiEntities: [...(config.pii?.entities ?? [])],
     piiExceptPatterns: [...(config.pii?.exceptPatterns ?? [])],
-    secretsChoice: config.secrets ? (config.secrets.enabled ? "on" : "off") : "inherit",
+    secretsChoice: secretsChoiceOf(config.secrets),
     secretsPatterns: [...(config.secrets?.customPatterns ?? [])],
     customAttributes: (config.customAttributes ?? []).map((rule) => ({
       pattern: rule.pattern,
       disposition: rule.disposition,
     })),
   };
+}
+
+function secretsChoiceOf(secrets: DataPrivacyConfig["secrets"]): SecretsChoice {
+  if (!secrets) return "inherit";
+  return secrets.enabled ? "on" : "off";
 }
 
 const CATEGORY_SUMMARY_LABELS: Record<ContentCategory, string> = {
@@ -332,26 +355,33 @@ export function ruleSummary(config: DataPrivacyConfig): string {
   if (attributeRules > 0) {
     parts.push(attributeRules === 1 ? "1 attribute rule" : `${attributeRules} attribute rules`);
   }
-  if (config.pii) {
-    if (config.pii.level === "custom") {
-      const count = config.pii.entities?.length ?? 0;
-      parts.push(count === 1 ? "Custom PII (1 type)" : `Custom PII (${count} types)`);
-    } else {
-      parts.push(PII_SUMMARY_LABELS[config.pii.level]);
-    }
-    const exceptions = config.pii.exceptPatterns?.length ?? 0;
-    if (exceptions > 0) {
-      parts.push(exceptions === 1 ? "1 PII exception" : `${exceptions} PII exceptions`);
-    }
-  }
-  if (config.secrets) {
-    parts.push(config.secrets.enabled ? "Secrets redaction" : "Secrets redaction off");
-    const patterns = config.secrets.customPatterns?.length ?? 0;
-    if (patterns > 0) {
-      parts.push(patterns === 1 ? "1 secret pattern" : `${patterns} secret patterns`);
-    }
-  }
+  if (config.pii) parts.push(...piiSummaryParts(config.pii));
+  if (config.secrets) parts.push(...secretsSummaryParts(config.secrets));
   return parts.length > 0 ? parts.join(" · ") : "Inherits everything";
+}
+
+function secretsSummaryParts(secrets: NonNullable<DataPrivacyConfig["secrets"]>): string[] {
+  const parts = [secrets.enabled ? "Secrets redaction" : "Secrets redaction off"];
+  const patterns = secrets.customPatterns?.length ?? 0;
+  if (patterns > 0) {
+    parts.push(patterns === 1 ? "1 secret pattern" : `${patterns} secret patterns`);
+  }
+  return parts;
+}
+
+function piiSummaryParts(pii: NonNullable<DataPrivacyConfig["pii"]>): string[] {
+  const parts: string[] = [];
+  if (pii.level === "custom") {
+    const count = pii.entities?.length ?? 0;
+    parts.push(count === 1 ? "Custom PII (1 type)" : `Custom PII (${count} types)`);
+  } else {
+    parts.push(PII_SUMMARY_LABELS[pii.level]);
+  }
+  const exceptions = pii.exceptPatterns?.length ?? 0;
+  if (exceptions > 0) {
+    parts.push(exceptions === 1 ? "1 PII exception" : `${exceptions} PII exceptions`);
+  }
+  return parts;
 }
 
 /** Whether the built config persists nothing (every control inherits). */

@@ -121,9 +121,8 @@ function readText(file: string): string {
  */
 function uvOwns(root: string): boolean {
   if (fs.existsSync(path.join(root, "uv.lock"))) return true;
-  if (/^\[tool\.uv[\].]/m.test(readText(path.join(root, "pyproject.toml")))) {
-    return true;
-  }
+  const pyproject = readText(path.join(root, "pyproject.toml"));
+  if (/^\[tool\.uv[\].]/m.test(pyproject)) return true;
   return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
 }
 
@@ -341,21 +340,7 @@ export async function ensureSignedIn({
   const hadLogin = hasDeviceSession();
   let credentials = await usableLogin();
   if (!credentials) {
-    console.log(
-      chalk.gray(
-        hadLogin
-          ? "The login on this machine can no longer be used. Signing in again."
-          : "No login on this machine yet. Signing in first.",
-      ),
-    );
-    try {
-      await login({ device: true });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message.trim() : "";
-      throw new ShareControlError(
-        reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
-      );
-    }
+    await signInAgain({ login, hadLogin });
     credentials = await usableLogin();
     if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
   }
@@ -365,6 +350,30 @@ export async function ensureSignedIn({
     endpoint: credentials.endpoint,
     ...(credentials.projectId === undefined ? {} : { projectId: credentials.projectId }),
   };
+}
+
+async function signInAgain({
+  login,
+  hadLogin,
+}: {
+  login: (options: { device: boolean }) => Promise<void>;
+  hadLogin: boolean;
+}): Promise<void> {
+  console.log(
+    chalk.gray(
+      hadLogin
+        ? "The login on this machine can no longer be used. Signing in again."
+        : "No login on this machine yet. Signing in first.",
+    ),
+  );
+  try {
+    await login({ device: true });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.trim() : "";
+    throw new ShareControlError(
+      reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
+    );
+  }
 }
 
 /**
