@@ -403,6 +403,36 @@ export class ScimTokenService {
         tokenId: token.id,
       });
     }
+    await this.moveDirectoryRows({
+      organizationId,
+      fromConnectionId,
+      toConnectionId,
+      tokenIds: tokens.map(({ id }) => id),
+    });
+    await this.syncLifecycle.revoked({
+      organizationId,
+      connectionId: fromConnectionId,
+      tokenId: null,
+      cause: "teardown",
+    });
+    return { moved: tokens.length };
+  }
+
+  /**
+   * Moves the tokens, people and external ids in one transaction, reading the
+   * replacement's own rows inside it so a push landing mid-move cannot collide.
+   */
+  private async moveDirectoryRows({
+    organizationId,
+    fromConnectionId,
+    toConnectionId,
+    tokenIds,
+  }: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+    tokenIds: string[];
+  }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const [ownPeople, ownExternalIds] = await Promise.all([
         tx.scimDirectoryUser.findMany({
@@ -418,7 +448,7 @@ export class ScimTokenService {
         where: {
           organizationId,
           connectionId: fromConnectionId,
-          id: { in: tokens.map(({ id }) => id) },
+          id: { in: tokenIds },
         },
         data: { connectionId: toConnectionId },
       });
@@ -447,13 +477,6 @@ export class ScimTokenService {
         data: { connectionId: toConnectionId },
       });
     });
-    await this.syncLifecycle.revoked({
-      organizationId,
-      connectionId: fromConnectionId,
-      tokenId: null,
-      cause: "teardown",
-    });
-    return { moved: tokens.length };
   }
 
   /**
