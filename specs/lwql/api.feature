@@ -956,6 +956,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a probe error alone never re-provisions — the watch keeps polling until a snapshot is authoritative
     And a config store that never releases the model gives up at the budget with a warning
 
+  # AC4 shutdown race: stop() may fire while an ownership probe is already in
+  # flight. A probe that resolves "none" after shutdown was requested must never
+  # re-provision — the app is tearing down the very App a converge would touch.
+  @unit
+  Scenario: A probe that resolves after shutdown never re-provisions
+    Given the reconvergence watch has a probe in flight when the app requests shutdown
+    When that probe resolves "none" after stop was requested
+    Then the watch discards the snapshot and never calls converge
+
   # The re-provision gate is only as trustworthy as the probe behind it, so the
   # ownership classification is split from its I/O and unit-tested directly: a
   # pure classifier over two counts (config-store entities, SQL-store users) and
