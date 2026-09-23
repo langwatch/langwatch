@@ -105,7 +105,7 @@ import { WaterfallView } from "../waterfall-view.tsx";
 const TRACE_ID = "trace-1";
 const DEEP_SPAN = "span-30";
 
-function span(over: Partial<SpanTreeNode>): SpanTreeNode {
+function span(over: Partial<SpanTreeNode> & Pick<SpanTreeNode, "spanId">): SpanTreeNode {
   return {
     parentSpanId: null,
     name: "step",
@@ -116,7 +116,7 @@ function span(over: Partial<SpanTreeNode>): SpanTreeNode {
     status: "ok",
     model: null,
     ...over,
-  } as unknown as SpanTreeNode;
+  };
 }
 
 /** A root and forty children, which is more rows than a viewport holds. */
@@ -151,8 +151,11 @@ function comment(over: Partial<AnnotationByTrace>): AnnotationByTrace {
     id: "annotation-1",
     traceId: TRACE_ID,
     comment: "this step should not have run",
+    projectId: "proj-1",
+    userId: "user-2",
+    updatedAt: "2026-01-01T10:00:00Z",
     email: null,
-    createdAt: new Date("2026-01-01T10:00:00Z"),
+    createdAt: "2026-01-01T10:00:00Z",
     expectedOutput: null,
     isThumbsUp: null,
     scoreOptions: {},
@@ -161,7 +164,7 @@ function comment(over: Partial<AnnotationByTrace>): AnnotationByTrace {
     anchorId: "span-gone",
     anchorPath: null,
     ...over,
-  } as unknown as AnnotationByTrace;
+  };
 }
 
 function renderWaterfall({

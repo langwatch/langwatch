@@ -62,14 +62,25 @@ vi.mock("../annotation-popover.tsx", async () => {
 
 const { TurnAnnotationBadges } = await import("../turn-annotations.tsx");
 
-const ANNOTATIONS = [
+const ANNOTATIONS: NonNullable<
+  React.ComponentProps<typeof TurnAnnotationBadges>["prefetchedItems"]
+> = [
   {
     id: "annotation-1",
     comment: "the model invented a policy number",
     expectedOutput: null,
     user: { id: "user-1", name: "Ada", image: null },
     email: null,
-    createdAt: new Date("2026-08-01T10:30:00Z"),
+    createdAt: "2026-08-01T10:30:00Z",
+    updatedAt: "2026-08-01T10:30:00Z",
+    projectId: "proj-1",
+    traceId: "trace-1",
+    userId: "user-1",
+    isThumbsUp: null,
+    scoreOptions: {},
+    anchorKind: null,
+    anchorId: null,
+    anchorPath: null,
   },
   {
     id: "annotation-2",
@@ -77,9 +88,18 @@ const ANNOTATIONS = [
     expectedOutput: "Policy 4471 covers water damage.",
     user: { id: "user-2", name: "Grace", image: null },
     email: null,
-    createdAt: new Date("2026-08-02T10:30:00Z"),
+    createdAt: "2026-08-02T10:30:00Z",
+    updatedAt: "2026-08-02T10:30:00Z",
+    projectId: "proj-1",
+    traceId: "trace-1",
+    userId: "user-2",
+    isThumbsUp: null,
+    scoreOptions: {},
+    anchorKind: null,
+    anchorId: null,
+    anchorPath: null,
   },
-] as unknown as React.ComponentProps<typeof TurnAnnotationBadges>["prefetchedItems"];
+];
 
 function renderBadges() {
   return render(

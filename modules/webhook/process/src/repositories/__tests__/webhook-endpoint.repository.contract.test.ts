@@ -178,13 +178,16 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
   });
 
   describe("when delivery attempts keep failing past the 72h streak", () => {
-    it("auto-disables the endpoint and reports why", async () => {
-      const { endpoint } = await repository.create({
+    let endpoint: Awaited<ReturnType<WebhookEndpointRuntime["create"]>>["endpoint"];
+    let start: Instant;
+
+    beforeEach(async () => {
+      ({ endpoint } = await repository.create({
         organizationId: ORGANIZATION_ID,
         url: "https://example.com/hook",
         enabledEvents: ["gateway.request.completed"],
-      });
-      const start = at("2026-01-01T00:00:00Z");
+      }));
+      start = at("2026-01-01T00:00:00Z");
 
       await repository.recordDeliveryAttempt({
         organizationId: ORGANIZATION_ID,
@@ -195,6 +198,9 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
         outcome: "terminal",
         now: start,
       });
+    });
+
+    it("auto-disables the endpoint and reports why", async () => {
       await repository.recordDeliveryAttempt({
         organizationId: ORGANIZATION_ID,
         endpointId: endpoint.id,
@@ -223,22 +229,6 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
     });
 
     it("clears the streak on a success in between", async () => {
-      const { endpoint } = await repository.create({
-        organizationId: ORGANIZATION_ID,
-        url: "https://example.com/hook",
-        enabledEvents: ["gateway.request.completed"],
-      });
-      const start = at("2026-01-01T00:00:00Z");
-
-      await repository.recordDeliveryAttempt({
-        organizationId: ORGANIZATION_ID,
-        endpointId: endpoint.id,
-        dispatchId: "dispatch-1",
-        attempt: 1,
-        eventCount: 1,
-        outcome: "terminal",
-        now: start,
-      });
       await repository.recordDeliveryAttempt({
         organizationId: ORGANIZATION_ID,
         endpointId: endpoint.id,

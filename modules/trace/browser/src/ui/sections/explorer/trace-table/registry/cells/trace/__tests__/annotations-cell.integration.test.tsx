@@ -51,8 +51,13 @@ function row(over: Partial<TraceListItem>): TraceListItem {
     spanCount: 1,
     evaluations: [],
     events: NO_TRACE_EVENTS,
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
     ...over,
-  } as unknown as TraceListItem;
+  };
 }
 
 /**

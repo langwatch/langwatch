@@ -1,14 +1,33 @@
 import { LENS_CAPABILITIES } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
-import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../types/trace.ts";
 import { type ConversationGroup, sortConversationGroups } from "../conversation-groups.ts";
 
 /**
  * Regression coverage for the conversation lens sort.
  */
 
-const stubTrace = {} as unknown as TraceListItem;
+const stubTrace: TraceListItem = {
+  traceId: "t1",
+  timestamp: 0,
+  name: "trace",
+  serviceName: "svc",
+  durationMs: 1,
+  totalCost: 0,
+  nonBilledCost: 0,
+  totalTokens: 0,
+  models: [],
+  labels: [],
+  status: "ok",
+  spanCount: 1,
+  sizeBytes: 0,
+  input: null,
+  output: null,
+  origin: "application",
+  evaluations: [],
+  events: NO_TRACE_EVENTS,
+};
 
 function makeGroup(
   id: string,

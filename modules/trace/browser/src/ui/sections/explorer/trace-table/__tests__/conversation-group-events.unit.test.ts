@@ -29,9 +29,14 @@ function turn({
     status: "ok",
     spanCount: 1,
     conversationId: "conv-1",
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
     evaluations: [],
     events,
-  } as unknown as TraceListItem;
+  };
 }
 
 describe("groupTracesByConversation", () => {

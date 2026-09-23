@@ -6,7 +6,12 @@ import type { EvalColumnField } from "@langwatch/trace-browser-kit";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceEvalResult,
+  type TraceListItem,
+} from "../../../../../types/trace.ts";
+import type { CellRenderContext } from "../../../types.ts";
 import { makeEvalCellDef } from "../eval-result-cell.tsx";
 
 function evalResult(over: Partial<TraceEvalResult>): TraceEvalResult {
@@ -18,6 +23,52 @@ function evalResult(over: Partial<TraceEvalResult>): TraceEvalResult {
     passed: null,
     label: null,
     ...over,
+  };
+}
+
+function traceWith(evaluations: TraceEvalResult[]): TraceListItem {
+  return {
+    traceId: "t1",
+    timestamp: 0,
+    name: "trace",
+    serviceName: "svc",
+    durationMs: 1,
+    totalCost: 0,
+    nonBilledCost: 0,
+    totalTokens: 0,
+    models: [],
+    labels: [],
+    status: "ok",
+    spanCount: 1,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
+    events: NO_TRACE_EVENTS,
+    evaluations,
+  };
+}
+
+function cellContext(row: TraceListItem): CellRenderContext<TraceListItem> {
+  return {
+    row,
+    density: {
+      rowPaddingY: "3px",
+      rowFontSize: "12px",
+      ioFontSize: "11px",
+      ioPaddingTop: "2px",
+      ioPaddingBottom: "4px",
+      groupRowPaddingY: "5px",
+      errorRowPaddingY: "4px",
+      errorRowFontSize: "12px",
+      errorDetailPaddingBottom: "4px",
+    },
+    densityMode: "compact",
+    isExpanded: false,
+    isSelected: false,
+    isFocused: false,
+    actions: {},
+    enabledAddonIds: [],
   };
 }
 
@@ -35,13 +86,12 @@ function renderCell({
     evaluatorKey,
     field,
   });
-  const row = { evaluations } as TraceListItem;
   // Each test renders a fresh cell into document.body; without cleanup the
   // bound `getByText` (which searches the whole body) would see em-dashes
   // from previous renders and fail with "multiple elements".
   return render(
     <ChakraProvider value={defaultSystem}>
-      {cell.render({ row } as unknown as Parameters<typeof cell.render>[0])}
+      {cell.render(cellContext(traceWith(evaluations)))}
     </ChakraProvider>,
   );
 }

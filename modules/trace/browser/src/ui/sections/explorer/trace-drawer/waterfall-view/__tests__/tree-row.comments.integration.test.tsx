@@ -79,7 +79,7 @@ function span(): SpanTreeNode {
     durationMs: 100,
     status: "ok",
     model: null,
-  } as unknown as SpanTreeNode;
+  };
 }
 
 function node(): WaterfallTreeNode {
@@ -91,8 +91,11 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
     id: "annotation-1",
     traceId: TRACE_ID,
     comment: "this search returned nothing",
+    projectId: "proj-1",
+    userId: "user-2",
+    updatedAt: "2026-01-01T10:00:00Z",
     email: null,
-    createdAt: new Date("2026-01-01T10:00:00Z"),
+    createdAt: "2026-01-01T10:00:00Z",
     expectedOutput: null,
     isThumbsUp: null,
     scoreOptions: {},
@@ -101,7 +104,7 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
     anchorId: SPAN_ID,
     anchorPath: null,
     ...over,
-  } as unknown as AnnotationByTrace;
+  };
 }
 
 function renderRow(comments: AnnotationByTrace[]) {
@@ -212,13 +215,16 @@ describe("given a span whose name fills its column", () => {
   });
 
   describe("when the pointer is on its row", () => {
-    /** @scenario "A waterfall row's hidden actions take none of the name's room" */
-    it("brings the comment action on screen", async () => {
+    let container: HTMLElement;
+
+    beforeEach(async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const { container } = renderRow([]);
-
+      container = renderRow([]).container;
       await user.hover(rowOf(container));
+    });
 
+    /** @scenario "A waterfall row's hidden actions take none of the name's room" */
+    it("brings the comment action on screen", () => {
       expect(container.querySelector('[aria-label="Comment on web_search"]')).not.toHaveAttribute(
         "aria-hidden",
         "true",
@@ -226,12 +232,7 @@ describe("given a span whose name fills its column", () => {
     });
 
     /** @scenario "The actions the pointer asks for read below the span's name" */
-    it("hangs them under the row, centered, rather than over the name", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const { container } = renderRow([]);
-
-      await user.hover(rowOf(container));
-
+    it("hangs them under the row, centered, rather than over the name", () => {
       const name = screen.getByTitle("web_search");
       const nameColumn = name.parentElement?.parentElement;
       expect(rowOf(container).contains(hoverActions())).toBe(true);

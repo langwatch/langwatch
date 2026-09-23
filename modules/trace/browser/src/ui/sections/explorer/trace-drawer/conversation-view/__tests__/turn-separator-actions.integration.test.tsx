@@ -258,13 +258,15 @@ describe("given an unsaved correction on another turn's trace", () => {
     });
   }
 
-  /** @scenario "Edit trace on another turn with unsaved changes asks first" */
-  it("asks before discarding, and cancelling keeps everything", () => {
+  beforeEach(() => {
     startDirtyCorrectionOn("other-trace");
     renderTurn();
 
     fireEvent.click(editTrace());
+  });
 
+  /** @scenario "Edit trace on another turn with unsaved changes asks first" */
+  it("asks before discarding, and cancelling keeps everything", () => {
     expect(mocks.openDrawer).not.toHaveBeenCalled();
     expect(useTraceEditStore.getState().pendingExit).not.toBeNull();
     expect(useDrawerStore.getState().traceId).toBe("other-trace");
@@ -279,10 +281,6 @@ describe("given an unsaved correction on another turn's trace", () => {
 
   /** @scenario "Edit trace on another turn with unsaved changes asks first" */
   it("moves to the turn's trace once the discard is confirmed", () => {
-    startDirtyCorrectionOn("other-trace");
-    renderTurn();
-
-    fireEvent.click(editTrace());
     // What the discard dialog's confirm does: leave the old session, then run
     // the parked move.
     const run = useTraceEditStore.getState().pendingExit;

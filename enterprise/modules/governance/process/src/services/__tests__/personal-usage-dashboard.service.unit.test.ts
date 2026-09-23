@@ -45,8 +45,14 @@ const governanceProject: InternalProject = {
 };
 
 const personalWorkspace = {
-  team: { id: "team-personal" },
-  project: { id: PERSONAL_PROJECT_ID },
+  team: { id: "team-personal", name: "Personal", slug: "personal", createdAtMs: 0 },
+  project: {
+    id: PERSONAL_PROJECT_ID,
+    name: "Personal",
+    slug: "personal",
+    apiKey: "sk-lw-personal",
+    createdAtMs: 0,
+  },
 };
 
 /** A member who has one, unless the test says otherwise. */
@@ -66,7 +72,7 @@ function build(
     options.internalProject === undefined ? governanceProject : options.internalProject,
   );
 
-  const dependencies = {
+  const dependencies: PersonalUsageDashboardServiceOptions = {
     governance: {
       personalUsageSummary,
       personalUsageDailyBuckets,
@@ -74,7 +80,7 @@ function build(
     },
     organizations: { tryFindPersonalWorkspace },
     projects: { findInternal },
-  } as unknown as PersonalUsageDashboardServiceOptions;
+  };
 
   return {
     personalUsageSummary,

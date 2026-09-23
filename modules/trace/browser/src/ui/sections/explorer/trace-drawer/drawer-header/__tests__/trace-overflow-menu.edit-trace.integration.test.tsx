@@ -110,22 +110,21 @@ afterEach(() => {
 
 describe("given a reviewer reading a trace in the drawer", () => {
   describe("when they open the trace actions menu", () => {
-    /** @scenario "The overflow menu offers to edit the trace" */
-    it("offers an action to annotate the trace", async () => {
-      const user = userEvent.setup();
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
       renderMenu();
-
       await openMenu(user);
+    });
 
+    /** @scenario "The overflow menu offers to edit the trace" */
+    it("offers an action to annotate the trace", () => {
       expect(editTraceItem()).toBeInTheDocument();
     });
 
     /** @scenario "The overflow menu offers to edit the trace" */
     it("starts annotating that trace when the action is chosen", async () => {
-      const user = userEvent.setup();
-      renderMenu();
-      await openMenu(user);
-
       await user.click(screen.getByText("Edit trace"));
 
       expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
@@ -180,23 +179,19 @@ describe("given a reviewer reading a trace in the drawer", () => {
   });
 
   describe("when the trace is being read on its public share page", () => {
-    /** @scenario "A shared trace is never editable" */
-    it("offers no action to annotate the trace, however permitted the reader is", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderMenu({ readOnly: true });
-
       await openMenu(user);
+    });
 
+    /** @scenario "A shared trace is never editable" */
+    it("offers no action to annotate the trace, however permitted the reader is", () => {
       expect(editTraceItem()).not.toBeInTheDocument();
     });
 
     /** @scenario "A shared trace never offers the action" */
-    it("offers no action to queue the trace for annotation", async () => {
-      const user = userEvent.setup();
-      renderMenu({ readOnly: true });
-
-      await openMenu(user);
-
+    it("offers no action to queue the trace for annotation", () => {
       expect(annotationQueueItem()).not.toBeInTheDocument();
     });
   });

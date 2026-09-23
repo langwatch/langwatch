@@ -194,7 +194,7 @@ describe("given a conversation whose scroller arrives after the first render", (
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
-    globalThis.ResizeObserver = InertResizeObserver as unknown as typeof ResizeObserver;
+    globalThis.ResizeObserver = InertResizeObserver;
   });
 
   afterEach(() => {

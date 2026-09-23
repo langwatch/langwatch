@@ -76,24 +76,46 @@ import { TraceSummaryAccordions } from "../trace-summary-accordions.tsx";
 
 const TRACE_ID = "trace-1";
 
-const header = (overrides: Partial<TraceHeader> = {}): TraceHeader =>
-  ({
-    traceId: TRACE_ID,
-    timestamp: 1_000,
-    status: "ok",
-    spanCount: 1,
-    input: "what is the weather in Berlin?",
-    output: "mild",
-    attributes: {
-      "metadata.environment": "staging",
-      "metadata.reviewer": "unassigned",
-      "gen_ai.conversation.id": "thread-1",
-      "langwatch.origin": "sdk",
-      "scenario.run_id": "run-1",
-      "langwatch.labels": '["nightly"]',
-    },
-    ...overrides,
-  }) as unknown as TraceHeader;
+const header = (overrides: Partial<TraceHeader> = {}): TraceHeader => ({
+  traceId: TRACE_ID,
+  timestamp: 1_000,
+  name: "trace",
+  serviceName: "svc",
+  origin: "application",
+  conversationId: null,
+  userId: null,
+  durationMs: 1,
+  models: [],
+  totalCost: null,
+  nonBilledCost: 0,
+  totalTokens: 0,
+  inputTokens: null,
+  outputTokens: null,
+  tokensEstimated: false,
+  traceName: "trace",
+  rootSpanType: null,
+  scenarioRunId: null,
+  containsPrompt: false,
+  selectedPromptId: null,
+  selectedPromptSpanId: null,
+  lastUsedPromptId: null,
+  lastUsedPromptVersionNumber: null,
+  lastUsedPromptVersionId: null,
+  lastUsedPromptSpanId: null,
+  status: "ok",
+  spanCount: 1,
+  input: "what is the weather in Berlin?",
+  output: "mild",
+  attributes: {
+    "metadata.environment": "staging",
+    "metadata.reviewer": "unassigned",
+    "gen_ai.conversation.id": "thread-1",
+    "langwatch.origin": "sdk",
+    "scenario.run_id": "run-1",
+    "langwatch.labels": '["nightly"]',
+  },
+  ...overrides,
+});
 
 function renderSummary(trace: TraceHeader = header()) {
   return render(

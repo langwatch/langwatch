@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { TraceListItem } from "../../../../../types/trace.ts";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../../types/trace.ts";
 import { ContextSizeCell } from "../context-size-cell.tsx";
 
 afterEach(cleanup);
@@ -25,8 +25,15 @@ function row(over: Partial<TraceListItem>): TraceListItem {
     labels: [],
     status: "ok",
     spanCount: 1,
+    evaluations: [],
+    events: NO_TRACE_EVENTS,
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
     ...over,
-  } as unknown as TraceListItem;
+  };
 }
 
 function renderCell(item: TraceListItem) {

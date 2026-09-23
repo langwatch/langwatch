@@ -28,11 +28,26 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 import { useCorrectionMarks } from "../use-correction-marks.ts";
 
-const SPANS = [
-  { spanId: "root", parentSpanId: null },
-  { spanId: "removed", parentSpanId: "root" },
-  { spanId: "kept", parentSpanId: "root" },
-] as unknown as SpanTreeNode[];
+function spanNode(
+  over: Partial<SpanTreeNode> & Pick<SpanTreeNode, "spanId" | "parentSpanId">,
+): SpanTreeNode {
+  return {
+    name: "step",
+    type: "span",
+    startTimeMs: 0,
+    endTimeMs: 10,
+    durationMs: 10,
+    status: "ok",
+    model: null,
+    ...over,
+  };
+}
+
+const SPANS: SpanTreeNode[] = [
+  spanNode({ spanId: "root", parentSpanId: null }),
+  spanNode({ spanId: "removed", parentSpanId: "root" }),
+  spanNode({ spanId: "kept", parentSpanId: "root" }),
+];
 
 /** A stored correction that removes one span and renames another. */
 const PATCH = {

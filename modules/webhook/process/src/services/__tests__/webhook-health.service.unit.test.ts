@@ -3,13 +3,12 @@
  * zero attempts are unknown, and p95 from unsorted lists is arbitrary.
  */
 
-import type { ProcessStore } from "@langwatch/eventing";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
   WebhookHealthService,
   type WebhookEndpointHealthSource,
-  type WebhookHealthDeps,
 } from "../webhook-health.service.ts";
 
 const NOW = new Date("2026-08-31T12:00:00.000Z").getTime();
@@ -27,16 +26,11 @@ function serviceReporting(stats: { attempted: number; delivered: number; latenci
     findStatusSnapshot: async () => snapshot,
     getDeliveryStats: async () => stats,
   };
-  const processStore = {
-    findByRef: async () => null,
-    findMessagesByRef: async () => [],
-  } as unknown as ProcessStore;
-
   return WebhookHealthService.create({
     endpoints,
-    processStore,
+    processStore: InMemoryProcessStore.createForTesting(),
     now: () => NOW,
-  } as WebhookHealthDeps);
+  });
 }
 
 const health = (stats: { attempted: number; delivered: number; latencies: number[] }) =>
@@ -105,9 +99,9 @@ describe("WebhookHealthService.health", () => {
           findStatusSnapshot: async () => null,
           getDeliveryStats: async () => ({ attempted: 0, delivered: 0, latencies: [] }),
         },
-        processStore: {} as unknown as ProcessStore,
+        processStore: InMemoryProcessStore.createForTesting(),
         now: () => NOW,
-      } as WebhookHealthDeps);
+      });
 
       await expect(
         service.health({ organizationId: "organization-1", endpointId: "missing" }),

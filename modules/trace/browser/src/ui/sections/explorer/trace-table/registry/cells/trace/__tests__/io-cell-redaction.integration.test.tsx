@@ -24,23 +24,62 @@ vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () 
   }),
 }));
 
-import type { TraceListItem } from "../../../../../types/trace.ts";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../../types/trace.ts";
+import type { CellRenderContext } from "../../../types.ts";
 import { InputCell } from "../input-cell.tsx";
 import { OutputCell } from "../output-cell.tsx";
 
 function row(over: Partial<TraceListItem>): TraceListItem {
   return {
     traceId: "t1",
+    timestamp: 0,
+    name: "trace",
+    serviceName: "svc",
+    durationMs: 1,
+    totalCost: 0,
+    nonBilledCost: 0,
+    totalTokens: 0,
+    models: [],
+    labels: [],
+    status: "ok",
+    spanCount: 1,
+    sizeBytes: 0,
     input: null,
     output: null,
+    origin: "application",
+    evaluations: [],
+    events: NO_TRACE_EVENTS,
     ...over,
-  } as TraceListItem;
+  };
+}
+
+function cellContext(row: TraceListItem): CellRenderContext<TraceListItem> {
+  return {
+    row,
+    density: {
+      rowPaddingY: "3px",
+      rowFontSize: "12px",
+      ioFontSize: "11px",
+      ioPaddingTop: "2px",
+      ioPaddingBottom: "4px",
+      groupRowPaddingY: "5px",
+      errorRowPaddingY: "4px",
+      errorRowFontSize: "12px",
+      errorDetailPaddingBottom: "4px",
+    },
+    densityMode: "compact",
+    isExpanded: false,
+    isSelected: false,
+    isFocused: false,
+    actions: {},
+    enabledAddonIds: [],
+  };
 }
 
 function renderInput(over: Partial<TraceListItem>) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      {InputCell.render({ row: row(over) } as unknown as Parameters<typeof InputCell.render>[0])}
+      {InputCell.render(cellContext(row(over)))}
     </ChakraProvider>,
   );
 }
@@ -48,7 +87,7 @@ function renderInput(over: Partial<TraceListItem>) {
 function renderOutput(over: Partial<TraceListItem>) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      {OutputCell.render({ row: row(over) } as unknown as Parameters<typeof OutputCell.render>[0])}
+      {OutputCell.render(cellContext(row(over)))}
     </ChakraProvider>,
   );
 }

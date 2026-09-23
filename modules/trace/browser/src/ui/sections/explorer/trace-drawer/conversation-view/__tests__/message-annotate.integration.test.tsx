@@ -89,7 +89,7 @@ function turn(over: Partial<TraceListItem> = {}): TraceListItem {
   } as TraceListItem;
 }
 
-function anchored(anchorPath: "input" | "output", id: string) {
+function anchored(anchorPath: "input" | "output", id: string): AnnotationByTrace {
   return {
     id,
     projectId: "proj-1",
@@ -104,9 +104,9 @@ function anchored(anchorPath: "input" | "output", id: string) {
     anchorKind: "field",
     anchorId: TRACE_ID,
     anchorPath,
-    createdAt: new Date("2026-08-01T10:30:00Z"),
-    updatedAt: new Date("2026-08-01T10:30:00Z"),
-  } as unknown as AnnotationByTrace;
+    createdAt: "2026-08-01T10:30:00Z",
+    updatedAt: "2026-08-01T10:30:00Z",
+  };
 }
 
 function renderTurn({

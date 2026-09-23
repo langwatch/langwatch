@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TreeRow } from "../tree-row.tsx";
 import type { WaterfallTreeNode } from "../types.ts";
 
-const span = {
+const span: SpanTreeNode = {
   spanId: "span-1",
   parentSpanId: null,
   name: "web_search",
@@ -20,7 +20,8 @@ const span = {
   endTimeMs: 10,
   durationMs: 10,
   status: "ok",
-} as unknown as SpanTreeNode;
+  model: null,
+};
 
 const node: WaterfallTreeNode = {
   span,

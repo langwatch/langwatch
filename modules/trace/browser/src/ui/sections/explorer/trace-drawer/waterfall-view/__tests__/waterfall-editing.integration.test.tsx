@@ -20,10 +20,25 @@ const { useTraceEditStore } = await import("../../../../../../index.ts");
 const { useCorrectionMarks } = await import("../use-correction-marks.ts");
 const { useWaterfallEditing } = await import("../use-waterfall-editing.ts");
 
-const spans = [
-  { spanId: "span-1", parentSpanId: null, name: "handler" },
-  { spanId: "span-2", parentSpanId: "span-1", name: "fetch" },
-] as unknown as SpanTreeNode[];
+function spanNode(
+  over: Partial<SpanTreeNode> & Pick<SpanTreeNode, "spanId" | "parentSpanId">,
+): SpanTreeNode {
+  return {
+    name: "step",
+    type: "span",
+    startTimeMs: 0,
+    endTimeMs: 10,
+    durationMs: 10,
+    status: "ok",
+    model: null,
+    ...over,
+  };
+}
+
+const spans: SpanTreeNode[] = [
+  spanNode({ spanId: "span-1", parentSpanId: null, name: "handler" }),
+  spanNode({ spanId: "span-2", parentSpanId: "span-1", name: "fetch" }),
+];
 
 const storedCorrection: TraceEditOverlayPatch = {
   version: 1,
