@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";
 /**
  * Type check in repository; service relays refusal consistently.
@@ -39,14 +40,14 @@ const thrownBy = async (promise: Promise<unknown>): Promise<unknown> => {
 };
 
 function makeService(): ExperimentWorkbenchService {
-  const repository = {
+  const repository = createApiFixture<ExperimentRepository>({
     findWorkbenchState: async () => {
       throw new ExperimentTypeMismatchError();
     },
     resolveWorkbenchSaveTarget: async () => {
       throw new ExperimentTypeMismatchError();
     },
-  } as unknown as ExperimentRepository;
+  });
 
   return ExperimentWorkbenchService.create({
     repository,

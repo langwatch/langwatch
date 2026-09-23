@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see specs/scenarios/scenario-run-parameters.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { resolveRunParameters, type ScenarioApi } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
@@ -11,18 +12,9 @@ import { SuiteExecutionService } from "../suite-execution.service.ts";
 const scenarioId = "scenario_refund";
 
 /** Delegates to the real parameter-resolution rules, with no encryption. */
-const declaringScenarios = {
-  resolveRunParametersForScenarios: async ({
-    scenarios,
-    values,
-  }: {
-    scenarios: { id: string }[];
-    values?: Record<string, unknown>;
-  }) => {
-    const resolved = await resolveRunParameters({
-      scenarios: scenarios as never,
-      values: values as never,
-    });
+const declaringScenarios = createApiFixture<ScenarioApi>({
+  resolveRunParametersForScenarios: async ({ scenarios, values }) => {
+    const resolved = await resolveRunParameters({ scenarios, values });
     return [...resolved].map(([id, value]) => ({
       scenarioId: id,
       parameters: value.parameters,
@@ -30,7 +22,7 @@ const declaringScenarios = {
       scenarioVersion: 1,
     }));
   },
-} as unknown as ScenarioApi;
+});
 
 function execute(
   runParameters: Record<string, unknown>,

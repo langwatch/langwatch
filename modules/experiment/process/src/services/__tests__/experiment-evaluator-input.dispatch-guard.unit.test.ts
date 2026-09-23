@@ -11,36 +11,34 @@ import type { LoadedEvaluators } from "../experiment-execution-data.service.ts";
 
 const guard = ExperimentEvaluatorInputService.create({});
 
-const scoringEvaluator = (overrides: Record<string, unknown> = {}) =>
-  ({
-    id: "eval-1",
-    evaluatorType: "langevals/exact_match",
-    inputs: [
-      { identifier: "output", type: "str" },
-      { identifier: "expected_output", type: "str" },
-    ],
-    mappings: {},
-    ...overrides,
-  }) as unknown as EvaluatorConfig;
+const scoringEvaluator = (overrides: Partial<EvaluatorConfig> = {}): EvaluatorConfig => ({
+  id: "eval-1",
+  evaluatorType: "langevals/exact_match",
+  inputs: [
+    { identifier: "output", type: "str" },
+    { identifier: "expected_output", type: "str" },
+  ],
+  mappings: {},
+  ...overrides,
+});
 
 const cellFor = (
   evaluator: EvaluatorConfig,
   overrides: Partial<ExecutionCell> = {},
-): ExecutionCell =>
-  ({
-    rowIndex: 0,
-    targetId: "target-1",
-    targetConfig: {
-      id: "target-1",
-      type: "prompt",
-      inputs: [],
-      outputs: [],
-      mappings: {},
-    },
-    evaluatorConfigs: [evaluator],
-    datasetEntry: { _datasetId: "dataset-1" },
-    ...overrides,
-  }) as unknown as ExecutionCell;
+): ExecutionCell => ({
+  rowIndex: 0,
+  targetId: "target-1",
+  targetConfig: {
+    id: "target-1",
+    type: "prompt",
+    inputs: [],
+    outputs: [],
+    mappings: {},
+  },
+  evaluatorConfigs: [evaluator],
+  datasetEntry: { _datasetId: "dataset-1" },
+  ...overrides,
+});
 
 describe("given an evaluator that reads fields off the row", () => {
   describe("when no mapping resolved a value", () => {
@@ -140,31 +138,30 @@ describe("given a comparison cell", () => {
 });
 
 describe("given an evaluator that is its own column", () => {
-  const evaluatorColumn = (overrides: Record<string, unknown> = {}) =>
-    ({
-      rowIndex: 0,
-      targetId: "column-1",
-      targetConfig: {
-        id: "column-1",
-        type: "evaluator",
-        targetEvaluatorId: "db-eval",
-        inputs: [{ identifier: "output", type: "str" }],
-        outputs: [],
-        mappings: {
-          "dataset-1": {
-            output: {
-              type: "source",
-              source: "dataset",
-              sourceId: "dataset-1",
-              sourceField: "answer",
-            },
+  const evaluatorColumn = (overrides: Partial<ExecutionCell> = {}): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "column-1",
+    targetConfig: {
+      id: "column-1",
+      type: "evaluator",
+      targetEvaluatorId: "db-eval",
+      inputs: [{ identifier: "output", type: "str" }],
+      outputs: [],
+      mappings: {
+        "dataset-1": {
+          output: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "answer",
           },
         },
       },
-      evaluatorConfigs: [],
-      datasetEntry: { _datasetId: "dataset-1" },
-      ...overrides,
-    }) as unknown as ExecutionCell;
+    },
+    evaluatorConfigs: [],
+    datasetEntry: { _datasetId: "dataset-1" },
+    ...overrides,
+  });
 
   describe("when the column it reads holds nothing", () => {
     /** @scenario "An evaluator column with no resolved inputs reports an error instead of passing" */

@@ -32,23 +32,30 @@ const feed = async (events: EvaluationV3Event[]) => {
   return writer;
 };
 
-const started = {
+const started: EvaluationV3Event = {
   type: "execution_started",
   runId: "swift-bold-fox",
   total: 1,
-} as unknown as EvaluationV3Event;
+};
 
-const anOutput = {
+const anOutput: EvaluationV3Event = {
   type: "target_result",
   rowIndex: 0,
   targetId: "target-1",
   output: "an answer",
-} as unknown as EvaluationV3Event;
+};
 
-const done = {
+const done: EvaluationV3Event = {
   type: "done",
-  summary: { total: 1, completed: 1 },
-} as unknown as EvaluationV3Event;
+  summary: {
+    runId: "swift-bold-fox",
+    totalCells: 1,
+    completedCells: 1,
+    failedCells: 0,
+    duration: 0,
+    timestamps: { startedAt: 0 },
+  },
+};
 
 beforeEach(() => {
   getWorkbenchState.mockReset();

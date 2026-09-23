@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 /**
  * Queued suite run model recording via SuiteExecutionService.
@@ -11,15 +12,15 @@ import type { SuiteRunModelsResolver } from "../suite-run-models.service.ts";
 
 const scenarioId = "scenario_refund";
 
-const noopScenarios = {
-  resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
+const noopScenarios = createApiFixture<ScenarioApi>({
+  resolveRunParametersForScenarios: async ({ scenarios }) =>
     scenarios.map((scenario) => ({
       scenarioId: scenario.id,
       parameters: {},
       secretParameters: {},
       scenarioVersion: 1,
     })),
-} as unknown as ScenarioApi;
+});
 
 /** Starts a run of one case and returns the queued command it dispatched. */
 async function queuedCommandFor(params: {
