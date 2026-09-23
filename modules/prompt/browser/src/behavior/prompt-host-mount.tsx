@@ -71,14 +71,31 @@ const promptTabsCapabilities: PromptTabsCapabilities = {
 const PLAYGROUND_CHAT_AVAILABILITY: PromptPlaygroundChatAvailability = { available: true };
 
 class CapabilityPromptHost extends PromptHostApi {
-  constructor(
-    private readonly hostScope: PromptHostScope,
-    private readonly session: UiSession,
-    private readonly navigation: UiNavigation,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly hostScope: PromptHostScope;
+  private readonly session: UiSession;
+  private readonly navigation: UiNavigation;
+  private readonly uiRoute: UiRoute;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    hostScope,
+    session,
+    navigation,
+    uiRoute,
+    feedback,
+  }: {
+    hostScope: PromptHostScope;
+    session: UiSession;
+    navigation: UiNavigation;
+    uiRoute: UiRoute;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.hostScope = hostScope;
+    this.session = session;
+    this.navigation = navigation;
+    this.uiRoute = uiRoute;
+    this.feedback = feedback;
   }
 
   scope(): PromptHostScope {
@@ -170,7 +187,7 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
   );
 
   const host = useMemo(
-    () => new CapabilityPromptHost(hostScope, session, navigation, route, feedback),
+    () => new CapabilityPromptHost({ hostScope, session, navigation, uiRoute: route, feedback }),
     [hostScope, session, navigation, route, feedback],
   );
 

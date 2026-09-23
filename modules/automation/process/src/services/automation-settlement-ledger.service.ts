@@ -35,27 +35,63 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     persistCap: AutomationSettlementPersistCap;
     breach: AutomationSettlementBreach;
   }): AutomationSettlementLedgerService {
-    return new AutomationSettlementLedgerService(
-      input.triggers,
-      ActiveTriggerCacheService.create({ triggers: input.triggers, clock: input.clock }),
-      input.suppressions,
-      input.webhookDeliveries,
-      input.redis ?? null,
-      input.persistCap,
-      input.breach,
-    );
+    return new AutomationSettlementLedgerService({
+      triggers: input.triggers,
+      active: ActiveTriggerCacheService.create({ triggers: input.triggers, clock: input.clock }),
+      suppressions: input.suppressions,
+      webhookDeliveries: input.webhookDeliveries,
+      redis: input.redis ?? null,
+      persistCap: input.persistCap,
+      breach: input.breach,
+    });
   }
 
-  private constructor(
-    private readonly triggers: TriggerRepository,
-    private readonly active: ActiveTriggerCacheService,
-    private readonly suppressions: EmailSuppressionRepository,
-    private readonly webhookDeliveries: WebhookDeliveryRepository,
-    private readonly redis: AutomationPersistCapRedis | null,
-    private readonly persistCap: AutomationSettlementPersistCap,
-    private readonly breach: AutomationSettlementBreach,
-  ) {
+  private readonly triggers: TriggerRepository;
+
+  private readonly active: ActiveTriggerCacheService;
+
+  private readonly suppressions: EmailSuppressionRepository;
+
+  private readonly webhookDeliveries: WebhookDeliveryRepository;
+
+  private readonly redis: AutomationPersistCapRedis | null;
+
+  private readonly persistCap: AutomationSettlementPersistCap;
+
+  private readonly breach: AutomationSettlementBreach;
+
+  private constructor({
+    triggers,
+    active,
+    suppressions,
+    webhookDeliveries,
+    redis,
+    persistCap,
+    breach,
+  }: {
+    triggers: TriggerRepository;
+    active: ActiveTriggerCacheService;
+    suppressions: EmailSuppressionRepository;
+    webhookDeliveries: WebhookDeliveryRepository;
+    redis: AutomationPersistCapRedis | null;
+    persistCap: AutomationSettlementPersistCap;
+    breach: AutomationSettlementBreach;
+  }) {
     super();
+
+    this.triggers = triggers;
+
+    this.active = active;
+
+    this.suppressions = suppressions;
+
+    this.webhookDeliveries = webhookDeliveries;
+
+    this.redis = redis;
+
+    this.persistCap = persistCap;
+
+    this.breach = breach;
   }
 
   getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {

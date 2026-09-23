@@ -2,9 +2,10 @@
  * Builds AutomationInfrastructure for the API process; implements reads/writes to trigger
  * rows, not evaluation/delivery/scheduling (those are the worker's responsibilities).
  */
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   ApiAutomationUnavailableError,
+  type AutomationAction,
   type SlackActionParams,
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
@@ -38,6 +39,7 @@ import type {
   AutomationProviderSecrets,
   AutomationSlackDirectory,
   AutomationTraceFilterCompiler,
+  AutomationWebhookStoredParams,
 } from "./automation.app.ts";
 import type { AutomationClock } from "./automation.members.ts";
 
@@ -304,21 +306,18 @@ class UndeliverableApiTestFire extends AutomationTestFire {
 class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
   constructor(private readonly registry: AutomationProviderRegistryService) {}
 
-  actionParamsSchemaFor(action: Parameters<AutomationProviderSecrets["actionParamsSchemaFor"]>[0]) {
+  actionParamsSchemaFor(action: AutomationAction) {
     return this.registry.actionParamsSchemaFor(action);
   }
 
   persistActionParamsFor(
-    action: Parameters<AutomationProviderSecrets["persistActionParamsFor"]>[0],
-    args: Parameters<AutomationProviderSecrets["persistActionParamsFor"]>[1],
+    action: AutomationAction,
+    args: Readonly<{ incoming: Record<string, unknown>; loadExisting: () => Promise<unknown> }>,
   ) {
     return this.registry.persistActionParamsFor(action, args);
   }
 
-  redactActionParamsFor(
-    action: Parameters<AutomationProviderSecrets["redactActionParamsFor"]>[0],
-    params: unknown,
-  ) {
+  redactActionParamsFor(action: AutomationAction, params: unknown) {
     return this.registry.redactActionParamsFor(action, params);
   }
 
@@ -326,15 +325,11 @@ class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
     return this.registry.findDecryptedSlackBotToken(actionParams);
   }
 
-  decryptWebhookHeaders(
-    stored: Parameters<AutomationProviderSecrets["decryptWebhookHeaders"]>[0],
-  ): Record<string, string> {
+  decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string> {
     return this.registry.decryptWebhookHeaders(stored);
   }
 
-  decryptWebhookSigningSecrets(
-    stored: Parameters<AutomationProviderSecrets["decryptWebhookSigningSecrets"]>[0],
-  ): readonly string[] {
+  decryptWebhookSigningSecrets(stored: AutomationWebhookStoredParams): readonly string[] {
     return this.registry.decryptWebhookSigningSecrets(stored);
   }
 }
@@ -402,9 +397,7 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
       userId: entry.userId,
       ...(entry.projectId === undefined ? {} : { projectId: entry.projectId }),
       action: entry.action,
-      ...(entry.args === undefined
-        ? {}
-        : { args: entry.args as Parameters<AuditLogApi["record"]>[0]["args"] }),
+      ...(entry.args === undefined ? {} : { args: entry.args as RecordAuditLogCommand["args"] }),
     });
   }
 }

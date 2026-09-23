@@ -114,12 +114,17 @@ const hasUnsavedChanges = (
  * locally-changed prompt carries its full local config; an unchanged saved
  * prompt is referenced by id only.
  */
-const convertTabToTarget = (
-  tabData: TabData,
-  index: number,
-  datasets: DatasetReference[],
-  savedPrompt: WireVersionedPrompt | null | undefined,
-): TargetConfig => {
+const convertTabToTarget = ({
+  tabData,
+  index,
+  datasets,
+  savedPrompt,
+}: {
+  tabData: TabData;
+  index: number;
+  datasets: DatasetReference[];
+  savedPrompt: WireVersionedPrompt | null | undefined;
+}): TargetConfig => {
   const configId = tabData.form.currentValues.configId;
   const versionId = tabData.form.currentValues.versionMetadata?.versionId;
 
@@ -268,7 +273,12 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
     const targets = (isComparing || !activeTab ? allTabs : [activeTab]).map((tab, index) => {
       const configId = tab.data.form.currentValues.configId;
       const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
-      return convertTabToTarget(tab.data, index, initialState.datasets, savedPrompt);
+      return convertTabToTarget({
+        tabData: tab.data,
+        index,
+        datasets: initialState.datasets,
+        savedPrompt,
+      });
     });
     initialState.targets = targets;
 

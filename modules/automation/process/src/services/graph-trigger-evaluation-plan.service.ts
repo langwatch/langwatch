@@ -98,14 +98,14 @@ export class GraphTriggerEvaluationPlanService {
       graph,
       now,
       startDate,
-      timeseriesInput: this.timeseriesInput(
-        request.projectId,
-        customGraph.filters,
+      timeseriesInput: this.timeseriesInput({
+        projectId: request.projectId,
+        filters: customGraph.filters,
         graph,
         series,
         startDate,
-        now,
-      ),
+        endDate: now,
+      }),
     };
   }
 
@@ -123,14 +123,21 @@ export class GraphTriggerEvaluationPlanService {
     return series;
   }
 
-  private timeseriesInput(
-    projectId: string,
-    filters: unknown,
-    graph: StoredGraphConfig,
-    series: GraphSeries,
-    startDate: Instant,
-    endDate: Instant,
-  ): TimeseriesInputType {
+  private timeseriesInput({
+    projectId,
+    filters,
+    graph,
+    series,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    filters: unknown;
+    graph: StoredGraphConfig;
+    series: GraphSeries;
+    startDate: Instant;
+    endDate: Instant;
+  }): TimeseriesInputType {
     return {
       projectId,
       startDate: startDate.epochMilliseconds,

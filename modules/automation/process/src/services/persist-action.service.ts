@@ -32,13 +32,31 @@ function sanitizeRecord(record: Record<string, string | number>): Record<string,
 /** Owns the persist-class trigger actions. Host code supplies only complete
  * project/trace services and named write/mapping ports. */
 export class AutomationPersistActionService {
-  private constructor(
-    private readonly automation: AutomationSettlementLedger,
-    private readonly projects: AutomationProjectDirectory,
-    private readonly traces: AutomationSettlementTraceReader,
-    private readonly mapper: AutomationDatasetMapper,
-    private readonly writer: AutomationPersistActionWriter,
-  ) {}
+  private readonly automation: AutomationSettlementLedger;
+  private readonly projects: AutomationProjectDirectory;
+  private readonly traces: AutomationSettlementTraceReader;
+  private readonly mapper: AutomationDatasetMapper;
+  private readonly writer: AutomationPersistActionWriter;
+
+  private constructor({
+    automation,
+    projects,
+    traces,
+    mapper,
+    writer,
+  }: {
+    automation: AutomationSettlementLedger;
+    projects: AutomationProjectDirectory;
+    traces: AutomationSettlementTraceReader;
+    mapper: AutomationDatasetMapper;
+    writer: AutomationPersistActionWriter;
+  }) {
+    this.automation = automation;
+    this.projects = projects;
+    this.traces = traces;
+    this.mapper = mapper;
+    this.writer = writer;
+  }
 
   static create(input: {
     automation: AutomationSettlementLedger;
@@ -47,13 +65,13 @@ export class AutomationPersistActionService {
     mapper: AutomationDatasetMapper;
     writer: AutomationPersistActionWriter;
   }): AutomationPersistActionService {
-    return new AutomationPersistActionService(
-      input.automation,
-      input.projects,
-      input.traces,
-      input.mapper,
-      input.writer,
-    );
+    return new AutomationPersistActionService({
+      automation: input.automation,
+      projects: input.projects,
+      traces: input.traces,
+      mapper: input.mapper,
+      writer: input.writer,
+    });
   }
 
   async dispatch(input: {

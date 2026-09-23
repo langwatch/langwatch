@@ -10,20 +10,35 @@ import type { GraphTriggerEvaluationDeps } from "./trigger-evaluator.service.ts"
 
 /** Public private-automation evaluator that composes focused graph collaborators. */
 export class GraphTriggerEvaluatorService {
-  private constructor(
-    private readonly deps: GraphTriggerEvaluationDeps,
-    private readonly plans: GraphTriggerEvaluationPlanService,
-    private readonly series: GraphTriggerSeriesEvaluationService,
-    private readonly incidents: GraphTriggerIncidentService,
-  ) {}
+  private readonly deps: GraphTriggerEvaluationDeps;
+  private readonly plans: GraphTriggerEvaluationPlanService;
+  private readonly series: GraphTriggerSeriesEvaluationService;
+  private readonly incidents: GraphTriggerIncidentService;
+
+  private constructor({
+    deps,
+    plans,
+    series,
+    incidents,
+  }: {
+    deps: GraphTriggerEvaluationDeps;
+    plans: GraphTriggerEvaluationPlanService;
+    series: GraphTriggerSeriesEvaluationService;
+    incidents: GraphTriggerIncidentService;
+  }) {
+    this.deps = deps;
+    this.plans = plans;
+    this.series = series;
+    this.incidents = incidents;
+  }
 
   static create(deps: GraphTriggerEvaluationDeps): GraphTriggerEvaluatorService {
-    return new GraphTriggerEvaluatorService(
+    return new GraphTriggerEvaluatorService({
       deps,
-      GraphTriggerEvaluationPlanService.create(),
-      GraphTriggerSeriesEvaluationService.create(),
-      GraphTriggerIncidentService.create(),
-    );
+      plans: GraphTriggerEvaluationPlanService.create(),
+      series: GraphTriggerSeriesEvaluationService.create(),
+      incidents: GraphTriggerIncidentService.create(),
+    });
   }
 
   async evaluate(input: {

@@ -61,7 +61,8 @@ export const RecordTriggerMatchCommand = defineCommand({
   }),
 });
 
-const triggerMatchRecordedEventSchema = EventSchema.extend({
+const triggerMatchRecordedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TRIGGER_MATCH_RECORDED_EVENT_TYPE),
   data: triggerMatchRecordedEventDataSchema,
 });

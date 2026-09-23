@@ -29,15 +29,39 @@ function emptyResult(channel: GraphAlertDispatchResult["channel"]): GraphAlertDi
 
 /** Graph-alert notification policy shared by real-time and heartbeat dispatch. */
 export class GraphAlertDispatchService {
-  private constructor(
-    private readonly persistence: AutomationGraphDelivery,
-    private readonly emailCaps: AutomationEmailCapService,
-    private readonly delivery: AutomationNotificationDelivery,
-    private readonly webhooks: AutomationWebhookProvider,
-    private readonly clock: AutomationClock,
-    private readonly emailHourlyCap: number,
-    private readonly tenantDailyCap: number,
-  ) {}
+  private readonly persistence: AutomationGraphDelivery;
+  private readonly emailCaps: AutomationEmailCapService;
+  private readonly delivery: AutomationNotificationDelivery;
+  private readonly webhooks: AutomationWebhookProvider;
+  private readonly clock: AutomationClock;
+  private readonly emailHourlyCap: number;
+  private readonly tenantDailyCap: number;
+
+  private constructor({
+    persistence,
+    emailCaps,
+    delivery,
+    webhooks,
+    clock,
+    emailHourlyCap,
+    tenantDailyCap,
+  }: {
+    persistence: AutomationGraphDelivery;
+    emailCaps: AutomationEmailCapService;
+    delivery: AutomationNotificationDelivery;
+    webhooks: AutomationWebhookProvider;
+    clock: AutomationClock;
+    emailHourlyCap: number;
+    tenantDailyCap: number;
+  }) {
+    this.persistence = persistence;
+    this.emailCaps = emailCaps;
+    this.delivery = delivery;
+    this.webhooks = webhooks;
+    this.clock = clock;
+    this.emailHourlyCap = emailHourlyCap;
+    this.tenantDailyCap = tenantDailyCap;
+  }
 
   static create(input: {
     persistence: AutomationGraphDelivery;
@@ -48,15 +72,15 @@ export class GraphAlertDispatchService {
     emailHourlyCap: number;
     tenantDailyCap: number;
   }): GraphAlertDispatchService {
-    return new GraphAlertDispatchService(
-      input.persistence,
-      input.emailCaps,
-      input.delivery,
-      input.webhooks,
-      input.clock,
-      input.emailHourlyCap,
-      input.tenantDailyCap,
-    );
+    return new GraphAlertDispatchService({
+      persistence: input.persistence,
+      emailCaps: input.emailCaps,
+      delivery: input.delivery,
+      webhooks: input.webhooks,
+      clock: input.clock,
+      emailHourlyCap: input.emailHourlyCap,
+      tenantDailyCap: input.tenantDailyCap,
+    });
   }
 
   // `async` so the unsupported-action branch REJECTS rather than throwing

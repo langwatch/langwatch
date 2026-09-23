@@ -16,11 +16,11 @@ import {
   type WebhookDeliveryTransport,
   type WebhookSendResult,
 } from "../channels/http/http.webhook-delivery.channel.ts";
+import { SlackWebApiTransportAdapter } from "../channels/slack/slack-web-api-transport.channel.ts";
 import {
   SlackWebApiDeliveryAdapter,
   type SlackApiTransport,
 } from "../channels/slack/slack.web-api-delivery.channel.ts";
-import { SlackWebApiTransportAdapter } from "../channels/slack/slack.web-api.transport.channel.ts";
 import { SlackWebhookClientAdapter } from "../channels/slack/slack.webhook-client.channel.ts";
 import { SlackWebhookDeliveryAdapter } from "../channels/slack/slack.webhook-delivery.channel.ts";
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "./trigger-no-reply.service.ts";
@@ -85,40 +85,88 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
     const logger = options.logger ?? createLogger("langwatch:automations:delivery");
     const slackClient = options.slackWebhookClient ?? SlackWebhookClientAdapter.create();
 
-    return new AutomationNotificationDeliveryAdapter(
-      options.mailer,
-      options.renderer,
-      options.baseHost,
-      UnsubscribeTokenService.create({ secret: options.unsubscribeSigningSecret }),
-      TriggerNoReplyService.create({
+    return new AutomationNotificationDeliveryAdapter({
+      mailer: options.mailer,
+      renderer: options.renderer,
+      baseHost: options.baseHost,
+      unsubscribeTokens: UnsubscribeTokenService.create({
+        secret: options.unsubscribeSigningSecret,
+      }),
+      noReply: TriggerNoReplyService.create({
         secret: options.unsubscribeSigningSecret,
         warnings: new LoggedNoReplyWarning(logger),
       }),
-      SlackWebhookDeliveryAdapter.create((webhook) => ({
+      slackWebhooks: SlackWebhookDeliveryAdapter.create((webhook) => ({
         send: (payload) => slackClient.send({ webhook, payload }),
       })),
-      SlackWebApiDeliveryAdapter.create(
+      slackApi: SlackWebApiDeliveryAdapter.create(
         options.slackApiTransport ?? SlackWebApiTransportAdapter.create(),
       ),
-      options.webhookTransport
+      webhooks: options.webhookTransport
         ? WebhookDeliveryAdapter.create(options.webhookTransport)
         : undefined,
       logger,
-    );
+    });
   }
 
-  private constructor(
-    private readonly mailer: EmailDelivery,
-    private readonly renderer: MailRender,
-    private readonly baseHost: string,
-    private readonly unsubscribeTokens: UnsubscribeTokenService,
-    private readonly noReply: TriggerNoReplyService,
-    private readonly slackWebhooks: SlackWebhookDeliveryAdapter,
-    private readonly slackApi: SlackWebApiDeliveryAdapter,
-    private readonly webhooks: WebhookDeliveryAdapter | undefined,
-    private readonly logger: Logger,
-  ) {
+  private readonly mailer: EmailDelivery;
+
+  private readonly renderer: MailRender;
+
+  private readonly baseHost: string;
+
+  private readonly unsubscribeTokens: UnsubscribeTokenService;
+
+  private readonly noReply: TriggerNoReplyService;
+
+  private readonly slackWebhooks: SlackWebhookDeliveryAdapter;
+
+  private readonly slackApi: SlackWebApiDeliveryAdapter;
+
+  private readonly webhooks: WebhookDeliveryAdapter | undefined;
+
+  private readonly logger: Logger;
+
+  private constructor({
+    mailer,
+    renderer,
+    baseHost,
+    unsubscribeTokens,
+    noReply,
+    slackWebhooks,
+    slackApi,
+    webhooks,
+    logger,
+  }: {
+    mailer: EmailDelivery;
+    renderer: MailRender;
+    baseHost: string;
+    unsubscribeTokens: UnsubscribeTokenService;
+    noReply: TriggerNoReplyService;
+    slackWebhooks: SlackWebhookDeliveryAdapter;
+    slackApi: SlackWebApiDeliveryAdapter;
+    webhooks: WebhookDeliveryAdapter | undefined;
+    logger: Logger;
+  }) {
     super();
+
+    this.mailer = mailer;
+
+    this.renderer = renderer;
+
+    this.baseHost = baseHost;
+
+    this.unsubscribeTokens = unsubscribeTokens;
+
+    this.noReply = noReply;
+
+    this.slackWebhooks = slackWebhooks;
+
+    this.slackApi = slackApi;
+
+    this.webhooks = webhooks;
+
+    this.logger = logger;
   }
 
   /**

@@ -69,7 +69,14 @@ export class GraphTriggerAlertDeliveryService {
       return this.alreadyFiring(plan, values.currentValue);
     }
 
-    return this.dispatch(plan, values, project, botDestination, previousFire?.id ?? null, claim.id);
+    return this.dispatch({
+      plan,
+      values,
+      project,
+      botDestination,
+      previousFireId: previousFire?.id ?? null,
+      claimId: claim.id,
+    });
   }
 
   private botDestination(plan: GraphEvaluationPlan): { token: string; channel: string } | null {
@@ -93,14 +100,21 @@ export class GraphTriggerAlertDeliveryService {
     return { token, channel };
   }
 
-  private async dispatch(
-    plan: GraphEvaluationPlan,
-    values: GraphSeriesEvaluation,
-    project: { id: string; name: string; slug: string },
-    botDestination: { token: string; channel: string } | null,
-    previousFireId: string | null,
-    claimId: string,
-  ): Promise<GraphTriggerEvaluationResult> {
+  private async dispatch({
+    plan,
+    values,
+    project,
+    botDestination,
+    previousFireId,
+    claimId,
+  }: {
+    plan: GraphEvaluationPlan;
+    values: GraphSeriesEvaluation;
+    project: { id: string; name: string; slug: string };
+    botDestination: { token: string; channel: string } | null;
+    previousFireId: string | null;
+    claimId: string;
+  }): Promise<GraphTriggerEvaluationResult> {
     try {
       const result = await plan.request.deps.notifier.dispatch({
         trigger: plan.trigger,
@@ -116,7 +130,7 @@ export class GraphTriggerAlertDeliveryService {
         }),
       });
 
-      return await this.finish(plan, values.currentValue, result, claimId);
+      return await this.finish({ plan, value: values.currentValue, result, claimId });
     } catch (error) {
       await this.rollbackRetryableClaim(plan, claimId, error);
 
@@ -176,12 +190,17 @@ export class GraphTriggerAlertDeliveryService {
     }
   }
 
-  private async finish(
-    plan: GraphEvaluationPlan,
-    value: number,
-    result: GraphAlertDispatchResult,
-    claimId: string,
-  ): Promise<GraphTriggerEvaluationResult> {
+  private async finish({
+    plan,
+    value,
+    result,
+    claimId,
+  }: {
+    plan: GraphEvaluationPlan;
+    value: number;
+    result: GraphAlertDispatchResult;
+    claimId: string;
+  }): Promise<GraphTriggerEvaluationResult> {
     if (!result.didSend) {
       await plan.request.deps.triggerSent.deleteOpenClaim({
         id: claimId,

@@ -173,12 +173,17 @@ const mergeProviderRowsByKey = (
   return byKey;
 };
 
-export const useModelSelectionOptions = (
-  options: string[],
-  model: string,
-  mode: "chat" | "embedding" = "chat",
-  opts?: { featureKey?: string | undefined },
-) => {
+export const useModelSelectionOptions = ({
+  options,
+  model,
+  mode = "chat",
+  opts,
+}: {
+  options: string[];
+  model: string;
+  mode?: "chat" | "embedding";
+  opts?: { featureKey?: string | undefined };
+}) => {
   const { project } = usePromptProject();
   // `listAllForProjectForFrontend` returns providers actually stored for this
   // project - unlike the legacy `getAllForProject`, it does not merge env-fed defaults.
@@ -317,12 +322,12 @@ export const ModelSelector = React.memo(function ModelSelector({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions(
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
     options,
     model,
     mode,
-    { featureKey },
-  );
+    opts: { featureKey },
+  });
 
   // ALL hooks must run unconditionally - keep the empty-state early
   // return *after* every hook below so we don't violate React's rules

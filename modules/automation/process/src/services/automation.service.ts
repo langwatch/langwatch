@@ -53,20 +53,58 @@ const normalize = (email: string): string => email.trim().toLowerCase();
  */
 export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;
-  private constructor(
-    private readonly triggers: TriggerRepository,
-    private readonly history: TriggerFireHistoryRepository,
-    private readonly suppressions: EmailSuppressionRepository,
-    private readonly names: EmailSuppressionNameRepository,
-    private readonly verifier: UnsubscribeTokenVerifier,
-    private readonly reportSchedules: ReportScheduleService,
-    private readonly clock: AutomationClock,
-    private readonly customGraphs: CustomGraphRepository,
-    private readonly webhookDeliveries: WebhookDeliveryRepository,
-    private readonly graph: AutomationGraphService,
-    private readonly templates: AutomationTemplateService,
-    private readonly persistCaps: AutomationPersistCapService,
-  ) {
+  private readonly triggers: TriggerRepository;
+  private readonly history: TriggerFireHistoryRepository;
+  private readonly suppressions: EmailSuppressionRepository;
+  private readonly names: EmailSuppressionNameRepository;
+  private readonly verifier: UnsubscribeTokenVerifier;
+  private readonly reportSchedules: ReportScheduleService;
+  private readonly clock: AutomationClock;
+  private readonly customGraphs: CustomGraphRepository;
+  private readonly webhookDeliveries: WebhookDeliveryRepository;
+  private readonly graph: AutomationGraphService;
+  private readonly templates: AutomationTemplateService;
+  private readonly persistCaps: AutomationPersistCapService;
+
+  private constructor({
+    triggers,
+    history,
+    suppressions,
+    names,
+    verifier,
+    reportSchedules,
+    clock,
+    customGraphs,
+    webhookDeliveries,
+    graph,
+    templates,
+    persistCaps,
+  }: {
+    triggers: TriggerRepository;
+    history: TriggerFireHistoryRepository;
+    suppressions: EmailSuppressionRepository;
+    names: EmailSuppressionNameRepository;
+    verifier: UnsubscribeTokenVerifier;
+    reportSchedules: ReportScheduleService;
+    clock: AutomationClock;
+    customGraphs: CustomGraphRepository;
+    webhookDeliveries: WebhookDeliveryRepository;
+    graph: AutomationGraphService;
+    templates: AutomationTemplateService;
+    persistCaps: AutomationPersistCapService;
+  }) {
+    this.triggers = triggers;
+    this.history = history;
+    this.suppressions = suppressions;
+    this.names = names;
+    this.verifier = verifier;
+    this.reportSchedules = reportSchedules;
+    this.clock = clock;
+    this.customGraphs = customGraphs;
+    this.webhookDeliveries = webhookDeliveries;
+    this.graph = graph;
+    this.templates = templates;
+    this.persistCaps = persistCaps;
     this.activeCache = ActiveTriggerCacheService.create({ triggers, clock });
   }
 
@@ -84,20 +122,20 @@ export class AutomationService {
     templates: AutomationTemplateService;
     persistCaps: AutomationPersistCapService;
   }): AutomationService {
-    return new AutomationService(
-      deps.triggers,
-      deps.history,
-      deps.suppressions,
-      deps.names,
-      deps.verifier,
-      deps.reportSchedules,
-      deps.clock,
-      deps.customGraphs,
-      deps.webhookDeliveries,
-      deps.graph,
-      deps.templates,
-      deps.persistCaps,
-    );
+    return new AutomationService({
+      triggers: deps.triggers,
+      history: deps.history,
+      suppressions: deps.suppressions,
+      names: deps.names,
+      verifier: deps.verifier,
+      reportSchedules: deps.reportSchedules,
+      clock: deps.clock,
+      customGraphs: deps.customGraphs,
+      webhookDeliveries: deps.webhookDeliveries,
+      graph: deps.graph,
+      templates: deps.templates,
+      persistCaps: deps.persistCaps,
+    });
   }
 
   countUsage(input: {
