@@ -8,7 +8,7 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
-export const entryNode = () => ({
+export const blankTemplateEntryNode = () => ({
   id: "entry",
   type: "entry",
   position: {
@@ -48,7 +48,7 @@ export const blankTemplate: StudioWorkflow = {
   workflow_type: "workflow",
   enable_tracing: true,
   nodes: [
-    entryNode(),
+    blankTemplateEntryNode(),
     {
       id: "llm_call",
       type: "signature",

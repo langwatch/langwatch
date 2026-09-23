@@ -1,14 +1,13 @@
+import {
+  assertCrispChatHidden,
+  installCrispBubblePolicy,
+  toggleSupportChat,
+} from "@langwatch/workflow-browser-kit";
 /**
  * @vitest-environment jsdom
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import {
-  assertCrispChatHidden,
-  installCrispBubblePolicy,
-  toggleSupportChat,
-} from "../crisp-bubble-policy.ts";
 
 const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 

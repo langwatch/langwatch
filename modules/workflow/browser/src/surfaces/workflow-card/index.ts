@@ -1,1 +1,1 @@
-export * from "../../ui/elements/workflow-card.tsx";
+export * from "@langwatch/workflow-browser-kit";

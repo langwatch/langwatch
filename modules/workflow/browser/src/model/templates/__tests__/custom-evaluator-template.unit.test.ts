@@ -1,6 +1,5 @@
+import { customEvaluatorTemplate } from "@langwatch/workflow-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import { customEvaluatorTemplate } from "../custom-evaluator.template.ts";
 
 const node = (id: string) => {
   const result = customEvaluatorTemplate.nodes.find((candidate) => candidate.id === id);

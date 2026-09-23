@@ -1,6 +1,6 @@
+import { blankTemplate } from "@langwatch/workflow-browser-kit";
 import { describe, expect, it, vi } from "vitest";
 
-import { blankTemplate } from "../model/templates/blank.template.ts";
 import { parseWorkflowImport } from "../ui/elements/workflow-create-dialog.tsx";
 
 function workflowFile(contents: string, size = contents.length) {

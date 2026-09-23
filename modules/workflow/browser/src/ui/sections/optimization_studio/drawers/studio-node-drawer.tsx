@@ -1,6 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { VariablesSection } from "@langwatch/prompt-browser-kit";
 import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
+import { InsideDrawerProvider } from "@langwatch/workflow-browser-kit";
 import type {
   AgentComponent,
   Component,
@@ -18,7 +19,6 @@ import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";
-import { InsideDrawerProvider } from "../../../elements/studio-drawer-footer.tsx";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import { CodePropertiesPanel as WorkflowCodePropertiesPanel } from "../../properties/workflow-code-properties-panel.tsx";
 import { EndPropertiesPanel as WorkflowEndPropertiesPanel } from "../../properties/workflow-end-properties-panel.tsx";

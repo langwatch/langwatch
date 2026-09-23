@@ -6,7 +6,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { FormatMoney } from "@langwatch/workflow-browser/format-money";
+import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { HoverableBigText } from "@langwatch/workflow-browser/hoverable-big-text";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";

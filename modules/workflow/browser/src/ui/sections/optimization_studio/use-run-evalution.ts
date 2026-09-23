@@ -15,8 +15,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
-import { useVersionState } from "./history.tsx";
 import { usePostEvent } from "./use-post-event.tsx";
+import { useVersionState } from "./use-version-state.ts";
 
 const logger = createLogger("langwatch:studio:evaluation");
 

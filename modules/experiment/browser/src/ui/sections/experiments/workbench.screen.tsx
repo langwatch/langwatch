@@ -19,7 +19,7 @@ import {
   useRegisterLangyActions,
   useRegisterLangyHandlers,
 } from "@langwatch/langy-browser/langy-page-registration";
-import { assertCrispChatHidden } from "@langwatch/workflow-browser/crisp-bubble-policy";
+import { assertCrispChatHidden } from "@langwatch/workflow-browser-kit";
 import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
 import { useEffect, useMemo, useState } from "react";
 

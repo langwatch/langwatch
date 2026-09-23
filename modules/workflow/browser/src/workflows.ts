@@ -28,7 +28,7 @@ export {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "./model/workflow-host.ts";
+} from "@langwatch/workflow-browser-kit";
 
 /**
  * The Optimization Studio, `/:project/studio/:workflow` - the third

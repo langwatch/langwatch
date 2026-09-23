@@ -19,7 +19,7 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import { FormatMoney } from "@langwatch/workflow-browser/format-money";
+import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
 import { VersionBox } from "@langwatch/workflow-browser/version-history";
 import type { Experiment, Project } from "@langwatch/workflow-contract";

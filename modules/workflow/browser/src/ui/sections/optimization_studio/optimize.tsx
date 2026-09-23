@@ -40,9 +40,9 @@ import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-or
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
-import { useVersionState } from "./history.tsx";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/optimization-studio-llm-config-field.tsx";
 import { useOptimizationExecution } from "./use-optimization-execution.ts";
+import { useVersionState } from "./use-version-state.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
 const optimizerOptions: {

@@ -73,11 +73,6 @@
       "types": "./dist/add-model-provider-key.d.ts",
       "default": "./src/add-model-provider-key.ts"
     },
-    "./format-money": {
-      "langwatch-declaration-source": "./src/format-money.ts",
-      "types": "./dist/format-money.d.ts",
-      "default": "./src/format-money.ts"
-    },
     "./version-history": {
       "langwatch-declaration-source": "./src/version-history.ts",
       "types": "./dist/version-history.d.ts",
@@ -108,45 +103,15 @@
       "types": "./dist/component-types.d.ts",
       "default": "./src/component-types.ts"
     },
-    "./next-link": {
-      "langwatch-declaration-source": "./src/next-link.ts",
-      "types": "./dist/next-link.d.ts",
-      "default": "./src/next-link.ts"
-    },
-    "./platform-defaults": {
-      "langwatch-declaration-source": "./src/platform-defaults.ts",
-      "types": "./dist/platform-defaults.d.ts",
-      "default": "./src/platform-defaults.ts"
-    },
-    "./crisp-bubble-policy": {
-      "langwatch-declaration-source": "./src/crisp-bubble-policy.ts",
-      "types": "./dist/crisp-bubble-policy.d.ts",
-      "default": "./src/crisp-bubble-policy.ts"
-    },
     "./fetch-sse": {
       "langwatch-declaration-source": "./src/fetch-sse.ts",
       "types": "./dist/fetch-sse.d.ts",
       "default": "./src/fetch-sse.ts"
     },
-    "./workflow-card": {
-      "langwatch-declaration-source": "./src/workflow-card.ts",
-      "types": "./dist/workflow-card.d.ts",
-      "default": "./src/workflow-card.ts"
-    },
     "./code-agent": {
       "langwatch-declaration-source": "./src/code-agent.ts",
       "types": "./dist/code-agent.d.ts",
       "default": "./src/code-agent.ts"
-    },
-    "./workflow-templates": {
-      "langwatch-declaration-source": "./src/workflow-templates.ts",
-      "types": "./dist/workflow-templates.d.ts",
-      "default": "./src/workflow-templates.ts"
-    },
-    "./studio-drawer-footer": {
-      "langwatch-declaration-source": "./src/studio-drawer-footer.ts",
-      "types": "./dist/studio-drawer-footer.d.ts",
-      "default": "./src/studio-drawer-footer.ts"
     },
     "./evaluate-api-snippet": {
       "langwatch-declaration-source": "./src/evaluate-api-snippet.ts",

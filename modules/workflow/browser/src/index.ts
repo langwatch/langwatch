@@ -1,5 +1,4 @@
 export * from "./model/optimizers.ts";
-export * from "./ui/elements/workflow-card.tsx";
 export * from "./ui/elements/workflow-create-dialog.tsx";
 export * from "./ui/sections/workflow-autosave.tsx";
 export * from "./ui/sections/workflow-base-properties-panel.tsx";
@@ -23,7 +22,6 @@ export * from "./ui/sections/properties/workflow-properties-panel.tsx";
 export * from "./behavior/workflow-store.ts";
 export * from "./model/studio-registry.ts";
 export * from "./model/signature-message-edge.ts";
-export * from "./ui/elements/studio-drawer-footer.tsx";
 export * from "./model/studio-evaluation-query.ts";
 export * from "./model/workflow-llm-form.ts";
 export * from "./behavior/use-workflow-store.ts";
@@ -88,12 +86,4 @@ export { SignatureNode } from "./ui/sections/workflow-nodes.signature.tsx";
 export { AgentNodeDraggable } from "./ui/sections/workflow-agent-node-draggable.tsx";
 export { EvaluatorNodeDraggable } from "./ui/sections/workflow-evaluator-node-draggable.tsx";
 export { NodeDraggable } from "./ui/sections/workflow-node-draggable.tsx";
-export {
-  blankTemplate,
-  entryNode as blankTemplateEntryNode,
-} from "./model/templates/blank.template.ts";
-export {
-  customEvaluatorTemplate,
-  entryNode as customEvaluatorTemplateEntryNode,
-} from "./model/templates/custom-evaluator.template.ts";
 export * from "./model/templates/templates.registry.ts";

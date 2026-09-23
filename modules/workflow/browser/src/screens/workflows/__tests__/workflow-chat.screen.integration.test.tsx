@@ -4,14 +4,14 @@
  * The standalone chat address with two states worth pinning.
  */
 
+import {
+  blankTemplate,
+  blankTemplateEntryNode,
+} from "@langwatch/workflow-browser-kit";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  blankTemplate,
-  entryNode as blankTemplateEntryNode,
-} from "../../../model/templates/blank.template.ts";
 import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../testing.tsx";
 import WorkflowChatScreen from "../workflow-chat.screen.tsx";
 

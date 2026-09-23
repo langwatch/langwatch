@@ -62,7 +62,8 @@ vi.mock("@langwatch/workflow-browser/studio-scope", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-browser/studio-drawer-footer", () => ({
+vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useRegisterDrawerFooter: () => void 0,
 }));
 

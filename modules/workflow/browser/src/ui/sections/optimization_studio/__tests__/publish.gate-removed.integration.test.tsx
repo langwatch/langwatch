@@ -117,7 +117,7 @@ vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys.ts", (
   }),
 }));
 
-vi.mock("../history.tsx", () => ({
+vi.mock("../use-version-state.ts", () => ({
   useVersionState: () => ({
     canSaveNewVersion: false,
     versionToBeEvaluated: { version: "1.0.0" },

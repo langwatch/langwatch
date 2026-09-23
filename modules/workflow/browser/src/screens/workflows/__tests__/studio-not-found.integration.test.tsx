@@ -2,10 +2,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { WorkflowHostProvider } from "@langwatch/workflow-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { WorkflowHostProvider } from "../../../model/workflow-host.ts";
 
 const { workflowRef } = vi.hoisted(() => ({
   workflowRef: { current: {} as Record<string, unknown> },

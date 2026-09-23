@@ -1,26 +1,19 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
-import { useRouter } from "@langwatch/browser-host/use-router";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 import { Chip, ConversationExpandContext } from "@langwatch/trace-browser-kit";
 import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
-import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
-import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
-import {
-  useRunStateStream,
-  type ScenarioRunState,
-} from "../../../behavior/simulations/use-run-state-stream.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import type { ScenarioRunState } from "../../../behavior/simulations/use-run-state-stream.ts";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
+import { ParameterRow, SECRET_VALUE_MASK } from "../../elements/parameter-row.tsx";
 import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../elements/run-detail-section.tsx";
 import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
@@ -31,7 +24,7 @@ import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
 import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
-import { useRunAgainActions } from "./use-run-again-actions.ts";
+import { useScenarioRunDetail } from "./use-scenario-run-detail.ts";
 
 /**
  * The Agent Testing variant: wider, side by side when the width allows, and
@@ -46,102 +39,7 @@ function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
 }
 
-/**
- * What a secret parameter shows in place of a value. There is no value to
- * show: the run records the name and nothing else.
- */
-const SECRET_VALUE_MASK = "••••••••";
-
-/**
- * Whole-conversation view in Trace Explorer: every trace of this run carries the
- * scenario.run_id attribute, so a scenarioRun:"<id>" search shows the full
- * conversation. Same #<lens>?q= fragment contract as the command bar's trace links.
- */
-function useOpenRunInTraces({
-  projectSlug,
-  scenarioRunId,
-}: {
-  projectSlug: string | undefined;
-  scenarioRunId: string | undefined;
-}) {
-  const router = useRouter();
-
-  return useCallback(() => {
-    if (!projectSlug || !scenarioRunId) return;
-    const query = encodeURIComponent(`scenarioRun:"${scenarioRunId}"`);
-    void router.push(`/${projectSlug}/traces#all-traces?q=${query}`);
-  }, [projectSlug, scenarioRunId, router]);
-}
-
-/**
- * Everything the run detail drawer knows about one run: the live state, the streamed
- * messages, the scenario record, and the actions on it. Shared by the classic drawer
- * and the Agent Testing variant so the two layouts read the same run the same way.
- */
-export function useScenarioRunDetail({
-  scenarioRunId,
-  open,
-}: {
-  scenarioRunId: string | undefined;
-  open: boolean;
-}) {
-  const { openDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
-  const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
-
-  const dejaView = useDejaViewLink({
-    aggregateId: scenarioRunId,
-    tenantId: project?.id,
-  });
-
-  const stream = useRunStateStream({
-    scenarioRunId,
-    projectId: project?.id,
-    isOpen: open,
-  });
-  const scenarioId = stream.scenarioState?.scenarioId;
-  const batchRunId = stream.scenarioState?.batchRunId;
-
-  const { data: scenarioData } = api.scenarios.getByIdIncludingArchived.useQuery(
-    { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project?.id && !!scenarioId },
-  );
-
-  const facts = useRunDetailFacts({
-    scenarioState: stream.scenarioState,
-    streamingMessages: stream.streamingMessages,
-    scenarioRunId,
-    isOpen: open,
-  });
-  const actions = useRunAgainActions({
-    scenarioId,
-    projectId: project?.id,
-    projectSlug: project?.slug,
-  });
-  const handleOpenInTraces = useOpenRunInTraces({
-    projectSlug: project?.slug,
-    scenarioRunId,
-  });
-
-  return {
-    project,
-    openDrawer,
-    scenarioId,
-    batchRunId,
-    scenarioData,
-    dejaView,
-    scenarioEditorOpen,
-    setScenarioEditorOpen,
-    handleOpenInTraces,
-    ...stream,
-    ...facts,
-    ...actions,
-  };
-}
-
-export type ScenarioRunDetail = ReturnType<typeof useScenarioRunDetail>;
-
-export { formatResultsForCopy, SECRET_VALUE_MASK };
+export { formatResultsForCopy };
 
 /**
  * The run detail drawer. The Agent Testing pages open the same registry key
@@ -538,32 +436,5 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
         scenarioId={scenarioId && isAgentTestScenarioId(scenarioId) ? undefined : scenarioId}
       />
     </>
-  );
-}
-
-/** One name and what the run recorded for it. */
-export function ParameterRow({
-  name,
-  value,
-  muted = false,
-}: {
-  name: string;
-  value: string;
-  muted?: boolean;
-}) {
-  return (
-    <HStack gap={3} align="start">
-      <Text fontSize="xs" fontFamily="mono" color="fg.muted" width="180px" flexShrink={0}>
-        {name}
-      </Text>
-      <Text
-        fontSize="xs"
-        fontFamily="mono"
-        wordBreak="break-word"
-        color={muted ? "fg.subtle" : undefined}
-      >
-        {value}
-      </Text>
-    </HStack>
   );
 }

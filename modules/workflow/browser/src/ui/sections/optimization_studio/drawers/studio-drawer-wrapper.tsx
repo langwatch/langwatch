@@ -2,7 +2,7 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit";
+import { ComponentIcon, DrawerFooterContext } from "@langwatch/workflow-browser-kit";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { motion } from "motion/react";
@@ -14,7 +14,6 @@ import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import { DrawerFooterContext } from "../../../elements/studio-drawer-footer.tsx";
 import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";
 import { getNodeDisplayName } from "../../workflow-nodes.tsx";

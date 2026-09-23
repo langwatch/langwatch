@@ -56,7 +56,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-vi.mock("../history.tsx", () => ({
+vi.mock("../use-version-state.ts", () => ({
   useVersionState: () => ({
     previousVersion: { id: "v-1", version: "1.0" },
     // `useVersionState` parses the stored envelope into the typed Studio

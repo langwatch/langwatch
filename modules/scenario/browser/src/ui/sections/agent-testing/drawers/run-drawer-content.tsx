@@ -10,10 +10,10 @@ import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";
+import { ParameterRow, SECRET_VALUE_MASK } from "../../../elements/parameter-row.tsx";
 import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
 import { TypingBubble } from "../../../elements/typing-bubble.tsx";
 import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
-import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer.tsx";
 import { isHumanCallerRun } from "../results/caller-display.ts";
 import { hasVerdict, type RunDetail, type RunScenarioState } from "./use-run-drawer-state.ts";
 

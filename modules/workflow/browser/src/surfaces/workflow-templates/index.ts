@@ -1,2 +1,2 @@
-export { blankTemplate } from "../../model/templates/blank.template.ts";
-export { customEvaluatorTemplate } from "../../model/templates/custom-evaluator.template.ts";
+export { blankTemplate } from "@langwatch/workflow-browser-kit";
+export { customEvaluatorTemplate } from "@langwatch/workflow-browser-kit";

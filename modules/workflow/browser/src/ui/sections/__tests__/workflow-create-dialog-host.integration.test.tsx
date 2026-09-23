@@ -22,7 +22,8 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   };
 });
 
-vi.mock("../../../model/workflow-host.ts", () => ({
+vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowHost: () => ({
     scope: () => ({ projectId: "project_1", projectSlug: "project-one" }),
     navigate: vi.fn(),

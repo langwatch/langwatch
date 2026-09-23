@@ -3,7 +3,7 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
-import { WorkflowCardDisplay } from "@langwatch/workflow-browser/workflow-card";
+import { WorkflowCardDisplay } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";

@@ -4,10 +4,9 @@
 
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal, toDate } from "@langwatch/time";
+import { useWorkflowHost, type WorkflowCopyTarget } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
-
-import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
 
 /**
  * The project row, as the studio's closure reads it.

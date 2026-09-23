@@ -10,23 +10,19 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api,api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
-import {
-  hasDSLChanged,
-  parseStudioWorkflow,
-  type Project,
-  studioWorkflowSchema,
-} from "@langwatch/workflow-contract";
-import { useCallback, useEffect, useMemo } from "react";
-import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+import { parseStudioWorkflow } from "@langwatch/workflow-contract";
+import { useCallback } from "react";
+import { FormProvider, useForm } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 import { UserAvatar } from "../../elements/user-avatar.tsx";
+import { useVersionState } from "./use-version-state.ts";
 import { NewVersionFields } from "./version-to-be-used.tsx";
 
 export function History() {
@@ -281,103 +277,4 @@ export const VersionBox = ({
       {children}
     </Box>
   );
-};
-
-export const useVersionState = ({
-  project,
-  form,
-  allowSaveIfAutoSaveIsCurrentButNotLatest = true,
-}: {
-  project?: Project;
-  form?: UseFormReturn<{ version: string; commitMessage: string }>;
-  allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
-}) => {
-  const { workflowId, getWorkflow, autosavedWorkflow } = useWorkflowStore(
-    ({ workflow_id: workflowId, version, getWorkflow, autosavedWorkflow }) => ({
-      workflowId,
-      version,
-      getWorkflow,
-      autosavedWorkflow,
-    }),
-  );
-
-  const versions = workflowApi.workflow.getVersions.useQuery(
-    {
-      projectId: project?.id ?? "",
-      workflowId: workflowId ?? "",
-      returnDSL: "previousVersion",
-    },
-    { enabled: !!project?.id && !!workflowId },
-  );
-  const currentVersion = versions.data?.find((version) => version.isCurrentVersion);
-  const previousVersion = versions.data?.find((version) => version.isPreviousVersion);
-  const latestVersion = versions.data?.find((version) => version.isLatestVersion);
-  /**
-   * `getVersions` publishes the open `WorkflowDsl` envelope; parse it once
-   * here into the typed Studio refinement the diff and autogen both need.
-   */
-  const previousVersionDsl = useMemo(() => {
-    if (!previousVersion?.dsl) return undefined;
-    const parsed = studioWorkflowSchema.safeParse(previousVersion.dsl);
-    return parsed.success ? parsed.data : undefined;
-  }, [previousVersion?.dsl]);
-  const hasChanges = autosavedWorkflow
-    ? hasDSLChanged(getWorkflow(), autosavedWorkflow, false)
-    : false;
-
-  const canSaveNewVersion =
-    hasChanges ||
-    !!latestVersion?.autoSaved ||
-    (allowSaveIfAutoSaveIsCurrentButNotLatest && !!currentVersion?.autoSaved);
-
-  const [versionMajor] = latestVersion?.version.split(".") ?? ["0"];
-  const nextVersion = useMemo(() => {
-    return latestVersion?.autoSaved
-      ? latestVersion.version
-      : `${parseInt(versionMajor ?? "0") + 1}`;
-  }, [latestVersion?.autoSaved, latestVersion?.version, versionMajor]);
-
-  const versionToBeEvaluated = useMemo(() => {
-    return canSaveNewVersion
-      ? { id: "", version: nextVersion, commitMessage: "" }
-      : currentVersion?.autoSaved
-        ? {
-            id: currentVersion?.parent?.id,
-            version: currentVersion?.parent?.version,
-            commitMessage: currentVersion?.parent?.commitMessage,
-          }
-        : {
-            id: currentVersion?.id,
-            version: currentVersion?.version,
-            commitMessage: currentVersion?.commitMessage,
-          };
-  }, [
-    canSaveNewVersion,
-    currentVersion?.autoSaved,
-    currentVersion?.commitMessage,
-    currentVersion?.id,
-    currentVersion?.parent?.commitMessage,
-    currentVersion?.parent?.id,
-    currentVersion?.parent?.version,
-    currentVersion?.version,
-    nextVersion,
-  ]);
-
-  useEffect(() => {
-    if (form) {
-      form.setValue("version", nextVersion);
-    }
-  }, [nextVersion, form]);
-
-  return {
-    versions,
-    currentVersion,
-    previousVersion,
-    previousVersionDsl,
-    latestVersion,
-    hasChanges,
-    canSaveNewVersion,
-    nextVersion,
-    versionToBeEvaluated,
-  };
 };

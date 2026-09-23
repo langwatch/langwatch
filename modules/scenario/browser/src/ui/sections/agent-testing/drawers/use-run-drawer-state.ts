@@ -17,7 +17,7 @@ import {
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
-import { useScenarioRunDetail } from "../../simulations/scenario-run-detail-drawer.tsx";
+import { useScenarioRunDetail } from "../../simulations/use-scenario-run-detail.ts";
 
 /** Everything one open drawer knows about the run it is showing. */
 export type RunDrawerState = ReturnType<typeof useRunDrawerState>;

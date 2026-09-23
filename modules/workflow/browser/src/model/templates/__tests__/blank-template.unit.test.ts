@@ -1,6 +1,5 @@
+import { blankTemplate } from "@langwatch/workflow-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import { blankTemplate } from "../blank.template.ts";
 
 const node = (id: string) => {
   const result = blankTemplate.nodes.find((candidate) => candidate.id === id);

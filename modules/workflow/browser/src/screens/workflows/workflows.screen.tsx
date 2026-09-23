@@ -8,10 +8,10 @@ import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@chakra-ui/react"
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
 
-import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowCreateDialogHost } from "../../ui/sections/workflow-create-dialog-host.tsx";
 import { WorkflowListCard } from "../../ui/sections/workflow-list-card.tsx";
 

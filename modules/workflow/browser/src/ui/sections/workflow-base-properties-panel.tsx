@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useInsideDrawer } from "@langwatch/workflow-browser-kit";
 import type {
   Component,
   ComponentType,
@@ -33,7 +34,6 @@ import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
-import { useInsideDrawer } from "../elements/studio-drawer-footer.tsx";
 import { ComponentExecutionButton } from "./workflow-node-execution.tsx";
 import { getNodeDisplayName, isExecutableComponent } from "./workflow-nodes.tsx";
 

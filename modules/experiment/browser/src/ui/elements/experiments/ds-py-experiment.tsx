@@ -32,7 +32,7 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { FormatMoney } from "@langwatch/workflow-browser/format-money";
+import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { VersionBox } from "@langwatch/workflow-browser/version-history";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";

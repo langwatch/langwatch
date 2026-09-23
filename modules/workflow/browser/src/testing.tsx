@@ -3,9 +3,6 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
-import type { ReactElement } from "react";
-
 import {
   WorkflowHostApi,
   WorkflowHostProvider,
@@ -14,7 +11,9 @@ import {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "./model/workflow-host.ts";
+} from "@langwatch/workflow-browser-kit";
+import { render } from "@testing-library/react";
+import type { ReactElement } from "react";
 
 export type QueryWrite = {
   next: Readonly<Record<string, string | undefined>>;

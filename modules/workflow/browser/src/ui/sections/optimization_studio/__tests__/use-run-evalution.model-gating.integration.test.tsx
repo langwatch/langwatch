@@ -67,7 +67,7 @@ const storeState = {
   }),
 };
 
-vi.mock("../history.tsx", () => ({
+vi.mock("../use-version-state.ts", () => ({
   useVersionState: () => ({
     latestVersion: { id: "v-1-auto", autoSaved: true },
     previousVersion: { id: "v-1", version: "1.0" },

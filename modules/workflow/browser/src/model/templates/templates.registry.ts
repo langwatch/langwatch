@@ -1,5 +1,4 @@
-import { blankTemplate } from "./blank.template.ts";
-import { customEvaluatorTemplate } from "./custom-evaluator.template.ts";
+import { blankTemplate, customEvaluatorTemplate } from "@langwatch/workflow-browser-kit";
 
 export const TEMPLATES = {
   blank: blankTemplate,

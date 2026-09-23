@@ -24,6 +24,7 @@ import {
   OutputsSection,
   type OutputType,
 } from "@langwatch/prompt-browser/outputs-section";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
 import type {
   HttpAuth,
   HttpComponentConfig,
@@ -53,7 +54,6 @@ import {
   buildAvailableSources,
   buildInputMappings,
 } from "../../../../model/edge-mapping.ts";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";

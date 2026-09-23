@@ -30,7 +30,8 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-vi.mock("../../elements/studio-drawer-footer.tsx", () => ({
+vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useInsideDrawer: () => false,
 }));
 

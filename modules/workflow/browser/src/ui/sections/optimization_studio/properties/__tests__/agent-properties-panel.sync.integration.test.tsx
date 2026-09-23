@@ -57,7 +57,7 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),
 }));
-vi.mock("../../../../elements/studio-drawer-footer.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRegisterDrawerFooter: (content: ReactNode) => {
     footerHolder.content = content;

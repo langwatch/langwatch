@@ -8,14 +8,13 @@ import { Box, Button, Flex, HStack, Input, Spinner, Text, VStack } from "@chakra
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
+import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { getEntryInputs } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-
-import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /**
  * What the public workflow-run endpoint answers with. Run over that

@@ -16,7 +16,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit";
+import { ComponentIcon, assertCrispChatHidden } from "@langwatch/workflow-browser-kit";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -45,7 +45,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
-import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow.ts";

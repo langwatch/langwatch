@@ -15,7 +15,7 @@ import { useDebounceCallback } from "usehooks-ts";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { useVersionState } from "./history.tsx";
+import { useVersionState } from "./use-version-state.ts";
 
 export const VersionToBeUsed = () => {
   const { checkCanCommitNewVersion } = useWorkflowStore(({ checkCanCommitNewVersion }) => ({

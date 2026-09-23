@@ -11,6 +11,7 @@ import {
   getEvaluatorDefaultSettings,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { DEFAULT_EMBEDDINGS_MODEL, useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
@@ -21,13 +22,11 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "../../../../model/edge-mapping.ts";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
 /**

@@ -7,9 +7,8 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useEffect, useState } from "react";
-
-import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /** One replica, as the picker lists it. */
 type WorkflowCopy = { id: string; name: string; fullPath: string };

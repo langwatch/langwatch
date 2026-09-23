@@ -33,7 +33,7 @@ import {
   getEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
