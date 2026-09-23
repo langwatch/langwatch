@@ -65,12 +65,14 @@ function resolveLocal({
   specifier: string;
   fromFile: string;
 }): string | null {
-  const base = specifier.startsWith("~/")
-    ? join(SRC_DIR, specifier.slice(2))
-    : specifier.startsWith(".")
-      ? resolve(dirname(fromFile), specifier)
-      : null;
-  if (base === null) return null;
+  let base: string;
+  if (specifier.startsWith("~/")) {
+    base = join(SRC_DIR, specifier.slice(2));
+  } else if (specifier.startsWith(".")) {
+    base = resolve(dirname(fromFile), specifier);
+  } else {
+    return null;
+  }
 
   const candidates = [
     base,

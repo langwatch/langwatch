@@ -230,6 +230,20 @@ function groupProjectOptions({
   return { teamGroups, orphanProjects };
 }
 
+function listedOrCurrent<E extends { id: string; name: string }>({
+  listed,
+  currentId,
+  currentName,
+}: {
+  listed: E[] | undefined;
+  currentId: string | undefined;
+  currentName: string;
+}): (E | { id: string; name: string })[] {
+  if (listed && listed.length > 0) return listed;
+  if (currentId) return [{ id: currentId, name: currentName }];
+  return [];
+}
+
 // Collapse redundant scopes per lineage; org/dept mutually exclusive.
 export function collapseRedundantScopes(
   next: ScopeChipPickerEntry[],
@@ -438,12 +452,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
       }
     }
     if (allowed.has("TEAM")) {
-      const teams =
-        availableTeams && availableTeams.length > 0
-          ? availableTeams
-          : teamId
-            ? [{ id: teamId, name: teamName ?? "Team" }]
-            : [];
+      const teams = listedOrCurrent({
+        listed: availableTeams,
+        currentId: teamId,
+        currentName: teamName ?? "Team",
+      });
       for (const team of teams) {
         out.push({
           value: `TEAM:${team.id}`,
@@ -454,12 +467,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
       }
     }
     if (allowed.has("PROJECT")) {
-      const projects =
-        availableProjects && availableProjects.length > 0
-          ? availableProjects
-          : projectId
-            ? [{ id: projectId, name: projectName ?? "Project" }]
-            : [];
+      const projects = listedOrCurrent({
+        listed: availableProjects,
+        currentId: projectId,
+        currentName: projectName ?? "Project",
+      });
       for (const project of projects) {
         out.push({
           value: `PROJECT:${project.id}`,
@@ -808,12 +820,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
             onChange(
               collapseRedundantScopes(next, scopes, {
                 organizationId,
-                availableProjects:
-                  availableProjects && availableProjects.length > 0
-                    ? availableProjects
-                    : projectId
-                      ? [{ id: projectId, name: projectName ?? "Project" }]
-                      : [],
+                availableProjects: listedOrCurrent({
+                  listed: availableProjects,
+                  currentId: projectId,
+                  currentName: projectName ?? "Project",
+                }),
               }),
             );
           }}

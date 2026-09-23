@@ -193,9 +193,10 @@ for (const { name, entry } of ENTRIES) {
     for (const imported of output.imports) {
       if (!imported.external) continue;
       const id = imported.path;
-      if (id.startsWith("node:") || builtins.has(basePackage(id))) continue;
-      if (id === ".prisma" || id.startsWith(".prisma/")) continue;
+      if (id.startsWith("node:")) continue;
       const base = basePackage(id);
+      if (builtins.has(base)) continue;
+      if (id === ".prisma" || id.startsWith(".prisma/")) continue;
       if (declared.has(base)) continue;
       if (optionalExternals.has(base)) continue;
       let entriesFor = undeclared.get(base);
@@ -218,9 +219,11 @@ for (const { name, entry } of ENTRIES) {
     for (const m of source.matchAll(/^[ \t]*import\s*(["'])([^"'\n]+)\1/gm)) {
       const spec = m[2] ?? "";
       if (/^(\.|\/|#)/.test(spec)) continue;
-      if (spec.startsWith("node:") || builtins.has(basePackage(spec))) continue;
+      if (spec.startsWith("node:")) continue;
+      const specPackage = basePackage(spec);
+      if (builtins.has(specPackage)) continue;
       if (sideEffectImports.has(spec)) continue;
-      if (workspaceBundled.has(basePackage(spec))) continue;
+      if (workspaceBundled.has(specPackage)) continue;
       let files = unlistedSideEffectImports.get(spec);
       if (!files) {
         files = new Set();

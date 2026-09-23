@@ -120,6 +120,18 @@ export function scopeChipTooltip(entry: {
   return entry.detail ? `${style.kind}: ${label} · ${entry.detail}` : `${style.kind}: ${label}`;
 }
 
+function entriesOrFallback({
+  scopes,
+  fallbackScopeType,
+}: {
+  scopes: ScopeEntry[] | undefined;
+  fallbackScopeType: ProviderScopeType | undefined;
+}): ScopeEntry[] {
+  if (scopes && scopes.length > 0) return scopes;
+  if (fallbackScopeType) return [{ scopeType: fallbackScopeType, scopeId: "" }];
+  return [];
+}
+
 // Scope chips list; tooltip for scope kind; personal chip orthogonal.
 export function ProviderScopeChips({
   scopes,
@@ -144,12 +156,7 @@ export function ProviderScopeChips({
   principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";
 }) {
-  const entries: ScopeEntry[] =
-    scopes && scopes.length > 0
-      ? scopes
-      : fallbackScopeType
-        ? [{ scopeType: fallbackScopeType, scopeId: "" }]
-        : [];
+  const entries = entriesOrFallback({ scopes, fallbackScopeType });
   const iconSize = size === "xs" ? 10 : 12;
   const principalLabel = principal?.name?.trim() || principal?.email?.trim() || undefined;
   if (entries.length === 0 && !principalLabel) {

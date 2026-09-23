@@ -45,11 +45,10 @@ export function parseLangWatchQLTimeWindowText(text: string): number | undefined
   if (Number.isNaN(parsed)) return void 0;
 
   const typed = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  return formatLangWatchQLDateTimeParameter(
+  const spelledBack = formatLangWatchQLDateTimeParameter(
     toDate(Temporal.Instant.fromEpochMilliseconds(parsed)),
-  ) === typed
-    ? parsed
-    : void 0;
+  );
+  return spelledBack === typed ? parsed : void 0;
 }
 
 interface WindowText {

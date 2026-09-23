@@ -162,17 +162,11 @@ function ReportsContent() {
         <>
           <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
           {project ? (
-            customChartPlaygroundEnabled ? (
-              <Button colorPalette="orange" size="sm" onClick={() => setIsAddChartOpen(true)}>
-                <Plus /> Add chart
-              </Button>
-            ) : (
-              <Link href={addChartUrl} asChild>
-                <Button colorPalette="orange" size="sm">
-                  <Plus /> Add chart
-                </Button>
-              </Link>
-            )
+            <AddChartButton
+              opensDrawer={customChartPlaygroundEnabled}
+              href={addChartUrl}
+              onOpenDrawer={() => setIsAddChartOpen(true)}
+            />
           ) : null}
         </>
       }
@@ -244,4 +238,29 @@ function ReportsContent() {
  * `withPermissionGuard("analytics:view")` in
  * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`.
  */
+function AddChartButton({
+  opensDrawer,
+  href,
+  onOpenDrawer,
+}: {
+  opensDrawer: boolean;
+  href: string;
+  onOpenDrawer: () => void;
+}) {
+  if (opensDrawer) {
+    return (
+      <Button colorPalette="orange" size="sm" onClick={onOpenDrawer}>
+        <Plus /> Add chart
+      </Button>
+    );
+  }
+  return (
+    <Link href={href} asChild>
+      <Button colorPalette="orange" size="sm">
+        <Plus /> Add chart
+      </Button>
+    </Link>
+  );
+}
+
 export default ReportsContent;

@@ -977,7 +977,6 @@ function SeriesFieldItem({
     >
       <Accordion.ItemTrigger
         cursor="pointer"
-        role="button"
         background="bg.subtle"
         fontWeight="bold"
         paddingLeft={1}
@@ -1400,7 +1399,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       onInputChange={(input) => {
         setQuery(input);
       }}
-      options={options as any}
+      options={options}
       value={current}
       isSearchable={true}
       // useBasicStyles

@@ -75,6 +75,7 @@ export function LangWatchQLResultTable({ result }: LangWatchQLResultTableProps) 
       {duplicates.length > 0 && <DuplicateColumnWarning names={duplicates} />}
 
       <Box
+        as="section"
         ref={setScrollContainer}
         data-testid="lwql-result-scroll"
         // Inline, like the virtualizer's own row heights below: both axes
@@ -90,7 +91,6 @@ export function LangWatchQLResultTable({ result }: LangWatchQLResultTableProps) 
         // a scrollable region that is not focusable is unreachable without a
         // pointer.
         tabIndex={0}
-        role="region"
         aria-label="Query result rows"
       >
         <Table.Root size="sm" variant="line" width="full">
