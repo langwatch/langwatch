@@ -48,6 +48,12 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
     Given the chart is rendered at one release version and then at the next
     Then the ClickHouse pod template's access-model annotation differs between the two renders
 
+  @e2e
+  Scenario: A first upgrade from a pre-LWQL release provisions the access model on every pod
+    Given a chart-managed release with no render RBAC and no LangWatchQL password Secret
+    When the chart is upgraded to the rendered LangWatchQL delivery
+    Then the pre-upgrade hook recreates the RBAC and passwords, the render succeeds, and every ClickHouse pod serves a tenant-filtered query
+
   # ── Rendered is the chart default; sql mode is opt-in for BYO ──────────────
 
   @e2e

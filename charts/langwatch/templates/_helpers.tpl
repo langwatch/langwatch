@@ -928,23 +928,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      ClickHouse user/profile/policy/grants/named collection, and the
      PostgreSQL lwql_ro reader — on every path, chart-managed ClickHouse
      included. The chart's only job is handing over the two passwords the app
-     converges those identities with, both from the app Secret.
+     converges those identities with.
+
+     Where the passwords live: an operator-supplied `secrets.existingSecret`
+     carries them; otherwise, when the chart generates them (autogen), they are
+     in the chart-owned `langwatch.lwql.passwordSecretName` Secret — a
+     pre-install,pre-upgrade hook, so the render Job finds them on a first upgrade
+     before the app Secret is healed (see templates/lwql-passwords-secret.yaml);
+     with autogen off and no existingSecret the operator hand-creates the app
+     Secret, so they come from there. All three pre-exist before the render hook.
 
      `optional: true` is deliberate: a Secret without these keys means
      LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of
      the pod dying in CreateContainerConfigError. */}}
 {{- if .Values.lwql.enabled }}
-{{- $appSecret := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+{{- $lwqlPwSecret := .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ $appSecret }}
+      name: {{ $lwqlPwSecret }}
       key: LWQL_CLICKHOUSE_PASSWORD
       optional: true
 - name: LWQL_POSTGRES_READER_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ $appSecret }}
+      name: {{ $lwqlPwSecret }}
       key: LWQL_POSTGRES_READER_PASSWORD
       optional: true
 {{- end }}
@@ -1280,6 +1288,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 */}}
 {{- define "langwatch.lwql.accessSecretName" -}}
   {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
+{{/*
+  Name of the chart-owned Secret holding the two LWQL passwords
+  (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) when the chart
+  generates them (autogen, no existingSecret). It is a pre-install,pre-upgrade
+  hook (templates/lwql-passwords-secret.yaml) so the passwords exist before the
+  render Job on a first upgrade, when the app Secret has not yet been healed with
+  the keys. sharedEnv resolves the LWQL passwords to this Secret on the autogen
+  path, and every consumer (app, workers, render Job) reads them from here.
+*/}}
+{{- define "langwatch.lwql.passwordSecretName" -}}
+  {{- printf "%s-lwql-passwords" (include "langwatch.fullname" .) -}}
 {{- end -}}
 
 {{/* ClickHouse: Password secret key */}}

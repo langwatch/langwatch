@@ -477,10 +477,10 @@ test_lwql() {
   # the Service.
   #
   # langwatch_lwql authenticates with LWQL_CLICKHOUSE_PASSWORD, which the render
-  # Job read from the APP Secret and wrote into the mounted user file as its
-  # password_sha256_hex.
+  # Job read from the chart-owned LWQL password Secret and wrote into the mounted
+  # user file as its password_sha256_hex.
   local lwql_pw
-  lwql_pw=$(kc get secret "langwatch-app-secrets" \
+  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   local p
@@ -724,7 +724,7 @@ test_lwql_replicas() {
   app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
     -o jsonpath='{.items[0].metadata.name}')
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
-  lwql_pw=$(kc get secret "langwatch-app-secrets" \
+  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   local pod_count
@@ -843,6 +843,106 @@ $refuse_out"
     assert_eq "[$p] no SQL-store copy of langwatch_lwql (guard blocked sql-mode DDL)" \
       "$(ch_query "$p" "SELECT count() FROM system.users WHERE name='langwatch_lwql' AND storage != 'users_xml'")" "0"
   done
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: first upgrade onto rendered LWQL from a pre-LWQL release (AC3)
+#
+# The real customer-base path at merge: every existing install's FIRST upgrade
+# onto this chart version. Before this version there is no render RBAC and no
+# LWQL password Secret, and the app Secret carries no LWQL keys. The render Job
+# runs as a pre-upgrade hook, which fires BEFORE the main phase — so its RBAC and
+# its passwords have to be pre-upgrade hooks too, or the upgrade aborts (missing
+# RBAC) or the render fails (LwqlRenderConfigMissingInputError). This suite
+# reproduces that exact starting state and asserts the upgrade converges.
+#
+# Why not install origin/main's chart and upgrade off it: the harness builds ONE
+# branch app image and points helm at the working-tree chart; there is no second,
+# historical chart to install, and pairing origin/main's chart with a branch-built
+# image is a combination that never ships and is untested. The pre-LWQL state is
+# three concrete absences (render RBAC, the <release>-lwql-passwords Secret, LWQL
+# keys in the app Secret) — deleting exactly those from a fresh install reproduces
+# it deterministically, which an origin/main install would not (its state depends
+# on whatever LWQL objects that version did or did not create).
+# ─────────────────────────────────────────────────────────────────────────────
+# @scenario "A first upgrade from a pre-LWQL release provisions the access model on every pod"
+test_lwql_upgrade_from_main() {
+  sep; info "Suite: first upgrade onto rendered LWQL from a pre-LWQL release (AC3 upgrade path)"
+
+  # Baseline: a normal install (chart-managed ClickHouse, 3 replicas).
+  helm_uninstall
+  helm_install \
+    --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (baseline, chart-managed ClickHouse, replicas=3)"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+
+  # Strip the release back to a pre-LWQL state: delete the render RBAC and the
+  # chart-owned LWQL password Secret. (The app Secret already carries no LWQL keys
+  # in this version — they live only in langwatch-lwql-passwords — so there is
+  # nothing to strip there.) The next `helm upgrade` now hits the same
+  # missing-inputs state a real customer's first upgrade does.
+  info "Reproducing the pre-LWQL state: deleting render RBAC and the LWQL password Secret"
+  kc delete serviceaccount "${RELEASE}-lwql-access-render" --ignore-not-found
+  kc delete role "${RELEASE}-lwql-access-render" --ignore-not-found
+  kc delete rolebinding "${RELEASE}-lwql-access-render" --ignore-not-found
+  kc delete secret "langwatch-lwql-passwords" --ignore-not-found
+  assert_eq "pre-LWQL state: no LWQL password Secret before upgrade" \
+    "$(kc get secret langwatch-lwql-passwords -o name 2>/dev/null || echo missing)" "missing"
+
+  # The first upgrade. --wait-for-jobs so a failed pre-upgrade hook Job fails the
+  # upgrade (helm awaits hook Jobs; without the RBAC/password-secret hooks this
+  # aborts). Bump the catalog annotation so the StatefulSet rolls and every pod
+  # RE-MOUNTS the freshly rendered Secret — proving the upgrade delivered a fresh,
+  # working model rather than the pods coasting on the baseline install's mount.
+  info "First upgrade onto the rendered LWQL delivery (pre-upgrade hooks must recreate RBAC + passwords)"
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1 \
+    --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-upgrade' \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade succeeded from a pre-LWQL state"
+
+  # The pre-upgrade hook chain ran: RBAC + password Secret recreated, render Job
+  # completed.
+  assert_render_job_complete
+  assert_eq "pre-upgrade hook recreated the LWQL password Secret" \
+    "$(kc get secret langwatch-lwql-passwords -o name 2>/dev/null || echo missing)" \
+    "secret/langwatch-lwql-passwords"
+
+  # Every ClickHouse pod serves the tenant-filtered query with the FRESHLY
+  # rendered identity — its password comes from the recreated password Secret, so
+  # authenticating with it proves the whole pre-upgrade chain wrote a working
+  # model before the pods rolled onto it.
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  local app_pod pods p lwql_pw
+  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  lwql_pw=$(kc get secret "langwatch-lwql-passwords" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+
+  for p in $pods; do
+    assert_eq "[$p] langwatch_lwql delivered as a rendered users_xml user after the first upgrade" \
+      "$(ch_query "$p" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
+    assert_eq "[$p] restricted identity authenticates with the freshly rendered password" \
+      "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+  done
+
+  local svc_ok=0 svc_try svc_out
+  for svc_try in $(seq 1 12); do
+    svc_out=$(kc exec "$app_pod" -- curl -s -m 10 \
+      -H "X-ClickHouse-User: langwatch_lwql" \
+      -H "X-ClickHouse-Key: $lwql_pw" \
+      "http://${RELEASE}-clickhouse:8123/" \
+      --data-binary "SELECT count() FROM langwatch.lwql_api_key_tenant_map" 2>/dev/null | tr -d ' \r\n')
+    if [ "$svc_out" = "0" ]; then svc_ok=$((svc_ok + 1)); fi
+  done
+  assert_eq "tenant-filtered query succeeds on every hit across three pods after the first upgrade" "$svc_ok" "12"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1231,8 +1331,11 @@ main() {
   test_upgrade
   test_external_clickhouse
   test_cold_storage_and_backup
-  # Runs last: reinstalls the release at replicas=3, then scales to 4 (AC3).
+  # Reinstalls the release at replicas=3, then scales to 4 (AC3).
   test_lwql_replicas
+  # Runs last: the real first-upgrade-from-pre-LWQL path (AC3 upgrade), which
+  # does its own clean install first.
+  test_lwql_upgrade_from_main
 
   sep
   pass "All langwatch chart tests passed"

@@ -2081,7 +2081,8 @@ clickhouse:
 #   - Chart-managed ClickHouse (default): RENDERED delivery. The
 #     <release>-lwql-access-render Job renders the model and writes it into the
 #     Secret <release>-lwql-clickhouse-access, which every ClickHouse pod mounts
-#     (see clickhouse.extraVolumes above), so every replica carries the whole
+#     (see clickhouse.lwqlAccess.secretName above, rendered into the pod by the
+#     subchart StatefulSet), so every replica carries the whole
 #     set. No access SQL DDL runs; the ClickHouse identity holds no ACCESS
 #     MANAGEMENT. This is LWQL_ACCESS_MODEL_MODE=rendered (the default when
 #     unset); the chart never sets the variable for chart-managed ClickHouse.
