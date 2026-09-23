@@ -50,10 +50,7 @@ describe("CriteriaInput", () => {
     beforeEach(async () => {
       onChange = vi.fn();
       renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
-      await waitFor(() => {
-        expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText("Add the first criteria"));
+      fireEvent.click(await screen.findByText("Add the first criteria"));
     });
 
     it("saves criterion on Save click", async () => {

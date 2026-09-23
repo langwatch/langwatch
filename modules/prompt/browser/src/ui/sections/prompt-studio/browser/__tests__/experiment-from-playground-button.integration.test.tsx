@@ -530,9 +530,7 @@ describe("ExperimentFromPlaygroundButton", () => {
       store.getState().addTab({ data: createTabData({ title: "Prompt" }) });
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
       await user.click(screen.getByRole("button", { name: /experiment/i }));
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
-      });
+      await screen.findByRole("button", { name: /cancel/i });
     });
 
     it("closes dialog on cancel", async () => {

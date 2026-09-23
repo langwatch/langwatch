@@ -245,14 +245,16 @@ describe("phoneTransport", () => {
       it("throws the unavailable error from every browser-only method", () => {
         const assertThrows = (call: () => unknown) => {
           expect(call).toThrow(VoicePhoneTransportUnavailableError);
+          let thrown: unknown;
           try {
             call();
           } catch (error) {
-            expect((error as VoicePhoneTransportUnavailableError).code).toBe(
-              "voice_phone_transport_unavailable",
-            );
-            expect((error as Error).message).toBe(PHONE_NO_BROWSER_CALL_MESSAGE);
+            thrown = error;
           }
+          expect(thrown).toMatchObject({
+            code: "voice_phone_transport_unavailable",
+            message: PHONE_NO_BROWSER_CALL_MESSAGE,
+          });
         };
         const transport = createPhoneTransport({ processEnv: {} });
         assertThrows(() => transport.assertAvailable?.());

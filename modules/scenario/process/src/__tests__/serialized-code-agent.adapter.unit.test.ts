@@ -816,11 +816,8 @@ describe("SerializedCodeAgentAdapter", () => {
           const callPromise = adapter.call(defaultInput);
           // Attach the rejection handler before advancing timers so the
           // synchronous abort doesn't surface as an unhandled rejection.
-          const settled = await expect(callPromise).rejects.toBeInstanceOf(
-            SerializedCodeAgentAdapterError,
-          );
+          await expect(callPromise).rejects.toBeInstanceOf(SerializedCodeAgentAdapterError);
           await vi.advanceTimersByTimeAsync(630_001);
-          await settled;
         } finally {
           vi.useRealTimers();
         }

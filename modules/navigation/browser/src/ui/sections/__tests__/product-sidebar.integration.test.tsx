@@ -183,13 +183,12 @@ beforeEach(() => {
   forgetMenuScrollPositions();
 });
 
-const realGetBoundingClientRect = window.HTMLElement.prototype.getBoundingClientRect;
-
 afterEach(() => {
   cleanup();
   // jsdom has no scrollIntoView; the deep-link tests install one.
   delete (window.HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-  window.HTMLElement.prototype.getBoundingClientRect = realGetBoundingClientRect;
+  // jsdom defines getBoundingClientRect on Element; dropping the stub restores it.
+  Reflect.deleteProperty(window.HTMLElement.prototype, "getBoundingClientRect");
 });
 
 describe("the product sidebar", () => {

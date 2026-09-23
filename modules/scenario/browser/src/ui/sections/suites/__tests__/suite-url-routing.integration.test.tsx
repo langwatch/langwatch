@@ -228,18 +228,18 @@ describe("Simulation Page URL Routing", () => {
 
   describe("when navigating to /simulations (base path)", () => {
     it("shows the all runs view", async () => {
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
     });
 
     it("displays Simulations heading", async () => {
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByText("Simulations")).toBeInTheDocument();
     });
 
     /** @scenario "Detail panel empty state button" */
     it("displays New Run Plan button", async () => {
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByText(/New Run Plan/)).toBeInTheDocument();
     });
   });
@@ -247,7 +247,7 @@ describe("Simulation Page URL Routing", () => {
   describe("when navigating to /simulations/run-plans/:suiteSlug", () => {
     it("shows that suite details", async () => {
       mockQuery = { project: "my-project", path: ["run-plans", "suite-a"] };
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByTestId("suite-detail-panel")).toBeInTheDocument();
       expect(screen.getByText("Suite A details")).toBeInTheDocument();
     });
@@ -256,7 +256,7 @@ describe("Simulation Page URL Routing", () => {
   describe("when navigating to /simulations/:externalSetSlug", () => {
     it("shows the external set panel", async () => {
       mockQuery = { project: "my-project", path: ["python-examples"] };
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByTestId("external-set-panel")).toBeInTheDocument();
       expect(screen.getByText("python-examples details")).toBeInTheDocument();
     });
@@ -268,7 +268,7 @@ describe("Simulation Page URL Routing", () => {
         project: "my-project",
         path: ["run-plans", "non-existent-slug"],
       };
-      await renderSimulationsPage();
+      renderSimulationsPage();
       expect(screen.getByTestId("suite-empty-state")).toBeInTheDocument();
     });
   });
@@ -277,7 +277,7 @@ describe("Simulation Page URL Routing", () => {
     /** @scenario "Quick run from drawer navigates to runs page via URL with drawer params" */
     it("navigates with shallow routing", async () => {
       const user = userEvent.setup();
-      await renderSimulationsPage();
+      renderSimulationsPage();
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
@@ -295,7 +295,7 @@ describe("Simulation Page URL Routing", () => {
     it("navigates with shallow routing", async () => {
       mockQuery = { project: "my-project", path: ["run-plans", "suite-a"] };
       const user = userEvent.setup();
-      await renderSimulationsPage();
+      renderSimulationsPage();
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(

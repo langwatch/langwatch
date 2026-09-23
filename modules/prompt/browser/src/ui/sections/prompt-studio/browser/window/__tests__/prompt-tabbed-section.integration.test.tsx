@@ -245,10 +245,9 @@ describe("Playground Variables Section Integration", () => {
       const inputs = screen.getAllByRole("textbox");
       const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
 
-      if (valueInput) {
-        await user.type(valueInput, "test");
-        expect(onValueChange).toHaveBeenCalled();
-      }
+      expect(valueInput).toBeDefined();
+      await user.type(valueInput!, "test");
+      expect(onValueChange).toHaveBeenCalled();
     });
   });
 });

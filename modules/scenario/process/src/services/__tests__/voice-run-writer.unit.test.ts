@@ -85,9 +85,8 @@ describe("writeVoiceCallRun", () => {
     describe("when a snapshot fails after startRun and the finish is retried", () => {
       /** @scenario "A retried hang-up completes a half-written run" */
       it("completes on retry and emits finishRun exactly once", async () => {
-        mockMessageSnapshot
-          .mockRejectedValueOnce(new Error("snapshot write failed"))
-          .mockResolvedValue(undefined);
+        const snapshotFailure = new Error("snapshot write failed");
+        mockMessageSnapshot.mockRejectedValueOnce(snapshotFailure).mockResolvedValue(undefined);
         const record = fakeRecord({
           turns: [{ role: "caller", text: "hi" }],
         });
@@ -101,7 +100,7 @@ describe("writeVoiceCallRun", () => {
           turnTraceIds: ["trace_0"],
         };
 
-        await expect(writeVoiceCallRun(args)).rejects.toThrow();
+        await expect(writeVoiceCallRun(args)).rejects.toBe(snapshotFailure);
         await writeVoiceCallRun(args);
 
         expect(mockFinishRun).toHaveBeenCalledTimes(1);

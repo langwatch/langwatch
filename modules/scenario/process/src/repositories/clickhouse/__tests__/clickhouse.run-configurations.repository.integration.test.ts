@@ -50,8 +50,6 @@ let ch: ClickHouseClient | undefined;
 let repository: RunConfigurationsClickHouseRepository;
 let stateRepository: SimulationRunStateRepositoryClickHouse;
 
-const integration = describe.skipIf(databaseUrl === null);
-
 beforeAll(() => {
   if (!databaseUrl) return;
   ch = createClient({
@@ -206,7 +204,7 @@ async function readConfigurations(plans: ScenarioPlanRecord[]) {
   return service.getEntries({ projectId: tenantId, startDate: WINDOW_START });
 }
 
-integration("the previous configurations of a scope", () => {
+describe.skipIf(databaseUrl === null)("the previous configurations of a scope", () => {
   describe("given one plan run twice with different parameters", () => {
     /** @scenario "One plan run with two parameter sets is two configurations" */
     it("lists both, under one plan name, with different keys", async () => {

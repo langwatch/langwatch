@@ -267,7 +267,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
       beforeEach(async () => {
         routerQueryPath.current = undefined;
         renderSimulationsPage();
-        expect(capturedOnRunScheduled.current).not.toBeNull();
       });
 
       /** @scenario Quick run from the All Runs page keeps the user on All Runs */
@@ -289,7 +288,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
       beforeEach(async () => {
         routerQueryPath.current = ["run-plans", "other-suite-slug"];
         renderSimulationsPage();
-        expect(capturedOnRunScheduled.current).not.toBeNull();
         capturedOnRunScheduled.current!("suite_target", "batch_002");
       });
 
@@ -307,7 +305,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
       beforeEach(async () => {
         routerQueryPath.current = ["run-plans", "target-suite-slug"];
         renderSimulationsPage();
-        expect(capturedOnRunScheduled.current).not.toBeNull();
         capturedOnRunScheduled.current!("suite_target", "batch_003");
       });
 
