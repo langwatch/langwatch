@@ -65,30 +65,35 @@ Never two lanes in one module. Never two lanes owning any path in common.
 
 ## 3. Model routing, and you enforce it
 
-The `Model:` line in a manifest is advisory until you actually pass that model
-when you spawn the lane. Pass it.
+**Opus 5.5 by default, effort as the dial (Alex, 2026-09-23).** The
+orchestrator and lanes run on Opus 5.5 (`claude-opus-5-5`), with effort pinned
+by the agent type you spawn, so the spawn is the enforcement. Sonnet and
+Haiku remain for really simple work, to save usage:
 
-| Model      | Use for                                                                                                                                                           |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Opus**   | Architecture decisions. Behaviour-parity review. Cross-module integration. Difficult debugging. Final review of a risky migration.                                |
-| **Fable**  | Restructuring files once the shape is decided. Moving guidance into references. Templates and prompts. Documentation consolidation. Duplicate-instruction sweeps. |
-| **Sonnet** | Ordinary implementation lanes. Scoped module conversions. Repetitive transport declarations. Straightforward tests and review.                                    |
-| **Haiku**  | File inventory. Narrow validation. Formatting. Repetitive mechanical checks.                                                                                      |
+| Agent type         | Effort | Use for                                                                                                  |
+| ------------------ | ------ | -------------------------------------------------------------------------------------------------------- |
+| `lane-opus`        | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.   |
+| `lane-opus-medium` | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps.  |
+| `lane-opus-low`    | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                      |
 
-Do not quietly use Opus for repetitive work - that is where roughly
-twenty-four thousand dollars of the twenty-nine went.
+| `lane` + `sonnet`  | —      | Really simple work, to save usage: a mechanical port with no judgement left, a straightforward test.     |
+| `lane` + `haiku`   | —      | The simplest: file inventories, narrow validation, formatting, repetitive checks.                        |
+
+Opus 5.5 is the default; reach for Sonnet or Haiku only when the task has no
+judgement left in it. A manifest's `Model:` line names one of these. Opus 5.5 needs
+Claude Code 2.1.280 or newer; an older CLI refuses the model at the API.
 
 **How to spawn one.** Write the manifest, then add the lane's row to
 `.claude/coordinator/LANES.md` **before** the Agent call - a lane spawned and
 not recorded is precisely the one a rotating coordinator loses - then start it
-with the Agent tool: `subagent_type` `lane`, `model` set to what the manifest names, and a
+with the Agent tool: `subagent_type` set to the `lane-opus*` type the manifest names, and a
 prompt built from the paste in `.claude/coordinator/LANE.md` with the manifest
-and handoff paths filled in. Passing the model is the whole of enforcement - a
-manifest that says `sonnet` and a spawn that omits it runs on whatever the
-default is, and nobody notices until the bill.
+and handoff paths filled in. Choosing the type is the whole of enforcement:
+the type pins the model and the effort, so nothing depends on remembering a
+parameter.
 
-`lane` is the agent defined in `.claude/agents/lane.md`. It pins no model on
-purpose, so yours always wins, and it carries a restricted tool list: a lane gets
+The three types are defined in `.claude/agents/lane-opus*.md` (the model-free
+`lane.md` remains for other sessions' use). Each carries a restricted tool list: a lane gets
 Read, Write, Edit, Bash, Grep, Glob and Skill, and **no Agent tool**. That makes
 "no subagents, no forks" a constraint rather than a sentence a lane can overlook,
 and it keeps a lane from publishing, scheduling or fetching anything.
@@ -111,6 +116,12 @@ it. You take that decision yourself or open an Opus lane for it.
 
 Use `manifest-template.md`. The parts that actually decide whether the lane
 succeeds:
+
+**CLAUDE.md always binds, and no manifest overrides it.** Before writing a
+manifest, load the `architecture-guide` skill and read the record sections the
+work touches. Every "ruling" a manifest states cites an ARCHITECTURE.md
+section or Alex's words; an uncited one is your invention, so ask Alex. A
+manifest never pre-authorises a new `*Api` operation, type or shim (2026-09-23).
 
 - **Owned paths**, listed explicitly. Never "all dirty files minus a regex" -
   a slice built that way swept 1,730 files of another lane's work once.

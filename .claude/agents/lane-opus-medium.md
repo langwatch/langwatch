@@ -1,6 +1,7 @@
 ---
-name: lane
+name: lane-opus-medium
 description: |
+  The lane agent pinned to Opus 5.5 (Alex, 2026-09-22): medium effort — mechanical ports, pattern-following UI, sweeps.
   A bounded implementation lane in the LangWatch coordinator/lane workflow. Use
   when spawning work that has a manifest under .claude/manifests/ - the lane
   edits only its owned paths, runs only scoped checks, and stops with a handoff
@@ -9,6 +10,8 @@ description: |
   <example>Start the module conversion task with model sonnet</example>
   Always pass an explicit model: the manifest names one and the coordinator
   enforces it at spawn.
+model: claude-opus-5-5
+effort: medium
 tools:
   - Read
   - Write
