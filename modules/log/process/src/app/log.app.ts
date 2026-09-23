@@ -15,11 +15,11 @@ import {
   type LogServerConfig,
 } from "@langwatch/log-contract";
 
-import type { LogProcessingPipeline } from "../eventing/log.pipeline.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import { createLogClickHouseResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
-import { ClickhouseLogRepository } from "../repositories/clickhouse/clickhouse.log.repository.ts";
+import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
 import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
-import type { LogService } from "../services/log.service.ts";
+import { LogService } from "../services/log.service.ts";
 
 export type LogInfrastructure = Readonly<{
   /** The process's one ClickHouse client, which routes each statement itself. */
@@ -47,14 +47,23 @@ export class LogApp implements LogApiContract {
   }
 
   static create({ dependencies, members, config }: LogSetup): LogApp {
-    const composition = ClickhouseLogRepository.create({
+    const repository = ClickHouseCanonicalLogRecordRepository.create({
       resolveClient: createLogClickHouseResolver(members.clickhouse),
       defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
       defaultReadLimit: LOG_DEFAULT_READ_LIMIT,
-      logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(config.processingShards),
-      redaction: dependencies.dataPrivacy,
     });
-    return new LogApp(composition.getService(), composition.buildProcessing());
+    const service = LogService.create({
+      preparation: CanonicalLogAdapter.create({ redaction: dependencies.dataPrivacy }),
+      repository,
+    });
+    const pipeline = LogProcessingAdapter.create({
+      repository,
+      defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
+      logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
+        config.processingShards,
+      ),
+    }).build();
+    return new LogApp(service, pipeline);
   }
 
   prepareCanonicalLogRecords(input: {

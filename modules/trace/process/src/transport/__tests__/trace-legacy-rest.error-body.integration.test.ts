@@ -27,7 +27,6 @@ const runtime = createRestRuntime({
 function buildApi(findTrace: () => Promise<never>) {
   const members: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
     credential: async () => ({
-      ok: true,
       project,
       credential: { kind: "legacyProjectKey" },
       markUsed: () => undefined,
@@ -45,6 +44,7 @@ function buildApi(findTrace: () => Promise<never>) {
       unknown
     >["searchBodySchema"],
     describeValidationError: () => "invalid search body",
+    formatSpansDigest: vi.fn(),
   };
 
   const family = runtime.mount(traceLegacyRest.router(), {

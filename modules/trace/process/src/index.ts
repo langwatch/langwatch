@@ -23,7 +23,6 @@ export { trimAttributesForAnalytics } from "./rules/analytics-attribute-trim.rul
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
 export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
-export { createTraceClickHouseResolver } from "./app/trace-composition.build.ts";
 
 // Restored: these names have consumers outside this module.
 export { traceRepositories } from "./repositories/trace-repositories.registry.ts";
@@ -100,14 +99,14 @@ export type {
   TraceClickHouseResolver,
   TraceClickHouseWriteResolver,
 } from "./repositories/trace-clickhouse-client.repository.ts";
-export { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
+export { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
 export { TraceQueryClassificationAdapter } from "./services/trace-query-classification.service.ts";
 export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";
 export {
   TraceSpanStorageClickHouseRepository,
   TraceStoredSpanReaderClickHouseRepository,
 } from "./repositories/clickhouse/trace-span-storage.repository.ts";
-export { TraceStoredSpanReaderRepository } from "./repositories/read/trace-stored-span-reader.repository.ts";
+export { TraceStoredSpanReaderRepository } from "./repositories/trace-stored-span-reader.repository.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/trace-event-derivation.service.ts";
 export { ScenarioRoleMetricsDerivationService } from "./services/scenario-role-metrics-derivation.service.ts";

@@ -4,8 +4,8 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceUsageCount } from "@langwatch/trace-contract";
 
-import { TraceExistenceRepository } from "../read/trace-existence.repository.ts";
 import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
+import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
   static create(options: {

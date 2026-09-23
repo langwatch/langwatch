@@ -25,7 +25,7 @@ import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../repositories/read/query-field-values.repository.ts";
+} from "../repositories/query-field-values.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";

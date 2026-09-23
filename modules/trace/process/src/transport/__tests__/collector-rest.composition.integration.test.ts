@@ -1,4 +1,5 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -19,7 +20,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -312,6 +312,10 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/collector", sdkBody(), { "X-Auth-Token": "" });
 
       expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: "Unauthorized",
+        message: "Invalid credentials",
+      });
       expect(recordedSpans).toHaveLength(0);
     });
   });
@@ -323,6 +327,10 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/collector", sdkBody());
 
       expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: "Unauthorized",
+        message: "Invalid credentials",
+      });
       expect(recordedSpans).toHaveLength(0);
     });
   });
@@ -335,6 +343,13 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/collector", sdkBody());
 
       expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        error: "api_key_permission_denied",
+        permission: "traces:create",
+        retryable: false,
+      });
+      expect(body).not.toHaveProperty("code");
       expect(recordedSpans).toHaveLength(0);
     });
   });

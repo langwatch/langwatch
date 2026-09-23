@@ -1,7 +1,7 @@
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesResult,
-} from "../read/query-field-values.repository.ts";
+} from "../query-field-values.repository.ts";
 
 export class MemoryNullQueryFieldValuesRepository extends TraceQueryFieldValuesRepository {
   private constructor() {

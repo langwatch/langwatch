@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { TraceTreeComposition } from "#app/trace-tree.composition";
 import type { TraceFullIo } from "#app/trace.members";
-import { TraceQueryFieldValuesRepository } from "#repositories/read/query-field-values.repository";
-import { TracePayloadReaderRepository } from "#repositories/read/trace-payload-reader.repository";
-import { TraceSummaryReaderRepository } from "#repositories/read/trace-summary-reader.repository";
+import { TraceQueryFieldValuesRepository } from "#repositories/query-field-values.repository";
+import { TracePayloadReaderRepository } from "#repositories/trace-payload-reader.repository";
+import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader.repository";
 
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 // From the port that defines them: an in-package test does not need the

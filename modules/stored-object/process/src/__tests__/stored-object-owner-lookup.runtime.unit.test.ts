@@ -5,8 +5,9 @@ import {
   type StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
 } from "../app/stored-object.members.ts";
-import { ClickhouseStoredObjectOwnerLookupRuntimeRepository as StoredObjectOwnerLookupRuntimeAdapter } from "../repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts";
+import { ClickHouseStoredObjectOwnerRepository } from "../repositories/clickhouse/clickhouse.stored-object-owner.repository.ts";
 import { StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectory } from "../repositories/stored-object-owner-instance-directory.repository.ts";
+import { StoredObjectOwnerLookupService } from "../services/stored-object-owner-lookup.service.ts";
 
 const resolveInstances = vi.fn();
 
@@ -47,15 +48,15 @@ function makeFailingClient(error: Error) {
 
 function service(telemetry = new RecordingTelemetry()) {
   return {
-    service: StoredObjectOwnerLookupRuntimeAdapter.create({
-      instanceDirectory: new TestInstanceDirectory(),
+    service: StoredObjectOwnerLookupService.create({
+      repository: ClickHouseStoredObjectOwnerRepository.create(new TestInstanceDirectory()),
       telemetry,
-    }).resolver,
+    }),
     telemetry,
   };
 }
 
-describe("StoredObjectOwnerLookupRuntimeAdapter", () => {
+describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => {
   beforeEach(() => {
     resolveInstances.mockReset();
   });

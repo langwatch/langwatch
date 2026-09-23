@@ -1,7 +1,6 @@
 /**
  * The dashboard-widget REST family's wire shapes. Bounds mirror
- * `DashboardWidgetDefinition` in `server/src/repositories/dashboardWidgetDefinition.ts`,
- * STATED here rather than imported: a contract may not depend on a server package.
+ * `DashboardWidgetDefinition` in `@langwatch/analytics-contract/dashboard-widget-definition`.
  */
 import { z } from "zod";
 
@@ -14,8 +13,8 @@ const MAX_QUERY_SQL_LENGTH = 50_000;
 const MAX_PARAMETERS_PER_QUERY = 32;
 const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 
-export const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
-export const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
+const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
+const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
 
 const dashboardWidgetQueryParameterSchema = z.object({
   name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
@@ -25,13 +24,13 @@ const dashboardWidgetQueryParameterSchema = z.object({
     .optional(),
 });
 
-export const dashboardWidgetQuerySchema = z.object({
+const dashboardWidgetQuerySchema = z.object({
   name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
   sql: z.string().min(1).max(MAX_QUERY_SQL_LENGTH),
   parameters: z.array(dashboardWidgetQueryParameterSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
 });
 
-export const dashboardWidgetQueriesSchema = z
+const dashboardWidgetQueriesSchema = z
   .array(dashboardWidgetQuerySchema)
   .max(MAX_QUERIES_PER_WIDGET);
 
@@ -92,5 +91,3 @@ export const dashboardWidgetParamsSchema = z.object({
   ...dashboardWidgetProjectParamsSchema.shape,
   widgetId: z.string().min(1),
 });
-
-export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;

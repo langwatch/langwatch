@@ -29,7 +29,6 @@ import {
   sessionGroupsResultSchema,
 } from "@langwatch/trace-contract";
 
-import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
@@ -230,8 +229,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     return Object.fromEntries(
       await Promise.all(
         traces.map(
-          async (t) =>
-            [t.trace_id, await TraceReadableSpanService.formatSpansDigest(t.spans ?? [])] as const,
+          async (t) => [t.trace_id, await app.formatSpansDigest({ spans: t.spans ?? [] })] as const,
         ),
       ),
     );

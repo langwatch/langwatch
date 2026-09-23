@@ -113,7 +113,7 @@ import type { z } from "zod";
 
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
-import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
+import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
   createFacetFilterResolver,

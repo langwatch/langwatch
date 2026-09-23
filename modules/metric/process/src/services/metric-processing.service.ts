@@ -19,13 +19,10 @@ import type {
   RecordMetricDataPointCommandData,
 } from "@langwatch/metric-contract";
 import {
-  DEFAULT_METRIC_COMMAND_SHARDS,
-  MAX_METRIC_COMMAND_SHARDS,
   METRIC_COMMAND_COALESCE_MAX_BATCH,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST,
   METRIC_PROCESSING_EVENT_TYPES,
-  MIN_METRIC_COMMAND_SHARDS,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
   recordMetricDataPointCommandDataSchema,
 } from "@langwatch/metric-contract";
@@ -34,7 +31,7 @@ import { MetricDataPointStorageMapProjection } from "../eventing/metric-data-poi
 import { MetricSeriesCatalogMapProjection } from "../eventing/metric-series-catalog.projection.ts";
 import { MetricTimeRollupMapProjection } from "../eventing/metric-time-rollup.projection.ts";
 import type { MetricDataPointAppendRepository } from "../repositories/metric-data-point-append.repository.ts";
-import { sha256 } from "../rules/metric-serialization.rules.ts";
+import { metricCommandGroupKey } from "../rules/metric-command-lanes.rules.ts";
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
@@ -185,56 +182,3 @@ export class RecordMetricDataPointCommand implements CommandHandler<
     };
   }
 }
-
-function clampMetricCommandShardCount(value: number): number {
-  if (!Number.isFinite(value)) return MIN_METRIC_COMMAND_SHARDS;
-  return Math.min(
-    MAX_METRIC_COMMAND_SHARDS,
-    Math.max(MIN_METRIC_COMMAND_SHARDS, Math.trunc(value)),
-  );
-}
-
-function resolveMetricCommandShardCount(value: string | undefined): number {
-  if (!value) return DEFAULT_METRIC_COMMAND_SHARDS;
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? clampMetricCommandShardCount(parsed)
-    : DEFAULT_METRIC_COMMAND_SHARDS;
-}
-
-/** Spreads a point across a bounded set of ordered lanes by its PointId. */
-function metricCommandGroupKey({
-  pointId,
-  shardCount,
-}: {
-  pointId: string;
-  shardCount: number;
-}): string {
-  const count = BigInt(clampMetricCommandShardCount(shardCount));
-  const lane = BigInt(`0x${sha256(pointId).slice(0, 16)}`) % count;
-  return `metric:${lane}`;
-}
-
-/**
- * Routes map work across bounded lanes while keeping the same logical identity
- * serialized. Point storage uses PointId; series catalog and rollups use
- * SeriesId so concurrent points cannot race updates for one series.
- */
-function metricMapGroupKey({
-  identity,
-  shardCount,
-}: {
-  identity: string;
-  shardCount: number;
-}): string {
-  const count = BigInt(clampMetricCommandShardCount(shardCount));
-  const lane = BigInt(`0x${sha256(identity).slice(0, 16)}`) % count;
-  return `metric-map:${lane}`;
-}
-
-export {
-  clampMetricCommandShardCount,
-  metricCommandGroupKey,
-  metricMapGroupKey,
-  resolveMetricCommandShardCount,
-};

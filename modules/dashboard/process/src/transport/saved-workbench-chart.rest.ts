@@ -5,14 +5,7 @@
  */
 import {
   LangWatchQLNotEnabledError,
-  createSavedWorkbenchChartSchema,
   langWatchQLCallerProtections,
-  placeSavedWorkbenchChartSchema,
-  savedWorkbenchChartListSchema,
-  savedWorkbenchChartParamsSchema,
-  savedWorkbenchChartProjectParamsSchema,
-  savedWorkbenchChartSchema,
-  updateSavedWorkbenchChartSchema,
 } from "@langwatch/analytics-contract";
 import {
   apiErrorSchema,
@@ -24,7 +17,17 @@ import {
   type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
-import { DashboardApi, type SavedWorkbenchChart } from "@langwatch/dashboard-contract";
+import {
+  createSavedWorkbenchChartSchema,
+  DashboardApi,
+  placeSavedWorkbenchChartSchema,
+  savedWorkbenchChartListSchema,
+  savedWorkbenchChartParamsSchema,
+  savedWorkbenchChartProjectParamsSchema,
+  savedWorkbenchChartResourceSchema,
+  updateSavedWorkbenchChartSchema,
+  type SavedWorkbenchChart,
+} from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
 /**
@@ -71,7 +74,7 @@ async function projectFor(input: { app: DashboardApi; scope: { id: string } }): 
 function chartResource(
   chart: SavedWorkbenchChart,
   platformUrl: string,
-): z.infer<typeof savedWorkbenchChartSchema> {
+): z.infer<typeof savedWorkbenchChartResourceSchema> {
   return {
     id: chart.id,
     name: chart.name,
@@ -135,7 +138,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withInput(createSavedWorkbenchChartSchema)
   .withPermission("analytics:create")
   .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
-  .withOutput(savedWorkbenchChartSchema)
+  .withOutput(savedWorkbenchChartResourceSchema)
   .withStatus(201)
   .withDocs({
     summary: "Save a workbench chart",
@@ -146,7 +149,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...canonicalBaseResponses,
       201: {
         description: "The chart was saved",
-        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartResourceSchema) } },
       },
     },
   })
@@ -169,7 +172,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(savedWorkbenchChartUrl)
-  .withOutput(savedWorkbenchChartSchema)
+  .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Get a saved workbench chart",
     description:
@@ -180,7 +183,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The saved chart",
-        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartResourceSchema) } },
       },
     },
   })
@@ -199,7 +202,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withInput(updateSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
   .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
-  .withOutput(savedWorkbenchChartSchema)
+  .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Update a saved workbench chart",
     description:
@@ -210,7 +213,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The updated chart",
-        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartResourceSchema) } },
       },
     },
   })
@@ -233,6 +236,7 @@ export const savedWorkbenchChartRest: Readonly<{
   )
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
+  .withOutput(z.void())
   .withDocs({
     summary: "Delete a saved workbench chart",
     description:
@@ -258,7 +262,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withInput(placeSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
   .withMiddleware(savedWorkbenchChartUrl)
-  .withOutput(savedWorkbenchChartSchema)
+  .withOutput(savedWorkbenchChartResourceSchema)
   .withDocs({
     summary: "Place a saved workbench chart on a dashboard",
     description:
@@ -269,7 +273,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The chart, now placed",
-        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartResourceSchema) } },
       },
     },
   })
@@ -287,6 +291,7 @@ export const savedWorkbenchChartRest: Readonly<{
   )
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")
+  .withOutput(z.void())
   .withDocs({
     summary: "Remove a saved workbench chart from its dashboard",
     description:

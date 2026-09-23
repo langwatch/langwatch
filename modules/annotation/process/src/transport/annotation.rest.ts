@@ -11,6 +11,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { z } from "zod";
 
 export const annotationRest: Readonly<{
   protocol: "rest";
@@ -66,6 +67,7 @@ export const annotationRest: Readonly<{
   .delete("/:id", "deleteAnnotation")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
+  .withOutput(z.void())
   .withDocs({ summary: "Delete an annotation in the caller’s project" })
   .handle(async ({ app, input, scope }) => {
     await app.delete({ id: input.id, projectId: scope.id });

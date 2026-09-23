@@ -2,7 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { createTraceClickHouseResolver } from "../../app/trace-composition.build.ts";
+import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
@@ -32,7 +32,7 @@ export class PostgresTraceRepositories {
       clickhouse: ClickHouseQueryClient;
     }>,
   ): TraceRepositories {
-    const traceClickHouse = createTraceClickHouseResolver(members.clickhouse);
+    const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
     const storage = {
       resolveClient: traceClickHouse,
       defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),

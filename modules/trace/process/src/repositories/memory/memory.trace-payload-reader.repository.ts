@@ -1,4 +1,4 @@
-import { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
+import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 
 /**
  * Memory-backed payloads return null for offloaded fields: event_log is unavailable,

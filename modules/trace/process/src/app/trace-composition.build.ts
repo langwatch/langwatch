@@ -5,15 +5,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing, FoldProjectionStore } from "@langwatch/eventing";
-import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import { TraceCapabilityUnavailableError, type TraceSummaryData } from "@langwatch/trace-contract";
 
+import { MemberTraceClickHouseClientRepository } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import type {
-  TraceClickHouseWriteClient,
-  TraceClickHouseWriteResolver,
-} from "../repositories/trace-clickhouse-client.repository.ts";
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
@@ -178,62 +174,10 @@ export function buildTraceProcessRegistrationCommands(input: {
   };
 }
 
-/**
- * The routed ClickHouse member, adapted to the low-level client Trace's
- * repositories ask for. One tenant per resolution, exactly as the tables' own
- * rule requires: every statement names its tenant.
- */
-class MemberTraceClickHouseClient implements TraceClickHouseWriteClient {
-  constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
-    private readonly tenantId: string,
-  ) {}
-
-  async query<Row>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string>;
-  }): Promise<{ json<T = Row>(): Promise<T[]> }> {
-    const result = await this.clickhouse.query<Row>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params ?? {},
-      ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
-    });
-    return { json: async <T = Row>() => result.rows as unknown as T[] };
-  }
-
-  async insert(input: {
-    table: string;
-    values: readonly unknown[];
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
-  }): Promise<unknown> {
-    return this.clickhouse.insert({
-      tenantId: this.tenantId,
-      table: input.table,
-      rows: input.values as readonly Record<string, unknown>[],
-      ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
-    });
-  }
-}
-
-/**
- * The member, as the tenant-keyed resolver every Trace repository takes. The
- * cast is the one seam where Trace's own narrow client meets the vendor's
- * `ClickHouseClient` param — repositories only call `query` and `insert`.
- */
-export function createTraceClickHouseResolver(
-  clickhouse: ClickHouseQueryClient,
-): TraceClickHouseWriteResolver {
-  return (tenantId) => Promise.resolve(new MemberTraceClickHouseClient(clickhouse, tenantId));
-}
-
 function memberClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
 ): (tenantId: string) => Promise<ClickHouseClient> {
-  const resolve = createTraceClickHouseResolver(clickhouse);
+  const resolve = MemberTraceClickHouseClientRepository.resolverFor(clickhouse);
   return resolve as unknown as (tenantId: string) => Promise<ClickHouseClient>;
 }
 
@@ -271,20 +215,6 @@ const isSender = (value: unknown): value is CommandSender =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as CommandSender).send === "function";
-
-/** A capability this deployment did not compose, refused by name at the call. */
-class TraceCapabilityUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(processName: string, capability: string) {
-    super("service_unavailable", "This part of the product is not available on this deployment", {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { process: processName, capability },
-    });
-    this.name = "TraceCapabilityUnavailableError";
-  }
-}
 
 function refusalFactory(
   processName: string,

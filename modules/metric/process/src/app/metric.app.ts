@@ -13,11 +13,14 @@ import {
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
 
-import { createMetricClickHouseResolver } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { ClickhouseMetricProcessingRepository } from "../repositories/clickhouse/clickhouse.metric-processing.repository.ts";
+import {
+  ClickHouseMetricDataPointAppendRepository,
+  createMetricClickHouseResolver,
+} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
 import {
-  resolveMetricCommandShardCount,
+  MetricProcessingService,
   type MetricProcessingPipeline,
 } from "../services/metric-processing.service.ts";
 import { MetricService } from "../services/metric.service.ts";
@@ -49,11 +52,14 @@ export class MetricApp implements MetricApiContract {
 
   static create({ dependencies, members, config }: MetricSetup): MetricApp {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
-    const pipeline = ClickhouseMetricProcessingRepository.create({
-      resolveClient: createMetricClickHouseResolver(members.clickhouse),
+    const pipeline = MetricProcessingService.create({
+      repository: ClickHouseMetricDataPointAppendRepository.create({
+        resolveClient: createMetricClickHouseResolver(members.clickhouse),
+        defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
+      }),
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
-    }).buildProcessing();
+    }).build();
     return new MetricApp(MetricService.create({ preparation }), pipeline);
   }
 
@@ -67,7 +73,9 @@ export class MetricApp implements MetricApiContract {
     return this.#service.prepareMetricDataPoints(input);
   }
 
-  async recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Promise<void> {
+  async recordCanonicalMetricDataPoints(
+    points: readonly CanonicalMetricDataPoint[],
+  ): Promise<void> {
     if (points.length === 0) return;
     if (!this.#commands) {
       throw new Error("metric_processing pipeline senders are not connected yet");

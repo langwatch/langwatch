@@ -3,8 +3,8 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestCredentialPrincipal,
-  type RestRawResult,
 } from "@langwatch/api/rest";
+import type { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -27,12 +27,16 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
+import {
+  isTraceDoorRefusal,
+  traceDoorRefusalBody,
+  traceDoorRefusalStatus,
+} from "#rules/trace-ingest-refusal.rules";
 /**
  * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
  * Declared public, resolves own credential, checks permissions in handler. Literal
  * paths (no versioning) that released SDKs dial.
  */
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 
 const PRODUCES_JSON = "application/json";
 
@@ -50,16 +54,13 @@ const payloadTooLarge = (): Error =>
 /** Search filters can name many ids; the bulk cap is the ceiling they get. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
-/** A resolved project credential, or the refusal this family publishes. */
-export type TraceLegacyCredential =
-  | Readonly<{
-      ok: true;
-      project: Readonly<{ id: string }>;
-      /** What the redactions are resolved FOR: the key, never its holder. */
-      credential: RestCredentialPrincipal;
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
+/** A resolved project credential; a refusal is thrown, and this family renders it. */
+export type TraceLegacyCredential = Readonly<{
+  project: Readonly<{ id: string }>;
+  /** What the redactions are resolved FOR: the key, never its holder. */
+  credential: RestCredentialPrincipal;
+  markUsed: () => void;
+}>;
 
 /**
  * How this process turns a request plus one permission ceiling into a
@@ -122,6 +123,7 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   searchBodySchema(): z.ZodType<TSearchBody, TSearchBodyRaw>;
   /** Renders a schema failure as the one sentence this family answers with. */
   describeValidationError(error: unknown): string;
+  formatSpansDigest(input: { spans: Span[] }): Promise<string>;
 }
 
 /** The four fields the legacy search body adds to the shared filter input. */
@@ -137,17 +139,46 @@ export type TraceLegacySearchFields = Readonly<{
 export const TraceLegacyApi =
   moduleApi<TraceLegacyRestMembers<TraceLegacySearchFields, unknown>>("trace");
 
-/** One answer, in the shape `c.json(body, status)` used to write. */
+/** One protocol answer, in the shape `c.json(body, status)` used to write. */
+type LegacyAnswer = Readonly<{
+  status: ContentfulStatusCode;
+  mediaType: typeof PRODUCES_JSON;
+  body: string;
+  headers: Readonly<Record<string, string>>;
+}>;
+
 function answer(
   body: unknown,
   status: ContentfulStatusCode,
   headers: Readonly<Record<string, string>> = {},
-): RestRawResult {
-  return {
-    status,
-    headers: { "content-type": PRODUCES_JSON, ...headers },
-    body: JSON.stringify(body),
-  };
+): LegacyAnswer {
+  return { status, mediaType: PRODUCES_JSON, body: JSON.stringify(body), headers };
+}
+
+type LegacyApp = TraceLegacyRestMembers<TraceLegacySearchFields, unknown>;
+
+/** Answers the read for a resolved credential, or the refusal in this family's own body. */
+async function authorised(
+  input: Readonly<{
+    app: LegacyApp;
+    request: Request;
+    permission: "traces:view" | "traces:share";
+  }>,
+  read: (auth: TraceLegacyCredential) => Promise<LegacyAnswer>,
+): Promise<LegacyAnswer> {
+  let auth: TraceLegacyCredential;
+  try {
+    auth = await input.app.credential({ request: input.request, permission: input.permission });
+  } catch (error) {
+    if (!isTraceDoorRefusal(error)) throw error;
+    return refusalAnswer(error);
+  }
+
+  return read(auth);
+}
+
+function refusalAnswer(refusal: HandledError): LegacyAnswer {
+  return answer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
 }
 
 /** The two headers a superseded route names its replacement with. */
@@ -191,6 +222,212 @@ const SHARE_REASON =
   "Trace API key resolved in-handler, so the refusal carries this family's own sentence; " +
   "the route itself is gated on traces:share, which mints a PUBLIC link";
 
+const LEGACY_PROTOCOL_REASON =
+  "Released SDKs parse this deprecated family's own statuses and bodies, credential refusals included";
+
+/** `readLegacyTrace`: one legacy route's read, for a resolved credential. */
+async function readLegacyTrace({
+  app,
+  input,
+  auth: { project, credential, markUsed },
+}: {
+  app: LegacyApp;
+  input: z.infer<typeof traceLegacyIdParamsSchema> & z.infer<typeof traceFormatQuerySchema>;
+  auth: TraceLegacyCredential;
+}): Promise<LegacyAnswer> {
+  // No catch-all here: an unanticipated failure is the shared error
+  // renderer's to answer, which degrades it to the generic unknown plus the
+  // request's trace id. Rendering it here put the internal message, the
+  // absolute source paths and the stack frames in front of a customer.
+  const traceId = input.id;
+  const llmMode = input.llmMode === "true" || input.llmMode === "1";
+  const format = input.format ?? (llmMode ? "digest" : "json");
+
+  // Prepared before the read, so the 404 below carries them too.
+  const headers = supersededBy(`/api/traces/${traceId}?format=${format}`);
+
+  const protections = await app.getProtections({ projectId: project.id, credential });
+  // `findTrace` resolves offloaded values in full (#4991) — the same
+  // `{ full: true }` this handler used to pass for itself.
+  const trace = await app.traces().findTrace({
+    projectId: project.id,
+    traceId,
+    protections,
+  });
+  if (!trace) return answer({ message: "Trace not found." }, 404, headers);
+
+  const evaluationsMap = await app.traces().readEvaluations({
+    projectId: project.id,
+    traceIds: [traceId],
+    protections,
+  });
+  const evaluations = evaluationsMap[traceId] ?? [];
+
+  markUsed();
+
+  if (format === "digest") {
+    return answer(
+      {
+        trace_id: traceId,
+        formatted_trace: app.formatSpansDigest({ spans: trace.spans ?? [] }),
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        evaluations,
+      },
+      200,
+      headers,
+    );
+  }
+
+  return answer(
+    {
+      ...trace,
+      evaluations,
+      ascii_tree: generateAsciiTree(trace.spans),
+    },
+    200,
+    headers,
+  );
+}
+
+/** `shareLegacyTrace`: one legacy route's read, for a resolved credential. */
+async function shareLegacyTrace({
+  app,
+  input,
+  auth: { project, markUsed },
+}: {
+  app: LegacyApp;
+  input: z.infer<typeof traceLegacyIdParamsSchema>;
+  auth: TraceLegacyCredential;
+}): Promise<LegacyAnswer> {
+  const share = await app.shares().createShare({
+    projectId: project.id,
+    resourceType: "TRACE",
+    resourceId: input.id,
+  });
+
+  markUsed();
+
+  return answer({ status: "success", path: `/share/${share.id}` }, 200);
+}
+
+/** `unshareLegacyTrace`: one legacy route's read, for a resolved credential. */
+async function unshareLegacyTrace({
+  app,
+  input,
+  auth: { project, markUsed },
+}: {
+  app: LegacyApp;
+  input: z.infer<typeof traceLegacyIdParamsSchema>;
+  auth: TraceLegacyCredential;
+}): Promise<LegacyAnswer> {
+  await app.shares().unshare({
+    projectId: project.id,
+    resourceType: "TRACE",
+    resourceId: input.id,
+  });
+
+  markUsed();
+
+  return answer({ status: "success" }, 200);
+}
+
+/** `searchLegacyTraces`: one legacy route's read, for a resolved credential. */
+async function searchLegacyTraces({
+  app,
+  raw,
+  auth: { project, credential, markUsed },
+}: {
+  app: LegacyApp;
+  raw: string;
+  auth: TraceLegacyCredential;
+}): Promise<LegacyAnswer> {
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return answer({ error: "Invalid body" }, 400);
+  }
+
+  const parsed = app.searchBodySchema().safeParse(body);
+  if (!parsed.success) {
+    return answer({ error: app.describeValidationError(parsed.error) }, 400);
+  }
+  const params = parsed.data as TraceLegacySearchFields & Record<string, unknown>;
+
+  const format = params.format ?? (params.llmMode ? "digest" : "json");
+
+  const headers = supersededBy("/api/traces/search");
+
+  const pageSize = params.pageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const protections = await app.getProtections({ projectId: project.id, credential });
+  const query: TraceLegacyListInput = {
+    ...params,
+    projectId: project.id,
+    startDate:
+      typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
+    endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
+    pageSize,
+  };
+  const results = await app.traces().listTraces({
+    query,
+    protections,
+    options: {
+      downloadMode: true,
+      scrollId: params.scrollId ?? undefined,
+    },
+  });
+
+  const rawTraces = results.groups.flat() as Trace[];
+  const enrichedTraces = enrichTracesWithEvaluations({
+    traces: rawTraces,
+    traceChecks: results.traceChecks,
+  });
+
+  const traces = legacySearchTraces(enrichedTraces, {
+    format,
+    llmMode: params.llmMode ?? false,
+  });
+
+  markUsed();
+
+  return answer(
+    {
+      traces,
+      pagination: {
+        totalHits: results.totalHits,
+        scrollId: results.scrollId,
+      },
+    },
+    200,
+    headers,
+  );
+}
+
+/** `readLegacyThread`: one legacy route's read, for a resolved credential. */
+async function readLegacyThread({
+  app,
+  input,
+  auth: { project, credential, markUsed },
+}: {
+  app: LegacyApp;
+  input: z.infer<typeof traceLegacyIdParamsSchema>;
+  auth: TraceLegacyCredential;
+}): Promise<LegacyAnswer> {
+  const protections = await app.getProtections({ projectId: project.id, credential });
+  // Thread-detail read consumes conversation content — `readThreadTraces`
+  // resolves full IO (#4991), which is what this handler asked for itself.
+  const traces = await app.traces().readThreadTraces({
+    projectId: project.id,
+    threadId: input.id,
+    protections,
+  });
+
+  markUsed();
+
+  return answer({ traces }, 200);
+}
+
 export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withNamespace("trace-legacy")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -202,67 +439,15 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withParams(traceLegacyIdParamsSchema)
   .withQuery(traceFormatQuerySchema)
   .withAccess(publicRoute({ reason: READ_REASON }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }): Promise<RestRawResult> => {
-    const auth = await app.credential({ request, permission: "traces:view" });
-    if (!auth.ok) return answer(auth.body, auth.status);
-    const { project, credential, markUsed } = auth;
-
-    // No catch-all here: an unanticipated failure is the shared error
-    // renderer's to answer, which degrades it to the generic unknown plus the
-    // request's trace id. Rendering it here put the internal message, the
-    // absolute source paths and the stack frames in front of a customer.
-    const traceId = input.id;
-    const llmMode = input.llmMode === "true" || input.llmMode === "1";
-    const format = input.format ?? (llmMode ? "digest" : "json");
-
-    // Prepared before the read, so the 404 below carries them too.
-    const headers = supersededBy(`/api/traces/${traceId}?format=${format}`);
-
-    const protections = await app.getProtections({ projectId: project.id, credential });
-    // `findTrace` resolves offloaded values in full (#4991) — the same
-    // `{ full: true }` this handler used to pass for itself.
-    const trace = await app.traces().findTrace({
-      projectId: project.id,
-      traceId,
-      protections,
-    });
-    if (!trace) return answer({ message: "Trace not found." }, 404, headers);
-
-    const evaluationsMap = await app.traces().readEvaluations({
-      projectId: project.id,
-      traceIds: [traceId],
-      protections,
-    });
-    const evaluations = evaluationsMap[traceId] ?? [];
-
-    markUsed();
-
-    if (format === "digest") {
-      return answer(
-        {
-          trace_id: traceId,
-          formatted_trace: TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
-          timestamps: trace.timestamps,
-          metadata: trace.metadata,
-          evaluations,
-        },
-        200,
-        headers,
-      );
-    }
-
-    return answer(
-      {
-        ...trace,
-        evaluations,
-        ascii_tree: generateAsciiTree(trace.spans),
-      },
-      200,
-      headers,
-    );
-  })
+  .handle(async ({ app, input, request, response }) =>
+    response.write(
+      await authorised({ app, request, permission: "traces:view" }, (auth) =>
+        readLegacyTrace({ app, input, auth }),
+      ),
+    ),
+  )
 
   // ── the public-link pair ──────────────────────────────────────────────────
   //
@@ -271,44 +456,28 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .post("/api/trace/:id/share", "shareLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
   .withAccess(publicRoute({ reason: SHARE_REASON }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }): Promise<RestRawResult> => {
-    const auth = await app.credential({ request, permission: "traces:share" });
-    if (!auth.ok) return answer(auth.body, auth.status);
-    const { project, markUsed } = auth;
-
-    const share = await app.shares().createShare({
-      projectId: project.id,
-      resourceType: "TRACE",
-      resourceId: input.id,
-    });
-
-    markUsed();
-
-    return answer({ status: "success", path: `/share/${share.id}` }, 200);
-  })
+  .handle(async ({ app, input, request, response }) =>
+    response.write(
+      await authorised({ app, request, permission: "traces:share" }, (auth) =>
+        shareLegacyTrace({ app, input, auth }),
+      ),
+    ),
+  )
 
   .post("/api/trace/:id/unshare", "unshareLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
   .withAccess(publicRoute({ reason: SHARE_REASON }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }): Promise<RestRawResult> => {
-    const auth = await app.credential({ request, permission: "traces:share" });
-    if (!auth.ok) return answer(auth.body, auth.status);
-    const { project, markUsed } = auth;
-
-    await app.shares().unshare({
-      projectId: project.id,
-      resourceType: "TRACE",
-      resourceId: input.id,
-    });
-
-    markUsed();
-
-    return answer({ status: "success" }, 200);
-  })
+  .handle(async ({ app, input, request, response }) =>
+    response.write(
+      await authorised({ app, request, permission: "traces:share" }, (auth) =>
+        unshareLegacyTrace({ app, input, auth }),
+      ),
+    ),
+  )
 
   // ── the deprecated trace search ───────────────────────────────────────────
   //
@@ -318,98 +487,28 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: READ_REASON }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
-    const auth = await app.credential({ request, permission: "traces:view" });
-    if (!auth.ok) return answer(auth.body, auth.status);
-    const { project, credential, markUsed } = auth;
-
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      return answer({ error: "Invalid body" }, 400);
-    }
-
-    const parsed = app.searchBodySchema().safeParse(body);
-    if (!parsed.success) {
-      return answer({ error: app.describeValidationError(parsed.error) }, 400);
-    }
-    const params = parsed.data as TraceLegacySearchFields & Record<string, unknown>;
-
-    const format = params.format ?? (params.llmMode ? "digest" : "json");
-
-    const headers = supersededBy("/api/traces/search");
-
-    const pageSize = params.pageSize ?? DEFAULT_TRACES_PAGE_SIZE;
-    const protections = await app.getProtections({ projectId: project.id, credential });
-    const query: TraceLegacyListInput = {
-      ...params,
-      projectId: project.id,
-      startDate:
-        typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
-      endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
-      pageSize,
-    };
-    const results = await app.traces().listTraces({
-      query,
-      protections,
-      options: {
-        downloadMode: true,
-        scrollId: params.scrollId ?? undefined,
-      },
-    });
-
-    const rawTraces = results.groups.flat() as Trace[];
-    const enrichedTraces = enrichTracesWithEvaluations({
-      traces: rawTraces,
-      traceChecks: results.traceChecks,
-    });
-
-    const traces = legacySearchTraces(enrichedTraces, {
-      format,
-      llmMode: params.llmMode ?? false,
-    });
-
-    markUsed();
-
-    return answer(
-      {
-        traces,
-        pagination: {
-          totalHits: results.totalHits,
-          scrollId: results.scrollId,
-        },
-      },
-      200,
-      headers,
-    );
-  })
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(
+      await authorised({ app, request, permission: "traces:view" }, (auth) =>
+        searchLegacyTraces({ app, raw, auth }),
+      ),
+    ),
+  )
 
   // ── the deprecated thread read ────────────────────────────────────────────
   .get("/api/thread/:id", "getLegacyThread")
   .withParams(traceLegacyIdParamsSchema)
   .withAccess(publicRoute({ reason: READ_REASON }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }): Promise<RestRawResult> => {
-    const auth = await app.credential({ request, permission: "traces:view" });
-    if (!auth.ok) return answer(auth.body, auth.status);
-    const { project, credential, markUsed } = auth;
-
-    const protections = await app.getProtections({ projectId: project.id, credential });
-    // Thread-detail read consumes conversation content — `readThreadTraces`
-    // resolves full IO (#4991), which is what this handler asked for itself.
-    const traces = await app.traces().readThreadTraces({
-      projectId: project.id,
-      threadId: input.id,
-      protections,
-    });
-
-    markUsed();
-
-    return answer({ traces }, 200);
-  })
+  .handle(async ({ app, input, request, response }) =>
+    response.write(
+      await authorised({ app, request, permission: "traces:view" }, (auth) =>
+        readLegacyThread({ app, input, auth }),
+      ),
+    ),
+  )
 
   .build();

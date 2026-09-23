@@ -43,14 +43,14 @@ import {
 } from "@langwatch/trace-contract";
 
 import type { TraceQueryClassifier, TraceEventDerivation } from "../app/trace.members.ts";
-import type { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import type { TraceFullRecordRepository } from "../repositories/read/trace-full-record.repository.ts";
-import type { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
-import type { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
+import type { TraceQueryFieldValuesRepository } from "../repositories/query-field-values.repository.ts";
+import type { TraceFullRecordRepository } from "../repositories/trace-full-record.repository.ts";
 import {
   type TraceProjectedReadRepository,
   type TraceSpanSummaryRecord,
 } from "../repositories/trace-projected-read.repository.ts";
+import type { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
+import type { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
 
 type TraceComposition = {

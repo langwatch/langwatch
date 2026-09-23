@@ -1,18 +1,8 @@
-import {
-  assignDashboardWidgetToDashboardSchema,
-  createDashboardWidgetSchema,
-  dashboardWidgetParamsSchema,
-  dashboardWidgetProjectParamsSchema,
-  dashboardWidgetResourceSchema,
-  dashboardWidgetListSchema,
-  updateDashboardWidgetSchema,
-  type DashboardWidget,
-} from "@langwatch/analytics-contract";
-import { DashboardApi } from "@langwatch/dashboard-contract";
+import type { DashboardWidget } from "@langwatch/analytics-contract";
 /**
  * Dashboard widgets under `/api/v1/projects/:projectId/analytics/dashboard-widgets`,
- * the `CustomGraph`-playground twin of saved-workbench-chart. Analytics owns the
- * wire shapes, this feature owns the rows; this file only declares the routes.
+ * the `CustomGraph`-playground twin of saved-workbench-chart. This feature owns the
+ * wire shapes and the rows; this file only declares the routes.
  */
 import {
   apiErrorSchema,
@@ -24,6 +14,16 @@ import {
   type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
+import {
+  assignDashboardWidgetToDashboardSchema,
+  createDashboardWidgetSchema,
+  DashboardApi,
+  dashboardWidgetListSchema,
+  dashboardWidgetParamsSchema,
+  dashboardWidgetProjectParamsSchema,
+  dashboardWidgetResourceSchema,
+  updateDashboardWidgetSchema,
+} from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
 /**
@@ -247,6 +247,7 @@ export const dashboardWidgetRest: Readonly<{
   )
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:delete")
+  .withOutput(z.void())
   .withDocs({
     summary: "Delete a dashboard widget",
     description:

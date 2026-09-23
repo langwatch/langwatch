@@ -5,9 +5,9 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type TraceEventDerivation, type TraceQueryClassifier } from "./app/trace.members.ts";
-import { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
-import { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
-import { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
+import { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
+import { TraceRecordRepository } from "./repositories/trace-record.repository.ts";
+import { TraceSummaryReaderRepository } from "./repositories/trace-summary-reader.repository.ts";
 
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";

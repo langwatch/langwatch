@@ -13,12 +13,12 @@ import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,
 } from "../../repositories/clickhouse/trace-full-protection.mapper.ts";
-import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
-import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
 import type {
   TraceClickHouseClient,
   TraceClickHouse,
 } from "../trace-clickhouse-client.repository.ts";
+import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
+import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;

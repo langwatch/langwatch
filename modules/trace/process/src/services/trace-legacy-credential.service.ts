@@ -1,3 +1,4 @@
+import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 /** Legacy trace API credential resolution. Strict error ordering: present,
  * resolves, then permission ceiling. */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
@@ -7,20 +8,8 @@ import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OtlpIngestCredentialInput } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { TraceLegacyCredential } from "../transport/trace-legacy.rest.ts";
-
-/**
- * The sentence an unauthenticated caller of this family receives. It names all
- * three accepted credential shapes because that is what it has always named,
- * and an SDK's own error copy quotes it.
- */
-export const TRACE_LEGACY_MISSING_CREDENTIAL_MESSAGE =
-  "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
-
-/** What an unresolvable token receives. Deliberately says nothing about why. */
-export const TRACE_LEGACY_INVALID_CREDENTIAL_MESSAGE = "Invalid auth token.";
 
 /** A token read off a request, and the project it named where one was given. */
 export type TraceLegacyRequestCredentials = Readonly<{
@@ -104,48 +93,27 @@ export class TraceLegacyCredentialService {
   }
 
   /**
-   * Resolves the request's project credential and enforces one permission
-   * as the API key's ceiling. Answers a refusal rather than throwing: this
-   * family writes its own bodies, unlike the framework's error envelope.
+   * Resolves the request's project credential and enforces one permission as
+   * the API key's ceiling, throwing the refusal; the family renders it itself.
    */
   async resolve(input: {
     request: Request;
     permission: "traces:view" | "traces:share";
   }): Promise<TraceLegacyCredential> {
     const credentials = readTraceLegacyRequestCredentials(input.request);
-    if (!credentials) {
-      return {
-        ok: false,
-        status: 401,
-        body: { message: TRACE_LEGACY_MISSING_CREDENTIAL_MESSAGE },
-      };
-    }
+    if (!credentials) throw new ProjectMissingCredentialsError();
 
     const resolved = await this.#apiKeys.findResolvedToken(credentials);
-    if (!resolved) {
-      return {
-        ok: false,
-        status: 401,
-        body: { message: TRACE_LEGACY_INVALID_CREDENTIAL_MESSAGE },
-      };
-    }
+    if (!resolved) throw new ProjectInvalidCredentialsError();
 
     // A legacy project key has no per-permission ceiling: project keys predate
     // RBAC and carry full project access by design.
     if (resolved.type === "apiKey") {
       const allowed = await this.#withinCeiling(resolved, input.permission);
-      if (!allowed) {
-        const refusal = this.#ceilingRefusal(resolved, input.permission);
-        return {
-          ok: false,
-          status: refusal.httpStatus as ContentfulStatusCode,
-          body: handledErrorResponseBody(refusal),
-        };
-      }
+      if (!allowed) throw this.#ceilingRefusal(resolved, input.permission);
     }
 
     return {
-      ok: true,
       project: resolved.project,
       // The resolved token becomes the family's principal, so its handlers ask
       // a second question of the KEY rather than of whoever holds it.
@@ -184,22 +152,4 @@ export class TraceLegacyCredentialService {
     );
     return new ApiKeyPermissionDeniedError(permission);
   }
-}
-
-/**
- * The wire body for a handled error answered by a door rather than by an error
- * boundary: the code as the discriminant, the sentence, the meta bag spread
- * flat, and the remediation channel alongside.
- */
-function handledErrorResponseBody(error: HandledError): object {
-  const { code, message, meta, tips, docsUrl, fault, retryable } = error;
-  return {
-    error: code,
-    message,
-    ...meta,
-    ...(tips?.length ? { tips } : {}),
-    ...(docsUrl ? { docsUrl } : {}),
-    ...(fault ? { fault } : {}),
-    retryable: retryable === true,
-  };
 }

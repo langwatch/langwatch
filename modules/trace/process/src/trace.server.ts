@@ -7,9 +7,9 @@ import {
   TraceLegacyReadClickHouseRepository,
   type ClickHouseTraceLegacyReadOptions,
 } from "./repositories/clickhouse/trace-legacy-read.repository.ts";
-import type { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
 import type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
+import type { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";

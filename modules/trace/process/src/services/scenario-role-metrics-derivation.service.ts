@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
-import type { TraceDerivationSpanReaderRepository } from "../repositories/read/trace-derivation-span-reader.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "../repositories/trace-derivation-span-reader.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
 import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules.ts";
 import type { SpanCostService } from "./span-cost.service.ts";

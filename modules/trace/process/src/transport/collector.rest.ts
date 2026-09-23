@@ -3,7 +3,8 @@
  * project credential. MUST mount before `/api/collector/*` wildcard dispatcher.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import type { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import {
@@ -32,6 +33,12 @@ import {
   type CollectorRejection,
 } from "#rules/trace-collector-body.rules";
 import {
+  isTraceDoorRefusal,
+  isUnknownCredentialRefusal,
+  traceDoorRefusalBody,
+  traceDoorRefusalStatus,
+} from "#rules/trace-ingest-refusal.rules";
+import {
   TraceCollectorDispatchService,
   type CollectorEvaluationReport,
   type CollectorSpanIngest,
@@ -41,6 +48,9 @@ const logger = createLogger("langwatch.collector");
 
 const PRODUCES_JSON = "application/json";
 
+const COLLECTOR_PROTOCOL_REASON =
+  "Released SDKs parse this door's own statuses and bodies, credential refusals included";
+
 /** The project a collector body is recorded against. */
 export type CollectorProject = Readonly<{
   id: string;
@@ -48,14 +58,8 @@ export type CollectorProject = Readonly<{
   organizationId: string;
 }>;
 
-/**
- * A resolved credential, or why it was refused. The two refusals are told apart rather than
- * passed through as one body, because their copy comes from two different places.
- */
-export type CollectorCredential =
-  | Readonly<{ ok: true; project: CollectorProject; markUsed: () => void }>
-  | Readonly<{ ok: false; kind: "credential" }>
-  | Readonly<{ ok: false; kind: "ceiling"; status: ContentfulStatusCode; body: object }>;
+/** A resolved credential; a refusal is thrown, and this door renders it. */
+export type CollectorCredential = Readonly<{ project: CollectorProject; markUsed: () => void }>;
 
 /** How this process turns a request into a project credential. */
 export type CollectorCredentialResolver = (input: {
@@ -98,13 +102,29 @@ export type CollectorApp = Readonly<{
 
 export const CollectorApi = moduleApi<CollectorApp>()("trace");
 
-/** One answer, in the shape `c.json(body, status)` used to write. */
-function answer(body: unknown, status: ContentfulStatusCode): RestRawResult {
-  return {
-    status,
-    headers: { "content-type": PRODUCES_JSON },
-    body: JSON.stringify(body),
-  };
+/** One protocol answer, in the shape `c.json(body, status)` used to write. */
+type CollectorAnswer = Readonly<{
+  status: ContentfulStatusCode;
+  mediaType: typeof PRODUCES_JSON;
+  body: string;
+}>;
+
+function answer(body: unknown, status: ContentfulStatusCode): CollectorAnswer {
+  return { status, mediaType: PRODUCES_JSON, body: JSON.stringify(body) };
+}
+
+/**
+ * An unknown credential earns the sentence this door has always written; a key we know
+ * and refused earns the full handled body — code, permission, tips — not just a sentence.
+ */
+function refusalAnswer(refusal: HandledError): CollectorAnswer {
+  if (isUnknownCredentialRefusal(refusal)) {
+    logger.warn("collector request is not authenticated");
+    return answer({ error: "Unauthorized", message: "Invalid credentials" }, 401);
+  }
+
+  logger.warn("collector request denied by API key ceiling");
+  return answer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
 }
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
@@ -224,7 +244,7 @@ async function ingestCollectorBody(input: {
   app: CollectorApp;
   params: CollectorRESTParamsValidator;
   prepared: PreparedCollectorBody;
-}): Promise<RestRawResult> {
+}): Promise<CollectorAnswer> {
   const { project, app, params, prepared } = input;
   const { spans, traceId, metadata } = prepared;
 
@@ -290,17 +310,13 @@ async function collect({
   app: CollectorApp;
   request: Request;
   raw: string;
-}): Promise<RestRawResult> {
-  const auth = await app.collectorCredential({ request });
-  if (!auth.ok) {
-    if (auth.kind === "ceiling") {
-      logger.warn("collector request denied by API key ceiling");
-      // The full handled body — code, permission, tips — not just a sentence.
-      return answer(auth.body, auth.status);
-    }
-    logger.warn("collector request is not authenticated");
-
-    return answer({ error: "Unauthorized", message: "Invalid credentials" }, 401);
+}): Promise<CollectorAnswer> {
+  let auth: CollectorCredential;
+  try {
+    auth = await app.collectorCredential({ request });
+  } catch (error) {
+    if (!isTraceDoorRefusal(error)) throw error;
+    return refusalAnswer(error);
   }
 
   const body = readCollectorBody(request, raw);
@@ -351,8 +367,10 @@ export const collectorRest = defineRestRouter(CollectorApi)
     }),
   )
   .withBodyLimit({ maxBytes: COLLECTOR_MAX_BODY_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: COLLECTOR_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) => collect({ app, request, raw }))
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(await collect({ app, request, raw })),
+  )
 
   .build();

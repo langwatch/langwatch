@@ -7,17 +7,8 @@ export type {
   TopicModelData,
 } from "./services/topic-clustering-eventing.service.ts";
 export { TopicApp } from "./app/topic.app.ts";
-export {
-  topicServer,
-  createTopicWorkerInstaller,
-  type TopicWorkerInstaller,
-  createTopicClusteringMetrics,
-} from "./topic.server.ts";
+export { topicServer, createTopicClusteringMetrics } from "./topic.server.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
-export type {
-  TopicClusteringExecutionDependencies,
-  TopicServerInstallerDependencies,
-} from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
 export {
   OtelTopicClusteringMetricsService,

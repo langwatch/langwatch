@@ -68,7 +68,7 @@ describe("the public evaluation REST family", () => {
 
     it("reads its own body and writes its own answer on every route", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.rawResponse !== undefined]).toEqual([route.operation, true]);
+        expect([route.operation, route.response?.kind]).toEqual([route.operation, "protocol"]);
       }
 
       for (const route of declaration.routes.filter((one) => one.method === "post")) {

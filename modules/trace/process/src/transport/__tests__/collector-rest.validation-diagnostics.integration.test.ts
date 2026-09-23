@@ -51,7 +51,7 @@ const runtime = createRestRuntime({
 
 const collector = runtime.mount(collectorRest.router(), {
   app: () => ({
-    collectorCredential: async () => ({ ok: true as const, project, markUsed: () => undefined }),
+    collectorCredential: async () => ({ project, markUsed: () => undefined }),
     collectorUsageLimit: async () => undefined,
     ingestSpan: async () => ({ status: "collected" }),
     reportEvaluation: async () => undefined,

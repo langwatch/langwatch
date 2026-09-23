@@ -3,9 +3,9 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
 
-import { TraceStoredSpanReaderRepository } from "../read/trace-stored-span-reader.repository.ts";
 import { TraceSpanStorageRepository } from "../span-storage-write.repository.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import { TraceStoredSpanReaderRepository } from "../trace-stored-span-reader.repository.ts";
 import {
   type FullSpanRow,
   mapChRowToNormalized,

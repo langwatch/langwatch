@@ -32,21 +32,6 @@ export * from "./analytics-query.errors.ts";
 export * from "./langwatch-ql.errors.ts";
 export * from "./analytics.input-schemas.ts";
 export * from "./analytics.config.ts";
-export {
-  assignDashboardWidgetToDashboardSchema,
-  createDashboardWidgetSchema,
-  dashboardWidgetCodeSchema,
-  dashboardWidgetListSchema,
-  dashboardWidgetNameSchema,
-  dashboardWidgetParamsSchema,
-  dashboardWidgetProjectParamsSchema,
-  dashboardWidgetQueriesSchema,
-  dashboardWidgetQuerySchema,
-  dashboardWidgetResourceSchema,
-  updateDashboardWidgetSchema,
-  type DashboardWidgetQuery,
-} from "./dashboard-widget.schemas.ts";
-
 export * from "./dashboard-widget.errors.ts";
 export * from "./langwatch-ql-app-functions.ts";
 export * from "./langwatch-ql-app-function.errors.ts";

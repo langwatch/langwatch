@@ -7,8 +7,8 @@ import {
   collectAuthDiagnostics,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestRawResult,
 } from "@langwatch/api/rest";
+import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   applyOtlpReceiverPolicy,
@@ -29,9 +29,9 @@ import { nowInstant } from "@langwatch/time";
 import {
   OtlpIngestSourceBillingUnavailableError,
   TraceApi,
+  type OtlpIngestCredential,
   type OtlpIngestCredentialInput,
   type OtlpIngestIdentity,
-  type OtlpIngestRefusalStatus,
   type TraceOtlpIngestApi,
 } from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
@@ -40,11 +40,22 @@ import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
+import {
+  isTraceDoorRefusal,
+  traceDoorRefusalBody,
+  traceDoorRefusalStatus,
+} from "#rules/trace-ingest-refusal.rules";
+
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
 const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
+
+const PRODUCES_JSON = "application/json";
+
+const OTLP_PROTOCOL_REASON =
+  "OTLP/HTTP answers exporters in the protocol's own statuses and bodies, credential refusals included";
 
 /**
  * The generated protobuf message this receiver decodes into, for the
@@ -114,12 +125,7 @@ function logCorrectedPath({
   );
 }
 
-type OtlpAuthenticated =
-  | Readonly<{
-      project: { id: string; teamId: string; organizationId: string };
-      identity: OtlpIngestIdentity;
-    }>
-  | Readonly<{ refusal: { status: OtlpIngestRefusalStatus; body: object } }>;
+type OtlpAuthenticated = OtlpIngestCredential | Readonly<{ refusal: HandledError }>;
 
 /**
  * Resolves the credential and logs an auth-diagnostic fingerprint on every
@@ -142,23 +148,23 @@ async function authenticate(
     xAuthToken: request.headers.get("x-auth-token"),
     xProjectId: request.headers.get("x-project-id"),
   };
-  const resolution = await credential(credentialInput);
+  let resolution: OtlpIngestCredential;
+  try {
+    resolution = await credential(credentialInput);
+  } catch (error) {
+    if (!isTraceDoorRefusal(error)) throw error;
 
-  if (!resolution.ok) {
     logger.warn(
-      { ...diagnostics, refusalStatus: resolution.status },
+      { ...diagnostics, refusalStatus: traceDoorRefusalStatus(error) },
       diagnostics.hasEmptyAuthToken
         ? "Authentication failed: X-Auth-Token sent but empty"
         : "Authentication failed",
     );
-    return { refusal: { status: resolution.status, body: resolution.body } };
+    return { refusal: error };
   }
 
   logCorrectedPath({ request, path: url.pathname, projectId: resolution.project.id, logger });
-  return {
-    project: resolution.project,
-    identity: resolution.identity,
-  };
+  return resolution;
 }
 
 function applyReceiverProvenance({
@@ -267,11 +273,21 @@ function correctedOtlpRequest(request: Request): Request | null {
   return new Request(url, { method: request.method, headers });
 }
 
-const jsonAnswer = (body: unknown, status: ContentfulStatusCode): RestRawResult => ({
+/** One protocol answer: a JSON body at the status the receiver has always written. */
+type OtlpAnswer = Readonly<{
+  status: ContentfulStatusCode;
+  mediaType: typeof PRODUCES_JSON;
+  body: string;
+}>;
+
+const jsonAnswer = (body: unknown, status: ContentfulStatusCode): OtlpAnswer => ({
   status,
-  headers: { "content-type": "application/json" },
+  mediaType: PRODUCES_JSON,
   body: JSON.stringify(body),
 });
+
+const refusalAnswer = (refusal: HandledError): OtlpAnswer =>
+  jsonAnswer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
 
 /** The whole of one `POST /api/otel/v1/traces` request, inside its server span. */
 async function handleTracesRequest(
@@ -279,13 +295,13 @@ async function handleTracesRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: TraceOtlpIngestApi,
-): Promise<RestRawResult> {
+): Promise<OtlpAnswer> {
   // Auth runs before decompression, but the raw-body middleware has already
   // buffered the wire body — the declared body cap is what keeps a 401 cheap.
   const authenticated = await authenticate(request, ports.otlpCredential, loggerTraces);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-    return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
+    return refusalAnswer(authenticated.refusal);
   }
 
   const { project, identity } = authenticated;
@@ -355,11 +371,11 @@ async function handleLogsRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: TraceOtlpIngestApi,
-): Promise<RestRawResult> {
+): Promise<OtlpAnswer> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerLogs);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-    return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
+    return refusalAnswer(authenticated.refusal);
   }
 
   const { project, identity } = authenticated;
@@ -430,11 +446,11 @@ async function handleMetricsRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: TraceOtlpIngestApi,
-): Promise<RestRawResult> {
+): Promise<OtlpAnswer> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerMetrics);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
-    return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
+    return refusalAnswer(authenticated.refusal);
   }
 
   const { project, identity } = authenticated;
@@ -515,7 +531,7 @@ async function handleOtlpPathAlias({
   app: TraceOtlpIngestApi;
   raw: Uint8Array;
   request: Request;
-}): Promise<RestRawResult> {
+}): Promise<OtlpAnswer> {
   const corrected = correctedOtlpRequest(request);
   if (!corrected) return jsonAnswer({ error: "Not Found" }, 404);
 
@@ -556,45 +572,49 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }) => {
-    const tracer = getLangWatchTracer("langwatch.otel.traces");
-
-    return tracer.withActiveSpan(
-      "TracesV1.handleTracesRequest",
-      { kind: SpanKind.SERVER },
-      (span) => handleTracesRequest(request, span, raw as Uint8Array, app),
-    );
-  })
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(
+      await getLangWatchTracer("langwatch.otel.traces").withActiveSpan(
+        "TracesV1.handleTracesRequest",
+        { kind: SpanKind.SERVER },
+        (span) => handleTracesRequest(request, span, raw, app),
+      ),
+    ),
+  )
 
   .post("/api/otel/v1/logs", "ingestOtlpLogs")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }) => {
-    const tracer = getLangWatchTracer("langwatch.otel.logs");
-
-    return tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, (span) =>
-      handleLogsRequest(request, span, raw as Uint8Array, app),
-    );
-  })
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(
+      await getLangWatchTracer("langwatch.otel.logs").withActiveSpan(
+        "[POST] /api/otel/v1/logs",
+        { kind: SpanKind.SERVER },
+        (span) => handleLogsRequest(request, span, raw, app),
+      ),
+    ),
+  )
 
   .post("/api/otel/v1/metrics", "ingestOtlpMetrics")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }) => {
-    const tracer = getLangWatchTracer("langwatch.otel.metrics");
-
-    return tracer.withActiveSpan("[POST] /api/otel/v1/metrics", { kind: SpanKind.SERVER }, (span) =>
-      handleMetricsRequest(request, span, raw as Uint8Array, app),
-    );
-  })
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(
+      await getLangWatchTracer("langwatch.otel.metrics").withActiveSpan(
+        "[POST] /api/otel/v1/metrics",
+        { kind: SpanKind.SERVER },
+        (span) => handleMetricsRequest(request, span, raw, app),
+      ),
+    ),
+  )
 
   // Exporters append `/v1/{signal}` to their configured base. Keep each
   // released base in this one canonical declaration so it shares byte parsing,
@@ -603,32 +623,40 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(await handleOtlpPathAlias({ app, raw, request })),
+  )
 
   .post("/api/collector/*", "ingestOtlpAliasCollector")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(await handleOtlpPathAlias({ app, raw, request })),
+  )
 
   .post("/api/v1/*", "ingestOtlpAliasApiV1")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(await handleOtlpPathAlias({ app, raw, request })),
+  )
 
   .post("/v1/*", "ingestOtlpAliasRootV1")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withRawResponse({ produces: "application/json" })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
+  .handle(async ({ app, raw, request, response }) =>
+    response.write(await handleOtlpPathAlias({ app, raw, request })),
+  )
 
   .build();

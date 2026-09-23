@@ -1,7 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 
-import type { TraceDerivationSpanReaderRepository } from "../repositories/read/trace-derivation-span-reader.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "../repositories/trace-derivation-span-reader.repository.ts";
 
 /**
  * How long an unused memo entry lingers. Correctness comes from the fold

@@ -4,12 +4,12 @@ import type { LogRecordStorageRepository } from "./log-record-storage.repository
 import type { TraceAnalyticsProjectionRepository } from "./projection/trace-analytics-projection.repository.ts";
 import type { TraceAnalyticsRollupRepository } from "./projection/trace-analytics-rollup.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./projection/trace-summary-projection.repository.ts";
-import type { TraceDerivationSpanReaderRepository } from "./read/trace-derivation-span-reader.repository.ts";
-import type { TraceExistenceRepository } from "./read/trace-existence.repository.ts";
-import type { TracePayloadReaderRepository } from "./read/trace-payload-reader.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
+import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
+import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
 
 /**

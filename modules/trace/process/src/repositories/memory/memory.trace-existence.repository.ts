@@ -1,6 +1,6 @@
 import type { TraceUsageCount } from "@langwatch/trace-contract";
 
-import { TraceExistenceRepository } from "../read/trace-existence.repository.ts";
+import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 
 /**

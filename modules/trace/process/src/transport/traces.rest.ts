@@ -41,6 +41,7 @@ import {
   type TraceSearchBody,
   type TraceSharedFiltersInput,
 } from "@langwatch/trace-contract";
+import type { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 /**
@@ -52,7 +53,6 @@ import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-format
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
 import { TraceFacetValuesService } from "#services/trace-facet-values.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -308,6 +308,99 @@ export type TracesRestOptions = Readonly<{
 }>;
 
 /** The `/api/traces` and `/api/v1/traces` family. */
+/** One `POST /search` answer: the envelope, serialised once with its rows already JSON. */
+async function searchTraces({
+  app,
+  input,
+  scope,
+  project,
+  caller,
+}: {
+  app: TraceApi;
+  input: z.infer<typeof traceSearchBodySchema>;
+  scope: { id: string };
+  project: { projectSlug: string };
+  caller: { apiKeyId: string | null; userId: string | null };
+}): Promise<string> {
+  const params = input;
+  const {
+    from,
+    select,
+    dateField,
+    filter,
+    format: formatParam,
+    includeSpans,
+    llmMode,
+    scrollId,
+    startDate,
+    endDate,
+    pageSize: rawPageSize,
+    ...searchFields
+  } = params;
+  const format = resolveTraceFormat({ format: formatParam, llmMode });
+
+  logger.info({ projectId: scope.id }, "Searching traces for project");
+
+  const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  const protections = await app.resolveApiKeyProtections({
+    projectId: scope.id,
+    apiKeyId: caller.apiKeyId,
+    userId: caller.userId,
+  });
+
+  const { projection } = compileRequestedProjection({ from, select, protections });
+
+  const startEpoch = coerceToEpochOrThrow(startDate, "startDate");
+  const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
+  const filterWhere = app.compileExplorerTraceFilter({
+    query: filter ?? "",
+    tenantId: scope.id,
+    timeRange: { from: startEpoch, to: endEpoch },
+    originNamed: namesOriginFilter(searchFields.filters),
+    dateField,
+  });
+
+  const results = await app.listTraces({
+    query: {
+      ...searchFields,
+      projectId: scope.id,
+      startDate: startEpoch,
+      endDate: endEpoch,
+      pageSize,
+    } as never,
+    protections,
+    options: {
+      downloadMode: true,
+      includeSpans: includeSpans ?? false,
+      scrollId: scrollId ?? undefined,
+      dateField,
+      filterWhere,
+      ...(projection ? { projection: projection.plan } : {}),
+    },
+  });
+
+  const enrichedTraces = enrichTracesWithEvaluations({
+    traces: results.groups.flat() as Trace[],
+    traceChecks: results.traceChecks,
+  });
+
+  const serializeTrace = projection
+    ? (trace: Trace) => projection!.project(trace as unknown as ProjectableTrace)
+    : (trace: Trace) => formatTraceRow(trace, { app, format, projectSlug: project.projectSlug });
+
+  const { serializedTraces, skippedCount } = serializeTraceRows(enrichedTraces, serializeTrace);
+
+  const pagination = JSON.stringify({
+    totalHits: results.totalHits,
+    scrollId: results.scrollId,
+    ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
+    ...(results.updatedThrough !== undefined ? { updatedThrough: results.updatedThrough } : {}),
+  });
+  const schemaSuffix = projection ? `,"schema":${JSON.stringify(projection.schema)}` : "";
+
+  return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
+}
+
 export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
   protocol: "rest";
   namespace: string;
@@ -322,7 +415,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
     .post("/search", "searchTraces")
     .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
-    .withRawResponse({ produces: "application/json" })
+    .withResponse("bytes", { produces: "application/json" })
     .withMiddleware(projectRestFacts, tracesRestCredential)
     .withDocs({
       description: "Search traces for a project",
@@ -334,89 +427,11 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
         ...SHARED_ERROR_ANSWERS,
       },
     })
-    .handle(async ({ app, input, scope }, project, caller): Promise<Response> => {
-      const params = input;
-      const {
-        from,
-        select,
-        dateField,
-        filter,
-        format: formatParam,
-        includeSpans,
-        llmMode,
-        scrollId,
-        startDate,
-        endDate,
-        pageSize: rawPageSize,
-        ...searchFields
-      } = params;
-      const format = resolveTraceFormat({ format: formatParam, llmMode });
-
-      logger.info({ projectId: scope.id }, "Searching traces for project");
-
-      const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
-      const protections = await app.resolveApiKeyProtections({
-        projectId: scope.id,
-        apiKeyId: caller.apiKeyId,
-        userId: caller.userId,
-      });
-
-      const { projection } = compileRequestedProjection({ from, select, protections });
-
-      const startEpoch = coerceToEpochOrThrow(startDate, "startDate");
-      const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
-      const filterWhere = app.compileExplorerTraceFilter({
-        query: filter ?? "",
-        tenantId: scope.id,
-        timeRange: { from: startEpoch, to: endEpoch },
-        originNamed: namesOriginFilter(searchFields.filters),
-        dateField,
-      });
-
-      const results = await app.listTraces({
-        query: {
-          ...searchFields,
-          projectId: scope.id,
-          startDate: startEpoch,
-          endDate: endEpoch,
-          pageSize,
-        } as never,
-        protections,
-        options: {
-          downloadMode: true,
-          includeSpans: includeSpans ?? false,
-          scrollId: scrollId ?? undefined,
-          dateField,
-          filterWhere,
-          ...(projection ? { projection: projection.plan } : {}),
-        },
-      });
-
-      const enrichedTraces = enrichTracesWithEvaluations({
-        traces: results.groups.flat() as Trace[],
-        traceChecks: results.traceChecks,
-      });
-
-      const serializeTrace = projection
-        ? (trace: Trace) => projection!.project(trace as unknown as ProjectableTrace)
-        : (trace: Trace) =>
-            formatTraceRow(trace, { app, format, projectSlug: project.projectSlug });
-
-      const { serializedTraces, skippedCount } = serializeTraceRows(enrichedTraces, serializeTrace);
-
-      const pagination = JSON.stringify({
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
-        ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
-        ...(results.updatedThrough !== undefined ? { updatedThrough: results.updatedThrough } : {}),
-      });
-      const schemaSuffix = projection ? `,"schema":${JSON.stringify(projection.schema)}` : "";
-
-      return new Response(streamSearchEnvelope(serializedTraces, pagination, schemaSuffix), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    });
+    .handle(async ({ app, input, scope, response }, project, caller) =>
+      response.buffer(await searchTraces({ app, input, scope, project, caller }), {
+        mediaType: "application/json",
+      }),
+    );
 
   // GET /facets - what the trace filter fields hold. Registered BEFORE
   // :traceId so "facets" is never read as a trace id.
@@ -554,7 +569,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       if (format === "digest") {
         return {
           trace_id: resolvedTraceId,
-          formatted_trace: await TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
+          formatted_trace: await app.formatSpansDigest({ spans: trace.spans ?? [] }),
           timestamps: trace.timestamps,
           metadata: trace.metadata,
           evaluations,

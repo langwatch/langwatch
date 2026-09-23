@@ -6,11 +6,11 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { type TraceFullIo } from "../../../app/trace.members.ts";
-import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
 import {
   TraceClickHouse,
   type TraceClickHouseClient,
 } from "../../trace-clickhouse-client.repository.ts";
+import { TracePayloadReaderRepository } from "../../trace-payload-reader.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
 function outputText(value: unknown): string {

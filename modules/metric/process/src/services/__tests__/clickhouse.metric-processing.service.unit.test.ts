@@ -4,7 +4,7 @@ import { point } from "../../app/__tests__/metric.fixture.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
-import { ClickhouseMetricProcessingRepository } from "../../repositories/clickhouse/clickhouse.metric-processing.repository.ts";
+import { MetricProcessingService } from "../metric-processing.service.ts";
 
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
   return {
@@ -20,11 +20,14 @@ describe("ClickHouseMetricProcessingAdapter", () => {
     it("builds the metric-processing pipeline from that client alone", () => {
       const resolveClient = vi.fn(async () => client());
 
-      const pipeline = ClickhouseMetricProcessingRepository.create({
-        resolveClient,
+      const pipeline = MetricProcessingService.create({
+        repository: ClickHouseMetricDataPointAppendRepository.create({
+          resolveClient,
+          defaultRetentionDays: 49,
+        }),
         defaultRetentionDays: 49,
         metricCommandShardCount: 8,
-      }).buildProcessing();
+      }).build();
 
       expect(pipeline.metadata.name).toBe("metric_processing");
       expect(pipeline.commands.map((command) => command.name)).toEqual(["recordDataPoint"]);
@@ -37,11 +40,13 @@ describe("ClickHouseMetricProcessingAdapter", () => {
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = ClickhouseMetricProcessingRepository.create({
-        resolveClient: async () => client(),
+      const pipeline = MetricProcessingService.create({
+        repository: ClickHouseMetricDataPointAppendRepository.create({
+          resolveClient: async () => client(),
+          defaultRetentionDays: 49,
+        }),
         defaultRetentionDays: 49,
         metricCommandShardCount: 8,
-      }).buildProcessing({
         subscribers: [
           {
             name: "codingAgentMetricFactsDispatch",
@@ -49,7 +54,7 @@ describe("ClickHouseMetricProcessingAdapter", () => {
             handle: async () => undefined,
           },
         ],
-      });
+      }).build();
 
       expect([...pipeline.eventSubscribers.keys()]).toEqual(["codingAgentMetricFactsDispatch"]);
     });

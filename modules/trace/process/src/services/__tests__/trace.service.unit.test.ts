@@ -8,14 +8,14 @@ import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../../repositories/read/query-field-values.repository.ts";
-import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
-import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
+} from "../../repositories/query-field-values.repository.ts";
+import { TraceFullRecordRepository } from "../../repositories/trace-full-record.repository.ts";
 import {
   TraceProjectedReadRepository,
   type TraceSpanSummaryRecord,
   type TraceSpanPage,
 } from "../../repositories/trace-projected-read.repository.ts";
+import { TraceSummaryReaderRepository } from "../../repositories/trace-summary-reader.repository.ts";
 import { TraceService } from "../trace.service.ts";
 
 const node: SpanTreeNode = {

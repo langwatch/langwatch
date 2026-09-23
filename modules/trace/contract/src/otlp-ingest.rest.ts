@@ -7,9 +7,6 @@ import { HandledError } from "@langwatch/handled-error";
 import type { OtlpReceiverPolicy } from "@langwatch/otlp";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 
-/** The two authentication refusals OTLP preserves from the key directory. */
-export type OtlpIngestRefusalStatus = 401 | 403;
-
 export type OtlpIngestCredentialInput = Readonly<{
   authorization: string | null;
   xAuthToken: string | null;
@@ -32,13 +29,11 @@ export type OtlpIngestIdentity = Readonly<{
     | { status: "failed"; error: unknown };
 }>;
 
-export type OtlpIngestCredential =
-  | Readonly<{
-      ok: true;
-      project: OtlpIngestProject;
-      identity: OtlpIngestIdentity;
-    }>
-  | Readonly<{ ok: false; status: OtlpIngestRefusalStatus; body: object }>;
+/** A resolved receiver credential; a refusal is thrown, and the receiver renders it. */
+export type OtlpIngestCredential = Readonly<{
+  project: OtlpIngestProject;
+  identity: OtlpIngestIdentity;
+}>;
 
 export type OtlpTraceCollectionResult = Readonly<{
   rejectedSpans?: number;

@@ -235,3 +235,17 @@ export class TraceAiQueryUnavailableError extends HandledError {
     this.name = "TraceAiQueryUnavailableError";
   }
 }
+
+/** A capability this deployment did not compose, refused by name at the call. */
+export class TraceCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(processName: string, capability: string) {
+    super("service_unavailable", "This part of the product is not available on this deployment", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { process: processName, capability },
+    });
+    this.name = "TraceCapabilityUnavailableError";
+  }
+}

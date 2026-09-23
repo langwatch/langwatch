@@ -4,7 +4,7 @@
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
@@ -50,6 +50,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
@@ -99,11 +100,20 @@ const PRODUCES_JSON = "application/json";
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
-/** One answer, in the shape `c.json(body, status)` used to write. */
-function answer(body: unknown, status: number): RestRawAnswer {
+const LEGACY_PROTOCOL_REASON =
+  "Released SDKs parse these doors' own statuses and bodies, refusals included";
+
+/** One protocol answer, in the shape `c.json(body, status)` used to write. */
+type LegacyAnswer = Readonly<{
+  status: ContentfulStatusCode;
+  mediaType: typeof PRODUCES_JSON;
+  body: string;
+}>;
+
+function answer(body: unknown, status: number): LegacyAnswer {
   return {
-    status: status as RestRawAnswer["status"],
-    headers: { "Content-Type": PRODUCES_JSON },
+    status: status as ContentfulStatusCode,
+    mediaType: PRODUCES_JSON,
     body: JSON.stringify(body),
   };
 }
@@ -159,7 +169,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       reason: "static evaluator catalogue; the same list for every caller, no project data",
     }),
   )
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "List the built-in evaluators",
     description:
@@ -174,17 +184,17 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       },
     },
   })
-  .handle(() => {
+  .handle(({ response }) => {
     evaluatorCatalogue ??= buildEvaluatorCatalogue();
 
-    return answer({ evaluators: evaluatorCatalogue }, 200);
+    return response.write(answer({ evaluators: evaluatorCatalogue }, 200));
   })
 
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Report batch evaluation results",
     description:
@@ -210,8 +220,8 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       },
     },
   })
-  .handle(({ app, raw, request, scope }) =>
-    logBatchResults({ app, raw, request, projectId: scope.id }),
+  .handle(async ({ app, raw, request, scope, response }) =>
+    response.write(await logBatchResults({ app, raw, request, projectId: scope.id })),
   )
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
@@ -219,7 +229,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run an evaluator",
     description:
@@ -227,14 +237,16 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(({ app, raw, input, scope }) =>
-    handleEvaluatorCall({
-      app,
-      raw,
-      projectId: scope.id,
-      evaluatorSlug: input.evaluator,
-      asGuardrail: false,
-    }),
+  .handle(async ({ app, raw, input, scope, response }) =>
+    response.write(
+      await handleEvaluatorCall({
+        app,
+        raw,
+        projectId: scope.id,
+        evaluatorSlug: input.evaluator,
+        asGuardrail: false,
+      }),
+    ),
   )
 
   .post(
@@ -245,7 +257,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run a namespaced evaluator",
     description:
@@ -253,14 +265,16 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(({ app, raw, input, scope }) =>
-    handleEvaluatorCall({
-      app,
-      raw,
-      projectId: scope.id,
-      evaluatorSlug: `${input.evaluator}/${input.subpath}`,
-      asGuardrail: false,
-    }),
+  .handle(async ({ app, raw, input, scope, response }) =>
+    response.write(
+      await handleEvaluatorCall({
+        app,
+        raw,
+        projectId: scope.id,
+        evaluatorSlug: `${input.evaluator}/${input.subpath}`,
+        asGuardrail: false,
+      }),
+    ),
   )
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
@@ -268,7 +282,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run an evaluator as a guardrail",
     description:
@@ -276,21 +290,23 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     tags: ["Evaluations"],
     responses: EVALUATE_RESPONSES,
   })
-  .handle(({ app, raw, input, scope }) =>
-    handleEvaluatorCall({
-      app,
-      raw,
-      projectId: scope.id,
-      evaluatorSlug: input.evaluator,
-      asGuardrail: true,
-    }),
+  .handle(async ({ app, raw, input, scope, response }) =>
+    response.write(
+      await handleEvaluatorCall({
+        app,
+        raw,
+        projectId: scope.id,
+        evaluatorSlug: input.evaluator,
+        asGuardrail: true,
+      }),
+    ),
   )
 
   .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Evaluate a dataset",
     description:
@@ -325,7 +341,9 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       },
     },
   })
-  .handle(({ app, raw, scope }) => evaluateDataset({ app, raw, projectId: scope.id }))
+  .handle(async ({ app, raw, scope, response }) =>
+    response.write(await evaluateDataset({ app, raw, projectId: scope.id })),
+  )
   .build();
 
 // ============ The batch result log ============
@@ -340,7 +358,7 @@ async function logBatchResults({
   raw: string;
   request: Request;
   projectId: string;
-}): Promise<RestRawAnswer> {
+}): Promise<LegacyAnswer> {
   const contentType = request.headers.get("content-type");
 
   if (!contentType?.includes(PRODUCES_JSON)) {
@@ -397,7 +415,7 @@ async function recordBatch({
   app: EvaluationApi;
   projectId: string;
   params: ESBatchEvaluationRESTParams;
-}): Promise<RestRawAnswer> {
+}): Promise<LegacyAnswer> {
   try {
     await app.logBatchEvaluation({ projectId, params });
   } catch (error) {
@@ -442,7 +460,7 @@ async function evaluateDataset({
   app: EvaluationApi;
   raw: string;
   projectId: string;
-}): Promise<RestRawAnswer> {
+}): Promise<LegacyAnswer> {
   const body = parseJson(raw);
 
   if (!body) return answer({ message: "Bad request" }, 400);
@@ -568,7 +586,7 @@ async function handleEvaluatorCall({
   projectId: string;
   evaluatorSlug: string;
   asGuardrail: boolean;
-}): Promise<RestRawAnswer> {
+}): Promise<LegacyAnswer> {
   const body = parseJson(raw);
 
   if (!body) return answer({ message: "Bad request" }, 400);
@@ -667,7 +685,7 @@ function disabledGuardrailAnswer({
 }: {
   monitor: EvaluationMonitorSummary | null;
   isGuardrail: boolean;
-}): RestRawAnswer | null {
+}): LegacyAnswer | null {
   if (!monitor || monitor.enabled || !isGuardrail) return null;
 
   return answer({ status: "skipped", details: `Guardrail is not enabled`, passed: true }, 200);
@@ -678,7 +696,7 @@ async function resolveSavedEvaluator(
   app: EvaluationApi,
   projectId: string,
   evaluatorSlug: string,
-): Promise<ResolvedEvaluator | { refusal: RestRawAnswer }> {
+): Promise<ResolvedEvaluator | { refusal: LegacyAnswer }> {
   const slugOrId = evaluatorSlug.replace("evaluators/", "");
 
   try {
@@ -751,7 +769,7 @@ async function mergeEvaluatorSettings({
   monitor: EvaluationMonitorSummary | null;
   isLegacyPairwiseDispatch: boolean;
   evaluatorDefinition: ResolvedEvaluatorDefinition;
-}): Promise<{ settings: any } | { refusal: RestRawAnswer }> {
+}): Promise<{ settings: any } | { refusal: LegacyAnswer }> {
   const evaluatorSettingSchema = checkType.startsWith("custom/")
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
@@ -812,7 +830,7 @@ function missingRequiredField({
   evaluatorDefinition: ResolvedEvaluatorDefinition;
   data: EvaluationDispatchData;
   projectId: string;
-}): RestRawAnswer | null {
+}): LegacyAnswer | null {
   for (const requiredField of evaluatorDefinition.requiredFields) {
     if (data.data[requiredField] !== undefined && data.data[requiredField] !== null) continue;
 
@@ -858,7 +876,7 @@ async function runAndReport({
   saved: ResolvedEvaluator;
   monitor: EvaluationMonitorSummary | null;
   isGuardrail: boolean;
-}): Promise<RestRawAnswer> {
+}): Promise<LegacyAnswer> {
   const evaluationId = params.evaluation_id ?? generate(EVALUATION_KSUID_PREFIX).toString();
   const evaluatorId =
     saved.savedEvaluatorId ??

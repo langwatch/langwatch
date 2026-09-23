@@ -1,10 +1,10 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { LogProcessingAdapter } from "../../../eventing/log.pipeline.ts";
 import { ClickHouseCanonicalLogRecordAppendRepository } from "../clickhouse.canonical-log-record-append.repository.ts";
 import type { LogClickHouseClient } from "../clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse.canonical-log-record.repository.ts";
-import { ClickhouseLogProcessingRepository } from "../clickhouse.log-processing.repository.ts";
 
 function client(overrides: Partial<LogClickHouseClient> = {}): LogClickHouseClient {
   return {
@@ -68,11 +68,14 @@ describe("ClickHouseLogProcessingAdapter", () => {
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     /** @scenario "Valid OTLP logs become canonical durable events" */
     it("builds the log-processing pipeline from that client alone", () => {
-      const pipeline = ClickhouseLogProcessingRepository.create({
-        resolveClient: async () => client(),
+      const pipeline = LogProcessingAdapter.create({
+        repository: ClickHouseCanonicalLogRecordAppendRepository.create({
+          resolveClient: async () => client(),
+          defaultRetentionDays: 49,
+        }),
         defaultRetentionDays: 49,
         logCommandShardCount: 8,
-      }).buildProcessing();
+      }).build();
 
       expect(pipeline.metadata.name).toBe("log_processing");
       expect(pipeline.commands.map((command) => command.name)).toEqual(["recordLogRecord"]);
@@ -81,11 +84,13 @@ describe("ClickHouseLogProcessingAdapter", () => {
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = ClickhouseLogProcessingRepository.create({
-        resolveClient: async () => client(),
+      const pipeline = LogProcessingAdapter.create({
+        repository: ClickHouseCanonicalLogRecordAppendRepository.create({
+          resolveClient: async () => client(),
+          defaultRetentionDays: 49,
+        }),
         defaultRetentionDays: 49,
         logCommandShardCount: 8,
-      }).buildProcessing({
         subscribers: [
           {
             name: "codingAgentLogFactsDispatch",
@@ -93,7 +98,7 @@ describe("ClickHouseLogProcessingAdapter", () => {
             handle: async () => undefined,
           },
         ],
-      });
+      }).build();
 
       expect([...pipeline.eventSubscribers.keys()]).toEqual(["codingAgentLogFactsDispatch"]);
     });

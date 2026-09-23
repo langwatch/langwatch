@@ -10,7 +10,7 @@ import {
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
 
-import { metricMapGroupKey } from "../services/metric-processing.service.ts";
+import { metricMapGroupKey } from "../rules/metric-command-lanes.rules.ts";
 
 const events = [metricDataPointReceivedEventSchema] as const;
 

@@ -1,4 +1,5 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -19,7 +20,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -381,6 +381,10 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/otel/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
 
       expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        message:
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      });
       expect(recordedSpans).toHaveLength(0);
     });
   });
@@ -413,6 +417,7 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ message: "Invalid auth token." });
       expect(recordedSpans).toHaveLength(0);
     });
   });
@@ -425,6 +430,13 @@ describe("given the trace module as a process composes it", () => {
       const response = await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        error: "api_key_permission_denied",
+        permission: "traces:create",
+        retryable: false,
+      });
+      expect(body).not.toHaveProperty("code");
       expect(recordedSpans).toHaveLength(0);
     });
   });
