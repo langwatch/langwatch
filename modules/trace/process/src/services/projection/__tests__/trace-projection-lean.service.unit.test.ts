@@ -706,7 +706,7 @@ function makeSpanReceivedEventWithOversizedEventAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  };
 }
 
 /**
@@ -744,7 +744,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  };
 }
 
 // ---------------------------------------------------------------------------

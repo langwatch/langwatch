@@ -48,7 +48,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
-import type { Event } from "@langwatch/eventing";
+import { createTenantId, type Event } from "@langwatch/eventing";
 import type * as observabilityModule from "@langwatch/observability";
 import {
   EVENTREF_ATTR_PREFIX,
@@ -56,6 +56,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
   SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
@@ -119,10 +120,12 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
   return {
     type: SPAN_RECEIVED_EVENT_TYPE,
     id: "evt-1",
-    tenantId: PROJECT_ID,
+    tenantId: createTenantId(PROJECT_ID),
     aggregateId: TRACE_ID,
     aggregateType: "trace",
     occurredAt: Date.now(),
+    createdAt: Date.now(),
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
       span: {
         traceId: TRACE_ID,
@@ -142,7 +145,7 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
       resource: { attributes: [] },
       instrumentationScope: { name: "test" },
     },
-  } as unknown as Event;
+  };
 }
 
 /**

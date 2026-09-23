@@ -20,7 +20,15 @@ const controllerOf = vi.mocked(usePromptBrowserTabController);
 
 function givenTabTitled(title: string) {
   controllerOf.mockReturnValue({
-    tab: { id: "tab-1", data: { meta: { title } } },
+    tab: {
+      id: "tab-1",
+      data: {
+        chat: { initialMessagesFromSpanData: [] },
+        form: { currentValues: {} },
+        meta: { title },
+        variableValues: {},
+      },
+    },
     title,
     hasUnsavedChanges: false,
     handleClose: vi.fn(),
@@ -29,7 +37,7 @@ function givenTabTitled(title: string) {
     isOutdated: false,
     handleUpgrade: vi.fn(),
     showVersionBadge: false,
-  } as unknown as ReturnType<typeof usePromptBrowserTabController>);
+  });
 }
 
 function renderTab(props: { isActive?: boolean; isCrowded?: boolean } = {}) {
