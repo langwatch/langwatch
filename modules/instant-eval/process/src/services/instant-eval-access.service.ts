@@ -23,12 +23,22 @@ export interface InstantEvalProjectReader {
 }
 
 export class InstantEvalAccessService {
-  private constructor(
-    private readonly flags: InstantEvalFlagReader,
-    private readonly projects: InstantEvalProjectReader,
-    private readonly isJudgeConfigured: () => boolean,
-    private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">,
-  ) {}
+  private readonly flags: InstantEvalFlagReader;
+  private readonly projects: InstantEvalProjectReader;
+  private readonly isJudgeConfigured: () => boolean;
+  private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
+
+  private constructor(options: {
+    flags: InstantEvalFlagReader;
+    projects: InstantEvalProjectReader;
+    isJudgeConfigured: () => boolean;
+    judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
+  }) {
+    this.flags = options.flags;
+    this.projects = options.projects;
+    this.isJudgeConfigured = options.isJudgeConfigured;
+    this.judge = options.judge;
+  }
 
   static create({
     flags,
@@ -43,7 +53,7 @@ export class InstantEvalAccessService {
     /** The judge, where it judges for some organizations and not others. */
     judge?: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
   }): InstantEvalAccessService {
-    return new InstantEvalAccessService(flags, projects, isJudgeConfigured, judge);
+    return new InstantEvalAccessService({ flags, projects, isJudgeConfigured, judge });
   }
 
   /**

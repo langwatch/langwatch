@@ -1181,7 +1181,11 @@ class RepositoryAppBuilder<
       App,
       Dependencies,
       Members
-    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
   }
 
   /** Background work this module contributes to the worker role. */
@@ -1192,7 +1196,7 @@ class RepositoryAppBuilder<
       >,
       ModuleRepositories<Live, Memory>,
       App
-    >(this.build(), workers, []);
+    >({ declaration: this.build(), workers, tasks: [] });
   }
 
   /** One-shot work this module contributes to the tasks role. */
@@ -1203,7 +1207,7 @@ class RepositoryAppBuilder<
       >,
       ModuleRepositories<Live, Memory>,
       App
-    >(this.build(), [], tasks);
+    >({ declaration: this.build(), workers: [], tasks });
   }
 
   build(): ServerFeatureDeclaration<
@@ -1282,7 +1286,7 @@ class RepositoryAppBuilder<
       >,
       ModuleRepositories<Live, Memory>,
       App
-    >(this.build(), [], [], eventing as FeatureEventing);
+    >({ declaration: this.build(), workers: [], tasks: [], eventing: eventing as FeatureEventing });
   }
 }
 
@@ -1364,22 +1368,31 @@ class ConfiguredAppBuilder<
       App,
       Dependencies,
       Members
-    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
   }
 
   /** Background work this module contributes to the worker role. */
   withWorkers(...workers: readonly unknown[]) {
-    return withContributions(this.build(), workers, []);
+    return withContributions({ declaration: this.build(), workers, tasks: [] });
   }
 
   /** One-shot work this module contributes to the tasks role. */
   withTasks(...tasks: readonly unknown[]) {
-    return withContributions(this.build(), [], tasks);
+    return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
-    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+    return withContributions({
+      declaration: this.build(),
+      workers: [],
+      tasks: [],
+      eventing: eventing as FeatureEventing,
+    });
   }
 
   build(): ServerFeatureDeclaration<
@@ -1460,22 +1473,31 @@ class UnconfiguredAppBuilder<
       App,
       Dependencies,
       Members
-    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
   }
 
   /** Background work this module contributes to the worker role. */
   withWorkers(...workers: readonly unknown[]) {
-    return withContributions(this.build(), workers, []);
+    return withContributions({ declaration: this.build(), workers, tasks: [] });
   }
 
   /** One-shot work this module contributes to the tasks role. */
   withTasks(...tasks: readonly unknown[]) {
-    return withContributions(this.build(), [], tasks);
+    return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
-    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+    return withContributions({
+      declaration: this.build(),
+      workers: [],
+      tasks: [],
+      eventing: eventing as FeatureEventing,
+    });
   }
 
   build(): ServerFeatureDeclaration<
@@ -1587,25 +1609,40 @@ function withContributions<
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
   Members = unknown,
->(
-  declaration: Declaration,
-  workers: readonly unknown[],
-  tasks: readonly unknown[],
-  eventing?: FeatureEventing,
-): ModuleContributions<Declaration, Repositories, App, Dependencies, Members> {
+>({
+  declaration,
+  workers,
+  tasks,
+  eventing,
+}: {
+  declaration: Declaration;
+  workers: readonly unknown[];
+  tasks: readonly unknown[];
+  eventing?: FeatureEventing;
+}): ModuleContributions<Declaration, Repositories, App, Dependencies, Members> {
   const contributions = {
     ...declaration,
     workers,
     tasks,
     eventing,
     withWorkers: (...next: readonly unknown[]) =>
-      withContributions(declaration, [...workers, ...next], tasks, eventing),
+      withContributions({ declaration, workers: [...workers, ...next], tasks, eventing }),
     withTasks: (...next: readonly unknown[]) =>
-      withContributions(declaration, workers, [...tasks, ...next], eventing),
+      withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing }),
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
-      withContributions(bindingTransportFacts(declaration, bind), workers, tasks, eventing),
+      withContributions({
+        declaration: bindingTransportFacts(declaration, bind),
+        workers,
+        tasks,
+        eventing,
+      }),
     withEventing: (next: FeatureEventing) =>
-      withContributions(declaration, workers, tasks, withAnotherPipeline(eventing, next)),
+      withContributions({
+        declaration,
+        workers,
+        tasks,
+        eventing: withAnotherPipeline(eventing, next),
+      }),
   } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
 
   return contributions;

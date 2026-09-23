@@ -18,13 +18,13 @@ describe("the command bar's invite command", () => {
       const close = vi.fn();
       const openDrawer = vi.fn();
 
-      handleCommandSelect(
-        command!,
-        "project-1",
-        { go: vi.fn(), newTab: false, close },
-        vi.fn(),
+      handleCommandSelect({
+        cmd: command!,
+        projectSlug: "project-1",
+        ctx: { go: vi.fn(), newTab: false, close },
+        addRecentItem: vi.fn(),
         openDrawer,
-      );
+      });
 
       expect(close).toHaveBeenCalled();
       expect(openDrawer).toHaveBeenCalledWith("inviteMember");

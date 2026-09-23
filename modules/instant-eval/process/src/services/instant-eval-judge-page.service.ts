@@ -101,18 +101,40 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
 type InstantEvalJudgePageInput = Parameters<InstantEvalRunExecutor["judgePage"]>[0];
 
 export class InstantEvalJudgePageService {
-  private constructor(
-    private readonly context: InstantEvalRunContextService,
-    private readonly rowSource: Pick<InstantEvalRowSourceService, "keys">,
-    private readonly textSource: InstantEvalTextSource,
-    private readonly judge: InstantEvalJudgeChannel,
-    private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">,
-    private readonly cancellation: InstantEvalCancellationChannel,
-    private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">,
-    private readonly readAhead: InstantEvalReadAheadService,
-    private readonly concurrency: number,
-    private readonly now: () => number,
-  ) {}
+  private readonly context: InstantEvalRunContextService;
+  private readonly rowSource: Pick<InstantEvalRowSourceService, "keys">;
+  private readonly textSource: InstantEvalTextSource;
+  private readonly judge: InstantEvalJudgeChannel;
+  private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
+  private readonly cancellation: InstantEvalCancellationChannel;
+  private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+  private readonly readAhead: InstantEvalReadAheadService;
+  private readonly concurrency: number;
+  private readonly now: () => number;
+
+  private constructor(options: {
+    context: InstantEvalRunContextService;
+    rowSource: Pick<InstantEvalRowSourceService, "keys">;
+    textSource: InstantEvalTextSource;
+    judge: InstantEvalJudgeChannel;
+    judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
+    cancellation: InstantEvalCancellationChannel;
+    budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+    readAhead: InstantEvalReadAheadService;
+    concurrency: number;
+    now: () => number;
+  }) {
+    this.context = options.context;
+    this.rowSource = options.rowSource;
+    this.textSource = options.textSource;
+    this.judge = options.judge;
+    this.judgments = options.judgments;
+    this.cancellation = options.cancellation;
+    this.budget = options.budget;
+    this.readAhead = options.readAhead;
+    this.concurrency = options.concurrency;
+    this.now = options.now;
+  }
 
   static create({
     context,
@@ -138,7 +160,7 @@ export class InstantEvalJudgePageService {
     concurrency?: number;
     now?: () => number;
   }): InstantEvalJudgePageService {
-    return new InstantEvalJudgePageService(
+    return new InstantEvalJudgePageService({
       context,
       rowSource,
       textSource,
@@ -149,7 +171,7 @@ export class InstantEvalJudgePageService {
       readAhead,
       concurrency,
       now,
-    );
+    });
   }
 
   /** One page: its keys, its verdicts, and what it added to the run. */

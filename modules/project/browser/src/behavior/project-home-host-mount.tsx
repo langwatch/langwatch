@@ -25,19 +25,40 @@ const LANGY_CREATE_PERMISSION = "langy:create";
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
 class CapabilityProjectHomeHost extends ProjectHomeHost {
-  constructor(
-    private readonly project_: ProjectHomeProject | undefined,
-    private readonly organization_: ProjectHomeOrganization | undefined,
-    private readonly currentUser_: ProjectHomeUser | undefined,
-    private readonly isLoading_: boolean,
-    private readonly hasPermissionOf: (permission: string) => boolean,
-    private readonly featureFlagOf: (flag: string) => boolean | undefined,
-    private readonly isDemoProject: boolean,
-    private readonly deployment_: ProjectHomeDeployment,
-    private readonly reducedMotion_: boolean,
-    private readonly navigateOf: (to: string) => void,
-  ) {
+  private readonly project_: ProjectHomeProject | undefined;
+  private readonly organization_: ProjectHomeOrganization | undefined;
+  private readonly currentUser_: ProjectHomeUser | undefined;
+  private readonly isLoading_: boolean;
+  private readonly hasPermissionOf: (permission: string) => boolean;
+  private readonly featureFlagOf: (flag: string) => boolean | undefined;
+  private readonly isDemoProject: boolean;
+  private readonly deployment_: ProjectHomeDeployment;
+  private readonly reducedMotion_: boolean;
+  private readonly navigateOf: (to: string) => void;
+
+  constructor(options: {
+    project: ProjectHomeProject | undefined;
+    organization: ProjectHomeOrganization | undefined;
+    currentUser: ProjectHomeUser | undefined;
+    isLoading: boolean;
+    hasPermissionOf: (permission: string) => boolean;
+    featureFlagOf: (flag: string) => boolean | undefined;
+    isDemoProject: boolean;
+    deployment: ProjectHomeDeployment;
+    reducedMotion: boolean;
+    navigateOf: (to: string) => void;
+  }) {
     super();
+    this.project_ = options.project;
+    this.organization_ = options.organization;
+    this.currentUser_ = options.currentUser;
+    this.isLoading_ = options.isLoading;
+    this.hasPermissionOf = options.hasPermissionOf;
+    this.featureFlagOf = options.featureFlagOf;
+    this.isDemoProject = options.isDemoProject;
+    this.deployment_ = options.deployment;
+    this.reducedMotion_ = options.reducedMotion;
+    this.navigateOf = options.navigateOf;
   }
 
   project(): ProjectHomeProject | undefined {
@@ -118,26 +139,31 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
   // and a fresh object every render would remount the whole tree under it.
   const host = useMemo(
     () =>
-      new CapabilityProjectHomeHost(
-        projectId !== void 0
-          ? { id: projectId, name: projectName ?? "", slug: projectSlug ?? "" }
-          : void 0,
-        organizationName !== void 0 && organizationId !== void 0
-          ? { id: organizationId, name: organizationName }
-          : void 0,
-        actorId !== void 0 ? { id: actorId, name: actorName ?? null } : void 0,
-        status === "loading",
-        (permission) => session.hasPermission(permission),
-        (flag) => session.featureFlag(flag),
-        isLangyDemoProject({ projectSlug, demoProjectSlug: deployment.demoProjectSlug }),
-        {
+      new CapabilityProjectHomeHost({
+        project:
+          projectId !== void 0
+            ? { id: projectId, name: projectName ?? "", slug: projectSlug ?? "" }
+            : void 0,
+        organization:
+          organizationName !== void 0 && organizationId !== void 0
+            ? { id: organizationId, name: organizationName }
+            : void 0,
+        currentUser: actorId !== void 0 ? { id: actorId, name: actorName ?? null } : void 0,
+        isLoading: status === "loading",
+        hasPermissionOf: (permission) => session.hasPermission(permission),
+        featureFlagOf: (flag) => session.featureFlag(flag),
+        isDemoProject: isLangyDemoProject({
+          projectSlug,
+          demoProjectSlug: deployment.demoProjectSlug,
+        }),
+        deployment: {
           isSaaS: deployment.isSaaS,
           isDevelopment: deployment.isDevelopment,
           ...(deployment.demoProjectSlug ? { demoProjectSlug: deployment.demoProjectSlug } : {}),
         },
         reducedMotion,
-        (to) => navigation.navigate(to),
-      ),
+        navigateOf: (to) => navigation.navigate(to),
+      }),
     [
       projectId,
       projectName,

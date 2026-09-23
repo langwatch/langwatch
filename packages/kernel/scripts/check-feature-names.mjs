@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -23,9 +23,7 @@ const generatedSource = `${[
 ].join("\n")}`;
 
 if (process.argv.includes("--write")) {
-  await import("node:fs/promises").then(({ writeFile }) =>
-    writeFile(generatedPath, generatedSource, "utf8"),
-  );
+  await writeFile(generatedPath, generatedSource, "utf8");
   process.stdout.write(`Wrote ${generatedPath}\n`);
   process.exit(0);
 }

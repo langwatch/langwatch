@@ -30,12 +30,15 @@ export interface FilteredCommands {
  * Hook for filtering commands based on search query.
  * Handles category-based and keyword-based filtering.
  */
-export function useFilteredCommands(
-  query: string,
-  isSaas: boolean | undefined,
-  _projectId: string | undefined,
-  _isDevMode: boolean,
-): FilteredCommands {
+export function useFilteredCommands({
+  query,
+  isSaas,
+}: {
+  query: string;
+  isSaas: boolean | undefined;
+  projectId: string | undefined;
+  isDevMode: boolean;
+}): FilteredCommands {
   const host = useNavigationHost();
   const hasOpsAccess = host.opsAccess().hasAccess;
   const commandFeatureFlags = useCommandFeatureFlags();

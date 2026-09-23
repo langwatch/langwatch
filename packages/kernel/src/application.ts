@@ -445,7 +445,7 @@ export class ApplicationBuilder<
                 : void 0,
         });
         featureServices.push(...resources.sealServices());
-        this.bindProviders(declaration, state, apis, provided);
+        this.bindProviders({ declaration, state, apis, provided });
         const installedState = declaration.apiContract
           ? { ...state, provided: apis.reference(declaration.apiContract) }
           : state;
@@ -511,12 +511,17 @@ export class ApplicationBuilder<
     }
   }
 
-  private bindProviders(
-    declaration: DeclaredFeature,
-    state: InstalledFeatureState,
-    apis: LocalFeatureApis,
-    provided: Map<TokenIdentity, unknown>,
-  ): void {
+  private bindProviders({
+    declaration,
+    state,
+    apis,
+    provided,
+  }: {
+    declaration: DeclaredFeature;
+    state: InstalledFeatureState;
+    apis: LocalFeatureApis;
+    provided: Map<TokenIdentity, unknown>;
+  }): void {
     for (const provider of declaration.providers) {
       const value = provider.read(state.provided as never);
       if (provider.token instanceof ModuleApiToken) {
@@ -741,7 +746,7 @@ function orderByDependency(
       ]);
     }
     path.push(declaration.name);
-    for (const dependency of constructorDependencies(declaration, role, providerOf, byName)) {
+    for (const dependency of constructorDependencies({ declaration, role, providerOf, byName })) {
       visit(dependency);
     }
     path.pop();
@@ -764,12 +769,17 @@ function assertLegacyProviders(declaration: DeclaredFeature): void {
   }
 }
 
-function constructorDependencies(
-  declaration: DeclaredFeature,
-  role: ServerRole,
-  providerOf: ReadonlyMap<TokenIdentity, string>,
-  byName: ReadonlyMap<string, DeclaredFeature>,
-): DeclaredFeature[] {
+function constructorDependencies({
+  declaration,
+  role,
+  providerOf,
+  byName,
+}: {
+  declaration: DeclaredFeature;
+  role: ServerRole;
+  providerOf: ReadonlyMap<TokenIdentity, string>;
+  byName: ReadonlyMap<string, DeclaredFeature>;
+}): DeclaredFeature[] {
   const dependencies: DeclaredFeature[] = [];
   for (const [, token] of dependenciesFor(declaration, role)) {
     if (token instanceof ModuleApiToken) continue;

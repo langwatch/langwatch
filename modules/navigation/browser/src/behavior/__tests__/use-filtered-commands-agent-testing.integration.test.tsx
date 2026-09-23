@@ -34,9 +34,12 @@ function navigationIdsFor({
     </WithStubNavigationHost>
   );
 
-  const { result } = renderHook(() => useFilteredCommands(query, true, "project-1", false), {
-    wrapper,
-  });
+  const { result } = renderHook(
+    () => useFilteredCommands({ query, isSaas: true, projectId: "project-1", isDevMode: false }),
+    {
+      wrapper,
+    },
+  );
   return result.current.navigation.map((command) => command.id);
 }
 

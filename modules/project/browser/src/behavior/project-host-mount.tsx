@@ -25,16 +25,31 @@ type ProjectOrganizationGraph = ProjectApiMap["organization"]["getAll"]["query"]
 const NO_ORGANIZATIONS: readonly ProjectOrganizationGraph[] = [];
 
 class CapabilityProjectHost extends ProjectHostApi {
-  constructor(
-    private readonly organization_: ProjectHostOrganization | undefined,
-    private readonly project_: ProjectHostProject | undefined,
-    private readonly hasPermissionOf: (permission: string) => boolean,
-    private readonly isFeatureEnabledOf: (flag: string) => boolean,
-    private readonly scopeHost: UiScopeHost | undefined,
-    private readonly succeededOf: (notice: ProjectSuccessNotice) => void,
-    private readonly failedOf: (failure: ProjectFailureNotice) => void,
-  ) {
+  private readonly organization_: ProjectHostOrganization | undefined;
+  private readonly project_: ProjectHostProject | undefined;
+  private readonly hasPermissionOf: (permission: string) => boolean;
+  private readonly isFeatureEnabledOf: (flag: string) => boolean;
+  private readonly scopeHost: UiScopeHost | undefined;
+  private readonly succeededOf: (notice: ProjectSuccessNotice) => void;
+  private readonly failedOf: (failure: ProjectFailureNotice) => void;
+
+  constructor(options: {
+    organization: ProjectHostOrganization | undefined;
+    project: ProjectHostProject | undefined;
+    hasPermissionOf: (permission: string) => boolean;
+    isFeatureEnabledOf: (flag: string) => boolean;
+    scopeHost: UiScopeHost | undefined;
+    succeededOf: (notice: ProjectSuccessNotice) => void;
+    failedOf: (failure: ProjectFailureNotice) => void;
+  }) {
     super();
+    this.organization_ = options.organization;
+    this.project_ = options.project;
+    this.hasPermissionOf = options.hasPermissionOf;
+    this.isFeatureEnabledOf = options.isFeatureEnabledOf;
+    this.scopeHost = options.scopeHost;
+    this.succeededOf = options.succeededOf;
+    this.failedOf = options.failedOf;
   }
 
   organization(): ProjectHostOrganization | undefined {
@@ -108,15 +123,15 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityProjectHost(
+      new CapabilityProjectHost({
         organization,
         project,
-        (permission) => session.hasPermission(permission),
-        (flag) => session.isFeatureEnabled(flag),
+        hasPermissionOf: (permission) => session.hasPermission(permission),
+        isFeatureEnabledOf: (flag) => session.isFeatureEnabled(flag),
         scopeHost,
-        (notice) => feedback.succeeded(notice),
-        (notice) => feedback.failed(notice),
-      ),
+        succeededOf: (notice) => feedback.succeeded(notice),
+        failedOf: (notice) => feedback.failed(notice),
+      }),
     [organization, project, session, scopeHost, feedback],
   );
   return <ProjectHostProvider value={host}>{children}</ProjectHostProvider>;

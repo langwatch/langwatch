@@ -16,12 +16,22 @@ import type { InstantEvalSpendService } from "./instant-eval-spend.service.ts";
 const logger = createLogger("langwatch:instant-eval:finish");
 
 export class InstantEvalFinishService {
-  private constructor(
-    private readonly spend: Pick<InstantEvalSpendService, "recordSpend">,
-    private readonly budget: Pick<InstantEvalFreeBudgetService, "release">,
-    private readonly pricing: InstantEvalPricing,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly spend: Pick<InstantEvalSpendService, "recordSpend">;
+  private readonly budget: Pick<InstantEvalFreeBudgetService, "release">;
+  private readonly pricing: InstantEvalPricing;
+  private readonly now: () => Instant;
+
+  private constructor(options: {
+    spend: Pick<InstantEvalSpendService, "recordSpend">;
+    budget: Pick<InstantEvalFreeBudgetService, "release">;
+    pricing: InstantEvalPricing;
+    now: () => Instant;
+  }) {
+    this.spend = options.spend;
+    this.budget = options.budget;
+    this.pricing = options.pricing;
+    this.now = options.now;
+  }
 
   static create({
     spend,
@@ -35,7 +45,7 @@ export class InstantEvalFinishService {
     pricing: InstantEvalPricing;
     now?: () => Instant;
   }): InstantEvalFinishService {
-    return new InstantEvalFinishService(spend, budget, pricing, now);
+    return new InstantEvalFinishService({ spend, budget, pricing, now });
   }
 
   async finish({

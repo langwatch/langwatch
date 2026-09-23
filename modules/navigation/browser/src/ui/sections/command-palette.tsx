@@ -160,13 +160,18 @@ export function CommandPalette({
   const isMac =
     typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
-  const filteredCommands = useFilteredCommands(
+  const filteredCommands = useFilteredCommands({
     query,
-    deployment.isSaaS,
-    project?.id,
-    deployment.isDevelopment,
-  );
-  const filteredProjects = useFilteredProjects(query, organizations, project?.slug, currentUserId);
+    isSaas: deployment.isSaaS,
+    projectId: project?.id,
+    isDevMode: deployment.isDevelopment,
+  });
+  const filteredProjects = useFilteredProjects({
+    query,
+    organizations,
+    currentProjectSlug: project?.slug,
+    currentUserId,
+  });
 
   const {
     allItems,
@@ -175,16 +180,16 @@ export function CommandPalette({
     searchInDocsItem,
     easterEggItem,
     askLangyItem,
-  } = useCommandBarItems(
+  } = useCommandBarItems({
     query,
     filteredCommands,
     filteredProjects,
     searchResults,
     idResult,
     groupedItems,
-    project?.slug,
+    projectSlug: project?.slug,
     langyEnabled,
-  );
+  });
 
   const { triggerEffect } = useEasterEggEffects();
 
@@ -291,11 +296,17 @@ export function CommandPalette({
           return;
         }
 
-        handleCommandSelect(cmd, projectSlug, ctx, addRecentItem, openDrawer);
+        handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer });
       } else if (item.type === "search") {
-        handleSearchResultSelect(item.data, projectSlug, ctx, addRecentItem, openDrawer);
+        handleSearchResultSelect({
+          result: item.data,
+          projectSlug,
+          ctx,
+          addRecentItem,
+          openDrawer,
+        });
       } else if (item.type === "recent") {
-        handleRecentItemSelect(item.data, ctx, addRecentItem, openDrawer);
+        handleRecentItemSelect({ item: item.data, ctx, addRecentItem, openDrawer });
       } else if (item.type === "project") {
         handleProjectSelect(item.data, ctx, addRecentItem);
       }
@@ -372,15 +383,15 @@ export function CommandPalette({
   // straight to Langy. Reaching the assistant by arrowing to the bottom of a
   // list of places to go made the more capable of the two routes read as the
   // fallback after navigation failed to match.
-  const handleKeyDown = useCommandBarKeyboard(
+  const handleKeyDown = useCommandBarKeyboard({
     allItems,
     selectedIndex,
     setSelectedIndex,
     handleSelect,
     handleCopyLink,
     isMac,
-    langyEnabled ? enterLangyMode : undefined,
-  );
+    onAskLangy: langyEnabled ? enterLangyMode : undefined,
+  });
 
   if (langyMode) {
     return (

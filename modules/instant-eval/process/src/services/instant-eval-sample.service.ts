@@ -26,12 +26,22 @@ export interface InstantEvalSample {
 }
 
 export class InstantEvalSampleService {
-  private constructor(
-    private readonly judgments: InstantEvalJudgmentsRepository,
-    private readonly textSource: InstantEvalTextSource,
-    private readonly now: () => Instant,
-    private readonly seed: () => number,
-  ) {}
+  private readonly judgments: InstantEvalJudgmentsRepository;
+  private readonly textSource: InstantEvalTextSource;
+  private readonly now: () => Instant;
+  private readonly seed: () => number;
+
+  private constructor(options: {
+    judgments: InstantEvalJudgmentsRepository;
+    textSource: InstantEvalTextSource;
+    now: () => Instant;
+    seed: () => number;
+  }) {
+    this.judgments = options.judgments;
+    this.textSource = options.textSource;
+    this.now = options.now;
+    this.seed = options.seed;
+  }
 
   static create({
     judgments,
@@ -45,12 +55,12 @@ export class InstantEvalSampleService {
     /** Varies which rows a repeated read picks. Injected so a test pins it. */
     seed?: () => number;
   }): InstantEvalSampleService {
-    return new InstantEvalSampleService(
+    return new InstantEvalSampleService({
       judgments,
       textSource,
       now,
-      seed ?? (() => nowInstant().epochMilliseconds),
-    );
+      seed: seed ?? (() => nowInstant().epochMilliseconds),
+    });
   }
 
   /**

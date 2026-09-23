@@ -42,12 +42,22 @@ export interface InstantEvalCancelCommands {
 }
 
 export class InstantEvalCancelService {
-  private constructor(
-    private readonly reads: InstantEvalReadsService,
-    private readonly commands: InstantEvalCancelCommands,
-    private readonly cancellations: InstantEvalCancellationChannel,
-    private readonly now: () => number,
-  ) {}
+  private readonly reads: InstantEvalReadsService;
+  private readonly commands: InstantEvalCancelCommands;
+  private readonly cancellations: InstantEvalCancellationChannel;
+  private readonly now: () => number;
+
+  private constructor(options: {
+    reads: InstantEvalReadsService;
+    commands: InstantEvalCancelCommands;
+    cancellations: InstantEvalCancellationChannel;
+    now: () => number;
+  }) {
+    this.reads = options.reads;
+    this.commands = options.commands;
+    this.cancellations = options.cancellations;
+    this.now = options.now;
+  }
 
   static create({
     reads,
@@ -60,7 +70,7 @@ export class InstantEvalCancelService {
     cancellations: InstantEvalCancellationChannel;
     now: () => number;
   }): InstantEvalCancelService {
-    return new InstantEvalCancelService(reads, commands, cancellations, now);
+    return new InstantEvalCancelService({ reads, commands, cancellations, now });
   }
 
   async cancelRun({

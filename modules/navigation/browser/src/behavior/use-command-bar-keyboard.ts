@@ -5,20 +5,28 @@ import type { ListItem } from "../model/command-icon-info.ts";
 /**
  * Hook that handles keyboard navigation and shortcuts for the command bar.
  */
-export function useCommandBarKeyboard(
-  allItems: ListItem[],
-  selectedIndex: number,
-  setSelectedIndex: (index: number | ((prev: number) => number)) => void,
-  handleSelect: (item: ListItem, newTab?: boolean) => void,
-  handleCopyLink: () => void,
-  isMac: boolean,
+export function useCommandBarKeyboard({
+  allItems,
+  selectedIndex,
+  setSelectedIndex,
+  handleSelect,
+  handleCopyLink,
+  isMac,
+  onAskLangy,
+}: {
+  allItems: ListItem[];
+  selectedIndex: number;
+  setSelectedIndex: (index: number | ((prev: number) => number)) => void;
+  handleSelect: (item: ListItem, newTab?: boolean) => void;
+  handleCopyLink: () => void;
+  isMac: boolean;
   /**
    * Hand what is typed to Langy, on Tab — omitted for a reader who cannot
    * start a Langy turn, so the key falls through to moving focus: a
    * shortcut that silently does nothing is worse than none at all.
    */
-  onAskLangy?: () => void,
-) {
+  onAskLangy?: () => void;
+}) {
   return useCallback(
     (e: React.KeyboardEvent) => {
       const modKey = isMac ? e.metaKey : e.ctrlKey;

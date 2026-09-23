@@ -135,14 +135,28 @@ export class InstantEvalApp implements InstantEvalApiContract {
   /** `redis` is the shared token bucket that paces the judge across every pod. */
   static readonly reads = ["redis", "connectJudge"] as const;
 
-  private constructor(
-    private readonly access: InstantEvalAccessService,
-    private readonly classifications: InstantEvalClassifyService,
-    private readonly reads: InstantEvalReadsService,
-    private readonly runs: InstantEvalRunService,
-    private readonly dispatcher: InstantEvalCommandDispatcherService,
-    private readonly pipeline: InstantEvalProcessingPipelineDefinition,
-  ) {}
+  private readonly access: InstantEvalAccessService;
+  private readonly classifications: InstantEvalClassifyService;
+  private readonly reads: InstantEvalReadsService;
+  private readonly runs: InstantEvalRunService;
+  private readonly dispatcher: InstantEvalCommandDispatcherService;
+  private readonly pipeline: InstantEvalProcessingPipelineDefinition;
+
+  private constructor(options: {
+    access: InstantEvalAccessService;
+    classifications: InstantEvalClassifyService;
+    reads: InstantEvalReadsService;
+    runs: InstantEvalRunService;
+    dispatcher: InstantEvalCommandDispatcherService;
+    pipeline: InstantEvalProcessingPipelineDefinition;
+  }) {
+    this.access = options.access;
+    this.classifications = options.classifications;
+    this.reads = options.reads;
+    this.runs = options.runs;
+    this.dispatcher = options.dispatcher;
+    this.pipeline = options.pipeline;
+  }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalApp> {
     return setup.secrets.into(InstantEvalApp.secrets.classifierApiKey, (apiKey) =>
@@ -171,9 +185,8 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const rowSource = InstantEvalRowSourceService.create({ analytics });
     // The extraction half of a judged plan, which is Analytics' own: this
     // module judges the texts it answers with and never the rows behind them.
-    const textSource = {
-      texts: (input: Parameters<AnalyticsApi["hydrateLangWatchQLTexts"]>[0]) =>
-        analytics.hydrateLangWatchQLTexts(input),
+    const textSource: InstantEvalTextSource = {
+      texts: (input) => analytics.hydrateLangWatchQLTexts(input),
     };
     const cancellations = setup.members.redis
       ? RedisInstantEvalCancellationChannel.create(setup.members.redis)
@@ -207,11 +220,11 @@ export class InstantEvalApp implements InstantEvalApiContract {
       },
     });
 
-    return new InstantEvalApp(
+    return new InstantEvalApp({
       access,
-      InstantEvalClassifyService.create({ judge }),
+      classifications: InstantEvalClassifyService.create({ judge }),
       reads,
-      InstantEvalRunService.create({
+      runs: InstantEvalRunService.create({
         units: {
           statements: InstantEvalStatementService.create({ analytics, rowSource }),
           creates: InstantEvalCreateService.create({
@@ -250,7 +263,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
         },
       }),
       dispatcher,
-      InstantEvalProcessingPipelineAdapter.create({
+      pipeline: InstantEvalProcessingPipelineAdapter.create({
         instantEvalRunStore: InstantEvalRunProjectionStore.create({ runs: repositories.runs }),
         dispatch: {
           executor: InstantEvalApp.executorOf({
@@ -268,7 +281,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
           commands: () => dispatcher.outcomeCommands(),
         },
       }),
-    );
+    });
   }
 
   /**

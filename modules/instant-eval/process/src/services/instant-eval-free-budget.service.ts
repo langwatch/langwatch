@@ -50,12 +50,22 @@ interface CachedSpend {
 export class InstantEvalFreeBudgetService {
   readonly #spent = new Map<string, CachedSpend>();
 
-  private constructor(
-    private readonly peers: InstantEvalBudgetPeers,
-    private readonly reservations: InstantEvalBudgetReservationsChannel,
-    private readonly isBounded: boolean,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly peers: InstantEvalBudgetPeers;
+  private readonly reservations: InstantEvalBudgetReservationsChannel;
+  private readonly isBounded: boolean;
+  private readonly now: () => Instant;
+
+  private constructor(options: {
+    peers: InstantEvalBudgetPeers;
+    reservations: InstantEvalBudgetReservationsChannel;
+    isBounded: boolean;
+    now: () => Instant;
+  }) {
+    this.peers = options.peers;
+    this.reservations = options.reservations;
+    this.isBounded = options.isBounded;
+    this.now = options.now;
+  }
 
   /**
    * `isBounded` is the deployment's own decision: an installation that does
@@ -73,7 +83,12 @@ export class InstantEvalFreeBudgetService {
     isBounded?: boolean;
     now?: () => Instant;
   }): InstantEvalFreeBudgetService {
-    return new InstantEvalFreeBudgetService(peers, reservations, isBounded, now ?? nowInstant);
+    return new InstantEvalFreeBudgetService({
+      peers,
+      reservations,
+      isBounded,
+      now: now ?? nowInstant,
+    });
   }
 
   /** Where the project's organization stands against the budget. */

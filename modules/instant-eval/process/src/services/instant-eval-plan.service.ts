@@ -27,12 +27,22 @@ export interface InstantEvalKeyCapSource {
 }
 
 export class InstantEvalPlanService {
-  private constructor(
-    private readonly context: InstantEvalRunContextService,
-    private readonly rowSource: Pick<InstantEvalRowSourceService, "probe" | "count" | "sampleKeys">,
-    private readonly textSource: InstantEvalTextSource,
-    private readonly keyCaps: InstantEvalKeyCapSource,
-  ) {}
+  private readonly context: InstantEvalRunContextService;
+  private readonly rowSource: Pick<InstantEvalRowSourceService, "probe" | "count" | "sampleKeys">;
+  private readonly textSource: InstantEvalTextSource;
+  private readonly keyCaps: InstantEvalKeyCapSource;
+
+  private constructor(options: {
+    context: InstantEvalRunContextService;
+    rowSource: Pick<InstantEvalRowSourceService, "probe" | "count" | "sampleKeys">;
+    textSource: InstantEvalTextSource;
+    keyCaps: InstantEvalKeyCapSource;
+  }) {
+    this.context = options.context;
+    this.rowSource = options.rowSource;
+    this.textSource = options.textSource;
+    this.keyCaps = options.keyCaps;
+  }
 
   static create({
     context,
@@ -45,7 +55,7 @@ export class InstantEvalPlanService {
     textSource: InstantEvalTextSource;
     keyCaps: InstantEvalKeyCapSource;
   }): InstantEvalPlanService {
-    return new InstantEvalPlanService(context, rowSource, textSource, keyCaps);
+    return new InstantEvalPlanService({ context, rowSource, textSource, keyCaps });
   }
 
   /** What the run is about to do, learned without judging anything. */
