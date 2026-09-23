@@ -25,6 +25,13 @@ Feature: Reading one stored span back for a derivation consumer
     Then the nested event and link columns are not selected
     And the read keeps its lazy-materialization setting and takes the latest version only
 
+  @integration
+  Scenario: The latest of several unmerged versions is the one read back
+    Given a span stored as several versions not yet merged
+    When the derivation consumer reads that span back
+    Then it receives the version with the latest UpdatedAt
+    And another tenant asking for the same span receives nothing
+
   @unit
   Scenario: A span that has not landed is a miss, not an unbounded scan
     Given a referenced span that is not in its own window yet

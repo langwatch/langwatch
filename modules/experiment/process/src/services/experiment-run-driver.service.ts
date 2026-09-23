@@ -401,12 +401,7 @@ export class ExperimentRunDriverService {
   }): AsyncGenerator<EvaluationV3Event> {
     const { projectId, experimentId, ports } = input;
     try {
-      while (true) {
-        const event = await waitForEvent();
-        if (event === null) {
-          break;
-        }
-
+      for (let event = await waitForEvent(); event !== null; event = await waitForEvent()) {
         yield event;
       }
 

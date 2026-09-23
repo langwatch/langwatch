@@ -81,12 +81,7 @@ async function mapWithConcurrency<T, R>(
 
   let cursor = 0;
   const worker = async (): Promise<void> => {
-    for (;;) {
-      const index = cursor++;
-      if (index >= items.length) {
-        return;
-      }
-
+    for (let index = cursor++; index < items.length; index = cursor++) {
       results[index] = await fn(items[index]!, index);
     }
   };

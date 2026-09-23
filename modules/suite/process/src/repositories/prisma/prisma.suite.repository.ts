@@ -34,10 +34,9 @@ function nextAvailableSlug(baseSlug: string, existingSlugs: string[]): string {
   const existing = new Set(existingSlugs);
   if (!existing.has(baseSlug)) return baseSlug;
 
-  for (let suffix = 2; ; suffix += 1) {
-    const candidate = `${baseSlug}-${suffix}`;
-    if (!existing.has(candidate)) return candidate;
-  }
+  let suffix = 2;
+  while (existing.has(`${baseSlug}-${suffix}`)) suffix += 1;
+  return `${baseSlug}-${suffix}`;
 }
 
 function slugify(value: string): string {

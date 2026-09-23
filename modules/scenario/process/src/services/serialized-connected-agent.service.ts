@@ -157,46 +157,44 @@ export class SerializedConnectedAgentAdapter extends SerializedAgent {
 
     const startedAt = nowInstant().epochMilliseconds;
     const budgetEndsAt = startedAt + BUSY_RETRY_BUDGET_MS;
-    for (;;) {
-      const response = await this.post({ url, headers, body });
-      if (response.status === 429 && nowInstant().epochMilliseconds < budgetEndsAt) {
-        const retryAfterMs = retryAfterMsOf(response.headers.get("retry-after"));
-        // Jitter spreads the retries of a batch of scenarios that all hit a
-        // full agent at the same moment.
-        const waitMs = Math.min(
-          retryAfterMs + Math.floor(Math.random() * retryAfterMs),
-          budgetEndsAt - nowInstant().epochMilliseconds,
-        );
-        this.logger.info(
-          { agentId: this.config.agentId, waitMs },
-          "connected agent busy, waiting before the next try",
-        );
-        await this.sleep(Math.max(0, waitMs));
-        continue;
-      }
-      if (!response.ok) {
-        throw await failureOf(response);
-      }
-      const payload = (await response.json()) as {
-        output: unknown;
-        session?: unknown;
-        instance: ServedInstance;
-      };
-      this.storeSession({
-        threadId: input.threadId,
-        session: payload.session,
-      });
-      this.served = payload.instance;
-      this.logger.info(
-        {
-          agentId: this.config.agentId,
-          instance: payload.instance,
-          durationMs: nowInstant().epochMilliseconds - startedAt,
-        },
-        "connected agent call ok",
+    let response = await this.post({ url, headers, body });
+    while (response.status === 429 && nowInstant().epochMilliseconds < budgetEndsAt) {
+      const retryAfterMs = retryAfterMsOf(response.headers.get("retry-after"));
+      // Jitter spreads the retries of a batch of scenarios that all hit a
+      // full agent at the same moment.
+      const waitMs = Math.min(
+        retryAfterMs + Math.floor(Math.random() * retryAfterMs),
+        budgetEndsAt - nowInstant().epochMilliseconds,
       );
-      return payload.output as string;
+      this.logger.info(
+        { agentId: this.config.agentId, waitMs },
+        "connected agent busy, waiting before the next try",
+      );
+      await this.sleep(Math.max(0, waitMs));
+      response = await this.post({ url, headers, body });
     }
+    if (!response.ok) {
+      throw await failureOf(response);
+    }
+    const payload = (await response.json()) as {
+      output: unknown;
+      session?: unknown;
+      instance: ServedInstance;
+    };
+    this.storeSession({
+      threadId: input.threadId,
+      session: payload.session,
+    });
+    this.served = payload.instance;
+    this.logger.info(
+      {
+        agentId: this.config.agentId,
+        instance: payload.instance,
+        durationMs: nowInstant().epochMilliseconds - startedAt,
+      },
+      "connected agent call ok",
+    );
+    return payload.output as string;
   }
 
   private async post({

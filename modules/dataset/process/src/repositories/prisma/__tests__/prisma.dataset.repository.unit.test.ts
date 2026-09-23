@@ -8,7 +8,7 @@ import { PrismaDatasetRepository } from "../prisma.dataset.repository.ts";
 
 const NOW = new Date(0);
 
-const row = (id: string, recordCount: number) => ({
+const row = (id: string) => ({
   id,
   projectId: "project-1",
   name: `Dataset ${id}`,
@@ -18,7 +18,6 @@ const row = (id: string, recordCount: number) => ({
   updatedAt: NOW,
   archivedAt: null,
   mapping: null,
-  _count: { datasetRecords: recordCount },
 });
 
 describe("PrismaDatasetRepository", () => {
@@ -26,8 +25,15 @@ describe("PrismaDatasetRepository", () => {
     describe("when a page of them is listed", () => {
       /** @scenario "List datasets returns paginated non-archived datasets" */
       it("asks only for the live rows, windowed, each with its record count", async () => {
-        const findMany = vi.fn().mockResolvedValue([row("a", 2), row("b", 0), row("c", 7)]);
-        const prisma = { dataset: { findMany } } as unknown as PrismaClient;
+        const findMany = vi.fn().mockResolvedValue([row("a"), row("b"), row("c")]);
+        const groupBy = vi.fn().mockResolvedValue([
+          { datasetId: "a", _count: { _all: 2 } },
+          { datasetId: "c", _count: { _all: 7 } },
+        ]);
+        const prisma = {
+          dataset: { findMany },
+          datasetRecord: { groupBy },
+        } as unknown as PrismaClient;
 
         const listed = await PrismaDatasetRepository.create({ prisma }).findAll({
           projectId: "project-1",
@@ -40,7 +46,11 @@ describe("PrismaDatasetRepository", () => {
           orderBy: { createdAt: "desc" },
           skip: 5,
           take: 5,
-          include: { _count: { select: { datasetRecords: true } } },
+        });
+        expect(groupBy).toHaveBeenCalledWith({
+          by: ["datasetId"],
+          where: { projectId: "project-1", datasetId: { in: ["a", "b", "c"] } },
+          _count: { _all: true },
         });
         expect(
           listed.map(({ id, name, slug, columnTypes, recordCount }) => ({

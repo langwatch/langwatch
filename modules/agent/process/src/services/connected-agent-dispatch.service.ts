@@ -101,53 +101,67 @@ export class ConnectedAgentDispatchService {
     const startedAt = now();
     const deadlineAt = startedAt + params.agent.timeoutMs;
 
-    let excluded: string[] = [];
-    let attempts = 0;
-    for (;;) {
-      throwIfAborted(params.signal);
-      const instance = await this.#pickInstance({ ...params, excluded, now });
-      attempts += 1;
-      const callId = generate(CALL_KSUID_RESOURCE).toString();
-      const envelope = buildCallEnvelope({
-        callId,
-        agentId: params.agent.id,
-        threadId: params.call.threadId,
-        messages: params.call.messages,
-        newMessages: params.call.newMessages,
-        params: params.call.params,
-        session: params.call.session,
-        traceparent: params.call.traceparent,
-        deadlineAt,
-        run: params.call.run,
-      });
-
-      const outcome = await this.#runOnInstance({
-        projectId: params.projectId,
-        instance,
-        envelope,
-        signal: params.signal,
+    const first = await this.#attempt({ params, excluded: [], now, deadlineAt });
+    let last = first;
+    // The instance left before the function started, and the call was
+    // never acknowledged: it is safe to try once on another instance.
+    if (first.outcome.kind === "retry") {
+      logger.warn(
+        { callId: first.callId, instanceId: first.instance.instanceId, agentId: params.agent.id },
+        "instance gone before ack, retrying the call on another instance",
+      );
+      last = await this.#attempt({
+        params,
+        excluded: [first.instance.instanceId],
         now,
-        isSticky: params.agent.isSticky,
-        timeoutMs: params.agent.timeoutMs,
+        deadlineAt,
       });
-      if (outcome.kind === "answered") {
-        return {
-          ...outcome.answer,
-          durationMs: now() - startedAt,
-        };
-      }
-      // The instance left before the function started, and the call was
-      // never acknowledged: it is safe to try once on another instance.
-      if (outcome.kind === "retry" && attempts < 2) {
-        excluded = [...excluded, instance.instanceId];
-        logger.warn(
-          { callId, instanceId: instance.instanceId, agentId: params.agent.id },
-          "instance gone before ack, retrying the call on another instance",
-        );
-        continue;
-      }
-      throw new AgentDisconnectedError({ instanceId: instance.instanceId });
     }
+    if (last.outcome.kind !== "answered") {
+      throw new AgentDisconnectedError({ instanceId: last.instance.instanceId });
+    }
+    return {
+      ...last.outcome.answer,
+      durationMs: now() - startedAt,
+    };
+  }
+
+  async #attempt({
+    params,
+    excluded,
+    now,
+    deadlineAt,
+  }: {
+    params: DispatchParams;
+    excluded: string[];
+    now: () => number;
+    deadlineAt: number;
+  }) {
+    throwIfAborted(params.signal);
+    const instance = await this.#pickInstance({ ...params, excluded, now });
+    const callId = generate(CALL_KSUID_RESOURCE).toString();
+    const envelope = buildCallEnvelope({
+      callId,
+      agentId: params.agent.id,
+      threadId: params.call.threadId,
+      messages: params.call.messages,
+      newMessages: params.call.newMessages,
+      params: params.call.params,
+      session: params.call.session,
+      traceparent: params.call.traceparent,
+      deadlineAt,
+      run: params.call.run,
+    });
+    const outcome = await this.#runOnInstance({
+      projectId: params.projectId,
+      instance,
+      envelope,
+      signal: params.signal,
+      now,
+      isSticky: params.agent.isSticky,
+      timeoutMs: params.agent.timeoutMs,
+    });
+    return { instance, callId, outcome };
   }
 
   /** Picks the instance for a call, or refuses in the way the ADR names. */
@@ -166,37 +180,33 @@ export class ConnectedAgentDispatchService {
     const pinned = agent.isSticky ? await this.#store.tryGet(pinKey) : null;
 
     const waitUntil = now() + this.#firstTurnGraceMs;
-    for (;;) {
+    const findLive = (): Promise<LiveInstance[]> => {
       throwIfAborted(signal);
-      const live = await this.#liveInstances({
-        projectId,
-        agentId: agent.id,
-        excluded,
-        now,
-      });
-
-      if (pinned) return pinnedInstance(live, pinned);
-
-      if (live.length > 0) {
-        const chosen = chooseInstance(live, call.threadId);
-        await this.#pinThread({
-          isSticky: agent.isSticky,
-          pinKey,
-          instanceId: chosen.instanceId,
-        });
-        return chosen;
-      }
-
-      // The first turn of a thread waits for a process that is still
-      // starting; later turns hit the same wait, which is short.
-      if (now() >= waitUntil) {
-        throw new AgentOfflineError({
-          agentName: agent.name,
-          environment: agent.environment,
-        });
-      }
+      return this.#liveInstances({ projectId, agentId: agent.id, excluded, now });
+    };
+    let live = await findLive();
+    // The first turn of a thread waits for a process that is still
+    // starting; later turns hit the same wait, which is short.
+    while (!pinned && live.length === 0 && now() < waitUntil) {
       await sleep(Math.min(this.#firstTurnPollMs, waitUntil - now()), signal);
+      live = await findLive();
     }
+
+    if (pinned) return pinnedInstance(live, pinned);
+    if (live.length === 0) {
+      throw new AgentOfflineError({
+        agentName: agent.name,
+        environment: agent.environment,
+      });
+    }
+
+    const chosen = chooseInstance(live, call.threadId);
+    await this.#pinThread({
+      isSticky: agent.isSticky,
+      pinKey,
+      instanceId: chosen.instanceId,
+    });
+    return chosen;
   }
 
   /** The live instances of one agent, without the ones already tried. */

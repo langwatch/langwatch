@@ -870,18 +870,19 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     // `occurredAtMs`), and a frozen clock would make this poll loop unable to
     // ever time out.
     const deadline = nowInstant().epochMilliseconds + poll.timeoutMs;
-    for (;;) {
-      if (await check()) return true;
-      if (nowInstant().epochMilliseconds >= deadline) {
-        logger.warn(
-          { organizationId, what },
-          "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
-        );
-        if (required) throw new AuthzGrantNotConfirmedError();
-        return false;
-      }
+    let isConverged = await check();
+    while (!isConverged && nowInstant().epochMilliseconds < deadline) {
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
+      isConverged = await check();
     }
+    if (isConverged) return true;
+
+    logger.warn(
+      { organizationId, what },
+      "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
+    );
+    if (required) throw new AuthzGrantNotConfirmedError();
+    return false;
   }
 }
 
@@ -1051,7 +1052,7 @@ export class AuthzLedgerMapper {
    *  caller vocabulary, so null and the caller bails. */
   private static roleKeyFromCustomRoleFilter(
     value: NonNullable<AuthzRoleBindingFilter["customRoleId"]>,
-  ): AuthzGrantFilter["roleKey"] | null {
+  ): string | { in: string[] } | null {
     if (typeof value === "string") return `custom:${value}`;
     if (typeof value !== "object" || value === null) return null;
     if (!("in" in value)) return null;

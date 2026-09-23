@@ -254,8 +254,8 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
     }
   }
 
-  // WHERE pins primary key prefix (tiny granule range); ORDER BY UpdatedAt DESC LIMIT 1
-  // uses LazilyRead optimizer. Note: engine version is StartTime, not UpdatedAt
+  // Latest version by IN-tuple dedup: the inner GROUP BY reads only keys and
+  // UpdatedAt, the outer SELECT reads heavy columns for the winning row only.
   private async fetchNormalizedSpanRow(
     input: { tenantId: string; traceId: string; spanId: string },
     window: { fromMs: number; toMs: number } | null,
@@ -273,7 +273,15 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
           AND TraceId = {traceId:String}
           AND SpanId = {spanId:String}
           ${partition}
-        ORDER BY UpdatedAt DESC
+          AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              AND SpanId = {spanId:String}
+              ${partition}
+            GROUP BY TenantId, TraceId, SpanId
+          )
         LIMIT 1
       `,
       query_params: {

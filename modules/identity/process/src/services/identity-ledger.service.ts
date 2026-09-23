@@ -153,18 +153,18 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
     const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
-    for (;;) {
-      if (await this.foldReached({ userId, context, last })) return;
-      if (nowInstant().epochMilliseconds >= deadline) {
-        LEDGER_METRICS.recordProjectionConvergenceTimeout();
-        logger.warn(
-          { userId, commandCount: events.length },
-          "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
-        );
-        return;
-      }
+    let isReached = await this.foldReached({ userId, context, last });
+    while (!isReached && nowInstant().epochMilliseconds < deadline) {
       await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      isReached = await this.foldReached({ userId, context, last });
     }
+    if (isReached) return;
+
+    LEDGER_METRICS.recordProjectionConvergenceTimeout();
+    logger.warn(
+      { userId, commandCount: events.length },
+      "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
+    );
   }
 
   private async foldReached({

@@ -74,11 +74,13 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     let unchanged = 0;
     for (const project of projects) {
       this.assertActive(input.signal);
+      const limit = this.options.pageSize ?? 250;
       let afterId: string | undefined;
-      for (;;) {
+      let isFullPage: boolean;
+      do {
         const query: { projectId: string; afterId?: string; limit: number } = {
           projectId: project.id,
-          limit: this.options.pageSize ?? 250,
+          limit,
         };
         if (afterId) query.afterId = afterId;
         const page = await this.options.legacy.findPage(query);
@@ -89,10 +91,9 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
           if (result === "imported") imported += 1;
           else unchanged += 1;
         }
-        if (page.length < (this.options.pageSize ?? 250)) break;
+        isFullPage = page.length >= limit;
         afterId = page.at(-1)?.id;
-        if (!afterId) break;
-      }
+      } while (isFullPage && afterId);
     }
 
     const drain = initialDrain.valid

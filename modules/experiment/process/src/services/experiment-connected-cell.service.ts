@@ -259,12 +259,14 @@ export class ExperimentConnectedCellService {
     budgetEndsAt: number;
     callTimeoutMs: number;
   }): Promise<CallOutcome> {
-    for (;;) {
+    // Every attempt gets its own deadline, not one shared signal — a
+    // shared signal would carry the earlier attempts' spent time and
+    // abort a later attempt the moment it starts.
+    const attempt = (): Promise<CallOutcome> =>
+      this.dispatch({ ...params, signal: AbortSignal.timeout(callTimeoutMs) });
+    while (this.now() < budgetEndsAt) {
       try {
-        // Every attempt gets its own deadline, not one shared signal — a
-        // shared signal would carry the earlier attempts' spent time and
-        // abort a later attempt the moment it starts.
-        return await this.dispatch({ ...params, signal: AbortSignal.timeout(callTimeoutMs) });
+        return await attempt();
       } catch (error) {
         const waitMs = await this.busyWaitMs({ error, budgetEndsAt, isAborted });
         if (waitMs === undefined) {
@@ -274,6 +276,7 @@ export class ExperimentConnectedCellService {
         await this.sleep(waitMs);
       }
     }
+    return attempt();
   }
 
   /**

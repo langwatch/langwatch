@@ -12,7 +12,7 @@ import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository
 /** The client slice scope-target expansion reads. */
 export type GatewayBudgetScopeTargetDatabase = Pick<
   PrismaClient,
-  "group" | "organization" | "team" | "user" | "virtualKey"
+  "group" | "groupMembership" | "organization" | "team" | "user" | "virtualKey"
 >;
 
 export type BudgetScopeTargetInfo = {
@@ -164,20 +164,24 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     if (idSet.size === 0 || !organizationId) return;
     const groups = await prisma.group.findMany({
       where: { id: { in: [...idSet] }, organizationId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        _count: { select: { members: true } },
-      },
+      select: { id: true, name: true, slug: true },
     });
+    const counts =
+      groups.length > 0
+        ? await prisma.groupMembership.groupBy({
+            by: ["groupId"],
+            where: { groupId: { in: groups.map((g) => g.id) } },
+            _count: { groupId: true },
+          })
+        : [];
+    const memberCounts = new Map(counts.map((row) => [row.groupId, row._count.groupId]));
     for (const g of groups) {
       out.set(scopeTargetKey("GROUP", g.id), {
         kind: "GROUP",
         id: g.id,
         name: g.name,
         secondary: g.slug,
-        memberCount: g._count.members,
+        memberCount: memberCounts.get(g.id) ?? 0,
       });
     }
   }
@@ -249,6 +253,11 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     const projectScopeIdByVirtualKeyId = new Map(
       virtualKeyProjectScopes.map((scope) => [scope.virtualKeyId, scope.projectId]),
     );
+    this.addProjectTargets({
+      out,
+      idSet: ids.PROJECT!,
+      projectsById,
+    });
     await Promise.all([
       this.addNamedTargets({
         out,
@@ -261,11 +270,6 @@ export class PrismaGatewayBudgetScopeTargetRepository {
         prisma,
         kind: "TEAM",
         idSet: ids.TEAM!,
-      }),
-      this.addProjectTargets({
-        out,
-        idSet: ids.PROJECT!,
-        projectsById,
       }),
       this.addVirtualKeyTargets({
         out,

@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server";
 /** The client slice the organization/group tenancy reads below touch. */
 export type GatewayOrganizationDirectoryDatabase = Pick<
   PrismaClient,
-  "organization" | "group" | "organizationUser"
+  "organization" | "group" | "groupMembership" | "organizationUser"
 >;
 
 export class PrismaGatewayOrganizationDirectoryRepository {
@@ -32,14 +32,15 @@ export class PrismaGatewayOrganizationDirectoryRepository {
   ): Promise<readonly { id: string; name: string; memberCount: number }[]> {
     const groups = await this.database.group.findMany({
       where: { organizationId },
-      select: { id: true, name: true, _count: { select: { members: true } } },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+    const memberCounts = await this.countMembers(groups.map((group) => group.id));
 
     return groups.map((group) => ({
       id: group.id,
       name: group.name,
-      memberCount: group._count.members,
+      memberCount: memberCounts.get(group.id) ?? 0,
     }));
   }
 
@@ -53,10 +54,21 @@ export class PrismaGatewayOrganizationDirectoryRepository {
     if (groupIds.length === 0) return new Map();
     const groups = await this.database.group.findMany({
       where: { id: { in: groupIds } },
-      select: { id: true, _count: { select: { members: true } } },
+      select: { id: true },
     });
+    const memberCounts = await this.countMembers(groups.map((group) => group.id));
 
-    return new Map(groups.map((group) => [group.id, group._count.members]));
+    return new Map(groups.map((group) => [group.id, memberCounts.get(group.id) ?? 0]));
+  }
+
+  private async countMembers(groupIds: string[]): Promise<Map<string, number>> {
+    if (groupIds.length === 0) return new Map();
+    const counts = await this.database.groupMembership.groupBy({
+      by: ["groupId"],
+      where: { groupId: { in: groupIds } },
+      _count: { groupId: true },
+    });
+    return new Map(counts.map((row) => [row.groupId, row._count.groupId]));
   }
 
   /** Whether a user belongs to this organization. */

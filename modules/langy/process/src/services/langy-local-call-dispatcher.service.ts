@@ -131,23 +131,17 @@ export class LocalCallDispatcherService {
   }): Promise<PollCallResponse | null> {
     const until = this.now() + holdMs;
     const beat = this.beater();
-    for (;;) {
+    const look = async (): Promise<StoredLocalCall | null> => {
       const call = await this.read(callId);
-      if (!call) {
-        return null;
-      }
-
-      if (call.state === "done") {
-        return toPollResponse(call);
-      }
-
-      await beat(call);
-      if (this.now() >= until || signal?.aborted) {
-        return toPollResponse(call);
-      }
-
+      if (call && call.state !== "done") await beat(call);
+      return call;
+    };
+    let call = await look();
+    while (call && call.state !== "done" && this.now() < until && !signal?.aborted) {
       await sleep(this.pollIntervalMs, signal);
+      call = await look();
     }
+    return call ? toPollResponse(call) : null;
   }
 
   /**
@@ -423,20 +417,18 @@ export class LocalCallDispatcherService {
    */
   private async requireWorkspace(conversationId: string): Promise<void> {
     const until = this.now() + this.offlineWaitMs;
-    for (;;) {
-      const workspace = await this.presence.read(conversationId);
-      if (workspace) {
-        return;
-      }
-
-      if (this.now() >= until) {
-        logger.info({ conversationId }, "no local folder answered the call");
-
-        throw new LangyLocalWorkspaceOfflineError({ conversationId });
-      }
-
+    let workspace = await this.presence.read(conversationId);
+    while (!workspace && this.now() < until) {
       await sleep(this.pollIntervalMs);
+      workspace = await this.presence.read(conversationId);
     }
+    if (workspace) {
+      return;
+    }
+
+    logger.info({ conversationId }, "no local folder answered the call");
+
+    throw new LangyLocalWorkspaceOfflineError({ conversationId });
   }
 
   private async settle(call: StoredLocalCall): Promise<StoredLocalCall> {

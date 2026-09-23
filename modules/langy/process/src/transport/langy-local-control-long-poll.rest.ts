@@ -154,16 +154,17 @@ export class LocalControlLongPoll {
     if (orphaned.length > 0) return { ok: true, frames: orphaned };
 
     const until = nowInstant().epochMilliseconds + this.holdMs;
-    for (;;) {
+    const look = async (): Promise<PlatformFrame[]> => {
       entry.lastSeenAt = nowInstant().epochMilliseconds;
       if (!entry.released) await this.core.heartbeat(entry.session);
-      if (entry.queue.length > 0) {
-        return { ok: true, frames: entry.queue.splice(0, entry.queue.length) };
-      }
-      if (nowInstant().epochMilliseconds >= until || signal?.aborted)
-        return { ok: true, frames: [] };
+      return entry.queue.splice(0, entry.queue.length);
+    };
+    let frames = await look();
+    while (frames.length === 0 && nowInstant().epochMilliseconds < until && !signal?.aborted) {
       await sleep(this.pollIntervalMs, signal);
+      frames = await look();
     }
+    return { ok: true, frames };
   }
 
   /** A cancel frame for each call the command line holds and the platform does not. */

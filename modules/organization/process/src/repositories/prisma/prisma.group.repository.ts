@@ -47,33 +47,20 @@ export class PrismaGroupRepository extends GroupRepository {
     const [rows, total] = await Promise.all([
       this.database.group.findMany({
         where,
-        select: {
-          ...groupSelect,
-          _count: {
-            select: {
-              members: {
-                where: {
-                  user: {
-                    orgMemberships: {
-                      some: { organizationId: input.organizationId },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        select: groupSelect,
         orderBy: { name: "asc" },
         skip: (input.page - 1) * input.limit,
         take: input.limit,
       }),
       this.database.group.count({ where }),
     ]);
+    const memberCounts = await this.countMembers({
+      organizationId: input.organizationId,
+      groupIds: rows.map((group) => group.id),
+      onlyOrganizationMembers: true,
+    });
     return {
-      data: rows.map(({ _count, ...group }) => ({
-        ...group,
-        memberCount: _count.members,
-      })),
+      data: rows.map((group) => ({ ...group, memberCount: memberCounts.get(group.id) ?? 0 })),
       pagination: { page: input.page, limit: input.limit, total },
     };
   }
@@ -87,16 +74,39 @@ export class PrismaGroupRepository extends GroupRepository {
         organizationId: input.organizationId,
         members: { some: { userId: input.userId } },
       },
-      select: {
-        ...groupSelect,
-        _count: { select: { members: true } },
-      },
+      select: groupSelect,
       orderBy: { name: "asc" },
     });
-    return rows.map(({ _count, ...group }) => ({
-      ...group,
-      memberCount: _count.members,
-    }));
+    const memberCounts = await this.countMembers({
+      organizationId: input.organizationId,
+      groupIds: rows.map((group) => group.id),
+      onlyOrganizationMembers: false,
+    });
+    return rows.map((group) => ({ ...group, memberCount: memberCounts.get(group.id) ?? 0 }));
+  }
+
+  private async countMembers({
+    organizationId,
+    groupIds,
+    onlyOrganizationMembers,
+  }: {
+    organizationId: string;
+    groupIds: string[];
+    onlyOrganizationMembers: boolean;
+  }): Promise<Map<string, number>> {
+    if (groupIds.length === 0) return new Map();
+    const counts = await this.database.groupMembership.groupBy({
+      by: ["groupId"],
+      where: {
+        groupId: { in: groupIds },
+        group: { organizationId },
+        ...(onlyOrganizationMembers
+          ? { user: { orgMemberships: { some: { organizationId } } } }
+          : {}),
+      },
+      _count: { groupId: true },
+    });
+    return new Map(counts.map((row) => [row.groupId, row._count.groupId]));
   }
 
   async listMembers(input: {
@@ -154,20 +164,22 @@ export class PrismaGroupRepository extends GroupRepository {
     baseSlug: string;
     excludeGroupId?: string;
   }): Promise<string> {
-    let candidate = input.baseSlug;
-    let suffix = 2;
-    for (;;) {
+    const isTaken = async (slug: string): Promise<boolean> => {
       const row = await this.database.group.findFirst({
         where: {
           organizationId: input.organizationId,
-          slug: candidate,
+          slug,
           ...(input.excludeGroupId ? { id: { not: input.excludeGroupId } } : {}),
         },
         select: { id: true },
       });
-      if (!row) return candidate;
-      candidate = `${input.baseSlug}-${suffix++}`;
+      return row !== null;
+    };
+    let candidate = input.baseSlug;
+    for (let suffix = 2; await isTaken(candidate); suffix += 1) {
+      candidate = `${input.baseSlug}-${suffix}`;
     }
+    return candidate;
   }
 
   create(input: {

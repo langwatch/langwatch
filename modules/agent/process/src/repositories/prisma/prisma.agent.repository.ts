@@ -114,10 +114,22 @@ export class PrismaAgentRepository
     const rows = await this.prisma.agent.findMany({
       where: { projectId: input.projectId, archivedAt: null, AND: [connectedAgentVisibleWhere()] },
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { copiedAgents: true } } },
     });
+    const agentIds = rows.map((row) => row.id);
+    // Copies live in any project, as `findCopies` reads them.
+    const copies =
+      agentIds.length > 0
+        ? await this.prisma.agent.groupBy({
+            by: ["copiedFromAgentId"],
+            where: { copiedFromAgentId: { in: agentIds } },
+            _count: { _all: true },
+          })
+        : [];
+    const copyCounts = new Map(copies.map((copy) => [copy.copiedFromAgentId, copy._count._all]));
 
-    return rows.map(mapAgentRow);
+    return rows.map((row) =>
+      mapAgentRow({ ...row, _count: { copiedAgents: copyCounts.get(row.id) ?? 0 } }),
+    );
   }
 
   async findReferenceStates(input: AgentIdsInput) {

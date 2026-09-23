@@ -164,19 +164,19 @@ export class ModelProviderScopeService {
     const teams: OrganizationTeam[] = [];
     const limit = 1_000;
     let page = 1;
+    let total: number;
 
-    while (true) {
+    do {
       const result = await this.organizations.listTeams({
         organizationId,
         page,
         limit,
       });
       teams.push(...result.data);
-      if (teams.length >= result.pagination.total) {
-        return teams;
-      }
-
+      total = result.pagination.total;
       page += 1;
-    }
+    } while (teams.length < total);
+
+    return teams;
   }
 }

@@ -158,24 +158,20 @@ export class UserWaitService {
   }): Promise<PollWaitResponse | null> {
     const until = this.now() + holdMs;
     const beat = this.beater();
-    for (;;) {
+    const look = async (): Promise<StoredUserWait | null> => {
       const wait = await this.readSettlingExpiry(waitId);
-      if (!wait) {
-        return null;
+      if (wait?.state === "pending") {
+        await beat(wait);
+        await this.keepAlive(wait);
       }
-
-      if (wait.state !== "pending") {
-        return toPollResponse(wait);
-      }
-
-      await beat(wait);
-      await this.keepAlive(wait);
-      if (this.now() >= until || signal?.aborted) {
-        return toPollResponse(wait);
-      }
-
+      return wait;
+    };
+    let wait = await look();
+    while (wait?.state === "pending" && this.now() < until && !signal?.aborted) {
       await sleep(this.pollIntervalMs, signal);
+      wait = await look();
     }
+    return wait ? toPollResponse(wait) : null;
   }
 
   /**

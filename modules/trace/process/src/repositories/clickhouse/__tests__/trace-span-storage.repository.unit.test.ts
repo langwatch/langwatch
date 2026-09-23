@@ -515,7 +515,7 @@ describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       expect(clickhouse.queries[0]?.settings).toMatchObject({
         query_plan_optimize_lazy_materialization: "1",
       });
-      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
+      expect(clickhouse.queries[0]?.query).toContain("max(UpdatedAt)");
       expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
     });
 

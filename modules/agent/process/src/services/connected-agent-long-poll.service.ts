@@ -238,13 +238,12 @@ export class LongPollTransportService {
   }): Promise<(CallFrame | CancelFrame)[]> {
     const frames: (CallFrame | CancelFrame)[] = [];
     const deadline = this.#core.now() + this.#pollWaitMs;
-    for (;;) {
-      frames.push(...(await this.#drain({ session, inFlight })));
-      const remaining = deadline - this.#core.now();
-      if (this.#settled({ frames, signal }) || remaining <= 0) {
-        return frames;
-      }
-
+    frames.push(...(await this.#drain({ session, inFlight })));
+    for (
+      let remaining = deadline - this.#core.now();
+      remaining > 0 && !this.#settled({ frames, signal });
+      remaining = deadline - this.#core.now()
+    ) {
       const nudge = await this.#watchesOfInstances.findNextNudge({
         watch,
         ms: remaining,
@@ -255,17 +254,17 @@ export class LongPollTransportService {
         return frames;
       }
 
-      if (outcome === "drain") {
-        continue;
+      if (outcome !== "drain") {
+        inFlight.delete(outcome.cancel);
+        frames.push({
+          type: "cancel",
+          protocol: PROTOCOL_VERSION,
+          callId: outcome.cancel,
+        });
       }
-
-      inFlight.delete(outcome.cancel);
-      frames.push({
-        type: "cancel",
-        protocol: PROTOCOL_VERSION,
-        callId: outcome.cancel,
-      });
+      frames.push(...(await this.#drain({ session, inFlight })));
     }
+    return frames;
   }
 
   /**

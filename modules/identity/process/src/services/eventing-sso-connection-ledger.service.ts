@@ -167,17 +167,17 @@ export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
     const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
-    for (;;) {
-      if (await this.foldReached({ connectionId, context, last })) return;
-      if (nowInstant().epochMilliseconds >= deadline) {
-        logger.warn(
-          { connectionId, commandCount: events.length },
-          "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
-        );
-        return;
-      }
+    let isReached = await this.foldReached({ connectionId, context, last });
+    while (!isReached && nowInstant().epochMilliseconds < deadline) {
       await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      isReached = await this.foldReached({ connectionId, context, last });
     }
+    if (isReached) return;
+
+    logger.warn(
+      { connectionId, commandCount: events.length },
+      "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
+    );
   }
 
   private async foldReached({

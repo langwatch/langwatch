@@ -29,8 +29,9 @@ export async function* paginate<T extends { id: string }>(
   load: (request: MigrationPageRequest) => Promise<T[]>,
 ): AsyncGenerator<T> {
   let afterId: string | undefined;
-  for (;;) {
-    const page = await load({ afterId, limit: INVENTORY_PAGE_SIZE });
+  let page: T[];
+  do {
+    page = await load({ afterId, limit: INVENTORY_PAGE_SIZE });
     if (page.length === 0) {
       return;
     }
@@ -45,10 +46,7 @@ export async function* paginate<T extends { id: string }>(
     }
 
     afterId = nextAfterId;
-    if (page.length < INVENTORY_PAGE_SIZE) {
-      return;
-    }
-  }
+  } while (page.length >= INVENTORY_PAGE_SIZE);
 }
 
 export function hasMigratableChunkCount(

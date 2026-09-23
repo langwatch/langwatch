@@ -221,7 +221,8 @@ export class StoredObjectService {
     let deletedObjectCount = 0;
     let deletedByteLength = 0;
     const limit = this.options.cleanupBatchSize ?? 100;
-    for (;;) {
+    let isFullPage: boolean;
+    do {
       const query: {
         tenantId: string;
         afterId?: StoredObjectId;
@@ -247,15 +248,9 @@ export class StoredObjectService {
         }
       }
 
-      if (page.length < limit) {
-        break;
-      }
-
+      isFullPage = page.length >= limit;
       afterId = page.at(-1)?.id;
-      if (!afterId) {
-        break;
-      }
-    }
+    } while (isFullPage && afterId);
 
     return {
       projectId: input.projectId,

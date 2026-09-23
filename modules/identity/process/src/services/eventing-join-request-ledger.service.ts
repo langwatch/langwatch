@@ -123,17 +123,17 @@ export class EventingJoinRequestLedgerAdapter implements JoinRequestLedger {
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
     const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
-    for (;;) {
-      if (await this.foldReached({ joinRequestId, context, last })) return;
-      if (nowInstant().epochMilliseconds >= deadline) {
-        logger.warn(
-          { joinRequestId, commandCount: events.length },
-          "join request projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
-        );
-        return;
-      }
+    let isReached = await this.foldReached({ joinRequestId, context, last });
+    while (!isReached && nowInstant().epochMilliseconds < deadline) {
       await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      isReached = await this.foldReached({ joinRequestId, context, last });
     }
+    if (isReached) return;
+
+    logger.warn(
+      { joinRequestId, commandCount: events.length },
+      "join request projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
+    );
   }
 
   private async foldReached({

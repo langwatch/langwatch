@@ -113,15 +113,22 @@ export class PrismaDashboardRepository
     const rows = await this.prisma.dashboard.findMany({
       where: { projectId: input.projectId },
       orderBy: { order: "asc" },
-      include: {
-        _count: {
-          select: {
-            graphs: { where: { kind: { in: [...input.graphKinds] } } },
-          },
-        },
-      },
     });
-    return rows.map((row) => ({ ...dashboardRow(row), graphCount: row._count.graphs }));
+    const dashboardIds = rows.map((row) => row.id);
+    const counts =
+      dashboardIds.length > 0
+        ? await this.prisma.customGraph.groupBy({
+            by: ["dashboardId"],
+            where: {
+              projectId: input.projectId,
+              dashboardId: { in: dashboardIds },
+              kind: { in: [...input.graphKinds] },
+            },
+            _count: { _all: true },
+          })
+        : [];
+    const graphCounts = new Map(counts.map((count) => [count.dashboardId, count._count._all]));
+    return rows.map((row) => ({ ...dashboardRow(row), graphCount: graphCounts.get(row.id) ?? 0 }));
   }
 
   async findDashboard(input: {

@@ -19,10 +19,10 @@ import type {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type DatasetDatabase = Pick<PrismaClient, "dataset">;
+export type DatasetDatabase = Pick<PrismaClient, "dataset" | "datasetRecord">;
 
 export class PrismaDatasetRepository
-  extends PrismaRepository.for("Dataset")
+  extends PrismaRepository.for("Dataset", "DatasetRecord")
   implements DatasetRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDatasetRepository(prisma));
@@ -73,11 +73,20 @@ export class PrismaDatasetRepository
       orderBy: { createdAt: "desc" },
       skip: (input.page - 1) * input.limit,
       take: input.limit,
-      include: { _count: { select: { datasetRecords: true } } },
     });
+    const datasetIds = rows.map((row) => row.id);
+    const counts =
+      datasetIds.length > 0
+        ? await this.database.datasetRecord.groupBy({
+            by: ["datasetId"],
+            where: { projectId: input.projectId, datasetId: { in: datasetIds } },
+            _count: { _all: true },
+          })
+        : [];
+    const recordCounts = new Map(counts.map((count) => [count.datasetId, count._count._all]));
     return rows.map((row) => ({
       ...toDataset(row),
-      recordCount: row._count.datasetRecords,
+      recordCount: recordCounts.get(row.id) ?? 0,
     }));
   }
 
