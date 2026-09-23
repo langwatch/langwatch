@@ -63,7 +63,11 @@ function makeRepository(): StoredObjectsRepository {
     findAllByProject: vi.fn().mockResolvedValue([]),
     deleteByProject: vi.fn().mockResolvedValue(undefined),
     deleteByIds: vi.fn().mockResolvedValue(undefined),
-  } as unknown as StoredObjectsRepository;
+    findLiveRowsByProjectPage: () =>
+      Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
+    sumSizeBytesByProject: () =>
+      Promise.reject(new Error("sumSizeBytesByProject is not used here")),
+  };
 }
 
 function makeRegistry(): StoredObjectStorageRepository {
@@ -72,7 +76,7 @@ function makeRegistry(): StoredObjectStorageRepository {
     put: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     exists: vi.fn().mockResolvedValue(true),
-  } as unknown as StoredObjectStorageRepository;
+  };
 }
 
 function makeTelemetry(): StoredObjectsTelemetry {
@@ -82,7 +86,7 @@ function makeTelemetry(): StoredObjectsTelemetry {
     recordWriteFailure: vi.fn(),
     recordReadFailure: vi.fn(),
     observeSizeBytes: vi.fn(),
-  } as unknown as StoredObjectsTelemetry;
+  };
 }
 
 function makeRow(overrides: Partial<StoredObject> = {}): StoredObject {

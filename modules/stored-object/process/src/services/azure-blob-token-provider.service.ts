@@ -131,9 +131,6 @@ async function exchangeToken(credentials: TokenModeCredentials): Promise<Exchang
 }
 
 function startExchange(key: string, credentials: TokenModeCredentials): CacheEntry {
-  const entry: CacheEntry = {
-    promise: undefined as unknown as Promise<ExchangeResult>,
-  };
   const promise = exchangeToken(credentials).then((result) => {
     // Only record the resolved expiry if we're still the active entry for
     // this key — a later refresh may already have replaced us.
@@ -142,7 +139,7 @@ function startExchange(key: string, credentials: TokenModeCredentials): CacheEnt
     }
     return result;
   });
-  entry.promise = promise;
+  const entry: CacheEntry = { promise };
   // Clear the cache on failure so the NEXT call retries instead of
   // replaying a cached rejection forever.
   promise.catch(() => {

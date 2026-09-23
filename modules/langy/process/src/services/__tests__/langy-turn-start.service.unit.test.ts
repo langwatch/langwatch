@@ -97,10 +97,11 @@ describe("LangyTurnStartService", () => {
         admission: {
           claim: vi.fn(async () => ({ kind: "mismatch" as const })),
           commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
           abort: vi.fn(async () => undefined),
           release: vi.fn(async () => undefined),
         },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
 
       await expect(
         LangyTurnService.create(fixture.deps).startConversationTurn(input()),
@@ -129,6 +130,7 @@ describe("LangyTurnStartService", () => {
         admission: {
           claim: vi.fn(async () => ({ kind: "busy" as const })),
           commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
           abort: vi.fn(async () => undefined),
           release: vi.fn(async () => undefined),
         },
@@ -138,7 +140,7 @@ describe("LangyTurnStartService", () => {
           cancel: vi.fn(async () => undefined),
           warm: vi.fn(async () => undefined),
         },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
 
       await expect(
         LangyTurnService.create(fixture.deps).startConversationTurn(input()),
@@ -182,10 +184,11 @@ describe("LangyTurnStartService", () => {
         admission: {
           claim,
           commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
           abort: vi.fn(async () => undefined),
           release: vi.fn(async () => undefined),
         },
-      } as unknown as Partial<LangyTurnServiceDeps>);
+      });
       const service = LangyTurnService.create(fixture.deps);
 
       await service.startConversationTurn(input());

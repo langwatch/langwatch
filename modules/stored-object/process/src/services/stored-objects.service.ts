@@ -33,7 +33,7 @@ function deriveStoredObjectId({
   sha256: string;
 }): string {
   const hash = createHash("sha1").update(`${projectId}:${sha256}`).digest();
-  const identifier = hash.subarray(0, 8) as unknown as Uint8Array;
+  const identifier = hash.subarray(0, 8);
   const instance = new Instance(Instance.schemes.RANDOM, identifier);
 
   return new Ksuid("prod", "so", 0, instance, 0).toString();
