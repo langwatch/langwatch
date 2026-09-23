@@ -394,16 +394,20 @@ function readScoreEntry({
   if (!parsed.success) return null;
 
   const score = parsed.data;
-  const value = Array.isArray(score.value) ? score.value.join(", ") : String(score.value ?? "");
+  const value = Array.isArray(score.value) ? score.value.join(", ") : scoreText(score.value);
   if (!value) return null;
 
   return { name, value, reason: readReason(score.reason) };
 }
 
+function scoreText(value: unknown): string {
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+}
+
 function readReason(reason: unknown): string | null {
   if (reason == null || reason === "") return null;
 
-  if (typeof reason === "object") return JSON.stringify(reason);
+  if (typeof reason === "string") return reason;
 
-  return String(reason);
+  return JSON.stringify(reason);
 }

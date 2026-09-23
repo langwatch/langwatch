@@ -117,7 +117,8 @@ function jsonInput(value: unknown): string | number | boolean | object | null {
 }
 
 function asString(value: unknown): string {
-  return value === undefined || value === null ? "" : String(value);
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function asNumber(value: unknown): number {
@@ -434,7 +435,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
         // body, rather than a silent empty header).
         return match;
       }
-      return String(value);
+      return typeof value === "string" ? value : JSON.stringify(value);
     });
   }
 
@@ -525,6 +526,6 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
     if (cursor === undefined || cursor === null || cursor === "") {
       return null;
     }
-    return String(cursor);
+    return typeof cursor === "string" ? cursor : JSON.stringify(cursor);
   }
 }

@@ -1,5 +1,6 @@
 import { Button, HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { Toaster, toaster } from "./toaster.tsx";
 
 const meta = {
@@ -120,7 +121,7 @@ export const WithMeta: Story = {
         renderMeta={(meta) =>
           meta?.traceId ? (
             <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
-              {String(meta.traceId)}
+              {typeof meta.traceId === "string" ? meta.traceId : ""}
             </Text>
           ) : null
         }

@@ -306,7 +306,7 @@ async function putOnQueue({
       // provider that already resolved against the old permissions.
       channel.invalidate(queueUrl);
     }
-    const detail = error instanceof Error ? error.message : String(error ?? "");
+    const detail = error instanceof Error ? error.message : (JSON.stringify(error) ?? "");
     return {
       verdict,
       status: null,

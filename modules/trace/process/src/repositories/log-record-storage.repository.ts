@@ -42,7 +42,11 @@ export abstract class LogRecordStorageRepository {
         row.spanId,
         row.timeUnixMs,
         row.scopeName,
-        JSON.stringify(Object.fromEntries(Object.entries(row.attributes).toSorted())),
+        JSON.stringify(
+          Object.fromEntries(
+            Object.entries(row.attributes).toSorted(([a], [b]) => (a < b ? -1 : Number(a > b))),
+          ),
+        ),
       ].join("\0");
       deduped.set(key, row);
     }

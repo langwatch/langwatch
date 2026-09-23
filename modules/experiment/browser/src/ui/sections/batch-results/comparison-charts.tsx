@@ -92,7 +92,7 @@ const calculateYAxisWidth = (
 // Axis label geometry is shared with WinRateChart so every chart on this page
 // trims and slants the same variant names identically — see chartAxisLabels.ts.
 
-export type XAxisOption = "runs" | "target" | "model" | "prompt" | string;
+export type XAxisOption = string;
 
 type ComparisonChartsProps = {
   /** Comparison data from multiple runs */
@@ -776,7 +776,7 @@ export const ComparisonCharts = ({
   const axisLabels = useMemo(
     () =>
       buildAxisLabels(
-        chartData.map((d) => String(d.name)),
+        chartData.map((d) => (typeof d.name === "string" ? d.name : JSON.stringify(d.name))),
         axis.maxLabelLength,
       ),
     [chartData, axis.maxLabelLength],

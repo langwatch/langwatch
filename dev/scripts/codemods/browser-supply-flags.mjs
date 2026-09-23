@@ -100,7 +100,7 @@ function rewriteFlagModule(output, tuples, registered, counts, module) {
   const type = `${camel(module.id)[0].toUpperCase()}${camel(module.id).slice(1)}WebFlag`;
   output.set(
     declaration,
-    `import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";\nexport const ${value} = ${JSON.stringify([...flags].toSorted())} as const satisfies readonly FrontendFeatureFlag[];\nexport type ${type} = (typeof ${value})[number];\n`,
+    `import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";\nexport const ${value} = ${JSON.stringify([...flags].toSorted((a, b) => (a < b ? -1 : Number(a > b))))} as const satisfies readonly FrontendFeatureFlag[];\nexport type ${type} = (typeof ${value})[number];\n`,
   );
   tuples.set(module.id, { file: declaration, value, type, flags: [...flags] });
   for (const source of sources) {

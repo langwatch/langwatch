@@ -332,7 +332,7 @@ export class TraceAttributeExtractionService {
       if (typeof value === "string") {
         result[key] = value;
       } else if (value !== null && value !== undefined) {
-        result[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
+        result[key] = typeof value === "string" ? value : JSON.stringify(value);
       }
     }
   }
@@ -407,10 +407,10 @@ export class TraceAttributeExtractionService {
       return value;
     }
 
-    if (typeof value === "object") {
-      return JSON.stringify(value);
+    if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+      return String(value);
     }
 
-    return String(value);
+    return JSON.stringify(value) ?? "";
   }
 }

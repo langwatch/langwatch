@@ -103,10 +103,12 @@ describe("SavedViewService.getAll", () => {
       const first = serviceWith({ count: 0, existing: [] });
       await first.service.getAll({ projectId: "project-1" });
       const allSeeds = (
-        first.calls.find((call) => call.method === "createMany")?.views as { name: string }[]
-      ).map((view) => view.name);
+        first.calls.find((call) => call.method === "createMany")?.views as
+          | { name: string }[]
+          | undefined
+      )?.map((view) => view.name);
 
-      const { service, calls } = serviceWith({ existing: seeded(allSeeds) });
+      const { service, calls } = serviceWith({ existing: seeded(allSeeds ?? []) });
       await service.getAll({ projectId: "project-1" });
 
       expect(calls.some((call) => call.method === "createMany")).toBe(false);

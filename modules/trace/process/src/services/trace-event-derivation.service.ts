@@ -68,18 +68,19 @@ export class TraceEventDerivationService {
     // slow heavy-trace reads this exists for.
     const entry: MemoEntry = { value, expiresAt: Number.POSITIVE_INFINITY };
     this.memo.set(key, entry);
-    value.then(
-      () => {
+    value
+      .then(() => {
         entry.expiresAt = nowInstant().epochMilliseconds + EVENT_DERIVATION_WINDOW_MS;
-      },
-      // Never cache a failure: drop it so the next caller retries the read
-      // rather than replaying the rejection.
-      () => {
-        if (this.memo.get(key) === entry) {
-          this.memo.delete(key);
-        }
-      },
-    );
+      })
+      .catch(
+        // Never cache a failure: drop it so the next caller retries the read
+        // rather than replaying the rejection.
+        () => {
+          if (this.memo.get(key) === entry) {
+            this.memo.delete(key);
+          }
+        },
+      );
     this.evict(now);
 
     return value;

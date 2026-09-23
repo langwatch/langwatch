@@ -1,7 +1,7 @@
-import { checkPrefix, checkInstance, checkNonEmptyString } from "./validation.ts";
 import { Instance } from "./instance.ts";
-import { getRandomBytes, detectPlatform } from "./platform.ts";
 import type { Ksuid } from "./ksuid.ts";
+import { getRandomBytes, detectPlatform } from "./platform.ts";
+import { checkPrefix, checkInstance, checkNonEmptyString } from "./validation.ts";
 
 // Factory function to create Ksuid instances
 export type KsuidFactory = (
@@ -22,7 +22,7 @@ export class Node {
   constructor(environment = "prod", instance?: Instance, ksuidFactory?: KsuidFactory) {
     this._environment = environment;
     this._instance = instance ?? this.createInstance();
-    this._ksuidFactory = ksuidFactory ?? this.defaultKsuidFactory;
+    this._ksuidFactory = ksuidFactory ?? this.defaultKsuidFactory.bind(this);
   }
 
   get environment(): string {

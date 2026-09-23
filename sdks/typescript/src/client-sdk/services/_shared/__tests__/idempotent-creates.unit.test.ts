@@ -23,7 +23,7 @@ const headersOf = (call: number): Headers =>
   new Headers((mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers);
 
 const bodyOf = (call: number): string =>
-  (mockFetch.mock.calls[call]?.[1] as RequestInit).body as string;
+  (mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.body as string;
 
 /**
  * The three creates the control plane deduplicates, each with the body it
@@ -156,7 +156,9 @@ describe("Feature: retrying a create without minting a duplicate", () => {
 
         await surface.create({ signal: controller.signal });
 
-        expect((mockFetch.mock.calls[0]?.[1] as RequestInit).signal).toBe(controller.signal);
+        expect((mockFetch.mock.calls[0]?.[1] as RequestInit | undefined)?.signal).toBe(
+          controller.signal,
+        );
       });
     });
   });

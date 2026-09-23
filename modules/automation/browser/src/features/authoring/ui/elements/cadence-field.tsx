@@ -17,7 +17,7 @@ export function AutomationCadenceField({
   onValueChange,
 }: {
   value: NotificationCadence;
-  onValueChange(value: NotificationCadence): void;
+  onValueChange: (value: NotificationCadence) => void;
 }) {
   const collection = useMemo(() => createListCollection({ items: CADENCE_OPTIONS }), []);
 

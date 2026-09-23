@@ -228,7 +228,7 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
               borderRadius: 6,
               fontSize: 12,
             }}
-            formatter={(value) => [`${value}`, "Wins"]}
+            formatter={(value) => [JSON.stringify(value), "Wins"]}
             // The axis label is elided; the tooltip is where the full variant
             // name lives, so hovering a bar always tells you exactly which
             // variant it is.

@@ -49,7 +49,8 @@ export class TraceNameResolutionService {
 
     const isRootSpan = span.parentSpanId === null;
     const spanStartMs = span.startTimeUnixMs;
-    const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+    const rawSpanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
+    const spanType = typeof rawSpanType === "string" ? rawSpanType : "";
 
     return isRootSpan
       ? this.fromRealRoot({

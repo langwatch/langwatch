@@ -566,7 +566,7 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.modelProviders,
       };
     }
-    const names = [...new Set(providers.map((row) => row.provider))].sort();
+    const names = [...new Set(providers.map((row) => row.provider))].toSorted();
     return { outcome: "verified", detail: `Configured: ${names.join(", ")}.` };
   }
 
@@ -798,7 +798,9 @@ function firstLine(text: string): string {
 }
 
 function reasonOf(error: unknown): string {
-  return firstLine(error instanceof Error ? error.message : String(error ?? "unknown error"));
+  return firstLine(
+    error instanceof Error ? error.message : (JSON.stringify(error) ?? "unknown error"),
+  );
 }
 
 function bodyText(body: unknown): string {

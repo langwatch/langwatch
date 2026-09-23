@@ -211,7 +211,7 @@ function resolvePullConfig(
   // generic adapter can run unmodified. The locked-shape reference pullers
   // (copilot_studio / openai_compliance / claude_compliance) only need the
   // adapter id - their validateConfig override returns the frozen config.
-  const builders: Record<PullConfigBuilderSourceType, [() => unknown | null, string, string]> = {
+  const builders: Record<PullConfigBuilderSourceType, [() => unknown, string, string]> = {
     http_custom: [
       () => buildHttpCustomPullConfig(composer),
       "Missing required HTTP source fields",
@@ -4195,7 +4195,7 @@ const DROP_PARSER_FIELD = Symbol("drop");
 // The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
 // it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
 // flat instead of a five-deep branch ladder.
-function parserFieldValue(key: string, value: unknown): unknown | typeof DROP_PARSER_FIELD {
+function parserFieldValue(key: string, value: unknown): unknown {
   if (value == null || value === "") return DROP_PARSER_FIELD;
   // Secrets travel in exactly one place: `pullConfig.credentials`, which is
   // the only subtree `encryptParserConfigCredentials` wraps before the row
@@ -4261,7 +4261,7 @@ export function seedComposerParserConfig({
     }
     const stored = storedParserConfig[field.key];
     if (stored == null) continue;
-    values[field.key] = String(stored);
+    values[field.key] = typeof stored === "string" ? stored : JSON.stringify(stored);
   }
   return values;
 }

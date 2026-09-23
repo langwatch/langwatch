@@ -321,7 +321,7 @@ function serializeSpanIO(io: SpanInputOutput | null | undefined): string {
   if (io.type === "list") {
     return JSON.stringify(io.value);
   }
-  return String(io.value ?? "");
+  return typeof io.value === "string" ? io.value : (JSON.stringify(io.value) ?? "");
 }
 
 function serializeError(error: ErrorCapture | null | undefined): string {

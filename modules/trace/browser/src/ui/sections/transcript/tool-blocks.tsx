@@ -73,7 +73,7 @@ export function ToolPairCard({
     try {
       return JSON.stringify(input, null, 2);
     } catch {
-      return String(input);
+      return "[unserializable value]";
     }
   }, [input]);
 

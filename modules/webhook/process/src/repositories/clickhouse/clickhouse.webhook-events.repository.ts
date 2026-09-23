@@ -7,6 +7,11 @@ import type {
 } from "../../services/webhook-envelope.service.ts";
 import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository.ts";
 
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
 const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
@@ -40,7 +45,7 @@ function mapSpendEventRow(raw: Record<string, unknown>): WebhookSpendEventRow {
     traceId: String(raw.TraceId),
     model: String(raw.Model),
     providerKey: String(raw.ProviderKey),
-    requestType: String(raw.RequestType ?? ""),
+    requestType: asString(raw.RequestType),
     tokensInput: Number(raw.TokensInput),
     tokensOutput: Number(raw.TokensOutput),
     tokensCacheRead: Number(raw.TokensCacheRead),
@@ -48,14 +53,14 @@ function mapSpendEventRow(raw: Record<string, unknown>): WebhookSpendEventRow {
     tokensReasoning: Number(raw.TokensReasoning),
     costNanoUsd,
     costUsd: nanoUsdToDecimalString(costNanoUsd),
-    rateVersion: String(raw.RateVersion ?? ""),
+    rateVersion: asString(raw.RateVersion),
     status: String(raw.Status) as WebhookSpendEventStatus,
     errorClass: String(raw.ErrorClass),
     httpStatus: Number(raw.HttpStatus),
     needsReconciliation: Number(raw.NeedsReconciliation ?? 0) === 1,
-    settleReason: String(raw.SettleReason ?? ""),
+    settleReason: asString(raw.SettleReason),
     labels: Array.isArray(raw.Labels) ? raw.Labels.map(String) : [],
-    metadata: String(raw.Metadata ?? ""),
+    metadata: asString(raw.Metadata),
     durationMs: Number(raw.DurationMS),
     occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(raw.OccurredAtMs)),
   };

@@ -265,7 +265,7 @@ function grainExclusionReason(family: string, action: string): string | undefine
  * Fail-closed: too strict shows as reviewer needing to classify, not silently
  * over-broad credential.
  */
-export function classifyForLangy(permission: AuthzPermission | string): LangyPermissionVerdict {
+export function classifyForLangy(permission: string): LangyPermissionVerdict {
   const { family, action } = splitPermission(permission);
 
   if (!action) {

@@ -76,7 +76,7 @@ async function prepareMetric({
   accepted: MetricDataPointPreparation["accepted"];
   rejections: RejectionLog;
 }): Promise<void> {
-  const label = String(metric.name ?? "<unnamed>");
+  const label = typeof metric.name === "string" ? metric.name : "<unnamed>";
   const kind = metricKind(metric);
   if (!kind) {
     rejections.reject(

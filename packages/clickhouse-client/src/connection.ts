@@ -37,7 +37,7 @@ export interface ClickHouseConnectionServiceOptions<Client extends ClickHouseClo
 }
 
 export interface ClickHouseInstance<Client extends ClickHouseCloseableClient> {
-  target: "shared" | string;
+  target: string;
   client: Client;
 }
 
@@ -47,7 +47,7 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
   private readonly clientByUrl = new Map<string, Client>();
   private readonly endpointByUrl = new Map<
     string,
-    { instance: string; cluster: string; target: "shared" | string }
+    { instance: string; cluster: string; target: string }
   >();
   private state: "open" | "closing" | "closed" = "open";
 

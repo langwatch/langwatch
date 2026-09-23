@@ -37,7 +37,9 @@ describe("given the Langy prompt documents the derived-card shapes", () => {
     /** @scenario The card shapes the prompt teaches are shapes the panel renders */
     it("finds one example per model-emittable kind", () => {
       const kinds = examples.map((raw) => JSON.parse(raw).kind);
-      expect([...kinds].toSorted()).toEqual([...DERIVED_SAFE_CARD_KINDS].toSorted());
+      expect([...kinds].toSorted((a, b) => (a < b ? -1 : Number(a > b)))).toEqual(
+        [...DERIVED_SAFE_CARD_KINDS].toSorted((a, b) => (a < b ? -1 : Number(a > b))),
+      );
     });
 
     it.each(examples)("validates %s", (raw) => {

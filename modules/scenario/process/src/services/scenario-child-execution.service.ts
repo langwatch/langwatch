@@ -270,7 +270,7 @@ function formatScenarioChildErrorValue(error: unknown): string {
       parts.push(typeof code === "string" ? `${current.message} (${code})` : current.message);
       current = current.cause;
     } else {
-      parts.push(String(current));
+      parts.push(typeof current === "string" ? current : (JSON.stringify(current) ?? ""));
       break;
     }
   }

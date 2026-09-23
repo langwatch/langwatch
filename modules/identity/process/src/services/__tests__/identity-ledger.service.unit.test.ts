@@ -221,7 +221,7 @@ describe("the identity ledger writer", () => {
       const projection = store.stored.get(USER)!;
       const facts = Object.values(projection.state.identifiers);
       expect(facts[0]!.value).toBe("sam.j@acme.com");
-      expect(projection.cursor.eventId).toBe((appended[0]?.[0] as IdentityEvent).id);
+      expect(projection.cursor.eventId).toBe((appended[0]?.[0] as IdentityEvent | undefined)?.id);
     });
 
     it("stages the COMMAND, not the facts: the queue re-runs the guard", async () => {

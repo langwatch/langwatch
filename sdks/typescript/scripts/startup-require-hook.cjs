@@ -112,6 +112,7 @@ process.on("exit", () => {
   try {
     fs.writeFileSync(out, JSON.stringify(payload, null, 2));
   } catch (error) {
-    process.stderr.write(`startup-require-hook: cannot write ${out}: ${error}\n`);
+    const reason = error instanceof Error ? error.message : JSON.stringify(error);
+    process.stderr.write(`startup-require-hook: cannot write ${out}: ${reason}\n`);
   }
 });

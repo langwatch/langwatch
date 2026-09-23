@@ -71,7 +71,7 @@ export class CodingAgentSessionCandidatesService {
       }),
     ]);
     const rowMatchedSessionKeys = new Set(
-      rowMatched.map(CodingAgentPullRequestShareService.sessionKey),
+      rowMatched.map((row) => CodingAgentPullRequestShareService.sessionKey(row)),
     );
 
     const missing = stamped.filter(
@@ -89,7 +89,9 @@ export class CodingAgentSessionCandidatesService {
     // The id read cannot scope per tenant, so a provider session id shared by
     // two projects fetches both; keep only the (tenant, session) pairs the
     // stamps actually named.
-    const missingKeys = new Set(missing.map(CodingAgentPullRequestShareService.sessionKey));
+    const missingKeys = new Set(
+      missing.map((row) => CodingAgentPullRequestShareService.sessionKey(row)),
+    );
     const stampedOnly = fetched.filter((session) =>
       missingKeys.has(CodingAgentPullRequestShareService.sessionKey(session)),
     );

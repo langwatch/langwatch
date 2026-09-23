@@ -30,7 +30,7 @@ const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")
  * original index.
  */
 function maskNonCode(sql: string): string {
-  const out = [...sql];
+  const out = sql.split("");
 
   const blank = (from: number, to: number): void => {
     for (let i = from; i < to && i < out.length; i++) {
@@ -305,7 +305,7 @@ export function checkInsertTenantScope(
     if (tenantId === undefined || tenantId === null || tenantId === "") {
       return { kind: "missing-row-tenant", row: index };
     }
-    if (String(tenantId) !== request.tenantId) {
+    if (tenantId !== request.tenantId) {
       return { kind: "row-tenant-mismatch", row: index, actual: tenantId };
     }
   }

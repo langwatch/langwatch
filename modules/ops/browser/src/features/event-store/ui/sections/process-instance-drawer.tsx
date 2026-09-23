@@ -144,10 +144,10 @@ export function ProcessInstanceDrawer({
   const detail = detailQuery.data ?? null;
 
   const copyKey = () => {
-    navigator.clipboard.writeText(processKey).then(
-      () => toaster.create({ title: "Process key copied", type: "success" }),
-      () => toaster.create({ title: "Couldn't copy the key", type: "error" }),
-    );
+    navigator.clipboard
+      .writeText(processKey)
+      .then(() => toaster.create({ title: "Process key copied", type: "success" }))
+      .catch(() => toaster.create({ title: "Couldn't copy the key", type: "error" }));
   };
 
   return (

@@ -11,6 +11,14 @@ import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attri
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
+function attributeText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
+}
+
 /**
  * Copilot's instrumentation scope name; `@github/copilot` is a legacy alias for older builds.
  * Matching by scope rather than only by a `github.copilot.*` attribute is what lets an
@@ -85,19 +93,19 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
 
     const premiumRequests = attrs.take(`${COPILOT_ATTR_PREFIX}total_premium_requests`);
     if (premiumRequests !== void 0 && premiumRequests !== null) {
-      ctx.setAttr("metadata.copilot_premium_requests", String(premiumRequests));
+      ctx.setAttr("metadata.copilot_premium_requests", attributeText(premiumRequests));
       ctx.recordRule(`${this.id}:premium_requests`);
     }
 
     const copilotCost = attrs.take(`${COPILOT_ATTR_PREFIX}cost`);
     if (copilotCost !== void 0 && copilotCost !== null) {
-      ctx.setAttr("metadata.copilot_cost", String(copilotCost));
+      ctx.setAttr("metadata.copilot_cost", attributeText(copilotCost));
       ctx.recordRule(`${this.id}:cost_units`);
     }
 
     const nanoAiu = attrs.take(`${COPILOT_ATTR_PREFIX}nano_aiu`);
     if (nanoAiu !== void 0 && nanoAiu !== null) {
-      ctx.setAttr("metadata.copilot_nano_aiu", String(nanoAiu));
+      ctx.setAttr("metadata.copilot_nano_aiu", attributeText(nanoAiu));
       ctx.recordRule(`${this.id}:nano_aiu`);
     }
 

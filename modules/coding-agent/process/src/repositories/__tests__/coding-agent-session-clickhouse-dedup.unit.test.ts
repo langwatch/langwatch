@@ -78,7 +78,7 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
   }
   const raw = row[expression];
   if (typeof raw === "number") return raw;
-  const asString = String(raw ?? "");
+  const asString = typeof raw === "string" ? raw : "";
   return asString !== "" && !Number.isNaN(Number(asString)) ? Number(asString) : asString;
 }
 

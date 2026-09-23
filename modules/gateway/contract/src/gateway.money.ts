@@ -114,7 +114,9 @@ export function decimalUsdToNanoUsd(value: { toString(): string }): number | nul
  * MAX_SAFE_INTEGER and negative totals.
  */
 export function parseSummedNanoUsd(value: unknown): number {
-  const parsed = BigInt(String(value ?? 0));
+  const parsed = BigInt(
+    typeof value === "string" || typeof value === "number" || typeof value === "bigint" ? value : 0,
+  );
   if (parsed > BigInt(Number.MAX_SAFE_INTEGER) || parsed < 0n) {
     throw new Error(`Summed nano-USD value ${parsed} exceeds the safe integer range`);
   }

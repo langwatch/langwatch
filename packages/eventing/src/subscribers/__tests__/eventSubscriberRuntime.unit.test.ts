@@ -41,6 +41,13 @@ function createMemoryGlobalQueue(registry: Map<string, JobRegistryEntry>) {
       __jobName: jobName,
       ...clean
     } = payload;
+    if (
+      typeof pipelineName !== "string" ||
+      typeof jobType !== "string" ||
+      typeof jobName !== "string"
+    ) {
+      return null;
+    }
     const entry = registry.get(`${pipelineName}:${jobType}:${jobName}`);
     return entry ? { entry, clean } : null;
   };

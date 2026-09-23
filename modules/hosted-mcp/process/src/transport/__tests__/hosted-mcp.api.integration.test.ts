@@ -28,6 +28,13 @@ import {
   type McpHandler,
 } from "../../index.ts";
 
+function stringField(body: unknown, key: string): string {
+  const value: unknown =
+    typeof body === "object" && body !== null ? Reflect.get(body, key) : undefined;
+  if (typeof value !== "string") throw new Error(`response carries no string ${key}`);
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -770,7 +777,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         // The whole point: this registration must be durably retrievable by
         // /mcp/authorize later, not just echoed back in this response.
         expect(mockRedis.set).toHaveBeenCalledWith(
-          `mcp:oauth:client:${body.client_id}`,
+          `mcp:oauth:client:${stringField(body, "client_id")}`,
           JSON.stringify({
             redirectUris: ["https://registered.example/callback"],
             clientName: "test-client",
@@ -993,7 +1000,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         }),
       });
       const tokenBody = await tokenRes.json();
-      const accessToken = (tokenBody as Record<string, unknown>).access_token;
+      const accessToken = stringField(tokenBody, "access_token");
 
       // Clear the mock to prove MCP init does its own DB lookup
       mockPrisma.project.findUnique.mockClear();
@@ -1120,7 +1127,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         }),
       });
       const tokenBody = await tokenRes.json();
-      const accessToken = (tokenBody as Record<string, unknown>).access_token;
+      const accessToken = stringField(tokenBody, "access_token");
 
       // Clear in-memory cache
       handler.clearTokenCache();
@@ -1615,7 +1622,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         }),
       });
       const tokenBody = (await tokenRes.json()) as { access_token: string };
-      const accessToken = (tokenBody as Record<string, unknown>).access_token;
+      const accessToken = stringField(tokenBody, "access_token");
 
       // Reset redis mock (auth code was consumed)
       mockRedis.get.mockResolvedValue(null);

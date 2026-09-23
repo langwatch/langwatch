@@ -243,8 +243,8 @@ export function useSourceEventsPager<R extends PagerRow>({
         pageSize: snapshot.pageSize,
         displayedRows: snapshot.pages?.flat() ?? [],
         fetchPage,
-      }).then(
-        ({ rows, hasMore }) =>
+      })
+        .then(({ rows, hasMore }) =>
           dispatch({
             type: "fetchLanded",
             generation: snapshot.generation,
@@ -252,14 +252,15 @@ export function useSourceEventsPager<R extends PagerRow>({
             rows,
             hasMore,
           }),
-        (error: unknown) =>
+        )
+        .catch((error: unknown) =>
           dispatch({
             type: "fetchFailed",
             generation: snapshot.generation,
             walkId,
             error,
           }),
-      );
+        );
     },
     [fetchPage],
   );

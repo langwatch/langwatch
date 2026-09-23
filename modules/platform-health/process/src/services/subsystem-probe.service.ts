@@ -67,7 +67,7 @@ export interface SubsystemProbeCollaborators {
   readonly publicBaseUrl: string;
   /** The automation application the trigger probe reads a recent fire from. */
   automation(): Readonly<{
-    findById(input: { triggerId: string; projectId: string }): Promise<unknown | null>;
+    findById(input: { triggerId: string; projectId: string }): Promise<unknown>;
     getRecentFires(input: {
       projectId: string;
       triggerId: string;

@@ -16,7 +16,7 @@ const SOURCE_ID = "source-1";
 
 async function runGuard(action: GuardParams["action"], args: GuardParams["args"]): Promise<void> {
   if (action !== "findUnique" && action !== "upsert") {
-    throw new Error(`Unexpected projection action: ${action}`);
+    throw new Error(`Unexpected projection action: ${JSON.stringify(action)}`);
   }
   if (!args.where) {
     throw new Error("Projection access must include a tenant-scoped where clause");

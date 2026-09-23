@@ -430,7 +430,7 @@ describe("TraceProjectionLeanService.structuredIoPreview", () => {
       expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(32 * 1024);
       const messages = JSON.parse(preview!) as {
         role: string;
-        content: string | unknown;
+        content: unknown;
       }[];
       expect(messages[0]!.role).toBe("developer");
       expect(messages[messages.length - 1]).toEqual({

@@ -29,7 +29,7 @@ export interface ShareApi {
   unpinTrace(input: TracePinInput): Promise<void>;
   findTracePin(input: TracePinInput): Promise<PinnedTrace | null>;
   listTracePins(input: ShareProjectScope): Promise<PinnedTrace[]>;
-  findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null>;
+  findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown>;
   cachePayload(input: SharedPayloadCacheInput & { payload: unknown }): Promise<void>;
 }
 

@@ -109,7 +109,11 @@ function storedSpanCost(extra: CallExtra): number | null {
  *  repository selects the canonical attributes ingest wrote. */
 function recomputedSummaryRowCost(extra: CallExtra): number | null {
   const attributes = storedSpan(extra).spanAttributes as Record<string, unknown>;
-  const attribute = (key: string): string => String(attributes[key] ?? "");
+  const attribute = (key: string): string => {
+    const value = attributes[key];
+    if (value === undefined) return "";
+    return typeof value === "string" ? value : JSON.stringify(value);
+  };
 
   return SpanStorageClickHouseRepository.mapSpanSummaryRow({
     SpanId: SPAN_ID,

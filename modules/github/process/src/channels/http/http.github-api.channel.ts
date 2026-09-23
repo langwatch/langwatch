@@ -302,7 +302,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
 
   private request(
     url: string,
-    init: RequestInit & { headers: Record<string, string> },
+    init: Omit<RequestInit, "headers"> & { headers: Record<string, string> },
   ): Promise<Response> {
     return fetch(url, {
       ...init,

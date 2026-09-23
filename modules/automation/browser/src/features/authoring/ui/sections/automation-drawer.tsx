@@ -92,7 +92,8 @@ function templateValidationTitle(error: unknown): string | undefined {
   const handled = readHandledError(error);
   if (handled?.code !== "template_validation_error") return undefined;
 
-  return TEMPLATE_FIELD_TITLES[String(handled.meta.field ?? "")];
+  const field = handled.meta.field;
+  return typeof field === "string" ? TEMPLATE_FIELD_TITLES[field] : undefined;
 }
 
 /** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →

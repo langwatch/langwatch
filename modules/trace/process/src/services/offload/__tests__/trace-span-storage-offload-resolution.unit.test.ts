@@ -85,14 +85,12 @@ function makeNormalizedSpan(
 /** Stub with findNormalizedSpansByTraceId returning spans, others null (forces
  * resolution path). */
 function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepository {
-  const nullRepo = new NullSpanStorageRepository();
-  return {
-    ...nullRepo,
+  return Object.assign(new NullSpanStorageRepository(), {
     findNormalizedSpansByTraceId: vi.fn(async () => normalizedSpans),
     // Keep raw paths returning empty so tests can distinguish the two paths.
     findSpansByTraceId: vi.fn(async () => []),
     findSpanByIds: vi.fn(async () => null),
-  } as unknown as SpanStorageRepository;
+  });
 }
 
 function makeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {

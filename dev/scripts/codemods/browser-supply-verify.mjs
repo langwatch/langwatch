@@ -89,12 +89,16 @@ try {
   assert.equal(new Set(pages).size, pages.length);
   assert.equal(new Set(drawers).size, drawers.length);
   assert.deepEqual(
-    [...new Set(pages)].toSorted(),
-    plan.declarations.tree.pages.map((page) => page.page).toSorted(),
+    [...new Set(pages)].toSorted((a, b) => (a < b ? -1 : Number(a > b))),
+    plan.declarations.tree.pages
+      .map((page) => page.page)
+      .toSorted((a, b) => (a < b ? -1 : Number(a > b))),
   );
   assert.deepEqual(
-    drawers.toSorted(),
-    plan.declarations.tree.drawers.map((drawer) => drawer.name).toSorted(),
+    drawers.toSorted((a, b) => (a < b ? -1 : Number(a > b))),
+    plan.declarations.tree.drawers
+      .map((drawer) => drawer.name)
+      .toSorted((a, b) => (a < b ? -1 : Number(a > b))),
   );
   console.log(
     `fixture: 41 declaration exports discovered without index.ts; ${pages.length} renderer keys; ${drawers.length} drawer keys; no duplicates`,

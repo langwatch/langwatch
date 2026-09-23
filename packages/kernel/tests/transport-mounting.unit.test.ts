@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { moduleApi } from "../src/module-api-token.ts";
 import {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,
   type FeatureRestHost,
   type FeatureTrpcHost,
 } from "../src/transport-mounting.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 interface CatalogueApi {
   read(): string;
@@ -127,7 +127,7 @@ describe("given a feature whose server declares transports", () => {
 
       const mounted = runtime.transports.trpc.dataset;
 
-      expect((mounted?.app as CatalogueApi).read()).toBe("one dataset");
+      expect((mounted?.app as CatalogueApi | undefined)?.read()).toBe("one dataset");
     });
 
     it("keys each mounted namespace by the name its declaration carries", async () => {

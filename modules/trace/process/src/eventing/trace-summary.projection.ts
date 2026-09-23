@@ -687,7 +687,8 @@ export class TraceSummaryFoldProjection
       rootMetadataFromFallback,
     } = runtime.traceName.resolveFromSpan({ state, span });
 
-    const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+    const rawSpanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
+    const spanType = typeof rawSpanType === "string" ? rawSpanType : "";
     const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
     const promptRollup = runtime.tracePrompt.accumulate({

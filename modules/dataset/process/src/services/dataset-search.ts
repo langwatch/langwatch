@@ -77,15 +77,19 @@ export const matchesDatasetSearch = ({
 /**
  * Objects and arrays are searched by their JSON text — what the editor
  * renders in the cell. A value that can't serialise (a cycle, a BigInt)
- * falls back to `String(...)` rather than failing the whole search.
+ * falls back to a placeholder rather than failing the whole search.
  */
 const safeStringifyValue = (value: unknown): string => {
   if (typeof value === "object") {
     try {
       return JSON.stringify(value) ?? "";
     } catch {
-      return String(value);
+      return "[unserializable value]";
     }
   }
-  return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
 };

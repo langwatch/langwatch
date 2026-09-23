@@ -21,7 +21,7 @@ export const API_VERSION_HEADER = "X-API-Version" as const;
  * for an endpoint that lives only in the preview namespace. `"latest"` is
  * derived, never registered.
  */
-export type VersionLabel = DateVersion | typeof VERSION_PREVIEW;
+export type VersionLabel = DateVersion;
 
 /** The version status header value a mount responds with. */
 export type VersionStatus = "stable" | "latest" | "preview";
@@ -64,7 +64,7 @@ export function assertVersionLabel(version: string): void {
 
   if (!isDateVersion(version)) {
     throw new RangeError(
-      `Invalid API version "${version}"; expected a real date in YYYY-MM-DD form`,
+      `Invalid API version ${JSON.stringify(version)}; expected a real date in YYYY-MM-DD form`,
     );
   }
 }
@@ -361,7 +361,10 @@ export function addressesOf<Api>({
   }
 
   return [
-    { path: `/${version}${suffix}`, context: { version, status: "stable", suffix: dated(version) } },
+    {
+      path: `/${version}${suffix}`,
+      context: { version, status: "stable", suffix: dated(version) },
+    },
     {
       path: `/${VERSION_LATEST}${suffix}`,
       context: { version: VERSION_LATEST, status: "latest", suffix: VERSION_LATEST },

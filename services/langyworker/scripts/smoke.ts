@@ -60,7 +60,7 @@ const deadline = setTimeout(() => {
 }, 60_000);
 
 child.stderr.on("data", (chunk: Buffer) => {
-  process.stderr.write(`[worker stderr] ${chunk}`);
+  process.stderr.write(`[worker stderr] ${chunk.toString("utf8")}`);
 });
 
 // A spawn that never starts emits `error`, not `exit`, so the report and the

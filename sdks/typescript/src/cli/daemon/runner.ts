@@ -294,7 +294,7 @@ export function createCommandExecutor({
         resolve(code);
       };
       settle = finish;
-      completed.then(finish, (error: unknown) => {
+      completed.then(finish).catch((error: unknown) => {
         clearTimeout(timeout);
         // A rejection means the window couldn't be applied before any output was
         // produced — the server turns it into a `fallback` frame for the client to

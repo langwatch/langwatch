@@ -34,6 +34,12 @@ import { LocalControlSessionCoreService } from "../../services/langy-local-sessi
 import { LocalControlLongPoll } from "../langy-local-control-long-poll.rest.ts";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.ws.ts";
 
+function frameText(raw: WebSocket.RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (Buffer.isBuffer(raw)) return raw.toString("utf8");
+  return Buffer.from(raw).toString("utf8");
+}
+
 const ns = `local-control-${nanoid(8)}`;
 
 let connection: RedisConnection;
@@ -311,7 +317,7 @@ class FakeCli {
       },
     });
     this.socket.on("message", (raw) => {
-      const frame = JSON.parse(raw.toString()) as Frame;
+      const frame = JSON.parse(frameText(raw)) as Frame;
       this.frames.push(frame);
       for (const waiter of this.waiters.splice(0)) waiter(frame);
     });

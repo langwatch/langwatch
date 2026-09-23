@@ -27,7 +27,7 @@ const row = (patch: unknown): TraceEditOverlayRow =>
     updatedBy: { id: "user-1", name: "First Reviewer", image: null },
   }) as TraceEditOverlayRow;
 
-const buildService = (stored: unknown | null) => {
+const buildService = (stored: unknown) => {
   const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch));
   const deleteRow = vi.fn(async () => undefined);
   const repository = {

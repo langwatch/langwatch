@@ -37,7 +37,8 @@ function normalizeQuery(query: Record<string, unknown>): Record<string, string |
     // An array repeats a key in a real query string; this reading is
     // single-valued, and the compat router's `query` bag was too by the time a
     // page read it back. First wins, which is what `new URLSearchParams` does.
-    next[key] = Array.isArray(value) ? String(value[0] ?? "") : String(value);
+    const first: unknown = Array.isArray(value) ? (value[0] ?? "") : value;
+    next[key] = typeof first === "string" ? first : JSON.stringify(first);
   }
   return next;
 }

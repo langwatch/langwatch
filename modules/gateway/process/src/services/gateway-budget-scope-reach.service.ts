@@ -89,7 +89,7 @@ export class GatewayBudgetScopeReachService {
       case "GROUP":
         return key.groupIds.includes(budget.scopeId);
       default:
-        throw new Error(`Unsupported Gateway budget scope: ${budget.scopeType}`);
+        throw new Error(`Unsupported Gateway budget scope: ${JSON.stringify(budget.scopeType)}`);
     }
   }
 

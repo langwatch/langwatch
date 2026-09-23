@@ -292,10 +292,11 @@ describe("given the edit drawer for an existing key", () => {
 
       await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await save();
-      expect([...lastUpdateInput().config.providersAllowed].toSorted()).toEqual([
-        "mp-anthropic",
-        "mp-openai",
-      ]);
+      expect(
+        [...lastUpdateInput().config.providersAllowed].toSorted((a, b) =>
+          a < b ? -1 : Number(a > b),
+        ),
+      ).toEqual(["mp-anthropic", "mp-openai"]);
     });
   });
 

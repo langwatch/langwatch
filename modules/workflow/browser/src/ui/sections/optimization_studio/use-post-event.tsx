@@ -175,10 +175,10 @@ export const usePostEvent = () => {
         // Handle stream errors
         onError,
       })
-        .catch(onError)
         .finally(() => {
           setIsLoading(false);
-        });
+        })
+        .catch(onError);
     },
     [handleServerMessage, project, setEvaluationState],
   );

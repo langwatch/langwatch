@@ -25,6 +25,5 @@ export type {
   TranscriptEntry,
   TranscriptLogRecord,
 } from "./coding-agent-transcript.ts";
-export type { LogContentCategory, LogContentKey } from "./coding-agent-log-content.ts";
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";

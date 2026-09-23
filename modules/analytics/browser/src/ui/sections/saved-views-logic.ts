@@ -70,7 +70,7 @@ export function normalizeFilterValue(value: FilterParam | undefined): FilterPara
     .map(([k, v]) => {
       if (Array.isArray(v)) {
         if (v.length === 0) return null;
-        return [k, [...v].toSorted()] as const;
+        return [k, [...v].toSorted((a, b) => (a < b ? -1 : Number(a > b)))] as const;
       }
       // Nested record
       const innerEntries = Object.entries(v as Record<string, string[]>)

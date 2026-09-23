@@ -46,7 +46,6 @@ export function salvageJsonText(raw: string): LangySalvageResult {
     return j >= n;
   };
 
-  const HEX = /[0-9a-fA-F]/;
   const ESCAPES: Record<string, string> = {
     '"': '"',
     "\\": "\\",
@@ -81,7 +80,7 @@ export function salvageJsonText(raw: string): LangySalvageResult {
         const esc = text[i + 1]!;
         if (esc === "u") {
           const hex = text.slice(i + 2, i + 6);
-          if (hex.length === 4 && [...hex].every((h) => HEX.test(h))) {
+          if (/^[0-9a-fA-F]{4}$/.test(hex)) {
             out += String.fromCharCode(parseInt(hex, 16));
             i += 6;
             continue;

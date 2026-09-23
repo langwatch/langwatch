@@ -52,7 +52,7 @@ function walk(directory: string, found: string[] = []): string[] {
 
 /** Blanks comment and string bodies so neither can steer the match. */
 function maskNonCode(sql: string): string {
-  const out = [...sql];
+  const out = sql.split("");
   const blank = (from: number, to: number): void => {
     for (let i = from; i < to && i < out.length; i++) if (out[i] !== "\n") out[i] = " ";
   };

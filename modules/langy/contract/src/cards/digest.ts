@@ -127,7 +127,7 @@ function paginationOf(document: unknown): Pagination | undefined {
 }
 
 /** The JSON document behind an output that may still carry console noise. */
-function documentOf(output: unknown): unknown | null {
+function documentOf(output: unknown): unknown {
   if (output && typeof output === "object") return output;
   if (typeof output !== "string") return null;
   return parseCliJson(output);

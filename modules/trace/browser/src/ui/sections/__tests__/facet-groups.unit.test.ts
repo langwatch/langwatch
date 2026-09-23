@@ -30,7 +30,7 @@ describe("FACET_GROUPS configuration", () => {
       }
     }
     const duplicates = [...occurrences.entries()].filter(([, n]) => n > 1);
-    expect(duplicates, `keys appearing in multiple groups: ${duplicates}`).toEqual([]);
+    expect(duplicates, `keys appearing in multiple groups: ${duplicates.join(", ")}`).toEqual([]);
   });
 
   it("orders the groups as the default Observability perspective", () => {

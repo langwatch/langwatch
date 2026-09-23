@@ -13,8 +13,7 @@ const MAX_ECHOED_IDENTIFIER = 80;
  * identifier: C0/C1 controls, zero-width characters, and the bidi override
  * range, which would otherwise ride back into terminals and agent logs.
  */
-const UNPRINTABLE =
-  /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/gu;
+const UNPRINTABLE = /[^\P{Cc}\t-\r]|[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
 /**
  * Quotes a caller-supplied identifier back at them, bounded and single-line. The bound counts

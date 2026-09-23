@@ -105,7 +105,9 @@ export const asFlatFields = (
 
   if (schema.required !== undefined) {
     if (!Array.isArray(schema.required)) return null;
-    const required = [...(schema.required as unknown[])].toSorted();
+    const required = [...(schema.required as unknown[])].toSorted((a, b) =>
+      String(a).localeCompare(String(b)),
+    );
     const names = [...propertyNames].toSorted();
     if (required.length !== names.length || required.some((r, i) => r !== names[i])) {
       return null;

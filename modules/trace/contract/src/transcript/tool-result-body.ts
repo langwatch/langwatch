@@ -19,7 +19,7 @@ export function toolResultBodyToString(content: unknown): string {
   try {
     return JSON.stringify(content, null, 2);
   } catch {
-    return String(content);
+    return "[unserializable value]";
   }
 }
 import { isRecord } from "./record.ts";

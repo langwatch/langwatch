@@ -151,7 +151,10 @@ describe("LangyUiActionService against real Redis", () => {
       service.claim({ ...IDS, actionId }),
       service.claim({ ...IDS, userId: "user-tab-2", actionId }),
     ]);
-    expect([first.isClaimed, second.isClaimed].toSorted()).toEqual([false, true]);
+    expect([first.isClaimed, second.isClaimed].toSorted((a, b) => Number(a) - Number(b))).toEqual([
+      false,
+      true,
+    ]);
 
     const claimant = first.isClaimed ? IDS.userId : "user-tab-2";
     await service.complete({

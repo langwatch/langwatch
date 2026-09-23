@@ -23,6 +23,12 @@ import { AgentSessionService } from "../../services/connected-agent-session.serv
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
 
+function frameText(raw: WebSocket.RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (Buffer.isBuffer(raw)) return raw.toString("utf8");
+  return Buffer.from(raw).toString("utf8");
+}
+
 /** The minimal router a standalone `http.Server` needs, main's shape. */
 function createUpgradeRouter(server: Server): ConnectUpgradeRouter {
   const handlers = new Map<string, UpgradeHandler>();
@@ -122,7 +128,7 @@ describe("ConnectGateway without Redis", () => {
         headers: { Authorization: "Bearer sk-lw-anything" },
       });
       const refused = await new Promise<Record<string, unknown>>((resolve, reject) => {
-        socket.once("message", (raw) => resolve(JSON.parse(raw.toString())));
+        socket.once("message", (raw) => resolve(JSON.parse(frameText(raw))));
         socket.once("error", reject);
       });
       expect(refused).toMatchObject({
@@ -223,7 +229,7 @@ function connectAndRegister(
   });
   const registered = new Promise<Record<string, unknown>>((resolve, reject) => {
     socket.once("open", () => socket.send(JSON.stringify(frame)));
-    socket.once("message", (raw) => resolve(JSON.parse(raw.toString())));
+    socket.once("message", (raw) => resolve(JSON.parse(frameText(raw))));
     socket.once("error", reject);
   });
   return { socket, registered };

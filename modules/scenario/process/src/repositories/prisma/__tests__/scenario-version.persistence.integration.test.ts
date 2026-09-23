@@ -282,7 +282,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     ]);
     const history = await scenarios.listVersions({ projectId, scenarioId: scenario.id });
 
-    expect([first.version, second.version].toSorted()).toEqual([5, 6]);
+    expect([first.version, second.version].toSorted((a, b) => a - b)).toEqual([5, 6]);
     expect(history.versions.map((version) => version.version)).toEqual([6, 5, 4, 3, 2, 1]);
   });
 

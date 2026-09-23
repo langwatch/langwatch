@@ -683,14 +683,14 @@ interface BannerViewProps {
   colors: string[];
   displayMesh: Mesh;
   eligible: Slide[];
-  handleCta(slide: Slide): void;
+  handleCta: (slide: Slide) => void;
   hoveredRef: MutableRefObject<boolean>;
   lanternColors: string[];
   lowPerf: boolean;
   multi: boolean;
   progress: MotionValue<number>;
   reduceMotion: boolean;
-  selectSlide(index: number): void;
+  selectSlide: (index: number) => void;
   slide: Slide | undefined;
   slideTransition: Transition;
 }

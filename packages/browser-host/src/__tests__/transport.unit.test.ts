@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { createUiFeatureApiClient } from "../transport";
 
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
 type Call = { url: string; method: string };
 
 function transportOver(bodies: unknown[]): {
@@ -11,7 +16,7 @@ function transportOver(bodies: unknown[]): {
   const calls: Call[] = [];
   const queue = [...bodies];
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), method: init?.method ?? "GET" });
+    calls.push({ url: requestUrl(input), method: init?.method ?? "GET" });
     return new Response(JSON.stringify(queue.shift()), {
       status: 200,
       headers: { "content-type": "application/json" },

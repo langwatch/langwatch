@@ -348,7 +348,7 @@ export class ShareService {
     await this.#options.dataRetention.unpin(parsed);
   }
 
-  async findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null> {
+  async findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown> {
     const parsed = sharedPayloadCacheInputSchema.parse(input);
     const key = ShareService.buildPayloadCacheKey(parsed);
 

@@ -1094,10 +1094,12 @@ describe("evaluateGraphTrigger", () => {
       expect(harness.dispatch).toHaveBeenCalledTimes(2);
       // The two fires carry DISTINCT digests — the resolved first incident is
       // the second fire's generation, so retries never conflate them.
-      const firstDigest = (harness.dispatch.mock.calls[0]?.[0] as { fireDigest: string })
-        .fireDigest;
-      const secondDigest = (harness.dispatch.mock.calls[1]?.[0] as { fireDigest: string })
-        .fireDigest;
+      const firstDigest = (
+        harness.dispatch.mock.calls[0]?.[0] as { fireDigest: string } | undefined
+      )?.fireDigest;
+      const secondDigest = (
+        harness.dispatch.mock.calls[1]?.[0] as { fireDigest: string } | undefined
+      )?.fireDigest;
       expect(firstDigest).toBeTruthy();
       expect(secondDigest).not.toBe(firstDigest);
     });

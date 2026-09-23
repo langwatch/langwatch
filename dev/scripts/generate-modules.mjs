@@ -78,7 +78,7 @@ function membersFor({ root, entry }) {
     if (!match?.[1]) continue;
     for (const name of match[1].matchAll(/["'`]([A-Za-z][\w]*)["'`]/g)) declared.add(name[1]);
   }
-  return [...declared].toSorted();
+  return [...declared].toSorted((a, b) => (a < b ? -1 : Number(a > b)));
 }
 
 /** Every installed module's declaration, as the manifest records it. */
@@ -175,7 +175,9 @@ function packageSourceFor({ root, manifestPath, packages }) {
   const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), "utf8"));
 
   manifest.dependencies = Object.fromEntries(
-    [...new Set(packages)].toSorted().map((name) => [name, "workspace:*"]),
+    [...new Set(packages)]
+      .toSorted((a, b) => (a < b ? -1 : Number(a > b)))
+      .map((name) => [name, "workspace:*"]),
   );
 
   return `${JSON.stringify(manifest, undefined, 2)}\n`;

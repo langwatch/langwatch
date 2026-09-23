@@ -314,7 +314,8 @@ describe("result-parsing", () => {
 
         if (groupBy && row.group_key !== undefined && row.group_key !== null) {
           // Grouped results — mirrors parseTimeseriesResults lines 242-270
-          const groupKey = String(row.group_key);
+          const groupKey =
+            typeof row.group_key === "string" ? row.group_key : JSON.stringify(row.group_key);
           if (!bucket[groupBy]) {
             bucket[groupBy] = {};
           }

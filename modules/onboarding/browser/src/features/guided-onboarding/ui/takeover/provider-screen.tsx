@@ -179,7 +179,9 @@ export function ProviderScreen({
                   onClick={() => {
                     emit("confirmed", "skip_tour");
                     setConfirmSkip(false);
-                    skip().then(onSkip, (error: unknown) => onSkipFailed?.(error));
+                    skip()
+                      .then(onSkip)
+                      .catch((error: unknown) => onSkipFailed?.(error));
                   }}
                   fontSize="13px"
                   fontWeight="500"

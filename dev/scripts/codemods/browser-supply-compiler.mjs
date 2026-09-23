@@ -46,6 +46,7 @@ const packages = Object.fromEntries([
   ["$shell", "@langwatch/ui"],
 ]);
 const count = (data, key) => data.reduce((total, item) => total + item[key].length, 0);
+/** @type {Array<[string, unknown, unknown]>} */
 const cases = [
   ["valid-real-scale", base, null],
   ["valid-including-native-routes", declarations(true), null],

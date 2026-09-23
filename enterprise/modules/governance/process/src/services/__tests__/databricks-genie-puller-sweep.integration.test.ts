@@ -762,8 +762,8 @@ describe("given the directory fails while the sweep is running", () => {
     expect(afterOutage).toBeDefined();
 
     expect(lookups).toBeGreaterThanOrEqual(2);
-    expect(String(extensionOf(duringOutage!).actorEmail ?? "")).toBe("");
-    expect(String(extensionOf(afterOutage!).actorEmail ?? "")).toBe("dana.hoffman@acme.test");
+    expect(extensionOf(duringOutage!).actorEmail ?? "").toBe("");
+    expect(extensionOf(afterOutage!).actorEmail ?? "").toBe("dana.hoffman@acme.test");
   }, 60_000);
 });
 

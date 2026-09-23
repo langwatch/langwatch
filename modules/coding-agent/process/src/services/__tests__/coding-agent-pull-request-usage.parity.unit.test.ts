@@ -699,7 +699,7 @@ describe("PullRequestUsageService", () => {
           headBranches: ["feat/linkage", "feat/next"],
         }),
       );
-      expect(usage.rows.map((row) => row.prNumber).toSorted()).toEqual([7, 8]);
+      expect(usage.rows.map((row) => row.prNumber).toSorted((a, b) => a - b)).toEqual([7, 8]);
       // With no stamped facts, the whole session prices under the pull
       // request it opened first; the other row is discovered but reports the
       // work that was stamped on it, which is none.

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import chalk from "chalk";
+import { describe, expect, it } from "vitest";
 
 import { buildTable, humanRelative } from "../list";
 
@@ -8,7 +8,7 @@ import { buildTable, humanRelative } from "../list";
 chalk.level = 1;
 
 // intentional: stripping ANSI escape codes from chalk output
-const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+const stripAnsi = (s: string) => s.replace(/\p{Cc}\[[0-9;]*m/gu, "");
 
 describe("humanRelative", () => {
   describe("when the timestamp is in the past", () => {

@@ -119,12 +119,9 @@ export class ReplayService {
       throw new ReplayStartFailedError(error);
     }
 
-    this.executeReplay({ runId, ...params }).then(
-      () => {},
-      (err) => {
-        logger.error({ error: err, runId }, "Unexpected replay orchestration error");
-      },
-    );
+    this.executeReplay({ runId, ...params }).catch((err) => {
+      logger.error({ error: err, runId }, "Unexpected replay orchestration error");
+    });
 
     return { runId };
   }

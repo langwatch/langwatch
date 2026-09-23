@@ -69,7 +69,8 @@ export function applyHandledErrorToForm({
   let placed = false;
   if (isRecord(fieldErrors)) {
     for (const [field, message] of Object.entries(fieldErrors)) {
-      const text = Array.isArray(message) ? String(message[0] ?? "") : String(message ?? "");
+      const first: unknown = Array.isArray(message) ? message[0] : message;
+      const text = typeof first === "string" ? first : "";
       if (!text) continue;
       form.setError(field, { type: "server", message: text });
       placed = true;

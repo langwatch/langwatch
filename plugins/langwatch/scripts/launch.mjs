@@ -36,8 +36,7 @@ const CLAUDE_MARKERS = ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PROJECT_
 const NOT_INSTALLED =
   "LangWatch: the langwatch CLI is not installed, so this session's repository and branch are not being recorded. Install it with `npm install -g langwatch`, then run `langwatch login`.";
 
-const configPath = () =>
-  process.env[CLI_CONFIG.envVar] || join(homedir(), ...CLI_CONFIG.path);
+const configPath = () => process.env[CLI_CONFIG.envVar] || join(homedir(), ...CLI_CONFIG.path);
 
 function recordedCli() {
   try {
@@ -78,7 +77,10 @@ const readStdin = () =>
     let raw = "";
     const done = () => resolve(raw);
     setTimeout(done, 1_000).unref();
-    process.stdin.on("data", (chunk) => (raw += chunk)).on("end", done).on("error", done);
+    process.stdin
+      .on("data", (chunk) => (raw += chunk))
+      .on("end", done)
+      .on("error", done);
   });
 
 // One line, once per session, only where Claude Code reads it as context.
@@ -125,6 +127,5 @@ async function main() {
 // The exit is forced rather than left to the event loop: reading stdin refs
 // that handle, and a client that never closes the pipe would otherwise keep
 // the hook alive past its answer. Everything written above is drained first.
-main()
-  .catch(() => undefined)
-  .finally(() => process.exit(0));
+await main().catch(() => undefined);
+process.exit(0);

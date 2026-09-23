@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
+
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
 import type { ReplayEvent } from "../replayEventSource.ts";
 import { FoldAccumulator, MapAccumulator, replayEvents } from "../replayExecutor.ts";
 
@@ -354,9 +355,9 @@ describe("MapAccumulator", () => {
     const { projection, bulkAppendSpy } = createTestMapProjection();
     const acc = new MapAccumulator(projection);
 
-    await acc.apply(makeEvent({ data: { value: 5 } }));
-    await acc.apply(makeEvent({ data: { value: 10 } }));
-    await acc.apply(makeEvent({ data: { value: 15 } }));
+    acc.apply(makeEvent({ data: { value: 5 } }));
+    acc.apply(makeEvent({ data: { value: 10 } }));
+    acc.apply(makeEvent({ data: { value: 15 } }));
 
     expect(acc.processed).toBe(3);
     expect(bulkAppendSpy).not.toHaveBeenCalled();
@@ -377,8 +378,8 @@ describe("MapAccumulator", () => {
       });
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ type: "other.event", data: { value: 100 } }));
-      await acc.apply(makeEvent({ type: "test.event", data: { value: 5 } }));
+      acc.apply(makeEvent({ type: "other.event", data: { value: 100 } }));
+      acc.apply(makeEvent({ type: "test.event", data: { value: 5 } }));
 
       expect(acc.processed).toBe(1);
 
@@ -406,8 +407,8 @@ describe("MapAccumulator", () => {
       };
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ data: { value: 5 } }));
-      await acc.apply(makeEvent({ data: { value: 20 } }));
+      acc.apply(makeEvent({ data: { value: 5 } }));
+      acc.apply(makeEvent({ data: { value: 20 } }));
 
       expect(acc.processed).toBe(1);
 
@@ -424,16 +425,19 @@ describe("MapAccumulator", () => {
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 1 } }));
-      await acc.apply(makeEvent({ tenantId: "t-B", data: { value: 2 } }));
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 3 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ tenantId: "t-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 3 } }));
 
       await acc.flush();
 
       expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
 
       const byTenant = new Map<string, { doubled: number }[]>();
-      for (const [records, context] of bulkAppendSpy.mock.calls as [{ doubled: number }[], { tenantId: string }][]) {
+      for (const [records, context] of bulkAppendSpy.mock.calls as [
+        { doubled: number }[],
+        { tenantId: string },
+      ][]) {
         byTenant.set(String(context.tenantId), records);
       }
       expect(byTenant.get("t-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
@@ -450,9 +454,9 @@ describe("MapAccumulator", () => {
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
-      await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
-      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 3 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 3 } }));
 
       await acc.flush();
 
@@ -481,8 +485,8 @@ describe("MapAccumulator", () => {
       };
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 5 } }));
-      await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 10 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 10 } }));
 
       await acc.flush();
 
@@ -507,7 +511,7 @@ describe("MapAccumulator", () => {
       const acc = new MapAccumulator(projection);
 
       for (let i = 0; i < 5; i++) {
-        await acc.apply(makeEvent({ data: { value: i } }));
+        acc.apply(makeEvent({ data: { value: i } }));
       }
 
       await acc.flush(2);
@@ -663,8 +667,8 @@ describe("retention policy on replay write contexts", () => {
         retentionResolver: resolver,
       });
 
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 6 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 6 } }));
       await acc.flush();
 
       const context = bulkAppendSpy.mock.calls[0]![1] as {
@@ -686,7 +690,7 @@ describe("retention policy on replay write contexts", () => {
       };
       const acc = new MapAccumulator(projection);
 
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
       await acc.flush();
 
       const context = bulkAppendSpy.mock.calls[0]![1] as {
@@ -704,7 +708,7 @@ describe("retention policy on replay write contexts", () => {
         retentionResolver: resolver,
       });
 
-      await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
       await acc.flush();
 
       const batch = storeBatchSpy.mock.calls[0]![0] as {

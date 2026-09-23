@@ -420,7 +420,7 @@ export class TraceAiQueryService {
    * Only known-set values come back, never prose and never a headline: the registry owns that.
    */
   static summarizeProviderError(err: unknown, context?: { model?: string }): AiActionErrorDetails {
-    const raw = err instanceof Error ? err.message : String(err ?? "");
+    const raw = err instanceof Error ? err.message : (JSON.stringify(err) ?? "");
     const cleaned = raw
       .split("\n")
       .filter((line) => !/^\s*at\s+/.test(line))

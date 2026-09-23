@@ -144,14 +144,22 @@ export function GroupDetailDialog({
   const toggleBindingRemoval = (id: string) =>
     setPendingBindingRemovals((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
   const toggleMemberRemoval = (userId: string) =>
     setPendingRemovals((prev) => {
       const next = new Set(prev);
-      next.has(userId) ? next.delete(userId) : next.add(userId);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
       return next;
     });
 

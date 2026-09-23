@@ -462,7 +462,7 @@ function MainPanel({
   connectedToLocalRun,
 }: {
   error: unknown;
-  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  selectedSuiteSlug: string | null;
   selectedSuite: SimulationSuite | null;
   selectedExternalSetId: string | null;
   isLoading: boolean;

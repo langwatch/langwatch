@@ -5,6 +5,7 @@
 
 import { Redis as IORedis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
@@ -155,10 +156,10 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
       const processor = makeProcessor();
       // Never released, so close() loses its race against the shutdown budget.
       const closing = processor.close();
-      const settled = await expect(closing).rejects.toThrow(/timed out/);
+      closing.catch(() => undefined);
 
       await vi.advanceTimersByTimeAsync(60_000);
-      await settled;
+      await expect(closing).rejects.toThrow(/timed out/);
 
       await expect(processor.send({ id: "a", groupId: "g" })).rejects.toThrow(/drain has finished/);
     });

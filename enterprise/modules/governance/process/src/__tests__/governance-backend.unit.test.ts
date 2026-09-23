@@ -19,10 +19,10 @@ class MemoryPolicyRepository extends CostAttributionPolicyRepository {
 
 class ReversibleEncryption implements GovernanceEncryptor {
   encrypt(plaintext: string): string {
-    return [...plaintext].reverse().join("");
+    return plaintext.split("").reverse().join("");
   }
   decrypt(ciphertext: string): string {
-    return [...ciphertext].reverse().join("");
+    return ciphertext.split("").reverse().join("");
   }
 }
 

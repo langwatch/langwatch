@@ -207,7 +207,7 @@ function renderValue(value: unknown, path: string, ctx: RenderContext): React.Re
 
   return [
     <TokenSpan key={path} color="fg.muted" path={path} changedPaths={ctx.changedPaths}>
-      {String(value)}
+      {JSON.stringify(value) ?? "undefined"}
     </TokenSpan>,
   ];
 }

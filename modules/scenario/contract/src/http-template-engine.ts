@@ -17,7 +17,8 @@ export class RawJson {
 
 /** Escapes a scalar without adding the quotes already present in a template. */
 function escapeForJsonStringLiteral(value: unknown): string {
-  return JSON.stringify(String(value ?? "")).slice(1, -1);
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return JSON.stringify(text).slice(1, -1);
 }
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";

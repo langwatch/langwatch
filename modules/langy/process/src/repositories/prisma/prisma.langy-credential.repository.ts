@@ -20,10 +20,7 @@ export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
     return project?.team ? { organizationId: project.team.organizationId } : null;
   }
 
-  tryFindVirtualKeyConfig(input: {
-    projectId: string;
-    organizationId: string;
-  }): Promise<unknown | null> {
+  tryFindVirtualKeyConfig(input: { projectId: string; organizationId: string }): Promise<unknown> {
     return this.prisma.virtualKey
       .findFirst({
         where: {
@@ -40,7 +37,7 @@ export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
       .then((row) => row?.config ?? null);
   }
 
-  async tryFindEgressAllowlist(projectId: string): Promise<unknown | null> {
+  async tryFindEgressAllowlist(projectId: string): Promise<unknown> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { langyEgressAllowlist: true },

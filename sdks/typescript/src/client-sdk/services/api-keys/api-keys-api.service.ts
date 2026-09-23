@@ -1,10 +1,11 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import type {
   ManagementRole,
   ManagementScopeType,
 } from "@/client-sdk/services/_shared/management-types";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -118,7 +119,7 @@ export class ApiKeysApiService {
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
-      headers: { ...this.headers(), ...init?.headers },
+      headers: mergeHeaders(this.headers(), init?.headers),
     });
     if (!response.ok) {
       let parsedBody: unknown;

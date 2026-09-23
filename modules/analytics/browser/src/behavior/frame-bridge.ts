@@ -168,15 +168,15 @@ export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridg
     // (e.g. Promise.all of two LW.query calls) don't cancel one another.
     const abort = new AbortController();
     activeAborts.set(requestId, abort);
-    executeQuery({ queryName, params, signal: abort.signal }).then(
-      (result) => {
+    executeQuery({ queryName, params, signal: abort.signal })
+      .then((result) => {
         // A reply for a request we've already forgotten (torn down, or this
         // exact requestId already settled) is dropped.
         if (disposed || !activeAborts.has(requestId) || !port) return;
         activeAborts.delete(requestId);
         port.postMessage({ type: "lw:query-result", requestId, result });
-      },
-      (error: unknown) => {
+      })
+      .catch((error: unknown) => {
         if (disposed || !activeAborts.has(requestId) || !port) return;
         activeAborts.delete(requestId);
         port.postMessage({
@@ -184,8 +184,7 @@ export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridg
           requestId,
           error: toChartQueryErrorPayload(error),
         });
-      },
-    );
+      });
   };
 
   const onPortMessage = (event: MessageEvent) => {

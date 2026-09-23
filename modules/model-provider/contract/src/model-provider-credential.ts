@@ -47,7 +47,7 @@ export function getSchemaShape(schema: unknown, depth = 0): Record<string, unkno
   const s = schema as {
     shape?: Record<string, unknown>;
     unwrap?: () => unknown;
-    innerType?: (() => { shape?: Record<string, unknown> }) | unknown;
+    innerType?: unknown;
     _def?: { schema?: unknown; innerType?: unknown };
   };
   if (!s) return {};

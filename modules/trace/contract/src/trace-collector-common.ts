@@ -187,10 +187,7 @@ const chatMessagesToText = (messages: any[], last: boolean): string => {
   }
 
   return messages
-    .map((message) => {
-      const content = getMessageContent(message);
-      return content ?? JSON.stringify(message);
-    })
+    .map((message) => messageContentToText(getMessageContent(message), message))
     .join("");
 };
 
@@ -375,7 +372,7 @@ const jsonToText = (value: unknown, last: boolean, preferRole: string | undefine
 
     return firstAndOnlyKey(json) ?? stringified(json);
   } catch {
-    return value == null ? "" : String(value);
+    return typeof value === "string" ? value : "[unserializable value]";
   }
 };
 

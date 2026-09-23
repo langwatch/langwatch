@@ -157,16 +157,15 @@ function withTimeout<T>({
 }): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then(
-      (value) => {
+    promise
+      .then((value) => {
         clearTimeout(timer);
         resolve(value);
-      },
-      (error) => {
+      })
+      .catch((error) => {
         clearTimeout(timer);
         reject(error);
-      },
-    );
+      });
   });
 }
 

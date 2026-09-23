@@ -1,5 +1,6 @@
-import { type LangWatchTracer } from "@/observability-sdk";
 import { SpanKind } from "@opentelemetry/api";
+
+import { type LangWatchTracer } from "@/observability-sdk";
 
 // Type for decorator methods that receive span as first parameter
 type DecoratorMethodWithSpan<T extends (...args: any[]) => any> = (
@@ -85,7 +86,7 @@ const isGetterOrSetter = (target: any, prop: string | symbol): boolean => {
   }
 
   // Return true if it's a getter or setter
-  return !!(descriptor?.get ?? descriptor?.set);
+  return descriptor?.get !== undefined || descriptor?.set !== undefined;
 };
 
 // Helper function to check if a method is a built-in method that should not be traced

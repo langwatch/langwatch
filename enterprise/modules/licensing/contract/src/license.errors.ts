@@ -5,7 +5,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 
-import { LICENSE_ERRORS, type LicenseError } from "./license-constants.ts";
+import { LICENSE_ERRORS } from "./license-constants.ts";
 
 /**
  * The organization a license action names does not exist. Matched by
@@ -120,7 +120,7 @@ export class LicenseSigningFailedError extends HandledError {
  * a server discriminant (not copy), and unrecognized verdicts fail closed to
  * "invalid".
  */
-export function licenseValidationError(verdict: LicenseError | string | undefined): HandledError {
+export function licenseValidationError(verdict: string | undefined): HandledError {
   return verdict === LICENSE_ERRORS.EXPIRED
     ? new LicenseExpiredError()
     : new LicenseKeyInvalidError();

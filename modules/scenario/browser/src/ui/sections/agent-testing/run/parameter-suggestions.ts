@@ -120,7 +120,9 @@ function pairIsRefused({
 }): boolean {
   if (name !== error.name) return false;
   if (error.value === undefined) return true;
-  return raw === String(error.value) || raw === JSON.stringify(error.value);
+  return (
+    (typeof error.value === "string" && raw === error.value) || raw === JSON.stringify(error.value)
+  );
 }
 
 /** The message that belongs on a line: set when the line holds the refused pair. */

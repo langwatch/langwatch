@@ -4,6 +4,12 @@ import type React from "react";
 import { ShikiCodeBlock } from "../../elements/markdown/shiki-highlight.tsx";
 import { stripThinkingMarker, ThinkingText } from "../../elements/markdown/thinking.tsx";
 
+function codeText(children: React.ReactNode): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  return Array.isArray(children) ? children.map((child) => codeText(child)).join("") : "";
+}
+
 /**
  * Markdown → Chakra components mapping. Each element is a real Chakra component
  * (`Heading`, `Text`, `Link`, `Table`, etc.) so typography, spacing, and colors all
@@ -123,7 +129,7 @@ export function buildMarkdownComponents(colorMode: string) {
       const { className, children } = props;
       const match = /language-(\w+)/.exec(className ?? "");
       const lang = match ? match[1] : undefined;
-      const code = String(children ?? "").replace(/\n$/, "");
+      const code = codeText(children).replace(/\n$/, "");
       if (!lang) {
         return (
           <Text

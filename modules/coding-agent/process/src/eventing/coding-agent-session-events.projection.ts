@@ -103,7 +103,11 @@ export class CodingAgentSessionEventsMapProjection
     this.store = deps.store;
     this.options = {
       coalesceMaxBatch: CODING_AGENT_MAP_COALESCE_MAX_BATCH,
-      enqueue: { filter: CodingAgentSessionEventsMapProjection.accepts },
+      enqueue: {
+        filter: CodingAgentSessionEventsMapProjection.accepts.bind(
+          CodingAgentSessionEventsMapProjection,
+        ),
+      },
     };
   }
 

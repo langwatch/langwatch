@@ -29,9 +29,9 @@ function looksLikeImageUrl({ text, url }: { text: string; url: URL }): boolean {
 
 /** The image URL a cell value names, or `null` when it names none. */
 export const datasetImageUrl = (value: unknown): string | null => {
-  if (!value) return null;
+  if (typeof value !== "string" || !value) return null;
 
-  const text = String(value).trim();
+  const text = value.trim();
 
   // Markdown image syntax: ![alt](url)
   const markdownMatch = /^!\[.*?\]\((.*?)\)$/.exec(text);

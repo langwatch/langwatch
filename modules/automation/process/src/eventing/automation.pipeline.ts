@@ -229,4 +229,6 @@ export class AutomationsPipelineAdapter {
   }
 }
 
-export const createAutomationsPipeline = AutomationsPipelineAdapter.createPipeline;
+export const createAutomationsPipeline = AutomationsPipelineAdapter.createPipeline.bind(
+  AutomationsPipelineAdapter,
+);

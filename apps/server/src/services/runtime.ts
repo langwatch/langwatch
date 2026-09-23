@@ -207,7 +207,7 @@ async function stopHandles(handles: { stop(): Promise<void> }[]): Promise<void> 
 }
 
 function toServiceHandle(h: SupervisedHandle): ServiceHandle {
-  return { name: h.name, pid: h.pid, stop: h.stop };
+  return { name: h.name, pid: h.pid, stop: h.stop.bind(h) };
 }
 
 export const runtime = runtimeImpl;

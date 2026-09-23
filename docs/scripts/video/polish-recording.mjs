@@ -44,7 +44,7 @@ function run(cmd, args) {
     );
     p.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`${cmd} exited ${code}\n${Buffer.concat(err)}`));
+        reject(new Error(`${cmd} exited ${code}\n${Buffer.concat(err).toString("utf8")}`));
         return;
       }
       resolve(Buffer.concat(out));
@@ -1182,9 +1182,9 @@ async function main() {
   process.stderr.write("\r".padEnd(60) + "\r");
 
   if (drained && decCode !== 0) {
-    throw new Error(`decoder failed\n${Buffer.concat(decErr)}`);
+    throw new Error(`decoder failed\n${Buffer.concat(decErr).toString("utf8")}`);
   }
-  if (encCode !== 0) throw new Error(`encoder failed\n${Buffer.concat(encErr)}`);
+  if (encCode !== 0) throw new Error(`encoder failed\n${Buffer.concat(encErr).toString("utf8")}`);
 
   const result = await probe(output);
   const size = fs.statSync(output).size;

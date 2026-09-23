@@ -200,11 +200,11 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
     React.useEffect(() => {
       if (!enabled) return;
       let cancelled = false;
-      resolve().then(
-        (data) => {
+      resolve()
+        .then((data) => {
           if (!cancelled) setState({ status: "success", data, error: null, fetched: true });
-        },
-        (error) => {
+        })
+        .catch((error) => {
           if (!cancelled)
             setState({
               status: "error",
@@ -212,8 +212,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
               error,
               fetched: true,
             });
-        },
-      );
+        });
       return () => {
         cancelled = true;
       };
@@ -302,8 +301,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
         status: "loading",
         error: null,
       }));
-      resolveListPage(input).then(
-        (page) => {
+      resolveListPage(input)
+        .then((page) => {
           if (!cancelled) {
             setState({
               status: "success",
@@ -312,8 +311,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
               fetched: true,
             });
           }
-        },
-        (error) => {
+        })
+        .catch((error) => {
           if (!cancelled) {
             setState({
               status: "error",
@@ -322,8 +321,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
               fetched: true,
             });
           }
-        },
-      );
+        });
       return () => {
         cancelled = true;
       };

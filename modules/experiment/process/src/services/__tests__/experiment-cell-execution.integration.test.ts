@@ -136,7 +136,9 @@ describe("given an evaluator attached to a target column", () => {
       const results = events.filter((e) => e.type === "evaluator_result");
       expect(results).toHaveLength(1);
       expect(results[0]?.result.status).toBe("error");
-      expect((results[0]?.result as { error_type?: string }).error_type).toBe("NoInputsResolved");
+      expect((results[0]?.result as { error_type?: string } | undefined)?.error_type).toBe(
+        "NoInputsResolved",
+      );
       expect(scripted.dispatched).toHaveLength(0);
     });
 
@@ -145,8 +147,10 @@ describe("given an evaluator attached to a target column", () => {
       const events = await runCell(makeCell(gradingEvaluator(false)));
 
       const result = events.find((e) => e.type === "evaluator_result");
-      expect((result?.result as { details?: string }).details).toContain("Exact Match Evaluator");
-      expect((result?.result as { details?: string }).details).toContain(
+      expect((result?.result as { details?: string } | undefined)?.details).toContain(
+        "Exact Match Evaluator",
+      );
+      expect((result?.result as { details?: string } | undefined)?.details).toContain(
         "Map its fields in the evaluator settings",
       );
     });

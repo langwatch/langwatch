@@ -41,6 +41,10 @@ import { parsePatchHunks, type TerminalToolSpan } from "./terminal-tool-spans.ts
 import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline.ts";
 import { toolResultBodyToString } from "./tool-result-body.ts";
 
+function graphemesOf(text: string): string[] {
+  return Array.from(new Intl.Segmenter().segment(text), ({ segment }) => segment);
+}
+
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
 const NO_TOOL_SPANS: ToolSpanIndex = new Map();
@@ -730,7 +734,7 @@ function flatMark(rows: readonly string[], color: string): MarkSpec {
 function columnColoredMark(rows: readonly string[], columnColors: readonly string[]): MarkSpec {
   return {
     rows: rows.map((row) =>
-      [...row].map((char, column) => ({
+      graphemesOf(row).map((char, column) => ({
         text: char,
         color: columnColors[column] ?? columnColors[columnColors.length - 1] ?? "",
       })),
@@ -741,7 +745,7 @@ function columnColoredMark(rows: readonly string[], columnColors: readonly strin
 function claudeGradientMark(rows: readonly string[]): MarkSpec {
   return {
     rows: rows.map((row) =>
-      [...row].map((char, index) => ({
+      graphemesOf(row).map((char, index) => ({
         text: char,
         color: gradientColorAt(index, row.length),
       })),

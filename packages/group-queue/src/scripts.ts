@@ -1823,7 +1823,10 @@ export class GroupStagingScripts {
       : [result as number, ""];
     return {
       isNew: Number(code) === 1,
-      orphanedValue: orphanedValue == null ? "" : String(orphanedValue),
+      orphanedValue:
+        typeof orphanedValue === "string" || typeof orphanedValue === "number"
+          ? String(orphanedValue)
+          : "",
     };
   }
 

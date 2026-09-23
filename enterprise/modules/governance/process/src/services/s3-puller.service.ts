@@ -100,7 +100,8 @@ function jsonInput(value: unknown): string | number | boolean | object | null {
 }
 
 function asString(value: unknown): string {
-  return value === undefined || value === null ? "" : String(value);
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function asNumber(value: unknown): number {

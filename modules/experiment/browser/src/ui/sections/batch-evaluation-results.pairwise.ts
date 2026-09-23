@@ -14,7 +14,7 @@ export function buildPairwiseComparisons(column: BatchComparisonColumn): Pairwis
     // winnerId, so it is read off the two flags.
     const isNoEvidence = verdict.isUnresolved || verdict.isUnsettled;
     const settledWinner = verdict.winnerId === null ? "tie" : verdict.winnerId;
-    const winner: string | "tie" | null = isNoEvidence ? null : settledWinner;
+    const winner: string | null = isNoEvidence ? null : settledWinner;
 
     return {
       // Rows predating candidate-id capture (very old runs) have none

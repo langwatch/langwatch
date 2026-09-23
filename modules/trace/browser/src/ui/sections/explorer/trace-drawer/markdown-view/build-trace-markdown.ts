@@ -86,7 +86,7 @@ function attributeLines(path: string, v: unknown): string[] {
   if (v == null || v === "") return [];
   if (Array.isArray(v)) return arrayAttributeLines(path, v);
   if (typeof v === "object") return flattenAttributes(v as Record<string, unknown>, path);
-  return [`${path}: ${truncate(String(v))}`];
+  return [`${path}: ${truncate(typeof v === "string" ? v : (JSON.stringify(v) ?? ""))}`];
 }
 
 /** An array attribute inline, or one item per line once it stops being readable. */
@@ -348,7 +348,9 @@ function renderToolCallBlock(block: Block, lines: string[]): void {
     const flat = flattenAttributes(input as Record<string, unknown>);
     for (const ln of flat) lines.push(`  ${ln}`);
   } else if (input != null) {
-    lines.push(`  args: ${truncate(String(input))}`);
+    lines.push(
+      `  args: ${truncate(typeof input === "string" ? input : (JSON.stringify(input) ?? ""))}`,
+    );
   }
 }
 

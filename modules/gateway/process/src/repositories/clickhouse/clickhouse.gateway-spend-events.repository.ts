@@ -39,6 +39,11 @@ import {
 } from "../../rules/gateway-spend-filters.rules.ts";
 import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
 
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
 const spendCursors = GatewaySpendCursorAdapter.create();
 const NANO_PER_USD = 1_000_000_000;
 const usageRowsSchema = z.array(
@@ -193,7 +198,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       requestType: row.requestType,
       labels: row.labels,
       metadataJson: row.metadata,
-      podId: String(r.PodId ?? ""),
+      podId: asString(r.PodId),
       podSeq: Number(r.PodSeq ?? 0),
       usage,
       rateVersion: row.rateVersion,
@@ -201,7 +206,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       errorType: row.errorClass,
       httpStatus: row.httpStatus,
       needsReconciliation: row.needsReconciliation,
-      settleReason: String(r.SettleReason ?? ""),
+      settleReason: asString(r.SettleReason),
       occurredAtMs: row.occurredAt.epochMilliseconds,
       durationMs: row.durationMs,
       createdAt: Number(r.CreatedAt ?? 0),
@@ -475,9 +480,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     const last = raw[raw.length - 1];
     const nextCursor =
       raw.length === limit && last
-        ? spendCursors.encodeSpendSummariesCursor(
-            dimensions.map((d) => String(last[d.alias] ?? "")),
-          )
+        ? spendCursors.encodeSpendSummariesCursor(dimensions.map((d) => asString(last[d.alias])))
         : null;
     const rows = raw.map((r) =>
       GatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
@@ -634,7 +637,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       traceId: String(r.TraceId),
       model: String(r.Model),
       providerKey: String(r.ProviderKey),
-      requestType: String(r.RequestType ?? ""),
+      requestType: asString(r.RequestType),
       tokensInput: Number(r.TokensInput),
       tokensOutput: Number(r.TokensOutput),
       tokensCacheRead: Number(r.TokensCacheRead),
@@ -642,14 +645,14 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       tokensReasoning: Number(r.TokensReasoning),
       costNanoUsd: nano,
       costUsd: nanoUsdToDecimalString(nano),
-      rateVersion: String(r.RateVersion ?? ""),
+      rateVersion: asString(r.RateVersion),
       status,
       errorClass: String(r.ErrorClass),
       httpStatus: Number(r.HttpStatus),
       needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
-      settleReason: String(r.SettleReason ?? ""),
+      settleReason: asString(r.SettleReason),
       labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
-      metadata: String(r.Metadata ?? ""),
+      metadata: asString(r.Metadata),
       durationMs: Number(r.DurationMS),
       occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(r.OccurredAtMs)),
     };
@@ -762,7 +765,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
 
   /** A grouping value is a String column, so an absent one is the empty key. */
   private static grouped(raw: Record<string, unknown>, column: string): string {
-    return String(raw[column] ?? "");
+    return asString(raw[column]);
   }
 
   private static mapSummaryRow({

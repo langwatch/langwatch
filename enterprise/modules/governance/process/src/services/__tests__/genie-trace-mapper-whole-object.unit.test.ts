@@ -37,7 +37,7 @@ function genieEvent(
   extra: Record<string, unknown> = {},
 ): NormalizedPullEvent {
   return {
-    source_event_id: String(message.message_id ?? "msg-1"),
+    source_event_id: typeof message.message_id === "string" ? message.message_id : "msg-1",
     event_timestamp: "2026-08-20T10:00:00.000Z",
     actor: "analyst@acme.example",
     action: "genie_query",
@@ -48,7 +48,7 @@ function genieEvent(
     raw_payload: JSON.stringify(message),
     extra: {
       conversationId: "conv-1",
-      messageId: String(message.message_id ?? "msg-1"),
+      messageId: typeof message.message_id === "string" ? message.message_id : "msg-1",
       ...extra,
     },
   };

@@ -422,7 +422,7 @@ describe("workflowStoreCore", () => {
 
         let state = testStore.getState();
         let nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect((nodeA?.data as Record<string, unknown>).localConfig).toEqual({
+        expect((nodeA?.data as Record<string, unknown> | undefined)?.localConfig).toEqual({
           someKey: "someValue",
         });
 
@@ -434,7 +434,7 @@ describe("workflowStoreCore", () => {
 
         state = testStore.getState();
         nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect((nodeA?.data as Record<string, unknown>).localConfig).toBeUndefined();
+        expect((nodeA?.data as Record<string, unknown> | undefined)?.localConfig).toBeUndefined();
         // Array fields remain untouched
         expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
       });
@@ -608,10 +608,12 @@ describe("workflowStoreCore", () => {
       const node = testStore.getState().nodes.find((n) => n.id === nodeId);
       const params =
         (
-          node?.data as {
-            parameters?: { identifier: string; value?: unknown }[];
-          }
-        ).parameters ?? [];
+          node?.data as
+            | {
+                parameters?: { identifier: string; value?: unknown }[];
+              }
+            | undefined
+        )?.parameters ?? [];
       return params.find((p) => p.identifier === "code")?.value as string;
     };
 

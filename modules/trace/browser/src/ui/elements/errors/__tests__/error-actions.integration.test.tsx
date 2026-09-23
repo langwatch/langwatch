@@ -26,7 +26,7 @@ const renderActions = (props: Parameters<typeof ErrorActions>[0]) =>
   );
 
 const withClipboard = (writeText: () => Promise<void>) => {
-  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+  vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: { writeText } } }));
 };
 
 describe("<ErrorActions />", () => {
@@ -77,7 +77,7 @@ describe("<ErrorActions />", () => {
   describe("given no clipboard API at all", () => {
     /** @scenario "An error id stays readable where it cannot be copied" */
     it("shows the id as text instead of a button that cannot work", () => {
-      vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+      vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: undefined } }));
 
       renderActions({ traceId: TRACE_ID });
 

@@ -44,10 +44,7 @@ function scan(sources) {
 /** The two spellings, and the two ways an earlier draft got each one wrong. */
 function selfTest() {
   const fixtures = [
-    [
-      "declared-and-never-bound.ts",
-      'const orphan = defineRestMiddleware("orphan", z.string());',
-    ],
+    ["declared-and-never-bound.ts", 'const orphan = defineRestMiddleware("orphan", z.string());'],
     [
       "bound-by-identifier.ts",
       'const named = defineRestMiddleware("named", z.string());\n' +
@@ -68,7 +65,7 @@ function selfTest() {
 
   if (reported.length !== expected.length || reported[0] !== expected[0]) {
     console.error(
-      `Self-test failed: expected [${expected}], got [${reported}]. Refusing to scan.`,
+      `Self-test failed: expected [${expected.join(",")}], got [${reported.join(",")}]. Refusing to scan.`,
     );
     process.exit(2);
   }
@@ -80,10 +77,7 @@ const files = execFileSync("git", ["ls-files", "*.ts"], { encoding: "utf8" })
   .split("\n")
   .filter(
     (file) =>
-      file &&
-      !file.includes("/dist/") &&
-      !file.includes("__tests__") &&
-      !file.endsWith(".test.ts"),
+      file && !file.includes("/dist/") && !file.includes("__tests__") && !file.endsWith(".test.ts"),
   );
 
 const sources = files.map((file) => [file, readFileSync(file, "utf8")]);
@@ -101,7 +95,7 @@ for (const { fact, file } of unbound) {
 }
 
 console.log(`${unbound.length} declared REST facts have no binding anywhere:\n`);
-for (const owner of [...byOwner.keys()].toSorted()) {
+for (const owner of [...byOwner.keys()].toSorted((a, b) => (a < b ? -1 : Number(a > b)))) {
   console.log(`  ${owner}`);
   for (const fact of byOwner.get(owner).toSorted()) console.log(`    ${fact}`);
 }

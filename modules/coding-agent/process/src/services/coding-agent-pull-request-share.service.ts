@@ -527,8 +527,12 @@ export class CodingAgentPullRequestShareService {
     weightOf: (usage: StampedUsage) => number;
     totalWeight: number;
   } {
-    const tokensOf = CodingAgentPullRequestShareService.tokensOf;
-    const costOf = CodingAgentPullRequestShareService.costOf;
+    const tokensOf = CodingAgentPullRequestShareService.tokensOf.bind(
+      CodingAgentPullRequestShareService,
+    );
+    const costOf = CodingAgentPullRequestShareService.costOf.bind(
+      CodingAgentPullRequestShareService,
+    );
     const tokenWeight = CodingAgentPullRequestShareService.sum(entries, tokensOf);
     if (tokenWeight > 0) {
       return { weightOf: tokensOf, totalWeight: tokenWeight };

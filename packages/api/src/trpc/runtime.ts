@@ -13,9 +13,9 @@ import {
   type ScopeTierField,
 } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import type { ModuleApiToken } from "@langwatch/kernel";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
-import type { ModuleApiToken } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import {
   context as otelContext,
@@ -45,7 +45,6 @@ import type {
 } from "@trpc/server/unstable-core-do-not-import";
 import { z } from "zod";
 
-import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 import {
   AuthenticationRequiredError,
   decide,
@@ -72,6 +71,7 @@ import {
   trpcFailureTraceIds,
   type TrpcFailureTraceIds,
 } from "./audit.ts";
+import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 
 const logger = createLogger("langwatch:trpc");
 const outputLogger = createLogger("langwatch:api:output-validation");
@@ -210,7 +210,7 @@ export function defineTrpcFact<Schema extends z.ZodType>(
 /** Where one fact's value comes from, as this process's mount reads it. */
 export interface TrpcFactBinding<TContext = never> {
   readonly fact: TrpcFact;
-  resolve(ctx: TContext): unknown | Promise<unknown>;
+  resolve(ctx: TContext): unknown;
 }
 
 /** A mount binds request access; handlers receive only the parsed result. */
@@ -1376,7 +1376,9 @@ function recordSpanError({
   span.setStatus({ code: SpanStatusCode.ERROR, message: failure.message });
 }
 
-function tracer<TContext extends TrpcRuntimeContext & object>(members: TrpcRuntimeMembers<TContext>) {
+function tracer<TContext extends TrpcRuntimeContext & object>(
+  members: TrpcRuntimeMembers<TContext>,
+) {
   const asError = (failure: unknown): Error => members.errors.asError(failure);
 
   return async ({

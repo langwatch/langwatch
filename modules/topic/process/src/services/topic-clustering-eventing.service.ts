@@ -120,4 +120,4 @@ export class TopicClusteringEventingService {
 }
 
 export const createTopicClusteringProcessingPipeline =
-  TopicClusteringEventingService.createPipeline;
+  TopicClusteringEventingService.createPipeline.bind(TopicClusteringEventingService);

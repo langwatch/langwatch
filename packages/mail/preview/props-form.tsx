@@ -102,7 +102,7 @@ const Field = ({
       <Labelled id={id} label={label} required={required} description={description}>
         <HtmlSelect
           id={id}
-          value={String(value ?? "")}
+          value={typeof value === "string" ? value : ""}
           onChange={(event: React.ChangeEvent<HTMLSelectElement>) => set(event.target.value)}
           width="full"
           fontSize="xs"

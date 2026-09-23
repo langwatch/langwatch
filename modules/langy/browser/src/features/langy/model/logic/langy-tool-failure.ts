@@ -104,7 +104,7 @@ function rawFailureText(errorText: unknown): string | undefined {
   const value = asRecord(errorText);
   const text = readFailureText({ errorText, value });
   if (!text) return undefined;
-  const cleaned = text.replace(/\u001b\[[0-9;]*m/g, "").trim();
+  const cleaned = text.replace(/\p{Cc}\[[0-9;]*m/gu, "").trim();
   return cleaned.length > 0 ? cleaned : undefined;
 }
 

@@ -471,10 +471,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    * body is unusable. Returns `undefined` in that case — a response has
    * already been sent and the caller must stop.
    */
-  async function readJsonBody(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<unknown | undefined> {
+  async function readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
     const raw = await readRawBody(req, res);
     if (raw === undefined) return undefined;
     try {

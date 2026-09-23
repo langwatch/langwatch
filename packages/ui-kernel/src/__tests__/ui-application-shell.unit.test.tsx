@@ -9,7 +9,7 @@ import { UiApplicationShell } from "../ui-application-shell.tsx";
 let root: Root | undefined;
 
 afterEach(async () => {
-  await act(() => root?.unmount());
+  act(() => root?.unmount());
   root = void 0;
   document.body.replaceChildren();
 });
@@ -29,7 +29,7 @@ describe("UiApplicationShell", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    await act(() => {
+    act(() => {
       root?.render(<UiApplicationShell outerProvider={LegacyOuterProvider} router={router} />);
     });
 

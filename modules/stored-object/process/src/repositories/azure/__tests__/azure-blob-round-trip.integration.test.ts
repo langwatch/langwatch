@@ -22,6 +22,11 @@ import {
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
 
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";
 const PROJECT_ID = "proj-1";
@@ -37,7 +42,7 @@ function installBlobAccount(): Map<string, Buffer> {
     input: string | URL | Request,
     init?: RequestInit,
   ) => {
-    const url = String(input);
+    const url = requestUrl(input);
     const method = init?.method ?? "GET";
     if (method === "PUT") {
       blobs.set(url, Buffer.from(init?.body as Uint8Array));

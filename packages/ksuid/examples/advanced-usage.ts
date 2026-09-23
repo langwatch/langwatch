@@ -77,7 +77,11 @@ for (let i = 0; i < 5; i++) {
 }
 
 // Sort by string representation (KSUIDs are naturally sortable)
-const sorted = [...ksuids].toSorted();
+const sorted = [...ksuids].toSorted((a, b) => {
+  const left = a.toString();
+  const right = b.toString();
+  return left < right ? -1 : Number(left > right);
+});
 console.log("Sorted KSUIDs:");
 sorted.forEach((ksuid, index) => {
   console.log(`${index + 1}. ${ksuid.toString()}`);

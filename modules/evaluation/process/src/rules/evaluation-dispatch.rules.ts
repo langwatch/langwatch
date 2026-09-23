@@ -54,7 +54,7 @@ const CANONICAL_KEYS: ReadonlySet<string> = new Set([
   "conversation",
 ]);
 
-const autoparseContexts = (contexts: unknown[] | unknown): string[] | undefined => {
+const autoparseContexts = (contexts: unknown): string[] | undefined => {
   if (contexts === null || contexts === undefined) return undefined;
   const parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
 

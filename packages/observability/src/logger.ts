@@ -4,6 +4,7 @@ import pino, {
   type Logger as PinoLogger,
   type SerializedError,
 } from "pino";
+
 import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants.ts";
 import {
   resolveLoggerConfiguration,
@@ -77,7 +78,10 @@ const errorSerializer = (error: unknown): SerializedError => {
   }
 
   const base = pino.stdSerializers.err(error);
-  const own = jsonSafe({ ...error }, new WeakSet()) as Record<string, unknown>;
+  const own = jsonSafe(Object.fromEntries(Object.entries(error)), new WeakSet()) as Record<
+    string,
+    unknown
+  >;
   return { ...base, ...own };
 };
 

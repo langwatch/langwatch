@@ -526,7 +526,7 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
 export const extractOutputText = (raw: unknown): string | null => {
   if (raw === null || raw === void 0) return null;
   if (typeof raw === "string") return raw;
-  if (typeof raw !== "object") return String(raw);
+  if (typeof raw !== "object") return JSON.stringify(raw);
   // Up to 3 layers of `.output` / `.answer` unwrap covers structured outputs
   // stored as `{output: {output: "..."}}` without recursing forever on
   // pathological shapes.

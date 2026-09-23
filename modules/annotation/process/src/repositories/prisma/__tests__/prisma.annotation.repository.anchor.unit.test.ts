@@ -146,11 +146,9 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
 
       expect(results.every((row) => row.anchorId === "trace-1")).toBe(true);
 
-      expect(results.map((row) => row.anchorPath).toSorted()).toEqual([
-        "input",
-        "metadata.environment",
-        "output",
-      ]);
+      expect(
+        results.map((row) => row.anchorPath).toSorted((a, b) => String(a).localeCompare(String(b))),
+      ).toEqual(["input", "metadata.environment", "output"]);
     });
   });
 

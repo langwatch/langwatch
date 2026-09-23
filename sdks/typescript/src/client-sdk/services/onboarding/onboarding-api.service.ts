@@ -1,4 +1,5 @@
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 /**
  * The `/api/v1/onboarding` family. CLI-only, deliberately not exported from
@@ -60,11 +61,10 @@ export class OnboardingApiService {
   private async request<T>(operation: string, path: string, options?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        { ...buildAuthHeaders({ apiKey: this.apiKey }), "Content-Type": "application/json" },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {

@@ -1,12 +1,13 @@
-import { APP_ERROR_CODES } from "./app-codes.ts";
-import { goErrorCodes, nodeErrorCodes } from "./codes.generated.ts";
-import { canonicalDocsBaseUrl, docsBaseUrl } from "./docs-url.ts";
 import {
   type HandledErrorFault,
   serializedReasonSchema,
   type SerializedHandledError,
   type SerializedReason,
 } from "@langwatch/handled-error";
+
+import { APP_ERROR_CODES } from "./app-codes.ts";
+import { goErrorCodes, nodeErrorCodes } from "./codes.generated.ts";
+import { canonicalDocsBaseUrl, docsBaseUrl } from "./docs-url.ts";
 
 /**
  * The client-side view of a handled error, lifted off whatever transport
@@ -317,9 +318,10 @@ export function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();
   if (collapsed.length === 0) return "";
   if (collapsed.length <= MAX_PROSE_LENGTH) return collapsed;
-  // By code point, not code unit: slicing mid-surrogate leaves a lone half
+  // By grapheme, not code unit: slicing mid-character leaves a broken half
   // that renders as a replacement character right before the ellipsis.
-  const kept = [...collapsed].slice(0, MAX_PROSE_LENGTH - 1).join("");
+  const graphemes = Array.from(new Intl.Segmenter().segment(collapsed), ({ segment }) => segment);
+  const kept = graphemes.slice(0, MAX_PROSE_LENGTH - 1).join("");
   return `${kept.trimEnd()}…`;
 }
 

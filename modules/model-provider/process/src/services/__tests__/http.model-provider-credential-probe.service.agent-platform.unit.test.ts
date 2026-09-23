@@ -6,6 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
 import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.service.ts";
 
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
 // The probe goes out through the guarded egress port the composition root
 // hands it rather than `global.fetch`, so that port is the seam these tests
 // stand in for. Only the fetch is stood in for; the redirect refusal is still
@@ -131,7 +138,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       // check while sending garbage, and `maxOutputTokens: 1` is what keeps
       // this probe cheap rather than generating a full response on every
       // credential check.
-      const body = JSON.parse(String(init.body));
+      const body = JSON.parse(requestBody(init));
       expect(body.contents[0].parts[0].text).toBeTruthy();
       expect(body.generationConfig.maxOutputTokens).toBe(1);
     });

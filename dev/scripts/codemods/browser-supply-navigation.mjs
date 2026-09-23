@@ -142,6 +142,7 @@ function scanRegistryGroup(tree, entries, literal, source, registries, field) {
   }
 }
 
+/** @param {string} base */
 function collectNavigationItems(tree, entries, literal, base, sources) {
   for (const [basename, registries, field] of [
     ["command-catalogue", ["navigationCommands"], "command"],
@@ -177,7 +178,7 @@ function emitNavigation(tree, entries, sources, gateNames, output) {
     if (!owned.length) continue;
     const icons = navigationIcons(owned, sources);
     const lines = [
-      `import { ${[...icons].toSorted().join(", ")} } from "lucide-react";`,
+      `import { ${[...icons].toSorted((a, b) => (a < b ? -1 : Number(a > b))).join(", ")} } from "lucide-react";`,
       'import type { NavigationGates } from "@langwatch/ui-kernel";',
       `export const ${camel(module.id)}Navigation = [`,
       ...owned.map(

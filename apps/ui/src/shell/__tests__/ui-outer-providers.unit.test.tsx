@@ -39,7 +39,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(() => root?.unmount());
+  act(() => root?.unmount());
   root = void 0;
   document.body.replaceChildren();
 });
@@ -60,7 +60,7 @@ describe("given the providers that wrap the router", () => {
       document.body.append(container);
       root = createRoot(container);
 
-      await act(() => {
+      act(() => {
         root?.render(
           <OuterProvider>
             <DesignSystemProbe />

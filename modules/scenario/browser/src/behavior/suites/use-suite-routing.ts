@@ -206,8 +206,8 @@ function travellingParams(query: Record<string, unknown>): URLSearchParams {
 }
 
 type SuiteRouting = {
-  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
-  navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  selectedSuiteSlug: string | null;
+  navigateToSuite: (slug: string) => void;
   highlightBatchId: string | null;
 };
 
@@ -258,7 +258,7 @@ export function useSuiteRouting(): SuiteRouting {
   const projectSlug = router.query.project as string | undefined;
 
   const navigateToSuite = useCallback(
-    (slug: string | typeof ALL_RUNS_ID) => {
+    (slug: string) => {
       if (!projectSlug) return;
 
       const carriedParams = carriedParamsOf(router.query);
@@ -308,7 +308,7 @@ export function deriveFromPath({
   isReady: boolean;
   path: string | string[] | undefined;
 }): {
-  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  selectedSuiteSlug: string | null;
   highlightBatchId: string | null;
 } {
   if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };

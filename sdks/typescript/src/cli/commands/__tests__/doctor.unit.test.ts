@@ -22,8 +22,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { doctorCommand, type DoctorReport } from "../doctor";
 import { setOutputFormat } from "../../utils/outputScope";
+import { doctorCommand, type DoctorReport } from "../doctor";
 
 class ProcessExitError extends Error {
   constructor(readonly code: number | undefined) {
@@ -110,17 +110,13 @@ describe("langwatch doctor", () => {
       result?.table();
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0]?.[0]).toBe(
-        "http://localhost:5560/api/checkup",
-      );
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:5560/api/checkup");
       const output = logs.join("\n");
       expect(output).toMatch(/PASS.*Application/);
       expect(output).toMatch(/FAIL.*Redis/);
       expect(output).toMatch(/NOT CHECKED.*Reach the connect host/);
       expect(output).toContain("Fix: Check REDIS_URL.");
-      expect(output).toContain(
-        "https://docs.langwatch.ai/self-hosting/troubleshooting",
-      );
+      expect(output).toContain("https://docs.langwatch.ai/self-hosting/troubleshooting");
     });
 
     /** @scenario "The explicit checks run only when asked for" */
@@ -130,25 +126,23 @@ describe("langwatch doctor", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
       fetchMock.mockReset();
-      fetchMock
-        .mockResolvedValueOnce(jsonResponse(report()))
-        .mockResolvedValueOnce(
-          jsonResponse({
-            ranAt: "2026-09-21T10:00:05.000Z",
-            rows: [
-              {
-                id: "reach_connect_host",
-                name: "Reach the connect host",
-                group: "langwatch",
-                cost: "egress",
-                verdict: {
-                  outcome: "verified",
-                  detail: "connect.langwatch.ai answers on port 443.",
-                },
+      fetchMock.mockResolvedValueOnce(jsonResponse(report())).mockResolvedValueOnce(
+        jsonResponse({
+          ranAt: "2026-09-21T10:00:05.000Z",
+          rows: [
+            {
+              id: "reach_connect_host",
+              name: "Reach the connect host",
+              group: "langwatch",
+              cost: "egress",
+              verdict: {
+                outcome: "verified",
+                detail: "connect.langwatch.ai answers on port 443.",
               },
-            ],
-          }),
-        );
+            },
+          ],
+        }),
+      );
 
       const result = await doctorCommand({ run: true, scenarioRunPlanId: "plan_1" });
 
@@ -159,7 +153,7 @@ describe("langwatch doctor", () => {
       expect(JSON.parse(init.body as string)).toEqual({
         scenarioRunPlanId: "plan_1",
       });
-      const merged = (result?.data as DoctorReport).rows.find(
+      const merged = (result?.data as DoctorReport | undefined)?.rows.find(
         (row) => row.id === "reach_connect_host",
       );
       expect(merged?.verdict.outcome).toBe("verified");
@@ -178,9 +172,7 @@ describe("langwatch doctor", () => {
       expect(rowsAt).toBeGreaterThan(-1);
       expect(reportAt).toBeGreaterThan(rowsAt);
       expect(output).toContain("https://connect.langwatch.ai/v1/stats");
-      expect(output).toContain(
-        JSON.stringify(report().usageReport.payload, null, 2),
-      );
+      expect(output).toContain(JSON.stringify(report().usageReport.payload, null, 2));
     });
 
     /** @scenario "A machine reader gets the whole answer as JSON" */
@@ -197,9 +189,7 @@ describe("langwatch doctor", () => {
   describe("when the install answers 401 to the key", () => {
     /** @scenario "A refused key is reported, not retried" */
     it("fails once and does not retry", async () => {
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse({ message: "Invalid auth token." }, 401),
-      );
+      fetchMock.mockResolvedValueOnce(jsonResponse({ message: "Invalid auth token." }, 401));
 
       await expect(doctorCommand({})).rejects.toThrow(ProcessExitError);
       expect(fetchMock).toHaveBeenCalledTimes(1);

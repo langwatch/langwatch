@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link";
 import { createUiFeatureApiClient, UI_SSE_ENDPOINT_PREFIX, UI_TRPC_ENDPOINT } from "../transport";
 
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
 /**
  * The third lane on this process's transport: the one a live procedure rides.
  */
@@ -57,7 +62,7 @@ function transport(bodies: unknown[] = []): Wiring {
   } as unknown as SseEventSourceConstructor;
 
   const fetch = (async (input: RequestInfo | URL) => {
-    requests.push(String(input));
+    requests.push(requestUrl(input));
     return new Response(JSON.stringify(queue.shift()), {
       status: 200,
       headers: { "content-type": "application/json" },

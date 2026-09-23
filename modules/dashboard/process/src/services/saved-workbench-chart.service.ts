@@ -91,7 +91,7 @@ export class SavedWorkbenchChartService {
     const name = parseName(input.name);
     const definition = parseDefinition(input.definition);
 
-    await this.#policy.validate({ projectId, protections: input.protections, definition });
+    this.#policy.validate({ projectId, protections: input.protections, definition });
 
     const chart = await this.#repository.createSavedWorkbenchChart({
       id:
@@ -123,7 +123,7 @@ export class SavedWorkbenchChartService {
       definitionUpdate === undefined ? undefined : parseDefinition(definitionUpdate.definition);
 
     if (definition !== undefined && definitionUpdate !== undefined) {
-      await this.#policy.validate({
+      this.#policy.validate({
         projectId: parsed.projectId,
         protections: definitionUpdate.protections,
         definition,

@@ -19,7 +19,7 @@ export type PairwiseComparison = {
    * (pending / error / unknown). Tie semantics are only well-defined for
    * 2-candidate rows; for N>2 a "tie" row is treated as null.
    */
-  winner: string | "tie" | null;
+  winner: string | null;
 };
 
 export type BTLeaderboardEntry = {

@@ -71,7 +71,7 @@ export interface CreateInvitesInviteInput {
   teamIds?: string;
   teams?: {
     teamId: string;
-    role: TeamUserRole | string;
+    role: string;
     customRoleId?: string;
   }[];
 }

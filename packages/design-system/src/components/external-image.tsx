@@ -1,14 +1,15 @@
 import { Box, Image, Portal, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { useEscapeKey } from "../use-escape-key.ts";
 import { Tooltip } from "./tooltip.tsx";
 
 export const getImageUrl = (str: unknown): string | null => {
-  if (!str) {
+  if (typeof str !== "string" || !str) {
     return null;
   }
 
-  const str_ = str.toString().trim();
+  const str_ = str.trim();
 
   // Check for markdown image format ![alt](url)
   const markdownImageRegex = /^!\[.*?\]\((.*?)\)$/;

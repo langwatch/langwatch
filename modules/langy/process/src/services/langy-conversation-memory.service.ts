@@ -253,7 +253,7 @@ export class LangyConversationMemoryService {
    */
   private static sanitizeTranscriptText(value: string): string {
     const cleaned = value
-      .replace(/[\u0000-\u0009\u000B-\u001F\u007F]+/g, " ")
+      .replace(/[^\P{Cc}\n]+/gu, " ")
       .replace(/ +\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
@@ -261,7 +261,8 @@ export class LangyConversationMemoryService {
       return cleaned;
     }
 
-    return [...cleaned].slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS).join("").trimEnd() + "…";
+    const graphemes = Array.from(new Intl.Segmenter().segment(cleaned), ({ segment }) => segment);
+    return graphemes.slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS).join("").trimEnd() + "…";
   }
 
   /**

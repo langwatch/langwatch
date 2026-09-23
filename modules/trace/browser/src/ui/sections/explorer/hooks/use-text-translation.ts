@@ -71,6 +71,9 @@ export function useTextTranslation({
         cachedForRef.current = sourceKey;
         setActiveFor(sourceKey);
       })
+      .finally(() => {
+        setInFlight(false);
+      })
       .catch((error: unknown) => {
         // The typed-error toasts (missing model / provider disabled /
         // AI call failed) are raised by the global tRPC error handler in
@@ -82,9 +85,6 @@ export function useTextTranslation({
             fallbackTitle: "Couldn't translate the message",
           });
         }
-      })
-      .finally(() => {
-        setInFlight(false);
       });
   }, [inFlight, isActive, project?.id, sourceKey, texts, translateAPI]);
 

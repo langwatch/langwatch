@@ -12,6 +12,12 @@ import { Prose } from "../elements/prose.tsx";
 import { getProxiedImageUrl } from "./external-image.tsx";
 import { ConfirmDialog } from "./gateway/confirm-dialog.tsx";
 
+function codeText(children: ReactNode): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  return Array.isArray(children) ? children.map((child) => codeText(child)).join("") : "";
+}
+
 const logger = createLogger("langwatch:components:Markdown");
 
 export const proxyMarkdownImageUrls = (markdown: string): string => {
@@ -72,15 +78,10 @@ function MarkdownWithPluginsAndProxy({
           code(props) {
             const { children, className, ...rest } = props;
             const match = /language-(\w+)/.exec(className ?? "");
-            const code = String(children).replace(/\n$/, "");
+            const code = codeText(children).replace(/\n$/, "");
 
             if (code.includes("\n")) {
-              return (
-                <RenderCode
-                  language={match ? match[1]! : ""}
-                  code={String(children).replace(/\n$/, "")}
-                />
-              );
+              return <RenderCode language={match ? match[1]! : ""} code={code} />;
             }
             return (
               <code className={className} {...rest}>

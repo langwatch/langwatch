@@ -15,7 +15,7 @@ export type NotTargeted = typeof NOT_TARGETED;
  * The project or organization a flag read is about (a real id, NOT_TARGETED,
  * or undefined if not yet known).
  */
-export type FeatureFlagTargetId = string | NotTargeted | undefined;
+export type FeatureFlagTargetId = string | undefined;
 
 /**
  * Converts a target id into the value the rule matcher compares against.

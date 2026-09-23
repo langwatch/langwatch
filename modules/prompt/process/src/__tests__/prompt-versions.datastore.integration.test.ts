@@ -109,7 +109,7 @@ describe.skipIf(!DB_URL)("Feature: Prompt version history", () => {
 
       const versions = await service.getAllVersions({ idOrHandle: prompt.id, projectId });
 
-      expect(versions.map((one) => one.version).toSorted()).toEqual([1, 2]);
+      expect(versions.map((one) => one.version).toSorted((a, b) => a - b)).toEqual([1, 2]);
       expect(versions.map((one) => one.prompt)).toEqual(
         expect.arrayContaining(["You are a helpful assistant", "You are a warm assistant"]),
       );

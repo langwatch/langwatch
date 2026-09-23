@@ -4,8 +4,8 @@
  * @see specs/agents/agent-test-run.feature
  */
 import { type AgentApi, type AgentWithFields } from "@langwatch/agent-contract";
-import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTestService } from "../services/agent-test.service.ts";
@@ -153,9 +153,9 @@ describe("AgentTestService.sendTurn", () => {
         message: "ping",
         actor,
       });
-      const rejected = await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
+      pending.catch(() => undefined);
       await vi.advanceTimersByTimeAsync(300_010);
-      await rejected;
+      await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
 
       vi.useRealTimers();
     });

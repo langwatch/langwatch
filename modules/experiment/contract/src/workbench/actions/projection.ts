@@ -160,7 +160,11 @@ const datasetRowCount = (dataset: DatasetReference): number => {
 };
 
 const truncateCell = (value: unknown): string => {
-  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  const text = value == null ? "" : JSON.stringify(value);
+  return clipCell(typeof value === "string" ? value : text);
+};
+
+const clipCell = (text: string): string => {
   return text.length > SAMPLE_CELL_MAX_CHARS ? `${text.slice(0, SAMPLE_CELL_MAX_CHARS)}…` : text;
 };
 

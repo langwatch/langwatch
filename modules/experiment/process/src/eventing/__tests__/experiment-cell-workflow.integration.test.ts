@@ -388,7 +388,7 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       const entryNode = result.workflow.nodes.find((n) => n.type === "entry");
-      const dataset = (entryNode?.data as any).dataset;
+      const dataset = (entryNode?.data as any)?.dataset;
 
       expect(dataset?.inline?.records?.user_input).toEqual(["What is 2+2?"]);
       expect(dataset?.inline?.records?.expected).toEqual(["4"]);

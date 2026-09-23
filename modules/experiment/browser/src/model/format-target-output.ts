@@ -28,7 +28,7 @@ export const formatTargetOutput = (output: unknown): string => {
 
   // Handle non-objects (primitives like string, number, boolean)
   if (typeof output !== "object") {
-    return String(output);
+    return typeof output === "string" ? output : JSON.stringify(output);
   }
 
   // Handle arrays - always stringify
@@ -46,7 +46,7 @@ export const formatTargetOutput = (output: unknown): string => {
     if (typeof content === "object") {
       return JSON.stringify(content, null, 2);
     }
-    return String(content);
+    return typeof content === "string" ? content : JSON.stringify(content);
   }
 
   // All other objects: display as formatted JSON

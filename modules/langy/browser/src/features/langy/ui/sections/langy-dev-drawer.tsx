@@ -930,6 +930,6 @@ function formatStoreValue(value: unknown): string {
     return value.length > 240 ? `${value.slice(0, 240)}…` : value || '""';
   }
   const json = JSON.stringify(value);
-  if (json === undefined) return String(value);
+  if (json === undefined) return typeof value;
   return json.length > 240 ? `${json.slice(0, 240)}…` : json;
 }

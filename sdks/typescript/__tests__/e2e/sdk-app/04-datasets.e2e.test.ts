@@ -54,7 +54,7 @@ describe("given an application that keeps a dataset on the platform", () => {
 
       const amended = await langwatch.datasets.listRecords(dataset.id);
       const changed = amended.data.find((record) => record.id === first!.id);
-      expect((changed?.entry as { answer?: string }).answer).toBe(
+      expect((changed?.entry as { answer?: string } | undefined)?.answer).toBe(
         "One unit of work inside a trace.",
       );
 

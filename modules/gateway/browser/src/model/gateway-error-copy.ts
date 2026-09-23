@@ -38,8 +38,12 @@ const ERROR_COPY: { code: string; copy: string }[] = [
   },
 ];
 
+function errorText(error: unknown): string {
+  return typeof error === "string" ? error : (JSON.stringify(error) ?? "");
+}
+
 export function humanizeGatewayError(error: unknown, fallback: string): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const message = error instanceof Error ? error.message : errorText(error);
   for (const { code, copy } of ERROR_COPY) {
     // The server's shape is `code: prose`; anchoring the delimiter keeps
     // a code from matching inside an unrelated longer code.

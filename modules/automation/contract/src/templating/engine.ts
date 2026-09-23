@@ -25,6 +25,11 @@ let engine: Liquid | undefined;
  * refuses file inclusion, so `{% render %}` cannot read a file under the process working
  * directory.
  */
+function filterText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 export function getLiquidEngine(): Liquid {
   if (!engine) {
     engine = createSandboxedLiquid({
@@ -48,10 +53,7 @@ export function getLiquidEngine(): Liquid {
     // user-authored content from forging mrkdwn links (`<https://evil|click>`) or broadcasts
     // (`<!channel>`).
     engine.registerFilter("mrkdwn_escape", (value: unknown): string =>
-      String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;"),
+      filterText(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
     );
   }
   return engine;

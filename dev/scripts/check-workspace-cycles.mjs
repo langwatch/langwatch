@@ -94,7 +94,7 @@ function strongconnect(v, graph, state) {
       state.onStack.delete(w);
       comp.push(w);
     } while (w !== v);
-    if (comp.length > 1) state.groups.push(comp.toSorted());
+    if (comp.length > 1) state.groups.push(comp.toSorted((a, b) => (a < b ? -1 : Number(a > b))));
   }
 }
 

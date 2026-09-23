@@ -248,9 +248,7 @@ describe("validateLangWatchQL", () => {
       const messages = result.violations.map((violation) => violation.message);
       expect(messages.join(" ")).toContain("evil");
       for (const message of messages) {
-        expect(message).not.toMatch(
-          /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/u,
-        );
+        expect(message).not.toMatch(/[^\P{Cc}\t-\r]|[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/u);
       }
     });
   });

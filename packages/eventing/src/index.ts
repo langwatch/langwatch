@@ -57,8 +57,6 @@ export {
   type EventingModule,
   type EventingSetup,
 } from "./pipeline/eventingModule.ts";
-export type { ProcessManagerApplier } from "./pipeline/processBuilder.ts";
-export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition.ts";
 export type {
   CommandHandlerOptions,
   NoCommands,
@@ -86,7 +84,6 @@ export type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "./projections/mapProjection.types.ts";
-export type { ProjectionStoreContext } from "./projections/projectionStoreContext.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
 export type {
   ProjectionCursor,
@@ -96,7 +93,6 @@ export type {
   StoredProjection,
 } from "./projections/stateProjection.types.ts";
 // Queues
-export type { EventSourcedQueueProcessor } from "./queues/index.ts";
 export { EventSourcingPipeline } from "./runtimePipeline.ts";
 // Services
 export { EventSourcingService } from "./services/eventSourcingService.ts";

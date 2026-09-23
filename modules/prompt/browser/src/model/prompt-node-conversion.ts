@@ -235,7 +235,7 @@ function nodeLlmConfig(rawLlmValue: LlmConfigParameter["value"]): LLMConfig {
   }
   if (typeof rawLlmValue === "string") {
     console.warn(
-      `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string "${rawLlmValue}" -> object`,
+      `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string ${JSON.stringify(rawLlmValue)} -> object`,
     );
     return { model: rawLlmValue };
   }

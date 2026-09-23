@@ -124,9 +124,9 @@ describe("the evaluators a run is graded with", () => {
 
       const events = await new QueueRunCommand({ loadRunAttachments }).handle(queueCommand());
 
-      const carried = (events[0]?.data as { evaluators: RunEvaluators }).evaluators;
-      expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
-      expect(carried.definitions).toEqual([DEFINITION]);
+      const carried = (events[0]?.data as { evaluators: RunEvaluators } | undefined)?.evaluators;
+      expect(carried?.fieldValues).toEqual({ golden_sql: "SELECT 1" });
+      expect(carried?.definitions).toEqual([DEFINITION]);
     });
 
     it("keeps the attachments the caller already resolved", async () => {
@@ -187,9 +187,9 @@ describe("the evaluators a run is graded with", () => {
       const events = await new FinishRunCommand(deps).handle(finishCommand());
 
       expect(deps.loadRunAttachments).not.toHaveBeenCalled();
-      const carried = (events[0]?.data as { evaluators: RunEvaluators }).evaluators;
-      expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
-      expect(carried.definitions).toEqual([DEFINITION]);
+      const carried = (events[0]?.data as { evaluators: RunEvaluators } | undefined)?.evaluators;
+      expect(carried?.fieldValues).toEqual({ golden_sql: "SELECT 1" });
+      expect(carried?.definitions).toEqual([DEFINITION]);
     });
 
     /** @scenario "A run with no queued attachments resolves them when it finishes" */

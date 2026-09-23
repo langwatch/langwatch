@@ -14,7 +14,7 @@ type DeleteManyDelegate = {
  * way to reach per-operation argument types. Extracting `where` from the
  * delegate methods instead does not survive their generic signatures.
  */
-type ModelName = keyof Prisma.TypeMap["model"] & string;
+type ModelName = Extract<keyof Prisma.TypeMap["model"], string>;
 
 type WhereOf<M extends ModelName> = NonNullable<
   Prisma.TypeMap["model"][M]["operations"]["deleteMany"]["args"]["where"]
@@ -129,7 +129,7 @@ function describe(value: unknown): string {
   if (value === undefined) return "undefined";
   if (value === null) return "null";
   if (value === "") return "an empty string";
-  return String(value);
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? typeof value);
 }
 
 function sanitizeWhere(where: unknown, label: string): SanitizeResult {

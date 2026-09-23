@@ -128,7 +128,7 @@ describe("given the create input for a pull-mode source", () => {
     it("creates with an empty space list covering every visible space", () => {
       const input = createInputFor(genieComposer({}));
       expect(input).not.toBeNull();
-      expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual([]);
+      expect((input?.pullConfig as { spaceIds?: string[] } | undefined)?.spaceIds).toEqual([]);
     });
   });
 
@@ -140,7 +140,9 @@ describe("given the create input for a pull-mode source", () => {
         organizationId: "org-1",
         toaster: recordingGovernanceToaster(),
       });
-      expect((input?.pullConfig as { readPaidGenieBill?: unknown }).readPaidGenieBill).toBe(false);
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown } | undefined)?.readPaidGenieBill,
+      ).toBe(false);
     });
   });
 
@@ -159,7 +161,9 @@ describe("given the create input for a pull-mode source", () => {
         organizationId: "org-1",
         toaster: recordingGovernanceToaster(),
       });
-      expect((input?.pullConfig as { readPaidGenieBill?: unknown }).readPaidGenieBill).toBe(true);
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown } | undefined)?.readPaidGenieBill,
+      ).toBe(true);
     });
   });
 

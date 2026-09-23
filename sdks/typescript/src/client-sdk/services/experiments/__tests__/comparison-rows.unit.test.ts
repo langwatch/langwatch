@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, it, expect, vi } from "vitest";
+
 import { ComparisonError } from "../errors";
 import type { Experiment } from "../experiment";
 import {
@@ -47,9 +48,11 @@ describe("Experiment.compare", () => {
         );
 
         expect(harness.judgeRequests).toHaveLength(3);
-        expect(harness.judgeRequests.map((request) => request.data.row_index).toSorted()).toEqual([
-          0, 1, 2,
-        ]);
+        expect(
+          harness.judgeRequests
+            .map((request) => request.data.row_index)
+            .toSorted((a, b) => Number(a) - Number(b)),
+        ).toEqual([0, 1, 2]);
         for (const request of harness.judgeRequests) {
           const city = CITIES[request.data.row_index!]!.answer;
           for (const candidate of request.data.candidates) {
@@ -143,7 +146,9 @@ describe("Experiment.compare", () => {
         await running;
 
         const recorded = comparisonEvaluations(harness);
-        expect(recorded.map((evaluation) => evaluation.index).toSorted()).toEqual([0, 1]);
+        expect(
+          recorded.map((evaluation) => evaluation.index).toSorted((a, b) => Number(a) - Number(b)),
+        ).toEqual([0, 1]);
         for (const evaluation of recorded) {
           expect(evaluation).toMatchObject({
             evaluator: "langevals/select_best_compare",

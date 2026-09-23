@@ -46,8 +46,8 @@ const FilterContainer = ({
   </HStack>
 );
 
-const FilterLabel = ({ children }: { children: React.ReactNode }) => {
-  const text = String(children)
+const FilterLabel = ({ children }: { children: string }) => {
+  const text = children
     .split(".")
     .filter((word, index) => index !== 0 || word.toLowerCase() === "evaluations")
     .join(" ");

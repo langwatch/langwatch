@@ -570,7 +570,7 @@ function IconPreview({
   fallback: React.ReactNode;
 }) {
   if (iconAsset && isToolPresetAsset(iconAsset)) {
-    const key = iconAsset.slice("preset:tool:".length) as (typeof TOOL_KINDS)[number] | string;
+    const key = iconAsset.slice("preset:tool:".length);
     const preset = TOOL_PRESETS[key as (typeof TOOL_KINDS)[number]];
     if (preset) {
       const Icon = preset.Icon;

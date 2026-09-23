@@ -409,10 +409,8 @@ describe("SystemMigrationsService.rollBack", () => {
 
         expect(decisions).toHaveLength(2);
         expect(decisions[1]).toBe(decisions[0]);
-        const pinned = (upserts[0]?.report as Record<string, unknown>).rolledBack as Record<
-          string,
-          unknown
-        >;
+        const pinned = (upserts[0]?.report as Record<string, unknown> | undefined)
+          ?.rolledBack as Record<string, unknown>;
         expect(pinned.at).toBe(decisions[0]);
       });
     });

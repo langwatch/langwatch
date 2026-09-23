@@ -83,7 +83,8 @@ for (const target of selected) {
     try {
       utimesSync(entryPath, now, now);
     } catch (error) {
-      console.error(`ensure-built: could not stamp ${target.entry}: ${error}`);
+      const reason = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error(`ensure-built: could not stamp ${target.entry}: ${reason}`);
     }
   } finally {
     rmSync(lock, { recursive: true, force: true });

@@ -145,7 +145,7 @@ function numberEnd({ text, at }: { text: string; at: number }): number {
  * a human table, an error message, an empty string. Null reads as "leave the raw
  * output alone".
  */
-export function parseCliJson(output: string): unknown | null {
+export function parseCliJson(output: string): unknown {
   if (typeof output !== "string") return null;
   const trimmed = output.trim();
   if (!trimmed) return null;

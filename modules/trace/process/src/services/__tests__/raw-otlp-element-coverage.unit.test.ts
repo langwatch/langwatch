@@ -33,8 +33,11 @@ const canonicalizeSpan = (fixture: {
   }).attributes;
 
 // ── element extractors over the canonical attribute bag ─────────────────────
-const str = (v: unknown): string | undefined =>
-  v === undefined || v === null ? undefined : String(v);
+const str = (v: unknown): string | undefined => {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === "number" || typeof v === "bigint" || typeof v === "boolean") return String(v);
+  return typeof v === "string" ? v : JSON.stringify(v);
+};
 
 const ELEMENTS: {
   key: string;

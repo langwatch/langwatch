@@ -8,7 +8,8 @@ const clickhouse = vi.hoisted(() => ({
 
 vi.mock("@langwatch/observability", () => {
   const record = (bucket: string[]) => (first: unknown, second?: unknown) => {
-    bucket.push(typeof first === "string" ? first : String(second ?? ""));
+    const text = typeof first === "string" ? first : second;
+    bucket.push(typeof text === "string" ? text : "");
   };
   const logger = {
     info: record(logged.info),

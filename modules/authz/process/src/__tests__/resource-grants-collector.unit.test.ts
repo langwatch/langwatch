@@ -61,9 +61,7 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
         findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });
@@ -211,7 +209,7 @@ describe("collector at the resource tier", () => {
         findShareLinks: vi.fn().mockResolvedValue([liveShareLinkRow]),
       });
       const rootReader = makeReader();
-      const reader = { ...rootReader, beginPass: vi.fn(() => passReader) };
+      const reader = Object.assign(rootReader, { beginPass: vi.fn(() => passReader) });
 
       const grants = await AuthzCollectorService.create({
         reader,

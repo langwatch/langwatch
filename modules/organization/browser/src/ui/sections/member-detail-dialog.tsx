@@ -370,7 +370,11 @@ export function MemberDetailDialog({
                               onClick={() =>
                                 setPendingBindingRemovals((prev) => {
                                   const next = new Set(prev);
-                                  next.has(b.id) ? next.delete(b.id) : next.add(b.id);
+                                  if (next.has(b.id)) {
+                                    next.delete(b.id);
+                                  } else {
+                                    next.add(b.id);
+                                  }
                                   return next;
                                 })
                               }

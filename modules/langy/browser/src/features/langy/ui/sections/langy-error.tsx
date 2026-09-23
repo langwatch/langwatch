@@ -217,7 +217,7 @@ function formatMetaValue(val: unknown): string {
       return "[object]";
     }
   }
-  return String(val);
+  return typeof val === "string" ? val : (JSON.stringify(val) ?? typeof val);
 }
 
 /** Flatten the recursive reason chain into an indented kind list. */

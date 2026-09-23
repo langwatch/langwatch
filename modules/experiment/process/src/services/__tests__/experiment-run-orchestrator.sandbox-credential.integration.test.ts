@@ -81,7 +81,8 @@ describe("given a run that minted a sandbox credential", () => {
 
       expect(scripted.dispatched).toHaveLength(1);
       expect(
-        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string }).sandbox_api_key,
+        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string } | undefined)
+          ?.sandbox_api_key,
       ).toBe("sandbox-key-123");
     });
   });
@@ -104,7 +105,8 @@ describe("given a run that minted a sandbox credential", () => {
 
       expect(scripted.dispatched).toHaveLength(1);
       expect(
-        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string }).sandbox_api_key,
+        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string } | undefined)
+          ?.sandbox_api_key,
       ).toBeUndefined();
     });
   });

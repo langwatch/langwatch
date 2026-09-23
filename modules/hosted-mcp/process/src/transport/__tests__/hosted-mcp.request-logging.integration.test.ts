@@ -15,7 +15,7 @@ const { logLines, loggerStub } = vi.hoisted(() => {
     if (typeof fields === "object" && fields !== null) {
       lines.push({
         fields: fields as Record<string, unknown>,
-        message: String(message ?? ""),
+        message: typeof message === "string" ? message : "",
       });
     }
   };

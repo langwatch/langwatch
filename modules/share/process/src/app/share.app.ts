@@ -117,7 +117,7 @@ export class ShareApp implements ShareApiContract {
     return this.#retention.listByProject(input);
   }
 
-  findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null> {
+  findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown> {
     return this.#shares.findCachedPayload(input);
   }
 

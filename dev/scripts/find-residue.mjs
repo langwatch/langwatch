@@ -5,13 +5,14 @@
  * a string-only reference reads as an orphan — leads, not a delete list.
  */
 
+import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname, resolve, relative } from "node:path";
-import { execSync } from "node:child_process";
 
 const ROOT = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
 const SOURCE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(?:test|spec)\.[cm]?[jt]sx?$|(^|\/)__tests__\//;
+const byCodeUnit = (a, b) => (a < b ? -1 : Number(a > b));
 const DETECTORS = ["orphan", "test-only", "re-export", "twin", "slack-ratchet", "dangling-guard"];
 /**
  * Files a tool finds by glob rather than by import: stories, fixtures,
@@ -699,7 +700,7 @@ const selfTest = () => {
     graphFindings
       .filter((f) => f.detector === name)
       .map((f) => f.file)
-      .toSorted();
+      .toSorted(byCodeUnit);
 
   check("graph: a file reached only by its own test is test-only", byDetector("test-only"), [
     "x/src/abandoned.ts",
@@ -735,10 +736,11 @@ const selfTest = () => {
         "x/src/four.ts": "export type Linked = 2;",
       })[relative(ROOT, absolute).split("\\").join("/")] ?? "",
   });
-  check("twin: one name in two unlinked files is a twin", twins.map((f) => f.file).toSorted(), [
-    "x/src/one.ts",
-    "x/src/two.ts",
-  ]);
+  check(
+    "twin: one name in two unlinked files is a twin",
+    twins.map((f) => f.file).toSorted(byCodeUnit),
+    ["x/src/one.ts", "x/src/two.ts"],
+  );
   check(
     "twin: a name re-declared in a file the other imports is not a twin",
     twins.some((f) => f.file.includes("three") || f.file.includes("four")),
@@ -785,7 +787,7 @@ const selfTest = () => {
   });
   check(
     "twin: a name published from one file and only declared in the other is residue",
-    halfPublished.map((f) => f.file).toSorted(),
+    halfPublished.map((f) => f.file).toSorted(byCodeUnit),
     ["x/src/one.ts", "x/src/two.ts"],
   );
   check(
@@ -796,7 +798,7 @@ const selfTest = () => {
         known: new Set(["x/src/index.ts", "x/src/a.ts"]),
         readFile: () => `export { A, type B as C } from "./a.ts";`,
       }).get("x/src/a.ts") ?? []),
-    ].toSorted(),
+    ].toSorted(byCodeUnit),
     ["A", "B"],
   );
 
@@ -807,7 +809,7 @@ const selfTest = () => {
         rootSpecs: new Set(["s/dist/index.d.ts", "s/dist/deep/index.d.ts"]),
         known: new Set(["s/src/index.ts", "s/src/deep/index.ts"]),
       }),
-    ].toSorted(),
+    ].toSorted(byCodeUnit),
     ["s/src/deep/index.ts", "s/src/index.ts"],
   );
   check(

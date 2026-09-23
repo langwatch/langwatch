@@ -1,8 +1,9 @@
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface MonitorResponse {
@@ -72,11 +73,10 @@ export class MonitorsApiService {
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        { ...buildAuthHeaders({ apiKey: this.apiKey }), "Content-Type": "application/json" },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {

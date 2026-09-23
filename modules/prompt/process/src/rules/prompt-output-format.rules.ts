@@ -33,7 +33,7 @@ function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean
       return typeof value === "object";
     default: {
       const _exhaustive: never = type;
-      throw new Error(`Unhandled output type: ${_exhaustive}`);
+      throw new Error(`Unhandled output type: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
@@ -56,7 +56,7 @@ export function formatOutputForStreaming(
 
   switch (type) {
     case "str":
-      return typeof value === "string" ? value : String(value);
+      return typeof value === "string" ? value : JSON.stringify(value);
     case "float":
       return typeof value === "number" ? String(value) : undefined;
     case "bool":

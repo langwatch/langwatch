@@ -29,8 +29,11 @@ function severityRank(name) {
 // shrank as you filtered could not tell you what you had filtered out.
 function levelCounts() {
   const counts = new Map();
-  for (const line of lines) counts.set(line.level || "other", (counts.get(line.level || "other") || 0) + 1);
-  return [...counts].sort((a, b) => severityRank(a[0]) - severityRank(b[0]) || a[0].localeCompare(b[0]));
+  for (const line of lines)
+    counts.set(line.level || "other", (counts.get(line.level || "other") || 0) + 1);
+  return [...counts].toSorted(
+    (a, b) => severityRank(a[0]) - severityRank(b[0]) || a[0].localeCompare(b[0]),
+  );
 }
 
 function renderLevels() {
@@ -112,7 +115,8 @@ function logRow(line, needle) {
     else span.textContent = value;
     // The clock alone cannot be lined up against a trace or another machine's
     // log; the whole timestamp can, and it costs a hover rather than a column.
-    if (className === "log-time") span.title = at.toLocaleString() + " · " + (line.level || "no level");
+    if (className === "log-time")
+      span.title = at.toLocaleString() + " · " + (line.level || "no level");
     row.append(span);
   }
   return row;

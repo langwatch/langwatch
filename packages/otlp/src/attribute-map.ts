@@ -98,7 +98,9 @@ export function normalizeOtlpAttributeMap(attributes: unknown): Record<string, s
     if (value instanceof Uint8Array) result[key] = Buffer.from(value).toString("hex");
     else if (Array.isArray(value)) result[key] = JSON.stringify(value);
     else if (typeof value === "string") result[key] = findNormalizedJson(value) ?? value;
-    else if (value !== undefined && value !== null) result[key] = String(value);
+    else if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+      result[key] = String(value);
+    else if (value !== undefined && value !== null) result[key] = JSON.stringify(value);
   }
   return result;
 }

@@ -28,14 +28,15 @@ const MAX_PROSE_LENGTH = 200;
 
 /**
  * Server prose, clamped to a sentence — a length clamp, not a safety
- * boundary, since callers pass text LangWatch wrote. Sliced by code point
- * to avoid cutting a surrogate pair in half.
+ * boundary, since callers pass text LangWatch wrote. Sliced by grapheme
+ * to avoid cutting a character in half.
  */
 export function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();
   if (collapsed.length === 0) return "";
   if (collapsed.length <= MAX_PROSE_LENGTH) return collapsed;
-  const kept = [...collapsed].slice(0, MAX_PROSE_LENGTH - 1).join("");
+  const graphemes = Array.from(new Intl.Segmenter().segment(collapsed), ({ segment }) => segment);
+  const kept = graphemes.slice(0, MAX_PROSE_LENGTH - 1).join("");
   return `${kept.trimEnd()}…`;
 }
 

@@ -46,7 +46,7 @@ const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({
   } as Entry,
 });
 
-const renderPanel = (node: Node<Entry> = createEntryNode(), datasetTotal?: number | undefined) =>
+const renderPanel = (node: Node<Entry> = createEntryNode(), datasetTotal?: number) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <EntryPointPropertiesPanel

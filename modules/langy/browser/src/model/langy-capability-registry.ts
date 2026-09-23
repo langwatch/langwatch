@@ -538,7 +538,7 @@ export function extractToolText(output: unknown): string {
   if (output == null) return "";
   if (typeof output === "string") return output;
   if (typeof output === "object") return extractObjectToolText(output as Record<string, unknown>);
-  return String(output);
+  return JSON.stringify(output) ?? "";
 }
 
 // Common id-bearing keys across MCP tool inputs/outputs, checked in priority

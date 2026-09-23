@@ -75,7 +75,7 @@ export const TraceInputOutput = memo(function TraceInputOutput({
       return typeof value === "string" ? value : JSON.stringify(value, null, 2);
     }
 
-    return `${value}`;
+    return value === undefined ? "undefined" : JSON.stringify(value);
   };
 
   const copy = () => {
@@ -161,7 +161,7 @@ export const TraceInputOutput = memo(function TraceInputOutput({
 
 function formatDisplayValue(value: unknown): string | undefined {
   if (!value) {
-    return `${value}`;
+    return value === undefined ? "undefined" : JSON.stringify(value);
   }
 
   if (typeof value === "string") {

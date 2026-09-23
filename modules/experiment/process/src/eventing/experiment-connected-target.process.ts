@@ -41,7 +41,7 @@ const messagesOf = (value: unknown): ProtocolMessage[] => {
     );
     if (messages.length > 0) return messages;
   }
-  const content = typeof value === "string" ? value : value === undefined ? "" : String(value);
+  const content = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
   return [{ role: "user", content }];
 };
 
@@ -75,7 +75,7 @@ const parameterValueOf = ({
   if (value === undefined || value === null || value === "") return undefined;
   if (definition.type === "number") return numberValueOf(value);
   if (definition.type === "boolean") return booleanValueOf(value);
-  return typeof value === "string" ? value : String(value);
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
 };
 
 /**

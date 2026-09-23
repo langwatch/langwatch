@@ -191,10 +191,10 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
       }),
   });
   const copyGroupId = (groupId: string) => {
-    navigator.clipboard.writeText(groupId).then(
-      () => toaster.create({ title: "Group ID copied", type: "success" }),
-      () => toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
-    );
+    navigator.clipboard
+      .writeText(groupId)
+      .then(() => toaster.create({ title: "Group ID copied", type: "success" }))
+      .catch(() => toaster.create({ title: "Couldn't copy the group ID", type: "error" }));
   };
 
   // Tenant-scoped controls. Activated when the search box is a single

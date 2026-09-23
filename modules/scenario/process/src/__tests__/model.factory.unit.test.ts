@@ -8,6 +8,13 @@ import { z } from "zod";
 
 import { createJudgeModelFromParams, createModelFromParams } from "../index.ts";
 
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
 const successResponse = {
   id: "chatcmpl-test",
   object: "chat.completion",
@@ -31,7 +38,7 @@ describe("scenario model factory", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-        requestBodies.push(JSON.parse(String(init?.body)));
+        requestBodies.push(JSON.parse(requestBody(init)));
         return new Response(JSON.stringify(successResponse), {
           status: 200,
           headers: { "Content-Type": "application/json" },

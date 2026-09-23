@@ -93,10 +93,11 @@ describe("given a project several people are working in", () => {
 
       expect(sessions).toHaveLength(2);
       expect(sessions.every((entry) => entry.user.id === alice.id)).toBe(true);
-      expect(sessions.map((entry) => entry.location.route.traceId).toSorted()).toEqual([
-        "T1",
-        "T2",
-      ]);
+      expect(
+        sessions
+          .map((entry) => entry.location.route.traceId)
+          .toSorted((a, b) => String(a).localeCompare(String(b))),
+      ).toEqual(["T1", "T2"]);
     });
   });
 

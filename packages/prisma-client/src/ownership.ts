@@ -1,10 +1,10 @@
+import type { PrismaClient } from "./generated/client.ts";
 import {
   prismaModelFieldCatalogue,
   prismaRelationCatalogue,
   prismaTableCatalogue,
   type PrismaTableModel,
 } from "./table-catalogue.ts";
-import type { PrismaClient } from "./generated/client.ts";
 
 export type { PrismaTableModel } from "./table-catalogue.ts";
 
@@ -82,7 +82,9 @@ function relationIndex(): RelationIndex {
     const relations = new Map<string, PrismaTableModel>();
     for (const [field, target] of Object.entries(modelRelations)) {
       if (!isPrismaTableModel(target)) {
-        throw new Error(`Unknown Prisma relation target ${target} for ${model}.${field}.`);
+        throw new Error(
+          `Unknown Prisma relation target ${JSON.stringify(target)} for ${model}.${field}.`,
+        );
       }
       relations.set(field, target);
     }
@@ -221,7 +223,7 @@ function scopedClient<Models extends readonly PrismaTableModel[]>(
               }
               const result = Reflect.apply(method, delegateTarget, args);
               return new Promise((resolve, reject) => {
-                Promise.resolve(result).then(resolve, reject);
+                Promise.resolve(result).then(resolve).catch(reject);
               });
             };
           },

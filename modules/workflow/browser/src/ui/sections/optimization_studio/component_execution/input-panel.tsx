@@ -71,9 +71,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
           const formData = Object.fromEntries(
             inputFields.map((field) => [
               field.identifier,
-              typeof field.value === "object"
-                ? JSON.stringify(field.value)
-                : (field.value?.toString() ?? ""),
+              typeof field.value === "string" ? field.value : (JSON.stringify(field.value) ?? ""),
             ]),
           );
           onExecute(formData);

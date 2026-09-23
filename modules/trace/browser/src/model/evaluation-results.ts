@@ -188,20 +188,7 @@ export interface EvalChipInput {
   evaluatorName?: string | null;
   evaluatorId?: string | null;
   /** Normalized verdict tokens from any source. */
-  status?:
-    | "pass"
-    | "passed"
-    | "fail"
-    | "failed"
-    | "processed"
-    | "warning"
-    | "skipped"
-    | "error"
-    | "running"
-    | "in_progress"
-    | "scheduled"
-    | "pending"
-    | string;
+  status?: string;
   /** Numeric verdict, when produced. Booleans collapse to passed/failed. */
   score?: number | boolean | null;
   /** Categorical label, when the evaluator produced one. */

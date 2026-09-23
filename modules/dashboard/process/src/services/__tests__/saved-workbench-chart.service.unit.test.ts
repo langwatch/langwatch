@@ -188,7 +188,7 @@ describe("SavedWorkbenchChartService", () => {
         });
 
         const call = repository.calls.find((c) => c.method === "createSavedWorkbenchChart");
-        expect((call?.input as { id: string }).id).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+        expect((call?.input as { id: string } | undefined)?.id).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
       });
     });
 
@@ -249,7 +249,9 @@ describe("SavedWorkbenchChartService", () => {
         });
 
         const call = repository.calls.find((c) => c.method === "createSavedWorkbenchChart");
-        expect((call?.input as { definition: SavedWorkbenchChartDefinition }).definition).toEqual({
+        expect(
+          (call?.input as { definition: SavedWorkbenchChartDefinition } | undefined)?.definition,
+        ).toEqual({
           version: WORKBENCH_CHART_DEFINITION_VERSION,
           sql: "SELECT count() FROM traces",
           parameters: { since: "2026-02-01" },
@@ -459,7 +461,7 @@ describe("SavedWorkbenchChartService", () => {
         });
 
         const call = repository.calls.find((c) => c.method === "placeSavedWorkbenchChart");
-        expect((call?.input as { gridRow: number }).gridRow).toBe(5);
+        expect((call?.input as { gridRow: number } | undefined)?.gridRow).toBe(5);
       });
     });
 
@@ -479,7 +481,7 @@ describe("SavedWorkbenchChartService", () => {
         });
 
         const call = repository.calls.find((c) => c.method === "placeSavedWorkbenchChart");
-        expect((call?.input as { gridRow: number }).gridRow).toBe(0);
+        expect((call?.input as { gridRow: number } | undefined)?.gridRow).toBe(0);
       });
     });
 
@@ -503,7 +505,7 @@ describe("SavedWorkbenchChartService", () => {
 
         expect(repository.calls.some((c) => c.method === "findLastGraphGridRow")).toBe(false);
         const call = repository.calls.find((c) => c.method === "placeSavedWorkbenchChart");
-        expect((call?.input as { gridRow: number }).gridRow).toBe(2);
+        expect((call?.input as { gridRow: number } | undefined)?.gridRow).toBe(2);
       });
     });
   });

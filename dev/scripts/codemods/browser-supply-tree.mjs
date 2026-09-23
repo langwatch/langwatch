@@ -62,7 +62,7 @@ export function files(directory) {
       const file = `${directory}/${entry.name}`;
       return entry.isDirectory() ? files(file) : [file];
     })
-    .toSorted();
+    .toSorted((a, b) => (a < b ? -1 : Number(a > b)));
 }
 export function resolveLocal(file, specifier) {
   const base = relative(root, resolve(root, dirname(file), specifier));

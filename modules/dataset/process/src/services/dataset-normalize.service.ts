@@ -99,7 +99,7 @@ const csvRowBytes = (data: Record<string, unknown>): number => {
     if (typeof value === "string") {
       bytes += Buffer.byteLength(value, "utf8");
     } else if (value != null) {
-      bytes += Buffer.byteLength(String(value), "utf8");
+      bytes += Buffer.byteLength(JSON.stringify(value) ?? "", "utf8");
     }
   }
   return bytes;

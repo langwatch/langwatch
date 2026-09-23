@@ -13,6 +13,10 @@ import {
 } from "../../trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
+function outputText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 class TenantClickHouseResolver extends TraceClickHouse {
   readonly tenants: string[] = [];
 
@@ -50,7 +54,7 @@ class FullIo implements TraceFullIo {
   recompute(spans: NormalizedSpan[]) {
     return {
       input: null,
-      output: { type: "text", value: String(spans[0]?.spanAttributes["langwatch.output"] ?? "") },
+      output: { type: "text", value: outputText(spans[0]?.spanAttributes["langwatch.output"]) },
     };
   }
 }
@@ -118,7 +122,8 @@ function clientFor(
   return {
     query: async <_Row>(input: { query: string; query_params?: Record<string, unknown> }) => {
       queries.push(input.query);
-      const traceId = String(input.query_params?.traceId ?? "trace");
+      const queriedTraceId = input.query_params?.traceId;
+      const traceId = typeof queriedTraceId === "string" ? queriedTraceId : "trace";
       const rows = input.query.includes("Attributes['gen_ai.conversation.id']")
         ? thread
           ? [

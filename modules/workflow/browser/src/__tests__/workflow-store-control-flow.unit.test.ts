@@ -43,7 +43,7 @@ describe("workflowStoreCore - branch gate connections", () => {
 
       expect(result).toBeUndefined();
       const target = store.getState().nodes.find((n) => n.id === "codeA");
-      expect((target?.data as { inputs?: unknown[] }).inputs).toEqual([
+      expect((target?.data as { inputs?: unknown[] } | undefined)?.inputs).toEqual([
         { identifier: GATE_FIELD, type: "bool" },
       ]);
       const edges = store.getState().edges;
@@ -75,7 +75,7 @@ describe("workflowStoreCore - branch gate connections", () => {
       });
 
       const target = store.getState().nodes.find((n) => n.id === "codeA");
-      expect((target?.data as { inputs?: unknown[] }).inputs).toEqual([
+      expect((target?.data as { inputs?: unknown[] } | undefined)?.inputs).toEqual([
         { identifier: "gate", type: "bool" },
       ]);
       expect(store.getState().edges).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("workflowStoreCore - branch gate connections", () => {
       });
 
       const target = store.getState().nodes.find((n) => n.id === "codeA");
-      expect((target?.data as { inputs?: unknown[] }).inputs).toEqual([
+      expect((target?.data as { inputs?: unknown[] } | undefined)?.inputs).toEqual([
         { identifier: "question", type: "str" },
         { identifier: GATE_FIELD, type: "bool" },
       ]);

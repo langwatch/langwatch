@@ -261,7 +261,7 @@ describe("AnalyticsService", () => {
         ({
           query: async (options: Record<string, unknown>) => {
             calls.push(options);
-            const query = String(options.query ?? "");
+            const query = typeof options.query === "string" ? options.query : "";
             const documentRows = query.includes("document_refs")
               ? [
                   {

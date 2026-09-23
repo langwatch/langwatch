@@ -81,22 +81,23 @@ const isSingleOutputKey = (output: object): output is { output: unknown } => {
 
 export const formatTargetOutput = (output: unknown): string => {
   if (output === null || output === undefined) return "";
-  if (typeof output !== "object") return String(output);
+  if (typeof output !== "object")
+    return typeof output === "string" ? output : JSON.stringify(output);
   if (Array.isArray(output)) return JSON.stringify(output, null, 2);
 
   if (isSingleOutputKey(output)) {
     const content = output.output;
     if (content === null || content === undefined) return "";
-    return typeof content === "object" ? JSON.stringify(content, null, 2) : String(content);
+    return typeof content === "string" ? content : JSON.stringify(content, null, 2);
   }
 
   return JSON.stringify(output, null, 2);
 };
 
 export const getImageUrl = (value: unknown): string | null => {
-  if (!value) return null;
+  if (typeof value !== "string" || !value) return null;
 
-  const source = String(value).trim();
+  const source = value.trim();
   const markdown = source.match(/^!\[.*?\]\((.*?)\)$/);
   if (markdown?.[1]) return markdown[1];
 

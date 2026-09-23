@@ -19,6 +19,12 @@ import { ConnectedAgentRuntimeService } from "../../services/connected-agent-run
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
 
+function frameText(raw: WebSocket.RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (Buffer.isBuffer(raw)) return raw.toString("utf8");
+  return Buffer.from(raw).toString("utf8");
+}
+
 function createUpgradeRouter(server: Server): ConnectUpgradeRouter {
   const handlers = new Map<string, UpgradeHandler>();
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -104,7 +110,7 @@ async function connectAndRegister(
   });
   await new Promise<void>((resolve) => {
     socket.once("message", (raw) => {
-      expect(JSON.parse(raw.toString())).toMatchObject({ type: "registered" });
+      expect(JSON.parse(frameText(raw))).toMatchObject({ type: "registered" });
       resolve();
     });
   });

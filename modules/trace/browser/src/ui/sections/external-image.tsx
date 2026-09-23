@@ -9,7 +9,10 @@ export const getImageUrl = (str: unknown): string | null => {
     return null;
   }
 
-  const str_ = str.toString().trim();
+  if (typeof str !== "string") {
+    return null;
+  }
+  const str_ = str.trim();
 
   // Check for markdown image format ![alt](url)
   const markdownImageRegex = /^!\[.*?\]\((.*?)\)$/;

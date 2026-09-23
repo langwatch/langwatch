@@ -22,8 +22,8 @@ const jsonRecordSchema = z.record(z.string(), z.unknown());
  */
 const stringify = (value: unknown): string => {
   if (value === null || value === void 0) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
 };
 
 /**

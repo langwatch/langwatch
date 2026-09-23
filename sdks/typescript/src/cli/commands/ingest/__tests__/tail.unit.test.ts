@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { formatEventLine, pickFreshEvents } from "../tail";
 import type { ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
+
+import { formatEventLine, pickFreshEvents } from "../tail";
 
 const mkEvent = (overrides: Partial<ActivityEventDetailRow>): ActivityEventDetailRow => ({
   eventId: "evt-default",
@@ -19,7 +20,7 @@ const mkEvent = (overrides: Partial<ActivityEventDetailRow>): ActivityEventDetai
 });
 
 // intentional: stripping ANSI escape codes from chalk output
-const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+const stripAnsi = (s: string) => s.replace(/\p{Cc}\[[0-9;]*m/gu, "");
 
 describe("pickFreshEvents", () => {
   describe("when next batch contains nothing newer than the cursor", () => {

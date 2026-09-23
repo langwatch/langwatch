@@ -31,7 +31,7 @@ export type AnnotationQueuesReading = {
   totalCount: number;
   queuesLoading: boolean;
   queuesReady: boolean;
-  queuesError: unknown | undefined;
+  queuesError: unknown;
 };
 
 export function useAnnotationQueues({

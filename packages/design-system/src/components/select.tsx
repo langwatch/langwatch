@@ -3,6 +3,7 @@
 import type { CollectionItem } from "@chakra-ui/react";
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
+
 import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth.ts";
 import { CloseButton } from "./close-button.tsx";
 
@@ -96,14 +97,14 @@ interface SelectValueTextProps extends Omit<
 
 export const SelectValueText = React.forwardRef<HTMLSpanElement, SelectValueTextProps>(
   function SelectValueText(props, ref) {
-    const { children, placeholder, ...rest } = props;
+    const { placeholder, ...rest } = props;
     return (
       <ChakraSelect.ValueText {...rest} ref={ref}>
         <ChakraSelect.Context>
           {(select) => {
             const items = select.selectedItems;
             if (items.length === 0) return placeholder;
-            if (children) return children(items);
+            if (props.children) return props.children(items);
             if (items.length === 1) return select.collection.stringifyItem(items[0]);
             return `${items.length} selected`;
           }}

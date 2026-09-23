@@ -69,14 +69,16 @@ describe("writeVoiceCallRun", () => {
           turnTraceIds: [],
         });
 
-        const { metadata } = mockStartRun.mock.calls[0]?.[0] as {
-          metadata: {
-            langwatch: { isCutAtLimit?: boolean };
-            isCutAtLimit?: unknown;
-          };
-        };
-        expect(metadata.langwatch.isCutAtLimit).toBe(true);
-        expect(metadata.isCutAtLimit).toBeUndefined();
+        const started = mockStartRun.mock.calls[0]?.[0] as
+          | {
+              metadata: {
+                langwatch: { isCutAtLimit?: boolean };
+                isCutAtLimit?: unknown;
+              };
+            }
+          | undefined;
+        expect(started?.metadata.langwatch.isCutAtLimit).toBe(true);
+        expect(started?.metadata.isCutAtLimit).toBeUndefined();
       });
     });
 
@@ -130,10 +132,12 @@ describe("writeVoiceCallRun", () => {
 
         const idsOf = (call: number) =>
           (
-            mockMessageSnapshot.mock.calls[call]?.[0] as {
-              messages: { id: string }[];
-            }
-          ).messages.map((m) => m.id);
+            mockMessageSnapshot.mock.calls[call]?.[0] as
+              | {
+                  messages: { id: string }[];
+                }
+              | undefined
+          )?.messages.map((m) => m.id);
         expect(idsOf(0)).toEqual(["run_1-0", "run_1-1"]);
         expect(idsOf(0)).toEqual(idsOf(1));
       });

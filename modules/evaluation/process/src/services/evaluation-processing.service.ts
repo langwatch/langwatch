@@ -94,7 +94,9 @@ export class EvaluationProcessingAdapter {
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
         delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
         dedup: {
-          makeId: EvaluationProcessingAdapter.graphTriggerActivityGroupKey,
+          makeId: EvaluationProcessingAdapter.graphTriggerActivityGroupKey.bind(
+            EvaluationProcessingAdapter,
+          ),
           ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
           extend: false,
           replace: false,
@@ -103,7 +105,9 @@ export class EvaluationProcessingAdapter {
         // carries no pipeline segment, so both pipelines' sweeps serialize in
         // ONE lane per tenant — a sweep evaluates all of the tenant's graph
         // triggers regardless of which event kind woke it.
-        groupKeyFn: EvaluationProcessingAdapter.graphTriggerActivityGroupKey,
+        groupKeyFn: EvaluationProcessingAdapter.graphTriggerActivityGroupKey.bind(
+          EvaluationProcessingAdapter,
+        ),
         handler: (event, context) =>
           this.deps.automations.handleEvaluationGraphTriggerActivity(event, context),
       })
@@ -115,7 +119,7 @@ export class EvaluationProcessingAdapter {
           serializeByAggregate: true,
           delay: 30_000,
           deduplication: {
-            makeId: ExecuteEvaluationCommand.makeJobId,
+            makeId: ExecuteEvaluationCommand.makeJobId.bind(ExecuteEvaluationCommand),
             ttlMs: 30_000,
           },
         },
@@ -137,4 +141,6 @@ export class EvaluationProcessingAdapter {
   }
 }
 
-export const createEvaluationProcessingPipeline = EvaluationProcessingAdapter.createPipeline;
+export const createEvaluationProcessingPipeline = EvaluationProcessingAdapter.createPipeline.bind(
+  EvaluationProcessingAdapter,
+);

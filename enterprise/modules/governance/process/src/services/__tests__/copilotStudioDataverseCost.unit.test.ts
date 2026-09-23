@@ -18,6 +18,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import capturedCostReply from "./fixtures/azureCostManagementDailyResponse.json";
 
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
 interface FetchCall {
   url: string;
   init: (RequestInit & { followRedirects?: boolean }) | undefined;
@@ -221,7 +228,7 @@ describe("the Azure cost read inside the Dataverse source", () => {
       await runPull({ azureSubscriptionId: SUBSCRIPTION_ID });
       const tokenCalls = capturedCalls.filter((c) => c.url.includes("login.microsoftonline.com"));
 
-      const scopes = tokenCalls.map((call) => String(call.init?.body));
+      const scopes = tokenCalls.map((call) => requestBody(call.init));
       expect(
         scopes.some((body) =>
           body.includes(encodeURIComponent("https://management.azure.com/.default")),
@@ -510,7 +517,7 @@ describe("the Azure cost read inside the Dataverse source", () => {
       // priced was in July, so the ask reaches back to the day after it
       // rather than over the trailing week a healthy source would send.
       const [call] = costCalls();
-      const asked = JSON.parse(String(call?.init?.body ?? "{}"));
+      const asked = JSON.parse(call === undefined ? "{}" : requestBody(call.init));
       expect(asked.timePeriod?.from).toBe("2026-07-02T00:00:00+00:00");
       expect(conversationEvents(result.events)).toHaveLength(1);
     });
@@ -691,7 +698,7 @@ describe("the billing identity beside the bot's", () => {
         credentials: WITH_BILLING,
       });
 
-      const bodies = signInCalls().map((call) => String(call.init?.body));
+      const bodies = signInCalls().map((call) => requestBody(call.init));
       const billSignIns = bodies.filter((body) => body.includes(armScope));
       const environmentSignIns = bodies.filter((body) => !body.includes(armScope));
 
@@ -738,7 +745,7 @@ describe("the billing identity beside the bot's", () => {
       // not a sign-in for its audience either. Asserted on the captured call
       // list, not on the absence of a log line.
       expect(costCalls()).toHaveLength(0);
-      const bodies = signInCalls().map((call) => String(call.init?.body));
+      const bodies = signInCalls().map((call) => requestBody(call.init));
       expect(bodies.some((body) => body.includes(armScope))).toBe(false);
 
       expect(conversationEvents(result.events)).toHaveLength(1);

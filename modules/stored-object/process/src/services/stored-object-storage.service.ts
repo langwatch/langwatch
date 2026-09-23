@@ -122,7 +122,7 @@ function assertProjectAddress(projectId: string, address: StoredObjectStorageAdd
         segment === "." ||
         segment === ".." ||
         segment.includes("%") ||
-        /[\u0000-\u001f?#]/u.test(segment),
+        /[^\P{Cc}\u007f-\u009f]|[?#]/u.test(segment),
     ) ||
     address.relativeId.includes("\\") ||
     segments[0] !== projectId;
@@ -138,7 +138,10 @@ function isProvider(value: string): value is "s3" | "file" | "azure-blob" {
 
 function isSafeSegment(value: string, provider: string): boolean {
   const hasUnsafeCharacters =
-    !value || value.includes("\\") || value.includes("%") || /[\u0000-\u001f?#]/u.test(value);
+    !value ||
+    value.includes("\\") ||
+    value.includes("%") ||
+    /[^\P{Cc}\u007f-\u009f]|[?#]/u.test(value);
 
   if (hasUnsafeCharacters) {
     return false;

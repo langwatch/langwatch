@@ -92,7 +92,9 @@ describe("given a row whose column and parser copy disagree", () => {
         seedPullSchedule({ pullSchedule: RUNNING, storedParserConfig: STORED }),
       );
 
-      expect((submission?.parserConfig as Record<string, unknown>).schedule).toBe(RUNNING);
+      expect((submission?.parserConfig as Record<string, unknown> | undefined)?.schedule).toBe(
+        RUNNING,
+      );
     });
   });
 

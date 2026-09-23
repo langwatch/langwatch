@@ -92,6 +92,10 @@ function stringifyQuery(query: UiRouterValues): string {
   return encoded ? `?${encoded}` : "";
 }
 
+function queryText(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 /** Renders the object form of an address as the string form of it. */
 function asAddress(to: UiRouterTarget, currentPathname: string): string {
   if (typeof to === "string") return to;
@@ -99,9 +103,9 @@ function asAddress(to: UiRouterTarget, currentPathname: string): string {
   for (const [key, value] of Object.entries(to.query ?? {})) {
     if (value === void 0 || value === null) continue;
     if (Array.isArray(value)) {
-      for (const entry of value) written.append(key, String(entry));
+      for (const entry of value) written.append(key, queryText(entry));
     } else {
-      written.set(key, String(value));
+      written.set(key, queryText(value));
     }
   }
   const encoded = written.toString();

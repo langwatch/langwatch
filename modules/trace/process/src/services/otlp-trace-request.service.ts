@@ -156,7 +156,7 @@ const normalizeOtlpUnixNano = (value: Fixed64): number => {
     }
   }
 
-  throw new Error(`Invalid Unix nano value: ${value}`);
+  throw new Error(`Invalid Unix nano value: ${JSON.stringify(value)}`);
 };
 
 const normalizeOtlpParentAndTraceContext = (
@@ -280,9 +280,7 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
   return out;
 };
 
-const normalizeOtlpAttributeValue = (
-  v: AttributeValue,
-): Exclude<NormalizedAttributes[string], undefined> | undefined => {
+const normalizeOtlpAttributeValue = (v: AttributeValue): unknown => {
   if (v instanceof Uint8Array) {
     return Buffer.from(v).toString("hex");
   }

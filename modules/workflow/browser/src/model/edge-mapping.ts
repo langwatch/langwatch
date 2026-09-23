@@ -162,7 +162,7 @@ export function buildInputMappings({
     if (input.value != null && input.value !== "" && !mappings[input.identifier]) {
       mappings[input.identifier] = {
         type: "value",
-        value: String(input.value),
+        value: typeof input.value === "string" ? input.value : JSON.stringify(input.value),
       };
     }
   });

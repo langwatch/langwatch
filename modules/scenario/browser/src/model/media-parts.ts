@@ -17,7 +17,7 @@ export type MediaPartData =
     };
 
 export function isSafeMediaUrl(url: string): boolean {
-  const cleaned = [...url].filter((character) => character.charCodeAt(0) > 32).join("");
+  const cleaned = url.replace(/[ \p{Cc}]/gu, "");
   if (cleaned.startsWith("/api/files/")) return !cleaned.includes("..");
   const lower = cleaned.toLowerCase();
   return lower.startsWith("data:") || lower.startsWith("https://") || lower.startsWith("http://");

@@ -7,8 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
-import { MissingMemberError } from "../src/module-members.ts";
 import { moduleApi } from "../src/module-api-token.ts";
+import { MissingMemberError } from "../src/module-members.ts";
 import type { MemberSource } from "../src/module-members.ts";
 
 interface ProjectApi {
@@ -51,14 +51,11 @@ let handed: Readonly<Record<string, unknown>> = {};
 const annotation = defineServerModule("annotation").withApp(AnnotationApp).build();
 
 /** A source that records which members were asked for, and in which order. */
-function recordingSource(
-  members: Partial<Members>,
-  asked: string[],
-): MemberSource<Members> {
-  const order = ["clock", "mail", "unread"] as (keyof Members & string)[];
+function recordingSource(members: Partial<Members>, asked: string[]): MemberSource<Members> {
+  const order = ["clock", "mail", "unread"] as Extract<keyof Members, string>[];
   return {
     order,
-    read<Name extends keyof Members & string>(name: Name): Members[Name] {
+    read<Name extends Extract<keyof Members, string>>(name: Name): Members[Name] {
       asked.push(name);
       const value = members[name];
       if (value === void 0) throw new Error(`This process has no "${name}" member.`);

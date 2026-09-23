@@ -136,9 +136,9 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
+        pending.catch(() => undefined);
         await vi.advanceTimersByTimeAsync(10_000);
-        await outcome;
+        await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         // A short grace, not the whole window: an id nobody is creating must
         // not pay the cost of one that is.
         expect(tryFindVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
@@ -192,9 +192,9 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
+        pending.catch(() => undefined);
         await vi.advanceTimersByTimeAsync(20_000);
-        await outcome;
+        await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
       } finally {
         vi.useRealTimers();
       }

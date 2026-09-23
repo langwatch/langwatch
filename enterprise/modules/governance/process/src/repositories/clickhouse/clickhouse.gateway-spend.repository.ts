@@ -71,6 +71,11 @@ import type {
 } from "../gateway-spend.repository.ts";
 import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
 
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
 const TABLE = "gateway_spend" as const;
 
 /**
@@ -190,7 +195,7 @@ export class ClickHouseGatewaySpendRepository extends GatewaySpendRepository {
       ordering: "Day",
     });
     return rows.map((row) => ({
-      day: String(row.Day ?? ""),
+      day: asString(row.Day),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       pricedRequestCount: int(row.PricedRequestCount),
@@ -208,7 +213,7 @@ export class ClickHouseGatewaySpendRepository extends GatewaySpendRepository {
       ordering: `${AMOUNT_DESC}, Model`,
     });
     return rows.map((row) => ({
-      model: String(row.Model ?? ""),
+      model: asString(row.Model),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       pricedRequestCount: int(row.PricedRequestCount),
@@ -226,7 +231,7 @@ export class ClickHouseGatewaySpendRepository extends GatewaySpendRepository {
       ordering: `${AMOUNT_DESC}, VirtualKeyId`,
     });
     return rows.map((row) => ({
-      virtualKeyId: String(row.VirtualKeyId ?? ""),
+      virtualKeyId: asString(row.VirtualKeyId),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       pricedRequestCount: int(row.PricedRequestCount),

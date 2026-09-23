@@ -261,7 +261,7 @@ function serializeBatch({
     default: {
       const _exhaustive: never = request.format;
 
-      throw new Error(`Unsupported format: ${_exhaustive}`);
+      throw new Error(`Unsupported format: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
@@ -291,7 +291,7 @@ function serializeCsvBatch({
     default: {
       const _exhaustive: never = request.mode;
 
-      throw new Error(`Unsupported mode: ${_exhaustive}`);
+      throw new Error(`Unsupported mode: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
@@ -311,7 +311,7 @@ function serializeJsonBatch({
     default: {
       const _exhaustive: never = request.mode;
 
-      throw new Error(`Unsupported mode: ${_exhaustive}`);
+      throw new Error(`Unsupported mode: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }

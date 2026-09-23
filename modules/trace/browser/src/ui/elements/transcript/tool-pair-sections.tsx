@@ -72,7 +72,7 @@ function describeToolArgument(value: unknown): ToolArgumentDisplay {
   try {
     return { kind: "json", text: JSON.stringify(value, null, 2) };
   } catch {
-    return { kind: "primitive", text: String(value) };
+    return { kind: "primitive", text: "[unserializable value]" };
   }
 }
 

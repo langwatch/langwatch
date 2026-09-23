@@ -204,11 +204,17 @@ export function convertValueToColumnType(
 
 function convertNumberValue(value: unknown): unknown {
   if (!value && value !== 0) return null;
-  return !isNaN(Number(value)) ? parseFloat(String(value)) : value;
+  if (typeof value === "string" && !isNaN(Number(value))) return parseFloat(value);
+  return value;
+}
+
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function convertBooleanValue(value: unknown): unknown {
-  const strValue = `${value ?? ""}`.toLowerCase();
+  const strValue = cellText(value).toLowerCase();
   if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
   if (["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(strValue)) {
     return false;

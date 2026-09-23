@@ -123,7 +123,8 @@ describe("given a conversation the customer never named", () => {
 
       await service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
 
-      const prompt = String(mockGenerateText.mock.calls[0]?.[0]?.prompt);
+      const sentPrompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
+      const prompt = typeof sentPrompt === "string" ? sentPrompt : "";
       const lines = prompt.split("\n").filter((line) => line.startsWith("user: "));
       expect(lines).toHaveLength(LANGY_TITLE_GENERATION.PROMPT_MESSAGE_LIMIT);
       // The first message kept is the one `PROMPT_MESSAGE_LIMIT` from the end,

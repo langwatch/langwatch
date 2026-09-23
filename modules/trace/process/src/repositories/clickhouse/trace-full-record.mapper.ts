@@ -257,7 +257,7 @@ export class TraceFullRecordMapper {
           content: context.content ?? context,
         };
       }
-      return { content: String(context) };
+      return { content: JSON.stringify(context) ?? "" };
     });
   }
 

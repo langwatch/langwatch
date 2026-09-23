@@ -42,7 +42,7 @@ export function publicNamespace(feature: ModuleName): string {
 /** Runtime boundary for names arriving from JSON or configuration. */
 export function publicNamespaceFromUnknown(feature: unknown): string {
   if (!isFeatureName(feature)) {
-    throw new Error(`Unknown feature name: ${feature}`);
+    throw new Error(`Unknown feature name: ${JSON.stringify(feature)}`);
   }
 
   const exception = Object.entries(NAMESPACE_EXCEPTIONS).find(([key]) => key === feature)?.[1];

@@ -10,7 +10,7 @@ import { UiDesignSystemShell } from "../ui-design-system-shell.tsx";
 let root: Root | undefined;
 
 afterEach(async () => {
-  await act(() => root?.unmount());
+  act(() => root?.unmount());
   root = void 0;
   document.body.replaceChildren();
 });
@@ -36,7 +36,7 @@ describe("UiDesignSystemShell", () => {
 
     const system = createDesignSystem();
 
-    await act(() => {
+    act(() => {
       root?.render(
         <UiDesignSystemShell system={system} forcedTheme="light">
           <ChakraSystemProbe expectedSystem={system} />

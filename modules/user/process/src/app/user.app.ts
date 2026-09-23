@@ -1083,7 +1083,9 @@ export class UserApp implements UserApi {
       spent_usd: scope.spentUsd,
     });
 
-    return { requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params}` };
+    return {
+      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`,
+    };
   }
 }
 

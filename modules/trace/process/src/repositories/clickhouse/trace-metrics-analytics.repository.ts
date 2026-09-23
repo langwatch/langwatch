@@ -12,6 +12,11 @@ import {
 } from "../projection/trace-analytics-projection.repository.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
 const TABLE_NAME = "trace_analytics" as const;
 
 const logger = createLogger("langwatch:trace:trace-analytics-repository");
@@ -404,9 +409,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
    */
   private static fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
     return {
-      tenantId: String(record.TenantId ?? ""),
-      traceId: String(record.TraceId ?? ""),
-      version: String(record.Version ?? ""),
+      tenantId: asString(record.TenantId),
+      traceId: asString(record.TraceId),
+      version: asString(record.Version),
       occurredAtMs: TraceAnalyticsClickHouseRepository.parseClickHouseDateTimeMs(
         String(record.OccurredAt),
       ),
@@ -417,13 +422,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         String(record.UpdatedAt),
       ),
 
-      traceName: String(record.TraceName ?? ""),
+      traceName: asString(record.TraceName),
       topicId: TraceAnalyticsClickHouseRepository.asNullableString(record.TopicId),
       subTopicId: TraceAnalyticsClickHouseRepository.asNullableString(record.SubTopicId),
       userId: TraceAnalyticsClickHouseRepository.asNullableString(record.UserId),
       conversationId: TraceAnalyticsClickHouseRepository.asNullableString(record.ConversationId),
       customerId: TraceAnalyticsClickHouseRepository.asNullableString(record.CustomerId),
-      origin: String(record.Origin ?? ""),
+      origin: asString(record.Origin),
       models: TraceAnalyticsClickHouseRepository.asStringArray(record.Models),
       labels: TraceAnalyticsClickHouseRepository.asStringArray(record.Labels),
 
@@ -463,7 +468,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
             "langwatch.reserved.log_record_count"
           ] ?? "",
         ) ||
-        String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+        asString(record.Version) < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 
       spanCount: TraceAnalyticsClickHouseRepository.asNumber(record.SpanCount),
       annotationIds: TraceAnalyticsClickHouseRepository.asStringArray(record.AnnotationIds),

@@ -5,6 +5,7 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { RunParameterValues, ScenarioApi } from "@langwatch/scenario-contract";
 import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
@@ -12,7 +13,6 @@ import {
   SuiteExecutionService,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-process";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -231,10 +231,11 @@ integration("the previous configurations of a scope", () => {
       expect(entries).toHaveLength(2);
       expect(entries.map((entry) => entry.planName)).toEqual(["Refunds", "Refunds"]);
       expect(entries[0]!.key).not.toBe(entries[1]!.key);
-      expect(entries.map((entry) => entry.runParameters.region).toSorted()).toEqual([
-        "eu-central",
-        "us-east",
-      ]);
+      expect(
+        entries
+          .map((entry) => entry.runParameters.region)
+          .toSorted((a, b) => (a < b ? -1 : Number(a > b))),
+      ).toEqual(["eu-central", "us-east"]);
     });
   });
 

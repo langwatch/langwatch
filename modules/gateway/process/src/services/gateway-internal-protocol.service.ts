@@ -40,6 +40,11 @@ import {
 } from "./gateway-realtime-session.service.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
 const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
 
@@ -540,10 +545,10 @@ function attributedIdentity(command: Record<string, unknown>): {
   organizationId: string;
 } {
   return {
-    gatewayRequestId: String(command.gateway_request_id ?? ""),
-    virtualKeyId: String(command.virtual_key_id ?? ""),
-    projectId: String(command.tenantId ?? ""),
-    organizationId: String(command.organization_id ?? ""),
+    gatewayRequestId: asString(command.gateway_request_id),
+    virtualKeyId: asString(command.virtual_key_id),
+    projectId: asString(command.tenantId),
+    organizationId: asString(command.organization_id),
   };
 }
 
@@ -617,7 +622,7 @@ async function enrichAttributedCommands({
   // do exactly that), so skipping here is the correct no-op. Silent by design:
   // one line per record through a fleet roll says nothing actionable.
   const attributableOutcomes = outcomes.filter(
-    (outcome) => String(outcome.virtual_key_id ?? "") !== "",
+    (outcome) => asString(outcome.virtual_key_id) !== "",
   );
   const commands = [...admits, ...attributableOutcomes];
   if (commands.length === 0) return;

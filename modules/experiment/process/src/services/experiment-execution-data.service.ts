@@ -31,7 +31,7 @@ export abstract class ExperimentWorkflowDsl {
     projectId: string;
     workflowId: string;
     versionId: string;
-  }): Promise<unknown | null>;
+  }): Promise<unknown>;
   /**
    * The workflow a "evaluate this workflow" call names, excluding archived
    * ones — a run of a workflow the customer has archived is a run of something

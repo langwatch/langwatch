@@ -347,7 +347,7 @@ export const parseCardResult = ({
  * was recorded as. Null when the output is not a document at all (a human table,
  * an error line, an empty stdout).
  */
-export const asJsonDocument = (output: unknown): unknown | null => {
+export const asJsonDocument = (output: unknown): unknown => {
   if (output && typeof output === "object") return output;
   if (typeof output !== "string") return null;
 

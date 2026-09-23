@@ -27,6 +27,13 @@ import {
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
 
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
@@ -170,7 +177,7 @@ beforeEach(() => {
       return reply({ spaces: [] });
     }
     if (path === "/api/2.0/sql/statements" && init?.method === "POST") {
-      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      const body = JSON.parse(requestBody(init)) as Record<string, unknown>;
       statementBodies.push(body);
       return String(body.statement).includes("billing_origin_product")
         ? answer(billPlan, PAID_BILL_COLUMNS, body)

@@ -55,7 +55,7 @@ export function createRedisTenantBroadcast(input: {
   logger?: Logger;
 }): TenantBroadcast {
   return RedisTenantBroadcastRepository.create({
-    publisher: new BoundTenantBroadcastPublisher(input.publish),
+    publisher: new BoundTenantBroadcastPublisher(input.publish.bind(input)),
     ...(input.logger ? { logger: input.logger } : {}),
   });
 }

@@ -256,11 +256,9 @@ export const useDSPyExperimentState = ({
     if (!firstVisibleRun || selectedPoint !== null) return;
 
     const lastStep = firstVisibleRun.steps[firstVisibleRun.steps.length - 1];
-    lastStep &&
-      setSelectedPoint({
-        runId: firstVisibleRun.runId,
-        index: lastStep.index,
-      });
+    if (lastStep) {
+      setSelectedPoint({ runId: firstVisibleRun.runId, index: lastStep.index });
+    }
   }, [firstVisibleRun, selectedPoint]);
 
   const runsById = useMemo(() => {

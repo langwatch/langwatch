@@ -46,7 +46,7 @@ export class RedisShareCacheRepository implements ShareCacheRepository {
     }
   }
 
-  async findPayload(key: string): Promise<unknown | null> {
+  async findPayload(key: string): Promise<unknown> {
     if (!this.#redis) {
       return null;
     }

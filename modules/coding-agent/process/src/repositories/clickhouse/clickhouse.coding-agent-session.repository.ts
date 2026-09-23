@@ -29,6 +29,11 @@ import {
 } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
 type CodingAgentSessionRow = CodingAgentSession;
 type CodingAgentSessionMetricSeriesRow = CodingAgentSession["metricSeries"][number];
 type CodingAgentBranchSessionRow = CodingAgentSessionBranchRecord;
@@ -201,22 +206,22 @@ const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
 function toBranchSessionRow(record: Record<string, unknown>): CodingAgentBranchSessionRow {
   return {
-    sessionId: String(record.SessionId ?? ""),
-    tenantId: String(record.TenantId ?? ""),
-    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
-    lastEventOccurredAtMs: parseClickHouseDateTimeMs(String(record.LastEventOccurredAt ?? "")),
+    sessionId: asString(record.SessionId),
+    tenantId: asString(record.TenantId),
+    startedAtMs: parseClickHouseDateTimeMs(asString(record.StartedAt)),
+    lastEventOccurredAtMs: parseClickHouseDateTimeMs(asString(record.LastEventOccurredAt)),
     inputTokens: asNumber(record.InputTokens),
     outputTokens: asNumber(record.OutputTokens),
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
-    agent: String(record.Agent ?? ""),
+    agent: asString(record.Agent),
     models: asStringArray(record.Models),
-    userId: String(record.UserId ?? ""),
-    gitBranch: String(record.GitBranch ?? ""),
+    userId: asString(record.UserId),
+    gitBranch: asString(record.GitBranch),
     gitBranches: asStringArray(record.GitBranches),
     usageByContext: asContextUsageRows(record.UsageByContext),
-    title: String(record.Title ?? ""),
+    title: asString(record.Title),
   };
 }
 
@@ -704,7 +709,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     // session id into one row here, silently dropping the other's cost.
     const byTenant = new Map<string, Record<string, unknown>[]>();
     for (const row of rows) {
-      const tenantId = String(row.TenantId ?? "");
+      const tenantId = asString(row.TenantId);
       const list = byTenant.get(tenantId) ?? [];
       list.push(row);
       byTenant.set(tenantId, list);
@@ -764,7 +769,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     const byTenant = new Map<string, Record<string, unknown>[]>();
     for (const row of rows) {
-      const tenantId = String(row.TenantId ?? "");
+      const tenantId = asString(row.TenantId);
       const list = byTenant.get(tenantId) ?? [];
       list.push(row);
       byTenant.set(tenantId, list);
@@ -903,11 +908,11 @@ const asMetricSeriesRows = (value: unknown): CodingAgentSessionMetricSeriesRow[]
     const tuple = parsed.data;
     return [
       {
-        seriesId: String(tuple[0] ?? ""),
-        metricName: String(tuple[1] ?? ""),
-        type: String(tuple[2] ?? ""),
-        decision: String(tuple[3] ?? ""),
-        language: String(tuple[4] ?? ""),
+        seriesId: asString(tuple[0]),
+        metricName: asString(tuple[1]),
+        type: asString(tuple[2]),
+        decision: asString(tuple[3]),
+        language: asString(tuple[4]),
         value: asNumber(tuple[5]),
       },
     ];
@@ -922,10 +927,10 @@ const asContextUsageRows = (value: unknown): CodingAgentSessionContextUsage[] =>
     ? value.map((entry) => {
         const tuple: unknown[] = Array.isArray(entry) ? entry : [];
         return {
-          repositoryHost: String(tuple[0] ?? ""),
-          repositoryOwner: String(tuple[1] ?? ""),
-          repositoryName: String(tuple[2] ?? ""),
-          branch: String(tuple[3] ?? ""),
+          repositoryHost: asString(tuple[0]),
+          repositoryOwner: asString(tuple[1]),
+          repositoryName: asString(tuple[2]),
+          branch: asString(tuple[3]),
           inputTokens: asNumber(tuple[4]),
           outputTokens: asNumber(tuple[5]),
           cacheReadTokens: asNumber(tuple[6]),
@@ -954,7 +959,7 @@ const asNumberMap = (value: unknown): Record<string, number> => {
 function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();
   for (const record of records) {
-    const sessionId = String(record.SessionId ?? "");
+    const sessionId = asString(record.SessionId);
     const incumbent = bySession.get(sessionId);
     bySession.set(sessionId, incumbent === undefined ? record : preferredOf(incumbent, record));
   }
@@ -972,7 +977,7 @@ function preferredOf(
   // which would make every comparison against it false and the winner depend on
   // argument order.
   const msOf = (value: unknown) => {
-    const ms = parseClickHouseDateTimeMs(String(value ?? ""));
+    const ms = parseClickHouseDateTimeMs(asString(value));
     return Number.isFinite(ms) ? ms : 0;
   };
   const progressOf = (record: Record<string, unknown>) => ({
@@ -1006,30 +1011,30 @@ function preferredOf(
 function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
   const steps = Array.isArray(record.Steps) ? record.Steps : [];
   return {
-    tenantId: String(record.TenantId ?? ""),
-    sessionId: String(record.SessionId ?? ""),
-    sessionKeySource: String(record.SessionKeySource ?? ""),
-    version: String(record.Version ?? ""),
-    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
+    tenantId: asString(record.TenantId),
+    sessionId: asString(record.SessionId),
+    sessionKeySource: asString(record.SessionKeySource),
+    version: asString(record.Version),
+    startedAtMs: parseClickHouseDateTimeMs(asString(record.StartedAt)),
 
-    agent: String(record.Agent ?? ""),
-    agentVersion: String(record.AgentVersion ?? ""),
+    agent: asString(record.Agent),
+    agentVersion: asString(record.AgentVersion),
     traceIds: asStringArray(record.TraceIds),
-    finalRequestId: String(record.FinalRequestId ?? ""),
-    userId: String(record.UserId ?? ""),
-    terminalType: String(record.TerminalType ?? ""),
-    entrypoint: String(record.Entrypoint ?? ""),
-    parentSessionId: String(record.ParentSessionId ?? ""),
+    finalRequestId: asString(record.FinalRequestId),
+    userId: asString(record.UserId),
+    terminalType: asString(record.TerminalType),
+    entrypoint: asString(record.Entrypoint),
+    parentSessionId: asString(record.ParentSessionId),
     isFork: Boolean(record.IsFork),
-    repositoryHost: String(record.RepositoryHost ?? ""),
-    repositoryOwner: String(record.RepositoryOwner ?? ""),
-    repositoryName: String(record.RepositoryName ?? ""),
-    gitBranch: String(record.GitBranch ?? ""),
+    repositoryHost: asString(record.RepositoryHost),
+    repositoryOwner: asString(record.RepositoryOwner),
+    repositoryName: asString(record.RepositoryName),
+    gitBranch: asString(record.GitBranch),
     usageByContext: asContextUsageRows(record.UsageByContext),
     gitBranches: asStringArray(record.GitBranches),
-    gitWorktree: String(record.GitWorktree ?? ""),
-    title: String(record.Title ?? ""),
-    titleSource: String(record.TitleSource ?? ""),
+    gitWorktree: asString(record.GitWorktree),
+    title: asString(record.Title),
+    titleSource: asString(record.TitleSource),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -1091,7 +1096,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
 
     toolsDenied: asNumber(record.ToolsDenied),
     toolsAborted: asNumber(record.ToolsAborted),
-    permissionMode: String(record.PermissionMode ?? ""),
+    permissionMode: asString(record.PermissionMode),
     permissionChanges: asNumber(record.PermissionChanges),
     hooksBlocked: asNumber(record.HooksBlocked),
     hooksCancelled: asNumber(record.HooksCancelled),
@@ -1106,15 +1111,15 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     languagesEdited: asStringArray(record.LanguagesEdited),
     atMentions: asNumber(record.AtMentions),
 
-    stopReason: String(record.StopReason ?? ""),
+    stopReason: asString(record.StopReason),
     truncated: Boolean(record.Truncated),
 
     subAgentIds: asStringArray(record.SubAgentIds),
     stepStartedAt: asNumberArray(record.StepStartedAt),
     previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
     metricSeries: asMetricSeriesRows(record.MetricSeries),
-    createdAt: parseClickHouseDateTimeMs(String(record.CreatedAt ?? "")),
-    updatedAt: parseClickHouseDateTimeMs(String(record.UpdatedAt ?? "")),
-    lastEventOccurredAt: parseClickHouseDateTimeMs(String(record.LastEventOccurredAt ?? "")),
+    createdAt: parseClickHouseDateTimeMs(asString(record.CreatedAt)),
+    updatedAt: parseClickHouseDateTimeMs(asString(record.UpdatedAt)),
+    lastEventOccurredAt: parseClickHouseDateTimeMs(asString(record.LastEventOccurredAt)),
   };
 }

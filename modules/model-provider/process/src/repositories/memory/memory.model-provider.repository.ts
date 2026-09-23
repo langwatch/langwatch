@@ -39,7 +39,7 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
       (row) => row.organizationId !== undefined && organizationIds.includes(row.organizationId),
     );
     return {
-      providers: [...new Set(rows.map((row) => row.provider))].sort(),
+      providers: [...new Set(rows.map((row) => row.provider))].toSorted(),
       ...(rows.length === 0
         ? {}
         : { firstModelProviderAt: Math.min(...rows.map((row) => row.createdAt.getTime())) }),

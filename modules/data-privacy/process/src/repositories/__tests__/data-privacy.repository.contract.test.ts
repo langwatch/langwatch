@@ -161,7 +161,9 @@ function contractCases(backend: Backend): void {
       const listed = await repository.findAllInOrganization({ organizationId: acme() });
 
       expect(listed).toHaveLength(2);
-      expect(listed.map((row) => row.personalOnly).toSorted()).toEqual([false, true]);
+      expect(
+        listed.map((row) => row.personalOnly).toSorted((a, b) => Number(a) - Number(b)),
+      ).toEqual([false, true]);
     });
 
     it("removes only the rule it was asked to remove", async () => {

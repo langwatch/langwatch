@@ -1,6 +1,6 @@
 import { AgentSessionUnknownError } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/api-fixture";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { describe, expect, it, vi } from "vitest";
 
 import { instanceChannel } from "../../rules/connected-agent-keys.rules.ts";
@@ -75,11 +75,11 @@ describe("InstanceWatchService subscription lifecycle", () => {
   it("releases a pending subscription when shutdown starts before it answers", async () => {
     const { store, watches, gate } = fixture();
     const pending = watches.ensureWatch(session);
-    const rejected = await expect(pending).rejects.toBeInstanceOf(AgentSessionUnknownError);
+    pending.catch(() => undefined);
     const closing = watches.closeAll();
     gate.resolve();
 
-    await rejected;
+    await expect(pending).rejects.toBeInstanceOf(AgentSessionUnknownError);
     await closing;
     expect(watches.watchCount).toBe(0);
     expect(await store.publish(instanceChannel(session.projectId, session.instanceId), "{}")).toBe(
@@ -91,9 +91,10 @@ describe("InstanceWatchService subscription lifecycle", () => {
   it("removes failed watches so the next poll can subscribe again", async () => {
     const { store, watches, gate, subscribed } = fixture();
     const failure = new Error("subscribe failed");
-    const failed = await expect(watches.ensureWatch(session)).rejects.toBe(failure);
+    const watching = watches.ensureWatch(session);
+    watching.catch(() => undefined);
     gate.reject(failure);
-    await failed;
+    await expect(watching).rejects.toBe(failure);
     expect(watches.watchCount).toBe(0);
 
     subscribed.mockRestore();

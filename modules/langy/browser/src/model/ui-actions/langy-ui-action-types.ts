@@ -6,7 +6,7 @@ import type { z } from "zod";
  */
 export interface LangyUiActionHandler {
   payloadSchema: z.ZodTypeAny;
-  run: (payload: never) => Promise<unknown> | unknown;
+  run: (payload: never) => unknown;
 }
 
 /** Everything the current page can execute, keyed by action kind. */

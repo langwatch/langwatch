@@ -264,7 +264,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         const scope = useOrganizationTeamProject();
         return (
           <div data-testid="scope">
-            {String(scope.isResolved)}|{String(scope.project)}|
+            {String(scope.isResolved)}|{JSON.stringify(scope.project) ?? "undefined"}|
             {String(scope.hasPermission("traces:read"))}
           </div>
         );

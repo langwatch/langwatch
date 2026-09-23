@@ -16,6 +16,18 @@ import {
 } from "../../channels/http/http.github-api.channel.ts";
 import type { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
 
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
   privateKeyEncoding: { type: "pkcs1", format: "pem" },
@@ -124,9 +136,11 @@ describe("mintInstallationToken", () => {
 
       expect(result.token).toBe("ghs_minted");
       // Exactly one GitHub call (the mint) and the request scopes the token.
-      const mintCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/access_tokens"));
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
       expect(mintCall).toBeDefined();
-      const body = JSON.parse(String(mintCall?.[1]?.body));
+      const body = JSON.parse(requestBody(mintCall?.[1]));
       expect(body.repository_ids).toEqual([42]);
       expect(body.permissions).toEqual(GITHUB_WRITE_PERMISSIONS);
 
@@ -154,7 +168,9 @@ describe("mintInstallationToken", () => {
       await svc.mintInstallationToken({ installationId: "5" });
       await svc.mintInstallationToken({ installationId: "5" });
 
-      const mintCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/access_tokens"));
+      const mintCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
       expect(mintCalls).toHaveLength(1);
     });
   });
@@ -180,7 +196,9 @@ describe("mintInstallationToken", () => {
         repositoryIds: ["7"],
       });
 
-      const mintCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/access_tokens"));
+      const mintCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
       expect(mintCalls).toHaveLength(2);
     });
   });
@@ -270,7 +288,7 @@ describe("mintInstallationToken", () => {
 
       expect(results.every((r) => r.token === "ghs_cached")).toBe(true);
       const livenessCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/app/installations/5"),
+        requestUrl(c[0]).includes("/app/installations/5"),
       );
       expect(livenessCalls).toHaveLength(1);
     });
@@ -297,7 +315,7 @@ describe("mintInstallationToken", () => {
       await svc.mintInstallationToken({ installationId: "5" });
 
       const livenessCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/app/installations/5"),
+        requestUrl(c[0]).includes("/app/installations/5"),
       );
       expect(livenessCalls).toHaveLength(1);
     });
@@ -322,7 +340,7 @@ describe("mintInstallationToken", () => {
       await svc.mintInstallationToken({ installationId: "5" });
 
       const livenessCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/app/installations/5"),
+        requestUrl(c[0]).includes("/app/installations/5"),
       );
       expect(livenessCalls).toHaveLength(2);
     });
@@ -343,7 +361,7 @@ describe("mintInstallationToken", () => {
       expect(first.token).toBe("ghs_cached");
       expect(second.token).toBe("ghs_cached");
       const livenessCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/app/installations/5"),
+        requestUrl(c[0]).includes("/app/installations/5"),
       );
       expect(livenessCalls).toHaveLength(1);
     });
@@ -356,7 +374,7 @@ describe("listPullRequestsForHead", () => {
     it("mints a repository-scoped token that can only read pull requests", async () => {
       const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const urlText = String(url);
+        const urlText = requestUrl(url);
         if (urlText.includes("/access_tokens")) {
           return new Response(
             JSON.stringify({
@@ -381,8 +399,10 @@ describe("listPullRequestsForHead", () => {
         branch: "feature/thing",
       });
 
-      const mintCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/access_tokens"));
-      const body = JSON.parse(String(mintCall?.[1]?.body));
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
+      const body = JSON.parse(requestBody(mintCall?.[1]));
       expect(body.permissions).toEqual(GITHUB_READ_PULL_PERMISSIONS);
       expect(body.permissions).not.toHaveProperty("contents");
       expect(body.repository_ids).toEqual([42]);
@@ -391,7 +411,7 @@ describe("listPullRequestsForHead", () => {
     it("asks for the branch's pull requests in any state", async () => {
       const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const urlText = String(url);
+        const urlText = requestUrl(url);
         if (urlText.includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,
@@ -426,9 +446,9 @@ describe("listPullRequestsForHead", () => {
         branch: "feature/thing",
       });
 
-      const readCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/pulls"));
-      expect(String(readCall?.[0])).toContain("head=acme%3Afeature%2Fthing");
-      expect(String(readCall?.[0])).toContain("state=all");
+      const readCall = fetchMock.mock.calls.find((c) => requestUrl(c[0]).includes("/pulls"));
+      expect(requestUrl(readCall?.[0])).toContain("head=acme%3Afeature%2Fthing");
+      expect(requestUrl(readCall?.[0])).toContain("state=all");
       expect(pulls).toEqual([
         {
           number: 7,
@@ -450,7 +470,7 @@ describe("listPullRequestsForHead", () => {
     it("reports a rate limit, not a permission failure", async () => {
       const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const urlText = String(url);
+        const urlText = requestUrl(url);
         if (urlText.includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,
@@ -483,7 +503,7 @@ describe("listPullRequestsForHead", () => {
     it("reports it as unreachable rather than as an unknown failure", async () => {
       const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const urlText = String(url);
+        const urlText = requestUrl(url);
         if (urlText.includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,

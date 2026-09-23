@@ -99,8 +99,10 @@ import PeoplePage from "../governance-people.screen.tsx";
 
 const seenAt = new Date("2026-08-01T00:00:00.000Z");
 
+const personKey = (value: unknown): string => (typeof value === "string" ? value : "x");
+
 const discovered = (over: Record<string, unknown>) => ({
-  id: `person_${String(over.id ?? over.displayText ?? "x")}`,
+  id: `person_${personKey(over.id ?? over.displayText)}`,
   provider: "copilot_studio_dataverse",
   kind: "person",
   displayText: "Someone",

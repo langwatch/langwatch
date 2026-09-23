@@ -679,12 +679,12 @@ describe("LangyUiActionService", () => {
           payload: { targetId: "t1" },
           experimentSlug: "my-exp",
         });
-        const settled = await expect(dispatch).rejects.toMatchObject({
-          code: "langy_ui_timeout",
-        });
+        dispatch.catch(() => undefined);
 
         await vi.advanceTimersByTimeAsync(UI_ACTION_MAX_BUDGET_MS);
-        await settled;
+        await expect(dispatch).rejects.toMatchObject({
+          code: "langy_ui_timeout",
+        });
       } finally {
         vi.useRealTimers();
       }

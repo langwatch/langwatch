@@ -1,7 +1,7 @@
 type ChatRole = "system" | "user" | "assistant" | "tool";
 
 interface ChatMessage {
-  role?: ChatRole | string;
+  role?: string;
   content?: unknown;
   tool_calls?: { function?: { name?: string } }[];
 }

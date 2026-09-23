@@ -16,10 +16,10 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listSimulationRunsCommand } from "../list";
-import { getSimulationRunCommand } from "../get";
-import { setOutputFormat } from "../../../utils/outputScope";
 import { stripAnsi } from "../../../utils/formatting";
+import { setOutputFormat } from "../../../utils/outputScope";
+import { getSimulationRunCommand } from "../get";
+import { listSimulationRunsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -505,7 +505,9 @@ describe("getSimulationRunCommand()", () => {
       expect(printed).toContain("The query groups by month, not by quarter");
       expect(printed).toContain("score 0.8");
       expect(printed).toContain("no table_schema on this scenario");
-      expect((result?.data as { results: { evaluations: unknown[] } }).results.evaluations).toHaveLength(3);
+      expect(
+        (result?.data as { results: { evaluations: unknown[] } } | undefined)?.results.evaluations,
+      ).toHaveLength(3);
     });
   });
 });

@@ -322,7 +322,7 @@ function formatValue(val: unknown): string {
   if (Array.isArray(val) || typeof val === "object") {
     return JSON.stringify(val);
   }
-  return String(val);
+  return typeof val === "string" ? val : (JSON.stringify(val) ?? "");
 }
 
 function filterAttributesBySearch(
@@ -581,7 +581,7 @@ function EditableValueCell({
   const display = formatValue(value);
   // `formatValue` is the read-only renderer and answers an em dash for an
   // empty value, which must never become text the reviewer is editing.
-  const writtenValue = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const writtenValue = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
   const editorText = value === undefined || value === null ? "" : writtenValue;
 
   if (editing.isRemoved) {

@@ -68,8 +68,8 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
 
         await repository.findByHashedSecret("hash-current");
 
-        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
-        expect(or[0]).toEqual({ hashedSecret: "hash-current" });
+        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] } | undefined)?.OR;
+        expect(or?.[0]).toEqual({ hashedSecret: "hash-current" });
       });
 
       it("also accepts the previous secret, but only while its window is open", async () => {
@@ -77,8 +77,8 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
 
         await repository.findByHashedSecret("hash-previous");
 
-        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
-        const previous = or[1] as {
+        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] } | undefined)?.OR;
+        const previous = (or ?? [])[1] as {
           previousHashedSecret: string;
           previousSecretValidUntil: { gt: Date };
         };
@@ -127,7 +127,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
           previousSecretValidUntil: nowInstant(),
         });
 
-        expect((calls[0]?.args.data as { revision: unknown }).revision).toEqual({
+        expect((calls[0]?.args.data as { revision: unknown } | undefined)?.revision).toEqual({
           increment: 1n,
         });
       });
@@ -157,7 +157,9 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
           revokedById: "user-1",
         });
 
-        expect((calls[0]?.args.data as { revokedAt: unknown }).revokedAt).toBeInstanceOf(Date);
+        expect(
+          (calls[0]?.args.data as { revokedAt: unknown } | undefined)?.revokedAt,
+        ).toBeInstanceOf(Date);
       });
     });
   });

@@ -111,8 +111,8 @@ export class AutomationProviderRegistryService {
     action: TriggerAction,
     args: PersistActionParamsArgs,
   ): Promise<unknown> {
-    const hook = this.providers[action].server.persistActionParams;
-    return hook ? hook(args) : args.incoming;
+    const { server } = this.providers[action];
+    return server.persistActionParams ? server.persistActionParams(args) : args.incoming;
   }
 
   /** Strips secrets from stored `actionParams` before the row leaves. */
@@ -122,8 +122,8 @@ export class AutomationProviderRegistryService {
     // whatever secrets that action stored, so return nothing instead.
     const entry = this.providers[action] as ServerEntry | undefined;
     if (!entry) return {};
-    const hook = entry.server.redactActionParams;
-    return hook ? hook(params) : params;
+    const { server } = entry;
+    return server.redactActionParams ? server.redactActionParams(params) : params;
   }
 
   /** The Slack bot token behind a delivery, or null when none is stored. */

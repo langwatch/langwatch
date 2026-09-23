@@ -71,7 +71,7 @@ export const encodePropsFragment = (props: unknown): string =>
   `#${PROPS_KEY}=${toBase64Url(JSON.stringify(props ?? null))}`;
 
 /** A fragment nobody hand-typed correctly falls back to the fixture, not a crash. */
-export const decodePropsFragment = (hash: string): unknown | undefined => {
+export const decodePropsFragment = (hash: string): unknown => {
   const encoded = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get(PROPS_KEY);
   if (!encoded) return undefined;
   try {

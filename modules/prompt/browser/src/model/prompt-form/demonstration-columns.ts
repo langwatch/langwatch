@@ -85,6 +85,6 @@ function inputOutputTypeToDatasetColumnType(
       return "json";
     default:
       type_ satisfies never;
-      throw new Error(`Unknown input/output type: ${type_}`);
+      throw new Error(`Unknown input/output type: ${JSON.stringify(type_)}`);
   }
 }

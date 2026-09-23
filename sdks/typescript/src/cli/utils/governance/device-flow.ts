@@ -6,6 +6,7 @@
 
 import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
+
 import { normalizeEndpoint } from "../../../internal/endpoint";
 
 export interface DeviceCode {
@@ -233,14 +234,13 @@ function watchDeviceApproval({
 }): { settled: Promise<void>; close: () => void } {
   const controller = new AbortController();
   const settled = new Promise<void>((resolve) => {
-    readApprovalStream({ opts, deviceCode, signal: controller.signal }).then(
-      (sawFrame) => {
+    readApprovalStream({ opts, deviceCode, signal: controller.signal })
+      .then((sawFrame) => {
         if (sawFrame) resolve();
-      },
-      () => {
+      })
+      .catch(() => {
         // Never settles: polling stays in charge.
-      },
-    );
+      });
   });
   return { settled, close: () => controller.abort() };
 }

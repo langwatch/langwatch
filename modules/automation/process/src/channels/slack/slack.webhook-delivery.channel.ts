@@ -40,11 +40,13 @@ export interface RenderedSlackMessageRequest {
  * need escaping, stopping trace content from forging links/formatting.
  * https://api.slack.com/reference/surfaces/formatting#escaping
  */
+const filterText = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
+};
+
 const escapeMrkdwn = (value: unknown): string =>
-  String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  filterText(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 interface TriggerData {
   traceId?: string;

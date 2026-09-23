@@ -231,7 +231,7 @@ export function setFacetValueAtLocation({
   }
   try {
     const ast = parse(currentQuery);
-    let fieldName: string | null = null;
+    const found: { fieldName: string | null } = { fieldName: null };
     walkAST(ast, (node) => {
       if (node.type !== "Tag") {
         return;
@@ -245,8 +245,9 @@ export function setFacetValueAtLocation({
       if (node.expression.type !== "LiteralExpression") {
         return;
       }
-      fieldName = node.field.name;
+      found.fieldName = node.field.name;
     });
+    const { fieldName } = found;
     if (fieldName === null) {
       return currentQuery;
     }

@@ -45,7 +45,7 @@ describe("ClickHouseFacetRegistryAdapter.FACET_REGISTRY shape", () => {
       seen.set(def.key, (seen.get(def.key) ?? 0) + 1);
     }
     const dupes = [...seen.entries()].filter(([, n]) => n > 1);
-    expect(dupes, `duplicate facet keys: ${dupes}`).toEqual([]);
+    expect(dupes, `duplicate facet keys: ${dupes.join(", ")}`).toEqual([]);
   });
 
   describe("given a facet label", () => {

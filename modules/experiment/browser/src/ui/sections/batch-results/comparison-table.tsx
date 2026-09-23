@@ -300,7 +300,7 @@ const getGroupValueForRow = (row: ComparisonRow, groupBy: string): string => {
     const value = entry?.[groupBy];
     if (value === null || value === undefined || value === "") continue;
     if (typeof value === "object") continue;
-    return String(value);
+    return typeof value === "string" ? value : JSON.stringify(value);
   }
   return GROUP_UNSPECIFIED;
 };

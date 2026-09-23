@@ -92,7 +92,7 @@ const unwrapSingleArg = (value: unknown): unknown => {
 };
 
 /** The parsed value of one `ClassName(...)` repr, or none when the grammar refuses it. */
-const parsePythonRepr = (input: string): unknown | undefined => {
+const parsePythonRepr = (input: string): unknown => {
   const match = grammar.match(input);
   if (!match.succeeded()) return undefined;
 

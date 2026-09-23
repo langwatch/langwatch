@@ -27,7 +27,7 @@ describe("RecordMetricDataPointCommand", () => {
       data,
     };
 
-    const events = await new RecordMetricDataPointCommand().handle(command);
+    const events = new RecordMetricDataPointCommand().handle(command);
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({

@@ -1,6 +1,6 @@
 export const camelCaseToTitleCase = (input: string): string => {
   if (typeof input !== "string") {
-    return `${input}`;
+    return JSON.stringify(input);
   }
   // Replace camelCase with spaces and capitalize the first letter of each word
   return titleCase(

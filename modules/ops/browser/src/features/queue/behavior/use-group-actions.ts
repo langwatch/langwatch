@@ -52,10 +52,10 @@ export function useGroupActions(target: GroupTarget) {
   });
 
   const copyGroupId = () => {
-    navigator.clipboard.writeText(target.groupId).then(
-      () => toaster.create({ title: "Group ID copied", type: "success" }),
-      () => toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
-    );
+    navigator.clipboard
+      .writeText(target.groupId)
+      .then(() => toaster.create({ title: "Group ID copied", type: "success" }))
+      .catch(() => toaster.create({ title: "Couldn't copy the group ID", type: "error" }));
   };
 
   return {

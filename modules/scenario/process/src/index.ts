@@ -9,7 +9,7 @@ export {
   scenarioDeferredComputeRunMetricsJob,
 } from "./eventing/compute-run-metrics.commands.ts";
 export type { ComputeRunMetricsDeps } from "./eventing/compute-run-metrics.commands.ts";
-export { FinishRunCommand, type FinishRunDeps } from "./eventing/finish-run.commands.ts";
+export type { FinishRunDeps } from "./eventing/finish-run.commands.ts";
 export {
   RecordEvaluationsCommand,
   type RecordEvaluationsDeps,
@@ -20,12 +20,6 @@ export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.ser
 export * from "./services/node-scenario-child-process.service.ts";
 export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
-export {
-  CANCELLATION_CHANNEL,
-  RedisCancellationPublisherAdapter,
-  UnavailableCancellationPublisherAdapter,
-  type CancellationPublisher,
-} from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
 export * from "./services/scenario-child-execution.service.ts";
 export * from "./services/serialized-agent-registry.service.ts";
@@ -74,10 +68,6 @@ export type {
 } from "./app/scenario.app.ts";
 export { STALL_THRESHOLD_MS } from "./eventing/simulation-run-execution-evolution.process.ts";
 export * from "./eventing/simulation-run-execution.process.ts";
-export {
-  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-  simulationRunExecutionPM,
-} from "./eventing/simulation-run-execution.process.ts";
 export type { SimulationRunStateData } from "./eventing/simulation-run-state.projection.ts";
 export {
   MAX_CODE_SCENARIOS,

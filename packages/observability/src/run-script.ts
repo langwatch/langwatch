@@ -22,7 +22,7 @@ export async function runScript({
   main,
 }: {
   name: string;
-  main: () => Promise<unknown> | unknown;
+  main: () => unknown;
 }): Promise<void> {
   try {
     await main();
@@ -110,7 +110,7 @@ export function processFailureLine({
 }): string {
   const failure = error instanceof Error ? error : void 0;
   const code = failure === void 0 ? void 0 : (failure as { code?: unknown }).code;
-  const message = failure?.message ?? (error === void 0 ? void 0 : String(error));
+  const message = failure?.message ?? (error === void 0 ? void 0 : JSON.stringify(error));
   return `${JSON.stringify({
     level: "fatal",
     time: new Date().toISOString(),

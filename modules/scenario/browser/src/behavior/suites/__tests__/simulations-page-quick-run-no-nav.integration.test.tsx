@@ -272,7 +272,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     describe("when the user is on All Runs", () => {
       beforeEach(async () => {
         routerQueryPath.current = undefined;
-        await renderSimulationsPage();
+        renderSimulationsPage();
         expect(capturedOnRunScheduled.current).not.toBeNull();
       });
 
@@ -294,7 +294,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     describe("when the user is on a different suite's detail page", () => {
       beforeEach(async () => {
         routerQueryPath.current = ["run-plans", "other-suite-slug"];
-        await renderSimulationsPage();
+        renderSimulationsPage();
         expect(capturedOnRunScheduled.current).not.toBeNull();
         capturedOnRunScheduled.current!("suite_target", "batch_002");
       });
@@ -312,7 +312,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     describe("when the user is on the same suite's detail page", () => {
       beforeEach(async () => {
         routerQueryPath.current = ["run-plans", "target-suite-slug"];
-        await renderSimulationsPage();
+        renderSimulationsPage();
         expect(capturedOnRunScheduled.current).not.toBeNull();
         capturedOnRunScheduled.current!("suite_target", "batch_003");
       });
@@ -338,7 +338,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         const user = userEvent.setup();
         routerQueryPath.current = undefined; // Start on All Runs
 
-        await renderSimulationsPage();
+        renderSimulationsPage();
 
         // Open the suite editor drawer — this causes SimulationsPage to call
         // setFlowCallbacks("suiteEditor", { onSaved, onRunRequested }) which
@@ -390,7 +390,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
       it("calls router push toward the run plan detail page", async () => {
         routerQueryPath.current = undefined; // Start on All Runs
 
-        await renderSimulationsPage();
+        renderSimulationsPage();
 
         expect(capturedOnViewRun.current).not.toBeNull();
 

@@ -36,7 +36,7 @@ function encodeAttributes(attributes: Record<string, unknown>): string {
               ? { type: "double", value }
               : { type: "string", value: String(value) },
       }))
-      .sort((left, right) => left.key.localeCompare(right.key)),
+      .toSorted((left, right) => left.key.localeCompare(right.key)),
   );
 }
 

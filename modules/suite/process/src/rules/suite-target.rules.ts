@@ -40,7 +40,7 @@ export function isAgentTarget(target: SuiteTarget): boolean {
     default: {
       const unhandledType: never = target.type;
 
-      throw new Error(`Unsupported suite target type: ${unhandledType}`);
+      throw new Error(`Unsupported suite target type: ${JSON.stringify(unhandledType)}`);
     }
   }
 }

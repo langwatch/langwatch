@@ -79,6 +79,11 @@ const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
  * the anchored `Code: <n>.` prefix. The symbolic name is never searched for in the
  * message — it echoes the query, so a caller could otherwise pick its own error code.
  */
+function errorCodeOf(error: object): string {
+  const code: unknown = "code" in error ? error.code : void 0;
+  return typeof code === "string" || typeof code === "number" ? String(code) : "";
+}
+
 function raisedServerError({
   error,
   variants,
@@ -87,7 +92,7 @@ function raisedServerError({
   variants: readonly ServerError[];
 }): boolean {
   const type = (error as { type?: string }).type;
-  const code = String((error as { code?: unknown }).code ?? "");
+  const code = errorCodeOf(error);
   const messageCode = /^Code:\s*(\d+)/.exec(error.message)?.[1] ?? "";
   return variants.some(
     (variant) =>
@@ -208,7 +213,7 @@ export function translateClickHouseQueryError(error: unknown, durationMs: number
     return new QueryScanLimitExceededError({ reasons: [toError(error)] });
   }
 
-  const errno = String((error as { code?: unknown }).code ?? "");
+  const errno = errorCodeOf(error);
   const status =
     (error as { statusCode?: number }).statusCode ?? (error as { status?: number }).status;
   if (TRANSIENT_NETWORK_CODES.has(errno) || status === 502 || status === 503) {

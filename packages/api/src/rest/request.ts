@@ -887,7 +887,7 @@ export { defineRestMiddleware, type RestTransportMiddleware };
 
 export interface RestTransportMiddlewareBinding {
   readonly middleware: RestTransportMiddleware;
-  resolve(context: Context): unknown | Promise<unknown>;
+  resolve(context: Context): unknown;
 }
 
 /** A composition root binds request access; handlers receive only the parsed result. */

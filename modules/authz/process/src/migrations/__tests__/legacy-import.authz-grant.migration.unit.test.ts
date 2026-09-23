@@ -213,10 +213,12 @@ describe("given an organization with legacy access rows", () => {
 
     expect(
       (
-        sent.find(({ kind }) => kind === "attachGrant")?.payload.grant as {
-          actor: unknown;
-        }
-      ).actor,
+        sent.find(({ kind }) => kind === "attachGrant")?.payload.grant as
+          | {
+              actor: unknown;
+            }
+          | undefined
+      )?.actor,
     ).toEqual({ type: "system", id: AUTHZ_ENGINE_ACTOR_ID });
   });
 
@@ -993,10 +995,11 @@ describe("given an organization with legacy access rows", () => {
       await migration.migrateTenant({ tenantId: ORG_ID });
 
       const deletions = sent.filter((entry) => entry.kind === "deleteRole");
-      expect(deletions.map((entry) => entry.payload.roleId).toSorted()).toEqual([
-        "role_gone",
-        "role_system",
-      ]);
+      expect(
+        deletions
+          .map((entry) => entry.payload.roleId)
+          .toSorted((a, b) => String(a).localeCompare(String(b))),
+      ).toEqual(["role_gone", "role_system"]);
     });
 
     /** @scenario "A custom role deleted before the migration finished stays deleted" */

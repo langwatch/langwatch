@@ -121,7 +121,7 @@ export const langyTurnContextSchema = z.object({
 
 export function sanitizeLangyPromptValue(value: string, max: number): string {
   return value
-    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/\p{Cc}+/gu, " ")
     .replace(/[`]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()

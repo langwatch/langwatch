@@ -7,6 +7,7 @@
 import * as fs from "node:fs";
 import * as net from "node:net";
 
+import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import {
   ensureSocketDir,
   inspectSocketTrust,
@@ -21,7 +22,6 @@ import {
   type ClientFrame,
   type ServerFrame,
 } from "./protocol";
-import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import { createCommandExecutor, type CommandExecutor } from "./runner";
 import { noopTelemetry, type DaemonTelemetry } from "./telemetry";
 
@@ -492,13 +492,13 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
           });
           execution = running;
 
-          running.completed.then(
-            (code) => {
+          running.completed
+            .then((code) => {
               send({ t: "exit", code });
               finish();
               endRequest();
-            },
-            (error: unknown) => {
+            })
+            .catch((error: unknown) => {
               // The window could not be applied — almost always because the
               // caller's cwd was deleted. No output has been produced, so the
               // client can safely run the command itself.
@@ -508,8 +508,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
               });
               finish();
               endRequest();
-            },
-          );
+            });
           return;
         }
       }

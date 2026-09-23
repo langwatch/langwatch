@@ -14,11 +14,16 @@ function toNumber(value: CellValue): Converted {
   const isNumeric = !Number.isNaN(Number(value));
   if (!isNumeric) return null;
 
-  return { value: Number.parseFloat(String(value)) };
+  return { value: Number(value) };
+}
+
+function cellText(value: CellValue): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function toBoolean(value: CellValue): Converted {
-  const normalizedValue = String(value ?? "").toLowerCase();
+  const normalizedValue = cellText(value).toLowerCase();
   if (TRUE_VALUES.has(normalizedValue)) return { value: true };
   if (FALSE_VALUES.has(normalizedValue)) return { value: false };
 

@@ -290,7 +290,11 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
   }
 
   private stringValue(value: unknown): string {
-    return String(value ?? "");
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
+      return String(value);
+    }
+    return value == null ? "" : JSON.stringify(value);
   }
 
   private stringArray(value: unknown): string[] {

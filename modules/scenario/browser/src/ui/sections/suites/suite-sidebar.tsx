@@ -46,10 +46,10 @@ import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 type SuiteSidebarProps = {
   projectSlug: string;
   suites: SimulationSuite[];
-  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  selectedSuiteSlug: string | null;
   runSummaries?: Map<string, SuiteRunSummary>;
   externalSets?: ExternalSetSummary[];
-  onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  onSelectSuite: (slug: string) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
   /** When set, the empty state offers a "New Run Plan" call to action. */

@@ -142,7 +142,7 @@ export class WebhookApp implements WebhookApiContract {
         endpoints: input.repositories.endpoints,
         processStore: input.repositories.processStore,
       }),
-      assertEndpointsEntitled: built.assertEndpointsEntitled,
+      assertEndpointsEntitled: built.assertEndpointsEntitled.bind(built),
       dispatch: built.dispatch,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
