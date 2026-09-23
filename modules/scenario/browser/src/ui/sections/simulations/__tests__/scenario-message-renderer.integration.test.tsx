@@ -260,7 +260,7 @@ describe("<ScenarioMessageRenderer/>", () => {
           input_audio: { url: "/api/files/test-id", mimeType: "audio/mpeg" },
         },
       ],
-    } as unknown as SimulationMessage;
+    };
 
     it("renders a media-part-audio element whose src is the file url (drawer variant)", () => {
       renderWith([urlShapeMessage]);
@@ -305,7 +305,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               filename: "voice-turn.bin",
             },
           ],
-        } as unknown as SimulationMessage,
+        },
       ]);
 
       // Graceful fallback present; no broken <audio> element rendered.
@@ -418,7 +418,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               role: "assistant",
               trace_id: "trace_voice",
               content: parts,
-            } as unknown as SimulationMessage,
+            },
           ]);
 
           // Exactly one audio element and one turn separator — no duplicate bubble.
@@ -456,7 +456,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               },
             },
           ],
-        } as unknown as SimulationMessage,
+        },
       ]);
 
       const audio = screen.getByTestId("media-part-audio");
@@ -481,7 +481,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               },
             },
           ],
-        } as unknown as SimulationMessage,
+        },
       ]);
 
       // Exactly one audio bubble.
@@ -519,7 +519,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               },
             },
           ],
-        } as unknown as SimulationMessage,
+        },
         {
           id: "msg_simulator_turn",
           role: "user",
@@ -533,7 +533,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               },
             },
           ],
-        } as unknown as SimulationMessage,
+        },
       ]);
 
       // Two audio players, one per turn — the callee turn is rendered, not dropped.

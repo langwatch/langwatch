@@ -12,7 +12,7 @@ import {
 } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
 import { type EvaluatorAttachment, scenarioMappingSources } from "@langwatch/scenario-contract";
 import type React from "react";
-import { type FieldValues, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { vi } from "vitest";
 
 import { useOpenScenarioEvaluatorEditor } from "../../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
@@ -57,7 +57,20 @@ export const SQL_EVALUATOR: AttachableEvaluator = {
 };
 
 /** The parts of the controller that stay the same across every fixture. */
-const STATIC_CONTROLLER_FIXTURE = {
+const STATIC_CONTROLLER_FIXTURE: Omit<
+  EvaluatorEditorController,
+  | "form"
+  | "onMappingChange"
+  | "gate"
+  | "required"
+  | "onRequiredChange"
+  | "onRemove"
+  | "handleSave"
+  | "handleClose"
+  | "handleDiscard"
+  | "handleApply"
+  | "flushLocalConfig"
+> = {
   evaluatorId: "eval_sql",
   evaluatorType: "ragas/sql_query_equivalence",
   evaluatorDef: undefined,
@@ -109,7 +122,7 @@ function buildController({
   onRemove,
   onMappingChange,
 }: {
-  form: ReturnType<typeof useForm>;
+  form: EvaluatorEditorController["form"];
   gate: EvaluatorGateConfig | undefined;
   required: boolean;
   onRequiredChange?: (required: boolean) => void;
@@ -129,7 +142,7 @@ function buildController({
     handleDiscard: vi.fn(),
     handleApply: vi.fn(),
     flushLocalConfig: vi.fn(),
-  } as unknown as EvaluatorEditorController;
+  };
 }
 
 /** The real drawer body and footer over a real form, with the gate wired. */
@@ -146,7 +159,7 @@ export function Harness({
   onRemove?: () => void;
   onMappingChange?: (identifier: string, mapping: unknown) => void;
 }) {
-  const form = useForm<FieldValues>({
+  const form = useForm<{ name: string; settings: Record<string, unknown> }>({
     defaultValues: { name: "SQL Equivalence", settings: {} },
   });
   const controller = buildController({

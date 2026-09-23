@@ -9,8 +9,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { posthogCapture } = vi.hoisted(() => ({ posthogCapture: vi.fn() }));
 vi.mock("posthog-js", () => ({
-  default: { capture: vi.fn() },
+  default: { capture: posthogCapture },
 }));
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
@@ -32,11 +33,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: vi.fn(() => ({ query: routerQuery })),
 }));
 
-import posthog from "posthog-js";
-// posthog-js declares `capture` as a method (lib type we cannot edit), so
-// referencing it unbound for the mock assertion below needs a local type
-// that carries it as a plain function property instead.
-const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
@@ -106,7 +102,7 @@ describe("<NewSimulationsCallout />", () => {
       fireEvent.click(bodyLink());
 
       expect(isLegacySimulationsPreferred("project-1")).toBe(true);
-      expect(mockedPosthog.capture).toHaveBeenCalledWith(
+      expect(posthogCapture).toHaveBeenCalledWith(
         "new_simulations_callout_back_click",
         expect.objectContaining({ surface: "agent_testing_sidebar" }),
       );

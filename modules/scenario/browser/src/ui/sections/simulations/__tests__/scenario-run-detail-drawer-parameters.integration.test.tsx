@@ -101,7 +101,7 @@ function buildRunState(metadata: Record<string, unknown> | null) {
     messages: [],
     timestamp: 1785177315009,
     durationInMs: 8400,
-  } as unknown as ScenarioRunData;
+  };
 }
 
 function renderDrawer() {

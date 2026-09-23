@@ -13,8 +13,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { posthogCapture } = vi.hoisted(() => ({ posthogCapture: vi.fn() }));
 vi.mock("posthog-js", () => ({
-  default: { capture: vi.fn() },
+  default: { capture: posthogCapture },
 }));
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
@@ -32,11 +33,6 @@ vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
   })),
 }));
 
-import posthog from "posthog-js";
-// posthog-js declares `capture` as a method (lib type we cannot edit), so
-// referencing it unbound for the mock assertion below needs a local type
-// that carries it as a plain function property instead.
-const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
@@ -95,7 +91,7 @@ describe("<ReturnToNewSimulationsBanner />", () => {
 
         expect(isLegacySimulationsPreferred("project-1")).toBe(false);
         expect(localStorage.getItem(SNOOZE_KEY)).toBeNull();
-        expect(mockedPosthog.capture).toHaveBeenCalledWith(
+        expect(posthogCapture).toHaveBeenCalledWith(
           "new_simulations_banner_return_click",
           expect.objectContaining({ surface: "scenario_library" }),
         );
