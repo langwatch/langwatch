@@ -1,13 +1,13 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
+import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 
-import { readableDate } from "../../model/display-formatters.ts";
 import { getEvaluationColumns } from "../../model/experiments/BatchEvaluationV2/utils.ts";
 
 /**

@@ -14,10 +14,6 @@
       "langwatch-declaration-source": "./src/github.web.ts",
       "types": "./dist/github.web.d.ts",
       "default": "./src/github.web.ts"
-    },
-    "./surfaces/github-connect-popup": {
-      "types": "./dist/behavior/github-connect-popup.d.ts",
-      "default": "./src/behavior/github-connect-popup.ts"
     }
   },
   "scripts": {

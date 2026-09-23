@@ -1,5 +1,5 @@
 import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useLangyStore, useReducedMotion, ACCENT, CARD } from "@langwatch/langy-browser-kit";
 import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { ACCENT, CARD } from "../../../../model/asaplangy-tokens.ts";
 import { type LangyFeedbackSentiment } from "../../../../model/langy-feedback-directive.ts";
 import { useLangyFeedback } from "../../behavior/data/use-langy-feedback.ts";
 

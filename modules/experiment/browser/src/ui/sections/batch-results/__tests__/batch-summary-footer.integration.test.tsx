@@ -5,13 +5,11 @@ import "@testing-library/jest-dom/vitest";
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type BatchRunSummary, BatchSummaryFooter } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { BatchRunSummary } from "../batch-runs-sidebar.tsx";
-import { BatchSummaryFooter } from "../batch-summary-footer.tsx";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (

@@ -1,4 +1,5 @@
 import { Badge, Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {
@@ -12,7 +13,6 @@ import {
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import { useDrawer } from "../../../../behavior/use-drawer.ts";
-import { formatDuration } from "../../../../model/display-formatters.ts";
 import type { PromptReference } from "../../../../model/prompt-attributes.ts";
 import {
   extractPromptReference,

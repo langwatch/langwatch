@@ -1,9 +1,8 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
+import { useUIStore } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, BookOpen, X } from "lucide-react";
 import type React from "react";
-
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 /**
  * Severity of a query-state issue — drives the SearchBar's border tint and the matching

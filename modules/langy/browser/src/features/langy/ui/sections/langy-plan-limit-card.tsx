@@ -1,12 +1,11 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore, LangyCard } from "@langwatch/langy-browser-kit";
 import { ArrowUpRight, Crown } from "lucide-react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePlanManagementUrl } from "../../../../behavior/use-plan-management-url.ts";
 import { trackEvent } from "../../../../model/tracking.ts";
-import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
 
 /**

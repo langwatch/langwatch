@@ -5,7 +5,6 @@ import { LuCalendarClock } from "react-icons/lu";
 // Imported HERE, not just via Langy components, so the greeting, banner, and
 // recents headings render the real face on every home — including the one
 // where no Langy surface mounts.
-import "@langwatch/langy-browser/surfaces/langy-theme.css";
 import { homeApi } from "../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { BriefingMockSwitcher, HomeBriefingSection, SetupHairline } from "./briefing/index.ts";

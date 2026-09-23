@@ -1,5 +1,5 @@
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore, LangyCard } from "@langwatch/langy-browser-kit";
 /**
  * Developer-mode card gallery — every card Langy can produce, on demand.
  *
@@ -32,7 +32,6 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import type { LangyPermissionCardData } from "../../../../model/langy-local-waits.ts";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
-import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
 import {
   explainLangyError,

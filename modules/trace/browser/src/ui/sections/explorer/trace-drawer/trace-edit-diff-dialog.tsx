@@ -1,9 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import {
-  computeLineDiff,
-  type DiffLine,
-  diffStat,
-} from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import { computeLineDiff, type DiffLine, diffStat } from "@langwatch/coding-agent-browser-kit";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { useMemo, useState } from "react";
 

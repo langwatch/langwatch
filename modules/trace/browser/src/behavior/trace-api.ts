@@ -10,7 +10,7 @@ import type {
   AnnotationScore,
 } from "@langwatch/annotation-contract";
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
-import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-browser-kit";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type {
   Dataset,

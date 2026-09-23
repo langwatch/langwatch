@@ -1,4 +1,4 @@
-import type { SeriesInputType } from "@langwatch/analytics-browser/surfaces/analytics-registry";
+import type { SeriesInputType } from "@langwatch/analytics-browser-kit";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 // The single canonical encoder for `getTimeseries` bucket keys (ADR-034
 // app-layer module). Reused — not re-implemented — so this reader can never

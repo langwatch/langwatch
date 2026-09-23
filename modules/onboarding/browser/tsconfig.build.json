@@ -6,23 +6,7 @@
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
     "files": [
-    "./src/model/observability/types.ts",
-    "./src/model/shared/build-mcp-config.ts",
     "./src/onboarding.web.ts",
-    "./src/ui/blocks/observability/docs-links.tsx",
-    "./src/ui/blocks/tech-stack.tsx",
-    "./src/ui/elements/onboarding-mesh-background.tsx",
-    "./src/ui/sections/active-project-context.tsx",
-    "./src/ui/sections/observability/code-preview.tsx",
-    "./src/ui/sections/observability/codegen/registry.tsx",
-    "./src/ui/sections/observability/framework-grid.tsx",
-    "./src/ui/sections/observability/framework-integration-code.tsx",
-    "./src/ui/sections/observability/install-preview.tsx",
-    "./src/ui/sections/observability/platform-grid.tsx",
-    "./src/ui/sections/observability/ui-options.ts",
-    "./src/ui/sections/shared/inline-copy-button.tsx",
-    "./src/ui/sections/via-claude-code-screen.tsx",
-    "./src/ui/sections/via-claude-desktop-screen.tsx"
   ],
   "include": [
     "src/**/*.ts",

@@ -1,23 +1,24 @@
 import { Box } from "@chakra-ui/react";
+import {
+  type FacetItem,
+  type FacetValueState,
+  type Section,
+  NONE_TOGGLE_VALUE,
+  getFacetIcon,
+  getRangeFormatter,
+} from "@langwatch/trace-browser-kit";
 import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
 
-import type {
-  FacetItem,
-  FacetValueState,
-  Section,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { NONE_TOGGLE_VALUE } from "../../../../behavior/facet-constants.ts";
 import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
 import { AttributesSection } from "./attributes-section.tsx";
 import { EvaluatorDrilldown } from "./evaluator-drilldown.tsx";
 import { EventDrilldown } from "./event-drilldown.tsx";
 import { FacetSection } from "./facet-section.tsx";
 import { RangeSection } from "./range-section.tsx";
-import { getFacetIcon, getRangeFormatter } from "./utils.ts";
 
 interface SectionRendererProps {
   section: Section;

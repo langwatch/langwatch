@@ -32,9 +32,9 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
 });
 
 import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
 
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
-import type { FacetItem, FacetValueState } from "../types.ts";
 
 // Five preloaded service values — the top-N the discover payload shipped.
 // "finance-team-42" is deliberately NOT among them: it lives only server-side.

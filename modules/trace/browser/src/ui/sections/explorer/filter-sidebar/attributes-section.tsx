@@ -1,12 +1,12 @@
 import { Button, Input, Link, Text, VStack } from "@chakra-ui/react";
+import {
+  type AttributeKey,
+  type FacetValueState,
+  MAX_VISIBLE_ATTRIBUTE_KEYS,
+} from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  AttributeKey,
-  FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../behavior/facet-constants.ts";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { AttributeKeyRow } from "./attribute-key-row.tsx";
 

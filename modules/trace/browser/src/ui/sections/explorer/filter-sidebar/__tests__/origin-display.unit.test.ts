@@ -1,11 +1,14 @@
-import { ORIGIN_DISPLAY } from "@langwatch/trace-browser-kit";
+import {
+  ORIGIN_DISPLAY,
+  FACET_COLORS,
+  facetLabel,
+  paletteFromColor,
+} from "@langwatch/trace-browser-kit";
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
-import { FACET_COLORS } from "../../../../../behavior/facet-constants.ts";
 import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells.tsx";
 import type { TraceListItem } from "../../types/trace.ts";
-import { facetLabel, paletteFromColor } from "../utils.ts";
 
 const knownOrigins = Object.keys(ORIGIN_DISPLAY) as (keyof typeof ORIGIN_DISPLAY)[];
 

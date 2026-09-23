@@ -1,6 +1,5 @@
+import { analyticsMetrics } from "@langwatch/analytics-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import { analyticsMetrics } from "../analytics-registry.ts";
 
 describe("analyticsMetrics", () => {
   describe("when reading evaluation_pass_rate", () => {

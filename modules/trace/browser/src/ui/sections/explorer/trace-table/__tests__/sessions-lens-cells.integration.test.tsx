@@ -3,13 +3,12 @@
 // @vitest-environment jsdom
 // @see specs/traces-v2/sessions-lens.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { getCapability } from "@langwatch/trace-browser-kit";
+import { getCapability, truncateId } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { truncateId } from "../../../../../model/display-formatters.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
 import type { ConversationGroup } from "../conversation-groups.ts";

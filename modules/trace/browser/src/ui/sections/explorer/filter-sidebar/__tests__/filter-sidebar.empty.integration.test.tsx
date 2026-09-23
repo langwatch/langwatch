@@ -61,22 +61,18 @@ vi.mock("../../../../../behavior/facet-visibility.store.ts", async (importOrigin
     }),
   selectVisibilityFor: () => ({ hidden: [], shown: [] }),
 }));
-vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({
-      toggleSidebar: vi.fn(),
-      facetManagerOpen: false,
-      setFacetManagerOpen: vi.fn(),
-      sidebarCollapsed: false,
-      sidebarWidth: null,
-    }),
-}));
-
 vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
   const actual = await importOriginal<typeof traceBrowserKitModule>();
   return {
     ...actual,
+    useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        toggleSidebar: vi.fn(),
+        facetManagerOpen: false,
+        setFacetManagerOpen: vi.fn(),
+        sidebarCollapsed: false,
+        sidebarWidth: null,
+      }),
     useFilterStore: (selector: (s: unknown) => unknown) =>
       selector({
         ast: { type: "group", combinator: "and", filters: [] },

@@ -1,9 +1,9 @@
 import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 
 import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
-import { formatDuration } from "../../../../../../../model/display-formatters.ts";
 import {
   findMessageContent,
   parseSystemPrompt,

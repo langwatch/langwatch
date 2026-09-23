@@ -4,15 +4,16 @@ import "@testing-library/jest-dom/vitest";
  * Issue #4632 — group ComparisonTable rows by a dataset-entry metadata field.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  type ComparisonRunData,
+  useResultsGrouping,
+  GroupRowsButton,
+  ComparisonTable,
+} from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-
-import type { ComparisonRunData } from "../../batch-evaluation-results.types.ts";
-import { useResultsGrouping } from "../../use-results-grouping.ts";
-import { GroupRowsButton } from "../batch-evaluation-results-table.tsx";
-import { ComparisonTable } from "../comparison-table.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

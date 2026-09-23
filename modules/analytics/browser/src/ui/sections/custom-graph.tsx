@@ -9,6 +9,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  getGroup,
+  getMetric,
+  type timeseriesSeriesInput,
+  type Unpacked,
+} from "@langwatch/analytics-browser-kit";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
@@ -49,8 +55,6 @@ import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-
 import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { getGroup, getMetric, type timeseriesSeriesInput } from "../../model/analytics-registry.ts";
-import type { Unpacked } from "../../model/analytics-value-types.ts";
 import { formatChartDate } from "../../model/chart-date.ts";
 import { describeError } from "../../model/describe-error.ts";
 import { buildMetadataFilterParams } from "../../model/metadata-filter-params.ts";

@@ -11,3 +11,14 @@ export { customEvaluatorTemplate } from "./model/templates/custom-evaluator.temp
 export * from "./ui/elements/studio-drawer-footer.tsx";
 export * from "./behavior/crisp-bubble-policy.ts";
 export { default as NextLink } from "./ui/elements/next-link.tsx";
+export * from "./ui/elements/code/workflow-code-editor.tsx";
+export * from "./ui/sections/code/render-code.tsx";
+export * from "./ui/elements/run-via-api/data-source-picker.tsx";
+export * from "./model/run-via-api/run-snippets.ts";
+export * from "./ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx";
+export * from "./ui/elements/studio-host/errors.tsx";
+export * from "./model/types.ts";
+export * from "./model/code-signature.ts";
+export * from "./ui/sections/copy-button.tsx";
+export { WorkflowConfigPopover } from "./ui/elements/workflow-config-popover.tsx";
+export type { PythonField } from "./model/code/python-provider.shared.ts";

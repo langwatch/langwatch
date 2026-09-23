@@ -1,4 +1,5 @@
 import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { useFilterParams } from "@langwatch/analytics-browser-kit";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
@@ -6,8 +7,6 @@ import { Delayed } from "@langwatch/design-system/delayed";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
-
-import { useFilterParams } from "../use-filter-params.ts";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();

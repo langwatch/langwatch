@@ -37,11 +37,6 @@
       "langwatch-declaration-source": "./src/upload-csv-drawer.ts",
       "types": "./dist/upload-csv-drawer.d.ts",
       "default": "./src/upload-csv-drawer.ts"
-    },
-    "./surfaces/dataset-image-preview-table": {
-      "langwatch-declaration-source": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
-      "types": "./dist/ui/blocks/datasets/editor/dataset-preview-table.d.ts",
-      "default": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx"
     }
   },
   "scripts": {

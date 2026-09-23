@@ -1,4 +1,4 @@
-import { SPAN_TYPE_COLORS } from "../../../../model/display-formatters.ts";
+import { SPAN_TYPE_COLORS } from "@langwatch/trace-browser-kit";
 
 /**
  * The palette read as the open map a span's `type` actually indexes.

@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
+import { formatRelativeTime } from "@langwatch/trace-browser-kit";
 
-import { formatRelativeTime } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { ConversationGroup } from "../../../conversation-groups.ts";
 import type { CellDef } from "../../types.ts";

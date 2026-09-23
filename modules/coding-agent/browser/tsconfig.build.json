@@ -7,11 +7,7 @@
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
     "files": [
     "./src/activity.ts",
-    "./src/agent-identity.ts",
-    "./src/agent-metrics.ts",
-    "./src/agent-traces.ts",
     "./src/coding-agent.web.ts",
-    "./src/index.ts",
     "./src/pull-requests.ts",
     "./src/session-table.ts"
   ],

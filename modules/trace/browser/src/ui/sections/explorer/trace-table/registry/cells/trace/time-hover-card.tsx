@@ -1,14 +1,14 @@
 import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
-import { useState } from "react";
-
 import {
   formatAbsoluteTime,
   formatDayOfWeek,
   formatISOTimestamp,
   formatLocalWithZone,
   resolveViewerTimeZone,
-} from "../../../../../../../model/display-formatters.ts";
+} from "@langwatch/trace-browser-kit";
+import type React from "react";
+import { useState } from "react";
+
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
 
 /**

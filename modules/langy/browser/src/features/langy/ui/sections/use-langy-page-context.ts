@@ -8,12 +8,12 @@ import {
   selectAddableChips,
   selectVisibleChips,
   useLangyStore,
+  useLangy,
 } from "@langwatch/langy-browser-kit";
 import { useEffect, useMemo } from "react";
 import { useInRouterContext, useLocation } from "react-router";
 
 import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context.ts";
-import { useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import { useLangySelectionContext } from "../../behavior/use-langy-selection-context.ts";
 import { useLangyTraceViewContext } from "../../behavior/use-langy-trace-view-context.ts";
 

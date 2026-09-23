@@ -15,7 +15,7 @@ import {
  * dataset column, and what the rows will look like once it does.
  */
 import type { WireOf } from "@langwatch/api/web";
-import { DatasetPreviewTable } from "@langwatch/dataset-browser/surfaces/dataset-image-preview-table";
+import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 import type {
   Dataset,
   DatasetColumns,
@@ -359,7 +359,7 @@ export function DatasetMappingPreview({
                 </Center>
               }
             >
-              <DatasetPreviewTable
+              <DatasetImagePreviewTable
                 rows={previewRows}
                 columns={selectedDataset.columnTypes ?? []}
                 maxColumns={50}

@@ -33,11 +33,6 @@
       "langwatch-declaration-source": "./src/evaluator-editor-callbacks.ts",
       "types": "./dist/evaluator-editor-callbacks.d.ts",
       "default": "./src/evaluator-editor-callbacks.ts"
-    },
-    "./batch-results": {
-      "langwatch-declaration-source": "./src/batch-results.ts",
-      "types": "./dist/batch-results.d.ts",
-      "default": "./src/batch-results.ts"
     }
   },
   "scripts": {

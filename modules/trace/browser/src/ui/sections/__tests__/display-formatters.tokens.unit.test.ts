@@ -1,11 +1,10 @@
+import { formatTokens } from "@langwatch/trace-browser-kit";
 /**
  * @vitest-environment node
  * @unit
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it } from "vitest";
-
-import { formatTokens } from "../../../model/display-formatters.ts";
 
 describe("formatTokens", () => {
   describe("given nothing counted", () => {

@@ -24,8 +24,7 @@ import {
   VersionBadge,
 } from "@langwatch/prompt-browser-kit";
 import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
-import type { LlmConfigInputType } from "@langwatch/workflow-browser/component-types";
+import { useRegisterDrawerFooter, type LlmConfigInputType } from "@langwatch/workflow-browser-kit";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";

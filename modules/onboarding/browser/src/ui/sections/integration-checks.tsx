@@ -1,10 +1,10 @@
 import { List, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { CheckCircle, Circle } from "react-feather";
 
 import { api } from "../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { Link } from "../elements/link.tsx";
 
 interface IntegrationCheckItemProps {
   href: string;

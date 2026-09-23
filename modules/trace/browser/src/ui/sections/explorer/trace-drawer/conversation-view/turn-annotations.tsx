@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
+import { readableDate } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
@@ -11,7 +12,6 @@ import {
 import { api, type RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,
   HoverActionCluster,

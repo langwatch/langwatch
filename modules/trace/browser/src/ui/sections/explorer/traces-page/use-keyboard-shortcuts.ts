@@ -1,10 +1,9 @@
-import { useSelectionStore } from "@langwatch/trace-browser-kit";
+import { useSelectionStore, useUIStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useFindStore } from "../../../../behavior/find-store.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;

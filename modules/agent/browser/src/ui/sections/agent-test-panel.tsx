@@ -5,8 +5,6 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { FieldLabel } from "@langwatch/scenario-browser/surfaces/dialog-fields";
-import { toLineRunParameters } from "@langwatch/scenario-browser/surfaces/parameter-line";
 import { ParameterLineField } from "@langwatch/scenario-browser/surfaces/parameter-line-field";
 import { parameterPlaceholder } from "@langwatch/scenario-browser/surfaces/parameter-suggestions";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
@@ -14,7 +12,9 @@ import { Play } from "lucide-react";
 import { useState } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { toLineRunParameters } from "../../model/parameter-line.ts";
 import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
+import { FieldLabel } from "../elements/field-label.tsx";
 
 /** The declared-parameter shape `parameterPlaceholder` and `ParameterLineField` take. */
 type DeclaredParameter = Parameters<typeof parameterPlaceholder>[0][number];

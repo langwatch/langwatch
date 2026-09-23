@@ -1,15 +1,11 @@
 import { Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatCost, formatDuration, formatTokens } from "@langwatch/trace-browser-kit";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../../../model/display-formatters.ts";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";

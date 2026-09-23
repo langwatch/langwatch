@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { SimpleSlider } from "@langwatch/design-system/slider";
+import { type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {
   EVALUATOR_LABEL_FIELD,
   EVALUATOR_VERDICT_FIELD,
@@ -9,14 +10,12 @@ import type { LiqeQuery } from "liqe";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
   commitRange,
   RangeEndpointInput,
   stepForSpan,
 } from "../../../elements/explorer/filter-sidebar/range-controls.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
-import { formatCount } from "./utils.ts";
 
 interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */

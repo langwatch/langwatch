@@ -1,5 +1,6 @@
+import type { ReadableDate } from "@langwatch/coding-agent-browser-kit";
+
 import type { SessionListRow } from "./session-list-row.ts";
-import type { ReadableDate } from "./short-date.ts";
 
 export type Period = { startDate: ReadableDate; endDate: ReadableDate };
 export type PeriodMode = "relative" | "absolute";

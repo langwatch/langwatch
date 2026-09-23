@@ -1,19 +1,12 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
-import { useCallback, useEffect, useMemo } from "react";
-
-import { useDensityStore } from "../../../../../behavior/density.store.ts";
-import type {
-  AttributeKey,
-  AttributesSectionData,
-  CategoricalSection,
-  FacetItem,
-  FacetValueState,
-  RangeSectionData,
-  Section,
-} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
-import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import {
+  useFilterStore,
+  type AttributeKey,
+  type AttributesSectionData,
+  type CategoricalSection,
+  type FacetItem,
+  type FacetValueState,
+  type RangeSectionData,
+  type Section,
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
   DISCRETE_MODE_MAX_VALUES,
@@ -26,7 +19,15 @@ import {
   RANGE_DEFAULTS,
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
-} from "../../../../../behavior/facet-constants.ts";
+  hashColor,
+  facetLabel,
+  sortBySectionOrder,
+} from "@langwatch/trace-browser-kit";
+import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
+import { useCallback, useEffect, useMemo } from "react";
+
+import { useDensityStore } from "../../../../../behavior/density.store.ts";
+import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { applyLensOrder, useFacetLensStore } from "../../../../../behavior/facet-lens.store.ts";
 import {
   selectVisibilityFor,
@@ -38,7 +39,6 @@ import {
   useNumericModeStore,
 } from "../../../../../behavior/numeric-mode.store.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { hashColor } from "../../../../../model/display-formatters.ts";
 import {
   type FacetCountState,
   mergeFacetDescriptors,
@@ -47,7 +47,6 @@ import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sid
 import { useFilteredTraceFacets } from "../../hooks/use-filtered-trace-facets.ts";
 import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
-import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
 export function useFilterSidebarData() {
   const ast = useFilterStore((s) => s.ast);

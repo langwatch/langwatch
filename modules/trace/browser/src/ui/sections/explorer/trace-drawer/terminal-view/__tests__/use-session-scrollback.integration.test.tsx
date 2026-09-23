@@ -1,4 +1,4 @@
-import { CONVERSATION_TURN_CAP } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import { CONVERSATION_TURN_CAP } from "@langwatch/coding-agent-browser-kit";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment jsdom

@@ -18,7 +18,12 @@ import {
 } from "@dnd-kit/sortable";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
+import {
+  useFilterStore,
+  useViewStore,
+  useUIStore,
+  getFacetIcon,
+} from "@langwatch/trace-browser-kit";
 import {
   ChevronsDownUp,
   ChevronsUpDown,
@@ -33,7 +38,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
 import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
@@ -42,7 +46,6 @@ import { FacetManagerPopover } from "./facet-manager-popover.tsx";
 import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data.ts";
 import { HoverHighlightStyle } from "./hover-highlight-style.tsx";
 import { SectionRenderer } from "./section-renderer.tsx";
-import { getFacetIcon } from "./utils.ts";
 
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 

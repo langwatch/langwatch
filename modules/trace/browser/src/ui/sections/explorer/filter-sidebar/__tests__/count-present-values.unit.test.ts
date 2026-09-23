@@ -1,6 +1,5 @@
+import { countPresentValues } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import { countPresentValues } from "../utils.ts";
 
 /**
  * A categorical facet keeps its default-value scaffolding visible even when a value has

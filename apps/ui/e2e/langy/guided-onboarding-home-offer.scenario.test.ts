@@ -5,10 +5,7 @@
  */
 
 import { openai } from "@ai-sdk/openai";
-import {
-  guidedKickoffPartOf,
-  guidedPathContinuationLine,
-} from "@langwatch/onboarding-browser/surfaces/guided-kickoff";
+import { guidedKickoffPartOf, guidedPathContinuationLine } from "@langwatch/onboarding-browser-kit";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 

@@ -4,10 +4,7 @@
  * The run summary footer links to full experiment results.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type BatchRunSummary,
-  BatchSummaryFooter,
-} from "@langwatch/experiment-browser/batch-results";
+import { type BatchRunSummary, BatchSummaryFooter } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";

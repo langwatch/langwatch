@@ -1,9 +1,9 @@
-import { availableFilters } from "@langwatch/analytics-browser/surfaces/filter-registry";
-import type { FilterField } from "@langwatch/analytics-browser/surfaces/filter-types";
 import {
+  availableFilters,
+  type FilterField,
   getAvailablePreconditionFields,
   PRECONDITION_ALLOWED_RULES,
-} from "@langwatch/analytics-browser/surfaces/precondition-matchers";
+} from "@langwatch/analytics-browser-kit";
 import type { PreconditionField } from "@langwatch/analytics-contract";
 
 import type { CheckPreconditionFields, CheckPreconditionRule } from "../evaluations/types.ts";

@@ -7,7 +7,7 @@ import {
   type UiActionExecution,
   executeUiAction,
   type LangyUiActionHandlers,
-} from "@langwatch/langy-browser/langy-ui-actions";
+} from "@langwatch/langy-browser-kit";
 
 import { CONFIG } from "./config";
 import type { LangyAdapter, UiActionEntry } from "./langy-agent";

@@ -6,7 +6,7 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
-} from "@langwatch/onboarding-browser/surfaces/active-project-context";
+} from "@langwatch/onboarding-browser-kit";
 import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";

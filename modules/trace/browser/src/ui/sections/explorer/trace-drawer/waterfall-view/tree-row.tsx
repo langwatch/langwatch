@@ -1,5 +1,6 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatCost, formatDuration } from "@langwatch/trace-browser-kit";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { BookText, ScrollText } from "lucide-react";
 import { memo, useCallback } from "react";
@@ -14,7 +15,6 @@ import {
 
 import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
 import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
-import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
 import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges.tsx";
 import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell.tsx";

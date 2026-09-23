@@ -1,10 +1,9 @@
+import {
+  type BatchComparisonColumn,
+  type BatchTargetColumn,
+  trailingComparisonColumns,
+} from "@langwatch/experiment-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import type {
-  BatchComparisonColumn,
-  BatchTargetColumn,
-} from "../../batch-evaluation-results.types.ts";
-import { trailingComparisonColumns } from "../single-run-table.tsx";
 
 const targetColumn = (id: string): BatchTargetColumn => ({
   id,

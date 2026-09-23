@@ -4,6 +4,7 @@
  * every read here is a one-shot ClickHouse aggregate.
  */
 
+import { URL_QS_PARSE_OPTIONS } from "@langwatch/analytics-browser-kit";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
@@ -16,7 +17,6 @@ import {
   type FilterParam,
 } from "../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../model/analytics-host.ts";
-import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import type { AnalyticsReadScope } from "./analytics-api.ts";
 import { useAnalyticsPeriod } from "./use-analytics-period.ts";
 

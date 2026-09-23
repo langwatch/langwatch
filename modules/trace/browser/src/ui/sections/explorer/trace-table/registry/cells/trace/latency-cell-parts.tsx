@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 
-import { formatDuration } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { MeterBar } from "../../../../../../elements/meter-bar.tsx";
 

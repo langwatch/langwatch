@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { type EventMetricValues, type FacetItem, formatCount } from "@langwatch/trace-browser-kit";
 import {
   EVENT_METRICS_PREFIX,
   eventMetricValueLabel,
@@ -7,12 +8,7 @@ import {
 import type { LiqeQuery } from "liqe";
 import type React from "react";
 
-import type {
-  EventMetricValues,
-  FacetItem,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
-import { formatCount } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;
 

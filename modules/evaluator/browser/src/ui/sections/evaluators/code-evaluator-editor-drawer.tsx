@@ -20,7 +20,7 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-browser-kit";
-import { rewriteCodeSignature } from "@langwatch/workflow-browser/code-agent";
+import { rewriteCodeSignature } from "@langwatch/workflow-browser-kit";
 import { CodeEditor } from "@langwatch/workflow-browser/surfaces/code-editor-transport";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";

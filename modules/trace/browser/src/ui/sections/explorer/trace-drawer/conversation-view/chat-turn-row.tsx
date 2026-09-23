@@ -1,5 +1,10 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
-import { useConversationExpand } from "@langwatch/trace-browser-kit";
+import {
+  useConversationExpand,
+  formatCost,
+  formatDuration,
+  formatRelativeTimeAgo,
+} from "@langwatch/trace-browser-kit";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -10,11 +15,6 @@ import {
 import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
-import {
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-} from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import { Markdown } from "../../../markdown.tsx";

@@ -14,11 +14,6 @@
       "types": "./dist/analytics.web.d.ts",
       "default": "./src/analytics.web.ts"
     },
-    "./surfaces/analytics-registry": {
-      "langwatch-declaration-source": "./src/model/analytics-registry.ts",
-      "types": "./dist/model/analytics-registry.d.ts",
-      "default": "./src/model/analytics-registry.ts"
-    },
     "./surfaces/custom-graph": {
       "langwatch-declaration-source": "./src/ui/sections/custom-graph.tsx",
       "types": "./dist/ui/sections/custom-graph.d.ts",
@@ -28,31 +23,6 @@
       "langwatch-declaration-source": "./src/ui/sections/filters/filter-sidebar.tsx",
       "types": "./dist/ui/sections/filters/filter-sidebar.d.ts",
       "default": "./src/ui/sections/filters/filter-sidebar.tsx"
-    },
-    "./surfaces/filter-toggle": {
-      "langwatch-declaration-source": "./src/ui/sections/filters/filter-toggle.tsx",
-      "types": "./dist/ui/sections/filters/filter-toggle.d.ts",
-      "default": "./src/ui/sections/filters/filter-toggle.tsx"
-    },
-    "./surfaces/filter-params": {
-      "langwatch-declaration-source": "./src/ui/sections/use-filter-params.ts",
-      "types": "./dist/ui/sections/use-filter-params.d.ts",
-      "default": "./src/ui/sections/use-filter-params.ts"
-    },
-    "./surfaces/precondition-matchers": {
-      "langwatch-declaration-source": "./src/model/filters/precondition-matchers.ts",
-      "types": "./dist/model/filters/precondition-matchers.d.ts",
-      "default": "./src/model/filters/precondition-matchers.ts"
-    },
-    "./surfaces/filter-registry": {
-      "langwatch-declaration-source": "./src/model/filters/registry.ts",
-      "types": "./dist/model/filters/registry.d.ts",
-      "default": "./src/model/filters/registry.ts"
-    },
-    "./surfaces/filter-types": {
-      "langwatch-declaration-source": "./src/model/filters/types.ts",
-      "types": "./dist/model/filters/types.d.ts",
-      "default": "./src/model/filters/types.ts"
     }
   },
   "scripts": {

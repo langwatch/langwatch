@@ -1,4 +1,4 @@
-import type { SeriesInputType } from "@langwatch/analytics-browser/surfaces/analytics-registry";
+import type { SeriesInputType } from "@langwatch/analytics-browser-kit";
 import { buildSeriesName, type TimeseriesBucket } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 

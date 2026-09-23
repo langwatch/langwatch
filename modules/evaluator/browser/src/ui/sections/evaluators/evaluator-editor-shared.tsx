@@ -31,8 +31,11 @@ import type {
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-browser-kit";
 import { toEpochMs } from "@langwatch/time";
-import { DEFAULT_EMBEDDINGS_MODEL, WorkflowCardDisplay } from "@langwatch/workflow-browser-kit";
-import { FormServerError } from "@langwatch/workflow-browser/handled-error-views";
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  WorkflowCardDisplay,
+  FormServerError,
+} from "@langwatch/workflow-browser-kit";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

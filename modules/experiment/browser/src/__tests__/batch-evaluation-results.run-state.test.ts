@@ -1,9 +1,5 @@
+import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "@langwatch/experiment-browser-kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import {
-  INTERRUPTED_THRESHOLD_MS,
-  isRunFinished,
-} from "../model/batch-evaluation-results.run-state.ts";
 
 describe("isRunFinished", () => {
   beforeEach(() => {

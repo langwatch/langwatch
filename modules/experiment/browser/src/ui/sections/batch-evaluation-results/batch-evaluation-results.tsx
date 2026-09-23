@@ -19,7 +19,24 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
-import { describeCellFailure } from "@langwatch/experiment-browser-kit";
+import {
+  describeCellFailure,
+  useResultDisplayPreferences,
+  getRunDisplayName,
+  isRunFinished,
+  TableSkeleton,
+  transformBatchEvaluationData,
+  type BatchEvaluationData,
+  BatchEvaluationResultsTable,
+  ColumnVisibilityButton,
+  DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  GroupRowsButton,
+  RowHeightButton,
+  type BatchRunSummary,
+  BatchRunsSidebar,
+  useResultsGrouping,
+} from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
@@ -34,26 +51,8 @@ import {
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
-import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
-import { isRunFinished } from "../../../model/batch-evaluation-results.run-state.ts";
-import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
-import {
-  transformBatchEvaluationData,
-  type BatchEvaluationData,
-} from "../batch-evaluation-results.types.ts";
-import {
-  BatchEvaluationResultsTable,
-  ColumnVisibilityButton,
-  DEFAULT_HIDDEN_COLUMNS,
-  FieldsButton,
-  GroupRowsButton,
-  RowHeightButton,
-} from "../batch-results/batch-evaluation-results-table.tsx";
-import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar.tsx";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
-import { useResultsGrouping } from "../use-results-grouping.ts";
 
 type BatchEvaluationResultsProps = {
   project?: Project;

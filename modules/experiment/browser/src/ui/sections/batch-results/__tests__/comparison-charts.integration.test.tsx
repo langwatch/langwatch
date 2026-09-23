@@ -4,14 +4,11 @@ import "@testing-library/jest-dom/vitest";
  * Tests for ComparisonCharts component
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type {
-  BatchEvaluationData,
-  ComparisonRunData,
-} from "../../batch-evaluation-results.types.ts";
 import {
   ComparisonCharts,
   computeRunMetrics,

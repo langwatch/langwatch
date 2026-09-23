@@ -5,11 +5,11 @@ import "@testing-library/jest-dom/vitest";
  * Metrics) get clipped by overflow:hidden ancestors in BatchEvaluationResults.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ComparisonRunData } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ComparisonRunData } from "../../batch-evaluation-results.types.ts";
 import { ComparisonCharts } from "../comparison-charts.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

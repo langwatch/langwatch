@@ -4,7 +4,7 @@
  *   ("A page that cannot save refuses the action instead of reporting success")
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { LangyUiActionHandlers } from "@langwatch/langy-browser/langy-ui-actions";
+import type { LangyUiActionHandlers } from "@langwatch/langy-browser-kit";
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -113,7 +113,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
   useOptimizeWithLangy: () => undefined,
 }));
 
-vi.mock("@langwatch/langy-browser/langy-page-registration", async (importOriginal) => {
+vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
@@ -172,7 +172,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-import type * as langyPageRegistrationModule from "@langwatch/langy-browser/langy-page-registration";
+import type * as langyPageRegistrationModule from "@langwatch/langy-browser-kit";
 
 import ExperimentsWorkbenchPage from "../workbench.screen.tsx";
 

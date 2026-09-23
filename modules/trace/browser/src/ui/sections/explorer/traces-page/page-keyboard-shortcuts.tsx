@@ -1,7 +1,7 @@
+import { useUIStore } from "@langwatch/trace-browser-kit";
 import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
 
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useAskLangyFromSearch } from "../search-bar/use-ask-langy-from-search.ts";
 import {
   KeyboardShortcutsHelp,

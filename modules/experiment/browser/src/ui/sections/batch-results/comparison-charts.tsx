@@ -3,6 +3,16 @@
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  type BatchComparisonColumn,
+  type BatchEvaluationData,
+  type BatchResultRow,
+  type BatchTargetColumn,
+  type ComparisonRunData,
+  useResultsGrouping,
+  ChartTooltip,
+  RUN_COLORS,
+} from "@langwatch/experiment-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
@@ -21,16 +31,7 @@ import {
   chartHeightFor,
   truncateLabel,
 } from "../../../model/batch-evaluation-results.chart-axis.ts";
-import type {
-  BatchComparisonColumn,
-  BatchEvaluationData,
-  BatchResultRow,
-  BatchTargetColumn,
-  ComparisonRunData,
-} from "../batch-evaluation-results.types.ts";
-import { useResultsGrouping } from "../use-results-grouping.ts";
 import { ComparisonLeaderboardChart } from "./comparison-leaderboard-chart.tsx";
-import { ChartTooltip, RUN_COLORS } from "./presentation.tsx";
 import { WinRateChart } from "./win-rate-chart.tsx";
 
 /** Metric types that can be displayed */

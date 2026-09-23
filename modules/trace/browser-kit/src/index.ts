@@ -31,3 +31,9 @@ export {
 } from "@langwatch/trace-contract";
 export * from "./view-context-chip.ts";
 export * from "./view.slice.ts";
+export * from "./ui/sections/explorer/search-bar/suggestion-dropdown.tsx";
+export * from "./behavior/facet-constants.ts";
+export * from "./model/display-formatters.ts";
+export * from "./behavior/ui.store.ts";
+export * from "./ui/sections/explorer/filter-sidebar/utils.ts";
+export * from "./behavior/explorer/filter-sidebar/types.ts";

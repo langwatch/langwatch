@@ -25,7 +25,6 @@ import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { TileIcon } from "@langwatch/user-browser/surfaces/tile-icon";
 import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -40,6 +39,7 @@ import type {
   CodingAssistantConfig,
   ExternalToolConfig,
 } from "../../model/ai-tool-tile.ts";
+import { TileIcon } from "../elements/tile-icon.tsx";
 import { useAiToolCatalog } from "./useAiToolCatalog.ts";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {

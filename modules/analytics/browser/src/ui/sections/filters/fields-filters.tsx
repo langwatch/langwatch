@@ -12,6 +12,14 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import {
+  availableFilters,
+  type FilterDefinition,
+  type FilterField,
+  filterOutEmptyFilters,
+  type FilterParam,
+  useFilterParams,
+} from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
@@ -35,10 +43,6 @@ import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
-import { availableFilters } from "../../../model/filters/registry.ts";
-import type { FilterDefinition, FilterField } from "../../../model/filters/types.ts";
-import { filterOutEmptyFilters } from "../analytics/utils.ts";
-import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */

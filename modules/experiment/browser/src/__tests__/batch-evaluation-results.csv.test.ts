@@ -1,3 +1,9 @@
+import {
+  type BatchComparisonColumn,
+  type BatchEvaluationData,
+  type BatchTargetOutput,
+  transformBatchEvaluationData,
+} from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
@@ -6,12 +12,6 @@ import {
   buildCsvHeaders,
   generateCsvContent,
 } from "../ui/sections/batch-evaluation-results.csv.ts";
-import type {
-  BatchComparisonColumn,
-  BatchEvaluationData,
-  BatchTargetOutput,
-} from "../ui/sections/batch-evaluation-results.types.ts";
-import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
 
 const createMinimalData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",

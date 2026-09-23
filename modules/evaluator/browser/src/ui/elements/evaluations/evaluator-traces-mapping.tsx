@@ -1,4 +1,4 @@
-import { useFilterParams } from "@langwatch/analytics-browser/surfaces/filter-params";
+import { useFilterParams } from "@langwatch/analytics-browser-kit";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { TracesMapping } from "@langwatch/trace-browser/surfaces/traces-mapping";
 

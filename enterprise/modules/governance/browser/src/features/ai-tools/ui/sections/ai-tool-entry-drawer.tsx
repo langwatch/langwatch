@@ -18,7 +18,7 @@ import {
   ASSISTANT_OPTIONS,
   ASSISTANT_PRESETS,
   type AssistantKind,
-} from "@langwatch/coding-agent-browser/surfaces/agent-identity";
+} from "@langwatch/coding-agent-browser-kit";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Switch } from "@langwatch/design-system/switch";
 import { Bot, Wrench } from "lucide-react";

@@ -1,4 +1,5 @@
 import { Box, Grid, GridItem, HStack, Text, VStack } from "@chakra-ui/react";
+import { accentChipBg, Link, useActiveProject } from "@langwatch/onboarding-browser-kit";
 import {
   Activity,
   ArrowUpRight,
@@ -10,10 +11,6 @@ import {
   Shield,
 } from "lucide-react";
 import type React from "react";
-
-import { accentChipBg } from "../../model/shared/accent-surface.ts";
-import { Link } from "../elements/link.tsx";
-import { useActiveProject } from "./active-project-context.tsx";
 
 interface CapabilityProps {
   icon: LucideIcon;

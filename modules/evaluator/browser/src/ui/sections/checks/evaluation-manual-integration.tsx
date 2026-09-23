@@ -6,7 +6,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser/render-code";
+import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";

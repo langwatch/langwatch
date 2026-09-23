@@ -15,25 +15,11 @@ export default defineConfig({
       "@langwatch/coding-agent-browser/surfaces/activity": fileURLToPath(
         new URL("../../coding-agent/browser/src/activity.ts", import.meta.url),
       ),
-      // Ahead of the bare package alias below, which is a PREFIX match and
-      // would otherwise rewrite this subpath to `…/src/index.ts/surfaces/…`.
-      "@langwatch/coding-agent-browser/surfaces/agent-identity": fileURLToPath(
-        new URL("../../coding-agent/browser/src/agent-identity.ts", import.meta.url),
-      ),
-      "@langwatch/coding-agent-browser/surfaces/agent-metrics": fileURLToPath(
-        new URL("../../coding-agent/browser/src/agent-metrics.ts", import.meta.url),
-      ),
-      "@langwatch/coding-agent-browser/surfaces/agent-traces": fileURLToPath(
-        new URL("../../coding-agent/browser/src/agent-traces.ts", import.meta.url),
-      ),
       "@langwatch/coding-agent-browser/surfaces/pull-requests": fileURLToPath(
         new URL("../../coding-agent/browser/src/pull-requests.ts", import.meta.url),
       ),
       "@langwatch/coding-agent-browser/surfaces/session-table": fileURLToPath(
         new URL("../../coding-agent/browser/src/session-table.ts", import.meta.url),
-      ),
-      "@langwatch/coding-agent-browser": fileURLToPath(
-        new URL("../../coding-agent/browser/src/index.ts", import.meta.url),
       ),
       "@langwatch/enterprise-governance-contract": fileURLToPath(
         new URL("../../../enterprise/modules/governance/contract/src/index.ts", import.meta.url),

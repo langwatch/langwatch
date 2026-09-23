@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import {
   ATTRIBUTES_SECTION_KEY,
   DEFAULT_PERSPECTIVE_ID,
@@ -14,7 +12,8 @@ import {
   SECTION_ORDER,
   SPAN_ATTRIBUTES_SECTION_KEY,
   sectionOrderForPerspective,
-} from "../../../behavior/facet-constants.ts";
+} from "@langwatch/trace-browser-kit";
+import { describe, expect, it } from "vitest";
 
 /**
  * Round-5 refined the 9-group AI-observability taxonomy into 12 finer sub-groups (Cost

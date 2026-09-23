@@ -2,9 +2,9 @@
  * Per-variant cost and duration statistics, computed at most once per row set.
  */
 
+import type { BatchResultRow } from "@langwatch/experiment-browser-kit";
 import { useMemo } from "react";
 
-import type { BatchResultRow } from "./batch-evaluation-results.types.ts";
 import {
   computeVariantMetrics,
   type VariantMetrics,

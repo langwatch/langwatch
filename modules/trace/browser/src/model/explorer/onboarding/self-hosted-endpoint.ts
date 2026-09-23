@@ -1,4 +1,4 @@
-import { CLOUD_ENDPOINT } from "@langwatch/onboarding-browser/surfaces/build-mcp-config";
+import { CLOUD_ENDPOINT } from "@langwatch/onboarding-browser-kit";
 
 /**
  * The endpoint a reader has to set, or null when the SDK's own default already points

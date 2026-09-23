@@ -18,11 +18,9 @@ import {
   buildGuidedKickoffParts,
   type GuidedKickoffInput,
   type GuidedKickoffTourStatus,
-} from "@langwatch/onboarding-browser/surfaces/guided-kickoff";
-import {
   GUIDED_PROVIDERS,
   type GuidedProvider,
-} from "@langwatch/onboarding-browser/surfaces/guided-providers";
+} from "@langwatch/onboarding-browser-kit";
 import type { GuidedPath } from "@langwatch/onboarding-contract";
 import { expect } from "vitest";
 

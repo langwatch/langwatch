@@ -1,4 +1,4 @@
-import { SPAN_TYPE_COLORS } from "../display-formatters.ts";
+import { SPAN_TYPE_COLORS } from "@langwatch/trace-browser-kit";
 
 const spanColors: Readonly<Record<string, string>> = SPAN_TYPE_COLORS;
 

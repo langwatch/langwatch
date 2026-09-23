@@ -1,6 +1,6 @@
+import { formatISOTimestamp } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
-import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";

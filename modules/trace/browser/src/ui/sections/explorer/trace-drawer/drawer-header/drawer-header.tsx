@@ -15,7 +15,16 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { TracePresenceAvatars } from "@langwatch/presence-browser";
-import { Chip, useFilterStore } from "@langwatch/trace-browser-kit";
+import {
+  Chip,
+  useFilterStore,
+  formatAbsoluteTime,
+  formatCost,
+  formatDuration,
+  formatRelativeTimeAgo,
+  formatTokens,
+  STATUS_COLORS,
+} from "@langwatch/trace-browser-kit";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -33,14 +42,6 @@ import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-d
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import {
-  formatAbsoluteTime,
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-  formatTokens,
-  STATUS_COLORS,
-} from "../../../../../model/display-formatters.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import {
   formatPinValue,

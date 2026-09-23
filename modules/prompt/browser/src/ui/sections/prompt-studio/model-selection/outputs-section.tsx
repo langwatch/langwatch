@@ -8,7 +8,7 @@ import {
   generateUniqueIdentifier,
   normalizeIdentifier,
 } from "@langwatch/prompt-contract";
-import { WorkflowCodeEditor } from "@langwatch/workflow-browser/workflow-code-editor";
+import { WorkflowCodeEditor } from "@langwatch/workflow-browser-kit";
 import type { Field } from "@langwatch/workflow-contract";
 import Ajv from "ajv";
 import { Plus, X } from "lucide-react";

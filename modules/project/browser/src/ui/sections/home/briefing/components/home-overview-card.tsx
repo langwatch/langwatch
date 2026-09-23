@@ -1,5 +1,5 @@
 import { Box, chakra, Grid, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { LangyPanelSurface } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useRef, useState } from "react";

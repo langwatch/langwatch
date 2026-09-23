@@ -3,11 +3,11 @@ import { Popover } from "@langwatch/design-system/popover";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import type { ModelOption } from "@langwatch/topic-contract";
-import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
+import { AddModelProviderKey } from "./add-model-provider-key.tsx";
 import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
 
 type LLMConfigFieldProps = {

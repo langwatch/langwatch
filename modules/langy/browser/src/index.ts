@@ -15,7 +15,6 @@ export * from "./model/langy-feedback-directive.ts";
 export * from "./model/langy-feature-map.ts";
 export * from "./model/langy-model-profile.ts";
 export * from "./model/langy-model-suggestions.ts";
-export * from "./model/langy-navigate-dedup.ts";
 export * from "./model/langy-peek-dock.ts";
 export * from "./model/langy-plan.ts";
 export * from "./model/langy-question-tool.ts";
@@ -58,20 +57,9 @@ export * from "./behavior/use-langy-peek-proximity.ts";
 export * from "./behavior/use-langy-turn-signals.ts";
 export * from "./behavior/use-lingering-dodge.ts";
 export * from "./behavior/use-scrolled-from-top.ts";
-export * from "./model/ui-actions/execute-ui-action.ts";
-export * from "./model/ui-actions/langy-ui-action-errors.ts";
-export * from "./model/ui-actions/langy-ui-action-types.ts";
 export * from "./model/values/langy-shimmer.ts";
 export * from "./model/values/langy-thinking-verbs.ts";
 // The panel's store, its page-context registry and the empty-state suggestion
 // list moved to `@langwatch/langy-browser-kit` — trace/browser is a consumer,
 // so this module is closed against reaching back into its own browser package.
 export { LangyClient, type LangyTransport } from "./model/langy-client.ts";
-// Per-page registration surface (proposal handlers + live UI actions,
-// specs/langy/langy-ui-actions.feature). A page outside this package —
-// the experiments workbench and its siblings — registers through these.
-export {
-  useRegisterLangyActions,
-  useRegisterLangyHandlers,
-} from "./ui/sections/langy-page-context.tsx";
-export type { AppliedOutcome, ProposalHandlers } from "./model/langy-proposal-handlers.ts";

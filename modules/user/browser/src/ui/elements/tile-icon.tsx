@@ -1,8 +1,5 @@
 import { Box, Image } from "@chakra-ui/react";
-import {
-  ASSISTANT_PRESETS,
-  type AssistantKind,
-} from "@langwatch/coding-agent-browser/surfaces/agent-identity";
+import { ASSISTANT_PRESETS, type AssistantKind } from "@langwatch/coding-agent-browser-kit";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";

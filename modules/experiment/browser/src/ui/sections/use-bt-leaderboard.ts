@@ -3,6 +3,7 @@
  * share `useMemo`, and polling rebuilds column objects each second.
  */
 
+import type { BatchComparisonColumn } from "@langwatch/experiment-browser-kit";
 import { useMemo } from "react";
 
 import {
@@ -11,7 +12,6 @@ import {
   computeBTLeaderboard,
 } from "../../model/batch-evaluation-results.bt-leaderboard.ts";
 import { buildPairwiseComparisons } from "./batch-evaluation-results.pairwise.ts";
-import type { BatchComparisonColumn } from "./batch-evaluation-results.types.ts";
 
 /**
  * Fits to keep. A results page shows a handful of comparison columns and a

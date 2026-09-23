@@ -16,9 +16,12 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { getRandomWorkflowIcon, customEvaluatorTemplate } from "@langwatch/workflow-browser-kit";
-import { EmojiPickerModal } from "@langwatch/workflow-browser/emoji-picker-modal";
-import { FormServerError } from "@langwatch/workflow-browser/handled-error-views";
+import {
+  getRandomWorkflowIcon,
+  customEvaluatorTemplate,
+  EmojiPickerModal,
+  FormServerError,
+} from "@langwatch/workflow-browser-kit";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";

@@ -7,13 +7,13 @@ import {
   COST_LENS_IDS,
   PERFORMANCE_LENS_IDS,
   useViewStore,
+  useUIStore,
 } from "@langwatch/trace-browser-kit";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { useErrorCount } from "../hooks/use-error-count.ts";
 import { CreateLensButton } from "./create-lens-button.tsx";

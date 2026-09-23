@@ -1,5 +1,6 @@
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { readableDate, type ReadableDate } from "@langwatch/coding-agent-browser-kit";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   differenceInCalendarDays,
@@ -14,7 +15,6 @@ import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 
 import type { Period, PeriodMode } from "./session-filters.ts";
-import { readableDate, type ReadableDate } from "./short-date.ts";
 
 /**
  * The date-range control the activity tables narrow by. A copy of the old

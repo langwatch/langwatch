@@ -1,3 +1,4 @@
+import type { GuidedKickoff, GuidedKickoffTourStatus } from "@langwatch/onboarding-browser-kit";
 /**
  * What a landing after the guided takeover owes: a tour still to run, a
  * kickoff still to queue, and the kickoff message itself. Framework-free.
@@ -9,7 +10,6 @@ import type {
   GuidedPath,
 } from "@langwatch/onboarding-contract";
 
-import type { GuidedKickoff, GuidedKickoffTourStatus } from "./kickoff.ts";
 import { pathHasTour } from "./tour-steps.ts";
 
 /** The first name the greeting uses, or nothing when the account has none. */

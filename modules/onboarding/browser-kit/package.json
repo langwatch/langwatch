@@ -36,6 +36,7 @@
     "@emotion/react": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "react": "catalog:",

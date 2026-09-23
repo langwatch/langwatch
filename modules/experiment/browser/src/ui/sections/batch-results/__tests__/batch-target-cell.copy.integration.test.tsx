@@ -2,12 +2,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type BatchTargetOutput, BatchTargetCell } from "@langwatch/experiment-browser-kit";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import type { BatchTargetOutput } from "../../batch-evaluation-results.types.ts";
-import { BatchTargetCell } from "../batch-target-cell.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

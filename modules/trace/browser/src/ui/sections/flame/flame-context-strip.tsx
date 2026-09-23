@@ -1,8 +1,8 @@
 import { Flex, HStack, Text } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 
 import { formatPercent } from "../../../behavior/flame/tree.ts";
 import type { FlameNode, SpanContext } from "../../../behavior/flame/types.ts";
-import { formatDuration } from "../../../model/display-formatters.ts";
 
 interface FlameContextStripProps {
   contextNode: FlameNode | null;

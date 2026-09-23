@@ -1,9 +1,9 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import { useCallback, useRef } from "react";
 
 import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
-import { formatDuration } from "../../../model/display-formatters.ts";
 import { getSpanColor } from "../../../model/flame/colors.ts";
 import {
   MIN_VIEWPORT_MS,

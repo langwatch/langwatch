@@ -27,7 +27,8 @@ const snakeCaseToPascalCase = (value: string) =>
     .filter(Boolean)
     .map((part) => part[0]!.toUpperCase() + part.slice(1))
     .join("");
-import { rewriteCodeSignature } from "../model/code-signature.ts";
+import { rewriteCodeSignature } from "@langwatch/workflow-browser-kit";
+
 import {
   GATE_FIELD,
   GATE_HANDLE_ID,

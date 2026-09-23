@@ -55,7 +55,8 @@ vi.mock("../use-show-comparison-leaderboard.ts", () => ({
 import {
   type ComparisonRunData,
   transformBatchEvaluationData,
-} from "../../../ui/sections/batch-evaluation-results.types.ts";
+} from "@langwatch/experiment-browser-kit";
+
 import { ComparisonCharts } from "../../../ui/sections/batch-results/comparison-charts.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

@@ -1,5 +1,5 @@
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import type { LlmConfigOutputType } from "@langwatch/workflow-browser/component-types";
+import type { LlmConfigOutputType } from "@langwatch/workflow-browser-kit";
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 

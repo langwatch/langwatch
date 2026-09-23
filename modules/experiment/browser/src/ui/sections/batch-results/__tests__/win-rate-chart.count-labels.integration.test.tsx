@@ -4,11 +4,11 @@ import "@testing-library/jest-dom/vitest";
  * The win count printed above each bar, and specifically the one above the TALLEST bar.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { BatchComparisonColumn } from "@langwatch/experiment-browser-kit";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
 import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the

@@ -1,21 +1,22 @@
 import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
+import {
+  type FacetItem,
+  type FacetValueState,
+  MAX_EXPANDED_FACETS,
+  MAX_VISIBLE_FACETS,
+  countPresentValues,
+} from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  FacetItem,
-  FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value.ts";
-import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "../../../../behavior/facet-constants.ts";
 import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
 import { dedupeByValue } from "../../../../model/dedupe-by-value.ts";
 import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row.tsx";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { useFacetSearch } from "../hooks/use-facet-search.ts";
 import { FacetRow } from "./facet-row.tsx";
-import { countPresentValues } from "./utils.ts";
 
 interface FacetSectionProps {
   title: string;

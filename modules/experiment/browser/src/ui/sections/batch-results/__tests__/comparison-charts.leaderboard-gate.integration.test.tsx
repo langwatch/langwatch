@@ -6,14 +6,11 @@ import "@testing-library/jest-dom/vitest";
  * @see specs/experiments/comparison-leaderboard.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { BatchComparisonColumn, ComparisonRunData } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  BatchComparisonColumn,
-  ComparisonRunData,
-} from "../../batch-evaluation-results.types.ts";
 import { ComparisonCharts } from "../comparison-charts.tsx";
 
 const EVALUATOR_ID = "comparison-1";

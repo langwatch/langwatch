@@ -1,5 +1,5 @@
 import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser/run-formatters";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser-kit";
 import { LuCheck, LuX } from "react-icons/lu";
 
 import { api } from "../../../../behavior/trace-api.ts";

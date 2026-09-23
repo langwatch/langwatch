@@ -3821,6 +3821,12 @@ importers:
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/numeral':
+        specifier: 'catalog:'
+        version: 2.0.5
+      '@types/qs':
+        specifier: 'catalog:'
+        version: 6.15.1
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -5246,6 +5252,15 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -6401,6 +6416,9 @@ importers:
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
+      '@langwatch/evaluator-browser-kit':
+        specifier: workspace:*
+        version: link:../browser-kit
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6956,6 +6974,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@types/numeral':
+        specifier: 'catalog:'
+        version: 2.0.5
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -9517,6 +9538,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18

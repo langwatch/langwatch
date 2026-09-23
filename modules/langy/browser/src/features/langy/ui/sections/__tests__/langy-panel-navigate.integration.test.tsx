@@ -184,14 +184,13 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
 
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore, LangyProvider } from "@langwatch/langy-browser-kit";
 
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 const PROJECT_ID = "project-demo";

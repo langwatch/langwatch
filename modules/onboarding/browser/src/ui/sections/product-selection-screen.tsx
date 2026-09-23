@@ -1,11 +1,11 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { accentChipBg, accentChipBorder } from "@langwatch/onboarding-browser-kit";
 import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 
 import { api } from "../../behavior/onboarding-api.ts";
 import type { ProductSelection } from "../../behavior/types.ts";
-import { accentChipBg, accentChipBorder } from "../../model/shared/accent-surface.ts";
 
 const MotionBox = motion.create(Box);
 

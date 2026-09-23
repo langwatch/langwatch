@@ -3,6 +3,7 @@ import {
   useFilterStore,
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
+  useUIStore,
 } from "@langwatch/trace-browser-kit";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +12,6 @@ import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { ExportProgress } from "../../../elements/explorer/export-progress.tsx";
 import { SidebarResizeHandle } from "../../../elements/explorer/filter-sidebar/sidebar-resize-handle.tsx";

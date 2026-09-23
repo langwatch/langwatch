@@ -2,7 +2,8 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import type React from "react";
 
-import { type DetailPayload, MISSING_VALUE } from "../../model/pull-request-detail.ts";
+import type { DetailPayload } from "../../model/pull-request-detail.ts";
+import { MISSING_VALUE } from "./cells/missing-value.tsx";
 import { EmptySection, Section } from "./detail-section.tsx";
 
 type ModelUsage = DetailPayload["modelBreakdown"][number];

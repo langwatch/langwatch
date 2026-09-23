@@ -8,7 +8,7 @@ import {
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import type { LlmConfigOutputType } from "@langwatch/workflow-browser/component-types";
+import type { LlmConfigOutputType } from "@langwatch/workflow-browser-kit";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";

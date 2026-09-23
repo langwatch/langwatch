@@ -19,6 +19,7 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
+import { type BatchComparisonColumn, disambiguateNames } from "@langwatch/experiment-browser-kit";
 import {
   Bar,
   BarChart,
@@ -36,8 +37,6 @@ import {
   buildAxisLabels,
   truncateLabel,
 } from "../../../model/batch-evaluation-results.chart-axis.ts";
-import type { BatchComparisonColumn } from "../batch-evaluation-results.types.ts";
-import { disambiguateNames } from "./presentation.tsx";
 
 /**
  * Fallback only, for a variant whose target this run has no colour for.

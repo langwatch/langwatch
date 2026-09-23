@@ -2,8 +2,8 @@
 
 import { Circle, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { TileIcon } from "@langwatch/user-browser/surfaces/tile-icon";
 
+import { TileIcon } from "../../ai-tools/ui/elements/tile-icon.tsx";
 import { SourceTypeIconGlyph } from "../ui/elements/source-type-icon-glyph.tsx";
 import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./toolCards";
 

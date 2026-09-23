@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-
-import type { CategoricalSection } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
+  type CategoricalSection,
   FACET_DEFAULTS,
   FACET_VALUE_ORDER,
   VIBRANT_FIELDS,
-} from "../../../../../behavior/facet-constants.ts";
+} from "@langwatch/trace-browser-kit";
+import { describe, expect, it } from "vitest";
+
 import { buildFacetItems, orderValues } from "../hooks/use-filter-sidebar-data.ts";
 
 /** A verdict facet as discover hands it over: counts, no order, no colour. */

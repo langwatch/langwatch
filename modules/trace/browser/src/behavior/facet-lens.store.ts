@@ -1,11 +1,10 @@
-import { create } from "zustand";
-
 import {
   DEFAULT_PERSPECTIVE_ID,
   type FacetPerspectiveId,
   isFacetPerspectiveId,
   sectionOrderForPerspective,
-} from "./facet-constants.ts";
+} from "@langwatch/trace-browser-kit";
+import { create } from "zustand";
 
 /**
  * Facet sidebar preferences modeled as a "lens" — section ordering plus explicit

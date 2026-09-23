@@ -1,4 +1,5 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import type { MouseEvent, PointerEvent, RefObject } from "react";
 
@@ -8,7 +9,6 @@ import type {
   FlameTick,
   Viewport,
 } from "../../../behavior/flame/types.ts";
-import { formatDuration } from "../../../model/display-formatters.ts";
 import { FlameAxis } from "./flame-axis.tsx";
 import { FlameRow } from "./flame-row.tsx";
 import { Minimap } from "./minimap.tsx";

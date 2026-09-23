@@ -7,18 +7,11 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/coding-agent.web.ts",
       "types": "./dist/coding-agent.web.d.ts",
       "default": "./src/coding-agent.web.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./surfaces/activity": {
       "langwatch-declaration-source": "./src/activity.ts",
@@ -34,21 +27,6 @@
       "langwatch-declaration-source": "./src/pull-requests.ts",
       "types": "./dist/pull-requests.d.ts",
       "default": "./src/pull-requests.ts"
-    },
-    "./surfaces/agent-identity": {
-      "langwatch-declaration-source": "./src/agent-identity.ts",
-      "types": "./dist/agent-identity.d.ts",
-      "default": "./src/agent-identity.ts"
-    },
-    "./surfaces/agent-metrics": {
-      "langwatch-declaration-source": "./src/agent-metrics.ts",
-      "types": "./dist/agent-metrics.d.ts",
-      "default": "./src/agent-metrics.ts"
-    },
-    "./surfaces/agent-traces": {
-      "langwatch-declaration-source": "./src/agent-traces.ts",
-      "types": "./dist/agent-traces.d.ts",
-      "default": "./src/agent-traces.ts"
     }
   },
   "scripts": {

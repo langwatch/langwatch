@@ -32,11 +32,6 @@
       "langwatch-declaration-source": "./src/available-evaluators.ts",
       "types": "./dist/available-evaluators.d.ts",
       "default": "./src/available-evaluators.ts"
-    },
-    "./surfaces/evaluation-status": {
-      "langwatch-declaration-source": "./src/model/evaluation-status.ts",
-      "types": "./dist/model/evaluation-status.d.ts",
-      "default": "./src/model/evaluation-status.ts"
     }
   },
   "scripts": {
@@ -54,6 +49,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-browser-kit": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",

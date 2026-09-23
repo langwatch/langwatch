@@ -1,6 +1,6 @@
 import { Card, EmptyState, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
+import { analyticsMetrics } from "@langwatch/analytics-browser-kit";
 
-import { analyticsMetrics } from "../../model/analytics-registry.ts";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { TopicsSelector } from "./topics-selector.tsx";
 

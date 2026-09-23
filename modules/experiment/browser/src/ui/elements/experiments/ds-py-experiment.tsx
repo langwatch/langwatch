@@ -23,6 +23,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
+import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -51,8 +52,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<

@@ -35,36 +35,19 @@ export * from "./model/control-flow.ts";
 export * from "./model/edge-convergence.ts";
 export * from "./model/edge-mapping.ts";
 export * from "./model/unsaved-changes.ts";
-export * from "./model/code-signature.ts";
-export * from "./model/evaluate-api-snippet.ts";
 export * from "./model/agent-node-data.ts";
 export { PromptSelectionButton } from "./ui/elements/prompt-selection-button.tsx";
-export { WorkflowConfigPopover } from "./ui/elements/workflow-config-popover.tsx";
 export {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
 export * from "./model/llm-signature-node-factory.ts";
-export * from "./model/code/python-providers.ts";
-export {
-  WorkflowCodeEditor,
-  WorkflowCodeEditorModal,
-  vscodeThemeName,
-  type WorkflowCodeEditorContractProps,
-  type WorkflowCodeEditorModalHost,
-} from "./ui/elements/code/workflow-code-editor.tsx";
 export { LiquidConditionEditor } from "./ui/elements/code/liquid-condition-editor.tsx";
 export {
   validateLiquidCondition,
   type LiquidConditionValidation,
 } from "./model/code/liquid-condition.ts";
-export type {
-  ContractRef,
-  PythonContract,
-  PythonField,
-  PythonProviderHandle,
-} from "./model/code/python-provider.shared.ts";
 export {
   ComponentNode,
   getNodeDisplayName,

@@ -8,7 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) =>
     selector({

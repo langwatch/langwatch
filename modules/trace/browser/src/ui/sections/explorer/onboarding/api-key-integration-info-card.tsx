@@ -1,7 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { CLOUD_ENDPOINT } from "@langwatch/onboarding-browser/surfaces/build-mcp-config";
-import { CodePreview } from "@langwatch/onboarding-browser/surfaces/code-preview";
-import { InlineCopyButton } from "@langwatch/onboarding-browser/surfaces/inline-copy-button";
+import { CLOUD_ENDPOINT, CodePreview, InlineCopyButton } from "@langwatch/onboarding-browser-kit";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";

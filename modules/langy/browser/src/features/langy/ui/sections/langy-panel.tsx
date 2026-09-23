@@ -33,6 +33,10 @@ import {
   selectLangySuggestions,
   LangyMark,
   LangyMarkGradientDefs,
+  navigateDedupKey,
+  reserveNavigate,
+  executeUiAction,
+  type LangyUiActionHandlers,
 } from "@langwatch/langy-browser-kit";
 import {
   isLangyHiddenLocalNotice,
@@ -109,7 +113,6 @@ import {
   langyQuestionWaitsByToolCall,
   routeLangyChoiceAnswer,
 } from "../../../../model/langy-local-waits.ts";
-import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   type LangyPeekPhase,
@@ -132,8 +135,6 @@ import {
 } from "../../../../model/langy-thinking-line.ts";
 import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts";
 import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
-import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
-import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { isOnPageOwningAction } from "../../../../model/ui-actions/manifest-routes.ts";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
 import { LangyWave } from "../../../../ui/elements/langy-wave.tsx";
@@ -200,10 +201,8 @@ import { toPendingCapabilities } from "./langy-tool-activity.tsx";
 import { type LangyProposal, MessageContent, type ProposalHandlers } from "./message-content.tsx";
 import { RecentChatsView } from "./recent-chats-view.tsx";
 import { useLangyExternalLinkGuard } from "./use-langy-external-link-guard.ts";
-
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
-import "../../../../ui/elements/langy-theme.css";
 import { useLangyPageContext } from "./use-langy-page-context.ts";
 
 // The same feature key Langy's chat route resolves against. Used to seed the

@@ -18,9 +18,8 @@ import {
   type ProposalHandlers,
   useRegisterLangyActions,
   useRegisterLangyHandlers,
-} from "@langwatch/langy-browser/langy-page-registration";
-import { assertCrispChatHidden } from "@langwatch/workflow-browser-kit";
-import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
+} from "@langwatch/langy-browser-kit";
+import { assertCrispChatHidden, HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAutosaveEvaluationsV3 } from "../../../behavior/experiments-v3/use-autosave-evaluations-v3.ts";

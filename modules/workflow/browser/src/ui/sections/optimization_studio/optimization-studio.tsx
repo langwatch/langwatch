@@ -5,7 +5,7 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 
 import "@xyflow/react/dist/style.css";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import { DatasetPreviewTable } from "@langwatch/dataset-browser/surfaces/dataset-image-preview-table";
+import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 import {
   useColorMode,
   useColorModeValue,
@@ -16,7 +16,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
-import { ComponentIcon, assertCrispChatHidden } from "@langwatch/workflow-browser-kit";
+import {
+  ComponentIcon,
+  assertCrispChatHidden,
+  EmojiPickerModal,
+} from "@langwatch/workflow-browser-kit";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -83,7 +87,6 @@ import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
 import { Evaluate } from "./evaluate.tsx";
 import { History } from "./history.tsx";
 import { Optimize } from "./optimize.tsx";
-import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { useComponentExecution } from "./use-component-execution.ts";
@@ -659,7 +662,7 @@ function StudioWorkflowRunUntilHereDialog() {
       datasetColumns={columns}
       onStartWorkflowExecution={startWorkflowExecution}
       renderDatasetPreview={({ rows: previewRows, columns: previewColumns, onRowClick }) => (
-        <DatasetPreviewTable
+        <DatasetImagePreviewTable
           rows={previewRows}
           columns={previewColumns}
           background="bg.panel"

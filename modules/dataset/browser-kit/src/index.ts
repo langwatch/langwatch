@@ -22,3 +22,4 @@ export {
   buildNavigableColumns,
   useTableKeyboardNavigation,
 } from "./behavior/use-table-keyboard-navigation.ts";
+export { DatasetImagePreviewTable } from "./ui/blocks/dataset-image-preview-table.tsx";

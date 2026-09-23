@@ -4,10 +4,8 @@
  * (Prisma, registry).
  */
 
+import type { FilterField, FilterParam } from "@langwatch/analytics-browser-kit";
 import { differenceInCalendarDays, nowInstant } from "@langwatch/time";
-
-import type { FilterField } from "../../model/filters/types.ts";
-import type { FilterParam } from "./use-filter-params.ts";
 
 /** Maximum allowed length for a view name */
 export const MAX_VIEW_NAME_LENGTH = 50;

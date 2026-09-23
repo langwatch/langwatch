@@ -12,7 +12,7 @@ import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
 } from "@langwatch/experiment-contract";
-import type { LangyUiActionHandlers } from "@langwatch/langy-browser/langy-ui-actions";
+import type { LangyUiActionHandlers } from "@langwatch/langy-browser-kit";
 
 export function buildFakeTabHandlers({
   catchUpIfBehind,

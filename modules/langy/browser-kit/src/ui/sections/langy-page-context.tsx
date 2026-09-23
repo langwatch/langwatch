@@ -1,0 +1,142 @@
+import {
+  createContext,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import { useLangyPageContextStore } from "../../behavior/langy-page-context.store.ts";
+import { type LangyContextChip } from "../../behavior/langy.store.ts";
+import type { ProposalHandlers } from "../../model/langy-proposal-handlers.ts";
+import type { LangyUiActionHandlers } from "../../model/ui-actions/langy-ui-action-types.ts";
+
+/**
+ * Per-page registration surface for Langy (proposal handlers + precise page context).
+ * Panel/composer/conversation UI STATE does NOT live here — that is the `useLangyStore`
+ * singleton.
+ */
+interface LangyContextValue {
+  // A ref, not state: pages re-derive their handlers object on most
+  // renders (see useRegisterLangyHandlers), and Langy only ever needs the
+  // latest value at proposal-click time, never during render. Storing it
+  // as state fed registration straight back into a render loop — register
+  // -> setState -> re-render -> new handlers object -> register -> ...
+  proposalHandlersRef: RefObject<ProposalHandlers>;
+  experimentSlug: string | undefined;
+  registerHandlers: (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => void;
+  clearHandlers: () => void;
+  /**
+   * Precise page-context chips a page has declared (see `useRegisterLangyPageContext`).
+   */
+  pageContext: LangyContextChip[];
+  registerPageContext: (items: LangyContextChip[]) => void;
+  clearPageContext: () => void;
+  /**
+   * The UI actions the CURRENT page can execute for the agent, kind → handler
+   * (specs/langy/langy-ui-actions.feature).
+   */
+  actionHandlersRef: RefObject<LangyUiActionHandlers>;
+  registerActions: (handlers: LangyUiActionHandlers) => void;
+  clearActions: () => void;
+}
+
+const LangyContext = createContext<LangyContextValue | null>(null);
+
+export function LangyProvider({ children }: { children: ReactNode }) {
+  const proposalHandlersRef = useRef<ProposalHandlers>({});
+  const actionHandlersRef = useRef<LangyUiActionHandlers>({});
+  const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
+  const pageContext = useLangyPageContextStore((state) => state.pageContext);
+  const registerPageContext = useLangyPageContextStore((state) => state.register);
+  const clearPageContext = useLangyPageContextStore((state) => state.clear);
+
+  const registerHandlers = useCallback(
+    (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => {
+      proposalHandlersRef.current = handlers;
+      setExperimentSlug(opts?.experimentSlug);
+    },
+    [],
+  );
+
+  const clearHandlers = useCallback(() => {
+    proposalHandlersRef.current = {};
+    setExperimentSlug(undefined);
+  }, []);
+
+  const registerActions = useCallback((handlers: LangyUiActionHandlers) => {
+    actionHandlersRef.current = handlers;
+  }, []);
+
+  const clearActions = useCallback(() => {
+    actionHandlersRef.current = {};
+  }, []);
+
+  const value = useMemo<LangyContextValue>(
+    () => ({
+      proposalHandlersRef,
+      experimentSlug,
+      registerHandlers,
+      clearHandlers,
+      pageContext,
+      registerPageContext,
+      clearPageContext,
+      actionHandlersRef,
+      registerActions,
+      clearActions,
+    }),
+    [
+      experimentSlug,
+      registerHandlers,
+      clearHandlers,
+      pageContext,
+      registerPageContext,
+      clearPageContext,
+      registerActions,
+      clearActions,
+    ],
+  );
+
+  return <LangyContext.Provider value={value}>{children}</LangyContext.Provider>;
+}
+
+export function useLangy(): LangyContextValue {
+  const ctx = useContext(LangyContext);
+  if (!ctx) {
+    throw new Error("useLangy must be used inside <LangyProvider>");
+  }
+  return ctx;
+}
+
+/**
+ * Optional hook for pages that want to expose page-specific proposal
+ * handlers (e.g. the experiments workbench). Handlers register on mount
+ * and clear on unmount, so other pages get a chat-only Langy.
+ */
+export function useRegisterLangyHandlers(
+  handlers: ProposalHandlers,
+  opts?: { experimentSlug?: string },
+) {
+  const { registerHandlers, clearHandlers } = useLangy();
+  const slug = opts?.experimentSlug;
+  useEffect(() => {
+    registerHandlers(handlers, { experimentSlug: slug });
+    return () => clearHandlers();
+  }, [handlers, slug, registerHandlers, clearHandlers]);
+}
+
+/**
+ * Optional hook for pages that expose live UI actions to the agent
+ * (specs/langy/langy-ui-actions.feature).
+ */
+export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
+  const { registerActions, clearActions } = useLangy();
+  useEffect(() => {
+    registerActions(handlers);
+    return () => clearActions();
+  }, [handlers, registerActions, clearActions]);
+}

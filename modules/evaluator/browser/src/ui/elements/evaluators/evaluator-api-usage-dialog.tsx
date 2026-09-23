@@ -16,7 +16,7 @@ import {
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser/render-code";
+import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 

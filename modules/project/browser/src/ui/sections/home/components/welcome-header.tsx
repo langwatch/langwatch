@@ -1,5 +1,5 @@
 import { Heading } from "@chakra-ui/react";
-import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { SERIF } from "@langwatch/langy-browser-kit";
 import { nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useState } from "react";
 

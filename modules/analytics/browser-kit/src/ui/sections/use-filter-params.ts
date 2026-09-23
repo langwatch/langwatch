@@ -1,0 +1,278 @@
+import { readUiStorage } from "@langwatch/browser-host/storage";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import qs from "qs";
+
+import { availableFilters } from "../../model/filters/registry.ts";
+import type { FilterField } from "../../model/filters/types.ts";
+import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options.ts";
+import { usePeriodSelector } from "../../period-selector.ts";
+import { filterOutEmptyFilters } from "./analytics/utils.ts";
+
+export type FilterParam =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+/**
+ * Applies a saved view's cached filters onto `filters`, keeping only keys
+ * this registry still recognizes.
+ */
+function applyCachedViewFilters(
+  filters: Partial<Record<FilterField, FilterParam>>,
+  viewFilters: Record<string, FilterParam>,
+): void {
+  for (const [key, value] of Object.entries(viewFilters)) {
+    if (key in availableFilters) {
+      filters[key as FilterField] = value;
+    }
+  }
+}
+
+/**
+ * Looks up `viewId` in the project's cached saved-views list and applies its
+ * filters, if any, onto `filters`.
+ */
+function applyCachedViewById(
+  filters: Partial<Record<FilterField, FilterParam>>,
+  projectId: string,
+  viewId: string,
+): void {
+  const raw = readUiStorage(`langwatch-saved-views-cache-${projectId}`);
+  if (!raw) return;
+  const cached = JSON.parse(raw) as {
+    id: string;
+    filters?: Record<string, FilterParam>;
+  }[];
+  const view = cached.find((v) => v.id === viewId);
+  if (view?.filters) {
+    applyCachedViewFilters(filters, view.filters);
+  }
+}
+
+export const useFilterParams = () => {
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+
+  const {
+    period: { startDate, endDate },
+  } = usePeriodSelector();
+
+  const filters: Partial<Record<FilterField, FilterParam>> = {};
+
+  const queryString = router.asPath.split("?")[1] ?? "";
+  const queryParams = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
+
+  for (const [filterKey, filter] of Object.entries(availableFilters)) {
+    const param = queryParams[filter.urlKey];
+    if (param) {
+      const filterParam = typeof param === "string" ? [param] : (param as FilterParam);
+
+      const filterEmptyAndConverScalarToArray = (
+        obj: FilterParam,
+        filter: boolean,
+      ): FilterParam => {
+        if (Array.isArray(obj)) {
+          return obj.filter((x) => x !== "");
+        }
+
+        return Object.fromEntries(
+          Object.entries(obj).flatMap(([key, value]): [string, FilterParam][] => {
+            if (Array.isArray(value)) {
+              const value_ = value.filter((x) => x !== "");
+              if (filter && value_.length === 0) {
+                return [];
+              }
+              return [[key, value_]];
+            } else if (value && typeof value === "object") {
+              const value_ = filterEmptyAndConverScalarToArray(value, filter);
+              if (filter && Object.keys(value_).length === 0) {
+                return [];
+              }
+              return [[key, value_]];
+            }
+            return [[key, [value]]];
+          }),
+        ) as FilterParam;
+      };
+
+      const filterParam_ = filterEmptyAndConverScalarToArray(filterParam, false);
+      filters[filterKey as FilterField] = filterParam_;
+    }
+  }
+
+  // Saved view fallback: when the URL has no filter/date/query params and a
+  // saved view is stored in localStorage, use the view's filters so the first
+  // query already has the correct filters. Layout params like project, view,
+  // group_by are fine — only filter keys, dates, and search prevent fallback.
+  const hasUrlFilterOrDateParams =
+    Object.values(availableFilters).some((f) => queryParams[f.urlKey] !== undefined) ||
+    !!queryParams.query ||
+    !!queryParams.startDate ||
+    !!queryParams.endDate;
+
+  if (!hasUrlFilterOrDateParams && project?.id) {
+    try {
+      const viewId =
+        readUiStorage(`langwatch-saved-views-selected-${project.id}`) ??
+        readUiStorage(`langwatch-selected-view-${project.id}`);
+
+      if (viewId && viewId !== "all-traces") {
+        applyCachedViewById(filters, project.id, viewId);
+      }
+    } catch {
+      // localStorage unavailable or corrupt — ignore
+    }
+  }
+
+  // Shallow-push helper that works on every page, including those with dynamic route params
+  // beyond [project] (e.g. /[project]/analytics/custom/[id]). The string form router.push("?" +
+  // qs) fails on dynamic-route pages in Next.js 15 Pages Router — the relative "?" URL isn't
+  // resolved correctly for shallow navigation, so the push silently does nothing.
+  const shallowPush = (newQs: string) => {
+    const currentPath = router.asPath.split("?")[0] ?? router.asPath;
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const routeParams = Object.fromEntries(
+      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
+    );
+    const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
+
+    // Every caller of this changes which rows match, and a keyset cursor describes a position
+    // in the PREVIOUS result set. Carrying it across the change resumes the new list partway
+    // down — the first rows matching the filter the user just applied are the ones they never
+    // see, and the footer still reads "page 3", so nothing signals it. Dropping the cursor
+    // sends them to the first page of the new results, which is what applying a filter means.
+    if ("scrollId" in parsed) delete parsed.scrollId;
+    const strippedQs = qs.stringify(parsed, {
+      allowDots: true,
+      arrayFormat: "comma" as const,
+      allowEmptyArrays: true,
+    });
+
+    void router.push(
+      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
+      currentPath + "?" + strippedQs,
+      { shallow: true, scroll: false },
+    );
+  };
+
+  const qsOpts = {
+    allowDots: true,
+    arrayFormat: "comma" as const,
+    allowEmptyArrays: true,
+  };
+
+  const setFilter = (filter: FilterField, params: FilterParam) => {
+    const filterUrl = availableFilters[filter].urlKey;
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) => key !== filterUrl && !key.startsWith(filterUrl + "."),
+            ),
+          ),
+          [filterUrl]: params,
+        },
+        qsOpts,
+      ),
+    );
+  };
+
+  const setFilters = (filtersToSet: Record<FilterField, FilterParam>) => {
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) =>
+                !Object.values(availableFilters).some(
+                  (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
+                ),
+            ),
+          ),
+          ...Object.entries(filtersToSet).reduce(
+            (acc, [filter, params]) => ({
+              ...acc,
+              [availableFilters[filter as keyof typeof availableFilters].urlKey]: params,
+            }),
+            {},
+          ),
+        },
+        qsOpts,
+      ),
+    );
+  };
+
+  const clearFilters = () => {
+    const cleared = Object.fromEntries(
+      Object.entries(queryParams).filter(
+        ([key]) =>
+          key !== "query" &&
+          !Object.values(availableFilters).some(
+            (filter) => key === filter.urlKey || key.startsWith(filter.urlKey + "."),
+          ),
+      ),
+    );
+    shallowPush(qs.stringify(cleared, qsOpts));
+  };
+
+  const filterParams = {
+    projectId: project?.id ?? "",
+    startDate: startDate.getTime(),
+    endDate: endDate.getTime(),
+    filters: filters,
+    ...(queryParams.query ? { query: queryParams.query as string } : {}),
+    ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
+  };
+
+  const getLatestFilters = () => {
+    return filterParams;
+  };
+
+  const setNegateFilters = (negateFilters: boolean) => {
+    shallowPush(
+      qs.stringify(
+        {
+          ...queryParams,
+          negateFilters: negateFilters ? "true" : "false",
+        },
+        qsOpts,
+      ),
+    );
+  };
+
+  const nonEmptyFilters = filterOutEmptyFilters(filterParams.filters);
+  const filterCount = Object.keys(nonEmptyFilters).length;
+  const hasAnyFilters = filterCount > 0;
+
+  return {
+    filters,
+    setFilter,
+    setFilters,
+    clearFilters,
+    getLatestFilters,
+    filterParams,
+    nonEmptyFilters,
+    filterCount,
+    hasAnyFilters,
+    queryOpts: {
+      enabled:
+        !!project &&
+        !!startDate &&
+        !isNaN(startDate.getTime()) &&
+        !!endDate &&
+        !isNaN(endDate.getTime()),
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
+    },
+    setNegateFilters,
+  };
+};

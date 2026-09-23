@@ -38,11 +38,6 @@
       "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",
       "default": "./src/ui/sections/presence/presence-menu-item.tsx"
     },
-    "./surfaces/suggestion-dropdown": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
-      "types": "./dist/ui/sections/explorer/search-bar/suggestion-dropdown.d.ts",
-      "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"
-    },
     "./surfaces/trace-id-peek": {
       "langwatch-declaration-source": "./src/ui/sections/explorer/trace-id-peek.tsx",
       "types": "./dist/ui/sections/explorer/trace-id-peek.d.ts",

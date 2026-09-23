@@ -7,7 +7,7 @@ import {
   type TurnDivider,
   type TerminalToolSpan,
   indexToolSpansBySpanId,
-} from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+} from "@langwatch/coding-agent-browser-kit";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

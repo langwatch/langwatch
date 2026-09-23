@@ -11,7 +11,8 @@ vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-vi.mock("../workflow-code-editor.tsx", () => ({
+vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   vscodeThemeName: () => "vs",
 }));
 

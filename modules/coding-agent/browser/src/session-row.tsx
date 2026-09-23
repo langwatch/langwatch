@@ -1,11 +1,10 @@
 import { Table } from "@chakra-ui/react";
+import { AgentLabel, MISSING_VALUE } from "@langwatch/coding-agent-browser-kit";
 import type React from "react";
 
-import { AgentLabel } from "./agent-label.tsx";
 import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";
 import { CompactionsCell } from "./cells/compactions-cell.tsx";
 import { ContextCell } from "./cells/context-cell.tsx";
-import { MISSING_VALUE } from "./cells/missing-value.tsx";
 import { PullRequestsCell } from "./cells/pull-requests-cell.tsx";
 import { SessionNameCell } from "./cells/session-name-cell.tsx";
 import { TokenCostCell } from "./cells/token-cost-cell.tsx";

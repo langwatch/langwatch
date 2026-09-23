@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { readableDate } from "@langwatch/trace-browser-kit";
 
-import { readableDate } from "../../../../../model/display-formatters.ts";
 import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 

@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
+import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 import { useEffect, useRef } from "react";
 
 import {

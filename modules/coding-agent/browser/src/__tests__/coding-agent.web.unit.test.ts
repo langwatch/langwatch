@@ -25,12 +25,7 @@ describe("given a browser that installs coding-agent", () => {
   });
 
   describe("when a surface the declaration publishes is asked for", () => {
-    it.each([
-      ["surfaces/activity"],
-      ["surfaces/agent-identity"],
-      ["surfaces/agent-metrics"],
-      ["surfaces/agent-traces"],
-    ] as const)("resolves %s", async (surface) => {
+    it.each([["surfaces/activity"]] as const)("resolves %s", async (surface) => {
       const publication = codingAgentWeb.installation.publications[surface];
       const loaded = await publication?.load();
 

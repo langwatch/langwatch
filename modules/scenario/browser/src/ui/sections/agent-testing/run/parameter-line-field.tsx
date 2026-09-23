@@ -4,7 +4,7 @@
  */
 
 import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
-import { SuggestionPanel } from "@langwatch/trace-browser/surfaces/suggestion-dropdown";
+import { SuggestionPanel } from "@langwatch/trace-browser-kit";
 import { useId, useRef } from "react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";

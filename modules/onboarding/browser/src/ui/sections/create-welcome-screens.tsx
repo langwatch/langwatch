@@ -1,5 +1,6 @@
 import { Alert, Checkbox, Field, Icon, Input, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Link } from "@langwatch/onboarding-browser-kit";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { Suspense, useMemo } from "react";
@@ -20,7 +21,6 @@ import { extractJoinInsteadNames, formatJoinInsteadNames } from "../../model/joi
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group.tsx";
 import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
-import { Link } from "../elements/link.tsx";
 import { BasicInfoConditionalFields } from "./basic-info-conditional-fields.tsx";
 import { useOnboardingFormContext } from "./form-context.tsx";
 import { IntentSelectionScreen } from "./intent-selection-screen.tsx";

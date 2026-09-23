@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const period = { daysDifference: 1 };
 const setRelativePeriod = vi.fn();
-vi.mock("@langwatch/analytics-browser-kit", () => ({
+vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   usePeriodSelector: () => ({ ...period, setRelativePeriod }),
 }));
 

@@ -3,7 +3,7 @@
  * that the ranking itself cannot show.
  */
 
-import { type BatchResultRow, extractOutputText } from "./batch-evaluation-results.types.ts";
+import { type BatchResultRow, extractOutputText } from "@langwatch/experiment-browser-kit";
 
 export type VerbosityProfile = {
   /** Mean output length in characters, per variant. Null when unmeasurable. */

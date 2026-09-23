@@ -1,10 +1,9 @@
 import { Alert, Box, Heading, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
+import { usePublicEnv, Link } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 
-import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
-import { Link } from "../../elements/link.tsx";
 import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
 import ObservabilityCard from "../../elements/welcome/observability-card.tsx";
 import { useIntegrationChecks } from "../integration-checks.tsx";

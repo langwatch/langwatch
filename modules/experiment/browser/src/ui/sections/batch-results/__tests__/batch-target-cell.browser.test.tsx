@@ -5,12 +5,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type BatchTargetOutput, BatchTargetCell } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
-
-import type { BatchTargetOutput } from "../../batch-evaluation-results.types.ts";
-import { BatchTargetCell } from "../batch-target-cell.tsx";
 
 const longError =
   "gateway chat/completions: provider_error: the upstream model returned an " +

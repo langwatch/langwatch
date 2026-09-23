@@ -1,9 +1,6 @@
+import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-browser-kit";
 import { describe, expect, it } from "vitest";
 
-import type {
-  BatchComparisonColumn,
-  BatchResultRow,
-} from "../ui/sections/batch-evaluation-results.types.ts";
 import { leaderboardFor } from "../ui/sections/use-bt-leaderboard.ts";
 import { variantMetricsFor } from "../ui/sections/use-variant-metrics.ts";
 

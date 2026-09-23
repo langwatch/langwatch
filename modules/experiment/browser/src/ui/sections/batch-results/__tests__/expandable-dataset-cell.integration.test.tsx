@@ -4,12 +4,11 @@ import "@testing-library/jest-dom/vitest";
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ExpandableDatasetCell } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-
-import { ExpandableDatasetCell } from "../expandable-dataset-cell.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

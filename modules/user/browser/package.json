@@ -14,10 +14,6 @@
       "langwatch-declaration-source": "./src/user.web.ts",
       "types": "./dist/user.web.d.ts",
       "default": "./src/user.web.ts"
-    },
-    "./surfaces/tile-icon": {
-      "types": "./dist/ui/elements/tile-icon.d.ts",
-      "default": "./src/ui/elements/tile-icon.tsx"
     }
   },
   "scripts": {

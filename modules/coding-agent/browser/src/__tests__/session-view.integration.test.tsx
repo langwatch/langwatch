@@ -5,12 +5,10 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import { type CodingAgentSessionDisplay, SessionView } from "@langwatch/coding-agent-browser-kit";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-
-import type { CodingAgentSessionDisplay } from "../trace/session-display.ts";
-import { SessionView } from "../trace/session-view.tsx";
 
 afterEach(cleanup);
 

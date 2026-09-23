@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { TerminalOutput } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import { TerminalOutput } from "@langwatch/coding-agent-browser-kit";
 import {
   applyChatTextLeaves,
   asMarkdownBody,

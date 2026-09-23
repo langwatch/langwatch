@@ -23,6 +23,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
+  RenderCode,
 } from "@langwatch/workflow-browser-kit";
 import {
   getEntryInputs,
@@ -40,7 +41,6 @@ import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-or
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
-import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 

@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OnboardingScreenIndex } from "../types.ts";
 import { useOnboardingFlow } from "../use-onboarding-flow.ts";
 
-vi.mock("../use-public-env.ts", () => ({
+vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   usePublicEnv: () => ({ data: { IS_SAAS: true }, isLoading: false }),
 }));
 

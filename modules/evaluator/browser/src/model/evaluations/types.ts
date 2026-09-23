@@ -1,4 +1,4 @@
-import { filterFieldsEnum } from "@langwatch/analytics-browser/surfaces/filter-types";
+import { filterFieldsEnum } from "@langwatch/analytics-browser-kit";
 import type {
   EvaluationResult,
   EvaluationResultError,

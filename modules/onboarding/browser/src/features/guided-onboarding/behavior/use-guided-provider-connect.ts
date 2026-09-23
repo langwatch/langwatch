@@ -4,10 +4,10 @@
  * connected model first, same as upstream), or records a skip.
  */
 import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
+import type { GuidedProvider } from "@langwatch/onboarding-browser-kit";
 import { useCallback } from "react";
 
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
-import type { GuidedProvider } from "../model/guided-providers.ts";
 
 export interface GuidedConnectedProvider {
   provider: string;

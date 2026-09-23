@@ -21,6 +21,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { LangyContextTarget, experimentContextChip } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
@@ -39,7 +40,6 @@ import {
 
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
-import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";

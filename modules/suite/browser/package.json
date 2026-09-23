@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/suite.web.ts",
       "types": "./dist/suite.web.d.ts",
       "default": "./src/suite.web.ts"
-    },
-    "./run-formatters": {
-      "langwatch-declaration-source": "./src/run-formatters.ts",
-      "types": "./dist/run-formatters.d.ts",
-      "default": "./src/run-formatters.ts"
     }
   },
   "scripts": {

@@ -1,16 +1,16 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { ChartNoAxesColumn, Telescope } from "lucide-react";
-import type React from "react";
-
-import type { OnboardingScreenProps } from "../../behavior/types.ts";
 import {
   accentChipBg,
   accentChipBorder,
   selectedSurfaceBg,
   selectedSurfaceBorder,
-} from "../../model/shared/accent-surface.ts";
+} from "@langwatch/onboarding-browser-kit";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
+import { ChartNoAxesColumn, Telescope } from "lucide-react";
+import type React from "react";
+
+import type { OnboardingScreenProps } from "../../behavior/types.ts";
 import { useOnboardingFormContext } from "./form-context.tsx";
 
 interface IntentOption {

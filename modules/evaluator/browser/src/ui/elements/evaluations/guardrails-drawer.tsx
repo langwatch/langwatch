@@ -4,7 +4,7 @@ import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser/render-code";
+import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

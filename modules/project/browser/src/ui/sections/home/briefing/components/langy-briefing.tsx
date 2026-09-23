@@ -1,5 +1,5 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { LangyPanelSurface } from "@langwatch/langy-browser-kit";
 import { Chip } from "@langwatch/trace-browser-kit";
 import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";

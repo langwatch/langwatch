@@ -1,6 +1,5 @@
+import { formatBytes } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
-
-import { formatBytes } from "../../../model/display-formatters.ts";
 
 /**
  * `formatBytes` humanises the trace's stored payload size (`_size_bytes` on

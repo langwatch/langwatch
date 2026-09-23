@@ -18,24 +18,11 @@ vi.mock("react-contextual-analytics", () => ({
 
 const API_KEY = "sk-lw-test-SUPERSECRET-000";
 
-vi.mock("../active-project-context.tsx", () => ({
-  useActiveProject: () => ({
-    project: { id: "project-1", apiKey: API_KEY },
-  }),
-}));
-
-vi.mock("../../../behavior/use-public-env.ts", () => ({
-  usePublicEnv: () => ({
-    data: { IS_SAAS: true, BASE_HOST: "https://app.langwatch.ai" },
-    isLoading: false,
-  }),
-}));
-
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { ViaClaudeCodeScreen } from "../via-claude-code-screen.tsx";
+import { ActiveProjectProvider, ViaClaudeCodeScreen } from "@langwatch/onboarding-browser-kit";
 
 type EmitCall = [string, string, Record<string, unknown> | undefined];
 
@@ -51,10 +38,29 @@ function onlyEmit(): EmitCall {
   return emitted()[0] ?? ["", "", undefined];
 }
 
+const PUBLIC_CONFIG = btoa(
+  JSON.stringify({ deployment: "saas", appBaseUrl: "https://app.langwatch.ai" }),
+);
+
+function withPublicConfig(): void {
+  if (document.querySelector('meta[name="langwatch-public-config"]')) return;
+  const meta = document.createElement("meta");
+  meta.name = "langwatch-public-config";
+  meta.content = PUBLIC_CONFIG;
+  document.head.append(meta);
+}
+
 function renderScreen() {
+  withPublicConfig();
   return render(
     <ChakraProvider value={defaultSystem}>
-      <ViaClaudeCodeScreen />
+      <ActiveProjectProvider
+        value={{
+          project: { id: "project-1", slug: "project-1", name: "Project", apiKey: API_KEY },
+        }}
+      >
+        <ViaClaudeCodeScreen />
+      </ActiveProjectProvider>
     </ChakraProvider>,
   );
 }

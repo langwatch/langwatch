@@ -4,7 +4,7 @@ import { formatCost, formatLatency } from "@langwatch/design-system/metric-value
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 import { Chip, ConversationExpandContext } from "@langwatch/trace-browser-kit";
-import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
+import { CopyButton } from "@langwatch/workflow-browser-kit";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { Suspense, useState } from "react";
 

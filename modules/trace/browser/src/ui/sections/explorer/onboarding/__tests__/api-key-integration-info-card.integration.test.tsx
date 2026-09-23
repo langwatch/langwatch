@@ -29,7 +29,8 @@ vi.mock("../../../use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
-vi.mock("@langwatch/onboarding-browser/surfaces/code-preview", () => ({
+vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   CodePreview: (props: Record<string, unknown>) => {
     capturedCodePreviewProps = props;
     return <div data-testid="code-preview">{String(props.code)}</div>;

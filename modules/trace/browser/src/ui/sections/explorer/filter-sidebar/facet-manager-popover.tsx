@@ -14,6 +14,12 @@ import { Kbd } from "@langwatch/design-system/kbd";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
+  FACET_PERSPECTIVES,
+  getFacetGroupId,
+  orderedGroupDefsForPerspective,
+  useUIStore,
+} from "@langwatch/trace-browser-kit";
+import {
   Activity,
   AlertCircle,
   BadgeCheck,
@@ -43,14 +49,8 @@ import {
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  FACET_PERSPECTIVES,
-  getFacetGroupId,
-  orderedGroupDefsForPerspective,
-} from "../../../../behavior/facet-constants.ts";
 import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
 import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 // Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
 // TracesPage). Below this + a little slack the "shown / total" count chip

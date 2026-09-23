@@ -19,8 +19,6 @@ const askLangy = vi.fn();
 vi.mock("@langwatch/langy-browser-kit", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
   LangyMark: () => null,
-}));
-vi.mock("@langwatch/langy-browser/surfaces/asaplangy", () => ({
   SERIF: "serif",
 }));
 

@@ -19,10 +19,8 @@ vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type {
-  FacetItem,
-  FacetValueState,
-} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
+
 import { FacetSection } from "../facet-section.tsx";
 
 const ITEMS: FacetItem[] = [

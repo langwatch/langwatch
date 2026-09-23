@@ -3,13 +3,11 @@ import { Kbd } from "@langwatch/design-system/kbd";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
-} from "@langwatch/onboarding-browser/surfaces/active-project-context";
-import {
   PromptList,
   SkillList,
   TRACING_SKILL_ID,
-} from "@langwatch/onboarding-browser/surfaces/via-claude-code-screen";
-import { ViaMcpClientScreen } from "@langwatch/onboarding-browser/surfaces/via-claude-desktop-screen";
+  ViaMcpClientScreen,
+} from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";

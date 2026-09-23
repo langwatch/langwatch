@@ -22,7 +22,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@langwatch/github-browser/surfaces/github-connect-popup", () => ({
+vi.mock("../../../behavior/github-connect-popup.ts", () => ({
   useGitHubConnectPopup: () => ({
     connect: vi.fn(async () => ({ ok: true, login: "acme" })),
   }),

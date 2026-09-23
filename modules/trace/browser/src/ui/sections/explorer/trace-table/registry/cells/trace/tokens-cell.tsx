@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatTokens } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 
-import { formatTokens } from "../../../../../../../model/display-formatters.ts";
 import { TokenBreakdownTooltipContent } from "../../../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

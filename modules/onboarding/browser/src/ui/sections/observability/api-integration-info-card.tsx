@@ -1,11 +1,9 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { usePublicEnv, CLOUD_ENDPOINT, useActiveProject } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 
-import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
-import { CLOUD_ENDPOINT } from "../../../model/shared/build-mcp-config.ts";
 import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
-import { useActiveProject } from "../active-project-context.tsx";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
   const host = useOnboardingHost();

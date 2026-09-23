@@ -8,7 +8,7 @@ import { Box, HStack } from "@chakra-ui/react";
 import {
   techStackFrameworkOptions,
   techStackLanguageOptions,
-} from "@langwatch/onboarding-browser/surfaces/tech-stack";
+} from "@langwatch/onboarding-browser-kit";
 import type { PropsWithChildren } from "react";
 
 import type { ProjectHostProject as Project } from "../../model/project-host.ts";

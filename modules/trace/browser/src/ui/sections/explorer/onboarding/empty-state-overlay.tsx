@@ -1,5 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
-import { OnboardingMeshBackground } from "@langwatch/onboarding-browser/surfaces/onboarding-mesh-background";
+import { OnboardingMeshBackground } from "@langwatch/onboarding-browser-kit";
 
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useEdgeGripAnchor } from "../../../../behavior/explorer/onboarding/use-edge-grip-anchor.ts";

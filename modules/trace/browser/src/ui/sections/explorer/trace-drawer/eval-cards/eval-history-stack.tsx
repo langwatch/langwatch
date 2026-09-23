@@ -1,9 +1,9 @@
 import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { truncateId, readableDate } from "@langwatch/trace-browser-kit";
 import { useState } from "react";
 import { LuArrowRight } from "react-icons/lu";
 
-import { truncateId, readableDate } from "../../../../../model/display-formatters.ts";
 import { type EvalEntry, isNoVerdict, STATUS } from "./utils.ts";
 
 /** A history row's score, as the stack prints it: "true"/"false", 2dp, or an em dash. */

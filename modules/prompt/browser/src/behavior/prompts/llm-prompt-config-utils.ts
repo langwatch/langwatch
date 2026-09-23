@@ -12,7 +12,7 @@ import {
   LlmConfigInputTypes,
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
-} from "@langwatch/workflow-browser/component-types";
+} from "@langwatch/workflow-browser-kit";
 import {
   type Component,
   type LLMConfig,

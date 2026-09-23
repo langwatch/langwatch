@@ -1,9 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { formatDurationSeconds, MissingValue } from "@langwatch/coding-agent-browser-kit";
 import type React from "react";
 
-import { formatDurationSeconds } from "../duration.ts";
 import type { SessionListRow } from "../session-list-row.ts";
-import { MissingValue } from "./missing-value.tsx";
 
 /**
  * How long the agent worked against how long it stood waiting on its human.

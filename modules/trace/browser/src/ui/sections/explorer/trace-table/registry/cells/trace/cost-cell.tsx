@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatCost } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 
-import { formatCost } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { CostBreakdownTooltipContent } from "../../../../shared/cost-breakdown-tooltip.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

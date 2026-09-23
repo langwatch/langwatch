@@ -1,7 +1,7 @@
+import type { FilterField, FilterParam } from "@langwatch/analytics-browser-kit";
 import { subDays } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { FilterField } from "../../../model/filters/types.ts";
 import {
   DEFAULT_VIEWS,
   filtersMatch,
@@ -10,7 +10,6 @@ import {
   normalizeFilterValue,
   type SavedView,
 } from "../saved-views-logic.ts";
-import type { FilterParam } from "../use-filter-params.ts";
 
 describe("savedViewsLogic", () => {
   // --- normalizeFilterValue ---

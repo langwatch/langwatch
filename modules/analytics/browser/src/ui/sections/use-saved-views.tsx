@@ -4,6 +4,12 @@
  * endpoints.
  */
 
+import {
+  availableFilters,
+  type FilterField,
+  type FilterParam,
+  useFilterParams,
+} from "@langwatch/analytics-browser-kit";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
@@ -19,16 +25,12 @@ import {
   useState,
 } from "react";
 
-import { availableFilters } from "../../model/filters/registry.ts";
-import type { FilterField } from "../../model/filters/types.ts";
 import {
   type DefaultView,
   findMatchingView,
   MAX_VIEW_NAME_LENGTH,
   type SavedView,
 } from "./saved-views-logic.ts";
-import type { FilterParam } from "./use-filter-params.ts";
-import { useFilterParams } from "./use-filter-params.ts";
 
 // Re-export types and constants for consumers
 export {

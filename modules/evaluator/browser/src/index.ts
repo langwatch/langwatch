@@ -37,7 +37,7 @@ export {
   type EvaluatorEditorHeadingProps,
 } from "./ui/elements/evaluator-editor-chrome.tsx";
 export { CheckStatusIcon } from "./ui/elements/evaluation-status.tsx";
-export { evaluationPassed, evaluationStatusColor } from "./model/evaluation-status.ts";
+export { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 export {
   type EvaluationsTagSummary,
   evaluationsTagLabel,

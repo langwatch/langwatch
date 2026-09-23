@@ -18,6 +18,7 @@ import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/w
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
@@ -33,7 +34,6 @@ import {
   useBatchEvaluationResults,
 } from "../../../behavior/experiments/use-batch-evaluation-run-results.ts";
 import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,

@@ -4,15 +4,15 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { slugify } from "@langwatch/design-system/slugify";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
-import { describeCellFailure } from "@langwatch/experiment-browser-kit";
-import { useBatchEvaluationState } from "@langwatch/experiment-browser/batch-evaluation-state";
 import {
+  describeCellFailure,
   BatchEvaluationResultsTable,
   type BatchRunSummary,
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
-} from "@langwatch/experiment-browser/batch-results";
+} from "@langwatch/experiment-browser-kit";
+import { useBatchEvaluationState } from "@langwatch/experiment-browser/batch-evaluation-state";
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";

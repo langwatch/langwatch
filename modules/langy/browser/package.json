@@ -14,23 +14,7 @@
       "langwatch-declaration-source": "./src/langy.web.ts",
       "types": "./dist/langy.web.d.ts",
       "default": "./src/langy.web.ts"
-    },
-    "./langy-page-registration": {
-      "langwatch-declaration-source": "./src/langy-page-registration.ts",
-      "types": "./dist/langy-page-registration.d.ts",
-      "default": "./src/langy-page-registration.ts"
-    },
-    "./langy-ui-actions": {
-      "langwatch-declaration-source": "./src/langy-ui-actions.ts",
-      "types": "./dist/langy-ui-actions.d.ts",
-      "default": "./src/langy-ui-actions.ts"
-    },
-    "./surfaces/asaplangy": {
-      "langwatch-declaration-source": "./src/asaplangy.ts",
-      "types": "./dist/asaplangy.d.ts",
-      "default": "./src/asaplangy.ts"
-    },
-    "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css"
+    }
   },
   "scripts": {
     "typecheck": "tsc -b",

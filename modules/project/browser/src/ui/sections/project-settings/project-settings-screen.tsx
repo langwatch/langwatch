@@ -18,7 +18,7 @@ import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { TechStackSelector } from "@langwatch/onboarding-browser/surfaces/tech-stack";
+import { TechStackSelector } from "@langwatch/onboarding-browser-kit";
 import {
   DepartmentPicker,
   useDepartmentColumn,

@@ -6,11 +6,11 @@
  * @see specs/traces-v2/search.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { FacetItem } from "@langwatch/trace-browser-kit";
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { FacetRow } from "../facet-row.tsx";
 
 const renderRow = (item: FacetItem) =>

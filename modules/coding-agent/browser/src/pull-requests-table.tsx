@@ -1,4 +1,9 @@
 import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  PeerComparisonCell,
+  peerComparisonSentence,
+  percentileStats,
+} from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -19,8 +24,6 @@ import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
 import { formatLastUpdate } from "./last-update.ts";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
-import { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell.tsx";
-import { percentileStats } from "./percentile.ts";
 import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
 import {
   decodePullRequestRef,

@@ -24,12 +24,12 @@ import {
   ModelSelector,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
+import { AddModelProviderKey } from "../../elements/checks/add-model-provider-key.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Simple component to handle model disabled check

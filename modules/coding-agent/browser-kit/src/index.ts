@@ -52,3 +52,5 @@ export * from "./ui/elements/detail-section.tsx";
 export * from "./ui/elements/peer-comparison-cell.tsx";
 export * from "./model/percentile.ts";
 export * from "./ui/elements/models-section.tsx";
+export type { DetailPayload } from "./model/pull-request-detail.ts";
+export { MISSING_VALUE, MissingValue } from "./ui/elements/cells/missing-value.tsx";

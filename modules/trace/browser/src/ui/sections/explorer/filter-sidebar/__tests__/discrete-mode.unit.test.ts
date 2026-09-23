@@ -1,6 +1,6 @@
+import type { RangeSectionData } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
-import type { RangeSectionData } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 
 /**

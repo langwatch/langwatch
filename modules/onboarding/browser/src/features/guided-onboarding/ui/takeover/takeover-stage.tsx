@@ -4,9 +4,8 @@
  * through it over 450ms.
  */
 import { Box, Flex } from "@chakra-ui/react";
+import { OnboardingMeshBackground } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
-
-import { OnboardingMeshBackground } from "../../../../ui/elements/onboarding-mesh-background.tsx";
 
 export const TAKEOVER_FADE_MS = 450;
 

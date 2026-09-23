@@ -4,10 +4,9 @@
  */
 
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";
+import { WorkflowConfigPopover } from "@langwatch/workflow-browser-kit";
 import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
 import { lazy, Suspense } from "react";
-
-import { WorkflowConfigPopover } from "../elements/workflow-config-popover.tsx";
 
 const EMOJI_STYLE_NATIVE = "native" as EmojiStyle;
 const SKIN_TONE_PREVIEW = "PREVIEW" as SkinTonePickerLocation;

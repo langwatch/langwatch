@@ -4,10 +4,10 @@ import "@testing-library/jest-dom/vitest";
  * Tests for WinRateChart.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { BatchComparisonColumn } from "@langwatch/experiment-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 vi.mock("recharts", () => {

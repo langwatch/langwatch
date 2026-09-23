@@ -41,16 +41,13 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),
       debouncedTimeRange: { from: 1, to: 2, label: undefined },
     }),
-}));
-
-vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
 }));
 

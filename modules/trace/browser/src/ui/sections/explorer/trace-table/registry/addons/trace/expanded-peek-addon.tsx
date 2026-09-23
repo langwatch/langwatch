@@ -1,9 +1,9 @@
 import { Box, Circle, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type React from "react";
 import { useMemo } from "react";
 
-import { formatDuration } from "../../../../../../../model/display-formatters.ts";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import { useTraceSpanTree } from "../../../../hooks/use-trace-span-tree.ts";
 import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";

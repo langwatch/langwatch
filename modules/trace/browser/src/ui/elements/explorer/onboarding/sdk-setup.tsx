@@ -4,20 +4,18 @@
  * it, so this body carries no credentials of its own.
  */
 import { Box, Grid, VStack } from "@chakra-ui/react";
-import { DocsLinks } from "@langwatch/onboarding-browser/surfaces/docs-links";
-import { FrameworkGrid } from "@langwatch/onboarding-browser/surfaces/framework-grid";
-import { FrameworkIntegrationCode } from "@langwatch/onboarding-browser/surfaces/framework-integration-code";
-import { InstallPreview } from "@langwatch/onboarding-browser/surfaces/install-preview";
-import { getRegistryEntry } from "@langwatch/onboarding-browser/surfaces/observability-codegen";
 import {
+  DocsLinks,
+  FrameworkGrid,
+  FrameworkIntegrationCode,
+  InstallPreview,
+  getRegistryEntry,
   FRAMEWORKS_BY_PLATFORM,
   PLATFORM_OPTIONS,
-} from "@langwatch/onboarding-browser/surfaces/observability-options";
-import type {
-  FrameworkKey,
-  PlatformKey,
-} from "@langwatch/onboarding-browser/surfaces/observability-types";
-import { PlatformGrid } from "@langwatch/onboarding-browser/surfaces/platform-grid";
+  type FrameworkKey,
+  type PlatformKey,
+  PlatformGrid,
+} from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useMemo, useState } from "react";
 

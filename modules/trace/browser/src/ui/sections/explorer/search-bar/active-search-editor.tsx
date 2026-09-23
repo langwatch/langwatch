@@ -1,9 +1,9 @@
+import { SuggestionDropdown } from "@langwatch/trace-browser-kit";
 import { EditorContent } from "@tiptap/react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 
 import { useGlobalSlashFocus } from "../../../../behavior/explorer/search-bar/use-global-slash-focus.ts";
-import { SuggestionDropdown } from "./suggestion-dropdown.tsx";
 import { useFilterEditor, type ValueResolver } from "./use-filter-editor.ts";
 
 interface ActiveSearchEditorProps {

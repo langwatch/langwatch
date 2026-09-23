@@ -12,10 +12,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PeriodSelector, usePeriodSelector } from "@langwatch/analytics-browser-kit";
-import { useFilterParams } from "@langwatch/analytics-browser/surfaces/filter-params";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+  useFilterParams,
+  FilterToggle,
+} from "@langwatch/analytics-browser-kit";
 import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
-import { FilterToggle } from "@langwatch/analytics-browser/surfaces/filter-toggle";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -25,6 +28,7 @@ import { formatMoney } from "@langwatch/design-system/format-money";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
+import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   type Evaluators,
   evaluatorsSchema,
@@ -40,7 +44,6 @@ import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
 import { readableDate } from "../../../model/display-formatters.ts";
-import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,

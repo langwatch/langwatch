@@ -4,6 +4,7 @@
  * rather than a copy of it, and only the "via the platform" flavour reaches it.
  */
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { ViaClaudeCodeScreen, ViaMcpClientScreen } from "@langwatch/onboarding-browser-kit";
 import { useEffect, useMemo, useRef } from "react";
 
 import {
@@ -16,8 +17,6 @@ import {
 import { ModelProviderStepScreen } from "./model-provider-step-screen.tsx";
 import { ObservabilityScreen } from "./observability-screen.tsx";
 import { ProductSelectionScreen } from "./product-selection-screen.tsx";
-import { ViaClaudeCodeScreen } from "./via-claude-code-screen.tsx";
-import { ViaMcpClientScreen } from "./via-claude-desktop-screen.tsx";
 import { ViaPlatformScreen } from "./via-platform-screen.tsx";
 
 interface ProductSelectionScreenWithAnalyticsProps extends OnboardingScreenProps {

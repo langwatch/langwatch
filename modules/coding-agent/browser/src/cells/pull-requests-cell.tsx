@@ -1,9 +1,9 @@
 import { Badge, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { MissingValue } from "@langwatch/coding-agent-browser-kit";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
 import type { SessionPullRequest } from "../session-list-row.ts";
-import { MissingValue } from "./missing-value.tsx";
 
 /** How many pull requests a row names before the rest go behind a hover. */
 const MAX_LISTED_PULL_REQUESTS = 4;

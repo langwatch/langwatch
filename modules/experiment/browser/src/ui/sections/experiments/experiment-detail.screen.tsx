@@ -2,7 +2,7 @@ import { Alert, Box } from "@chakra-ui/react";
 import { isNotFoundError as isNotFound } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
+import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
 
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";

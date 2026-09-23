@@ -17,6 +17,21 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import {
+  analyticsGroups,
+  analyticsMetrics,
+  analyticsPipelines,
+  type FlattenAnalyticsGroupsEnum,
+  type FlattenAnalyticsMetricsEnum,
+  getGroup,
+  getMetric,
+  metricAggregations,
+  pipelineAggregations,
+  type AggregationTypes,
+  type PipelineAggregationTypes,
+  type PipelineFields,
+  type SharedFiltersInput,
+} from "@langwatch/analytics-browser-kit";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -61,23 +76,6 @@ import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import type { FilterField } from "../../../model/analytics-filter-definition.ts";
 import { filterOutEmptyFilters, type FilterParam } from "../../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import {
-  analyticsGroups,
-  analyticsMetrics,
-  analyticsPipelines,
-  type FlattenAnalyticsGroupsEnum,
-  type FlattenAnalyticsMetricsEnum,
-  getGroup,
-  getMetric,
-  metricAggregations,
-  pipelineAggregations,
-} from "../../../model/analytics-registry.ts";
-import type {
-  AggregationTypes,
-  PipelineAggregationTypes,
-  PipelineFields,
-  SharedFiltersInput,
-} from "../../../model/analytics-vocabulary.ts";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,

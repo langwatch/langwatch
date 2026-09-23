@@ -19,10 +19,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
 }));
 
-import type {
-  BatchComparisonColumn,
-  BatchResultRow,
-} from "../../batch-evaluation-results.types.ts";
+import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-browser-kit";
+
 import { ComparisonLeaderboardDrawer } from "../comparison-leaderboard-drawer.tsx";
 
 const VARIANTS = ["target-1", "target-2", "target-3"];

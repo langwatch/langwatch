@@ -1,9 +1,9 @@
 import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "@langwatch/trace-browser-kit";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 
-import { formatDuration } from "../../../../../model/display-formatters.ts";
 import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import {
   GROUP_ROW_HEIGHT,

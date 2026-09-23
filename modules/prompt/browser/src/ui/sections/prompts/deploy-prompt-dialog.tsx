@@ -22,8 +22,8 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { CopyButton } from "@langwatch/workflow-browser-kit";
 import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
-import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
 import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Info } from "react-feather";

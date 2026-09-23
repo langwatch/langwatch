@@ -4,13 +4,14 @@
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  transformBatchEvaluationData,
+  BatchEvaluationResultsTable,
+} from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
-import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),

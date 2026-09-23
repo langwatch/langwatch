@@ -231,10 +231,9 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore, LangyProvider } from "@langwatch/langy-browser-kit";
 import { MemoryRouter } from "react-router";
 
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

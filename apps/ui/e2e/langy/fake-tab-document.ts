@@ -5,10 +5,7 @@
  */
 import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import { extractPersistedState } from "@langwatch/experiment-contract";
-import {
-  LangyUiPageOutOfDateError,
-  LangyUiSaveFailedError,
-} from "@langwatch/langy-browser/langy-ui-actions";
+import { LangyUiPageOutOfDateError, LangyUiSaveFailedError } from "@langwatch/langy-browser-kit";
 
 import { CONFIG } from "./config";
 import { trpcMutate, trpcQuery } from "./trpc";

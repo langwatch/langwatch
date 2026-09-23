@@ -1,4 +1,5 @@
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { usePublicEnv } from "@langwatch/onboarding-browser-kit";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { useMemo, useState } from "react";
 
@@ -16,7 +17,6 @@ import {
 } from "./types.ts";
 import { useFeatureFlag } from "./use-feature-flag.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
-import { usePublicEnv } from "./use-public-env.ts";
 
 export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();

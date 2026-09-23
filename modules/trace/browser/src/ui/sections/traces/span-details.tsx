@@ -2,10 +2,7 @@ import { Badge, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chak
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  evaluationPassed,
-  evaluationStatusColor,
-} from "@langwatch/evaluator-browser/surfaces/evaluation-status";
+import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,

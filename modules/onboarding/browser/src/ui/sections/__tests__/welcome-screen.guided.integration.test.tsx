@@ -54,7 +54,8 @@ vi.mock("../../blocks/loading-screen.tsx", () => ({
   LoadingScreen: () => <div data-testid="loading" />,
 }));
 
-vi.mock("../../../behavior/use-public-env.ts", () => ({
+vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   usePublicEnv: () => ({ data: { IS_SAAS: true, BASE_HOST: "" }, isLoading: false }),
 }));
 
