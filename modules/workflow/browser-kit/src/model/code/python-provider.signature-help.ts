@@ -21,21 +21,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
         endLineNumber: position.lineNumber,
         endColumn: position.column,
       });
-      // Find the nearest unclosed `(` on the current line so we can resolve
-      // which call we're inside (handles `foo(bar(baz, |))` chains).
-      let depth = 0;
-      let openIdx = -1;
-      for (let i = lineBefore.length - 1; i >= 0; i--) {
-        const ch = lineBefore[i];
-        if (ch === ")") depth++;
-        else if (ch === "(") {
-          if (depth === 0) {
-            openIdx = i;
-            break;
-          }
-          depth--;
-        }
-      }
+      const openIdx = unclosedParenIndex(lineBefore);
       if (openIdx === -1) return null;
 
       const beforeOpen = lineBefore.slice(0, openIdx + 1);
@@ -44,23 +30,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
       const callee = calleeMatch[1];
       if (!callee) return null;
 
-      // Resolve callee → catalogue entry.
-      let entry: PyMember | undefined;
-      let label: string | undefined;
-      if (callee.includes(".")) {
-        const [owner, ...rest] = callee.split(".");
-        const memberName = rest.join(".");
-        if (owner === void 0) return null;
-        const imports = scanImports(model.getValue());
-        const mod = imports.get(owner);
-        if (mod) {
-          entry = mod.members.find((m) => m.name === memberName);
-          if (entry) label = `${mod.name}.${entry.name}`;
-        }
-      } else {
-        entry = PYTHON_BUILTIN_BY_NAME.get(callee);
-        if (entry) label = entry.name;
-      }
+      const { entry, label } = resolveCallee({ callee, model });
       if (!entry?.signature) return null;
 
       const sigLabel = entry.signature ?? label ?? callee;
@@ -90,4 +60,39 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
       };
     },
   });
+}
+
+/**
+ * The nearest unclosed `(` on the line, so we can resolve which call we're
+ * inside (handles `foo(bar(baz, |))` chains); -1 when there is none.
+ */
+function unclosedParenIndex(lineBefore: string): number {
+  let depth = 0;
+  for (let i = lineBefore.length - 1; i >= 0; i--) {
+    const ch = lineBefore[i];
+    if (ch === ")") depth++;
+    else if (ch === "(") {
+      if (depth === 0) return i;
+      depth--;
+    }
+  }
+  return -1;
+}
+
+/** Resolve callee → catalogue entry. */
+function resolveCallee({ callee, model }: { callee: string; model: editor.ITextModel }): {
+  entry: PyMember | undefined;
+  label: string | undefined;
+} {
+  if (!callee.includes(".")) {
+    const entry = PYTHON_BUILTIN_BY_NAME.get(callee);
+    return { entry, label: entry?.name };
+  }
+  const [owner, ...rest] = callee.split(".");
+  const memberName = rest.join(".");
+  if (owner === void 0) return { entry: undefined, label: undefined };
+  const mod = scanImports(model.getValue()).get(owner);
+  if (!mod) return { entry: undefined, label: undefined };
+  const entry = mod.members.find((m) => m.name === memberName);
+  return { entry, label: entry ? `${mod.name}.${entry.name}` : undefined };
 }

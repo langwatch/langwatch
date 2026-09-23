@@ -37,13 +37,9 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
   };
 
   const getStatusText = () => {
-    if (verdict) {
-      return verdict === Verdict.SUCCESS
-        ? "PASSED"
-        : verdict === Verdict.FAILURE
-          ? "FAILED"
-          : "INCONCLUSIVE";
-    }
+    if (verdict === Verdict.SUCCESS) return "PASSED";
+    if (verdict === Verdict.FAILURE) return "FAILED";
+    if (verdict) return "INCONCLUSIVE";
     if (status !== undefined) {
       return STATUS_DISPLAY_TEXT_MAP[status];
     }

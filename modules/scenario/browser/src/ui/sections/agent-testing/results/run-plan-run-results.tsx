@@ -132,6 +132,11 @@ function SelectedRunResults({
   const rows = useRunRowHandlers({ scenarioSetId: plan.scenarioSetId });
   const onCancelRun = cancel.canStop ? cancel.handleCancelRun : undefined;
   const comparing = isComparison(targets);
+  const isGrid = viewMode === "grid";
+  const showsComparisonGrid = isGrid && comparing;
+  const showsRunGrid = isGrid && !comparing;
+  const showsComparisonTable = !isGrid && comparing;
+  const showsRunTable = !isGrid && !comparing;
   const resolveTargetName = targetNameResolver({
     targets,
     fallback: rows.resolveTargetName,
@@ -148,30 +153,30 @@ function SelectedRunResults({
         />
       ) : null}
 
-      {viewMode === "grid" ? (
-        comparing ? (
-          <ComparisonGrid
-            batch={batch}
-            targets={targets}
-            resolveTargetName={resolveTargetName}
-            onScenarioRunClick={rows.handleScenarioRunClick}
-            iterationMap={selection.iterationMap}
-            onCancelRun={onCancelRun}
-            cancellingJobId={cancel.cancellingJobId}
-          />
-        ) : (
-          <ScenarioRunContent
-            scenarioRuns={batch.scenarioRuns}
-            viewMode="grid"
-            gridPadding={0}
-            resolveTargetName={resolveTargetName}
-            onScenarioRunClick={rows.handleScenarioRunClick}
-            iterationMap={selection.iterationMap}
-            onCancelRun={onCancelRun}
-            cancellingJobId={cancel.cancellingJobId}
-          />
-        )
-      ) : comparing ? (
+      {showsComparisonGrid && (
+        <ComparisonGrid
+          batch={batch}
+          targets={targets}
+          resolveTargetName={resolveTargetName}
+          onScenarioRunClick={rows.handleScenarioRunClick}
+          iterationMap={selection.iterationMap}
+          onCancelRun={onCancelRun}
+          cancellingJobId={cancel.cancellingJobId}
+        />
+      )}
+      {showsRunGrid && (
+        <ScenarioRunContent
+          scenarioRuns={batch.scenarioRuns}
+          viewMode="grid"
+          gridPadding={0}
+          resolveTargetName={resolveTargetName}
+          onScenarioRunClick={rows.handleScenarioRunClick}
+          iterationMap={selection.iterationMap}
+          onCancelRun={onCancelRun}
+          cancellingJobId={cancel.cancellingJobId}
+        />
+      )}
+      {showsComparisonTable && (
         <ComparisonResultsTable
           scenarioRuns={batch.scenarioRuns}
           targets={targets}
@@ -179,7 +184,8 @@ function SelectedRunResults({
           onCancelRun={onCancelRun}
           cancellingJobId={cancel.cancellingJobId}
         />
-      ) : (
+      )}
+      {showsRunTable && (
         <RunResultsTable
           scenarioRuns={batch.scenarioRuns}
           resolveTargetName={resolveTargetName}

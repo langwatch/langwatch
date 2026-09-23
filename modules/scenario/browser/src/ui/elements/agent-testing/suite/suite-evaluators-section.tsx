@@ -40,10 +40,11 @@ function attachmentPillStyle({
   inherited: boolean;
   onClick?: () => void;
 }) {
+  const presentColor = inherited ? FG_MUTED : "fg";
   return {
     borderColor: isMissing ? "orange.solid" : "border",
     background: isMissing ? "orange.subtle" : "bg.muted/60",
-    color: isMissing ? "orange.fg" : inherited ? FG_MUTED : "fg",
+    color: isMissing ? "orange.fg" : presentColor,
     cursor: onClick ? "pointer" : "default",
     hoverStyle: onClick ? { borderColor: "border.emphasized" } : undefined,
   };
