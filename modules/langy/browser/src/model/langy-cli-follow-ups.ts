@@ -5,7 +5,7 @@
  */
 
 import { countResults } from "./langy-cli-result-document.ts";
-import type { LangyFeatureMap } from "./langy-feature-map.ts";
+import type { FeatureNode, LangyFeatureMap } from "./langy-feature-map.ts";
 
 /** A settled tool call from the turn, as the UI already models it. */
 export interface SettledToolResult {
@@ -73,25 +73,43 @@ export function followUpsForResult(
 
   for (const kind of source.produces) {
     if (UNOFFERABLE_KINDS.has(kind)) continue;
-    for (const consumer of featureMap?.featuresConsuming(kind) ?? []) {
-      if (consumer.id === source.id) continue;
+    suggestions.push(...kindSuggestions({ kind, source, result, featureMap, seen }));
+  }
+  return suggestions;
+}
 
-      const label = SUGGESTION_LABEL[consumer.id];
-      if (!label) continue;
+function kindSuggestions({
+  kind,
+  source,
+  result,
+  featureMap,
+  seen,
+}: {
+  kind: string;
+  source: FeatureNode;
+  result: SettledToolResult;
+  featureMap?: Pick<LangyFeatureMap, "featuresConsuming">;
+  seen: Set<string>;
+}): FollowUpSuggestion[] {
+  const suggestions: FollowUpSuggestion[] = [];
+  for (const consumer of featureMap?.featuresConsuming(kind) ?? []) {
+    if (consumer.id === source.id) continue;
 
-      const id = `${kind}:${consumer.id}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
+    const label = SUGGESTION_LABEL[consumer.id];
+    if (!label) continue;
 
-      suggestions.push({
-        id,
-        featureId: consumer.id,
-        featureName: consumer.name,
-        label,
-        kind,
-        sourceToolName: result.name,
-      });
-    }
+    const id = `${kind}:${consumer.id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    suggestions.push({
+      id,
+      featureId: consumer.id,
+      featureName: consumer.name,
+      label,
+      kind,
+      sourceToolName: result.name,
+    });
   }
   return suggestions;
 }

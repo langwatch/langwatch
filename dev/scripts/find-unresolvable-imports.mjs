@@ -40,9 +40,9 @@
  *    is not what stops a process from starting.
  */
 
+import { execSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 
 /** Packages whose exports are generated, so absent from tracked sources. */
 const GENERATED = ["prisma-client"];
@@ -60,12 +60,16 @@ const workspacePackages = () => {
   const manifests = execSync(
     "git ls-files '*/package.json' | grep -vE '(^|/)(node_modules|dist)/'",
     { encoding: "utf8", maxBuffer: 1 << 28 },
-  ).trim().split("\n");
+  )
+    .trim()
+    .split("\n");
   for (const manifest of manifests) {
     try {
       const name = JSON.parse(readFileSync(manifest, "utf8")).name;
       if (typeof name === "string" && name.startsWith("@langwatch/")) names.add(name);
-    } catch { /* unparseable manifest */ }
+    } catch {
+      /* unparseable manifest */
+    }
   }
   return names;
 };
@@ -83,79 +87,121 @@ const packageOf = (specifier) => specifier.split("/").slice(0, 2).join("/");
  * declarations says "fine" and the process still dies with "does not provide an
  * export named CodexAccountService".
  */
-const exportSurfaces = (sources, manifests) => {
+const packageEntries = (sources, manifests) => {
   const entries = new Map();
   for (const [manifest, raw] of manifests) {
     let pkg;
-    try { pkg = JSON.parse(raw); } catch { continue; }
+    try {
+      pkg = JSON.parse(raw);
+    } catch {
+      continue;
+    }
     if (typeof pkg.name !== "string" || !pkg.name.startsWith("@langwatch/")) continue;
     const dot = pkg.exports?.["."];
     const target = typeof dot === "string" ? dot : (dot?.default ?? dot?.import ?? pkg.main);
     const dir = manifest.replace(/\/package\.json$/, "");
     for (const candidate of [target, "src/index.ts", "index.ts"].filter(Boolean)) {
       const path = `${dir}/${String(candidate).replace(/^\.\//, "")}`;
-      if (sources.has(path)) { entries.set(pkg.name, path); break; }
+      if (sources.has(path)) {
+        entries.set(pkg.name, path);
+        break;
+      }
     }
   }
+  return entries;
+};
 
-  const of = (file, seen) => {
-    if (seen.has(file)) return new Set();
-    seen.add(file);
-    const src = sources.get(file);
-    if (!src) return new Set();
-    const names = new Set();
-    for (const m of src.matchAll(/^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|const|let|var|function\s*\*?|enum|interface)\s+([A-Za-z_$][\w$]*)/gm))
-      names.add(m[1]);
-    for (const m of src.matchAll(/^\s*export\s+type\s+([A-Za-z_$][\w$]*)\s*[=<]/gm)) names.add(m[1]);
-    for (const m of src.matchAll(/export\s+\{([^}]*)\}/g))
-      for (const part of m[1].split(",")) {
-        const raw = part.trim();
-        if (raw) names.add(raw.split(/\s+as\s+/).pop().trim().replace(/^type\s+/, ""));
-      }
-    for (const m of src.matchAll(/export\s+\*\s+from\s*["'](\.[^"']+)["']/g)) {
-      // Resolved against the file's own directory and kept REPO-RELATIVE: an
-      // absolute path never matches this map's keys, and the symptom of getting
-      // that wrong is every surface coming back empty and the whole tree
-      // reading as broken.
-      const parts = file.split("/").slice(0, -1);
-      for (const segment of m[1].split("/")) {
-        if (segment === "." || segment === "") continue;
-        if (segment === "..") parts.pop();
-        else parts.push(segment);
-      }
-      const base = parts.join("/");
-      for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`])
-        if (sources.has(candidate)) { for (const name of of(candidate, seen)) names.add(name); break; }
+const exportListNames = (src) => {
+  const names = new Set();
+  for (const m of src.matchAll(/export\s+\{([^}]*)\}/g))
+    for (const part of m[1].split(",")) {
+      const raw = part.trim();
+      if (raw)
+        names.add(
+          raw
+            .split(/\s+as\s+/)
+            .pop()
+            .trim()
+            .replace(/^type\s+/, ""),
+        );
     }
-    return names;
-  };
+  return names;
+};
 
+// Resolved against the file's own directory and kept REPO-RELATIVE: an
+// absolute path never matches the sources map's keys, and the symptom of getting
+// that wrong is every surface coming back empty and the whole tree
+// reading as broken.
+const resolveRelative = (file, specifier) => {
+  const parts = file.split("/").slice(0, -1);
+  for (const segment of specifier.split("/")) {
+    if (segment === "." || segment === "") continue;
+    if (segment === "..") parts.pop();
+    else parts.push(segment);
+  }
+  return parts.join("/");
+};
+
+const reExportedNames = (sources, file, specifier, seen) => {
+  const base = resolveRelative(file, specifier);
+  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`])
+    if (sources.has(candidate)) return surfaceOf(sources, candidate, seen);
+  return new Set();
+};
+
+const surfaceOf = (sources, file, seen) => {
+  if (seen.has(file)) return new Set();
+  seen.add(file);
+  const src = sources.get(file);
+  if (!src) return new Set();
+  const names = new Set();
+  for (const m of src.matchAll(
+    /^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|const|let|var|function\s*\*?|enum|interface)\s+([A-Za-z_$][\w$]*)/gm,
+  ))
+    names.add(m[1]);
+  for (const m of src.matchAll(/^\s*export\s+type\s+([A-Za-z_$][\w$]*)\s*[=<]/gm)) names.add(m[1]);
+  for (const name of exportListNames(src)) names.add(name);
+  for (const m of src.matchAll(/export\s+\*\s+from\s*["'](\.[^"']+)["']/g))
+    for (const name of reExportedNames(sources, file, m[1], seen)) names.add(name);
+  return names;
+};
+
+const exportSurfaces = (sources, manifests) => {
   const surfaces = new Map();
-  for (const [name, entry] of entries) surfaces.set(name, of(entry, new Set()));
+  for (const [name, entry] of packageEntries(sources, manifests))
+    surfaces.set(name, surfaceOf(sources, entry, new Set()));
   return surfaces;
 };
 
 const collectDeclarations = (sources) => {
   const value = new Set();
   const type = new Set();
-  for (const src of sources.values()) {
-    for (const m of src.matchAll(/^\s*export\s+interface\s+([A-Za-z_$][\w$]*)/gm)) type.add(m[1]);
-    for (const m of src.matchAll(/^\s*export\s+type\s+([A-Za-z_$][\w$]*)\s*[=<]/gm)) type.add(m[1]);
-    // `async`, `default` and a generator star all sit between `export` and the
-    // name. Omitting `async` made every `export async function` read as
-    // undeclared — four real call sites reported as defects because of one
-    // missing keyword in this pattern.
-    for (const m of src.matchAll(/^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|const|function\s*\*?|enum)\s+([A-Za-z_$][\w$]*)/gm))
-      value.add(m[1]);
-    for (const m of src.matchAll(/export\s+\{([^}]*)\}/g))
-      for (const part of m[1].split(",")) {
-        const raw = part.trim();
-        if (!raw) continue;
-        const exported = raw.split(/\s+as\s+/).pop().trim().replace(/^type\s+/, "");
-        (/^type\s/.test(raw) ? type : value).add(exported);
-      }
-  }
+  for (const src of sources.values()) addDeclarations(src, { value, type });
   return { value, type };
+};
+
+const addDeclarations = (src, { value, type }) => {
+  for (const m of src.matchAll(/^\s*export\s+interface\s+([A-Za-z_$][\w$]*)/gm)) type.add(m[1]);
+  for (const m of src.matchAll(/^\s*export\s+type\s+([A-Za-z_$][\w$]*)\s*[=<]/gm)) type.add(m[1]);
+  // `async`, `default` and a generator star all sit between `export` and the
+  // name. Omitting `async` made every `export async function` read as
+  // undeclared — four real call sites reported as defects because of one
+  // missing keyword in this pattern.
+  for (const m of src.matchAll(
+    /^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|const|function\s*\*?|enum)\s+([A-Za-z_$][\w$]*)/gm,
+  ))
+    value.add(m[1]);
+  for (const m of src.matchAll(/export\s+\{([^}]*)\}/g))
+    for (const part of m[1].split(",")) {
+      const raw = part.trim();
+      if (!raw) continue;
+      const exported = raw
+        .split(/\s+as\s+/)
+        .pop()
+        .trim()
+        .replace(/^type\s+/, "");
+      (/^type\s/.test(raw) ? type : value).add(exported);
+    }
 };
 
 /**
@@ -194,6 +240,11 @@ const proposals = (name, declared) => {
 
 const isGeneratedPackage = (pkgName) => GENERATED.some((pkg) => pkgName.includes(pkg));
 
+const importKind = (name, declared) => {
+  if (declared.value.has(name)) return "NOT-EXPORTED";
+  return declared.type.has(name) ? "TYPE-ONLY" : "ABSENT";
+};
+
 export const findUnresolvable = (sources, workspace, surfaces) => {
   const declared = collectDeclarations(sources);
   const rows = [];
@@ -213,9 +264,11 @@ export const findUnresolvable = (sources, workspace, surfaces) => {
         const exported = surface ? surface.has(name) : true;
         if (declaredAsValue && exported) continue;
         rows.push({
-          file, name, from: m[2],
+          file,
+          name,
+          from: m[2],
           line: src.slice(0, m.index).split("\n").length,
-          kind: declaredAsValue ? "NOT-EXPORTED" : declared.type.has(name) ? "TYPE-ONLY" : "ABSENT",
+          kind: importKind(name, declared),
           candidates: proposals(name, declared),
         });
       }
@@ -225,53 +278,83 @@ export const findUnresolvable = (sources, workspace, surfaces) => {
 };
 
 const FIXTURES = [
-  { want: "TYPE-ONLY", name: "an interface imported in value position",
+  {
+    want: "TYPE-ONLY",
+    name: "an interface imported in value position",
     sources: new Map([
       ["pkg.ts", "export interface GovernanceEncryptor { encrypt(v: string): string }"],
       ["use.ts", 'import { GovernanceEncryptor } from "@langwatch/enterprise-governance-process";'],
-    ]) },
-  { want: "ABSENT", name: "a name nothing declares",
+    ]),
+  },
+  {
+    want: "ABSENT",
+    name: "a name nothing declares",
     sources: new Map([
       ["pkg.ts", "export interface GovernanceDiagnosticsSink { warn(m: string): void }"],
-      ["use.ts", 'import { GovernanceDiagnostics } from "@langwatch/enterprise-governance-process";'],
-    ]) },
-  { want: null, name: "a real class import",
+      [
+        "use.ts",
+        'import { GovernanceDiagnostics } from "@langwatch/enterprise-governance-process";',
+      ],
+    ]),
+  },
+  {
+    want: null,
+    name: "a real class import",
     sources: new Map([
       ["pkg.ts", "export class IngestionPullWorkerService {}"],
-      ["use.ts", 'import { IngestionPullWorkerService } from "@langwatch/enterprise-governance-process";'],
-    ]) },
-  { want: null, name: "an already type-only specifier",
+      [
+        "use.ts",
+        'import { IngestionPullWorkerService } from "@langwatch/enterprise-governance-process";',
+      ],
+    ]),
+  },
+  {
+    want: null,
+    name: "an already type-only specifier",
     sources: new Map([
       ["pkg.ts", "export interface IngestionPullSource { id: string }"],
-      ["use.ts", 'import { type IngestionPullSource } from "@langwatch/enterprise-governance-process";'],
-    ]) },
+      [
+        "use.ts",
+        'import { type IngestionPullSource } from "@langwatch/enterprise-governance-process";',
+      ],
+    ]),
+  },
   // A published catalog dependency in the @langwatch scope. Its exports live in
   // node_modules, so a scan of tracked sources cannot see them — reporting it
   // would be the scan describing itself rather than the code. This fixture is
   // here because the first version did exactly that, for every `generate` import
   // from @langwatch/ksuid in the tree.
-  { want: null, name: "an import from a published (non-workspace) @langwatch package",
+  {
+    want: null,
+    name: "an import from a published (non-workspace) @langwatch package",
     workspace: new Set(["@langwatch/enterprise-governance-process"]),
-    sources: new Map([["use.ts", 'import { generate } from "@langwatch/ksuid";']]) },
+    sources: new Map([["use.ts", 'import { generate } from "@langwatch/ksuid";']]),
+  },
   // Declared, exported from its own file, and omitted from the package entry's
   // re-export list. `CodexAccountService` was exactly this and no declaration
   // scan could see it.
-  { want: "NOT-EXPORTED", name: "a class the package's entry does not re-export",
+  {
+    want: "NOT-EXPORTED",
+    name: "a class the package's entry does not re-export",
     workspace: new Set(["@langwatch/model-provider-process"]),
     surfaces: new Map([["@langwatch/model-provider-process", new Set(["SomethingElse"])]]),
     sources: new Map([
       ["svc.ts", "export class CodexAccountService {}"],
       ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-process";'],
-    ]) },
+    ]),
+  },
   // The same package with the name on its surface must stay silent — the guard
   // against a surface that comes back empty and condemns the whole tree.
-  { want: null, name: "a class the package's entry does re-export",
+  {
+    want: null,
+    name: "a class the package's entry does re-export",
     workspace: new Set(["@langwatch/model-provider-process"]),
     surfaces: new Map([["@langwatch/model-provider-process", new Set(["CodexAccountService"])]]),
     sources: new Map([
       ["svc.ts", "export class CodexAccountService {}"],
       ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-process";'],
-    ]) },
+    ]),
+  },
 ];
 
 const selfTest = () => {
@@ -280,7 +363,9 @@ const selfTest = () => {
     const rows = findUnresolvable(fixture.sources, fixture.workspace, fixture.surfaces);
     const got = rows.length ? rows[0].kind : null;
     if (got !== fixture.want) {
-      console.error(`self-test FAILED: ${fixture.name} — expected ${fixture.want ?? "no hit"}, got ${got ?? "no hit"}`);
+      console.error(
+        `self-test FAILED: ${fixture.name} — expected ${fixture.want ?? "no hit"}, got ${got ?? "no hit"}`,
+      );
       bad += 1;
     }
   }
@@ -303,11 +388,18 @@ const bootRelevant = (file) =>
 
 const listFiles = (target) => {
   if (!target) {
-    return execSync("git ls-files '*.ts' '*.tsx' | grep -vE '(^|/)(node_modules|dist)/'",
-      { encoding: "utf8", maxBuffer: 1 << 28 }).trim().split("\n").filter(bootRelevant);
+    return execSync("git ls-files '*.ts' '*.tsx' | grep -vE '(^|/)(node_modules|dist)/'", {
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+    })
+      .trim()
+      .split("\n")
+      .filter(bootRelevant);
   }
-  const walk = (dir) => readdirSync(dir, { withFileTypes: true })
-    .flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
+  const walk = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
+    );
   const stats = statSync(target);
   return (stats.isDirectory() ? walk(target) : [target]).filter((f) => /\.tsx?$/.test(f));
 };
@@ -320,25 +412,43 @@ if (selfTest() !== 0) process.exit(2);
 // a name declared outside the scope is still declared.
 const all = new Map();
 for (const file of listFiles(undefined)) {
-  try { all.set(file, readFileSync(file, "utf8")); } catch { /* unreadable */ }
+  try {
+    all.set(file, readFileSync(file, "utf8"));
+  } catch {
+    /* unreadable */
+  }
 }
 const scope = target ? new Set(listFiles(target)) : null;
 const manifests = new Map();
-for (const manifest of execSync("git ls-files '*/package.json' | grep -vE '(^|/)(node_modules|dist)/'",
-  { encoding: "utf8", maxBuffer: 1 << 28 }).trim().split("\n")) {
-  try { manifests.set(manifest, readFileSync(manifest, "utf8")); } catch { /* unreadable */ }
+for (const manifest of execSync(
+  "git ls-files '*/package.json' | grep -vE '(^|/)(node_modules|dist)/'",
+  { encoding: "utf8", maxBuffer: 1 << 28 },
+)
+  .trim()
+  .split("\n")) {
+  try {
+    manifests.set(manifest, readFileSync(manifest, "utf8"));
+  } catch {
+    /* unreadable */
+  }
 }
-const rows = findUnresolvable(all, workspacePackages(), exportSurfaces(all, manifests))
-  .filter((r) => !scope || scope.has(r.file));
+function renameHint(candidates) {
+  if (candidates.length === 1) return `  -> ${candidates[0]}`;
+  if (candidates.length) return `  -> one of [${candidates.join(", ")}]`;
+  return "  -> nothing declared; port it from history";
+}
+
+const rows = findUnresolvable(all, workspacePackages(), exportSurfaces(all, manifests)).filter(
+  (r) => !scope || scope.has(r.file),
+);
 
 const counts = rows.reduce((acc, r) => ({ ...acc, [r.kind]: (acc[r.kind] ?? 0) + 1 }), {});
 const sole = rows.filter((r) => r.candidates.length === 1);
-console.error(`${rows.length} unresolvable value imports ${JSON.stringify(counts)}; ` +
-  `${sole.length} have exactly one rename candidate`);
+console.error(
+  `${rows.length} unresolvable value imports ${JSON.stringify(counts)}; ` +
+    `${sole.length} have exactly one rename candidate`,
+);
 for (const r of rows) {
-  const hint = r.candidates.length === 1 ? `  -> ${r.candidates[0]}`
-    : r.candidates.length ? `  -> one of [${r.candidates.join(", ")}]`
-    : "  -> nothing declared; port it from history";
-  console.log(`${r.kind.padEnd(9)} ${r.file}:${r.line}  ${r.name}${hint}`);
+  console.log(`${r.kind.padEnd(9)} ${r.file}:${r.line}  ${r.name}${renameHint(r.candidates)}`);
 }
 process.exit(rows.length > 0 ? 1 : 0);

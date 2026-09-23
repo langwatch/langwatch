@@ -187,11 +187,14 @@ function readErrorOnce(record) {
   record.stack = frames;
   // "Error" names nothing a reader did not already know.
   if (type && type !== "Error" && !record.fields.some((field) => field.key === "error")) {
-    record.fields = [...record.fields, { key: "error", value: type }].toSorted((a, b) =>
-      a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
-    );
+    record.fields = [...record.fields, { key: "error", value: type }].toSorted(compareByKey);
   }
   return record;
+}
+
+function compareByKey(a, b) {
+  if (a.key < b.key) return -1;
+  return a.key > b.key ? 1 : 0;
 }
 
 /** Collapses every run of whitespace, so two copies indented differently match. */
@@ -212,9 +215,9 @@ function compactRepeatedError(fields, message) {
     }
     // A suffix, not an equal: a process failure composes its message as
     // "<what was happening>: <the error's own message>".
-    if (!error?.message || !normalizeSpace(message).endsWith(normalizeSpace(error.message))) {
-      return field;
-    }
+    if (!error?.message) return field;
+    const repeatsMessage = normalizeSpace(message).endsWith(normalizeSpace(error.message));
+    if (!repeatsMessage) return field;
     const kept = [error.type, error.code].filter(Boolean);
     return kept.length === 0 ? field : { key: field.key, value: kept.join(" ") };
   });
@@ -235,7 +238,8 @@ function trimRepeatedStackHeader(stack, message) {
   const at = header.indexOf(": ");
   const type = at === -1 ? "" : header.slice(0, at).trim();
   const body = at === -1 ? header : header.slice(at + 2);
-  if (!normalizeSpace(message).includes(normalizeSpace(body))) return kept;
+  const repeatsMessage = normalizeSpace(message).includes(normalizeSpace(body));
+  if (!repeatsMessage) return kept;
   return { type, frames: lines.slice(first).join("\n"), trimmed: true };
 }
 
