@@ -1,5 +1,12 @@
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import { createTenantId } from "@langwatch/eventing";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
+} from "@langwatch/scenario-contract";
+import type {
+  SimulationProcessingEvent,
+  SimulationRunFinishedEventData,
+} from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,15 +37,17 @@ const CONTEXT = {
   state: undefined,
 };
 
-function finishedEvent(data: Record<string, unknown> = {}): SimulationProcessingEvent {
+function finishedEvent(
+  data: Partial<SimulationRunFinishedEventData> = {},
+): SimulationProcessingEvent {
   return {
     id: "evt-1",
     aggregateId: "run-1",
     aggregateType: "simulation_run",
-    tenantId: "project-1",
+    tenantId: createTenantId("project-1"),
     createdAt: 5_000,
     occurredAt: 5_000,
-    version: "2026-08-06",
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
     type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
     data: {
       scenarioRunId: "run-1",
@@ -52,7 +61,7 @@ function finishedEvent(data: Record<string, unknown> = {}): SimulationProcessing
       },
       ...data,
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
 function makeDeps(attachments = [attachment]) {

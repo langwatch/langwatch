@@ -100,7 +100,7 @@ describe.skipIf(databaseUrl === null)(
             tenantId: createTenantId(tenantId),
             version: new Date(now).toISOString().slice(0, 10),
             data,
-          } as unknown as SimulationRunState,
+          },
           context,
         );
 

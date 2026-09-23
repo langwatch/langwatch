@@ -42,7 +42,7 @@ describe("GracefulShutdown", () => {
             order.push(`${name}:end`);
           },
         });
-        const exit = vi.fn() as unknown as (code: number) => never;
+        const exit = vi.fn<(code: number) => never>();
 
         const shutdown = GracefulShutdown.create({ logger: silentLogger(), exit })
           .phase(phase("a", 15))
@@ -56,7 +56,7 @@ describe("GracefulShutdown", () => {
       it("logs the failure and continues", async () => {
         const ran: string[] = [];
         const logger = silentLogger();
-        const exit = vi.fn() as unknown as (code: number) => never;
+        const exit = vi.fn<(code: number) => never>();
 
         const firstError = await GracefulShutdown.create({ logger, exit })
           .phase({
@@ -86,7 +86,7 @@ describe("GracefulShutdown", () => {
       it("runs a telemetry flush phase last and exits exactly once", async () => {
         const restore = borrowSignalListeners();
         const order: string[] = [];
-        const exit = vi.fn() as unknown as (code: number) => never;
+        const exit = vi.fn<(code: number) => never>();
         try {
           GracefulShutdown.create({ logger: silentLogger(), exit })
             .phase({ name: "app", run: () => void order.push("app") })
@@ -108,7 +108,7 @@ describe("GracefulShutdown", () => {
       /** @scenario A failing telemetry flush does not fail the shutdown */
       it("logs a failing flush and still exits zero", async () => {
         const restore = borrowSignalListeners();
-        const exit = vi.fn() as unknown as (code: number) => never;
+        const exit = vi.fn<(code: number) => never>();
         const logger = silentLogger();
         try {
           GracefulShutdown.create({ logger, exit })
@@ -143,7 +143,7 @@ describe("GracefulShutdown", () => {
         try {
           const ran: string[] = [];
           const logger = silentLogger();
-          const exit = vi.fn() as unknown as (code: number) => never;
+          const exit = vi.fn<(code: number) => never>();
 
           const done = GracefulShutdown.create({ logger, exit, deadlineMs: 60_000 })
             .phase({
@@ -171,7 +171,7 @@ describe("GracefulShutdown", () => {
       it("force-exits non-zero instead of waiting for SIGKILL", async () => {
         vi.useFakeTimers();
         try {
-          const exit = vi.fn() as unknown as (code: number) => never;
+          const exit = vi.fn<(code: number) => never>();
           const logger = silentLogger();
 
           const done = GracefulShutdown.create({ logger, exit, deadlineMs: 1_000 })
@@ -267,7 +267,7 @@ describe("GracefulShutdown", () => {
       it("runs the sequence once", async () => {
         const restore = borrowSignalListeners();
         let runs = 0;
-        const exit = vi.fn() as unknown as (code: number) => never;
+        const exit = vi.fn<(code: number) => never>();
         try {
           GracefulShutdown.create({ logger: silentLogger(), exit })
             .phase({ name: "count", run: () => void runs++ })

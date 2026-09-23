@@ -4,6 +4,7 @@
  * in the span exporter on exit, driving the flush before it returns its result.
  */
 import type { Logger } from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import { trace } from "@opentelemetry/api";
 import type { TracerProvider } from "@opentelemetry/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,17 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushScenarioOtelTraces } from "../scenario-child-execution.service.ts";
 
 function silentLogger(): Logger {
-  const warnings: unknown[] = [];
-
-  return {
-    debug: () => undefined,
-    info: () => undefined,
-    warn: (...args: unknown[]) => {
-      warnings.push(args);
-    },
-    error: () => undefined,
-    warnings,
-  } as unknown as Logger & { warnings: unknown[] };
+  return createTestLogger().logger;
 }
 
 function useProvider(provider: object): void {

@@ -109,7 +109,7 @@ describe.skipIf(databaseUrl === null)(
             tenantId: createTenantId(tenantId),
             version: new Date(now).toISOString().slice(0, 10),
             data: finishedRunWithInstance(scenarioRunId),
-          } as unknown as SimulationRunState,
+          },
           { tenantId: createTenantId(tenantId) },
         );
 

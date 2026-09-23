@@ -1,4 +1,4 @@
-import type { AgentAdapter } from "@langwatch/scenario";
+import { AgentRole, type AgentAdapter } from "@langwatch/scenario";
 import type { VoiceAgentData } from "@langwatch/scenario-contract";
 import type {
   VoiceTransport,
@@ -11,7 +11,7 @@ import {
   NO_OPENAI_KEY_MESSAGE,
 } from "../voice-agent.adapter.ts";
 
-const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;
+const fakeAdapter: AgentAdapter = { role: AgentRole.AGENT, call: async () => "" };
 
 function fakeRegistry(
   createAgentAdapter = vi.fn(() => fakeAdapter),

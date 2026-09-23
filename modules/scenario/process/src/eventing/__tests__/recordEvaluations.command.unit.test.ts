@@ -1,7 +1,10 @@
+import { createTenantId } from "@langwatch/eventing";
 import type {
   ScenarioEvaluationResult,
   RecordEvaluationsCommandData,
   SimulationProcessingEvent,
+  SimulationRunEvaluatedEventData,
+  SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -54,31 +57,54 @@ function makeCommand(overrides: Partial<RecordEvaluationsCommandData> = {}): {
 
 function queuedEvent(): SimulationProcessingEvent {
   return {
+    id: "event-queued",
     type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
     data: {
       scenarioRunId: "run-1",
       scenarioId: "scenario-1",
       batchRunId: "batch-1",
       scenarioSetId: "set-1",
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
 function startedEvent(): SimulationProcessingEvent {
   return {
+    id: "event-started",
     type: SIMULATION_RUN_EVENT_TYPES.STARTED,
+    version: SIMULATION_EVENT_VERSIONS.STARTED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
     data: {
       scenarioRunId: "run-1",
       scenarioId: "scenario-1",
       batchRunId: "batch-1",
       scenarioSetId: "set-1",
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
-function finishedEvent(overrides: Record<string, unknown> = {}): SimulationProcessingEvent {
+function finishedEvent(
+  overrides: Partial<SimulationRunFinishedEventData> = {},
+): SimulationProcessingEvent {
   return {
+    id: "event-finished",
     type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
     data: {
       scenarioRunId: "run-1",
       status: "SUCCESS",
@@ -89,12 +115,21 @@ function finishedEvent(overrides: Record<string, unknown> = {}): SimulationProce
       },
       ...overrides,
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
-function evaluatedEvent(overrides: Record<string, unknown> = {}): SimulationProcessingEvent {
+function evaluatedEvent(
+  overrides: Partial<SimulationRunEvaluatedEventData> = {},
+): SimulationProcessingEvent {
   return {
+    id: "event-evaluated",
     type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+    version: SIMULATION_EVENT_VERSIONS.EVALUATED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
     data: {
       scenarioRunId: "run-1",
       evaluations: [FAILED_REQUIRED],
@@ -104,7 +139,7 @@ function evaluatedEvent(overrides: Record<string, unknown> = {}): SimulationProc
       previousStatus: "SUCCESS",
       ...overrides,
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
 describe("RecordEvaluationsCommand", () => {

@@ -1,4 +1,4 @@
-import type { Command } from "@langwatch/eventing";
+import { createTenantId, type Command } from "@langwatch/eventing";
 import type {
   FinishRunCommandData,
   EvaluatorAttachment,
@@ -7,6 +7,7 @@ import type {
   SimulationProcessingEvent,
 } from "@langwatch/scenario-contract";
 import {
+  SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
@@ -88,9 +89,16 @@ function finishCommand() {
   } as Command<FinishRunCommandData>;
 }
 
-function queuedEvent(carried: RunEvaluators | undefined) {
+function queuedEvent(carried: RunEvaluators | undefined): SimulationProcessingEvent {
   return {
+    id: "event-queued",
     type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
     data: {
       scenarioRunId: "run-1",
       scenarioId: "scenario-1",
@@ -98,7 +106,7 @@ function queuedEvent(carried: RunEvaluators | undefined) {
       scenarioSetId: SET_ID,
       ...(carried && { evaluators: carried }),
     },
-  } as unknown as SimulationProcessingEvent;
+  };
 }
 
 describe("the evaluators a run is graded with", () => {

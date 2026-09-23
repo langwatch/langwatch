@@ -1,4 +1,4 @@
-import type { SimulationRunData } from "@langwatch/scenario-contract";
+import { ScenarioRunStatus, type SimulationRunData } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment node
  *
@@ -53,14 +53,16 @@ describe("SimulationClickHouseRepository.clampPageLimit()", () => {
 
 describe("SimulationClickHouseRepository.capRunsAtBatchBoundary()", () => {
   const makeBatch = ({ batchRunId, count }: { batchRunId: string; count: number }) =>
-    Array.from(
-      { length: count },
-      (_, index) =>
-        ({
-          batchRunId,
-          scenarioRunId: `${batchRunId}-run-${index}`,
-        }) as unknown as SimulationRunData,
-    );
+    Array.from({ length: count }, (_, index): SimulationRunData => ({
+      scenarioId: "scenario-1",
+      batchRunId,
+      scenarioRunId: `${batchRunId}-run-${index}`,
+      metadata: null,
+      status: ScenarioRunStatus.SUCCESS,
+      messages: [],
+      timestamp: 0,
+      durationInMs: 0,
+    }));
 
   describe("given the selected batches together hold more runs than the cap", () => {
     /** @scenario "include=messages stops the page at the batch that would pass the run cap" */

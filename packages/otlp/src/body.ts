@@ -30,8 +30,7 @@ const brotliDecompressAsync = promisify(brotliDecompress);
  * reading `default` first, namespace second, covers both.
  */
 export const otlpProtobufRoot: Record<string, any> =
-  (rootModule as { default?: Record<string, any> }).default ??
-  (rootModule as unknown as Record<string, any>);
+  (rootModule as { default?: Record<string, any> }).default ?? rootModule;
 
 const root = otlpProtobufRoot;
 

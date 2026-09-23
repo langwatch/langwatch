@@ -63,7 +63,7 @@ function serviceOptions(
 }
 
 describe("ScenarioService", () => {
-  describe("ScenarioService field values", () => {
+  describe("when field values are stored", () => {
     function fieldService() {
       const repository = MemoryScenarioRepository.create();
       return ScenarioService.create(serviceOptions(repository, "scenario_1"));

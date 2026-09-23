@@ -13,7 +13,7 @@ import type {
   ScenarioId,
   ScenarioSecretCipher,
 } from "../../app/scenario.app.ts";
-import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
+import { MemoryScenarioRepository } from "../../repositories/memory/memory.scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
 
 class CancellationTestSecretCipher implements ScenarioSecretCipher {
@@ -83,7 +83,7 @@ const defaultJobParams = {
 };
 
 function createService(simulations: SimulationService): ScenarioService {
-  const repository = Object.create(ScenarioRepository.prototype) as ScenarioRepository;
+  const repository = MemoryScenarioRepository.create();
   return ScenarioService.create({
     repository,
     simulations,
