@@ -322,7 +322,7 @@ export class PersonalWorkspaceService {
    * legacy fallback during PR 2, and the next session's `ensure()` retries
    * the attach. Any other failure still propagates: only the named,
    * actionable ledger-outage cases (resolver-reported, or the grants queue
-   * closing mid-flight) are safe to continue past.
+   * with closed staging) are safe to continue past.
    */
   private async attachOwnerAdminGrant({
     userId,
@@ -356,15 +356,18 @@ export class PersonalWorkspaceService {
       // Best-effort append: the grants ledger being momentarily unwritable is
       // not a failed sign-in. Two shapes mean the same "unavailable now, the
       // next ensure() retries": the resolver's own authz_ledger_unavailable
-      // (no queue to reach), and a QueueError when the queue is reachable but
-      // closing — its staging is shut between the send and the drain, as it is
-      // during a graceful shutdown, or when a test App is torn down while a
-      // fire-and-forget ensure() from a route is still in flight. Both are
-      // Recoverable and duplicate-safe on retry; anything else propagates.
+      // (no queue to reach), and a QueueError whose staging is closed — the
+      // queue is reachable but shutting down between the send and the drain,
+      // as it is during a graceful shutdown, or when a test App is torn down
+      // while a fire-and-forget ensure() from a route is still in flight. Both
+      // are duplicate-safe on retry; a real send fault (bad payload, Redis
+      // down) carries no `staging_closed` reason and still propagates.
       if (
         (HandledError.isHandled(err) &&
           err.code === "authz_ledger_unavailable") ||
-        err instanceof QueueError
+        (err instanceof QueueError &&
+          err.operation === "send" &&
+          err.context?.reason === "staging_closed")
       ) {
         logger.warn(
           { err, userId, organizationId, teamId },
