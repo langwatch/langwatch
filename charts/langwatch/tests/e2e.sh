@@ -694,8 +694,11 @@ test_lwql_replicas() {
   kc scale statefulset "${RELEASE}-clickhouse" --replicas=4
   local new_pod="${RELEASE}-clickhouse-3"
   # Wait until the new pod can answer at all, then assert the mounted access set.
+  # Probe with the credentialed helper (default-password.yaml sets a password on
+  # the default user, so a bare clickhouse-client is rejected 516 and the pod
+  # looks unqueryable even once it is Ready).
   local attempts=0
-  until kc exec "$new_pod" -- clickhouse-client -q 'SELECT 1' &>/dev/null; do
+  until ch_query "$new_pod" 'SELECT 1' &>/dev/null; do
     sleep 5; attempts=$((attempts + 1))
     if [[ $attempts -ge 60 ]]; then
       fail "scaled-up pod $new_pod never became queryable after 300s"
