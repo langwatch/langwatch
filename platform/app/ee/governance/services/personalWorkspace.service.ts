@@ -39,7 +39,6 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
-import { QueueError } from "~/server/event-sourcing/services/errorHandling";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:governance:personal-workspace");
@@ -321,8 +320,7 @@ export class PersonalWorkspaceService {
    * swallowed rather than thrown — permission checks still resolve via the
    * legacy fallback during PR 2, and the next session's `ensure()` retries
    * the attach. Any other failure still propagates: only the named,
-   * actionable ledger-outage cases (resolver-reported, or the grants queue
-   * closing mid-flight) are safe to continue past.
+   * actionable ledger-outage case is safe to continue past.
    */
   private async attachOwnerAdminGrant({
     userId,
@@ -353,18 +351,9 @@ export class PersonalWorkspaceService {
         awaitProjection: false,
       });
     } catch (err) {
-      // Best-effort append: the grants ledger being momentarily unwritable is
-      // not a failed sign-in. Two shapes mean the same "unavailable now, the
-      // next ensure() retries": the resolver's own authz_ledger_unavailable
-      // (no queue to reach), and a QueueError when the queue is reachable but
-      // closing — its staging is shut between the send and the drain, as it is
-      // during a graceful shutdown, or when a test App is torn down while a
-      // fire-and-forget ensure() from a route is still in flight. Both are
-      // Recoverable and duplicate-safe on retry; anything else propagates.
       if (
-        (HandledError.isHandled(err) &&
-          err.code === "authz_ledger_unavailable") ||
-        err instanceof QueueError
+        HandledError.isHandled(err) &&
+        err.code === "authz_ledger_unavailable"
       ) {
         logger.warn(
           { err, userId, organizationId, teamId },
