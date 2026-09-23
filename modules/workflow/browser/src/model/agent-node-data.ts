@@ -37,6 +37,95 @@ export function mapAgentOutputs(agent: TypedAgent): Field[] {
   return [{ identifier: "output", type: "str" }];
 }
 
+function httpAuthParameters(auth: Record<string, string> | undefined): Field[] {
+  const params: Field[] = [];
+  if (auth?.type && auth.type !== "none") {
+    params.push({ identifier: "auth_type", type: "str", value: auth.type });
+    if (auth.token)
+      params.push({
+        identifier: "auth_token",
+        type: "str",
+        value: auth.token,
+      });
+    if (auth.header)
+      params.push({
+        identifier: "auth_header",
+        type: "str",
+        value: auth.header,
+      });
+    if (auth.value)
+      params.push({
+        identifier: "auth_value",
+        type: "str",
+        value: auth.value,
+      });
+    if (auth.username)
+      params.push({
+        identifier: "auth_username",
+        type: "str",
+        value: auth.username,
+      });
+    if (auth.password)
+      params.push({
+        identifier: "auth_password",
+        type: "str",
+        value: auth.password,
+      });
+  }
+  return params;
+}
+
+function httpAgentParameters(config: Record<string, unknown>): Field[] {
+  const params: Field[] = [];
+  if (config.url)
+    params.push({
+      identifier: "url",
+      type: "str",
+      value: config.url as string,
+    });
+  if (config.method)
+    params.push({
+      identifier: "method",
+      type: "str",
+      value: config.method as string,
+    });
+  if (config.bodyTemplate)
+    params.push({
+      identifier: "body_template",
+      type: "str",
+      value: config.bodyTemplate as string,
+    });
+  if (config.outputPath)
+    params.push({
+      identifier: "output_path",
+      type: "str",
+      value: config.outputPath as string,
+    });
+  if (config.timeoutMs)
+    params.push({
+      identifier: "timeout_ms",
+      type: "str",
+      value: config.timeoutMs,
+    });
+
+  // Auth
+  const auth = config.auth as Record<string, string> | undefined;
+  params.push(...httpAuthParameters(auth));
+
+  // Headers
+  if (config.headers && typeof config.headers === "object") {
+    const headers = Array.isArray(config.headers)
+      ? Object.fromEntries(
+          (config.headers as { key: string; value: string }[])
+            .filter((h) => h.key)
+            .map((h) => [h.key, h.value]),
+        )
+      : config.headers;
+    params.push({ identifier: "headers", type: "str", value: headers });
+  }
+  return params;
+}
+
 /**
  * Build parameters array from agent config for backend execution.
  * The backend parser reads parameters to determine how to execute.
@@ -48,84 +137,7 @@ export function buildAgentParameters(agent: TypedAgent): Field[] {
 
   switch (agent.type) {
     case "http": {
-      if (config.url)
-        params.push({
-          identifier: "url",
-          type: "str",
-          value: config.url as string,
-        });
-      if (config.method)
-        params.push({
-          identifier: "method",
-          type: "str",
-          value: config.method as string,
-        });
-      if (config.bodyTemplate)
-        params.push({
-          identifier: "body_template",
-          type: "str",
-          value: config.bodyTemplate as string,
-        });
-      if (config.outputPath)
-        params.push({
-          identifier: "output_path",
-          type: "str",
-          value: config.outputPath as string,
-        });
-      if (config.timeoutMs)
-        params.push({
-          identifier: "timeout_ms",
-          type: "str",
-          value: config.timeoutMs,
-        });
-
-      // Auth
-      const auth = config.auth as Record<string, string> | undefined;
-      if (auth?.type && auth.type !== "none") {
-        params.push({ identifier: "auth_type", type: "str", value: auth.type });
-        if (auth.token)
-          params.push({
-            identifier: "auth_token",
-            type: "str",
-            value: auth.token,
-          });
-        if (auth.header)
-          params.push({
-            identifier: "auth_header",
-            type: "str",
-            value: auth.header,
-          });
-        if (auth.value)
-          params.push({
-            identifier: "auth_value",
-            type: "str",
-            value: auth.value,
-          });
-        if (auth.username)
-          params.push({
-            identifier: "auth_username",
-            type: "str",
-            value: auth.username,
-          });
-        if (auth.password)
-          params.push({
-            identifier: "auth_password",
-            type: "str",
-            value: auth.password,
-          });
-      }
-
-      // Headers
-      if (config.headers && typeof config.headers === "object") {
-        const headers = Array.isArray(config.headers)
-          ? Object.fromEntries(
-              (config.headers as { key: string; value: string }[])
-                .filter((h) => h.key)
-                .map((h) => [h.key, h.value]),
-            )
-          : config.headers;
-        params.push({ identifier: "headers", type: "str", value: headers });
-      }
+      params.push(...httpAgentParameters(config));
       break;
     }
     case "code": {

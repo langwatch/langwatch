@@ -58,7 +58,7 @@ export default function Studio() {
       setWorkflow({
         ...dsl,
         workflow_id: workflow.data?.id,
-        nodes: (dsl.nodes ?? []).map((node: any) => ({
+        nodes: (dsl.nodes ?? []).map((node) => ({
           ...node,
           selected: false,
         })),

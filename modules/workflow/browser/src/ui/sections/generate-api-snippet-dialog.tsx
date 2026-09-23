@@ -183,9 +183,14 @@ GenerateApiSnippetDialog.Trigger = function Trigger({
 
   if (!ctx) throw new Error("Trigger must be used within GenerateApiSnippetDialog");
   // Clone the child and inject onClick to open the dialog
-  return React.cloneElement(children as React.ReactElement<any>, {
-    onClick: ctx.onOpen,
-  });
+  return React.cloneElement(
+    children as React.ReactElement<{
+      onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    }>,
+    {
+      onClick: ctx.onOpen,
+    },
+  );
 } as React.FC<{ children: React.ReactElement }>;
 
 GenerateApiSnippetDialog.Trigger.displayName = "GenerateApiSnippetDialog.Trigger";

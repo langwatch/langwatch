@@ -9,6 +9,18 @@ import { validateLiquidCondition } from "../../../model/code/liquid-condition.ts
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
+function conditionBorderColor({
+  hasError,
+  hasMissingVariables,
+}: {
+  hasError: boolean;
+  hasMissingVariables: boolean;
+}): string {
+  if (hasError) return "red.400";
+  if (hasMissingVariables) return "orange.400";
+  return "border";
+}
+
 const LANGUAGE_ID = "liquid-condition";
 const MARKER_OWNER = "liquid-condition";
 
@@ -119,11 +131,9 @@ export function LiquidConditionEditor({
     applyMarkers();
   }, [applyMarkers]);
 
-  const borderColor = validation.error
-    ? "red.400"
-    : validation.missingVariables.length > 0
-      ? "orange.400"
-      : "border";
+  const hasError = Boolean(validation.error);
+  const hasMissingVariables = !hasError && validation.missingVariables.length > 0;
+  const borderColor = conditionBorderColor({ hasError, hasMissingVariables });
 
   return (
     <VStack width="full" align="start" gap={1}>
@@ -182,17 +192,18 @@ export function LiquidConditionEditor({
           {"%}"}
         </Text>
       </HStack>
-      {validation.error ? (
+      {hasError && (
         <Text fontSize="12px" color="red.500" data-testid="if-else-condition-error">
           {validation.error}
         </Text>
-      ) : validation.missingVariables.length > 0 ? (
+      )}
+      {hasMissingVariables && (
         <Text fontSize="12px" color="orange.600" data-testid="if-else-condition-warning">
           Unknown input
           {validation.missingVariables.length > 1 ? "s" : ""}:{" "}
           {validation.missingVariables.join(", ")}
         </Text>
-      ) : null}
+      )}
     </VStack>
   );
 }

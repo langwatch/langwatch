@@ -62,11 +62,8 @@ export const ExecutionInputPanel = ({
         };
       }
 
-      // Return empty values object when there are errors, otherwise return the values
-      return {
-        values: Object.keys(errors).length > 0 ? {} : values,
-        errors,
-      } as any;
+      if (Object.keys(errors).length > 0) return { values: {}, errors };
+      return { values, errors: {} };
     },
   });
 
