@@ -42,6 +42,9 @@ global:
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
 
+  ## @param global.podAnnotations [object] Annotations added to every pod this chart renders. Free-form pass-through map.
+  podAnnotations: {}
+
   # ServiceAccount for the first-party workloads that touch object storage
   # (app and workers; the cron pods only curl the app over HTTP, so they are
   # deliberately left off it). Opt-in: disabled by default, so installs that
@@ -80,6 +83,8 @@ global:
     # create one, since a PriorityClass is cluster-scoped and its value only
     # means anything relative to the other classes an operator has defined.
     priorityClassName: ""
+    ## @param global.scheduling.topologySpreadConstraints [array] Topology spread constraints applied to all pods. Free-form pass-through list.
+    topologySpreadConstraints: []
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -194,7 +199,7 @@ app:
   ## @param app.service.type [string, default: ClusterIP] Service type.
   ## @param app.service.port [default: 5560] Service port.
   ## @param app.service.annotations [object] Additional Service annotations. Required for cloud load-balancer configuration (AWS NLB scheme/subnets, GCP internal LB, ingress-controller hints) — those controllers are driven entirely by annotations, so without this a `type: LoadBalancer` install cannot be steered at all.
-  service: { type: ClusterIP, port: 5560, annotations: {} }
+  service: { type: ClusterIP, port: 5560, annotations: {}, nodePort: null } # nodePort: set an explicit NodePort when app.service.type is NodePort; null lets Kubernetes assign one
 
   # Resource requirements and limits for the application pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -297,8 +302,8 @@ app:
   ## @param app.upstreams.langevals.name [string, default: ""] Service name for Langevals upstream. If empty, defaults to {{ .Release.Name }}-langevals.
   ## @param app.upstreams.langevals.port [default: 5562] Port for Langevals upstream.
   upstreams:
-    nlp: { scheme: http, port: 5561 }
-    langevals: { scheme: http, port: 5562 }
+    nlp: { scheme: http, port: 5561, name: "" } # name: override the NLP Service host; empty derives <release>-langwatch-nlp
+    langevals: { scheme: http, port: 5562, name: "" } # name: override the langevals Service host; empty derives <release>-langevals
   # AI model evaluator configurations
   # These enable integration with various AI providers for evaluation tasks
   ## @extra app.evaluators Evaluator providers configuration.
@@ -1031,7 +1036,7 @@ workers:
   ## @param workers.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
   ## @param workers.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
-    langwatch: { scheme: http, port: 5560 }
+    langwatch: { scheme: http, port: 5560, name: "" } # name: override the app Service host; empty derives <release>-app
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
@@ -1193,7 +1198,7 @@ langwatch_nlp:
   ## @param langwatch_nlp.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
   ## @param langwatch_nlp.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
-    langwatch: { scheme: http, port: 5560 }
+    langwatch: { scheme: http, port: 5560, name: "" } # name: override the app Service host; empty derives <release>-app
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration

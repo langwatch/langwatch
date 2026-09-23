@@ -5,9 +5,50 @@ Feature: Chart CI lifecycle and e2e matrix
   every round were checkable in seconds. tasks#894 encodes those invariants and
   splits the e2e leg into independent, parallel legs that share one image build.
 
-  AC1's lifecycle-invariant scenarios live alongside these and bind to
-  charts/langwatch/tests/lifecycle.sh. The scenarios below (AC2-AC6) bind to
+  The AC1 scenarios bind to charts/langwatch/tests/lifecycle.sh, which renders
+  the chart for install and upgrade and reads the hook annotations directly for
+  the rollback assertion. The AC2-AC6 scenarios bind to
   charts/langwatch/tests/e2e.sh and charts/langwatch/tests/chart-workflow-matrix.sh.
+
+  @regression
+  Scenario: A hook Job's ServiceAccount is a lower-weight hook in every phase it runs (tasks#894)
+    Given the chart renders a Job carrying a helm.sh/hook annotation
+    And the Job names a serviceAccountName other than "default"
+    When lifecycle.sh inspects every rendered resource with a helm.sh/hook annotation
+    Then that ServiceAccount must itself be a hook running in every phase the Job runs
+    And its helm.sh/hook-weight must be strictly lower than the Job's
+    And a ServiceAccount that renders in the main phase instead is reported as found=main-phase
+
+  @regression
+  Scenario: A hook Job's secret dependencies are lower-weight hooks in every phase it runs (tasks#894)
+    Given the chart renders a hook Job that reads a Secret
+    And the Secret is named by a secretKeyRef, an envFrom.secretRef, or a volume secretName
+    When lifecycle.sh resolves each named Secret against the rendered resources
+    Then that Secret must itself be a hook running in every phase the Job runs, at a strictly lower weight
+    And a Secret that renders in the main phase is reported as found=main-phase
+    And a Secret that does not render at all is reported as found=missing
+
+  @regression
+  Scenario: Every pre-upgrade hook resource also runs on pre-rollback (tasks#894)
+    Given the chart renders resources carrying helm.sh/hook annotations
+    When lifecycle.sh reads the hook phases of every such resource
+    Then any resource whose phases include pre-upgrade must also include pre-rollback
+    And a resource that runs on pre-upgrade but not pre-rollback fails the check with its name and phases
+
+  @regression
+  Scenario: No template references an undeclared .Values path (tasks#894)
+    Given every template file under charts/langwatch/templates
+    When lifecycle.sh walks each `.Values.<path>` occurrence and resolves it against values.yaml
+    Then a path is allowed only when it, or a free-form prefix of it, is declared
+    And a template reading a path values.yaml does not declare fails the check with the file, line, and path
+    And an explicit allowlist at the top of the script exempts the subchart-owned and notes-only paths
+
+  @regression
+  Scenario: No subchart mount is delivered through a parent extraVolumes list (tasks#894)
+    Given values.yaml and every preset under charts/langwatch/examples and tests
+    When lifecycle.sh reads each subchart alias block in those files
+    Then no subchart alias may set a non-empty extraVolumes or extraVolumeMounts list
+    And a subchart mount pushed onto a parent list fails the check with the file and the key
 
   @regression
   Scenario: e2e.sh runs exactly the suites named as arguments (tasks#894)
